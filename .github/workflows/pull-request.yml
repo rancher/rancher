@@ -11,10 +11,6 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  CATTLE_KDM_BRANCH: dev-v2.9
-  CATTLE_K3S_VERSION: v1.30.2+k3s2
-  HELM_UNITTEST_VERSION: 0.3.2
-  HELM_VERSION_V3: v3.13.3
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -23,15 +19,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - id: env 
+        name: Setup Dependencies Env Variables
+        uses: ./.github/actions/setup-build-env
       - name: Install dependencies
         env: 
-          HELM_URL_V3: https://get.helm.sh/helm-${{ env.HELM_VERSION_V3 }}-linux-amd64.tar.gz
+          HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
         run: |
           sudo snap install yq
-          curl ${{ env.HELM_URL_V3 }} | tar xvzf - --strip-components=1 -C /tmp/ && \
+          curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
           sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
-          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
+          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}; \
       - name: Build
         run: ./scripts/chart/build chart
       - name: Validate
@@ -49,20 +48,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
       - name: Clean runner
         run: |
+          # removes dotnet
           sudo rm -rf /usr/share/dotnet
+          # removes haskell
           sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-      - name: Setup Environment Variables
-        run: |
-          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')" >> "$GITHUB_ENV"
-          source scripts/export-config
-          echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> "$GITHUB_ENV"
-          echo "CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION" >> "$GITHUB_ENV"
-          echo "CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION" >> "$GITHUB_ENV"
+          # removes android sdk
+          sudo rm -rf /usr/local/lib/android
+      - id: env 
+        name: Setup Dependencies Env Variables
+        uses: ./.github/actions/setup-build-env
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -77,9 +74,9 @@ jobs:
       - name: Create k3s images file
         uses: ./.github/actions/k3s-images
         with:
-          k3s_version: ${{ env.CATTLE_K3S_VERSION }}
+          k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
       - name: Download data.json
-        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build and export server
         id: build
         uses: docker/build-push-action@v5
@@ -88,11 +85,11 @@ jobs:
           build-args: |
             "VERSION=${{ env.TAG }}"
             "COMMIT=${{ github.SHA }}"
-            "RKE_VERSION=${{ env.RKE_VERSION }}"
+            "RKE_VERSION=${{ steps.env.outputs.RKE_VERSION }}"
             "ARCH=${{ matrix.arch }}"
-            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-            "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ env.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
-            "CATTLE_FLEET_VERSION=${{ env.CATTLE_FLEET_VERSION }}"
+            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+            "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
+            "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
@@ -122,17 +119,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
       - name: Clean runner
         run: |
+          # removes dotnet
           sudo rm -rf /usr/share/dotnet
+          # removes haskell
           sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-      - name: Setup Environment Variables
-        run: |
-          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-          source scripts/export-config
-          echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> "$GITHUB_ENV"
+          # removes android sdk
+          sudo rm -rf /usr/local/lib/android
+      - id: env 
+        name: Setup Dependencies Env Variables
+        uses: ./.github/actions/setup-build-env
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -171,7 +169,7 @@ jobs:
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
             "REGISTRY=localhost:5000"
-            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"

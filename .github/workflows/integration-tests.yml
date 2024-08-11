@@ -10,16 +10,6 @@ permissions: {}
 env:
   HOST_ARCH: amd64
   ARCH: amd64
-  CATTLE_HELM_VERSION: v2.16.8-rancher2
-  CATTLE_MACHINE_VERSION: v0.15.0-rancher116
-  CATTLE_K3S_VERSION: v1.30.2+k3s2
-  CATTLE_K3S_VERSION_DOCKER: v1.30.2+k3s2
-  HELM_VERSION: v3.15.2
-  KUSTOMIZE_VERSION: v5.4.2
-  HELM_UNITTEST_VERSION: 0.3.2
-  CATTLE_KDM_BRANCH: dev-v2.9
-  CONTROLLER_GEN_VERSION: v0.14.0
-  YQ_VERSION: v4.44.2
   PYTHON_VERSION: '3.11'
   GOLANG_VERSION: '1.22'
   IMAGE: ${{ github.repository_owner }}/rancher
@@ -39,12 +29,18 @@ jobs:
         run: |
           docker system prune -af
           docker volume prune -f
+      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
       - name: Clean runner
         run: |
+          # removes dotnet
           sudo rm -rf /usr/share/dotnet
+          # removes haskell
           sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          # removes android sdk
+          sudo rm -rf /usr/local/lib/android
+      - id: env 
+        name: Setup Dependencies Env Variables
+        uses: ./.github/actions/setup-build-env
       - name: Download Docker images artifact
         uses: actions/download-artifact@v4
         with:
@@ -99,10 +95,10 @@ jobs:
           sudo rm -rf /usr/local/bin/helm /usr/bin/rancher-helm /usr/bin/rancher-tiller ~/.helm /usr/local/bin/helm_v3 /usr/local/bin/tiller
 
       - name: Set Helm 2 URL
-        run: echo "HELM_URL_V2=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-helm" >> $GITHUB_ENV
+        run: echo "HELM_URL_V2=https://github.com/rancher/helm/releases/download/${{ steps.env.outputs.CATTLE_HELM_VERSION }}/rancher-helm" >> $GITHUB_ENV
 
       - name: Set Tiller URL
-        run: echo "TILLER_URL=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-tiller" >> $GITHUB_ENV
+        run: echo "TILLER_URL=https://github.com/rancher/helm/releases/download/${{ steps.env.outputs.CATTLE_HELM_VERSION }}/rancher-tiller" >> $GITHUB_ENV
 
       - name: Download Rancher Helm
         run: sudo curl -sLf ${{ env.HELM_URL_V2 }} -o /usr/bin/rancher-helm-v2
@@ -123,7 +119,7 @@ jobs:
         run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
       - name: Set Helm 3 URL
-        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
 
       - name: Create temporary directory for Helm 3
         run: sudo mkdir /usr/tmp
@@ -137,7 +133,7 @@ jobs:
       - name: KDM data
         run: |
           mkdir -p bin
-          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
+          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
       ## Helm Setup end
       - name: Set up Go
         uses: actions/setup-go@v5
