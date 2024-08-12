@@ -2953,6 +2953,7 @@ k8s.io/klog/v2 v2.2.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
 k8s.io/klog/v2 v2.80.1/go.mod h1:y1WjHnz7Dj687irZUWR/WLkLc5N1YHtjLdmgWjndZn0=
 k8s.io/klog/v2 v2.120.1 h1:QXU6cPEOIslTGvZaXvFWiP9VKyeet3sawzTOvdXb4Vw=
 k8s.io/klog/v2 v2.120.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
+k8s.io/kms v0.30.1 h1:gEIbEeCbFiaN2tNfp/EUhFdGr5/CSj8Eyq6Mkr7cCiY=
 k8s.io/kms v0.30.1/go.mod h1:GrMurD0qk3G4yNgGcsCEmepqf9KyyIrTXYR2lyUOJC4=
 k8s.io/kube-aggregator v0.30.1 h1:ymR2BsxDacTKwzKTuNhGZttuk009c+oZbSeD+IPX5q4=
 k8s.io/kube-aggregator v0.30.1/go.mod h1:SFbqWsM6ea8dHd3mPLsZFzJHbjBOS5ykIgJh4znZ5iQ=

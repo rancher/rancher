@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -20,8 +21,13 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	kserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
@@ -57,6 +63,19 @@ func main() {
 	router := mux.NewRouter()
 	if os.Getenv("IS_CLIENT") != "" {
 		port = 5555
+		router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				userName := req.Header.Get("X-Remote-User")
+				groups := req.Header.Get("X-Remote-Groups")
+				ctx = request.WithUser(req.Context(), &user.DefaultInfo{
+					Name:   userName,
+					Groups: []string{groups},
+				})
+				req = req.WithContext(ctx)
+
+				next.ServeHTTP(w, req)
+			})
+		})
 		ext.RegisterSubRoutes(router, wContext)
 
 		stopChan, readyChan := make(chan struct{}, 1), make(chan struct{}, 1)
@@ -116,7 +135,6 @@ func main() {
 				nil,
 			)
 		}()
-
 	} else {
 		port = 5554
 		authorizer := func(req *http.Request) (string, bool, error) {
@@ -148,9 +166,44 @@ func main() {
 				},
 			},
 		}
+		secureServingInfo := &kserver.SecureServingInfo{}
+
+		authInfo := &kserver.AuthenticationInfo{}
+		sso := options.NewSecureServingOptions()
+		sso.BindPort = port
+		err := sso.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil)
+		must(err)
+		err = sso.ApplyTo(&secureServingInfo)
+		must(err)
+
+		opts := options.NewDelegatingAuthenticationOptions()
+		opts.RemoteKubeConfigFile = os.Getenv("KUBECONFIG")
+		opts.DisableAnonymous = true
+
+		oapiConfig := &openapicommon.Config{}
+		err = opts.ApplyTo(authInfo, secureServingInfo, oapiConfig)
+
 		router.PathPrefix("/").HandlerFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			resp, isAuthenticated, err := authInfo.Authenticator.AuthenticateRequest(req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if !isAuthenticated {
+				http.Error(w, "unauthenticated", http.StatusForbidden)
+				return
+			}
+
+			req.Header.Add("X-Remote-User", resp.User.GetName())
+			req.Header.Add("X-Remote-Groups", resp.User.GetGroups()[0])
 			reverseProxy.ServeHTTP(w, req)
 		}))
+
+		stopCh := make(chan struct{})
+		secureServingInfo.Serve(router, time.Second*5, stopCh)
+		<-stopCh
+		return
 	}
 
 	err = server.ListenAndServe(ctx, port, 0, router, &server.ListenOpts{

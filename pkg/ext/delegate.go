@@ -18,8 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -165,11 +163,7 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 		}
 	}()
 
-	// TODO: Remove once we do auth
-	ctx := request.WithUser(req.Context(), &user.DefaultInfo{
-		Name:   "admin",
-		Groups: []string{"system:masters"},
-	})
+	ctx := req.Context()
 
 	logger := agonesRuntime.NewLoggerWithType(namespace)
 	https.LogRequest(logger, req).Info("RancherTokens")
