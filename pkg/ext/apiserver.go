@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 
 	"agones.dev/agones/pkg/util/https"
 	"agones.dev/agones/pkg/util/runtime"
@@ -40,6 +41,7 @@ import (
 	kmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 var (
@@ -97,12 +99,14 @@ func NewAPIServer(getDefinitions openapicommon.GetOpenAPIDefinitions) *APIServer
 		// the names that we want
 		openapi.NewDefinitionNamer(scheme),
 	)
+	oapiConfigV2.GetDefinitionName = getDefinitionName
 	oapiConfigV3 := genericapiserver.DefaultOpenAPIV3Config(
 		getDefinitions,
 		// TODO: Stop using NewDefinitionNamer because it's not generating
 		// the names that we want
 		openapi.NewDefinitionNamer(scheme),
 	)
+	oapiConfigV3.GetDefinitionName = getDefinitionName
 	oapiRoutes := &routes.OpenAPI{
 		Config:   oapiConfigV2,
 		V3Config: oapiConfigV3,
@@ -344,4 +348,11 @@ func errorHTTPHandler(logger *logrus.Entry, f errorHandlerFunc) http.HandlerFunc
 		runtime.HandleError(https.LogRequest(logger, r), err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func getDefinitionName(name string) (string, spec.Extensions) {
+	namer := openapi.NewDefinitionNamer(scheme)
+	defName, defGVK := namer.GetDefinitionName(name)
+	defName = strings.ReplaceAll(defName, "com.github.rancher.rancher.pkg.ext.resources.tokens", "io.cattle.ext.v1alpha1")
+	return defName, defGVK
 }
