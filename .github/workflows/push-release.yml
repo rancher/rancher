@@ -383,17 +383,26 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Create manifest list and push
         run: |
-          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
-            ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
-            ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 \
+          # docker manifest is used with windows images to maintain os.version in the manifest
+          docker manifest create ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
             ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 \
             ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
+
+          docker manifest push ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+
+          # docker buildx imagetools create pushes to the registry by default, which is not the same behavior as docker manifest create
+          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
+            --append ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
+            --append ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
-              ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
-              ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 \
+            docker manifest create ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
               ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 \
               ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
+            docker manifest push ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}
+
+            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
+              --append ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
+              --append ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 
           fi
       - name: Inspect image
         run: |
