@@ -16,15 +16,15 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
+	rbacapi "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
-	rbacapi "github.com/rancher/shepherd/extensions/kubeapi/rbac"
-	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/users"
 
+	"github.com/rancher/rancher/tests/v2/actions/rbac"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
-	"github.com/rancher/rancher/tests/v2/actions/rbac"
 )
 
 type GlobalRolesV2TestSuite struct {

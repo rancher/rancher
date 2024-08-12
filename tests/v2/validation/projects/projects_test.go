@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	project "github.com/rancher/rancher/tests/v2/actions/projects"
 	rbac "github.com/rancher/rancher/tests/v2/actions/rbac"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
@@ -13,8 +15,6 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/kubeapi/namespaces"
-	"github.com/rancher/shepherd/extensions/kubeapi/projects"
 	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"

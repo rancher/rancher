@@ -13,14 +13,15 @@ import (
 
 	"github.com/pkg/errors"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/serviceaccounts"
+	"github.com/rancher/rancher/tests/v2/actions/workloads"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusterrolebindings"
 	"github.com/rancher/shepherd/extensions/configmaps"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	"github.com/rancher/shepherd/extensions/serviceaccounts"
-	"github.com/rancher/shepherd/extensions/workloads"
+	extensionworkloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -443,7 +444,7 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	}
 
 	isCattleLabeled := true
-	deploymentTemplate := workloads.NewDeploymentTemplate(deploymentName, namespace, podSpecTemplate, isCattleLabeled, nil)
+	deploymentTemplate := extensionworkloads.NewDeploymentTemplate(deploymentName, namespace, podSpecTemplate, isCattleLabeled, nil)
 	deployment, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	if err != nil {
 		return deployment, err

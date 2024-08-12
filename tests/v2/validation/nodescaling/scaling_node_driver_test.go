@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/machinepools"
+	"github.com/rancher/rancher/tests/v2/actions/scalinginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/machinepools"
-	"github.com/rancher/shepherd/extensions/scalinginput"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"

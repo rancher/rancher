@@ -6,13 +6,14 @@ import (
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/services"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/kubectl"
-	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
@@ -118,7 +119,7 @@ func enableLeaderMigrationRKE1(rke1Cluster *management.Cluster) *management.Clus
 
 // rke1AWSCloudProviderMigration is a helper function to migrate from aws in-tree to out-of-tree on rke1 clusters
 func rke1AWSCloudProviderMigration(t *testing.T, client *rancher.Client, clusterName string) {
-	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	clusterID, err := extensionscluster.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
 
 	rke1Cluster, err := client.Management.Cluster.ByID(clusterID)
@@ -126,7 +127,7 @@ func rke1AWSCloudProviderMigration(t *testing.T, client *rancher.Client, cluster
 
 	clusterName = rke1Cluster.ID
 
-	_, steveClusterObject, err := clusters.GetProvisioningClusterByName(client, clusterName, fleetNamespace)
+	_, steveClusterObject, err := extensionscluster.GetProvisioningClusterByName(client, clusterName, fleetNamespace)
 	require.NoError(t, err)
 
 	lbServiceResponse := permutations.CreateCloudProviderWorkloadAndServicesLB(t, client, steveClusterObject)
@@ -151,7 +152,7 @@ func rke1AWSCloudProviderMigration(t *testing.T, client *rancher.Client, cluster
 	rke1Cluster, err = client.Management.Cluster.Update(rke1Cluster, newRKE1Cluster)
 	require.NoError(t, err)
 
-	err = clusters.WaitClusterToBeUpgraded(client, status.ClusterName)
+	err = extensionscluster.WaitClusterToBeUpgraded(client, status.ClusterName)
 	require.NoError(t, err)
 
 	podErrors := pods.StatusPods(client, status.ClusterName)
@@ -165,7 +166,7 @@ func rke1AWSCloudProviderMigration(t *testing.T, client *rancher.Client, cluster
 
 	logrus.Info("Upgrading the cluster to preform in-tree to out-of-tree migration.")
 
-	clusterMeta, err := clusters.NewClusterMeta(client, status.ClusterName)
+	clusterMeta, err := extensionscluster.NewClusterMeta(client, status.ClusterName)
 	require.NoError(t, err)
 
 	err = permutations.CreateAndInstallAWSExternalCharts(client, clusterMeta, true)
@@ -186,16 +187,16 @@ func rke1AWSCloudProviderMigration(t *testing.T, client *rancher.Client, cluster
 	podErrors = pods.StatusPods(client, status.ClusterName)
 	require.Empty(t, podErrors)
 
-	err = clusters.WaitClusterToBeUpgraded(client, status.ClusterName)
+	err = extensionscluster.WaitClusterToBeUpgraded(client, status.ClusterName)
 	require.NoError(t, err)
 
 	podErrors = pods.StatusPods(client, status.ClusterName)
 	require.Empty(t, podErrors)
 
 	// rke1 clusters go have a false positive during the upgrade, running it 2x adresses this issue
-	err = clusters.WaitClusterToBeUpgraded(client, status.ClusterName)
+	err = extensionscluster.WaitClusterToBeUpgraded(client, status.ClusterName)
 	require.NoError(t, err)
-	_, steveClusterObject, err = clusters.GetProvisioningClusterByName(client, clusterName, fleetNamespace)
+	_, steveClusterObject, err = extensionscluster.GetProvisioningClusterByName(client, clusterName, fleetNamespace)
 	require.NoError(t, err)
 
 	logrus.Info("Verifying in-tree LB persists.")
@@ -231,10 +232,10 @@ func rke2AWSCloudProviderMigration(t *testing.T, client *rancher.Client, steveCl
 	newSteveCluster.Spec = spec
 
 	steveClusterObject, err = client.Steve.SteveType(
-		clusters.ProvisioningSteveResourceType).Update(steveClusterObject, newSteveCluster)
+		extensionscluster.ProvisioningSteveResourceType).Update(steveClusterObject, newSteveCluster)
 	require.NoError(t, err)
 
-	err = clusters.WaitClusterToBeUpgraded(client, status.ClusterName)
+	err = extensionscluster.WaitClusterToBeUpgraded(client, status.ClusterName)
 	require.NoError(t, err)
 
 	podErrors := pods.StatusPods(client, status.ClusterName)
@@ -261,17 +262,17 @@ func rke2AWSCloudProviderMigration(t *testing.T, client *rancher.Client, steveCl
 
 	logrus.Info("Enabling out-of-tree provider on the cluster")
 
-	_, steveClusterObject, err = clusters.GetProvisioningClusterByName(client, steveClusterObject.Name, fleetNamespace)
+	_, steveClusterObject, err = extensionscluster.GetProvisioningClusterByName(client, steveClusterObject.Name, fleetNamespace)
 	require.NoError(t, err)
 
 	newSteveCluster = steveClusterObject
 	newSteveCluster.Spec = spec
 
 	steveClusterObject, err = client.Steve.SteveType(
-		clusters.ProvisioningSteveResourceType).Update(steveClusterObject, newSteveCluster)
+		extensionscluster.ProvisioningSteveResourceType).Update(steveClusterObject, newSteveCluster)
 	require.NoError(t, err)
 
-	err = clusters.WaitClusterToBeUpgraded(client, status.ClusterName)
+	err = extensionscluster.WaitClusterToBeUpgraded(client, status.ClusterName)
 	require.NoError(t, err)
 
 	logrus.Info("Uncordoning rke2 after an upgrade doesn't happen automatically - manually uncording control-plane nodes.")

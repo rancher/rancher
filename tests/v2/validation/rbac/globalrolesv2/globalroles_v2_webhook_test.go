@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rbacapi "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
-	rbacapi"github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/users"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -19,10 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 
+	"github.com/rancher/rancher/tests/v2/actions/rbac"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/rancher/rancher/tests/v2/actions/rbac"
 )
 
 type GlobalRolesV2WebhookTestSuite struct {

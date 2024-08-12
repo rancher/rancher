@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/resourcequotas"
+	"github.com/rancher/rancher/tests/v2/actions/namespaces"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/defaults"
-	"github.com/rancher/shepherd/extensions/kubeapi/resourcequotas"
-	"github.com/rancher/shepherd/extensions/namespaces"
 	steveResourceQuotas "github.com/rancher/shepherd/extensions/resourcequotas"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/rancher/shepherd/pkg/wait"
