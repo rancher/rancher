@@ -3,6 +3,8 @@ on:
   - pull_request 
 env:
   ARCH: amd64
+  TAG: ${{ github.sha }}
+  GIT_TAG: ${{ github.sha }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
