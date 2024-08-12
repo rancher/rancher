@@ -59,6 +59,7 @@ type ClusterRouter func(req *http.Request) string
 func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx *config.ScaledContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
 	return &tokenAuthenticator{
 		ctx:                 ctx,
@@ -68,7 +69,9 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		userAttributes:      mgmtCtx.Management.UserAttributes(""),
 		userLister:          mgmtCtx.Management.Users("").Controller().Lister(),
 		clusterRouter:       clusterRouter,
-		userAuthRefresher:   providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx),
+		refreshUser: func(userID string, force bool) {
+			go providerRefresher.TriggerUserRefresh(userID, force)
+		},
 	}
 }
 
@@ -80,7 +83,7 @@ type tokenAuthenticator struct {
 	userAttributeLister v3.UserAttributeLister
 	userLister          v3.UserLister
 	clusterRouter       ClusterRouter
-	userAuthRefresher   providerrefresh.UserAuthRefresher
+	refreshUser         func(userID string, force bool)
 }
 
 const (
@@ -112,17 +115,28 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
+	// If the auth provider is specified make sure it exists and enabled.
+	if token.AuthProvider != "" {
+		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
+		if err != nil {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "error checking if provider %s is disabled: %v", token.AuthProvider, err)
+		}
+		if disabled {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled", token.AuthProvider)
+		}
+	}
+
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
+		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve userattribute %s: %v", token.UserID, err)
 	}
 
-	u, err := a.userLister.Get("", token.UserID)
+	authUser, err := a.userLister.Get("", token.UserID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve user %s: %v", token.UserID, err)
 	}
 
-	if u.Enabled != nil && !*u.Enabled {
+	if authUser.Enabled != nil && !*authUser.Enabled {
 		return nil, errors.Wrap(ErrMustAuthenticate, "user is not enabled")
 	}
 
@@ -149,15 +163,16 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		}
 	}
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
-	if !strings.HasPrefix(token.UserID, "system:") {
-		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
+
+	if !(authUser.IsSystem() || strings.HasPrefix(token.UserID, "system:")) {
+		a.refreshUser(token.UserID, false)
 	}
 
 	authResp.IsAuthed = true
 	authResp.User = token.UserID
 	authResp.UserPrincipal = token.UserPrincipal.Name
 	authResp.Groups = groups
-	authResp.Extras = getUserExtraInfo(token, u, attribs)
+	authResp.Extras = getUserExtraInfo(token, authUser, attribs)
 	logrus.Debugf("Extras returned %v", authResp.Extras)
 
 	return authResp, nil
