@@ -2,6 +2,8 @@ package saml
 
 import (
 	"context"
+	"testing"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -11,14 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"testing"
 )
-
-func createSamlProviderWithMockedLdap(name string, hasLdap bool) *Provider {
-	provider := &Provider{name: name}
-	provider.ldapProvider = &mockLdapProvider{isLdapConfigured: hasLdap, providerName: provider.name}
-	return provider
-}
 
 func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
@@ -35,35 +30,62 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 }
 
 func TestSearchPrincipals(t *testing.T) {
-	var userSearchKey = "al"
-	// Note: The mocked ldap provider alawys returns a single user named "alice"
-	testcases := []struct {
-		name              string
-		providerName      string
-		expectedLoginName string
-		isLdapConfigured  bool
+	providerName := "okta"
+	userType := "okta_user"
+	groupType := "okta_group"
+
+	tests := []struct {
+		desc             string
+		searchKey        string
+		principalType    string
+		isLdapConfigured bool
+		principalName    string
 	}{
 		{
-			name:              "okta with ldap provides ldap user",
-			providerName:      "okta",
-			expectedLoginName: "alice",
-			isLdapConfigured:  true,
+			desc:             "search for user with ldap",
+			isLdapConfigured: true,
+			searchKey:        "al",
+			principalType:    "user",
+			principalName:    "alice",
 		},
 		{
-			name:              "okta without ldap uses fallback behavior",
-			providerName:      "okta",
-			expectedLoginName: "al",
-			isLdapConfigured:  false,
+			desc:             "search for user without ldap",
+			isLdapConfigured: false,
+			searchKey:        "alice",
+			principalType:    "user",
+			principalName:    "alice",
+		},
+		{
+			desc:             "search for group without ldap",
+			isLdapConfigured: false,
+			searchKey:        "admins",
+			principalType:    "group",
+			principalName:    "admins",
 		},
 	}
 
-	for _, tt := range testcases {
-		t.Run(tt.name, func(t *testing.T) {
-			provider := createSamlProviderWithMockedLdap(tt.providerName, tt.isLdapConfigured)
-			results, err := provider.SearchPrincipals(userSearchKey, "user", v3.Token{})
-			require.NoError(t, err, "Failed to search principals")
-			require.NotEmpty(t, results, "Got empty principal list")
-			assert.Equal(t, tt.expectedLoginName, results[0].LoginName)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.desc, func(t *testing.T) {
+			provider := &Provider{
+				name:      providerName,
+				userType:  userType,
+				groupType: groupType,
+				ldapProvider: &mockLdapProvider{
+					providerName:     providerName,
+					isLdapConfigured: tt.isLdapConfigured,
+				},
+			}
+
+			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, v3.Token{})
+			require.NoError(t, err)
+			require.NotEmpty(t, results)
+			if tt.principalType == "group" {
+				assert.Equal(t, groupType+"://"+tt.principalName, results[0].Name)
+			} else {
+				assert.Equal(t, userType+"://"+tt.principalName, results[0].Name)
+
+			}
 		})
 	}
 }
@@ -85,22 +107,18 @@ func (p *mockLdapProvider) AuthenticateUser(ctx context.Context, input interface
 }
 
 func (p *mockLdapProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
-	var principals []v3.Principal
-	if p.isLdapConfigured {
-		// The mock provider is pretty sure you meant the user "alice"
-		alice := v3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: "inetOrgPerson" + "://" + "alice"},
-			DisplayName:   "Alice",
-			LoginName:     "alice",
-			PrincipalType: "user",
-			Me:            true,
-			Provider:      p.providerName,
-		}
-		principals = append(principals, alice)
-		return principals, nil
-	} else {
-		return principals, ldap.ErrorNotConfigured{}
+	if !p.isLdapConfigured {
+		return nil, ldap.ErrorNotConfigured{}
 	}
+
+	return []v3.Principal{{
+		ObjectMeta:    metav1.ObjectMeta{Name: p.providerName + "_" + principalType + "://alice"},
+		DisplayName:   "Alice",
+		LoginName:     "alice",
+		PrincipalType: "user",
+		Me:            true,
+		Provider:      p.providerName,
+	}}, nil
 }
 
 func (p *mockLdapProvider) CustomizeSchema(schema *types.Schema) {
