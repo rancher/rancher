@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Setup Tag Env Variables
+        uses: ./.github/actions/setup-tag-env
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -54,6 +56,8 @@ jobs:
           sudo rm -rf /opt/ghc
           # removes android sdk
           sudo rm -rf /usr/local/lib/android
+      - name: Setup Tag Env Variables
+        uses: ./.github/actions/setup-tag-env
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -125,6 +129,8 @@ jobs:
           sudo rm -rf /opt/ghc
           # removes android sdk
           sudo rm -rf /usr/local/lib/android
+      - name: Setup Tag Env Variables
+        uses: ./.github/actions/setup-tag-env
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -195,5 +201,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - name: Setup Tag Env Variables
+      uses: ./.github/actions/setup-tag-env
     - name: Build Windows Agent Image
       run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
