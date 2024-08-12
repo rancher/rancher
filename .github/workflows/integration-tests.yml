@@ -8,6 +8,8 @@ on:
         required: true
 permissions: {}
 env:
+  TAG: v2.10-${{ github.sha }}-main
+  GIT_TAG: v2.10-${{ github.sha }}-main
   HOST_ARCH: amd64
   ARCH: amd64
   PYTHON_VERSION: '3.11'
