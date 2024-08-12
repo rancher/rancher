@@ -76,7 +76,7 @@ func (h *HostedAKSClusterProvisioningTestSuite) TestProvisioningHostedAKS() {
 		config.LoadConfig(aks.AKSClusterConfigConfigurationFileKey, &aksClusterConfig)
 
 		clusterObject, err := provisioning.CreateProvisioningAKSHostedCluster(tt.client, aksClusterConfig)
-		reports.TimeoutClusterReport(clusterObject, err)
+		reports.TimeoutRKEReport(clusterObject, err)
 		require.NoError(h.T(), err)
 
 		provisioning.VerifyHostedCluster(h.T(), tt.client, clusterObject)
