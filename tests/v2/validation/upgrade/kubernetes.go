@@ -11,7 +11,7 @@ import (
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
 	kcluster "github.com/rancher/shepherd/extensions/kubeapi/cluster"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -86,13 +86,13 @@ func validateKubernetesVersions(t *testing.T, client *rancher.Client, bc *bundle
 	}
 
 	switch cluster.Meta.Provider {
-	case clusters.KubernetesProviderRKE:
+	case extensionscluster.KubernetesProviderRKE:
 		if cluster.Meta.IsImported {
 			assert.Equalf(t, *versionToUpgrade, cluster.V3.RancherKubernetesEngineConfig.Version, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
 		} else if !cluster.Meta.IsImported {
 			assert.Equalf(t, *versionToUpgrade, cluster.V3.RancherKubernetesEngineConfig.Version, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
 		}
-	case clusters.KubernetesProviderRKE2:
+	case extensionscluster.KubernetesProviderRKE2:
 		if cluster.Meta.IsImported {
 			clusterSpec := &apiv1.ClusterSpec{}
 			err = v1.ConvertToK8sType(cluster.V1.Spec, clusterSpec)
@@ -102,7 +102,7 @@ func validateKubernetesVersions(t *testing.T, client *rancher.Client, bc *bundle
 		} else if !cluster.Meta.IsImported {
 			assert.Equalf(t, *versionToUpgrade, cluster.V3.Rke2Config.Version, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
 		}
-	case clusters.KubernetesProviderK3S:
+	case extensionscluster.KubernetesProviderK3S:
 		if cluster.Meta.IsImported {
 			clusterSpec := &apiv1.ClusterSpec{}
 			err = v1.ConvertToK8sType(cluster.V1.Spec, clusterSpec)
@@ -112,11 +112,11 @@ func validateKubernetesVersions(t *testing.T, client *rancher.Client, bc *bundle
 		} else if !cluster.Meta.IsImported {
 			assert.Equalf(t, *versionToUpgrade, cluster.V3.K3sConfig.Version, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
 		}
-	case clusters.KubernetesProviderGKE:
+	case extensionscluster.KubernetesProviderGKE:
 		assert.Equalf(t, *versionToUpgrade, *cluster.V3.GKEConfig.KubernetesVersion, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
-	case clusters.KubernetesProviderAKS:
+	case extensionscluster.KubernetesProviderAKS:
 		assert.Equalf(t, *versionToUpgrade, *cluster.V3.AKSConfig.KubernetesVersion, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
-	case clusters.KubernetesProviderEKS:
+	case extensionscluster.KubernetesProviderEKS:
 		assert.Equalf(t, *versionToUpgrade, *cluster.V3.EKSConfig.KubernetesVersion, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
 	}
 }
@@ -135,15 +135,15 @@ func validateNodepoolVersions(t *testing.T, client *rancher.Client, bc *bundledc
 	}
 
 	switch cluster.Meta.Provider {
-	case clusters.KubernetesProviderGKE:
+	case extensionscluster.KubernetesProviderGKE:
 		for i := range cluster.V3.GKEConfig.NodePools {
 			assert.Equalf(t, *versionToUpgrade, *cluster.V3.GKEConfig.NodePools[i].Version, "[%v]: %v", cluster.Meta.Name, logMessageNodepoolVersions)
 		}
-	case clusters.KubernetesProviderAKS:
+	case extensionscluster.KubernetesProviderAKS:
 		for i := range cluster.V3.AKSConfig.NodePools {
 			assert.Equal(t, *versionToUpgrade, *cluster.V3.AKSConfig.NodePools[i].OrchestratorVersion, "[%v]: %v", cluster.Meta.Name, logMessageNodepoolVersions)
 		}
-	case clusters.KubernetesProviderEKS:
+	case extensionscluster.KubernetesProviderEKS:
 		for i := range cluster.V3.EKSConfig.NodeGroups {
 			assert.Equal(t, *versionToUpgrade, *cluster.V3.EKSConfig.NodeGroups[i].Version, "[%v]: %v", cluster.Meta.Name, logMessageNodepoolVersions)
 		}

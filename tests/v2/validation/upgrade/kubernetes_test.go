@@ -6,14 +6,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	psadeploy "github.com/rancher/rancher/tests/v2/actions/psact"
+	"github.com/rancher/rancher/tests/v2/actions/upgradeinput"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
 	"github.com/rancher/shepherd/extensions/defaults"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
-	psadeploy "github.com/rancher/shepherd/extensions/psact"
-	"github.com/rancher/shepherd/extensions/upgradeinput"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
@@ -88,7 +89,7 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 	client, err := u.client.WithSession(subSession)
 	require.NoError(u.T(), err)
 
-	clusterMeta, err := clusters.NewClusterMeta(client, clusterName)
+	clusterMeta, err := extensionscluster.NewClusterMeta(client, clusterName)
 	require.NoError(u.T(), err)
 	require.NotNilf(u.T(), clusterMeta, "Couldn't get the cluster meta")
 	u.T().Logf("[%v]: Provider is: %v, Hosted: %v, Imported: %v , Local: %v", clusterName, clusterMeta.Provider, clusterMeta.IsHosted, clusterMeta.IsImported, clusterMeta.IsLocal)
@@ -114,7 +115,7 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 	validateKubernetesVersions(u.T(), client, updatedCluster, version, isCheckingCurrentCluster)
 
 	u.T().Logf("[%v]: Waiting cluster to be upgraded and ready", clusterName)
-	err = clusters.WaitClusterToBeUpgraded(client, clusterMeta.ID)
+	err = extensionscluster.WaitClusterToBeUpgraded(client, clusterMeta.ID)
 	require.NoError(u.T(), err)
 
 	u.T().Logf("[%v]: Validating updated cluster's kubernetes version", clusterName)
@@ -126,7 +127,7 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 		u.T().Logf("[%v]: Validating sent update request for nodepools kubernetes versions of the cluster", clusterName)
 		validateNodepoolVersions(u.T(), client, updatedCluster, version, isCheckingCurrentCluster)
 
-		err = clusters.WaitClusterToBeUpgraded(client, clusterMeta.ID)
+		err = extensionscluster.WaitClusterToBeUpgraded(client, clusterMeta.ID)
 		require.NoError(u.T(), err)
 
 		u.T().Logf("[%v]: Validating updated cluster's nodepools kubernetes versions", clusterName)
@@ -160,7 +161,7 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeLocalCluster(clusterName, versio
 	client, err := u.client.WithSession(subSession)
 	require.NoError(u.T(), err)
 
-	clusterMeta, err := clusters.NewClusterMeta(client, clusterName)
+	clusterMeta, err := extensionscluster.NewClusterMeta(client, clusterName)
 	require.NoError(u.T(), err)
 	require.NotNilf(u.T(), clusterMeta, "Couldn't get the cluster meta")
 	u.T().Logf("[%v]: Provider is: %v, Hosted: %v, Imported: %v , Local: %v", clusterName, clusterMeta.Provider, clusterMeta.IsHosted, clusterMeta.IsImported, clusterMeta.IsLocal)
