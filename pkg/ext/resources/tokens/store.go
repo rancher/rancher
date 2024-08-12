@@ -19,6 +19,8 @@ import (
 
 const tokenNamespace = "cattle-token-data"
 
+// +k8s:openapi-gen=false
+// +k8s:deepcopy-gen=false
 type TokenStore struct {
 	secretClient v1.SecretClient
 	secretCache  v1.SecretCache

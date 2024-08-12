@@ -2,6 +2,7 @@ package ext
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/ext/generated/openapi"
 	"github.com/rancher/rancher/pkg/ext/resources/tokens"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/kube-openapi/pkg/common"
@@ -20,7 +21,7 @@ func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 func getDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	result := make(map[string]common.OpenAPIDefinition)
 	for _, getDefs := range []func(common.ReferenceCallback) map[string]common.OpenAPIDefinition{
-		tokens.GetDefinitions,
+		openapi.GetOpenAPIDefinitions,
 	} {
 		defs := getDefs(ref)
 		for key, val := range defs {
