@@ -5,10 +5,10 @@ package nodescaling
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/scalinginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/eks"
-	"github.com/rancher/shepherd/extensions/scalinginput"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"

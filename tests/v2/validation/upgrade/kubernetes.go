@@ -12,16 +12,17 @@ import (
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
+	"github.com/rancher/rancher/tests/v2/actions/upgradeinput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
 	"github.com/rancher/shepherd/extensions/defaults"
 	kcluster "github.com/rancher/shepherd/extensions/kubeapi/cluster"
-	"github.com/rancher/shepherd/extensions/provisioning"
-	"github.com/rancher/shepherd/extensions/upgradeinput"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -36,7 +37,7 @@ const (
 
 // upgradeLocalCluster is a function to upgrade a local cluster.
 func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster) {
-	clusterObject, err := clusters.GetClusterIDByName(client, clusterName)
+	clusterObject, err := extensionscluster.GetClusterIDByName(client, clusterName)
 	require.NoError(u.T(), err)
 
 	clusterResp, err := client.Management.Cluster.ByID(clusterObject)
@@ -56,7 +57,7 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 	u.Run(testName, func() {
 		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest)
 
-		clusterMeta, err := clusters.NewClusterMeta(client, clusterName)
+		clusterMeta, err := extensionscluster.NewClusterMeta(client, clusterName)
 		require.NoError(u.T(), err)
 
 		initCluster, err := bundledclusters.NewWithClusterMeta(clusterMeta)
@@ -86,11 +87,11 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster) {
 	var isRKE1 = false
 
-	clusterObject, _, _ := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
+	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(client, clusterName, namespace)
 	if clusterObject == nil {
 		isRKE1 = true
 
-		clusterObject, err := clusters.GetClusterIDByName(client, clusterName)
+		clusterObject, err := extensionscluster.GetClusterIDByName(client, clusterName)
 		require.NoError(u.T(), err)
 
 		clusterResp, err := client.Management.Cluster.ByID(clusterObject)
@@ -99,10 +100,10 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 		testConfig.KubernetesVersion = cluster.ProvisioningInput.RKE1KubernetesVersions[0]
 		testName += "RKE1 cluster from " + clusterResp.RancherKubernetesEngineConfig.Version + " to " + testConfig.KubernetesVersion
 	} else {
-		clusterID, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
+		clusterID, err := extensionscluster.GetV1ProvisioningClusterByName(client, clusterName)
 		require.NoError(u.T(), err)
 
-		clusterResp, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
+		clusterResp, err := client.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(clusterID)
 		require.NoError(u.T(), err)
 
 		updatedCluster := new(apisV1.Cluster)
@@ -125,7 +126,7 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 			upgradedCluster, err := upgradeRKE1Cluster(u.T(), client, cluster, testConfig)
 			require.NoError(u.T(), err)
 
-			clusterResp, err := clusters.GetClusterIDByName(client, upgradedCluster.Name)
+			clusterResp, err := extensionscluster.GetClusterIDByName(client, upgradedCluster.Name)
 			require.NoError(u.T(), err)
 
 			upgradedRKE1Cluster, err := client.Management.Cluster.ByID(clusterResp)
@@ -145,7 +146,7 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 
 // upgradeRKE1Cluster is a function to upgrade a downstream RKE1 cluster.
 func upgradeRKE1Cluster(t *testing.T, client *rancher.Client, cluster upgradeinput.Cluster, clustersConfig *clusters.ClusterConfig) (*management.Cluster, error) {
-	clusterObj, err := clusters.GetClusterIDByName(client, cluster.Name)
+	clusterObj, err := extensionscluster.GetClusterIDByName(client, cluster.Name)
 	require.NoError(t, err)
 
 	clusterResp, err := client.Management.Cluster.ByID(clusterObj)
@@ -153,7 +154,7 @@ func upgradeRKE1Cluster(t *testing.T, client *rancher.Client, cluster upgradeinp
 
 	updatedCluster := clusters.UpdateRKE1ClusterConfig(clusterResp.Name, client, clustersConfig)
 
-	updatedClusterResp, err := clusters.UpdateRKE1Cluster(client, clusterResp, updatedCluster)
+	updatedClusterResp, err := extensionscluster.UpdateRKE1Cluster(client, clusterResp, updatedCluster)
 	require.NoError(t, err)
 
 	upgradedCluster, err := client.Management.Cluster.ByID(updatedClusterResp.ID)
@@ -167,10 +168,10 @@ func upgradeRKE1Cluster(t *testing.T, client *rancher.Client, cluster upgradeinp
 
 // upgradeRKE2K3SCluster is a function to upgrade a downstream RKE2 or K3S cluster.
 func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgradeinput.Cluster, clustersConfig *clusters.ClusterConfig) (*v1.SteveAPIObject, error) {
-	clusterObj, err := clusters.GetV1ProvisioningClusterByName(client, cluster.Name)
+	clusterObj, err := extensionscluster.GetV1ProvisioningClusterByName(client, cluster.Name)
 	require.NoError(t, err)
 
-	clusterResp, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterObj)
+	clusterResp, err := client.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(clusterObj)
 	require.NoError(t, err)
 
 	updatedCluster := clusters.UpdateK3SRKE2ClusterConfig(clusterResp, clustersConfig)
@@ -179,7 +180,7 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 	err = v1.ConvertToK8sType(updatedCluster, &updatedClusterObj)
 	require.NoError(t, err)
 
-	updatedClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, updatedCluster, updatedClusterObj)
+	updatedClusterResp, err := extensionscluster.UpdateK3SRKE2Cluster(client, updatedCluster, updatedClusterObj)
 	require.NoError(t, err)
 
 	updatedClusterSpec := &provv1.ClusterSpec{}

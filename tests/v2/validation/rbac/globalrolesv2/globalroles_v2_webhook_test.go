@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rbacapi "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/users"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -102,7 +102,7 @@ func (grw *GlobalRolesV2WebhookTestSuite) TestRemoveOwnerLabelRejectedByWebhook(
 			UserPrincipalName: crtb.UserPrincipalName,
 		}
 
-		_, err = rbac.UpdateClusterRoleTemplateBindings(grw.client, existingCRTB, crtbWithUpdatedLabels)
+		_, err = rbacapi.UpdateClusterRoleTemplateBindings(grw.client, existingCRTB, crtbWithUpdatedLabels)
 		require.Error(grw.T(), err)
 
 		expectedErrMessage := "admission webhook \"rancher.cattle.io.clusterroletemplatebindings.management.cattle.io\" denied the request: clusterroletemplatebinding.labels: Forbidden: label authz.management.cattle.io/grb-owner is immutable after creation"
@@ -121,7 +121,7 @@ func (grw *GlobalRolesV2WebhookTestSuite) TestLockedRoleTemplateInInheritedClust
 	roleTemplate.RoleTemplateNames = []string{roleOwner}
 	roleTemplate.Context = clusterContext
 	roleTemplate.Locked = true
-	lockedRoleTemplate, err := rbac.CreateRoleTemplate(grw.client, roleTemplate)
+	lockedRoleTemplate, err := rbacapi.CreateRoleTemplate(grw.client, roleTemplate)
 	require.NoError(grw.T(), err)
 
 	_, err = createGlobalRole(grw.client, []string{lockedRoleTemplate.Name})
@@ -139,14 +139,14 @@ func (grw *GlobalRolesV2WebhookTestSuite) TestAddGlobalRoleWithCustomTemplateAnd
 	roleTemplate.Name = namegen.AppendRandomString("customrole")
 	roleTemplate.RoleTemplateNames = []string{roleOwner}
 	roleTemplate.Context = clusterContext
-	customRoleTemplate, err := rbac.CreateRoleTemplate(grw.client, roleTemplate)
+	customRoleTemplate, err := rbacapi.CreateRoleTemplate(grw.client, roleTemplate)
 	require.NoError(grw.T(), err)
 
 	_, err = createGlobalRole(grw.client, []string{customRoleTemplate.Name})
 	require.NoError(grw.T(), err)
 
 	customRoleTemplate.Locked = true
-	lockCustomRoleTemplate, err := rbac.UpdateRoleTemplate(grw.client, customRoleTemplate)
+	lockCustomRoleTemplate, err := rbacapi.UpdateRoleTemplate(grw.client, customRoleTemplate)
 	require.NoError(grw.T(), err)
 	assert.Equal(grw.T(), lockCustomRoleTemplate.Locked, true)
 
@@ -165,7 +165,7 @@ func (grw *GlobalRolesV2WebhookTestSuite) TestDeleteCustomRoleTemplateInInherite
 	_, err = createGlobalRole(grw.client, []string{inheritedRoleTemplate.ID})
 	require.NoError(grw.T(), err)
 
-	err = rbac.DeleteRoletemplate(grw.client, inheritedRoleTemplate.ID)
+	err = rbacapi.DeleteRoletemplate(grw.client, inheritedRoleTemplate.ID)
 	require.Error(grw.T(), err)
 
 	pattern := "^admission webhook .*" + regexp.QuoteMeta("cannot be deleted because it is inherited by globalRole(s) \"") + regexp.QuoteMeta(globalRole.Name) + "\"$"
@@ -215,7 +215,7 @@ func (grw *GlobalRolesV2WebhookTestSuite) TestRoleTemplateWithBadUserSubject() {
 		clusterRoleTemplateBinding.Labels = crtb.Labels
 		clusterRoleTemplateBinding.ClusterName = crtb.ClusterName
 
-		createdCRTB, err := rbac.CreateClusterRoleTemplateBinding(grw.client, clusterRoleTemplateBinding)
+		createdCRTB, err := rbacapi.CreateClusterRoleTemplateBinding(grw.client, clusterRoleTemplateBinding)
 		require.NoError(grw.T(), err)
 
 		req, err := labels.NewRequirement(crtbOwnerLabel, selection.In, []string{grbOwner})
@@ -247,7 +247,7 @@ func (grw *GlobalRolesV2WebhookTestSuite) TestDuplicateCRTBsAreDeleted() {
 		clusterRoleTemplateBinding.UserPrincipalName = localPrefix + user.Name
 		clusterRoleTemplateBinding.Labels = crtb.Labels
 		clusterRoleTemplateBinding.ClusterName = crtb.ClusterName
-		createdCRTB, err := rbac.CreateClusterRoleTemplateBinding(grw.client, clusterRoleTemplateBinding)
+		createdCRTB, err := rbacapi.CreateClusterRoleTemplateBinding(grw.client, clusterRoleTemplateBinding)
 		require.NoError(grw.T(), err)
 
 		req, err := labels.NewRequirement(crtbOwnerLabel, selection.In, []string{grbOwner})
@@ -288,7 +288,7 @@ func (grw *GlobalRolesV2WebhookTestSuite) TestCRTBWithLocalClusterReferenceIsDel
 		clusterRoleTemplateBinding.Labels = crtb.Labels
 		clusterRoleTemplateBinding.ClusterName = localcluster
 
-		createdCRTB, err := rbac.CreateClusterRoleTemplateBinding(grw.client, clusterRoleTemplateBinding)
+		createdCRTB, err := rbacapi.CreateClusterRoleTemplateBinding(grw.client, clusterRoleTemplateBinding)
 		require.NoError(grw.T(), err)
 
 		req, err := labels.NewRequirement(crtbOwnerLabel, selection.In, []string{grbOwner})

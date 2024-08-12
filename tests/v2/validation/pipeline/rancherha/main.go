@@ -3,11 +3,11 @@ package main
 import (
 	"strings"
 
+	"github.com/rancher/rancher/tests/v2/actions/pipeline"
 	"github.com/rancher/rancher/tests/v2/validation/pipeline/rancherha/corralha"
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rkecli"
-	"github.com/rancher/shepherd/extensions/pipeline"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/rancher/shepherd/pkg/session"

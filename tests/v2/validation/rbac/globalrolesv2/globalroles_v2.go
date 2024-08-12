@@ -10,14 +10,14 @@ import (
 	"github.com/rancher/shepherd/pkg/config"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	rbacapi "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
-	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
-	"github.com/rancher/shepherd/extensions/provisioning"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
 
 	"github.com/rancher/shepherd/extensions/users"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -97,7 +97,7 @@ func listClusterRoleTemplateBindingsForInheritedClusterRoles(client *rancher.Cli
 	var crtbs *v3.ClusterRoleTemplateBindingList
 
 	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.OneMinuteTimeout, func() (done bool, pollErr error) {
-		crtbs, pollErr = rbac.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
+		crtbs, pollErr = rbacapi.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if pollErr != nil {
@@ -128,7 +128,7 @@ func getCRBsForCRTBs(client *rancher.Client, crtbs *v3.ClusterRoleTemplateBindin
 		}
 
 		selector := labels.NewSelector().Add(*req)
-		downstreamCRBsForCRTB, err := rbac.ListClusterRoleBindings(client, localcluster, metav1.ListOptions{
+		downstreamCRBsForCRTB, err := rbacapi.ListClusterRoleBindings(client, localcluster, metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 
@@ -152,7 +152,7 @@ func getRBsForCRTBs(client *rancher.Client, crtbs *v3.ClusterRoleTemplateBinding
 			listOpt := metav1.ListOptions{
 				FieldSelector: "metadata.name=" + roleTemplateName,
 			}
-			roleTemplateList, err := rbac.ListRoleTemplates(client, listOpt)
+			roleTemplateList, err := rbacapi.ListRoleTemplates(client, listOpt)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +162,7 @@ func getRBsForCRTBs(client *rancher.Client, crtbs *v3.ClusterRoleTemplateBinding
 		nameSelector := fmt.Sprintf("metadata.name=%s-%s", crtb.Name, roleTemplateName)
 		namespaceSelector := fmt.Sprintf("metadata.namespace=%s", crtb.ClusterName)
 		combinedSelector := fmt.Sprintf("%s,%s", nameSelector, namespaceSelector)
-		downstreamRBsForCRTB, err := rbac.ListRoleBindings(client, localcluster, "", metav1.ListOptions{
+		downstreamRBsForCRTB, err := rbacapi.ListRoleBindings(client, localcluster, "", metav1.ListOptions{
 			FieldSelector: combinedSelector,
 		})
 
@@ -217,7 +217,7 @@ func createDownstreamCluster(client *rancher.Client, clusterType string) (*manag
 func createGlobalRole(client *rancher.Client, inheritedClusterrole []string) (*v3.GlobalRole, error) {
 	globalRole.Name = namegen.AppendRandomString("testgr")
 	globalRole.InheritedClusterRoles = inheritedClusterrole
-	createdGlobalRole, err := rbac.CreateGlobalRole(client, &globalRole)
+	createdGlobalRole, err := rbacapi.CreateGlobalRole(client, &globalRole)
 	return createdGlobalRole, err
 }
 
@@ -240,7 +240,7 @@ func crtbStatus(client *rancher.Client, crtbName string, selector labels.Selecto
 	defer cancel()
 
 	err := kwait.PollUntilContextCancel(ctx, defaults.FiveHundredMillisecondTimeout, false, func(ctx context.Context) (done bool, err error) {
-		crtbs, err := rbac.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
+		crtbs, err := rbacapi.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if err != nil {
