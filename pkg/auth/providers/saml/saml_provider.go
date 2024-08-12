@@ -128,9 +128,6 @@ func PerformSamlLogout(apiContext *types.APIContext, token *v3.Token) error {
 }
 
 func PerformSamlLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
-	r := apiContext.Request
-	w := apiContext.Response
-
 	providerName := token.AuthProvider
 
 	logrus.Debugf("SAML [logout-all]: triggered by provider %s", providerName)
@@ -147,9 +144,11 @@ func PerformSamlLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	}
 
 	samlLogout := &v32.SamlConfigLogoutInput{}
+
+	r := apiContext.Request
 	if err := json.NewDecoder(r.Body).Decode(samlLogout); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
-			fmt.Sprintf("SAML: Failed to parse body: %+v", err))
+			fmt.Sprintf("SAML: Failed to parse body: %v", err))
 	}
 
 	userName := provider.userMGR.GetUser(apiContext)
@@ -165,6 +164,7 @@ func PerformSamlLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	userAtProvider := userAttributes.ExtraByProvider[providerName]["username"][0]
 	finalRedirectURL := samlLogout.FinalRedirectURL
 
+	w := apiContext.Response
 	provider.clientState.SetPath(provider.serviceProvider.SloURL.Path)
 	provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", finalRedirectURL)
 	provider.clientState.SetState(w, r, "Rancher_UserID", userName)

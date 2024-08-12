@@ -72,10 +72,14 @@ func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager 
 	}
 }
 
+// OnLogoutAll registers a callback function to invoke when processing the norman action `logoutAll`.
+// Note: Callbacks set at runtime are used because a direct call causes circular package imports.
 func OnLogoutAll(logoutAllFunc LogoutAllFunc) {
 	onLogoutAll = logoutAllFunc
 }
 
+// OnLogout registers a callback function to invoke when processing the norman action `logout`.
+// Note: Callbacks set at runtime are used because a direct call causes circular package imports.
 func OnLogout(logoutFunc LogoutFunc) {
 	onLogout = logoutFunc
 }
@@ -92,9 +96,19 @@ type Manager struct {
 	secretLister        v1.SecretLister
 }
 
-type LogoutAllFunc func(apiContext *types.APIContext, token *v3.Token) error
+type (
+	// LogoutAllFunc is the signature of the callback function to invoke when
+	// processing the norman action `logoutAll`.
+	LogoutAllFunc func(apiContext *types.APIContext, token *v3.Token) error
 
-type LogoutFunc func(apiContext *types.APIContext, token *v3.Token) error
+	// LogoutFunc is the signature of the callback function to invoke when
+	// processing the norman action `logout`.
+	LogoutFunc func(apiContext *types.APIContext, token *v3.Token) error
+
+	// Note: We use callback functions to link the token manager to the SAML
+	// providers at runtime because a static function call set at compile time
+	// is not possible. It would cause circular package imports.
+)
 
 func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	user, ok := obj.(*v3.User)
@@ -382,10 +396,10 @@ func (m *Manager) logout(actionName string, action *types.Action, request *types
 		if status == http.StatusNotFound {
 			// 0
 			status = http.StatusInternalServerError
-			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
+			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), err.Error())
 		} else if status != http.StatusGone {
 			// 401
-			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
+			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), err.Error())
 		}
 	}
 
