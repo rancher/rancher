@@ -9,24 +9,27 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/storageclasses"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/volumes/persistentvolumeclaims"
+	"github.com/rancher/rancher/tests/v2/actions/machinepools"
+	"github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	"github.com/rancher/rancher/tests/v2/actions/reports"
+	"github.com/rancher/rancher/tests/v2/actions/rke1/componentchecks"
+	"github.com/rancher/rancher/tests/v2/actions/rke1/nodetemplates"
+	"github.com/rancher/rancher/tests/v2/actions/services"
+	"github.com/rancher/rancher/tests/v2/actions/workloads"
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/kubeapi/storageclasses"
-	"github.com/rancher/shepherd/extensions/kubeapi/volumes/persistentvolumeclaims"
-	"github.com/rancher/shepherd/extensions/machinepools"
-	"github.com/rancher/shepherd/extensions/projects"
-	"github.com/rancher/shepherd/extensions/provisioning"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
-	"github.com/rancher/shepherd/extensions/reports"
-	"github.com/rancher/shepherd/extensions/rke1/componentchecks"
-	"github.com/rancher/shepherd/extensions/rke1/nodetemplates"
-	"github.com/rancher/shepherd/extensions/services"
-	"github.com/rancher/shepherd/extensions/workloads"
+	extensionscharts "github.com/rancher/shepherd/extensions/charts"
+	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
+	extensionsworkloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/namegenerator"
@@ -212,13 +215,13 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 // RunPostClusterCloudProviderChecks does additinal checks on the cluster if there's a cloud provider set
 // on an active cluster.
 func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clusterType string, nodeTemplate *nodetemplates.NodeTemplate, testClusterConfig *clusters.ClusterConfig, clusterObject *steveV1.SteveAPIObject, rke1ClusterObject *management.Cluster) {
-	if strings.Contains(clusterType, clusters.RKE1ClusterType.String()) {
+	if strings.Contains(clusterType, extensionscluster.RKE1ClusterType.String()) {
 		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 		require.NoError(t, err)
 
 		if strings.Contains(testClusterConfig.CloudProvider, provisioninginput.AWSProviderName.String()) {
 			if strings.Contains(testClusterConfig.CloudProvider, externalProviderString) {
-				clusterMeta, err := clusters.NewClusterMeta(client, rke1ClusterObject.Name)
+				clusterMeta, err := extensionscluster.NewClusterMeta(client, rke1ClusterObject.Name)
 				require.NoError(t, err)
 
 				err = CreateAndInstallAWSExternalCharts(client, clusterMeta, false)
@@ -228,7 +231,7 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 				require.Empty(t, podErrors)
 			}
 
-			clusterObject, err = adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+			clusterObject, err = adminClient.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
 			require.NoError(t, err)
 
 			lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(t, client, clusterObject)
@@ -253,18 +256,18 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 				podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
 				require.Empty(t, podErrors)
 
-				clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+				clusterObject, err := adminClient.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
 				require.NoError(t, err)
 
 				CreatePVCWorkload(t, client, clusterObject)
 			}
 		}
-	} else if strings.Contains(clusterType, clusters.RKE2ClusterType.String()) {
+	} else if strings.Contains(clusterType, extensionscluster.RKE2ClusterType.String()) {
 		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 		require.NoError(t, err)
 
 		if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
-			clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterObject.ID)
+			clusterObject, err := adminClient.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(clusterObject.ID)
 			require.NoError(t, err)
 
 			lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(t, client, clusterObject)
@@ -446,9 +449,9 @@ func createNginxDeploymentWithPVC(steveclient *steveV1.Client, containerNamePref
 		},
 	}
 
-	containerTemplate := workloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{volMount}, []corev1.EnvFromSource{}, nil, nil, nil)
-	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{podVol}, []corev1.LocalObjectReference{}, nil)
-	deployment := workloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
+	containerTemplate := extensionsworkloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{volMount}, []corev1.EnvFromSource{}, nil, nil, nil)
+	podTemplate := extensionsworkloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{podVol}, []corev1.LocalObjectReference{}, nil)
+	deployment := extensionsworkloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {
@@ -461,9 +464,9 @@ func createNginxDeploymentWithPVC(steveclient *steveV1.Client, containerNamePref
 // createNginxDeployment is a helper function that creates a nginx deployment in a cluster's default namespace
 func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix string) (*steveV1.SteveAPIObject, error) {
 	containerName := namegenerator.AppendRandomString(containerNamePrefix)
-	containerTemplate := workloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
-	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil)
-	deployment := workloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
+	containerTemplate := extensionsworkloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
+	podTemplate := extensionsworkloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil)
+	deployment := extensionsworkloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {
@@ -475,14 +478,14 @@ func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix stri
 
 // CreateAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
 // clusters that install the appropriate chart(s) and returns an error, if any.
-func CreateAndInstallAWSExternalCharts(client *rancher.Client, cluster *clusters.ClusterMeta, isLeaderMigration bool) error {
+func CreateAndInstallAWSExternalCharts(client *rancher.Client, cluster *extensionscluster.ClusterMeta, isLeaderMigration bool) error {
 	steveclient, err := client.Steve.ProxyDownstream(cluster.ID)
 	if err != nil {
 		return err
 	}
 
 	repoName := namegenerator.AppendRandomString(provisioninginput.AWSProviderName.String())
-	err = charts.CreateChartRepoFromGithub(steveclient, awsUpstreamCloudProviderRepo, masterBranch, repoName)
+	err = extensionscharts.CreateChartRepoFromGithub(steveclient, awsUpstreamCloudProviderRepo, masterBranch, repoName)
 	if err != nil {
 		return err
 	}

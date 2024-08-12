@@ -5,8 +5,8 @@ package prime
 import (
 	"testing"
 
+	prime "github.com/rancher/rancher/tests/v2/actions/prime"
 	"github.com/rancher/shepherd/clients/rancher"
-	prime "github.com/rancher/shepherd/extensions/prime"
 	"github.com/rancher/shepherd/extensions/rancherversion"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
