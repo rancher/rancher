@@ -385,9 +385,10 @@ jobs:
 
           docker manifest push ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
 
+          # docker buildx imagetools create pushes to the registry by default, which is not the same behavior as docker manifest create
           docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
             --append ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
-            --append ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 \
+            --append ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
             docker manifest create ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
               ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 \
