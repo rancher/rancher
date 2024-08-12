@@ -42,7 +42,7 @@ type StoreDelegate[
 	TList runtime.Object,
 ] struct {
 	Store              types.Store[T, TList]
-	GroupVersion       schema.GroupVersion
+	GroupVersionKind   schema.GroupVersionKind
 	requestInfoFactory request.RequestInfoFactory
 }
 
@@ -50,10 +50,10 @@ func NewStoreDelegate[
 	T Ptr[DerefT],
 	DerefT any,
 	TList runtime.Object,
-](store types.Store[T, TList], groupVersion schema.GroupVersion) StoreDelegate[T, DerefT, TList] {
+](store types.Store[T, TList], gvk schema.GroupVersionKind) StoreDelegate[T, DerefT, TList] {
 	return StoreDelegate[T, DerefT, TList]{
 		Store:              store,
-		GroupVersion:       groupVersion,
+		GroupVersionKind:   gvk,
 		requestInfoFactory: request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")},
 	}
 }
@@ -73,13 +73,18 @@ func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespac
 	}
 
 	ws := &restful.WebService{}
-	ws.Path(fmt.Sprintf("/apis/%s/%s", s.GroupVersion.Group, s.GroupVersion.Version))
+	ws.Path(fmt.Sprintf("/apis/%s/%s", s.GroupVersionKind.Group, s.GroupVersionKind.Version))
 	// TODO: Missing deletecollection
 	ws.Route(
 		ws.GET(path).
 			To(noop).
 			Operation("list").
-			AddExtension("x-kubernetes-action", "list").
+			Metadata("x-kubernetes-action", "list").
+			Metadata("x-kubernetes-group-version-kind", metav1.GroupVersionKind{
+				Group:   s.GroupVersionKind.Group,
+				Version: s.GroupVersionKind.Version,
+				Kind:    s.GroupVersionKind.Kind,
+			}).
 			Doc(fmt.Sprintf("list or watch objects of kind %T", t)).
 			Consumes(restful.MIME_JSON).
 			Produces(restful.MIME_JSON).
@@ -90,7 +95,7 @@ func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespac
 			To(noop).
 			Operation("create").
 			Reads(t).
-			AddExtension("x-kubernetes-action", "post").
+			Metadata("x-kubernetes-action", "post").
 			Doc(fmt.Sprintf("create a %T", t)).
 			Consumes(restful.MIME_JSON).
 			Produces(restful.MIME_JSON).
@@ -102,7 +107,12 @@ func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespac
 		ws.GET(pathWithNameParam).
 			To(noop).
 			Operation("get").
-			AddExtension("x-kubernetes-action", "get").
+			Metadata("x-kubernetes-action", "get").
+			Metadata("x-kubernetes-group-version-kind", metav1.GroupVersionKind{
+				Group:   s.GroupVersionKind.Group,
+				Version: s.GroupVersionKind.Version,
+				Kind:    s.GroupVersionKind.Kind,
+			}).
 			Doc(fmt.Sprintf("get objects of kind %T", t)).
 			Consumes(restful.MIME_JSON).
 			Produces(restful.MIME_JSON).
@@ -112,7 +122,7 @@ func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespac
 		ws.PUT(pathWithNameParam).
 			To(noop).
 			Operation("replace").
-			AddExtension("x-kubernetes-action", "put").
+			Metadata("x-kubernetes-action", "put").
 			Reads(t).
 			Doc(fmt.Sprintf("replace the specified %T", t)).
 			Consumes(restful.MIME_JSON).
@@ -124,7 +134,7 @@ func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespac
 		ws.DELETE(pathWithNameParam).
 			To(noop).
 			Operation("delete").
-			AddExtension("x-kubernetes-action", "delete").
+			Metadata("x-kubernetes-action", "delete").
 			Doc(fmt.Sprintf("delete a %T", t)).
 			Produces(restful.MIME_JSON).
 			// FIXME: Should be Status
@@ -136,7 +146,7 @@ func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespac
 		ws.PATCH(pathWithNameParam).
 			To(noop).
 			Operation("patch").
-			AddExtension("x-kubernetes-action", "patch").
+			Metadata("x-kubernetes-action", "patch").
 			Doc(fmt.Sprintf("delete a %T", t)).
 			Consumes("application/merge-patch+json").
 			Produces(restful.MIME_JSON).
@@ -348,7 +358,7 @@ func (s *StoreDelegate[T, DerefT, TList]) writeOkResponse(w http.ResponseWriter,
 	w.Header().Set("Content-Type", info.MediaType)
 	w.WriteHeader(http.StatusOK)
 	if obj != nil {
-		err = Codecs.EncoderForVersion(info.Serializer, s.GroupVersion).Encode(obj, w)
+		err = Codecs.EncoderForVersion(info.Serializer, s.GroupVersionKind.GroupVersion()).Encode(obj, w)
 	}
 	if err != nil {
 		return err
@@ -364,7 +374,7 @@ func (s *StoreDelegate[T, DerefT, TList]) readObjectFromRequest(req *http.Reques
 		return resource, err
 	}
 
-	_, _, err = Codecs.UniversalDecoder(s.GroupVersion).Decode(bytes, nil, resource)
+	_, _, err = Codecs.UniversalDecoder(s.GroupVersionKind.GroupVersion()).Decode(bytes, nil, resource)
 	return resource, err
 }
 
