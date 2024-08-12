@@ -54,10 +54,7 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
 
-type (
-	ClusterRouter func(req *http.Request) string
-	userRefresher func(string, bool)
-)
+type ClusterRouter func(req *http.Request) string
 
 func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx *config.ScaledContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
@@ -86,7 +83,7 @@ type tokenAuthenticator struct {
 	userAttributeLister v3.UserAttributeLister
 	userLister          v3.UserLister
 	clusterRouter       ClusterRouter
-	refreshUser         userRefresher
+	refreshUser         func(userID string, force bool)
 }
 
 const (
