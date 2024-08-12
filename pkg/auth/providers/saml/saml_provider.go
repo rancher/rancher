@@ -358,8 +358,13 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.To
 		principalType = "user"
 	}
 
+	name := s.userType + "://" + searchKey
+	if principalType == "group" {
+		name = s.groupType + "://" + searchKey
+	}
+
 	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + searchKey},
+		ObjectMeta:    metav1.ObjectMeta{Name: name},
 		DisplayName:   searchKey,
 		LoginName:     searchKey,
 		PrincipalType: principalType,
