@@ -201,11 +201,16 @@ type AuthConfig struct {
 	metav1.TypeMeta   `json:",inline" mapstructure:",squash"`
 	metav1.ObjectMeta `json:"metadata,omitempty" mapstructure:"metadata"`
 
-	Type                string           `json:"type" norman:"noupdate"`
-	Enabled             bool             `json:"enabled,omitempty"`
-	AccessMode          string           `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
-	AllowedPrincipalIDs []string         `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
-	Status              AuthConfigStatus `json:"status"`
+	Type                string   `json:"type" norman:"noupdate"`
+	Enabled             bool     `json:"enabled,omitempty"`
+	AccessMode          string   `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
+	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
+
+	// Flag. True when the auth provider supports a `Logout All` operation.
+	// Currently only the SAML providers do, with their `Single Log Out` flow.
+	LogoutAllSupported bool `json:"logoutAllSupported,omitempty"`
+
+	Status AuthConfigStatus `json:"status"`
 }
 
 type AuthConfigStatus struct {
@@ -475,6 +480,16 @@ type FreeIpaTestAndApplyInput struct {
 type SamlConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
+	// Flag. True when the auth provider is configured to accept a `Logout All`
+	// operation. Can be set if and only if the provider supports `Logout All`
+	// (see AuthConfig.LogoutAllSupported).
+	LogoutAllEnabled bool `json:"logoutAllEnabled,omitempty"`
+
+	// Flag. Can be set if and only if `LogoutAllEnabled` (above) is set.
+	// When set `Logout All` is the only kind of logout accepted. A regular
+	// logout request will be rejected.
+	LogoutAllForced bool `json:"logoutAllForced,omitempty"`
+
 	IDPMetadataContent string `json:"idpMetadataContent" norman:"required"`
 	SpCert             string `json:"spCert"             norman:"required"`
 	SpKey              string `json:"spKey"              norman:"required,type=password"`
@@ -491,6 +506,14 @@ type SamlConfigTestInput struct {
 }
 
 type SamlConfigTestOutput struct {
+	IdpRedirectURL string `json:"idpRedirectUrl"`
+}
+
+type SamlConfigLogoutInput struct {
+	FinalRedirectURL string `json:"finalRedirectUrl"`
+}
+
+type SamlConfigLogoutOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 

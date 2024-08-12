@@ -46,6 +46,8 @@ const (
 
 var (
 	toDeleteCookies = []string{CookieName, CSRFCookie}
+	onLogoutAll     LogoutAllFunc
+	onLogout        LogoutFunc
 )
 
 func RegisterIndexer(apiContext *config.ScaledContext) error {
@@ -70,6 +72,18 @@ func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager 
 	}
 }
 
+// OnLogoutAll registers a callback function to invoke when processing the norman action `logoutAll`.
+// Note: Callbacks set at runtime are used because a direct call causes circular package imports.
+func OnLogoutAll(logoutAllFunc LogoutAllFunc) {
+	onLogoutAll = logoutAllFunc
+}
+
+// OnLogout registers a callback function to invoke when processing the norman action `logout`.
+// Note: Callbacks set at runtime are used because a direct call causes circular package imports.
+func OnLogout(logoutFunc LogoutFunc) {
+	onLogout = logoutFunc
+}
+
 type Manager struct {
 	ctx                 context.Context
 	tokensClient        v3.TokenInterface
@@ -81,6 +95,20 @@ type Manager struct {
 	secrets             v1.SecretInterface
 	secretLister        v1.SecretLister
 }
+
+type (
+	// LogoutAllFunc is the signature of the callback function to invoke when
+	// processing the norman action `logoutAll`.
+	LogoutAllFunc func(apiContext *types.APIContext, token *v3.Token) error
+
+	// LogoutFunc is the signature of the callback function to invoke when
+	// processing the norman action `logout`.
+	LogoutFunc func(apiContext *types.APIContext, token *v3.Token) error
+
+	// Note: We use callback functions to link the token manager to the SAML
+	// providers at runtime because a static function call set at compile time
+	// is not possible. It would cause circular package imports.
+)
 
 func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	user, ok := obj.(*v3.User)
@@ -212,21 +240,6 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 		tokens = append(tokens, t)
 	}
 	return tokens, 0, nil
-}
-
-func (m *Manager) deleteToken(tokenAuthValue string) (int, error) {
-	logrus.Debug("DELETE Token Invoked")
-
-	storedToken, status, err := m.getToken(tokenAuthValue)
-	if err != nil {
-		if status == 404 {
-			return 0, nil
-		} else if status != 410 {
-			return 401, err
-		}
-	}
-
-	return m.deleteTokenByName(storedToken.Name)
 }
 
 func (m *Manager) deleteTokenByName(tokenName string) (int, error) {
@@ -377,13 +390,34 @@ func (m *Manager) logout(actionName string, action *types.Action, request *types
 	}
 	w.Header().Add("Content-type", "application/json")
 
-	//getToken
-	status, err := m.deleteToken(tokenAuthValue)
+	storedToken, status, err := m.getToken(tokenAuthValue)
 	if err != nil {
-		logrus.Errorf("DeleteToken failed with error: %v", err)
-		if status == 0 {
+		logrus.Errorf("getToken failed with error: %v", err)
+		if status == http.StatusNotFound {
+			// 0
 			status = http.StatusInternalServerError
+			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), err.Error())
+		} else if status != http.StatusGone {
+			// 401
+			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), err.Error())
 		}
+	}
+
+	if actionName == "logoutAll" {
+		err := onLogoutAll(request, storedToken)
+		if err != nil {
+			return err
+		}
+	} else if actionName == "logout" {
+		err := onLogout(request, storedToken)
+		if err != nil {
+			return err
+		}
+	}
+
+	status, err = m.deleteTokenByName(storedToken.Name)
+	if err != nil {
+		logrus.Errorf("deleteTokenByName failed with error: %v", err)
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 	return nil

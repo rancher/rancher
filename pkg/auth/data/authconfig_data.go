@@ -40,23 +40,23 @@ func AuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := addAuthConfig(saml.PingName, client.PingConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(saml.PingName, client.PingConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(saml.ADFSName, client.ADFSConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(saml.ADFSName, client.ADFSConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(saml.KeyCloakName, client.KeyCloakConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(saml.KeyCloakName, client.KeyCloakConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(saml.OKTAName, client.OKTAConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(saml.OKTAName, client.OKTAConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(saml.ShibbolethName, client.ShibbolethConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(saml.ShibbolethName, client.ShibbolethConfigType, false, management); err != nil {
 		return err
 	}
 
@@ -80,6 +80,14 @@ func AuthConfigs(management *config.ManagementContext) error {
 }
 
 func addAuthConfig(name, aType string, enabled bool, management *config.ManagementContext) error {
+	return addAuthConfigCore(name, aType, enabled, false, management)
+}
+
+func addAuthConfigWithSLO(name, aType string, enabled bool, management *config.ManagementContext) error {
+	return addAuthConfigCore(name, aType, enabled, true, management)
+}
+
+func addAuthConfigCore(name, aType string, enabled, sloSupported bool, management *config.ManagementContext) error {
 	annotations := make(map[string]string)
 	if name == azure.Name {
 		annotations[azure.GraphEndpointMigratedAnnotation] = "true"
@@ -91,8 +99,9 @@ func addAuthConfig(name, aType string, enabled bool, management *config.Manageme
 			Name:        name,
 			Annotations: annotations,
 		},
-		Type:    aType,
-		Enabled: enabled,
+		Type:               aType,
+		Enabled:            enabled,
+		LogoutAllSupported: sloSupported,
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err

@@ -16,28 +16,57 @@ import (
 // ServeHTTP is the handler for /saml/metadata and /saml/acs endpoints
 func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	serviceProvider := s.serviceProvider
+
+	log.Debugf("SAML [ServeHTTP]: Received %q %q", r.Method, r.URL)
+
+	r.ParseForm()
+
 	if r.URL.Path == serviceProvider.MetadataURL.Path {
 		buf, _ := xml.MarshalIndent(serviceProvider.Metadata(), "", "  ")
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 		w.Write(buf)
+
+		log.Debugf("SAML [ServeHTTP]: Returned meta data")
 		return
 	}
 
 	if r.URL.Path == serviceProvider.AcsURL.Path {
+		log.Debugf("SAML [ServeHTTP]: assertion processing started")
+
 		r.ParseForm()
 		assertion, err := serviceProvider.ParseResponse(r, s.getPossibleRequestIDs(r))
+
 		if err != nil {
+			log.Debugf("SAML [ServeHTTP]: assertion validation failed: %q", err)
+
 			if parseErr, ok := err.(*saml.InvalidResponseError); ok {
-				log.Debugf("RESPONSE: ===\n%s\n===\nNOW: %s\nERROR: %s",
+				log.Debugf("SAML RESPONSE: ===\n%s\n===\nSAML NOW: %s\nSAML ERROR: %s",
 					parseErr.Response, parseErr.Now, parseErr.PrivateErr)
 			}
+
 			redirectURL := r.URL.Host + "/login?errorCode=403"
 			http.Redirect(w, r, redirectURL, http.StatusFound)
 			return
 		}
+
+		log.Debugf("SAML [ServeHTTP]: assertions validated ok")
+
 		s.HandleSamlAssertion(w, r, assertion)
+
+		log.Debugf("SAML [ServeHTTP]: assertion processing completed")
 		return
 	}
+
+	if r.URL.Path == serviceProvider.SloURL.Path {
+		log.Debugf("SAML [ServeHTTP]: logout response processing started")
+
+		s.FinalizeSamlLogout(w, r)
+
+		log.Debugf("SAML [ServeHTTP]: logout response processing completed")
+		return
+	}
+
+	log.Debugf("SAML [ServeHTTP]: Failed to handle %s %s", r.Method, r.URL)
 
 	http.NotFoundHandler().ServeHTTP(w, r)
 }
@@ -73,7 +102,7 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 	if r.URL.Path == serviceProvider.AcsURL.Path {
 		return "", fmt.Errorf("don't wrap Middleware with RequireAccount")
 	}
-	log.Debugf("SAML [HandleSamlLogin]: Creating authentication request for %v", s.name)
+
 	binding := saml.HTTPRedirectBinding
 	bindingLocation := serviceProvider.GetSSOBindingLocation(binding)
 
@@ -92,6 +121,7 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 	claims := state.Claims.(jwt.MapClaims)
 	claims["id"] = req.ID
 	claims["uri"] = r.URL.String()
+
 	signedState, err := state.SignedString(secretBlock)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -104,6 +134,49 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 	if err != nil {
 		return "", err
 	}
+
+	return redirectURL.String(), nil
+}
+
+// HandleSamlLogout is the final handler for the logoutAll action
+func (s *Provider) HandleSamlLogout(name string, w http.ResponseWriter, r *http.Request) (string, error) {
+	serviceProvider := s.serviceProvider
+	if r.URL.Path == serviceProvider.AcsURL.Path {
+		return "", fmt.Errorf("don't wrap Middleware with RequireAccount")
+	}
+
+	binding := saml.HTTPRedirectBinding
+	bindingLocation := serviceProvider.GetSLOBindingLocation(binding)
+
+	req, err := serviceProvider.MakeLogoutRequest(bindingLocation, name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return "", err
+	}
+	// relayState is limited to 80 bytes but also must be integrity protected.
+	// this means that we cannot use a JWT because it is way too long. Instead
+	// we set a cookie that corresponds to the state
+	relayState := base64.URLEncoding.EncodeToString(randomBytes(42))
+
+	secretBlock := x509.MarshalPKCS1PrivateKey(serviceProvider.Key)
+	state := jwt.New(jwt.SigningMethodHS256)
+	claims := state.Claims.(jwt.MapClaims)
+	claims["id"] = req.ID
+	claims["uri"] = r.URL.String()
+
+	signedState, err := state.SignedString(secretBlock)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return "", err
+	}
+
+	s.clientState.SetState(w, r, relayState, signedState)
+
+	redirectURL, err := req.Redirect(relayState, serviceProvider)
+	if err != nil {
+		return "", err
+	}
+
 	return redirectURL.String(), nil
 }
 

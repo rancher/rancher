@@ -13,6 +13,9 @@ const (
 	KeyCloakConfigFieldGroupsField         = "groupsField"
 	KeyCloakConfigFieldIDPMetadataContent  = "idpMetadataContent"
 	KeyCloakConfigFieldLabels              = "labels"
+	KeyCloakConfigFieldLogoutAllEnabled    = "logoutAllEnabled"
+	KeyCloakConfigFieldLogoutAllForced     = "logoutAllForced"
+	KeyCloakConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	KeyCloakConfigFieldName                = "name"
 	KeyCloakConfigFieldOwnerReferences     = "ownerReferences"
 	KeyCloakConfigFieldRancherAPIHost      = "rancherApiHost"
@@ -38,6 +41,9 @@ type KeyCloakConfig struct {
 	GroupsField         string            `json:"groupsField,omitempty" yaml:"groupsField,omitempty"`
 	IDPMetadataContent  string            `json:"idpMetadataContent,omitempty" yaml:"idpMetadataContent,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllEnabled    bool              `json:"logoutAllEnabled,omitempty" yaml:"logoutAllEnabled,omitempty"`
+	LogoutAllForced     bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
+	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
