@@ -13,6 +13,6 @@ RUN curl -sLf https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d
 FROM scratch as k3d
 COPY --from=k3d-deps /usr/bin/k3d /k3d
 
-FROM golang:1.22 as apiserver-poc
+FROM scratch as apiserver-poc
 COPY ext /usr/bin/apiserver-poc
 ENTRYPOINT ["/usr/bin/apiserver-poc"]
