@@ -27,6 +27,9 @@ create-cluster: k3d
 delete-cluster: k3d
 	@bin/k3d cluster delete $(K3D_CLUSTER)
 
+build:
+	 CGO_ENABLED=0 go build -o ext ../cmd/ext/
+
 image:
 	@$(BUILD) \
 		--target=apiserver-poc \
