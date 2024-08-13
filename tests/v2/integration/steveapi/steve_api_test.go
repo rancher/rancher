@@ -291,6 +291,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	err = serviceaccounts.IsServiceAccountReady(client, s.clusterID, impersonationNamespace, impersonationSA)
 	require.NoError(s.T(), err)
 
+	fmt.Printf("namespaceMap: %v", namespaceMap)
 	// create project namespaces
 	for n := range namespaceMap {
 		if projectMap[projectNamespaceMap[n]] == nil {
@@ -298,6 +299,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 		}
 		name := namegenerator.AppendRandomString(n)
 		_, err := namespaces.CreateNamespace(client, name, "", nil, nil, projectMap[projectNamespaceMap[n]])
+		fmt.Printf("create namespace %s error: %v", n, err)
 		require.NoError(s.T(), err)
 		namespaceMap[n] = name
 	}
