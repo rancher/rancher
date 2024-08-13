@@ -267,21 +267,22 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.To
 		}
 	}
 
-	var principals []v3.Principal
 	if principalType == "" {
 		principalType = "user"
 	}
 
-	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + searchKey},
+	scheme := s.userType
+	if principalType == "group" {
+		scheme = s.groupType
+	}
+
+	return []v3.Principal{{
+		ObjectMeta:    metav1.ObjectMeta{Name: scheme + "://" + searchKey},
 		DisplayName:   searchKey,
 		LoginName:     searchKey,
 		PrincipalType: principalType,
 		Provider:      s.name,
-	}
-
-	principals = append(principals, p)
-	return principals, nil
+	}}, nil
 }
 
 func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
