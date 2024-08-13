@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/tls"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -120,7 +121,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	if err != nil {
 		return nil, err
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), h.secretCache, h.k8s, sa, "local-")
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), h.secretCache, h.k8s, sa, utils.FormatPrefix("local"))
 	if err != nil {
 		return nil, err
 	}
