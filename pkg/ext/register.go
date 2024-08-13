@@ -5,14 +5,25 @@ import (
 	"github.com/rancher/rancher/pkg/ext/generated/openapi"
 	"github.com/rancher/rancher/pkg/ext/resources/tokens"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kube-openapi/pkg/common"
 )
 
 func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 	apiServer := NewAPIServer(getDefinitions)
+
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tokens.TokenNamespace,
+		},
+	}
+	wContext.Core.Namespace().Create(ns)
+
 	tokenStore := tokens.NewTokenStore(wContext.Core.Secret(), wContext.Core.Secret().Cache(), wContext.K8s.AuthorizationV1().SubjectAccessReviews())
 	tokenHandler := NewStoreDelegate(tokenStore, tokens.SchemeGroupVersion.WithKind(tokens.TokenAPIResource.Kind))
 	tokenWebService := tokenHandler.WebService(tokens.RancherTokenName, tokens.TokenAPIResource.Namespaced)
+
 	apiServer.AddAPIResource(tokens.SchemeGroupVersion, tokens.TokenAPIResource, tokenHandler.Delegate, tokenWebService)
 	apiServer.RegisterRoutes(router)
 }

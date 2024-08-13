@@ -17,7 +17,7 @@ import (
 	authzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
-const tokenNamespace = "cattle-token-data"
+const TokenNamespace = "cattle-token-data"
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
@@ -80,7 +80,7 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Ranc
 			return nil, fmt.Errorf("can't create token for other user %s since user %s doesn't have * on ranchertokens", userInfo.GetName(), token.Spec.UserID)
 		}
 	}
-	currentSecret, err := t.secretCache.Get(tokenNamespace, token.Name)
+	currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get current token %s: %w", token.Name, err)
 	}
@@ -100,7 +100,7 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Ranc
 }
 
 func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*RancherToken, error) {
-	currentSecret, err := t.secretCache.Get(tokenNamespace, name)
+	currentSecret, err := t.secretCache.Get(TokenNamespace, name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, err
@@ -124,7 +124,7 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 }
 
 func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (*RancherTokenList, error) {
-	secrets, err := t.secretClient.List(tokenNamespace, *opts)
+	secrets, err := t.secretClient.List(TokenNamespace, *opts)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list tokens: %w", err)
 	}
@@ -160,7 +160,7 @@ func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1
 	ch := make(chan types.WatchEvent[*RancherToken])
 
 	go func() {
-		watcher, err := t.secretClient.Watch(tokenNamespace, metav1.ListOptions{
+		watcher, err := t.secretClient.Watch(TokenNamespace, metav1.ListOptions{
 			ResourceVersion: opts.ResourceVersion,
 		})
 		if err != nil {
@@ -192,7 +192,7 @@ func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1
 
 func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string, opts *metav1.DeleteOptions) error {
 	fmt.Println(userInfo, name)
-	secret, err := t.secretCache.Get(tokenNamespace, name)
+	secret, err := t.secretCache.Get(TokenNamespace, name)
 	if err != nil {
 		return fmt.Errorf("unable to confirm secret existence %s: %w", name, err)
 	}
@@ -207,7 +207,7 @@ func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string
 			return fmt.Errorf("can't create token for other user %s since user %s doesn't have * on ranchertokens", userInfo.GetName(), token.Spec.UserID)
 		}
 	}
-	err = t.secretClient.Delete(tokenNamespace, name, &metav1.DeleteOptions{})
+	err = t.secretClient.Delete(TokenNamespace, name, &metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to delete secret %s: %w", name, err)
 	}
@@ -239,8 +239,10 @@ func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
 func secretFromToken(token *RancherToken) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: tokenNamespace,
-			Name:      token.Name,
+			Namespace:   TokenNamespace,
+			Name:        token.Name,
+			Labels:      token.Labels,
+			Annotations: token.Annotations,
 		},
 		StringData: make(map[string]string),
 		Data:       make(map[string][]byte),
@@ -262,6 +264,8 @@ func tokenFromSecret(secret *corev1.Secret) *RancherToken {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              secret.Name,
 			CreationTimestamp: secret.CreationTimestamp,
+			Labels:            secret.Labels,
+			Annotations:       secret.Annotations,
 		},
 		Spec: RancherTokenSpec{
 			UserID:      string(secret.Data["userID"]),

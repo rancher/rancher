@@ -24,8 +24,11 @@ import (
 	wapiv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wappsv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -57,6 +60,9 @@ type handler struct {
 	serviceClient    wcorev1.ServiceClient
 	deploymentClient wappsv1.DeploymentClient
 	podClient        wcorev1.PodClient
+	saClient         wcorev1.ServiceAccountClient
+	crClient         wrbacv1.ClusterRoleClient
+	crbClient        wrbacv1.ClusterRoleBindingClient
 
 	cancel       context.CancelFunc
 	remoteTunnel *remoteTunnel
@@ -68,6 +74,9 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		serviceClient:    clients.Core.Service(),
 		deploymentClient: clients.Apps.Deployment(),
 		podClient:        clients.Core.Pod(),
+		saClient:         clients.Core.ServiceAccount(),
+		crClient:         clients.RBAC.ClusterRole(),
+		crbClient:        clients.RBAC.ClusterRoleBinding(),
 		remoteTunnel: &remoteTunnel{
 			restConfig: clients.RESTConfig,
 			podClient:  clients.Core.Pod(),
@@ -123,19 +132,74 @@ func (h *handler) OnChange(key string, setting *mgmt.Setting) (*mgmt.Setting, er
 		}
 		var ctx context.Context
 		ctx, h.cancel = context.WithCancel(context.Background())
-		h.remoteTunnel.Start(ctx)
+		go h.remoteTunnel.Start(ctx)
 	case "off":
 		if err := h.ensureAPIExtensionDisabled(); err != nil {
 			return setting, err
 		}
-		h.cancel()
-		h.remoteTunnel.Close()
+		if h.cancel != nil {
+			h.cancel()
+		}
+		h.remoteTunnel.Stop()
 	}
 
 	return setting, nil
 }
 
 func (h *handler) ensureAPIExtensionEnabled() error {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+		},
+	}
+	// TODO: Handle update
+	_, err := h.saClient.Create(sa)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create ServiceAccount %s: %w", sa.Name, err)
+	}
+
+	cr := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceName,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	}
+	// TODO: Handle update
+	_, err = h.crClient.Create(cr)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create ClusterRole %s: %w", cr.Name, err)
+	}
+
+	crb := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceName,
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     cr.Name,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+	}
+	// TODO: Handle update
+	_, err = h.crbClient.Create(crb)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create ClusterRoleBinding %s: %w", crb.Name, err)
+	}
+
 	apiService := &apiv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: apiSvcName,
@@ -156,7 +220,7 @@ func (h *handler) ensureAPIExtensionEnabled() error {
 	}
 
 	// TODO: Handle update
-	_, err := h.apiClient.Create(apiService)
+	_, err = h.apiClient.Create(apiService)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create APIService %s: %w", apiService.Name, err)
 	}
@@ -181,7 +245,7 @@ func (h *handler) ensureAPIExtensionEnabled() error {
 				},
 				Spec: corev1.PodSpec{
 					// TODO: Use api-extension specific service account
-					ServiceAccountName: "rancher-webhook",
+					ServiceAccountName: sa.Name,
 					Containers: []corev1.Container{
 						{
 							Name:            "api-extension",
