@@ -10,6 +10,8 @@ import (
 const (
 	UserAttributePrincipalID = "principalid"
 	UserAttributeUserName    = "username"
+	UserPrincipalType        = "user"
+	GroupPrincipalType       = "group"
 )
 
 type AuthProvider interface {
