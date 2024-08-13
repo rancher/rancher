@@ -10,6 +10,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
@@ -196,6 +197,60 @@ func TestClusterCustomization(t *testing.T) {
 		})
 	}
 
+}
+
+func TestAssignWorkspace(t *testing.T) {
+	require := require.New(t)
+
+	h := &handler{}
+
+	settings.FleetManagementByDefault.Set("false")
+	defer func() {
+		settings.FleetManagementByDefault.Set("true")
+	}()
+
+	tests := []struct {
+		name    string
+		cluster *apimgmtv3.Cluster
+	}{
+		{
+			name: "does not modify cluster without fleet workspace",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+				},
+				Spec: apimgmtv3.ClusterSpec{},
+			},
+		},
+		{
+			name: "does not modify cluster with fleet workspace set",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-cluster",
+					Namespace: "fleet-local",
+				},
+				Spec: apimgmtv3.ClusterSpec{
+					FleetWorkspaceName: "specific-name",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster, err := h.assignWorkspace("", tt.cluster)
+
+			if err != nil {
+				t.Errorf("Expected nil err")
+			}
+
+			if cluster == nil {
+				t.Errorf("Expected non-nil cluster: %v", err)
+			}
+
+			require.Equal(cluster, tt.cluster)
+		})
+	}
 }
 
 func TestCreateCluster(t *testing.T) {

@@ -106,7 +106,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 		return cluster, nil
 	}
 
-	if cluster.Spec.FleetWorkspaceName == "" {
+	if cluster.Spec.FleetWorkspaceName == "" && settings.FleetManagementByDefault.Get() == "true" {
 		def := settings.FleetDefaultWorkspaceName.Get()
 		if def == "" {
 			return cluster, nil
