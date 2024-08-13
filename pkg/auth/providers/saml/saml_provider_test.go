@@ -79,7 +79,7 @@ func TestSearchPrincipals(t *testing.T) {
 
 			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, v3.Token{})
 			require.NoError(t, err)
-			require.NotEmpty(t, results)
+			require.Len(t, results, 1)
 			if tt.principalType == "group" {
 				assert.Equal(t, groupType+"://"+tt.principalName, results[0].Name)
 			} else {
