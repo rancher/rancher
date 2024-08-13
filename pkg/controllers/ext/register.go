@@ -327,85 +327,114 @@ type remoteTunnel struct {
 	restConfig *rest.Config
 	podClient  wcorev1.PodClient
 
-	started atomic.Bool
+	running atomic.Bool
 }
 
 func (r *remoteTunnel) Start(ctx context.Context) {
-	if !r.started.CompareAndSwap(false, true) {
+	if !r.running.CompareAndSwap(false, true) {
 		return
 	}
 
-	readyChan := make(chan struct{}, 1)
-	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
-
-	go func() {
-		roundTripper, upgrader, err := spdy.RoundTripperFor(r.restConfig)
+	for {
+		err := r.start(ctx)
 		if err != nil {
-			panic(err)
+			logrus.Error(err)
+			time.Sleep(time.Second)
+			continue
 		}
 
-		var podName string
-		for podName == "" {
-			pods, err := r.podClient.List(namespace, metav1.ListOptions{
-				LabelSelector: "app=api-extension",
-			})
-			if err != nil {
-				panic(err)
-			}
-
-			if len(pods.Items) != 1 {
-				time.Sleep(time.Second)
-				continue
-			}
-
-			podName = pods.Items[0].Name
-		}
-		path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", namespace, podName)
-		hostIP := strings.TrimPrefix(r.restConfig.Host, "https://")
-		serverURL := url.URL{
-			Scheme: "https",
-			Path:   path,
-			Host:   hostIP,
-		}
-		dialer := spdy.NewDialer(upgrader, &http.Client{
-			Transport: roundTripper,
-		}, http.MethodPost, &serverURL)
-
-		// TODO: Call forwarder.Close()
-		forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d", apiSvcPort)}, ctx.Done(), readyChan, out, errOut)
-		if err != nil {
-			panic(err)
-		}
-
-		err = forwarder.ForwardPorts()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		for range readyChan {
-		}
-
-		dialer := &websocket.Dialer{
-			Proxy: http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{
-				// TODO: Only there for a POC
-				InsecureSkipVerify: true,
-			},
-		}
-		remotedialer.ClientConnect(
-			ctx,
-			fmt.Sprintf("wss://localhost:%d/connect", apiSvcPort),
-			// TODO: Shared secret here would be a good idea
-			http.Header{},
-			dialer,
-			func(string, string) bool { return true },
-			nil,
-		)
-	}()
+		break
+	}
 }
 
-func (r *remoteTunnel) Close() {
-	r.started.CompareAndSwap(true, false)
+func (r *remoteTunnel) Stop() {
+	r.running.CompareAndSwap(true, false)
+}
+
+func (r *remoteTunnel) start(ctx context.Context) error {
+	readyCh := make(chan struct{}, 1)
+	errCh := make(chan error, 1)
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	go func() {
+		err := r.runForwarder(ctx, readyCh)
+		errCh <- err
+		cancel()
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-errCh:
+			return err
+		case <-readyCh:
+		}
+		break
+	}
+
+	dialer := &websocket.Dialer{
+		TLSClientConfig: &tls.Config{
+			// TODO: Only there for a POC
+			InsecureSkipVerify: true,
+		},
+	}
+	err := remotedialer.ClientConnect(
+		ctx,
+		fmt.Sprintf("wss://localhost:%d/connect", apiSvcPort),
+		// TODO: Shared secret here would be a good idea
+		http.Header{},
+		dialer,
+		func(string, string) bool { return true },
+		nil,
+	)
+	return err
+}
+
+func (r *remoteTunnel) runForwarder(ctx context.Context, readyCh chan struct{}) error {
+	roundTripper, upgrader, err := spdy.RoundTripperFor(r.restConfig)
+	if err != nil {
+		return err
+	}
+
+	var podName string
+	for podName == "" {
+		pods, err := r.podClient.List(namespace, metav1.ListOptions{
+			LabelSelector: "app=api-extension",
+		})
+		if err != nil {
+			return err
+		}
+
+		if len(pods.Items) != 1 {
+			time.Sleep(time.Second)
+			continue
+		}
+
+		podName = pods.Items[0].Name
+	}
+	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", namespace, podName)
+	hostIP := strings.TrimPrefix(r.restConfig.Host, "https://")
+	serverURL := url.URL{
+		Scheme: "https",
+		Path:   path,
+		Host:   hostIP,
+	}
+	dialer := spdy.NewDialer(upgrader, &http.Client{
+		Transport: roundTripper,
+	}, http.MethodPost, &serverURL)
+
+	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
+	forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d", apiSvcPort)}, ctx.Done(), readyCh, out, errOut)
+	if err != nil {
+		return err
+	}
+
+	err = forwarder.ForwardPorts()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
