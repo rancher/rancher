@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"agones.dev/agones/pkg/util/https"
-	agonesRuntime "agones.dev/agones/pkg/util/runtime"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -165,8 +163,6 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 
 	ctx := req.Context()
 
-	logger := agonesRuntime.NewLoggerWithType(namespace)
-	https.LogRequest(logger, req).Info("RancherTokens")
 	// other middleware is expected to filter out unauthenticated requests
 	userInfo, _ := request.UserFrom(ctx)
 

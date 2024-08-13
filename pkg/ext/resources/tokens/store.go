@@ -124,7 +124,7 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 }
 
 func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (*RancherTokenList, error) {
-	secrets, err := t.secretClient.List(tokenNamespace, metav1.ListOptions{})
+	secrets, err := t.secretClient.List(tokenNamespace, *opts)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list tokens: %w", err)
 	}
@@ -260,7 +260,8 @@ func tokenFromSecret(secret *corev1.Secret) *RancherToken {
 			APIVersion: "ext.cattle.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secret.Name,
+			Name:              secret.Name,
+			CreationTimestamp: secret.CreationTimestamp,
 		},
 		Spec: RancherTokenSpec{
 			UserID:      string(secret.Data["userID"]),
