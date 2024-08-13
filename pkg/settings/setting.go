@@ -325,6 +325,7 @@ var (
 
 	// ImperativeAPIExtension turns on an API Service for the imperative actions
 	ImperativeAPIExtension = NewSetting("imperative-api-extension", "off")
+	ImperativeAPIImage     = NewSetting("imperative-api-image", "docker.io/tomleb/api-extension-remotedialer:latest")
 
 	// The following settings are only used by the UI, but need to be known to Rancher so that they're not removed.
 	_ = NewSetting("eula-agreed", "")
