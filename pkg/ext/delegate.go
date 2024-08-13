@@ -9,6 +9,7 @@ import (
 
 	"github.com/emicklei/go-restful/v3"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -318,19 +319,45 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 			return fmt.Errorf("unsupported patch")
 		}
 
-		resource, err := s.readObjectFromRequest(req)
+		name, _, err := s.resourceNameAndNamespace(req)
 		if err != nil {
 			return err
 		}
 
-		// XXX: Should this be metav1.PatchOptions?
+		patchBytes, err := io.ReadAll(req.Body)
+		if err != nil {
+			return err
+		}
+
+		resource, err := s.Store.Get(ctx, userInfo, name, &metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		versionedObj, err := json.Marshal(resource)
+		if err != nil {
+			return err
+		}
+
+		patchedObj, err := jsonpatch.MergePatch(versionedObj, patchBytes)
+		if err != nil {
+			return err
+		}
+
+		var newResource DerefT
+		err = json.Unmarshal(patchedObj, &newResource)
+		if err != nil {
+			return err
+		}
+
+		// XXX: Should this be metav1.PatchOptions? Looking at upstream, it seems it maps PatchOptions to UpdateOptions or to CreateOptions
 		updateOptions := &metav1.UpdateOptions{}
 		err = metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, updateOptions)
 		if err != nil {
 			return err
 		}
 
-		retResource, err := s.Store.Update(ctx, userInfo, resource, updateOptions)
+		retResource, err := s.Store.Update(ctx, userInfo, &newResource, updateOptions)
 		if err != nil {
 			return err
 		}
