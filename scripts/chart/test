@@ -8,7 +8,7 @@ if [ -z "$(type -p helm_v3)" ]; then
     exit 1
 fi
 
-if [ "${ARCH}" != "amd64" ]; then 
+if [ "${ARCH}" != "amd64" ]; then
     echo "${ARCH} is not supported for chart tests, chart tests won't run"
     exit 0
 fi
@@ -21,6 +21,6 @@ if [[ $? > 0 ]]; then
 fi
 
 current_dir=$(pwd)
-cd ../../build/chart/rancher
+cd $(dirname $0)/../../build/chart/rancher
 helm_v3 unittest ./
 cd $current_dir
