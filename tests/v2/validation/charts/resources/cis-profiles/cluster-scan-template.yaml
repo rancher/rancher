@@ -1,0 +1,16 @@
+apiVersion: cis.cattle.io/v1
+kind: ClusterScan
+metadata:
+  name: %s #string
+  annotations:
+    {}
+#    key: string
+spec:
+  scanProfileName: %s
+  scheduledScanConfig:
+    retentionCount: 3
+    scanAlertRule:
+#      alertOnComplete: boolean
+#      alertOnFailure: boolean
+#    cronSchedule: string
+  scoreWarning: pass
