@@ -345,7 +345,7 @@ func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 }
 
 // SearchPrincipals searches for a principal by name using LDAP if configured.
-// Othwerwise it returns a "fake" principal of a requested type with the name as the searchKey.
+// Otherwise it returns a "fake" principal of a requested type with the name as the searchKey.
 // If the principalType is empty, both user and group principals are returned.
 // This is done because SAML, in the absence of LDAP, doesn't have a user/group lookup mechanism.
 func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
