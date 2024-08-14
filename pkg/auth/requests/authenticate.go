@@ -241,18 +241,16 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 }
 
 func makeLastUsedPatch(lu metav1.Time) ([]byte, error) {
-	operations := []patchOperation{{
+	operations := []struct {
+		Op    string      `json:"op"`
+		Path  string      `json:"path"`
+		Value metav1.Time `json:"value"`
+	}{{
 		Op:    "replace",
 		Path:  "/lastUsedAt",
 		Value: lu,
 	}}
 	return json.Marshal(operations)
-}
-
-type patchOperation struct {
-	Op    string      `json:"op"`
-	Path  string      `json:"path"`
-	Value metav1.Time `json:"value"`
 }
 
 func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
