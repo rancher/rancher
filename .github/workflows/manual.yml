@@ -1,0 +1,102 @@
+# This is a basic workflow that is manually triggered
+
+name: Port issue
+run-name: "Port issue ${{ github.event.issue.number }}: ${{ github.event.issue.title }}"
+
+on:
+  issue_comment:
+    types:
+      - created
+
+jobs:
+  port-issue:
+    runs-on: ubuntu-latest
+    if: contains(github.event.comment.body, '/backport') || contains(github.event.comment.body, '/forwardport')
+    steps:
+      - name: Check org membership
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          if gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -e --arg GITHUB_ACTOR "$GITHUB_ACTOR" '.[] | select(.login == $GITHUB_ACTOR)' > /dev/null; then
+              echo "${GITHUB_ACTOR} is a member"
+              echo "is_member=true" >> $GITHUB_ENV
+          else
+              echo "${GITHUB_ACTOR} is not a member of ${GITHUB_REPOSITORY_OWNER}" >> $GITHUB_STEP_SUMMARY
+              echo "is_member=false" >> $GITHUB_ENV
+          fi
+      - name: Check milestone
+        if: env.is_member == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          BODY_MILESTONE=$(echo "${COMMENT_BODY}" | awk '{ print $2 }')
+          # Sanitize input
+          MILESTONE=${BODY_MILESTONE//[^a-zA-Z0-9\-\.]/}
+          if gh api repos/${GITHUB_REPOSITORY}/milestones --paginate | jq -e --arg MILESTONE "$MILESTONE" '.[] | select(.title == $MILESTONE)' > /dev/null; then
+              echo "Milestone exists"
+              echo "milestone_exists=true" >> $GITHUB_ENV
+           else
+              echo "Milestone ${MILESTONE} does not exist" >> $GITHUB_STEP_SUMMARY
+              gh issue comment -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --body "Not creating port issue, milestone ${MILESTONE} does not exist or is not an open milestone"
+              echo "milestone_exists=false" >> $GITHUB_ENV
+           fi
+      - name: Port issue
+        if: |
+          env.is_member == 'true' &&
+          env.milestone_exists == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          declare -a additional_cmd
+          BODY=$(mktemp)
+          ORIGINAL_ISSUE=$(gh issue view -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --json title,body,assignees)
+          ORIGINAL_TITLE=$(echo "${ORIGINAL_ISSUE}" | jq -r .title)
+          TYPE=$(echo "${COMMENT_BODY}" | awk '{ print $1 }' | sed -e 's_/__')
+          MILESTONE=$(echo "${COMMENT_BODY}" | awk '{ print $2 }')
+          NEW_TITLE="[${TYPE}] ${ORIGINAL_TITLE}"
+          # rancher/rancher title
+          if [[ $MILESTONE =~ (v[0-9]\.[0-9]+) ]]; then
+              NEW_TITLE="[${TYPE} ${BASH_REMATCH[1]}] ${ORIGINAL_TITLE}"
+          fi
+          # rancher/rke2 title
+          # MAJOR_MINOR_MILESTONE=$(echo $MILESTONE | cut -d. -f1,2)
+          # NEW_TITLE="[${TYPE} release-${MAJOR_MINOR_MILESTONE}] ${ORIGINAL_TITLE}"
+          ORIGINAL_LABELS=$(gh issue view -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --json labels --jq '.labels[].name' | grep -v '^\[zube\]:' | paste -sd "," -)
+          if [ -n "$ORIGINAL_LABELS" ]; then
+              additional_cmd+=("--label")
+              additional_cmd+=("${ORIGINAL_LABELS}")
+          fi
+          ORIGINAL_PROJECT=$(gh issue view -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --json projectItems --jq '.projectItems[].title')
+          if [ -n "$ORIGINAL_PROJECT" ]; then
+              additional_cmd+=("--project")
+              additional_cmd+=("${ORIGINAL_PROJECT}")
+          fi
+          ASSIGNEES=$(echo "${ORIGINAL_ISSUE}" | jq -r .assignees[].login)
+          if [ -n "$ASSIGNEES" ]; then
+              echo "Checking if assignee is member before assigning"
+              DELIMITER=""
+              NEW_ASSIGNEES=""
+              for ASSIGNEE in $ASSIGNEES; do
+                  if gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -e --arg GITHUB_ACTOR "$GITHUB_ACTOR" '.[] | select(.login == $GITHUB_ACTOR)' > /dev/null; then
+                      echo "${ASSIGNEE} is a member, adding to assignees"
+                      NEW_ASSIGNEES="${NEW_ASSIGNEES}${DELIMITER}${ASSIGNEE}"
+                      DELIMITER=","
+                  fi
+              done
+              if [ -n "$NEW_ASSIGNEES" ]; then
+                  echo "Assignees for new issue: ${NEW_ASSIGNEES}"
+                  additional_cmd+=("--assignee")
+                  additional_cmd+=("${NEW_ASSIGNEES}")
+              fi
+          fi
+          if [ -n "$MILESTONE" ]; then
+              echo -e "This is a ${TYPE} issue for #${ORIGINAL_ISSUE_NUMBER}, automatically created via [GitHub Actions workflow]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) initiated by @${GITHUB_ACTOR}\n" > $BODY
+              echo -e "\nOriginal issue body:\n" >> $BODY
+              echo "${ORIGINAL_ISSUE}" | jq -r '.body[0:65536]' >> $BODY
+              NEW_ISSUE=$(gh issue create -R "${GITHUB_REPOSITORY}" --title "${NEW_TITLE}" --body-file "${BODY}" -m "${MILESTONE}" "${additional_cmd[@]}")
+              echo "Port issue created: ${NEW_ISSUE}" >> $GITHUB_STEP_SUMMARY
+          fi
