@@ -236,7 +236,7 @@ func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
 
 func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
 	if principalType == s.userType {
-		princ.PrincipalType = "user"
+		princ.PrincipalType = common.UserPrincipalType
 		if token != nil {
 			princ.Me = s.isThisUserMe(token.UserPrincipal, princ)
 			if princ.Me {
@@ -245,7 +245,7 @@ func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token *
 			}
 		}
 	} else {
-		princ.PrincipalType = "group"
+		princ.PrincipalType = common.GroupPrincipalType
 		if token != nil {
 			princ.MemberOf = s.tokenMGR.IsMemberOf(*token, princ)
 		}
@@ -258,6 +258,10 @@ func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 	return nil, errors.New("Not implemented")
 }
 
+// SearchPrincipals searches for a principal by name using LDAP if configured.
+// Otherwise it returns a "fake" principal of a requested type with the name as the searchKey.
+// If the principalType is empty, both user and group principals are returned.
+// This is done because SAML, in the absence of LDAP, doesn't have a user/group lookup mechanism.
 func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
 	if s.hasLdapGroupSearch() {
 		principals, err := s.ldapProvider.SearchPrincipals(searchKey, principalType, token)
@@ -267,22 +271,29 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.To
 		}
 	}
 
-	if principalType == "" {
-		principalType = "user"
+	var principals []v3.Principal
+
+	if principalType != common.GroupPrincipalType {
+		principals = append(principals, v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + searchKey},
+			DisplayName:   searchKey,
+			LoginName:     searchKey,
+			PrincipalType: common.UserPrincipalType,
+			Provider:      s.name,
+		})
 	}
 
-	scheme := s.userType
-	if principalType == "group" {
-		scheme = s.groupType
+	if principalType != common.UserPrincipalType {
+		principals = append(principals, v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + searchKey},
+			DisplayName:   searchKey,
+			LoginName:     searchKey,
+			PrincipalType: common.GroupPrincipalType,
+			Provider:      s.name,
+		})
 	}
 
-	return []v3.Principal{{
-		ObjectMeta:    metav1.ObjectMeta{Name: scheme + "://" + searchKey},
-		DisplayName:   searchKey,
-		LoginName:     searchKey,
-		PrincipalType: principalType,
-		Provider:      s.name,
-	}}, nil
+	return principals, nil
 }
 
 func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {

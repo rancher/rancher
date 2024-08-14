@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -39,28 +40,44 @@ func TestSearchPrincipals(t *testing.T) {
 		searchKey        string
 		principalType    string
 		isLdapConfigured bool
-		principalName    string
+		principals       []string
 	}{
 		{
 			desc:             "search for user with ldap",
 			isLdapConfigured: true,
 			searchKey:        "al",
-			principalType:    "user",
-			principalName:    "alice",
+			principalType:    common.UserPrincipalType,
+			principals: []string{
+				userType + "://alice",
+			},
 		},
 		{
 			desc:             "search for user without ldap",
 			isLdapConfigured: false,
 			searchKey:        "alice",
-			principalType:    "user",
-			principalName:    "alice",
+			principalType:    common.UserPrincipalType,
+			principals: []string{
+				userType + "://alice",
+			},
 		},
 		{
 			desc:             "search for group without ldap",
 			isLdapConfigured: false,
 			searchKey:        "admins",
-			principalType:    "group",
-			principalName:    "admins",
+			principalType:    common.GroupPrincipalType,
+			principals: []string{
+				groupType + "://admins",
+			},
+		},
+		{
+			desc:             "search for any principal without ldap",
+			isLdapConfigured: false,
+			searchKey:        "dev",
+			principalType:    "",
+			principals: []string{
+				userType + "://dev",
+				groupType + "://dev",
+			},
 		},
 	}
 
@@ -79,12 +96,9 @@ func TestSearchPrincipals(t *testing.T) {
 
 			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, v3.Token{})
 			require.NoError(t, err)
-			require.Len(t, results, 1)
-			if tt.principalType == "group" {
-				assert.Equal(t, groupType+"://"+tt.principalName, results[0].Name)
-			} else {
-				assert.Equal(t, userType+"://"+tt.principalName, results[0].Name)
-
+			require.Len(t, results, len(tt.principals))
+			for _, principal := range results {
+				assert.Contains(t, tt.principals, principal.Name)
 			}
 		})
 	}
