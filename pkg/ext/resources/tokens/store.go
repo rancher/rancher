@@ -118,7 +118,6 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 			return nil, fmt.Errorf("can't create token for other user %s since user %s doesn't have * on ranchertokens", userInfo.GetName(), token.Spec.UserID)
 		}
 	}
-	token.Status.HashedToken = ""
 	token.Status.PlaintextToken = ""
 	return token, nil
 }
