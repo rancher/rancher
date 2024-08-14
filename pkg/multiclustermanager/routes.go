@@ -140,6 +140,9 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	extAuthed.Use(mux.MiddlewareFunc(impersonatingAuth))
 	extAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
 	extAuthed.Use(requests.NewAuthenticatedFilter)
+	extAuthed.Use(func(next http.Handler) http.Handler {
+		return http.StripPrefix("/ext", next)
+	})
 	ext.RegisterSubRoutes(extAuthed, scaledContext.Wrangler.WithAgent("extensions"))
 
 	unauthed.NotFoundHandler = extAuthed
