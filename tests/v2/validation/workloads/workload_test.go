@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/rancher/tests/v2/actions/workloads/deamonset"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -92,6 +93,17 @@ func (w *WorkloadTestSuite) TestWorkloadSideKick() {
 	countRunning, err = pods.CountPodContainerRunning(w.client, w.cluster.ID, namespace.Name)
 	require.NoError(w.T(), err)
 	require.Equal(w.T(), 2, countRunning)
+}
+
+func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	_, err = deamonset.CreateDeamonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	require.NoError(w.T(), err)
 }
 
 func TestWorkloadTestSuite(t *testing.T) {
