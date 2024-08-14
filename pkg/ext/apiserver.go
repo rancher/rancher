@@ -107,6 +107,9 @@ func NewAPIServer(getDefinitions openapicommon.GetOpenAPIDefinitions) *APIServer
 		openapi.NewDefinitionNamer(scheme),
 	)
 	oapiConfigV3.GetDefinitionName = getDefinitionName
+	// Must set to nil otherwise getDefinitionName won't be used for refs
+	// which will break kubectl explain
+	oapiConfigV3.Definitions = nil
 	oapiRoutes := &routes.OpenAPI{
 		Config:   oapiConfigV2,
 		V3Config: oapiConfigV3,
