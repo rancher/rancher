@@ -19,7 +19,7 @@ skip_host_node_port = pytest.mark.skipif(
     not ENABLE_HOST_NODE_PORT_TESTS,
     reason='Tests Skipped for AKS,GKE,EKS Clusters')
 
-
+#Converted to go test in TestWorkloadSideKick
 def test_wl_sidekick():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -42,7 +42,7 @@ def test_wl_sidekick():
     validate_workload_with_sidekicks(
         p_client, workload, "deployment", ns.name)
 
-
+#Converted to go test in TestWorkloadDeployment
 def test_wl_deployment():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -54,7 +54,7 @@ def test_wl_deployment():
                                         namespaceId=ns.id)
     validate_workload(p_client, workload, "deployment", ns.name)
 
-
+#Converted to go test in TestWorkloadStatefulset
 def test_wl_statefulset():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -68,7 +68,7 @@ def test_wl_statefulset():
                                         )
     validate_workload(p_client, workload, "statefulSet", ns.name)
 
-
+#Converted to go test in TestWorkloadDaemonSet
 def test_wl_daemonset():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -84,7 +84,7 @@ def test_wl_daemonset():
     validate_workload(p_client, workload, "daemonSet",
                       ns.name, schedulable_node_count)
 
-
+#Converted to go test in TestWorkloadCronjob
 def test_wl_cronjob():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
