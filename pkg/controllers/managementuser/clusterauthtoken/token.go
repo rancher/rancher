@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
@@ -76,6 +77,13 @@ func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error)
 
 // createClusterAuthToken handles actions commonly taken to create a clusterAuthToken from a token.
 func (h *tokenHandler) createClusterAuthToken(token *managementv3.Token, hashedValue string) error {
+
+	// ensure that the token's last-used-at field has a proper value to be copied into the cluster auth token.
+	if token.LastUsedAt == nil {
+		timeNow := metav1.NewTime(time.Now())
+		token.LastUsedAt = &timeNow
+	}
+
 	err := h.updateClusterUserAttribute(token)
 	if err != nil {
 		return err

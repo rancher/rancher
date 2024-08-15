@@ -23,6 +23,7 @@ func NewClusterAuthToken(token *managementv3.Token, hashedValue string) (*cluste
 		},
 		UserName:      token.UserID,
 		SecretKeyHash: hashedValue,
+		LastUsedAt:    token.LastUsedAt,
 		ExpiresAt:     token.ExpiresAt,
 		Enabled:       tokenEnabled,
 	}
