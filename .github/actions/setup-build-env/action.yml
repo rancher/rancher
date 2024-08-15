@@ -19,15 +19,6 @@ outputs:
   RKE_VERSION:
     description: "RKE_VERSION from go.mod"
     value: ${{ steps.vars.outputs.RKE_VERSION }}
-  CATTLE_RANCHER_WEBHOOK_VERSION:
-    description: "CATTLE_RANCHER_WEBHOOK_VERSION from scripts/export-config"
-    value: ${{ steps.vars.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}
-  CATTLE_CSP_ADAPTER_MIN_VERSION:
-    description: "CATTLE_CSP_ADAPTER_MIN_VERSION from scripts/export-config"
-    value: ${{ steps.vars.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}
-  CATTLE_FLEET_VERSION:
-    description: "CATTLE_FLEET_VERSION from scripts/export-config"
-    value: ${{ steps.vars.outputs.CATTLE_FLEET_VERSION }}
 runs:
   using: "composite"
   steps:
@@ -44,9 +35,6 @@ runs:
           RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
         fi
         RKE_VERSION=$RKE_VERSION
-        CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
-        CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
-        CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
 
         if [[ -z "$CATTLE_KDM_BRANCH" ]]; then
           echo "CATTLE_KDM_BRANCH not found"

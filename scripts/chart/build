@@ -6,7 +6,6 @@ echo "-- chart/build --"
 
 cd $(dirname $0)/..
 . ./version
-. ./export-config
 
 cd ..
 mkdir -p build/chart
