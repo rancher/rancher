@@ -90,7 +90,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "release-v2.9")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.10")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -531,7 +531,7 @@ func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 // GetRancherVersion will return the stored server version without the 'v' prefix.
 func GetRancherVersion() string {
 	rancherVersion := ServerVersion.Get()
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") || strings.HasSuffix(rancherVersion, "-main") {
 		return RancherVersionDev
 	}
 	return strings.TrimPrefix(rancherVersion, "v")
