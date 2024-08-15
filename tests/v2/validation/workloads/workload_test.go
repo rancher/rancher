@@ -49,6 +49,17 @@ func (w *WorkloadTestSuite) SetupSuite() {
 	require.NoError(w.T(), err)
 }
 
+func (w *WorkloadTestSuite) TestWorkloadDeployment() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	require.NoError(w.T(), err)
+}
+
 func (w *WorkloadTestSuite) TestWorkloadSideKick() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
