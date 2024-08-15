@@ -9,13 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
-
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -528,10 +527,21 @@ func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 	return envVars
 }
 
+func IsReleaseServerVersion(serverVersion string) bool {
+	if strings.HasPrefix(serverVersion, "dev") ||
+		strings.HasPrefix(serverVersion, "master") ||
+		serverVersion == "" ||
+		strings.HasSuffix(serverVersion, "-head") ||
+		strings.HasSuffix(serverVersion, "-main") {
+		return false
+	}
+	return true
+}
+
 // GetRancherVersion will return the stored server version without the 'v' prefix.
 func GetRancherVersion() string {
 	rancherVersion := ServerVersion.Get()
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") || strings.HasSuffix(rancherVersion, "-main") {
+	if !IsReleaseServerVersion(rancherVersion) {
 		return RancherVersionDev
 	}
 	return strings.TrimPrefix(rancherVersion, "v")

@@ -54,13 +54,3 @@ func VersionSatisfiesRange(v, rng string) (bool, error) {
 func VersionGreaterThan(a, b string) bool {
 	return version.GreaterThan(a, b)
 }
-
-func ReleaseServerVersion(serverVersion string) bool {
-	if serverVersion == "dev" ||
-		serverVersion == "master" ||
-		serverVersion == "" ||
-		strings.HasSuffix(serverVersion, "-head") {
-		return false
-	}
-	return true
-}

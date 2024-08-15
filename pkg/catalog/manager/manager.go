@@ -9,7 +9,6 @@ import (
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -256,7 +255,7 @@ func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion, cu
 	serverVersion := settings.ServerVersion.Get()
 
 	// don't compare if we are running as dev or in the build env
-	if !utils.ReleaseServerVersion(serverVersion) {
+	if !settings.IsReleaseServerVersion(serverVersion) {
 		return nil
 	}
 
