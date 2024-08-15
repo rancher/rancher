@@ -1,14 +1,19 @@
+//go:build (validation || infra.any || cluster.any || sanity) && !stress && !extended
+
 package workloads
 
 import (
 	"testing"
 
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/rancher/tests/v2/actions/workloads/cronjob"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/deamonset"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
+	"github.com/rancher/rancher/tests/v2/actions/workloads/statefulset"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
@@ -17,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type WorkloadTestSuite struct {
@@ -70,9 +76,8 @@ func (w *WorkloadTestSuite) TestWorkloadSideKick() {
 	createdDeployment, err := deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
 	require.NoError(w.T(), err)
 
-	countRunning, err := pods.CountPodContainerRunning(w.client, w.cluster.ID, namespace.Name)
+	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, createdDeployment)
 	require.NoError(w.T(), err)
-	require.Equal(w.T(), 1, countRunning)
 
 	containerName := namegen.AppendRandomString("updatetestcontainer")
 	newContainerTemplate := workloads.NewContainer(containerName,
@@ -87,12 +92,16 @@ func (w *WorkloadTestSuite) TestWorkloadSideKick() {
 
 	createdDeployment.Spec.Template.Spec.Containers = append(createdDeployment.Spec.Template.Spec.Containers, newContainerTemplate)
 
-	_, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, createdDeployment)
+	updatedDeployment, err := deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, createdDeployment)
 	require.NoError(w.T(), err)
 
-	countRunning, err = pods.CountPodContainerRunning(w.client, w.cluster.ID, namespace.Name)
+	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + updatedDeployment.Name,
+	})
 	require.NoError(w.T(), err)
-	require.Equal(w.T(), 2, countRunning)
+
+	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, updatedDeployment)
+	require.NoError(w.T(), err)
 }
 
 func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
@@ -102,7 +111,82 @@ func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
-	_, err = deamonset.CreateDeamonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	createdDaemonset, err := deamonset.CreateDeamonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	require.NoError(w.T(), err)
+
+	err = charts.WatchAndWaitDaemonSets(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + createdDaemonset.Name,
+	})
+	require.NoError(w.T(), err)
+}
+
+func (w *WorkloadTestSuite) TestWorkloadCronjob() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	containerName := namegen.AppendRandomString("testcontainer")
+	pullPolicy := corev1.PullAlways
+
+	containerTemplate := workloads.NewContainer(
+		containerName,
+		"nginx",
+		pullPolicy,
+		[]corev1.VolumeMount{},
+		[]corev1.EnvFromSource{},
+		nil,
+		nil,
+		nil,
+	)
+	podTemplate := workloads.NewPodTemplate(
+		[]corev1.Container{containerTemplate},
+		[]corev1.Volume{},
+		[]corev1.LocalObjectReference{},
+		nil,
+	)
+
+	cronJobTemplate, err := cronjob.CreateCronjob(w.client, w.cluster.ID, namespace.Name, "*/1 * * * *", podTemplate)
+	require.NoError(w.T(), err)
+
+	err = cronjob.WatchAndWaitCronjob(w.client, w.cluster.ID, namespace.Name, cronJobTemplate)
+	require.NoError(w.T(), err)
+}
+
+func (w *WorkloadTestSuite) TestWorkloadStatefulset() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	containerName := namegen.AppendRandomString("testcontainer")
+	pullPolicy := corev1.PullAlways
+
+	containerTemplate := workloads.NewContainer(
+		containerName,
+		"nginx",
+		pullPolicy,
+		[]corev1.VolumeMount{},
+		[]corev1.EnvFromSource{},
+		nil,
+		nil,
+		nil,
+	)
+	podTemplate := workloads.NewPodTemplate(
+		[]corev1.Container{containerTemplate},
+		[]corev1.Volume{},
+		[]corev1.LocalObjectReference{},
+		nil,
+	)
+
+	statefulsetTemplate, err := statefulset.CreateStatefulset(w.client, w.cluster.ID, namespace.Name, podTemplate, 1)
+	require.NoError(w.T(), err)
+
+	err = charts.WatchAndWaitStatefulSets(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + statefulsetTemplate.Name,
+	})
 	require.NoError(w.T(), err)
 }
 

@@ -54,7 +54,7 @@ def test_wl_deployment():
                                         namespaceId=ns.id)
     validate_workload(p_client, workload, "deployment", ns.name)
 
-
+#Converted to go test in TestWorkloadStatefulset
 def test_wl_statefulset():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -84,7 +84,7 @@ def test_wl_daemonset():
     validate_workload(p_client, workload, "daemonSet",
                       ns.name, schedulable_node_count)
 
-
+#Converted to go test in TestWorkloadCronjob
 def test_wl_cronjob():
     p_client = namespace["p_client"]
     ns = namespace["ns"]

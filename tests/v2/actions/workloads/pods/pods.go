@@ -1,19 +1,25 @@
 package pods
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/wait"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
@@ -121,32 +127,59 @@ func CheckPodLogsForErrors(client *rancher.Client, clusterID string, podName str
 	return nil
 }
 
-// CountPodContainerRunning is a helper to count all pod containers running
-func CountPodContainerRunning(client *rancher.Client, clusterID, namespaceName string) (int, error) {
+// WatchAndWaitPodContainerRunning is a helper to watch and wait all pod containers running
+func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespaceName string, deploymentTemplate *appv1.Deployment) error {
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	podsResp, err := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName).List(nil)
+	namespacedClient := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName)
+
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	count := 0
-	for _, podResp := range podsResp.Data {
-		podStatus := &corev1.PodStatus{}
-		err = v1.ConvertToK8sType(podResp.Status, podStatus)
-		if err != nil {
-			return 0, err
-		}
+	deploymentResource := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(namespaceName)
 
-		for _, containerStatus := range podStatus.ContainerStatuses {
-			if containerStatus.State.Running != nil {
-				count++
+	watchAppInterface, err := deploymentResource.Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + deploymentTemplate.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	countContainers := len(deploymentTemplate.Spec.Template.Spec.Containers)
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		podsResp, err := namespacedClient.List(nil)
+		if err != nil {
+			return false, err
+		}
+		count := 0
+		for _, podResp := range podsResp.Data {
+			podStatus := &corev1.PodStatus{}
+			err = v1.ConvertToK8sType(podResp.Status, podStatus)
+			if err != nil {
+				return false, err
+			}
+
+			for _, containerStatus := range podStatus.ContainerStatuses {
+				if containerStatus.State.Running != nil {
+					count++
+				}
 			}
 		}
+		if countContainers == count {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
 	}
 
-	return count, nil
+	return nil
 }
