@@ -396,7 +396,7 @@ jobs:
               ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
             docker manifest push ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}
 
-            docker buildx imagetools create -${{ env.REGISTRY}}/t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
+            docker buildx imagetools create -t ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
               --append ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
               --append ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 
           fi
