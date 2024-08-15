@@ -6,6 +6,7 @@ import (
 
 	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	fakes "github.com/rancher/rancher/pkg/controllers/management/auth/fakes"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	coreFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
@@ -140,7 +141,7 @@ func TestCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
 					UID:         defaultCRTB.UID,
-					Annotations: map[string]string{creatorIDAnn: "creator"},
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
 				},
 				PrincipalIDs: []string{},
 			},
@@ -150,7 +151,7 @@ func TestCreate(t *testing.T) {
 			expectedUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
-					Annotations: map[string]string{creatorIDAnn: "creator"},
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
 				},
 				PrincipalIDs: []string{"local://testuser"},
 			},
@@ -161,7 +162,7 @@ func TestCreate(t *testing.T) {
 			inputUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
-					Annotations: map[string]string{creatorIDAnn: "creator"},
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
 				},
 				PrincipalIDs: []string{},
 			},
@@ -233,7 +234,7 @@ func TestUpdated(t *testing.T) {
 			expectedUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
-					Annotations: map[string]string{creatorIDAnn: "creator"},
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
 				},
 				PrincipalIDs: []string{"local://testuser"},
 			},
