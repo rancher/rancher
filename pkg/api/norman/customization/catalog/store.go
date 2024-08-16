@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/catalog/manager"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	hcommon "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -91,7 +90,7 @@ func (t *templateStore) extractVersionLinks(apiContext *types.APIContext, resour
 func (t *templateStore) isTemplateVersionCompatible(clusterName, externalID string) bool {
 	rancherVersion := settings.ServerVersion.Get()
 
-	if !catUtil.ReleaseServerVersion(rancherVersion) {
+	if !settings.IsReleaseServerVersion(rancherVersion) {
 		return true
 	}
 

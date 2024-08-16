@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/channelserver/pkg/config"
 	"github.com/rancher/channelserver/pkg/model"
 	"github.com/rancher/channelserver/pkg/server"
-	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/schemas"
@@ -46,7 +45,7 @@ func GetURLAndInterval() (string, time.Duration) {
 // not a proper release version, the argument will be set to the dev version.
 func getChannelServerArg() string {
 	serverVersion := settings.ServerVersion.Get()
-	if !utils.ReleaseServerVersion(serverVersion) {
+	if !settings.IsReleaseServerVersion(serverVersion) {
 		return settings.RancherVersionDev
 	}
 	return serverVersion
