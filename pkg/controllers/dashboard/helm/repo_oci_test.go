@@ -363,7 +363,7 @@ func TestGetRetryPolicy(t *testing.T) {
 }
 
 func TestShouldSkip(t *testing.T) {
-	ociInterval = 1 * time.Hour
+	ociInterval := 1 * time.Hour
 	testCases := []struct {
 		name                     string
 		ociDownloadedTime        time.Time
@@ -520,7 +520,7 @@ func TestShouldSkip(t *testing.T) {
 						},
 					}},
 			}
-			assert.Equal(t, testCase.expected, handler.shouldSkip(clusterRepo, policy, "clusterRepo"))
+			assert.Equal(t, testCase.expected, handler.shouldSkip(clusterRepo, policy, "clusterRepo", ociInterval))
 		})
 	}
 }

@@ -204,7 +204,7 @@ func TestShouldRefresh(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := shouldRefresh(tt.spec, tt.status)
+			result := shouldRefresh(tt.spec, tt.status, 6*time.Hour)
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
