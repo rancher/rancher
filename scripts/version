@@ -65,10 +65,6 @@ if echo $TAG | grep -q dirty; then
     TAG=dev
 fi
 
-if [ -n "$GIT_TAG" ]; then
-    TAG=$GIT_TAG
-fi
-
 AGENT_TAG="$TAG"
 if [ "$AGENT_TAG" = dev ]; then
     AGENT_TAG="master-head"
