@@ -10,27 +10,24 @@ COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.yml)-${COMMIT}}"
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
-CATTLE_K3S_VERSION=$(yq '.env.CATTLE_K3S_VERSION' < .github/workflows/pull-request.yml)
-CATTLE_KDM_BRANCH=$(yq '.env.CATTLE_KDM_BRANCH' < .github/workflows/pull-request.yml)
+CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
+CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
+if [[ -z "$RKE_VERSION" ]]; then
+    RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
+fi
 CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq '.cspAdapterMinVersion' < build.yaml)
 CATTLE_FLEET_VERSION=$(yq '.fleetVersion' < build.yaml)
 
 # download airgap images and export it to a tarball
-if [ ! -f ./k3s-images.txt ]; then
-  curl -Lf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o ./k3s-images.txt
-fi
-if [ ! -f ./k3s-airgap-images.tar ]; then
-  AIRGAP_IMAGES=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' ./k3s-images.txt)
-  xargs -n1 docker pull <<< "${AIRGAP_IMAGES}"
-  xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
-fi
+curl -Lf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o ./k3s-images.txt
+AIRGAP_IMAGES=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' ./k3s-images.txt)
+xargs -n1 docker pull <<< "${AIRGAP_IMAGES}"
+xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
 
 # download kontainer driver metadata
-if [ ! -f ./data.json ]; then
-  curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > ./data.json
-fi
+curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > ./data.json
 
 # start the builds
 docker buildx build \
