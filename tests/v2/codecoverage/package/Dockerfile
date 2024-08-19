@@ -10,12 +10,12 @@ COPY --from=final / /chroot/
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
     git-core curl util-linux ca-certificates ca-certificates-mozilla unzip xz gzip sed tar shadow gawk vim-small \
-    netcat-openbsd mkisofs openssh-clients && \
+    netcat-openbsd mkisofs openssh-clients openssl patterns-base-fips && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 # Main stage using bci-micro as the base image
-FROM final
+FROM final AS base
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
@@ -59,11 +59,11 @@ ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.14
 ENV LOGLEVEL_VERSION v0.1.6
 ENV TINI_VERSION v0.18.0
-ENV TELEMETRY_VERSION v0.5.20
+ENV TELEMETRY_VERSION v0.6.2
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.5
+ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.7
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.15.2
 ENV KUSTOMIZE_VERSION v5.4.2
@@ -77,6 +77,7 @@ ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.8-rc.3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
+# make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 104.0.0+up0.7.0
@@ -90,7 +91,7 @@ ARG CATTLE_GKE_OPERATOR_VERSION
 ENV CATTLE_GKE_OPERATOR_VERSION=$CATTLE_GKE_OPERATOR_VERSION
 
 # System charts minimal version
-# Deprecated in favor of CATTLE_FLEET_VERSION
+# Deprecated in favor of CATTLE_FLEET_VERSION.
 ENV CATTLE_FLEET_MIN_VERSION=""
 ARG CATTLE_FLEET_VERSION
 ENV CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
@@ -123,12 +124,12 @@ RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACH
     curl -LO https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-amd64.zip && \
     unzip docker-machine-driver-linode_linux-amd64.zip -d /opt/drivers/management-state/bin && \
     mkdir -p /usr/share/rancher/ui/assets/ && \
-    cp /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-linode_linux-amd64.zip
 
 RUN curl -LO https://releases.rancher.com/harvester-node-driver/${DOCKER_MACHINE_HARVESTER_VERSION}/docker-machine-driver-harvester-amd64.tar.gz && \
     tar -xf docker-machine-driver-harvester-amd64.tar.gz -C /opt/drivers/management-state/bin && \
-    cp /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-harvester-amd64.tar.gz
 
 ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
@@ -148,7 +149,8 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
     ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz \
     KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
-RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
+RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin && \
+    chmod +x /usr/bin/kustomize
 
 # set up helm 2
 RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
@@ -160,7 +162,7 @@ RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
 # set up helm 3
 RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
-    chmod +x /usr/bin/kustomize
+    chmod +x /usr/bin/helm_v3
 
 # Set up K3s: copy the necessary binaries from the K3s image.
 COPY --from=rancher/k3s:v1.30.2-k3s2 \
@@ -210,8 +212,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.9.0-alpha2
-ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0-alpha6
+ENV CATTLE_UI_VERSION 2.9.0
+ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0
 ENV CATTLE_CLI_VERSION v2.9.0
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
@@ -256,27 +258,75 @@ ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
-ARG VERSION=dev
-ENV CATTLE_SERVER_VERSION ${VERSION}
-COPY run_rancher.sh rancher /usr/bin/
-COPY kustomize.sh /usr/bin/
-COPY jailer.sh /usr/bin/
-COPY k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
-RUN chmod +x /usr/bin/run_rancher.sh
-RUN chmod +x /usr/bin/kustomize.sh
+RUN curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
-COPY data.json /var/lib/rancher-data/driver-metadata/
-
-ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
-ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 ENV ETCDCTL_API=3
 
 ENV SSL_CERT_DIR /etc/rancher/ssl
+ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
+
+
+# Enable exporting of the k3s images as part of the build process.
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS images
+
+ENV CATTLE_K3S_VERSION v1.30.2+k3s2
+
+RUN zypper -n install libbtrfs-devel libgpgme-devel
+
+WORKDIR /src
+COPY hack/airgap/ /src/
+RUN go mod init github.com/rancher/rancher/airgap
+RUN go mod tidy
+
+RUN go build -tags k3s_export -o export-images ./...
+RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
+
+
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS build
+ARG VERSION=dev
+ARG COMMIT
+ARG RKE_VERSION
+ARG CGO_ENABLED=0
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static"
+ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /app
+
+# Only invalidate cache if go.mod/go.sum changes.
+COPY go.mod go.sum .
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+RUN go mod download
+
+COPY pkg/ pkg/
+COPY main.go .
+
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+
+FROM base
+
+ARG VERSION=${VERSION}
+ENV CATTLE_SERVER_VERSION ${VERSION}
+ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
+ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
+
+COPY --chown=root:root --chmod=0755 \
+     --from=build /app/rancher /usr/bin/
+COPY --chown=root:root --chmod=0755 \
+     --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+
+COPY --chown=root:root --chmod=0755 \
+        package/entrypoint.sh \
+        package/kustomize.sh \
+        package/jailer.sh /usr/bin/
+
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
 VOLUME /var/log
-
-ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 ENTRYPOINT ["run_rancher.sh"]
