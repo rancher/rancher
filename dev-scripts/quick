@@ -10,9 +10,12 @@ COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.yml)-${COMMIT}}"
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
-CATTLE_K3S_VERSION=$(yq '.env.CATTLE_K3S_VERSION' < .github/workflows/pull-request.yml)
-CATTLE_KDM_BRANCH=$(yq '.env.CATTLE_KDM_BRANCH' < .github/workflows/pull-request.yml)
+CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
+CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
+if [[ -z "$RKE_VERSION" ]]; then
+    RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
+fi
 CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq '.cspAdapterMinVersion' < build.yaml)
 CATTLE_FLEET_VERSION=$(yq '.fleetVersion' < build.yaml)
