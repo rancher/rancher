@@ -1,4 +1,17 @@
-#! /bin/sh
+#! /bin/bash
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -q|--quiet)
+            QUIET=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
 
 cd $(dirname $0)/../
 
