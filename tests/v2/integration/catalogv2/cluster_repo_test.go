@@ -114,7 +114,7 @@ type ClusterRepoParams struct {
 	URL2              string   // URL to use when updating the ClusterRepo resource to a new URL
 	InsecurePlainHTTP bool
 	StatusCode        int
-	ForceRefresh      bool
+	RefreshInterval   int
 }
 
 // TestHTTPRepo tests CREATE, UPDATE, and DELETE operations of HTTP ClusterRepo resources
@@ -458,11 +458,11 @@ func (c *ClusterRepoTestSuite) TestOCIRepo4() {
 		URL1:              fmt.Sprintf("oci://%s/", u.Host),
 		InsecurePlainHTTP: true,
 		Type:              OCI,
-		ForceRefresh:      true,
+		RefreshInterval:   65,
 	})
 }
 
-// TestOCIRepo4 tests 429 response code received from the registry which sends RateLimited-Remaining header
+// TestOCIRepo5 tests 429 response code received from the registry which sends RateLimited-Remaining header
 func (c *ClusterRepoTestSuite) TestOCIRepo5() {
 	ts, err := Start429Registry(c.T(), true)
 	require.NoError(c.T(), err)
@@ -477,7 +477,6 @@ func (c *ClusterRepoTestSuite) TestOCIRepo5() {
 		URL1:              fmt.Sprintf("oci://%s/", u.Host),
 		InsecurePlainHTTP: true,
 		Type:              OCI,
-		ForceRefresh:      false,
 	})
 }
 
@@ -487,6 +486,7 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	clusterRepo := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
 	setClusterRepoURL(&clusterRepo.Spec, params.Type, params.URL1)
 	clusterRepo.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
+	clusterRepo.Spec.RefreshInterval = params.RefreshInterval
 	expoValues := v1.ExponentialBackOffValues{
 		MinWait:    1,
 		MaxWait:    1,
@@ -528,15 +528,6 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	assert.Equal(c.T(), len(index.Entries["testingchart"]), 2)
 	assert.NotEmpty(c.T(), index.Entries["testingchart"][0].Digest)
 	time.Sleep(65 * time.Second)
-
-	if params.ForceRefresh {
-		// Refresh the clusterRepo
-		clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
-		assert.NoError(c.T(), err)
-		clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
-		clusterRepo, err = c.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
-		assert.NoError(c.T(), err)
-	}
 
 	err = wait.Poll(PollInterval, 5*time.Second, func() (done bool, err error) {
 		clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
