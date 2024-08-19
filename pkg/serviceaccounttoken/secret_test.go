@@ -351,7 +351,27 @@ func (f *fakeSecretLister) list(namespace string, selector labels.Selector) ([]*
 }
 
 func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
-	k8sClient := fake.NewSimpleClientset()
+	k8sClient := fake.NewSimpleClientset(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret-1",
+			Namespace: "default",
+			Labels: map[string]string{
+				ServiceAccountSecretLabel: "test",
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+	},
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-secret-2",
+				Namespace: "default",
+				Labels: map[string]string{
+					ServiceAccountSecretLabel: "test",
+				},
+			},
+			Type: corev1.SecretTypeOpaque,
+		},
+	)
 	var m sync.Mutex
 	var created []*corev1.Secret
 
@@ -407,7 +427,7 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 
 	wg.Wait()
 	if l := len(created); l != 1 {
-		t.Fatalf("EnsureSecretForServiceAccount() created %d secrets, want 1", l)
+		t.Errorf("EnsureSecretForServiceAccount() created %d secrets, want 1", l)
 	}
 
 	var remaining []string
@@ -416,4 +436,10 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 		return true
 	})
 	assert.Empty(t, remaining)
+
+	remainingSecrets, err := k8sClient.CoreV1().Secrets("default").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Len(t, remainingSecrets.Items, 1)
 }
