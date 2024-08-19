@@ -21,19 +21,13 @@ CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq '.cspAdapterMinVersion' < build.yaml)
 CATTLE_FLEET_VERSION=$(yq '.fleetVersion' < build.yaml)
 
 # download airgap images and export it to a tarball
-if [ ! -f ./k3s-images.txt ]; then
-  curl -Lf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o ./k3s-images.txt
-fi
-if [ ! -f ./k3s-airgap-images.tar ]; then
-  AIRGAP_IMAGES=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' ./k3s-images.txt)
-  xargs -n1 docker pull <<< "${AIRGAP_IMAGES}"
-  xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
-fi
+curl -Lf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o ./k3s-images.txt
+AIRGAP_IMAGES=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' ./k3s-images.txt)
+xargs -n1 docker pull <<< "${AIRGAP_IMAGES}"
+xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
 
 # download kontainer driver metadata
-if [ ! -f ./data.json ]; then
-  curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > ./data.json
-fi
+curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > ./data.json
 
 # start the builds
 docker buildx build \
