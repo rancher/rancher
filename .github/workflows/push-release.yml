@@ -543,6 +543,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
+      - name: Add release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NOTES=$(cat ./dist/rancher-components.txt)
+          gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
   docker-image-digests:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: ubuntu-latest
