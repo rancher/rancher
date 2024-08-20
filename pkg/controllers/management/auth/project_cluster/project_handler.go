@@ -33,7 +33,7 @@ type projectLifecycle struct {
 	mgr                  *config.ManagementContext
 	crtbClient           v3.ClusterRoleTemplateBindingInterface
 	crtbLister           v3.ClusterRoleTemplateBindingLister
-	nsClient             corev1.NamespaceInterface
+	nsLister             corev1.NamespaceLister
 	projects             v3.ProjectInterface
 	prtbLister           v3.ProjectRoleTemplateBindingLister
 	rbLister             rbacv1.RoleBindingLister
@@ -47,7 +47,7 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		mgr:                  management,
 		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
 		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		nsClient:             management.Core.Namespaces(""),
+		nsLister:             management.Core.Namespaces("").Controller().Lister(),
 		projects:             management.Management.Projects(""),
 		prtbLister:           management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
@@ -75,7 +75,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsClient)
+	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.mgr.K8sClient.CoreV1().Namespaces())
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
-	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
+	err = deleteNamespace(obj, ProjectRemoveController, l.mgr.K8sClient.CoreV1().Namespaces())
 	returnErr = errors.Join(returnErr, err)
 	return obj, returnErr
 }
