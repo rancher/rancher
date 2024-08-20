@@ -16,7 +16,7 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
       K3D_VERSION: v5.4.6
@@ -55,7 +55,13 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
+          
+          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
+          echo "the image created is $AMD_IMAGE"
           docker tag "$image_server_id" ${{ env.IMAGE }}:${{ env.TAG }}
+          docker image ls
+          docker rmi "$AMD_IMAGE"
+          docker image ls
       - name: Load agent image
         run: |
           image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -63,7 +69,13 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
+
+          AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
           docker tag "$image_agent_id" ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          echo "the image created is $AMD_IMAGE_AGENT"
+          docker image ls
+          docker rmi "$AMD_IMAGE_AGENT"
+          docker image ls
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
       - name: Uninstall existing Python versions
