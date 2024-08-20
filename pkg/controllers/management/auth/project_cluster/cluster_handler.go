@@ -49,7 +49,7 @@ type clusterLifecycle struct {
 	mgr                *config.ManagementContext
 	clusterClient      v3.ClusterInterface
 	crtbLister         v3.ClusterRoleTemplateBindingLister
-	nsClient           corev1.NamespaceInterface
+	nsLister           corev1.NamespaceLister
 	projects           wranglerv3.ProjectClient
 	projectLister      v3.ProjectLister
 	rbLister           rbacv1.RoleBindingLister
@@ -63,7 +63,7 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 		mgr:                management,
 		clusterClient:      management.Management.Clusters(""),
 		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		nsClient:           management.Core.Namespaces(""),
+		nsLister:           management.Core.Namespaces("").Controller().Lister(),
 		projects:           management.Wrangler.Mgmt.Project(),
 		projectLister:      management.Management.Projects("").Controller().Lister(),
 		rbLister:           management.RBAC.RoleBindings("").Controller().Lister(),
@@ -80,7 +80,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, l.nsClient)
+	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, l.nsLister, l.mgr.K8sClient.CoreV1().Namespaces())
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	}
 	returnErr = errors.Join(
 		l.deleteSystemProject(obj, ClusterRemoveController),
-		deleteNamespace(obj, ClusterRemoveController, l.nsClient),
+		deleteNamespace(obj, ClusterRemoveController, l.mgr.K8sClient.CoreV1().Namespaces()),
 	)
 	return obj, returnErr
 }
