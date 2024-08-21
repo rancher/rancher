@@ -39,12 +39,13 @@ import (
 )
 
 const (
-	ByCluster             = "by-cluster"
-	ByCloudCred           = "by-cloud-cred"
-	creatorIDAnn          = "field.cattle.io/creatorId"
-	administratedAnn      = "provisioning.cattle.io/administrated"
-	mgmtClusterNameAnn    = "provisioning.cattle.io/management-cluster-name"
-	fleetWorkspaceNameAnn = "provisioning.cattle.io/fleet-workspace-name"
+	ByCluster              = "by-cluster"
+	ByCloudCred            = "by-cloud-cred"
+	creatorIDAnn           = "field.cattle.io/creatorId"
+	administratedAnn       = "provisioning.cattle.io/administrated"
+	mgmtClusterNameAnn     = "provisioning.cattle.io/management-cluster-name"
+	fleetWorkspaceNameAnn  = "provisioning.cattle.io/fleet-workspace-name"
+	disableFleetDefaultAnn = "provisioning.cattle.io/disable-fleet-default"
 )
 
 var (
@@ -398,8 +399,10 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 
 	delete(cluster.Annotations, creatorIDAnn)
 
+	_, disabledFleetDefault := cluster.Annotations[disableFleetDefaultAnn]
+
 	if features.ProvisioningV2FleetWorkspaceBackPopulation.Enabled() {
-		if forcedFleetWorkspaceName, ok := cluster.Annotations[fleetWorkspaceNameAnn]; ok && forcedFleetWorkspaceName != "" { // force set the fleet workspace name
+		if forcedFleetWorkspaceName, ok := cluster.Annotations[fleetWorkspaceNameAnn]; ok && forcedFleetWorkspaceName != "" && !disabledFleetDefault { // force set the fleet workspace name
 			newCluster.Spec.FleetWorkspaceName = forcedFleetWorkspaceName
 		} else {
 			if err := h.backpopulateMgmtClusterFleetWorkspaceName(newCluster); err != nil {
@@ -409,7 +412,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 				newCluster.Spec.FleetWorkspaceName = cluster.Namespace
 			}
 		}
-	} else {
+	} else if !disabledFleetDefault {
 		newCluster.Spec.FleetWorkspaceName = cluster.Namespace
 	}
 
