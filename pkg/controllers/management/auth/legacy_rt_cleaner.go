@@ -28,7 +28,8 @@ func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, erro
 		return obj, nil
 	}
 
-	return p.mgmt.Management.RoleTemplates("").Update(obj)
+	cleanedObj := rtCleanUp(obj)
+	return p.mgmt.Management.RoleTemplates("").Update(cleanedObj)
 }
 
 // rtCleanUp returns a clean RoleTemplate based on filters specified within the function
