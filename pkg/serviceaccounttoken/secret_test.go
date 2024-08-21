@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -351,17 +352,18 @@ func (f *fakeSecretLister) list(namespace string, selector labels.Selector) ([]*
 }
 
 func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
-	k8sClient := fake.NewSimpleClientset(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-secret-1",
-			Namespace: "default",
-			Labels: map[string]string{
-				ServiceAccountSecretLabel: "test",
+	managedSecrets := map[string]*corev1.Secret{
+		"test-secret-1": &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-secret-1",
+				Namespace: "default",
+				Labels: map[string]string{
+					ServiceAccountSecretLabel: "test",
+				},
 			},
+			Type: corev1.SecretTypeOpaque,
 		},
-		Type: corev1.SecretTypeOpaque,
-	},
-		&corev1.Secret{
+		"test-secret-2": &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-secret-2",
 				Namespace: "default",
@@ -371,9 +373,10 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 			},
 			Type: corev1.SecretTypeOpaque,
 		},
-	)
+	}
+
+	k8sClient := fake.NewSimpleClientset()
 	var m sync.Mutex
-	var created []*corev1.Secret
 
 	k8sClient.PrependReactor("list", "secrets",
 		func(a k8stesting.Action) (bool, runtime.Object, error) {
@@ -381,7 +384,7 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 			defer m.Unlock()
 
 			secrets := &corev1.SecretList{}
-			for _, v := range created {
+			for _, v := range managedSecrets {
 				secrets.Items = append(secrets.Items, *v)
 			}
 
@@ -404,9 +407,21 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 			ret.Data = map[string][]byte{
 				"token": []byte("abcde"),
 			}
-			created = append(created, ret)
+
+			managedSecrets[ret.ObjectMeta.Name] = ret
 
 			return true, ret, nil
+		},
+	)
+
+	k8sClient.PrependReactor("delete", "secrets",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			m.Lock()
+			defer m.Unlock()
+			deleteName := action.(k8stesting.DeleteAction).GetName()
+			delete(managedSecrets, deleteName)
+
+			return true, nil, nil
 		},
 	)
 
@@ -426,20 +441,114 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 	}
 
 	wg.Wait()
-	if l := len(created); l != 1 {
-		t.Errorf("EnsureSecretForServiceAccount() created %d secrets, want 1", l)
-	}
-
 	var remaining []string
 	lockMap.Range(func(key, value any) bool {
 		remaining = append(remaining, fmt.Sprintf("%v", key))
 		return true
 	})
 	assert.Empty(t, remaining)
+	assert.Len(t, managedSecrets, 1)
+}
 
-	remainingSecrets, err := k8sClient.CoreV1().Secrets("default").List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
+func TestEnsureSecretForServiceAccount_in_parallel_avoids_deadlock(t *testing.T) {
+	managedSecrets := map[string]*corev1.Secret{
+		"test-secret-1": &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-secret-1",
+				Namespace: "default",
+				Labels: map[string]string{
+					ServiceAccountSecretLabel: "test",
+				},
+			},
+			Type: corev1.SecretTypeOpaque,
+		},
+		"test-secret-2": &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-secret-2",
+				Namespace: "default",
+				Labels: map[string]string{
+					ServiceAccountSecretLabel: "test",
+				},
+			},
+			Type: corev1.SecretTypeOpaque,
+		},
 	}
-	assert.Len(t, remainingSecrets.Items, 1)
+
+	k8sClient := fake.NewSimpleClientset()
+	var m sync.Mutex
+	var listCount int64
+
+	k8sClient.PrependReactor("list", "secrets",
+		func(a k8stesting.Action) (bool, runtime.Object, error) {
+			m.Lock()
+			defer m.Unlock()
+
+			secrets := &corev1.SecretList{}
+			if listCount > 0 {
+				for _, v := range managedSecrets {
+					secrets.Items = append(secrets.Items, *v)
+				}
+			}
+
+			atomic.AddInt64(&listCount, 1)
+			return true, secrets, nil
+		},
+	)
+
+	k8sClient.PrependReactor("create", "secrets",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			m.Lock()
+			defer m.Unlock()
+			ret := action.(k8stesting.CreateAction).GetObject().(*corev1.Secret)
+			ret.ObjectMeta.Name = ret.GenerateName + rand.String(5)
+			ret.ObjectMeta.Labels = map[string]string{
+				ServiceAccountSecretLabel: "test", // sa.Name from below
+			}
+			ret.ObjectMeta.Annotations = map[string]string{
+				serviceAccountSecretAnnotation: "test", // sa.Name from below
+			}
+			ret.Data = map[string][]byte{
+				"token": []byte("abcde"),
+			}
+
+			managedSecrets[ret.ObjectMeta.Name] = ret
+
+			return true, ret, nil
+		},
+	)
+
+	k8sClient.PrependReactor("delete", "secrets",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			m.Lock()
+			defer m.Unlock()
+			deleteName := action.(k8stesting.DeleteAction).GetName()
+			delete(managedSecrets, deleteName)
+
+			return true, nil, nil
+		},
+	)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient, &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "default",
+				},
+			}, "cluster-1-")
+			assert.NoError(t, err)
+		}()
+	}
+
+	wg.Wait()
+	var remaining []string
+	lockMap.Range(func(key, value any) bool {
+		remaining = append(remaining, fmt.Sprintf("%v", key))
+		return true
+	})
+	assert.Empty(t, remaining)
+	assert.Len(t, managedSecrets, 1)
 }
