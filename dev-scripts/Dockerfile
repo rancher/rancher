@@ -1,24 +1,13 @@
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 as build
-ARG VERSION
-ARG COMMIT
-ARG RKE_VERSION
-ARG CGO_ENABLED=0
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static"
-ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
-ARG TARGETOS
-ARG TARGETARCH
+ARG ARCH=amd64
+FROM --platform=$ARCH registry.suse.com/bci/golang:1.22 as build
 
 WORKDIR /app
 COPY . .
-RUN go mod download
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
-FROM registry.suse.com/bci/bci-micro:15.6 AS final
+FROM --platform=$ARCH registry.suse.com/bci/bci-micro:15.6 AS final
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS builder
+FROM --platform=$ARCH registry.suse.com/bci/bci-base:15.6 AS builder
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -58,12 +47,12 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.9
-ARG CHART_DEFAULT_BRANCH=dev-v2.9
+ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.9
+ARG CHART_DEFAULT_BRANCH=release-v2.9
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.9
+ARG CATTLE_KDM_BRANCH=release-v2.9
 ARG VERSION=${VERSION}
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
@@ -78,7 +67,7 @@ ENV CATTLE_ETCD_VERSION v3.5.14
 ENV LOGLEVEL_VERSION v0.1.6
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.6.2
-ENV DOCKER_MACHINE_LINODE_VERSION v0.1.12
+ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.7
@@ -91,7 +80,7 @@ ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.8
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.8-rc.3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
@@ -229,8 +218,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.9.1-rc4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.9.1-rc4
+ENV CATTLE_UI_VERSION 2.9.0
+ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0
 ENV CATTLE_CLI_VERSION v2.9.0
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
@@ -278,17 +267,14 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_SERVER_VERSION ${VERSION}
 
 COPY --from=build /app/rancher /usr/bin/
-COPY --from=build /app/package/entrypoint.sh /usr/bin/
-COPY --from=build /app/package/kustomize.sh /usr/bin/
-COPY --from=build app/package/jailer.sh /usr/bin/
+COPY --from=build /app/entrypoint.sh /usr/bin/
+COPY --from=build /app/kustomize.sh /usr/bin/
+COPY --from=build /app/jailer.sh /usr/bin/
 COPY --from=build /app/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 
 COPY --from=build /app/data.json /var/lib/rancher-data/driver-metadata/
-
-RUN mkdir -p /appsrc
-COPY --from=build /app /appsrc/
 
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher

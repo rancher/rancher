@@ -2,22 +2,22 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 ARG REGISTRY=docker.io
 ARG RANCHER_IMAGE=${REGISTRY}/${RANCHER_REPO}/rancher:${RANCHER_TAG}
-ARG ARCH
+ARG ARCH=amd64
 ARG VERSION=dev
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS build
+FROM --platform=$ARCH registry.suse.com/bci/golang:1.22 AS build
 ARG VERSION=${VERSION}
 
 WORKDIR /app
 
-# COPY . .
+COPY . .
 
 FROM ${RANCHER_IMAGE} AS rancher
 
-FROM registry.suse.com/bci/bci-base:15.6 AS final
+FROM --platform=$ARCH registry.suse.com/bci/bci-base:15.6 AS final
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS builder
+FROM --platform=$ARCH registry.suse.com/bci/bci-base:15.6 AS builder
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -82,6 +82,10 @@ ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERS
 RUN curl -skLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini
 
-COPY --from=build /app/agent /app/package/run.sh /app/package/kubectl-shell.sh /app/package/shell-setup.sh /usr/bin/
+COPY --from=build /app/agent /usr/bin/
+COPY --from=build /app/run.sh /usr/bin/
+COPY --from=build /app/kubectl-shell.sh /usr/bin/
+COPY --from=build /app/shell-setup.sh /usr/bin/
+# COPY --from=build /app/agent /app/run.sh /app/kubectl-shell.sh /app/shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 ENTRYPOINT ["/usr/bin/run.sh"]

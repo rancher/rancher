@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+source $(dirname $0)/../scripts/version
+
+cd $(dirname $0)/..
+
+mkdir -p bin
+
+GCFLAGS=""
+if [ -n "${DEBUG}" ]; then
+  GCFLAGS="-N -l"
+fi
+
+if [ "$(uname)" != "Darwin" ]; then
+  LINKFLAGS="-extldflags -static"
+  if [ -z "${DEBUG}" ]; then
+    LINKFLAGS="${LINKFLAGS} -s"
+  fi
+fi
+LDFLAGS="-X main.VERSION=$VERSION $LINKFLAGS"
+
+GOOS=$TARGETOS GOARCH=$AGENT_ARCH CGO_ENABLED=0 go build -tags "$TAG" -gcflags="all=${GCFLAGS}" -ldflags "$LDFLAGS" -o bin/agent ./cmd/agent
