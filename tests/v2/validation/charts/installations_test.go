@@ -5,12 +5,13 @@ package charts
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/registries"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/charts"
+	extencharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/registries"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,7 +71,7 @@ func (i *InstallationTestSuite) TestInstallMonitoringChart() {
 	require.NoError(i.T(), err)
 
 	i.T().Log("Checking if the monitoring chart is already installed")
-	initialMonitoringChart, err := charts.GetChartStatus(client, i.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringName)
+	initialMonitoringChart, err := extencharts.GetChartStatus(client, i.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringName)
 	require.NoError(i.T(), err)
 
 	if !initialMonitoringChart.IsAlreadyInstalled {
@@ -97,15 +98,15 @@ func (i *InstallationTestSuite) TestInstallMonitoringChart() {
 		require.NoError(i.T(), err)
 
 		i.T().Log("Waiting monitoring chart deployments to have expected number of available replicas")
-		err = charts.WatchAndWaitDeployments(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+		err = extencharts.WatchAndWaitDeployments(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
 		require.NoError(i.T(), err)
 
 		i.T().Log("Waiting monitoring chart DaemonSets to have expected number of available nodes")
-		err = charts.WatchAndWaitDaemonSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+		err = extencharts.WatchAndWaitDaemonSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
 		require.NoError(i.T(), err)
 
 		i.T().Log("Waiting monitoring chart StatefulSets to have expected number of ready replicas")
-		err = charts.WatchAndWaitStatefulSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+		err = extencharts.WatchAndWaitStatefulSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
 		require.NoError(i.T(), err)
 	}
 
@@ -120,7 +121,7 @@ func (i *InstallationTestSuite) TestInstallAlertingChart() {
 	client, err := i.client.WithSession(i.session)
 	require.NoError(i.T(), err)
 
-	alertingChart, err := charts.GetChartStatus(client, i.project.ClusterID, charts.RancherAlertingNamespace, charts.RancherAlertingName)
+	alertingChart, err := extencharts.GetChartStatus(client, i.project.ClusterID, charts.RancherAlertingNamespace, charts.RancherAlertingName)
 	require.NoError(i.T(), err)
 
 	if !alertingChart.IsAlreadyInstalled {
@@ -153,7 +154,7 @@ func (i *InstallationTestSuite) TestInstallLoggingChart() {
 	client, err := i.client.WithSession(i.session)
 	require.NoError(i.T(), err)
 
-	loggingChart, err := charts.GetChartStatus(client, i.project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
+	loggingChart, err := extencharts.GetChartStatus(client, i.project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
 	require.NoError(i.T(), err)
 
 	if !loggingChart.IsAlreadyInstalled {
@@ -187,7 +188,7 @@ func (i *InstallationTestSuite) TestInstallIstioChart() {
 	client, err := i.client.WithSession(i.session)
 	require.NoError(i.T(), err)
 
-	istioChart, err := charts.GetChartStatus(client, i.project.ClusterID, charts.RancherIstioNamespace, charts.RancherIstioName)
+	istioChart, err := extencharts.GetChartStatus(client, i.project.ClusterID, charts.RancherIstioNamespace, charts.RancherIstioName)
 	require.NoError(i.T(), err)
 
 	if !istioChart.IsAlreadyInstalled {

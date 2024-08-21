@@ -8,22 +8,23 @@ import (
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	"github.com/rancher/rancher/tests/v2/actions/etcdsnapshot"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
+	"github.com/rancher/rancher/tests/v2/actions/services"
+	deploy "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	scaling "github.com/rancher/rancher/tests/v2/validation/nodescaling"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
-	"github.com/rancher/shepherd/extensions/defaults"
 	extdefault "github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
-	"github.com/rancher/shepherd/extensions/etcdsnapshot"
+	extensionsetcdsnapshot "github.com/rancher/shepherd/extensions/etcdsnapshot"
 	"github.com/rancher/shepherd/extensions/ingresses"
+	extensionsingress "github.com/rancher/shepherd/extensions/ingresses"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
-	"github.com/rancher/shepherd/extensions/provisioning"
-	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
-	deploy "github.com/rancher/shepherd/extensions/workloads/deployment"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/sirupsen/logrus"
@@ -98,7 +99,7 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 		},
 	}
 
-	deploymentResp, err := deploy.CreateDeployment(steveclient, initialWorkloadName, deployment)
+	deploymentResp, err := createDeployment(steveclient, initialWorkloadName, deployment)
 	require.NoError(t, err)
 
 	err = deploy.VerifyDeployment(steveclient, deploymentResp)
@@ -112,13 +113,13 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 	require.NoError(t, err)
 	require.Equal(t, serviceAppendName+initialWorkloadName, serviceResp.ObjectMeta.Name)
 
-	path := ingresses.NewIngressPathTemplate(networking.PathTypeExact, ingressPath, serviceAppendName+initialWorkloadName, 80)
-	ingressTemplate := ingresses.NewIngressTemplate(initialIngressName, defaultNamespace, "", []networking.HTTPIngressPath{path})
+	path := extensionsingress.NewIngressPathTemplate(networking.PathTypeExact, ingressPath, serviceAppendName+initialWorkloadName, 80)
+	ingressTemplate := extensionsingress.NewIngressTemplate(initialIngressName, defaultNamespace, "", []networking.HTTPIngressPath{path})
 
-	ingressResp, err := ingresses.CreateIngress(steveclient, initialIngressName, ingressTemplate)
+	ingressResp, err := extensionsingress.CreateIngress(steveclient, initialIngressName, ingressTemplate)
 	require.NoError(t, err)
 
-	err = ingresses.VerifyIngress(steveclient, ingressResp, initialIngressName)
+	err = ingresses.WaitIngress(steveclient, ingressResp, initialIngressName)
 	require.NoError(t, err)
 	require.Equal(t, initialIngressName, ingressResp.ObjectMeta.Name)
 
@@ -156,10 +157,10 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 
 func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
 	etcdRestore *etcdsnapshot.Config, isRKE1 bool) (*management.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
-	existingSnapshots, err := etcdsnapshot.GetRKE1Snapshots(client, clusterID)
+	existingSnapshots, err := extensionsetcdsnapshot.GetRKE1Snapshots(client, clusterID)
 	require.NoError(t, err)
 
-	err = etcdsnapshot.CreateRKE1Snapshot(client, clusterName)
+	err = extensionsetcdsnapshot.CreateRKE1Snapshot(client, clusterName)
 	require.NoError(t, err)
 
 	cluster, err := client.Management.Cluster.ByID(clusterID)
@@ -232,10 +233,10 @@ func restoreRKE1(t *testing.T, client *rancher.Client, snapshotName string, etcd
 			RestoreRkeConfig: etcdRestore.SnapshotRestore,
 		}
 
-		err := etcdsnapshot.RestoreRKE1Snapshot(client, oldCluster.Name, snapshotRKE1Restore)
+		err := extensionsetcdsnapshot.RestoreRKE1Snapshot(client, oldCluster.Name, snapshotRKE1Restore)
 		require.NoError(t, err)
 
-		nodestat.AllManagementNodeReady(client, oldCluster.ID, defaults.ThirtyMinuteTimeout)
+		nodestat.AllManagementNodeReady(client, oldCluster.ID, extdefault.ThirtyMinuteTimeout)
 
 		clusterResp, err := client.Management.Cluster.ByID(clusterID)
 		require.NoError(t, err)
@@ -261,10 +262,10 @@ func restoreRKE1(t *testing.T, client *rancher.Client, snapshotName string, etcd
 
 func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
 	etcdRestore *etcdsnapshot.Config, isRKE1 bool) (*apisV1.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
-	existingSnapshots, err := etcdsnapshot.GetRKE2K3SSnapshots(client, clusterName)
+	existingSnapshots, err := extensionsetcdsnapshot.GetRKE2K3SSnapshots(client, clusterName)
 	require.NoError(t, err)
 
-	err = etcdsnapshot.CreateRKE2K3SSnapshot(client, clusterName)
+	err = extensionsetcdsnapshot.CreateRKE2K3SSnapshot(client, clusterName)
 	require.NoError(t, err)
 
 	cluster, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
@@ -349,7 +350,7 @@ func restoreV2Prov(t *testing.T, client *rancher.Client, snapshotName string, et
 			RestoreRKEConfig: etcdRestore.SnapshotRestore,
 		}
 
-		err := etcdsnapshot.RestoreRKE2K3SSnapshot(client, snapshotRKE2K3SRestore, clusterObject.Name)
+		err := extensionsetcdsnapshot.RestoreRKE2K3SSnapshot(client, snapshotRKE2K3SRestore, clusterObject.Name)
 		require.NoError(t, err)
 
 		clusterObject, _, err = clusters.GetProvisioningClusterByName(client, cluster.Name, namespace)
@@ -395,7 +396,7 @@ func createPostBackupWorkloads(t *testing.T, client *rancher.Client, clusterID s
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	require.NoError(t, err)
 
-	postDeploymentResp, err := deploy.CreateDeployment(steveclient, workloadNamePostBackup, postBackupDeployment)
+	postDeploymentResp, err := createDeployment(steveclient, workloadNamePostBackup, postBackupDeployment)
 	require.NoError(t, err)
 
 	err = deploy.VerifyDeployment(steveclient, postDeploymentResp)
@@ -442,4 +443,14 @@ func createSnapshotsUntilRetentionLimit(t *testing.T, client *rancher.Client, cl
 		err := etcdsnapshot.RKE2K3SRetentionLimitCheck(client, clusterName)
 		require.NoError(t, err)
 	}
+}
+
+func createDeployment(steveclient *steveV1.Client, wlName string, deployment *v1.Deployment) (*steveV1.SteveAPIObject, error) {
+	logrus.Infof("Creating deployment: %s", wlName)
+	deploymentResp, err := steveclient.SteveType(DeploymentSteveType).Create(deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	return deploymentResp, err
 }

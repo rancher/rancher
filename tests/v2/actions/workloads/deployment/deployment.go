@@ -1,10 +1,10 @@
 package deployment
 
 import (
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/kubeapi/workloads/deployments"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	appv1 "k8s.io/api/apps/v1"
@@ -13,7 +13,11 @@ import (
 )
 
 const (
-	imageName = "nginx"
+	active              = "active"
+	defaultNamespace    = "default"
+	port                = "port"
+	DeploymentSteveType = "apps.deployment"
+	imageName           = "nginx"
 )
 
 // CreateDeployment is a helper to create a deployment with or without a secret/configmap

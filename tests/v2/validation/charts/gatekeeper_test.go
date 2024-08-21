@@ -6,13 +6,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/namespaces"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/charts"
+	extencharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/namespaces"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,11 +83,11 @@ func (g *GateKeeperTestSuite) TestGatekeeperChart() {
 	require.NoError(g.T(), err)
 
 	g.T().Log("Waiting for gatekeeper chart deployments to have expected number of available replicas")
-	err = charts.WatchAndWaitDeployments(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+	err = extencharts.WatchAndWaitDeployments(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 	require.NoError(g.T(), err)
 
 	g.T().Log("Waiting for gatekeeper chart DaemonSets to have expected number of available nodes")
-	err = charts.WatchAndWaitDaemonSets(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+	err = extencharts.WatchAndWaitDaemonSets(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 	require.NoError(g.T(), err)
 
 	g.T().Log("Applying constraint")
@@ -159,7 +160,7 @@ func (g *GateKeeperTestSuite) TestUpgradeGatekeeperChart() {
 	g.gatekeeperChartInstallOptions.Version = versionBeforeLatest
 
 	g.T().Log("Checking if the gatekeeper chart is installed with one of the previous versions")
-	initialGatekeeperChart, err := charts.GetChartStatus(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, charts.RancherGatekeeperName)
+	initialGatekeeperChart, err := extencharts.GetChartStatus(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, charts.RancherGatekeeperName)
 	require.NoError(g.T(), err)
 
 	if initialGatekeeperChart.IsAlreadyInstalled && initialGatekeeperChart.ChartDetails.Spec.Chart.Metadata.Version == versionLatest {
@@ -172,15 +173,15 @@ func (g *GateKeeperTestSuite) TestUpgradeGatekeeperChart() {
 		require.NoError(g.T(), err)
 
 		g.T().Log("Waiting gatekeeper chart deployments to have expected number of available replicas")
-		err = charts.WatchAndWaitDeployments(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+		err = extencharts.WatchAndWaitDeployments(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 		require.NoError(g.T(), err)
 
 		g.T().Log("Waiting gatekeeper chart DaemonSets to have expected number of available nodes")
-		err = charts.WatchAndWaitDaemonSets(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+		err = extencharts.WatchAndWaitDaemonSets(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 		require.NoError(g.T(), err)
 	}
 
-	gatekeeperChartPreUpgrade, err := charts.GetChartStatus(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, charts.RancherGatekeeperName)
+	gatekeeperChartPreUpgrade, err := extencharts.GetChartStatus(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, charts.RancherGatekeeperName)
 	require.NoError(g.T(), err)
 
 	// Validate current version of rancher-gatekeeper is one of the versions before latest
@@ -195,14 +196,14 @@ func (g *GateKeeperTestSuite) TestUpgradeGatekeeperChart() {
 	require.NoError(g.T(), err)
 
 	g.T().Log("Waiting for gatekeeper chart deployments to have expected number of available replicas after upgrade")
-	err = charts.WatchAndWaitDeployments(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+	err = extencharts.WatchAndWaitDeployments(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 	require.NoError(g.T(), err)
 
 	g.T().Log("Waiting gatekeeper chart DaemonSets to have expected number of available nodes after upgrade")
-	err = charts.WatchAndWaitDaemonSets(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+	err = extencharts.WatchAndWaitDaemonSets(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 	require.NoError(g.T(), err)
 
-	gatekeeperChartPostUpgrade, err := charts.GetChartStatus(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, charts.RancherGatekeeperName)
+	gatekeeperChartPostUpgrade, err := extencharts.GetChartStatus(client, g.project.ClusterID, charts.RancherGatekeeperNamespace, charts.RancherGatekeeperName)
 	require.NoError(g.T(), err)
 
 	g.T().Log("Comparing installed and desired gatekeeper versions")

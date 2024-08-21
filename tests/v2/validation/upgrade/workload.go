@@ -9,20 +9,22 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	kubeingress "github.com/rancher/rancher/tests/v2/actions/kubeapi/ingresses"
+	"github.com/rancher/rancher/tests/v2/actions/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/rancher/tests/v2/actions/secrets"
+	"github.com/rancher/rancher/tests/v2/actions/services"
+	"github.com/rancher/rancher/tests/v2/actions/upgradeinput"
+	"github.com/rancher/rancher/tests/v2/actions/workloads"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/charts"
+	extensionscharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	kubeingress "github.com/rancher/shepherd/extensions/kubeapi/ingresses"
-	"github.com/rancher/shepherd/extensions/namespaces"
-	"github.com/rancher/shepherd/extensions/projects"
-	"github.com/rancher/shepherd/extensions/secrets"
-	"github.com/rancher/shepherd/extensions/services"
-	"github.com/rancher/shepherd/extensions/upgradeinput"
-	"github.com/rancher/shepherd/extensions/workloads"
+	extensionsworkloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/sirupsen/logrus"
@@ -87,23 +89,23 @@ func createPreUpgradeWorkloads(t *testing.T, client *rancher.Client, clusterName
 	testContainerPodTemplate := newPodTemplateWithTestContainer()
 
 	logrus.Infof("Creating deployment: %v", names.random[deploymentName])
-	deploymentTemplate := workloads.NewDeploymentTemplate(names.random[deploymentName], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+	deploymentTemplate := extensionsworkloads.NewDeploymentTemplate(names.random[deploymentName], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 	createdDeployment, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	require.NoError(t, err)
 	assert.Equal(t, createdDeployment.Name, names.random[deploymentName])
 
 	logrus.Infof("Waiting for deployment %v to have expected number of available replicas...", names.random[deploymentName])
-	err = charts.WatchAndWaitDeployments(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensionscharts.WatchAndWaitDeployments(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(t, err)
 
 	logrus.Infof("Creating daemonset: %v", names.random[daemonsetName])
-	daemonsetTemplate := workloads.NewDaemonSetTemplate(names.random[daemonsetName], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+	daemonsetTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random[daemonsetName], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(t, err)
 	assert.Equal(t, createdDaemonSet.Name, names.random[daemonsetName])
 
 	logrus.Infof("Waiting for daemonset %v to have the expected number of available replicas...", names.random[daemonsetName])
-	err = charts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensionscharts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(t, err)
 
 	logrus.Infof("Validating daemonset %v available replicas number are equal to the worker nodes...", names.random[daemonsetName])
@@ -119,19 +121,19 @@ func createPreUpgradeWorkloads(t *testing.T, client *rancher.Client, clusterName
 	podTemplateWithSecretVolume := newPodTemplateWithSecretVolume(names.random[secretName])
 
 	logrus.Infof("Creating deployment %v with the test container and secret as volume...", names.random[deploymentNameForVolumeSecret])
-	deploymentWithSecretTemplate := workloads.NewDeploymentTemplate(names.random[deploymentNameForVolumeSecret], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
+	deploymentWithSecretTemplate := extensionsworkloads.NewDeploymentTemplate(names.random[deploymentNameForVolumeSecret], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
 	createdDeploymentWithSecretVolume, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentWithSecretTemplate)
 	require.NoError(t, err)
 	assert.Equal(t, createdDeploymentWithSecretVolume.Name, names.random[deploymentNameForVolumeSecret])
 
 	logrus.Infof("Creating daemonset %v with the test container and secret as volume...", names.random[daemonsetNameForVolumeSecret])
-	daemonsetWithSecretTemplate := workloads.NewDaemonSetTemplate(names.random[daemonsetNameForVolumeSecret], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
+	daemonsetWithSecretTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random[daemonsetNameForVolumeSecret], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
 	createdDaemonSetWithSecretVolume, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetWithSecretTemplate)
 	require.NoError(t, err)
 	assert.Equal(t, createdDaemonSetWithSecretVolume.Name, names.random[daemonsetNameForVolumeSecret])
 
 	logrus.Infof("Waiting for daemonset %v to have the expected number of available replicas", names.random[daemonsetNameForVolumeSecret])
-	err = charts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensionscharts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(t, err)
 
 	logrus.Infof("Validating daemonset %v available replicas number are equal to the worker nodes...", names.random[daemonsetNameForVolumeSecret])
@@ -140,19 +142,19 @@ func createPreUpgradeWorkloads(t *testing.T, client *rancher.Client, clusterName
 	podTemplateWithSecretEnvironmentVariable := newPodTemplateWithSecretEnvironmentVariable(names.random[secretName])
 
 	logrus.Infof("Creating deployment %v with the test container and secret as environment variable...", names.random[deploymentNameForEnvironmentVariableSecret])
-	deploymentEnvironmentWithSecretTemplate := workloads.NewDeploymentTemplate(names.random[deploymentNameForEnvironmentVariableSecret], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
+	deploymentEnvironmentWithSecretTemplate := extensionsworkloads.NewDeploymentTemplate(names.random[deploymentNameForEnvironmentVariableSecret], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
 	createdDeploymentEnvironmentVariableSecret, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentEnvironmentWithSecretTemplate)
 	require.NoError(t, err)
 	assert.Equal(t, createdDeploymentEnvironmentVariableSecret.Name, names.random[deploymentNameForEnvironmentVariableSecret])
 
 	logrus.Infof("Creating daemonset %v with the test container and secret as environment variable...", names.random[daemonsetNameForEnvironmentVariableSecret])
-	daemonSetEnvironmentWithSecretTemplate := workloads.NewDaemonSetTemplate(names.random[daemonsetNameForEnvironmentVariableSecret], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
+	daemonSetEnvironmentWithSecretTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random[daemonsetNameForEnvironmentVariableSecret], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
 	createdDaemonSetEnvironmentVariableSecret, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonSetEnvironmentWithSecretTemplate)
 	require.NoError(t, err)
 	assert.Equal(t, createdDaemonSetEnvironmentVariableSecret.Name, names.random[daemonsetNameForEnvironmentVariableSecret])
 
 	logrus.Infof("Waiting daemonset %v to have expected number of available replicas", names.random[daemonsetNameForEnvironmentVariableSecret])
-	err = charts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensionscharts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(t, err)
 
 	logrus.Infof("Validating daemonset %v available replicas number is equal to worker nodes...", names.random[daemonsetNameForEnvironmentVariableSecret])
@@ -160,7 +162,7 @@ func createPreUpgradeWorkloads(t *testing.T, client *rancher.Client, clusterName
 
 	if *featuresToTest.Ingress {
 		logrus.Infof("Creating deployment %v with the test container for ingress...", names.random[deploymentNameForIngress])
-		deploymentForIngressTemplate := workloads.NewDeploymentTemplate(names.random[deploymentNameForIngress], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+		deploymentForIngressTemplate := extensionsworkloads.NewDeploymentTemplate(names.random[deploymentNameForIngress], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 		createdDeploymentForIngress, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentForIngressTemplate)
 		require.NoError(t, err)
 		assert.Equal(t, createdDeploymentForIngress.Name, names.random[deploymentNameForIngress])
@@ -200,7 +202,7 @@ func createPreUpgradeWorkloads(t *testing.T, client *rancher.Client, clusterName
 		assert.True(t, isIngressForDeploymentAccessible)
 
 		logrus.Infof("Creating daemonset %v with the test container for ingress...", names.random[daemonsetNameForIngress])
-		daemonSetForIngressTemplate := workloads.NewDaemonSetTemplate(names.random[daemonsetNameForIngress], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+		daemonSetForIngressTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random[daemonsetNameForIngress], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 		createdDaemonSetForIngress, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonSetForIngressTemplate)
 		require.NoError(t, err)
 		assert.Equal(t, createdDaemonSetForIngress.Name, names.random[daemonsetNameForIngress])
@@ -242,7 +244,7 @@ func createPreUpgradeWorkloads(t *testing.T, client *rancher.Client, clusterName
 
 	if *featuresToTest.Chart {
 		logrus.Infof("Checking if the logging chart is installed in cluster: %v", project.ClusterID)
-		loggingChart, err := charts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
+		loggingChart, err := extensionscharts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
 		require.NoError(t, err)
 
 		if !loggingChart.IsAlreadyInstalled {
@@ -369,7 +371,7 @@ func createPostUpgradeWorkloads(t *testing.T, client *rancher.Client, clusterNam
 
 	if *featuresToTest.Chart {
 		logrus.Infof("Checking if the logging chart is installed...")
-		loggingChart, err := charts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
+		loggingChart, err := extensionscharts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
 		require.NoError(t, err)
 		assert.True(t, loggingChart.IsAlreadyInstalled)
 	}
@@ -442,14 +444,14 @@ func newServiceTemplate(serviceName, namespaceName string, selector map[string]s
 // newTestContainerMinimal is a private constructor that returns container for minimal workload creations
 func newTestContainerMinimal() corev1.Container {
 	pullPolicy := corev1.PullAlways
-	return workloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil, nil, nil, nil)
+	return extensionsworkloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil, nil, nil, nil)
 }
 
 // newPodTemplateWithTestContainer is a private constructor that returns pod template spec for workload creations
 func newPodTemplateWithTestContainer() corev1.PodTemplateSpec {
 	testContainer := newTestContainerMinimal()
 	containers := []corev1.Container{testContainer}
-	return workloads.NewPodTemplate(containers, nil, nil, nil)
+	return extensionsworkloads.NewPodTemplate(containers, nil, nil, nil)
 }
 
 // newPodTemplateWithSecretVolume is a private constructor that returns pod template spec with volume option for workload creations
@@ -468,7 +470,7 @@ func newPodTemplateWithSecretVolume(secretName string) corev1.PodTemplateSpec {
 		},
 	}
 
-	return workloads.NewPodTemplate(containers, volumes, nil, nil)
+	return extensionsworkloads.NewPodTemplate(containers, volumes, nil, nil)
 }
 
 // newPodTemplateWithSecretEnvironmentVariable is a private constructor that returns pod template spec with envFrom option for workload creations
@@ -481,10 +483,10 @@ func newPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTe
 			},
 		},
 	}
-	container := workloads.NewContainer(containerName, containerImage, pullPolicy, nil, envFrom, nil, nil, nil)
+	container := extensionsworkloads.NewContainer(containerName, containerImage, pullPolicy, nil, envFrom, nil, nil, nil)
 	containers := []corev1.Container{container}
 
-	return workloads.NewPodTemplate(containers, nil, nil, nil)
+	return extensionsworkloads.NewPodTemplate(containers, nil, nil, nil)
 }
 
 // waitUntilIngressIsAccessible waits until the ingress is accessible

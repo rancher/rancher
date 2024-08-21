@@ -5,11 +5,11 @@ package clusterandprojectroles
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/projects"
+	rbac "github.com/rancher/rancher/tests/v2/actions/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/projects"
-	rbac "github.com/rancher/shepherd/extensions/rbac"
 	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"

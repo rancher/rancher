@@ -13,9 +13,9 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
