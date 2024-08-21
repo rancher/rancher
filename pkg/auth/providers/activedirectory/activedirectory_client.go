@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/auth/providers/activedirectory/guid"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -29,6 +28,7 @@ func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveD
 	if password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
+	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
@@ -38,30 +38,14 @@ func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveD
 
 	serviceAccountPassword := config.ServiceAccountPassword
 	serviceAccountUserName := config.ServiceAccountUsername
-
-	isObjectGUIDLogin := strings.HasPrefix(username, "objectGUID=")
-
-	// if logging with the objectGUID we need to use the serviceAccount to fetch the DN and login
-	if testServiceAccountBind || isObjectGUIDLogin {
+	if testServiceAccountBind {
 		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, config.DefaultLoginDomain, lConn)
 		if err != nil {
 			return v3.Principal{}, nil, err
 		}
 	}
 
-	// If the username has the format of "objectGUID=" we need to look for the proper loginAttribute
-	// This can be used to try a login with the user UUID
-	if isObjectGUIDLogin {
-		username, err = getUsernameFromObjectGUID(lConn, config, username)
-		if err != nil {
-			return v3.Principal{}, nil, err
-		}
-	}
-
 	logrus.Debug("Binding username password")
-
-	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
-
 	err = lConn.Bind(externalID, password)
 	if err != nil {
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
@@ -163,43 +147,6 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	}
 
 	return groupPrincipals, err
-}
-
-func getUsernameFromObjectGUID(lConn *ldapv3.Conn, config *v32.ActiveDirectoryConfig, username string) (string, error) {
-	uuid := strings.TrimPrefix(username, "objectGUID=")
-
-	parsedGUID, err := guid.Parse(uuid)
-	if err != nil {
-		return "", fmt.Errorf("parsing objectGUID to get the username: %w", err)
-	}
-
-	// search the user by its objectGUID
-	query := fmt.Sprintf(
-		"(&(%v=%v)(%s=%s))",
-		ObjectClass, config.UserObjectClass,
-		ObjectGUIDAttribute, guid.Escape(parsedGUID),
-	)
-	logrus.Debugf("LDAP Search query with objectGUID from UUID (%s): {%s}", parsedGUID.UUID(), query)
-
-	search := ldap.NewWholeSubtreeSearchRequest(
-		config.UserSearchBase,
-		query,
-		config.GetUserSearchAttributes(defaultUserAttributes...),
-	)
-
-	result, err := lConn.Search(search)
-	if err != nil {
-		return "", fmt.Errorf("LDAP search of user by objectGUID failed: %w", err)
-	}
-
-	if len(result.Entries) == 0 {
-		return "", errors.New("LDAP search of user by objectGUID returned no results")
-	} else if len(result.Entries) > 1 {
-		return "", fmt.Errorf("LDAP search of user by objectGUID returned more than 1 result")
-	}
-
-	// if found we can continue the login flow with the login attribute of the user
-	return result.Entries[0].GetAttributeValue(config.UserLoginAttribute), nil
 }
 
 func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult, config *v32.ActiveDirectoryConfig, lConn *ldapv3.Conn) (v3.Principal, []v3.Principal, error) {
