@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "k8s.io/api/rbac/v1"
@@ -58,7 +59,8 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
-	p, c := newPandCLifecycles(management)
+	p := project_cluster.NewProjectLifecycle(management)
+	c := project_cluster.NewClusterLifecycle(management)
 	u := newUserLifecycle(management, clusterManager)
 	n := newTokenController(management.WithAgent(tokenController))
 	ac := newAuthConfigController(ctx, management, clusterManager.ScaledContext)
@@ -74,8 +76,8 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.Users("").AddLifecycle(ctx, userController, u)
 	management.Management.RoleTemplates("").AddLifecycle(ctx, roleTemplateLifecycleName, rt)
 
-	management.Management.Clusters("").AddHandler(ctx, clusterCreateController, c.sync)
-	management.Management.Projects("").AddHandler(ctx, projectCreateController, p.sync)
+	management.Management.Clusters("").AddHandler(ctx, project_cluster.ClusterCreateController, c.Sync)
+	management.Management.Projects("").AddHandler(ctx, project_cluster.ProjectCreateController, p.Sync)
 	management.Management.ProjectRoleTemplateBindings("").AddHandler(ctx, prtbServiceAccountControllerName, prtbServiceAccountFinder.sync)
 	management.Management.Tokens("").AddHandler(ctx, tokenController, n.sync)
 	management.Management.AuthConfigs("").AddHandler(ctx, authConfigControllerName, ac.sync)
@@ -87,7 +89,8 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
-	p, c := newPandCLifecycles(management)
-	management.Management.Projects("").AddLifecycle(ctx, projectRemoveController, p)
-	management.Management.Clusters("").AddLifecycle(ctx, clusterRemoveController, c)
+	p := project_cluster.NewProjectLifecycle(management)
+	c := project_cluster.NewClusterLifecycle(management)
+	management.Management.Projects("").AddLifecycle(ctx, project_cluster.ProjectRemoveController, p)
+	management.Management.Clusters("").AddLifecycle(ctx, project_cluster.ClusterRemoveController, c)
 }
