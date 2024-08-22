@@ -69,6 +69,15 @@ type handler struct {
 	remoteTunnel *remoteTunnel
 }
 
+var (
+	KubeConfigFilePath string
+)
+
+// XXX: For POC purpose because Rancher unsets the env KUBECONFIG in main.go
+func SetKubeConfig(kubeConfig string) {
+	KubeConfigFilePath = kubeConfig
+}
+
 func must(err error) {
 	if err != nil {
 		panic(err)
@@ -104,7 +113,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		must(err)
 
 		opts := options.NewDelegatingAuthenticationOptions()
-		opts.RemoteKubeConfigFile = "/home/tlebreux/sources/SUSE/deployer/data/terraform/bootstrap/imperative2/kubeconfig-imperative2-lo.yaml"
+		opts.RemoteKubeConfigFile = KubeConfigFilePath
 		opts.DisableAnonymous = true
 
 		oapiConfig := &openapicommon.Config{}

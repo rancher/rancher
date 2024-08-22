@@ -12,6 +12,7 @@ import (
 	"github.com/ehazlett/simplelog"
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
+	"github.com/rancher/rancher/pkg/controllers/ext"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rancher"
@@ -217,6 +218,7 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	}
 	cfg.Embedded = embedded
 
+	ext.SetKubeConfig(os.Getenv("KUBECONFIG"))
 	os.Unsetenv("KUBECONFIG")
 
 	server, err := rancher.New(ctx, clientConfig, &cfg)
