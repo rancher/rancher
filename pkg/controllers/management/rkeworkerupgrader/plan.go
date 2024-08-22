@@ -7,9 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
-	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/librke"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	rkeservices "github.com/rancher/rke/services"

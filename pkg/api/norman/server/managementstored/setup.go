@@ -58,7 +58,7 @@ import (
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
-	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
