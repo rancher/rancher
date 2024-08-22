@@ -1,0 +1,14 @@
+{
+    "apiVersion": "ext.cattle.io/v1alpha1",
+    "kind": "RancherToken",
+    "metadata": {
+        "creationTimestamp": null,
+        "name": "foo-json"
+    },
+    "spec": {
+        "clusterName": "my-cluster",
+        "enabled": "true",
+        "ttl": "90",
+        "userID": "my-user"
+    }
+}

@@ -3,7 +3,7 @@ kind: RancherToken
 metadata:
   name: "foo2"
 spec:
-  userID: "my-user"
+  userID: "system:serviceaccount:default:apiserver-poc-read"
   clusterName: "my-cluster"
   ttl: "90"
   enabled: "true"

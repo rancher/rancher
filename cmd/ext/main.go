@@ -2,36 +2,67 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
+	"fmt"
+	"io"
+	"log"
+	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/dynamiclistener"
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
+	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
-	kserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/server/options"
-	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
-	namespace        = "cattle-system"
-	tlsName          = "apiserver-poc.default.svc"
-	certName         = "cattle-apiextension-tls"
-	caName           = "cattle-apiextension-ca"
-	defaultHTTPSPort = 9443
+	namespace = "cattle-system"
+	tlsName   = "apiserver-poc.default.svc"
+	certName  = "cattle-apiextension-tls"
+	caName    = "cattle-apiextension-ca"
 )
 
 func must(err error) {
 	if err != nil {
 		panic(err)
+	}
+}
+
+func runProxyListener(ctx context.Context, dialer remotedialer.Dialer) error {
+	l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", ext.APIPort))
+	if err != nil {
+		return err
+	}
+	defer l.Close()
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Print("proxy accept:", err)
+			continue
+		}
+
+		peerAddr := fmt.Sprintf(":%d", ext.APIPort)
+		clientConn, err := dialer(ctx, "tcp", peerAddr)
+		if err != nil {
+			log.Printf("proxy dial %s: %s", peerAddr, err)
+			continue
+		}
+
+		// XXX: This works but should really be tested with failures,
+		// etc I doubt it's robust
+		pipe := func(a, b net.Conn) {
+			defer a.Close()
+			defer b.Close()
+			io.Copy(a, b)
+		}
+
+		go pipe(conn, clientConn)
+		go pipe(clientConn, conn)
 	}
 }
 
@@ -49,11 +80,9 @@ func main() {
 
 	wContext.Start(ctx)
 
-	var port int
-
 	router := mux.NewRouter()
-	port = 5554
 	authorizer := func(req *http.Request) (string, bool, error) {
+		// XXX: Actually do authorization here with a shared Secret
 		return "my-id", true, nil
 	}
 	remoteDialerServer := remotedialer.New(authorizer, remotedialer.DefaultErrorWriter)
@@ -62,65 +91,13 @@ func main() {
 		remoteDialerServer.ServeHTTP(w, req)
 	}))
 
-	// XXX: We don't need a http reverse proxy. Instead we could
-	// have another port that would basically io.Copy() all data.
-	// This way we don't MITM the connection and Rancher doesn't
-	// need special auth handling.
-	dialer := remoteDialerServer.Dialer("my-id")
-	reverseProxy := httputil.ReverseProxy{
-		Rewrite: func(proxy *httputil.ProxyRequest) {
-			url := url.URL{
-				Scheme: "https",
-				Host:   "localhost:5555",
-			}
-			proxy.SetURL(&url)
-		},
-		Transport: &http.Transport{
-			DialContext: dialer,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-	secureServingInfo := &kserver.SecureServingInfo{}
-
-	authInfo := &kserver.AuthenticationInfo{}
-	sso := options.NewSecureServingOptions()
-	sso.BindPort = port
-	err = sso.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil)
-	must(err)
-	err = sso.ApplyTo(&secureServingInfo)
-	must(err)
-
-	opts := options.NewDelegatingAuthenticationOptions()
-	opts.RemoteKubeConfigFile = os.Getenv("KUBECONFIG")
-	opts.DisableAnonymous = true
-
-	oapiConfig := &openapicommon.Config{}
-	err = opts.ApplyTo(authInfo, secureServingInfo, oapiConfig)
-
-	router.PathPrefix("/").HandlerFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		resp, isAuthenticated, err := authInfo.Authenticator.AuthenticateRequest(req)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+	go func() {
+		if err := runProxyListener(ctx, remoteDialerServer.Dialer("my-id")); err != nil {
+			panic(err)
 		}
+	}()
 
-		if !isAuthenticated {
-			http.Error(w, "unauthenticated", http.StatusForbidden)
-			return
-		}
-
-		req.Header.Add("X-Remote-User", resp.User.GetName())
-		req.Header.Add("X-Remote-Groups", resp.User.GetGroups()[0])
-		reverseProxy.ServeHTTP(w, req)
-	}))
-
-	stopCh := make(chan struct{})
-	secureServingInfo.Serve(router, time.Second*5, stopCh)
-	<-stopCh
-
-	err = server.ListenAndServe(ctx, port, 0, router, &server.ListenOpts{
+	err = server.ListenAndServe(ctx, ext.TunnelPort, 0, router, &server.ListenOpts{
 		Secrets:       wContext.Core.Secret(),
 		CAName:        caName,
 		CANamespace:   namespace,

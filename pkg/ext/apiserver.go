@@ -355,7 +355,8 @@ func errorHTTPHandler(logger *logrus.Entry, f errorHandlerFunc) http.HandlerFunc
 
 func getDefinitionName(name string) (string, spec.Extensions) {
 	namer := openapi.NewDefinitionNamer(scheme)
-	defName, defGVK := namer.GetDefinitionName(name)
-	defName = strings.ReplaceAll(defName, "com.github.rancher.rancher.pkg.ext.resources.tokens", "io.cattle.ext.v1alpha1")
-	return defName, defGVK
+	originalName, defGVK := namer.GetDefinitionName(name)
+	// XXX: It works but would need more work to support more resources
+	updatedName := strings.ReplaceAll(originalName, "com.github.rancher.rancher.pkg.ext.resources.tokens", "io.cattle.ext.v1alpha1")
+	return updatedName, defGVK
 }

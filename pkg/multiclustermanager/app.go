@@ -189,6 +189,9 @@ func (m *mcm) Start(ctx context.Context) error {
 	}
 
 	m.wranglerContext.OnLeader(func(ctx context.Context) error {
+		// Run ASAP to prevent Rancher startup deadlock (which we should probably fix in another way)
+		extController.Register(ctx, m.wranglerContext)
+
 		err := m.wranglerContext.StartWithTransaction(ctx, func(ctx context.Context) error {
 			var (
 				err error
@@ -207,8 +210,6 @@ func (m *mcm) Start(ctx context.Context) error {
 			if err := managementController.RegisterWrangler(ctx, m.wranglerContext, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
 				return errors.Wrap(err, "failed to register wrangler controllers")
 			}
-
-			extController.Register(ctx, m.wranglerContext)
 			return nil
 		})
 		if err != nil {

@@ -13,8 +13,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/rancher/dynamiclistener"
-	"github.com/rancher/dynamiclistener/server"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/ext/resources/tokens"
@@ -32,19 +30,22 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	kserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/utils/ptr"
 )
 
 const (
 	apiSvcName = "v1alpha1.ext.cattle.io"
 	// Port is used both for APIService & remotedialer tunnel
-	apiSvcPort     = int32(5554)
+	apiSvcPort     = int32(ext.APIPort)
+	tunnelPort     = int32(ext.TunnelPort)
 	svcName        = "api-extension"
 	namespace      = "cattle-system"
 	deploymentName = "api-extension"
@@ -68,6 +69,12 @@ type handler struct {
 	remoteTunnel *remoteTunnel
 }
 
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		apiClient:        clients.API.APIService(),
@@ -85,37 +92,52 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.Mgmt.Setting().OnChange(ctx, "api-extension", h.OnChange)
 
 	go func() {
+		secureServingInfo := &kserver.SecureServingInfo{}
+
+		authInfo := &kserver.AuthenticationInfo{}
+		sso := options.NewSecureServingOptions()
+		sso.BindPort = int(apiSvcPort)
+		var err error
+		err = sso.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil)
+		must(err)
+		err = sso.ApplyTo(&secureServingInfo)
+		must(err)
+
+		opts := options.NewDelegatingAuthenticationOptions()
+		opts.RemoteKubeConfigFile = "/home/tlebreux/sources/SUSE/deployer/data/terraform/bootstrap/imperative2/kubeconfig-imperative2-lo.yaml"
+		opts.DisableAnonymous = true
+
+		oapiConfig := &openapicommon.Config{}
+		err = opts.ApplyTo(authInfo, secureServingInfo, oapiConfig)
+		must(err)
+
 		router := mux.NewRouter()
 		router.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				userName := req.Header.Get("X-Remote-User")
-				groups := req.Header.Get("X-Remote-Groups")
-				ctx = request.WithUser(req.Context(), &user.DefaultInfo{
-					Name:   userName,
-					Groups: []string{groups},
-				})
+				resp, isAuthenticated, err := authInfo.Authenticator.AuthenticateRequest(req)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				if !isAuthenticated {
+					http.Error(w, "unauthenticated", http.StatusForbidden)
+					return
+				}
+
+				// Inject the user info in the request, the store can then use it for more checks
+				ctx = request.WithUser(req.Context(), resp.User)
 				req = req.WithContext(ctx)
 
 				next.ServeHTTP(w, req)
 			})
 		})
 		ext.RegisterSubRoutes(router, clients)
-		err := server.ListenAndServe(ctx, 5555, 0, router, &server.ListenOpts{
-			Secrets:       clients.Core.Secret(),
-			CAName:        caName,
-			CANamespace:   namespace,
-			CertName:      certName,
-			CertNamespace: namespace,
-			TLSListenerConfig: dynamiclistener.Config{
-				SANs: []string{tlsName},
-				FilterCN: func(cns ...string) []string {
-					return []string{tlsName}
-				},
-			},
-		})
-		if err != nil {
-			panic(err)
-		}
+
+		stopCh := make(chan struct{})
+		secureServingInfo.Serve(router, time.Second*5, stopCh)
+		<-stopCh
+
 		<-ctx.Done()
 	}()
 }
@@ -253,6 +275,10 @@ func (h *handler) ensureAPIExtensionEnabled() error {
 							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
+									ContainerPort: tunnelPort,
+									Protocol:      corev1.ProtocolTCP,
+								},
+								{
 									ContainerPort: apiSvcPort,
 									Protocol:      corev1.ProtocolTCP,
 								},
@@ -323,6 +349,9 @@ func getEffectiveValue(setting *mgmt.Setting) string {
 	return value
 }
 
+// XXX: Warning, scary and probably buggy code ahead, but it kinda sorta work
+// for the POC
+
 type remoteTunnel struct {
 	restConfig *rest.Config
 	podClient  wcorev1.PodClient
@@ -382,7 +411,7 @@ func (r *remoteTunnel) start(ctx context.Context) error {
 	}
 	err := remotedialer.ClientConnect(
 		ctx,
-		fmt.Sprintf("wss://localhost:%d/connect", apiSvcPort),
+		fmt.Sprintf("wss://localhost:%d/connect", tunnelPort),
 		// TODO: Shared secret here would be a good idea
 		http.Header{},
 		dialer,
@@ -426,7 +455,7 @@ func (r *remoteTunnel) runForwarder(ctx context.Context, readyCh chan struct{}) 
 	}, http.MethodPost, &serverURL)
 
 	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
-	forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d", apiSvcPort)}, ctx.Done(), readyCh, out, errOut)
+	forwarder, err := portforward.NewOnAddresses(dialer, []string{"127.0.0.1"}, []string{fmt.Sprintf("%d", tunnelPort)}, ctx.Done(), readyCh, out, errOut)
 	if err != nil {
 		return err
 	}
