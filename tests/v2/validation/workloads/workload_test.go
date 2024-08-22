@@ -1,4 +1,4 @@
-//go:build (validation || infra.any || cluster.any || sanity) && !stress && !extended
+//go:build (validation || infra.any || cluster.any || sanity) && !stress
 
 package workloads
 
@@ -7,8 +7,9 @@ import (
 
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/cronjob"
-	deamonset "github.com/rancher/rancher/tests/v2/actions/workloads/daemonset"
+	"github.com/rancher/rancher/tests/v2/actions/workloads/daemonset"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
+	pods "github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/statefulset"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -20,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -75,6 +77,9 @@ func (w *WorkloadTestSuite) TestWorkloadSideKick() {
 	createdDeployment, err := deployment.CreateDeploymentWithConfigmap(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
 	require.NoError(w.T(), err)
 
+	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, createdDeployment)
+	require.NoError(w.T(), err)
+
 	containerName := namegen.AppendRandomString("updatetestcontainer")
 	newContainerTemplate := workloads.NewContainer(containerName,
 		"redis",
@@ -95,6 +100,9 @@ func (w *WorkloadTestSuite) TestWorkloadSideKick() {
 		FieldSelector: "metadata.name=" + updatedDeployment.Name,
 	})
 	require.NoError(w.T(), err)
+
+	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, updatedDeployment)
+	require.NoError(w.T(), err)
 }
 
 func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
@@ -104,7 +112,7 @@ func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
-	createdDaemonset, err := deamonset.CreateDaemonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	createdDaemonset, err := daemonset.CreateDaemonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
 	require.NoError(w.T(), err)
 
 	err = charts.WatchAndWaitDaemonSets(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
@@ -183,6 +191,90 @@ func (w *WorkloadTestSuite) TestWorkloadStatefulset() {
 		FieldSelector: "metadata.name=" + statefulsetTemplate.Name,
 	})
 	require.NoError(w.T(), err)
+}
+
+func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	upgradeDeployment, err := deployment.CreateDeploymentWithConfigmap(w.client, w.cluster.ID, namespace.Name, 2, "", "", false, false)
+	require.NoError(w.T(), err)
+
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "1", "nginx", 2)
+
+	containerName := namegen.AppendRandomString("updatetestcontainer")
+	newContainerTemplate := workloads.NewContainer(containerName,
+		"redis",
+		corev1.PullAlways,
+		[]corev1.VolumeMount{},
+		[]corev1.EnvFromSource{},
+		nil,
+		nil,
+		nil,
+	)
+	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
+
+	upgradeDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment)
+	require.NoError(w.T(), err)
+
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "2", "redis", 2)
+
+	containerName = namegen.AppendRandomString("updatetestcontainertwo")
+	newContainerTemplate = workloads.NewContainer(containerName,
+		"ubuntu",
+		corev1.PullAlways,
+		[]corev1.VolumeMount{},
+		[]corev1.EnvFromSource{},
+		nil,
+		nil,
+		nil,
+	)
+	newContainerTemplate.TTY = true
+	newContainerTemplate.Stdin = true
+	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
+
+	_, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment)
+	require.NoError(w.T(), err)
+
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "3", "ubuntu", 2)
+
+	logRollback, err := deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 1)
+	require.NoError(w.T(), err)
+	require.NotEmpty(w.T(), logRollback)
+
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "4", "nginx", 2)
+
+	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 2)
+	require.NoError(w.T(), err)
+	require.NotEmpty(w.T(), logRollback)
+
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "5", "redis", 2)
+
+	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 3)
+	require.NoError(w.T(), err)
+	require.NotEmpty(w.T(), logRollback)
+
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "6", "ubuntu", 2)
+}
+
+func validateDeploymentUpgrade(w *WorkloadTestSuite, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedContainerCount int) {
+	err := charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + appv1Deployment.Name,
+	})
+	require.NoError(w.T(), err)
+
+	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespaceName, appv1Deployment)
+	require.NoError(w.T(), err)
+
+	err = deployment.ValidateRolloutHistoryDeployment(w.client, w.cluster.ID, namespaceName, appv1Deployment.Name, expectedRevision)
+	require.NoError(w.T(), err)
+
+	countPods, err := pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespaceName, image)
+	require.NoError(w.T(), err)
+	require.Equal(w.T(), expectedContainerCount, countPods)
 }
 
 func TestWorkloadTestSuite(t *testing.T) {

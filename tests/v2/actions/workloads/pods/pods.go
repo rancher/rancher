@@ -1,14 +1,31 @@
 package pods
 
 import (
+	"context"
+	"errors"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
+	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/wait"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
-	timeFormat = "2006/01/02 15:04:05"
-	imageName  = "nginx"
+	timeFormat   = "2006/01/02 15:04:05"
+	imageName    = "nginx"
+	podSteveType = "pod"
 )
 
 // NewPodTemplateWithConfig is a helper to create a Pod template with a secret/configmap as an environment variable or volume mount or both
@@ -65,4 +82,128 @@ func NewPodTemplateWithConfig(secretName, configMapName string, useEnvVars, useV
 	container := workloads.NewContainer(containerName, imageName, pullPolicy, nil, envFrom, nil, nil, nil)
 	containers := []corev1.Container{container}
 	return workloads.NewPodTemplate(containers, volumes, nil, nil, nil)
+}
+
+// CheckPodLogsForErrors is a helper to check pod logs for errors
+func CheckPodLogsForErrors(client *rancher.Client, clusterID string, podName string, namespace string, errorPattern string, startTime time.Time) error {
+	startTimeUTC := startTime.UTC()
+
+	errorRegex := regexp.MustCompile(errorPattern)
+	timeRegex := regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}`)
+
+	var errorMessage string
+
+	kwait.Poll(defaults.TenSecondTimeout, defaults.FiveMinuteTimeout, func() (bool, error) {
+		podLogs, err := kubeconfig.GetPodLogs(client, clusterID, podName, namespace, "")
+		if err != nil {
+			return false, err
+		}
+
+		segments := strings.Split(podLogs, "\n")
+		for _, segment := range segments {
+			timeMatches := timeRegex.FindStringSubmatch(segment)
+			if len(timeMatches) > 0 {
+				segmentTime, err := time.Parse(timeFormat, timeMatches[0])
+				if err != nil {
+					continue
+				}
+
+				segmentTimeUTC := segmentTime.UTC()
+				if segmentTimeUTC.After(startTimeUTC) {
+					if matches := errorRegex.FindStringSubmatch(segment); len(matches) > 0 {
+						errorMessage = "error logs found in rancher: " + segment
+						return true, nil
+					}
+				}
+			}
+		}
+		return false, nil
+	})
+
+	if errorMessage != "" {
+		return errors.New(errorMessage)
+	}
+
+	return nil
+}
+
+// WatchAndWaitPodContainerRunning is a helper to watch and wait all pod containers running
+func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespaceName string, deploymentTemplate *appv1.Deployment) error {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
+	namespacedClient := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName)
+
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return err
+	}
+
+	deploymentResource := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(namespaceName)
+
+	watchAppInterface, err := deploymentResource.Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + deploymentTemplate.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		podsResp, err := namespacedClient.List(nil)
+		if err != nil {
+			return false, err
+		}
+
+		allContainerRunning := true
+		for _, podResp := range podsResp.Data {
+			podStatus := &corev1.PodStatus{}
+			err = v1.ConvertToK8sType(podResp.Status, podStatus)
+			if err != nil {
+				return false, err
+			}
+
+			for _, containerStatus := range podStatus.ContainerStatuses {
+				if containerStatus.State.Running == nil {
+					allContainerRunning = false
+				}
+			}
+		}
+		return allContainerRunning, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CountPodContainerRunningByImage is a helper to count all pod containers running by image
+func CountPodContainerRunningByImage(client *rancher.Client, clusterID, namespaceName string, image string) (int, error) {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return 0, err
+	}
+
+	podsResp, err := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName).List(nil)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, podResp := range podsResp.Data {
+		podStatus := &corev1.PodStatus{}
+		err = v1.ConvertToK8sType(podResp.Status, podStatus)
+		if err != nil {
+			return 0, err
+		}
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			if containerStatus.State.Running != nil && strings.Contains(containerStatus.Image, image) {
+				count++
+			}
+		}
+	}
+	return count, nil
 }
