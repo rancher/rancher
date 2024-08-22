@@ -30,6 +30,7 @@ const (
 	UserScope                          = Name + "_user"
 	GroupScope                         = Name + "_group"
 	ObjectClass                        = "objectClass"
+	ObjectGUIDAttribute                = "objectGUID"
 	MemberOfAttribute                  = "memberOf"
 	StatusConfigMapName                = "ad-guid-migration"
 	StatusConfigMapNamespace           = "cattle-system"

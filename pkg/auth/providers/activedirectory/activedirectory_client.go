@@ -18,6 +18,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var defaultUserAttributes = []string{MemberOfAttribute, ObjectClass, ObjectGUIDAttribute}
+
 func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveDirectoryConfig, caPool *x509.CertPool, testServiceAccountBind bool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
@@ -63,7 +65,7 @@ func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveD
 	search := ldap.NewWholeSubtreeSearchRequest(
 		config.UserSearchBase,
 		query,
-		config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
+		config.GetUserSearchAttributes(defaultUserAttributes...),
 	)
 
 	result, err := lConn.Search(search)
@@ -125,7 +127,7 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	search := ldap.NewBaseObjectSearchRequest(
 		dn,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
-		config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
+		config.GetUserSearchAttributes(defaultUserAttributes...),
 	)
 
 	result, err := lConn.Search(search)
@@ -371,7 +373,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 
 	var attrs []string
 	if strings.EqualFold(UserScope, scope) {
-		attrs = config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass)
+		attrs = config.GetUserSearchAttributes(defaultUserAttributes...)
 	} else {
 		attrs = config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass)
 	}
@@ -462,7 +464,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDi
 		search = ldap.NewWholeSubtreeSearchRequest(
 			searchDomain,
 			query,
-			config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
+			config.GetUserSearchAttributes(defaultUserAttributes...),
 		)
 	} else {
 		if config.GroupSearchBase != "" {
