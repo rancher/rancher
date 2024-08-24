@@ -213,6 +213,51 @@ func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string
 	return nil
 }
 
+var _ types.TableConvertor[*RancherTokenList] = (*TokenStore)(nil)
+
+func (t *TokenStore) ConvertToTable(list *RancherTokenList, opts *metav1.TableOptions) *metav1.Table {
+	table := &metav1.Table{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Table",
+			APIVersion: "meta.k8s.io/v1",
+		},
+		ListMeta: list.ListMeta,
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{
+				Name: "Name",
+				Type: "string",
+			},
+			{
+				Name: "Enabled",
+				Type: "boolean",
+			},
+			{
+				Name: "Cluster",
+				Type: "string",
+			},
+			{
+				Name:   "Age",
+				Type:   "string",
+				Format: "date",
+			},
+		},
+	}
+
+	for _, item := range list.Items {
+		row := metav1.TableRow{
+			Cells: []any{
+				item.Name,
+				item.Spec.Enabled,
+				item.Spec.ClusterName,
+				item.CreationTimestamp,
+			},
+		}
+		table.Rows = append(table.Rows, row)
+	}
+
+	return table
+}
+
 func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
 	sar := &authv1.SubjectAccessReview{
 		Spec: authv1.SubjectAccessReviewSpec{

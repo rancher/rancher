@@ -30,11 +30,13 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/schemes"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -49,7 +51,7 @@ var (
 	// Scheme scheme for unversioned types - such as APIResourceList, and Status
 	scheme = k8sruntime.NewScheme()
 	// Codecs for unversioned types - such as APIResourceList, and Status
-	Codecs = serializer.NewCodecFactory(schemes.All)
+	Codecs = serializer.NewCodecFactory(scheme)
 
 	unversionedVersion = schema.GroupVersion{Version: "v1"}
 	unversionedTypes   = []k8sruntime.Object{
@@ -68,6 +70,9 @@ const (
 func init() {
 	scheme.AddUnversionedTypes(unversionedVersion, unversionedTypes...)
 	schemes.AddToScheme(scheme)
+	metav1.AddMetaToScheme(scheme)
+	// Needed for CreateOptions, UpdateOptions, etc for ParameterCodec
+	internalversion.AddToScheme(scheme)
 }
 
 // CRDHandler is a http handler, that gets passed the Namespace it's working
@@ -279,16 +284,17 @@ func (as *APIServer) resourceHandler(groupVersion schema.GroupVersion) errorHand
 func (as *APIServer) addSerializedHandler(pattern string, router *gmux.Router, m k8sruntime.Object) {
 	router.HandleFunc(pattern, https.ErrorHTTPHandler(as.logger, func(w http.ResponseWriter, r *http.Request) error {
 		if r.Method == http.MethodGet {
-			info, err := AcceptedSerializer(r, Codecs)
+			_, info, err := negotiation.NegotiateOutputMediaType(r, Codecs, negotiation.DefaultEndpointRestrictions)
 			if err != nil {
 				return err
 			}
 
 			shallowCopy := shallowCopyObjectForTargetKind(m)
 			w.Header().Set(ContentTypeHeader, info.MediaType)
-			err = Codecs.EncoderForVersion(info.Serializer, unversionedVersion).Encode(shallowCopy, w)
+			w.WriteHeader(http.StatusOK)
+			err = info.Serializer.Encode(shallowCopy, w)
 			if err != nil {
-				return errors.New("error marshalling")
+				return err
 			}
 		} else {
 			https.FourZeroFour(as.logger, w, r)

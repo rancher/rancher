@@ -28,6 +28,10 @@ type Store[T runtime.Object, TList runtime.Object] interface {
 	Delete(ctx context.Context, userInfo user.Info, name string, opts *metav1.DeleteOptions) error
 }
 
+type TableConvertor[TList runtime.Object] interface {
+	ConvertToTable(list TList, opts *metav1.TableOptions) *metav1.Table
+}
+
 type backingStore[T runtime.Object, TList runtime.Object] struct {
 	createFunc func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.CreateOptions) (T, error)
 	updateFunc func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.UpdateOptions) (T, error)

@@ -16,7 +16,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -41,6 +43,8 @@ type StoreDelegate[
 	Store              types.Store[T, TList]
 	GroupVersionKind   schema.GroupVersionKind
 	requestInfoFactory request.RequestInfoFactory
+
+	codecFactory serializer.CodecFactory
 }
 
 func NewStoreDelegate[
@@ -52,6 +56,8 @@ func NewStoreDelegate[
 		Store:              store,
 		GroupVersionKind:   gvk,
 		requestInfoFactory: request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")},
+
+		codecFactory: Codecs,
 	}
 }
 
@@ -262,6 +268,7 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 		if err != nil {
 			return err
 		}
+
 		return s.writeOkResponse(w, req, resources)
 	case http.MethodPut:
 		// like k8s, internally we classify PUT as a create or update based on the existence of the object
@@ -367,23 +374,55 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 	}
 }
 
+// TODO: Move to responsewriters.WriteObjectNegotiated
 func (s *StoreDelegate[T, DerefT, TList]) writeOkResponse(w http.ResponseWriter, req *http.Request, obj runtime.Object) error {
-	info, err := AcceptedSerializer(req, Codecs)
+	opts, info, err := negotiation.NegotiateOutputMediaType(req, s.codecFactory, s)
 	if err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", info.MediaType)
+
+	w.Header().Set(ContentTypeHeader, info.MediaType)
 	w.WriteHeader(http.StatusOK)
 	if obj != nil {
-		err = Codecs.EncoderForVersion(info.Serializer, s.GroupVersionKind.GroupVersion()).Encode(obj, w)
+		result, err := s.applyConversion(req, obj, opts.Convert)
+		if err != nil {
+			return err
+		}
+
+		err = info.Serializer.Encode(result, w)
+		if err != nil {
+			return err
+		}
 	}
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
+func (s *StoreDelegate[T, DerefT, TList]) applyConversion(req *http.Request, obj runtime.Object, target *schema.GroupVersionKind) (runtime.Object, error) {
+	obj.GetObjectKind().SetGroupVersionKind(s.GroupVersionKind)
+	if target == nil {
+		return obj, nil
+	}
+
+	convertor, ok := s.Store.(types.TableConvertor[TList])
+	if !ok {
+		// Shouldn't happen
+		return obj, nil
+	}
+
+	opts := &metav1.TableOptions{}
+	if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, opts); err != nil {
+		return nil, err
+	}
+	return convertor.ConvertToTable(obj.(TList), opts), nil
+}
+
 func (s *StoreDelegate[T, DerefT, TList]) readObjectFromRequest(req *http.Request) (T, error) {
+	info, err := negotiation.NegotiateInputSerializer(req, false, s.codecFactory)
+	if err != nil {
+		return nil, err
+	}
+
 	var resource T = new(DerefT)
 
 	bytes, err := io.ReadAll(req.Body)
@@ -391,7 +430,7 @@ func (s *StoreDelegate[T, DerefT, TList]) readObjectFromRequest(req *http.Reques
 		return resource, err
 	}
 
-	_, _, err = Codecs.UniversalDecoder(s.GroupVersionKind.GroupVersion()).Decode(bytes, nil, resource)
+	_, _, err = info.Serializer.Decode(bytes, &s.GroupVersionKind, resource)
 	return resource, err
 }
 
@@ -403,6 +442,46 @@ func (s *StoreDelegate[T, DerefT, TList]) resourceNameAndNamespace(req *http.Req
 		return "", "", err
 	}
 	return info.Name, info.Namespace, nil
+}
+
+// AllowsMediaTypeTransform returns true if the endpoint allows either the requested mime type
+// or the requested transformation. If false, the caller should ignore this mime type. If the
+// target is nil, the client is not requesting a transformation.
+//
+// Implements negotiation.EndpointRestrictions
+func (s *StoreDelegate[T, DerefT, TList]) AllowsMediaTypeTransform(mimeType, mimeSubType string, target *schema.GroupVersionKind) bool {
+	if mimeSubType != "json" && mimeSubType != "yaml" {
+		return false
+	}
+
+	if target != nil {
+		gvk := *target
+		if gvk != metav1.SchemeGroupVersion.WithKind("Table") {
+			return false
+		}
+
+		if _, ok := s.Store.(types.TableConvertor[TList]); !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+// AllowsServerVersion should return true if the specified version is valid
+// for the server group.
+//
+// Implements negotiation.EndpointRestrictions
+func (s *StoreDelegate[T, DerefT, TList]) AllowsServerVersion(version string) bool {
+	return true
+}
+
+// AllowsStreamSchema should return true if the specified stream schema is
+// valid for the server group.
+//
+// Implements negotiation.EndpointRestrictions
+func (s *StoreDelegate[T, DerefT, TList]) AllowsStreamSchema(schema string) bool {
+	return true
 }
 
 // copied from k8s.io/apiserver/pkg/registry/generic/registry/store.go
