@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
@@ -28,6 +30,15 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 		return obj, nil
 	}
 
+	cleanedObj := gbrCleanUp(obj)
+	return p.mgmt.Management.GlobalRoleBindings("").Update(cleanedObj)
+}
+
+// gbrCleanUp returns a clean GlobalRoleBinding based on filters specified within the function
+func gbrCleanUp(obj *v3.GlobalRoleBinding) *v3.GlobalRoleBinding {
+	// set finalizers to the object by filtering out
+	// the ones that start with "clusterscoped.controller.cattle.io/grb-sync_"
+	// and then clean annotations that start with "lifecycle.cattle.io/create.grb-sync_"
 	obj.SetFinalizers(cleanFinalizers(obj.GetFinalizers(), "clusterscoped.controller.cattle.io/grb-sync_"))
 	cleanAnnotations := cleanAnnotations(obj.GetAnnotations(), "lifecycle.cattle.io/create.grb-sync_")
 
@@ -37,30 +48,23 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	delete(cleanAnnotations, grbstore.OldGrbVersion)
 	cleanAnnotations[grbstore.GrbVersion] = "true"
 	obj.SetAnnotations(cleanAnnotations)
-	return p.mgmt.Management.GlobalRoleBindings("").Update(obj)
+	return obj
 }
 
 // cleanFinalizers takes a list of finalizers and removes any finalizer that has the matching prefix
 func cleanFinalizers(finalizers []string, prefix string) []string {
-	var newFinalizers []string
-	for _, finalizer := range finalizers {
-		if strings.HasPrefix(finalizer, prefix) {
-			continue
-		}
-		newFinalizers = append(newFinalizers, finalizer)
-	}
-	return newFinalizers
+	filteredFinalizers := slices.DeleteFunc(finalizers, func(s string) bool {
+		return strings.HasPrefix(s, prefix)
+	})
+	return filteredFinalizers
 }
 
 // cleanAnnotations takes an objects annotations and removes any annotation that has the matching prefix
 // returning a new map
 func cleanAnnotations(annotations map[string]string, prefix string) map[string]string {
-	newAnnos := make(map[string]string)
-	for k, v := range annotations {
-		if strings.HasPrefix(k, prefix) {
-			continue
-		}
-		newAnnos[k] = v
-	}
-	return newAnnos
+	filteredAnnotations := maps.Clone(annotations)
+	maps.DeleteFunc(filteredAnnotations, func(key string, value string) bool {
+		return strings.HasPrefix(key, prefix)
+	})
+	return filteredAnnotations
 }
