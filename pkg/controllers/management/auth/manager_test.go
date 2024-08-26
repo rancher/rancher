@@ -747,18 +747,23 @@ func Test_gatherAndDedupeRoles(t *testing.T) {
 			wantErr:   true,
 		},
 		{
-			name:             "Role with roletemplates",
-			roleTemplateName: "recursive",
+			name:             "Role with dupe roletemplates",
+			roleTemplateName: "rolewithdupes",
 			want: map[string]*v3.RoleTemplate{
-				"recursive": {
+				"rolewithdupes": {
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "recursive",
+						Name: "rolewithdupes",
 					},
-					RoleTemplateNames: []string{"rt1"},
+					RoleTemplateNames: []string{"rt1", "rt2", "rt1"},
 				},
 				"rt1": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "rt1",
+					},
+				},
+				"rt2": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rt2",
 					},
 				},
 			},
@@ -773,12 +778,12 @@ func Test_gatherAndDedupeRoles(t *testing.T) {
 						if tt.wantRTErr {
 							return nil, fmt.Errorf("error getting role template")
 						}
-						if name == "recursive" {
+						if name == "rolewithdupes" {
 							return &v3.RoleTemplate{
 								ObjectMeta: metav1.ObjectMeta{
-									Name: "recursive",
+									Name: "rolewithdupes",
 								},
-								RoleTemplateNames: []string{"rt1"},
+								RoleTemplateNames: []string{"rt1", "rt2", "rt1"},
 							}, nil
 						}
 						return &v3.RoleTemplate{
