@@ -28,6 +28,12 @@ func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, erro
 		return obj, nil
 	}
 
+	cleanedObj := rtCleanUp(obj)
+	return p.mgmt.Management.RoleTemplates("").Update(cleanedObj)
+}
+
+// rtCleanUp returns a clean RoleTemplate based on filters specified within the function
+func rtCleanUp(obj *v3.RoleTemplate) *v3.RoleTemplate {
 	obj.SetFinalizers(cleanFinalizers(obj.GetFinalizers(), "clusterscoped.controller.cattle.io/cluster-roletemplate-sync_"))
 	cleanAnnotations := cleanAnnotations(obj.GetAnnotations(), "lifecycle.cattle.io/create.cluster-roletemplate-sync_")
 
@@ -37,5 +43,5 @@ func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, erro
 	delete(cleanAnnotations, roletemplate.OldRTVersion)
 	cleanAnnotations[roletemplate.RTVersion] = "true"
 	obj.SetAnnotations(cleanAnnotations)
-	return p.mgmt.Management.RoleTemplates("").Update(obj)
+	return obj
 }
