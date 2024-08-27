@@ -221,6 +221,9 @@ func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, 
 	// We could have been waiting for the Mutex to unlock in a parallel run of
 	// createServiceAccountSecret - check again for the secret existing.
 	secret, err := serviceAccountSecret(ctx, sa, secretLister, secretClient)
+	if err != nil {
+		return nil, err
+	}
 	if secret != nil {
 		return secret, nil
 	}

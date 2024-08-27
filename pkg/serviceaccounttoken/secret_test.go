@@ -398,12 +398,6 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 			defer m.Unlock()
 			ret := action.(k8stesting.CreateAction).GetObject().(*corev1.Secret)
 			ret.ObjectMeta.Name = ret.GenerateName + rand.String(5)
-			ret.ObjectMeta.Labels = map[string]string{
-				ServiceAccountSecretLabel: "test", // sa.Name from below
-			}
-			ret.ObjectMeta.Annotations = map[string]string{
-				serviceAccountSecretAnnotation: "test", // sa.Name from below
-			}
 			ret.Data = map[string][]byte{
 				"token": []byte("abcde"),
 			}
@@ -501,12 +495,6 @@ func TestEnsureSecretForServiceAccount_in_parallel_avoids_deadlock(t *testing.T)
 			defer m.Unlock()
 			ret := action.(k8stesting.CreateAction).GetObject().(*corev1.Secret)
 			ret.ObjectMeta.Name = ret.GenerateName + rand.String(5)
-			ret.ObjectMeta.Labels = map[string]string{
-				ServiceAccountSecretLabel: "test", // sa.Name from below
-			}
-			ret.ObjectMeta.Annotations = map[string]string{
-				serviceAccountSecretAnnotation: "test", // sa.Name from below
-			}
 			ret.Data = map[string][]byte{
 				"token": []byte("abcde"),
 			}
