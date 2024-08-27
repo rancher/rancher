@@ -263,6 +263,10 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 }
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+	return NewContextWithLeaseName(ctx, clientConfig, restConfig, "cattle-controllers")
+}
+
+func NewContextWithLeaseName(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config, leaseName string) (*Context, error) {
 	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(restConfig), Scheme, sharedOpts)
 	if err != nil {
@@ -401,7 +405,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	leadership := leader.NewManager("", "cattle-controllers", k8s)
+	leadership := leader.NewManager("", leaseName, k8s)
 	leadership.OnLeader(func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()

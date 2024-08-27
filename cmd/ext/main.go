@@ -75,7 +75,8 @@ func main() {
 	restConfig, err := clientConfig.ClientConfig()
 	must(err)
 
-	wContext, err := wrangler.NewContext(ctx, clientConfig, restConfig)
+	// TODO: We definitely don't need a lease here..
+	wContext, err := wrangler.NewContextWithLeaseName(ctx, clientConfig, restConfig, "cattle-api-extension")
 	must(err)
 
 	wContext.Start(ctx)
