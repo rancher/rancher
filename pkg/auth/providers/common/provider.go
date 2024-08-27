@@ -8,8 +8,14 @@ import (
 )
 
 const (
+	// UserAttributePrincipalID is a key in the ExtraByProvider field of the UserAttribute that holds principal IDs for a partucular provider.
 	UserAttributePrincipalID = "principalid"
-	UserAttributeUserName    = "username"
+	// UserAttributeUserName is a key in the ExtraByProvider field of the UserAttribute that holds usernames for a partucular provider.
+	UserAttributeUserName = "username"
+	// UserPrincipalType is the user principal type across all providers.
+	UserPrincipalType = "user"
+	// GroupPrincipalType is the group principal type  across all providers.
+	GroupPrincipalType = "group"
 )
 
 type AuthProvider interface {
