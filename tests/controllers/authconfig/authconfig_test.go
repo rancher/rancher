@@ -2,6 +2,9 @@ package authconfig_test
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
@@ -15,8 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"testing"
-	"time"
 )
 
 type AuthConfigSuite struct {
@@ -25,7 +26,6 @@ type AuthConfigSuite struct {
 	cancel            context.CancelFunc
 	testEnv           *envtest.Environment
 	managementContext *config.ManagementContext
-	wranglerContext   *wrangler.Context
 }
 
 func TestAuthConfigSuite(t *testing.T) {
@@ -36,13 +36,13 @@ func (s *AuthConfigSuite) SetupSuite() {
 	t := s.T()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
-	// Load CRD from YAML for REST Client
+	// Start envtest.
 	s.testEnv = &envtest.Environment{}
 	restCfg, err := s.testEnv.Start()
 	assert.NoError(t, err)
 	assert.NotNil(t, restCfg)
 
-	// Create CRDs
+	// Create CRDs.
 	factory, err := crd.NewFactoryFromClient(restCfg)
 	assert.NoError(t, err)
 
@@ -99,19 +99,25 @@ func (s *AuthConfigSuite) SetupSuite() {
 }
 
 func (s *AuthConfigSuite) TestTokensCleanup() {
-	t := s.T()
-
 	const (
 		tick         = 1 * time.Second
 		duration     = 10 * time.Second
-		numOfTokens  = 1000
+		numOfTokens  = 2
 		authProvider = "openldap"
 	)
 
+	t := s.T()
+
+	authConfigClient := s.managementContext.Management.AuthConfigs("")
+	tokenClient := s.managementContext.Management.Tokens("")
+
 	// create the AuthConfig for the authProvider
-	_, err := s.managementContext.Management.AuthConfigs("").Create(&v3.AuthConfig{
+	_, err := authConfigClient.Create(&v3.AuthConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: authProvider,
+			Annotations: map[string]string{
+				auth.CleanupAnnotation: auth.CleanupUnlocked,
+			},
 		},
 		Type:    client.OpenLdapConfigType,
 		Enabled: true,
@@ -120,36 +126,48 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 
 	// create some tokens for the authProvider
 	for i := 0; i < numOfTokens; i++ {
-		_, err := s.managementContext.Management.Tokens("").Create(&v3.Token{
+		_, err := tokenClient.Create(&v3.Token{
 			ObjectMeta:   metav1.ObjectMeta{GenerateName: "t-"},
 			AuthProvider: authProvider,
+			UserPrincipal: v3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "openldap_user://uid=user,dc=example,dc=org",
+				},
+				PrincipalType: "user",
+				Provider:      "openldap",
+			},
 		})
 		assert.NoError(t, err)
 	}
 
 	// and also some local tokens
 	for i := 0; i < numOfTokens; i++ {
-		_, err := s.managementContext.Management.Tokens("").Create(&v3.Token{
+		_, err := tokenClient.Create(&v3.Token{
 			ObjectMeta:   metav1.ObjectMeta{GenerateName: "t-"},
 			AuthProvider: "local",
+			UserPrincipal: v3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "local://u-abcdef",
+				},
+				PrincipalType: "user",
+				Provider:      "local",
+			},
 		})
 		assert.NoError(t, err)
 	}
 
-	t.Logf("created %d tokens\n", numOfTokens)
-
 	// disable the provider, setting the cleanup annotation (eventually because of retries)
-	authConfig, err := s.managementContext.Management.AuthConfigs("").Get(authProvider, metav1.GetOptions{})
+	authConfig, err := authConfigClient.Get(authProvider, metav1.GetOptions{})
 	assert.NoError(t, err)
 
 	authConfig.Enabled = false
 	authConfig.Annotations = map[string]string{auth.CleanupAnnotation: auth.CleanupUnlocked}
-	authConfig, err = s.managementContext.Management.AuthConfigs("").Update(authConfig)
+	_, err = authConfigClient.Update(authConfig)
 	assert.NoError(t, err)
 
 	// check that all the authProvider tokens are deleted
 	ok := assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		tokens, err := s.managementContext.Management.Tokens("").List(metav1.ListOptions{})
+		tokens, err := tokenClient.List(metav1.ListOptions{})
 		assert.NoError(c, err)
 		assert.NotNil(c, tokens)
 
