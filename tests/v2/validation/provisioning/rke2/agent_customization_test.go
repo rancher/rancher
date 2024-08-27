@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/machinepools"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/cloudcredentials"
 	shepherdclusters "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
@@ -194,7 +196,10 @@ func (r *RKE2AgentCustomizationTestSuite) TestFailureProvisioningRKE2ClusterAgen
 		testClusterConfig := clusters.ConvertConfigToClusterConfig(r.provisioningConfig)
 		testClusterConfig.KubernetesVersion = kubeVersions[0]
 
-		_, err = provisioning.CreateProvisioningCluster(client, *rke2Provider, testClusterConfig, nil)
+		credentialSpec := cloudcredentials.LoadCloudCredential(string(rke2Provider.Name))
+		machineConfigSpec := machinepools.LoadMachineConfigs(string(rke2Provider.Name))
+
+		_, err = provisioning.CreateProvisioningCluster(client, *rke2Provider, credentialSpec, testClusterConfig, machineConfigSpec, nil)
 		require.Error(r.T(), err)
 	}
 }

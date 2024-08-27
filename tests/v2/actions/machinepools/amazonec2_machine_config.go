@@ -1,15 +1,13 @@
 package machinepools
 
 import (
-	"github.com/rancher/shepherd/pkg/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	AWSKind                              = "Amazonec2Config"
-	AWSPoolType                          = "rke-machine-config.cattle.io.amazonec2config"
-	AWSResourceConfig                    = "amazonec2configs"
-	AWSMachineConfigConfigurationFileKey = "awsMachineConfigs"
+	AWSKind           = "Amazonec2Config"
+	AWSPoolType       = "rke-machine-config.cattle.io.amazonec2config"
+	AWSResourceConfig = "amazonec2configs"
 )
 
 type AWSMachineConfigs struct {
@@ -35,19 +33,16 @@ type AWSMachineConfig struct {
 
 // NewAWSMachineConfig is a constructor to set up rke-machine-config.cattle.io.amazonec2config. It returns an *unstructured.Unstructured
 // that CreateMachineConfig uses to created the rke-machine-config
-func NewAWSMachineConfig(generatedPoolName, namespace string) []unstructured.Unstructured {
-	var awsMachineConfigs AWSMachineConfigs
-	config.LoadConfig(AWSMachineConfigConfigurationFileKey, &awsMachineConfigs)
+func NewAWSMachineConfig(machineConfigs MachineConfigs, generatedPoolName, namespace string) []unstructured.Unstructured {
 	var multiConfig []unstructured.Unstructured
-
-	for _, awsMachineConfig := range awsMachineConfigs.AWSMachineConfig {
+	for _, awsMachineConfig := range machineConfigs.AmazonEC2MachineConfigs.AWSMachineConfig {
 		machineConfig := unstructured.Unstructured{}
 		machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
 		machineConfig.SetKind(AWSKind)
 		machineConfig.SetGenerateName(generatedPoolName)
 		machineConfig.SetNamespace(namespace)
 
-		machineConfig.Object["region"] = awsMachineConfigs.Region
+		machineConfig.Object["region"] = machineConfigs.AmazonEC2MachineConfigs.Region
 		machineConfig.Object["ami"] = awsMachineConfig.AMI
 		machineConfig.Object["iamInstanceProfile"] = awsMachineConfig.IAMInstanceProfile
 		machineConfig.Object["instanceType"] = awsMachineConfig.InstanceType
@@ -68,12 +63,10 @@ func NewAWSMachineConfig(generatedPoolName, namespace string) []unstructured.Uns
 }
 
 // GetAWSMachineRoles returns a list of roles from the given machineConfigs
-func GetAWSMachineRoles() []Roles {
-	var awsMachineConfigs AWSMachineConfigs
-	config.LoadConfig(AWSMachineConfigConfigurationFileKey, &awsMachineConfigs)
+func GetAWSMachineRoles(machineConfigs MachineConfigs) []Roles {
 	var allRoles []Roles
 
-	for _, awsMachineConfig := range awsMachineConfigs.AWSMachineConfig {
+	for _, awsMachineConfig := range machineConfigs.AmazonEC2MachineConfigs.AWSMachineConfig {
 		allRoles = append(allRoles, awsMachineConfig.Roles)
 	}
 

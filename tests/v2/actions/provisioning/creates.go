@@ -71,8 +71,7 @@ var (
 )
 
 // CreateProvisioningCluster provisions a non-rke1 cluster, then runs verify checks
-func CreateProvisioningCluster(client *rancher.Client, provider Provider, clustersConfig *clusters.ClusterConfig, hostnameTruncation []machinepools.HostnameTruncation) (*v1.SteveAPIObject, error) {
-	credentialSpec := cloudcredentials.LoadCloudCredential(string(provider.Name))
+func CreateProvisioningCluster(client *rancher.Client, provider Provider, credentialSpec cloudcredentials.CloudCredential, clustersConfig *clusters.ClusterConfig, machineConfigSpec machinepools.MachineConfigs, hostnameTruncation []machinepools.HostnameTruncation) (*v1.SteveAPIObject, error) {
 	cloudCredential, err := provider.CloudCredFunc(client, credentialSpec)
 	if err != nil {
 		return nil, err
@@ -87,7 +86,7 @@ func CreateProvisioningCluster(client *rancher.Client, provider Provider, cluste
 
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 	generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-	machinePoolConfigs := provider.MachinePoolFunc(generatedPoolName, namespace)
+	machinePoolConfigs := provider.MachinePoolFunc(machineConfigSpec, generatedPoolName, namespace)
 
 	var machinePoolResponses []v1.SteveAPIObject
 
@@ -138,7 +137,7 @@ func CreateProvisioningCluster(client *rancher.Client, provider Provider, cluste
 	}
 
 	machinePools := machinepools.
-		CreateAllMachinePools(machineConfigs, pools, machinePoolResponses, provider.Roles, hostnameTruncation)
+		CreateAllMachinePools(machineConfigs, pools, machinePoolResponses, provider.GetMachineRolesFunc(machineConfigSpec), hostnameTruncation)
 
 	if clustersConfig.CloudProvider == provisioninginput.VsphereCloudProviderName.String() {
 
