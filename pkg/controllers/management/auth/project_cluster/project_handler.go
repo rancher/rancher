@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -146,22 +145,16 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 
 func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
-		metaAccessor, err := meta.Accessor(obj)
-		if err != nil {
-			return obj, fmt.Errorf("error accessing project object %v: %w", obj, err)
+		project, ok := obj.(*apisv3.Project)
+		if !ok {
+			return obj, fmt.Errorf("expected project, got %T", obj)
 		}
 
-		typeAccessor, err := meta.TypeAccessor(obj)
-		if err != nil {
-			return obj, err
-		}
-
-		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnnotation]
-		if !ok || creatorID == "" {
-			logrus.Warnf("[%v] %v %v has no creatorId annotation. Cannot add creator as owner", ProjectCreateController, typeAccessor.GetKind(), metaAccessor.GetName())
+		creatorID := project.Annotations[CreatorIDAnnotation]
+		if creatorID == "" {
+			logrus.Warnf("[%s] project %s has no creatorId annotation. Cannot add creator as owner", ProjectCreateController, project.Name)
 			return obj, nil
 		}
-		project := obj.(*apisv3.Project)
 
 		if apisv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 			// The projectRoleBindings are already completed, no need to check
@@ -171,14 +164,13 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 		// If the project does not have the annotation it indicates the
 		// project is from a previous rancher version so don't add the
 		// default bindings.
-		bindingAnnotation := project.Annotations[roleTemplatesRequiredAnnotation]
-		if bindingAnnotation == "" {
+		creatorRoleBindings := project.Annotations[roleTemplatesRequiredAnnotation]
+		if creatorRoleBindings == "" {
 			return project, nil
 		}
 
 		roleMap := make(map[string][]string)
-		err = json.Unmarshal([]byte(bindingAnnotation), &roleMap)
-		if err != nil {
+		if err := json.Unmarshal([]byte(creatorRoleBindings), &roleMap); err != nil {
 			return obj, err
 		}
 
@@ -186,26 +178,34 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 		for _, role := range roleMap["required"] {
 			rtbName := "creator-" + role
-
-			if rtb, _ := l.prtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
+			if rtb, _ := l.prtbLister.Get(project.Name, rtbName); rtb != nil {
 				createdRoles = append(createdRoles, role)
 				// This projectRoleBinding exists, need to check all of them so keep going
 				continue
 			}
 
 			// The projectRoleBinding doesn't exist yet so create it
-			om := metav1.ObjectMeta{
-				Name:      rtbName,
-				Namespace: metaAccessor.GetName(),
-			}
-
-			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", ProjectCreateController, creatorID, metaAccessor.GetName())
-			if _, err := l.mgr.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ProjectRoleTemplateBinding{
-				ObjectMeta:       om,
-				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
+			prtb := &apisv3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      rtbName,
+					Namespace: project.Name,
+				},
+				ProjectName:      project.Namespace + ":" + project.Name,
 				RoleTemplateName: role,
 				UserName:         creatorID,
-			}); err != nil && !apierrors.IsAlreadyExists(err) {
+			}
+
+			if principalName := project.Annotations[creatorPrincipleNameAnnotation]; principalName != "" {
+				if !strings.HasPrefix(principalName, "local") {
+					// Setting UserPrincipalName only makes sense for non-local users.
+					prtb.UserPrincipalName = principalName
+					prtb.UserName = ""
+				}
+			}
+
+			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %s for project %s", ProjectCreateController, creatorID, project.Name)
+			_, err := l.mgr.Management.ProjectRoleTemplateBindings(project.Name).Create(prtb)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return obj, err
 			}
 			createdRoles = append(createdRoles, role)
@@ -223,7 +223,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 		if reflect.DeepEqual(roleMap["required"], createdRoles) {
 			apisv3.ProjectConditionInitialRolesPopulated.True(project)
-			logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ProjectCreateController, project.Name)
+			logrus.Infof("[%s] Setting InitialRolesPopulated condition on project %s", ProjectCreateController, project.Name)
 		}
 		if _, err := l.projects.Update(project); err != nil {
 			return obj, err
