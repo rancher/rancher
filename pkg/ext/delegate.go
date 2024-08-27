@@ -399,6 +399,11 @@ func (s *StoreDelegate[T, DerefT, TList]) writeOkResponse(w http.ResponseWriter,
 }
 
 func (s *StoreDelegate[T, DerefT, TList]) applyConversion(req *http.Request, obj runtime.Object, target *schema.GroupVersionKind) (runtime.Object, error) {
+	objList, ok := obj.(TList)
+	if !ok {
+		return obj, nil
+	}
+
 	obj.GetObjectKind().SetGroupVersionKind(s.GroupVersionKind)
 	if target == nil {
 		return obj, nil
@@ -414,7 +419,7 @@ func (s *StoreDelegate[T, DerefT, TList]) applyConversion(req *http.Request, obj
 	if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, opts); err != nil {
 		return nil, err
 	}
-	return convertor.ConvertToTable(obj.(TList), opts), nil
+	return convertor.ConvertToTable(objList, opts), nil
 }
 
 func (s *StoreDelegate[T, DerefT, TList]) readObjectFromRequest(req *http.Request) (T, error) {
