@@ -804,3 +804,74 @@ func Test_gatherAndDedupeRoles(t *testing.T) {
 		})
 	}
 }
+
+func Test_gatherRoleTemplates(t *testing.T) {
+	roleTemplates := map[string]*v3.RoleTemplate{
+		"root": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "root",
+			},
+			RoleTemplateNames: []string{"child1"},
+		},
+		"child1": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "child1",
+			},
+			RoleTemplateNames: []string{"child2"},
+		},
+		"child2": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "child2",
+			},
+			RoleTemplateNames: []string{},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		roleTemplateName string
+		wantErr          bool
+		want             map[string]*v3.RoleTemplate
+	}{
+		{
+			name:             "hierarchy of roletemplates",
+			roleTemplateName: "root",
+			wantErr:          false,
+			want: map[string]*v3.RoleTemplate{
+				"root":   roleTemplates["root"],
+				"child1": roleTemplates["child1"],
+				"child2": roleTemplates["child2"],
+			},
+		},
+		{
+			name:             "error getting roletemplate",
+			roleTemplateName: "root",
+			wantErr:          true,
+			want:             nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := &manager{
+				rtLister: &fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
+						rt, _ := roleTemplates[name]
+						if tt.wantErr {
+							return nil, fmt.Errorf("RoleTemplate not found")
+						}
+						return rt, nil
+					},
+				},
+			}
+			got := map[string]*v3.RoleTemplate{}
+			err := manager.gatherRoleTemplates(roleTemplates[tt.roleTemplateName], got)
+			if tt.wantErr {
+				assert.Error(t, err, "expected an error, got none")
+			} else {
+				assert.NoError(t, err, fmt.Sprintf("expected no error, got: %v", err))
+				assert.Equal(t, tt.want, got, "expected roles to be %v, got: %v", tt.want, got)
+			}
+		})
+	}
+}
