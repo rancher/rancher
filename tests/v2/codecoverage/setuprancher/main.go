@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
+	"github.com/rancher/rancher/tests/v2/actions/pipeline"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	nodepools "github.com/rancher/rancher/tests/v2/actions/rke1/nodepools"
+	aws "github.com/rancher/rancher/tests/v2/actions/rke1/nodetemplates/aws"
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/dynamic"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/clusters"
+	shepherdclusters "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
-	"github.com/rancher/shepherd/extensions/kubeapi/workloads/deployments"
-	"github.com/rancher/shepherd/extensions/pipeline"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
-	nodepools "github.com/rancher/shepherd/extensions/rke1/nodepools"
-	aws "github.com/rancher/shepherd/extensions/rke1/nodetemplates/aws"
 	"github.com/rancher/shepherd/extensions/token"
 	"github.com/rancher/shepherd/extensions/unstructured"
 	"github.com/rancher/shepherd/extensions/users"
@@ -283,7 +284,7 @@ func createTestCluster(client, adminClient *rancher.Client, numClusters int, clu
 		testClusterConfig.CNI = clustersConfig.CNIs[0]
 		cluster := clusters.NewRKE1ClusterConfig(clusterName, client, testClusterConfig)
 
-		clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
+		clusterResp, err := shepherdclusters.CreateRKE1Cluster(client, cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -312,7 +313,7 @@ func createTestCluster(client, adminClient *rancher.Client, numClusters int, clu
 			return nil, err
 		}
 
-		checkFunc := clusters.IsHostedProvisioningClusterReady
+		checkFunc := shepherdclusters.IsHostedProvisioningClusterReady
 
 		err = wait.WatchWait(watchInterface, checkFunc)
 		if err != nil {

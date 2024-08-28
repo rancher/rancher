@@ -4,8 +4,9 @@ import (
 	"time"
 
 	cis "github.com/rancher/cis-operator/pkg/apis/cis.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/extensions/charts"
+	extensionscharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/defaults"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/sirupsen/logrus"
@@ -31,19 +32,19 @@ func SetupCISBenchmarkChart(client *rancher.Client, projectClusterID string, cha
 	}
 
 	logrus.Infof("Waiting for CIS Benchmark chart deployments to have expected number of available replicas...")
-	err = charts.WatchAndWaitDeployments(client, projectClusterID, benchmarkNamespace, metav1.ListOptions{})
+	err = extensionscharts.WatchAndWaitDeployments(client, projectClusterID, benchmarkNamespace, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	logrus.Infof("Waiting for CIS Benchmark chart DaemonSets to have expected number of available nodes...")
-	err = charts.WatchAndWaitDaemonSets(client, projectClusterID, benchmarkNamespace, metav1.ListOptions{})
+	err = extensionscharts.WatchAndWaitDaemonSets(client, projectClusterID, benchmarkNamespace, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	logrus.Infof("Waiting for CIS Benchmark chart StatefulSets to have expected number of ready replicas...")
-	err = charts.WatchAndWaitStatefulSets(client, projectClusterID, benchmarkNamespace, metav1.ListOptions{})
+	err = extensionscharts.WatchAndWaitStatefulSets(client, projectClusterID, benchmarkNamespace, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

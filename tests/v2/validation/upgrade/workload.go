@@ -9,15 +9,16 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
+	kubeingress "github.com/rancher/rancher/tests/v2/actions/kubeapi/ingresses"
+	"github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/rancher/tests/v2/actions/services"
+	"github.com/rancher/rancher/tests/v2/actions/workloads"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	kubeingress "github.com/rancher/shepherd/extensions/kubeapi/ingresses"
-	"github.com/rancher/shepherd/extensions/projects"
-	"github.com/rancher/shepherd/extensions/services"
-	"github.com/rancher/shepherd/extensions/workloads"
+	extensionsworkloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/stretchr/testify/assert"
@@ -119,14 +120,14 @@ func newServiceTemplate(serviceName, namespaceName string, selector map[string]s
 // newTestContainerMinimal is a private constructor that returns container for minimal workload creations
 func newTestContainerMinimal() corev1.Container {
 	pullPolicy := corev1.PullAlways
-	return workloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil, nil, nil, nil)
+	return extensionsworkloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil, nil, nil, nil)
 }
 
 // newPodTemplateWithTestContainer is a private constructor that returns pod template spec for workload creations
 func newPodTemplateWithTestContainer() corev1.PodTemplateSpec {
 	testContainer := newTestContainerMinimal()
 	containers := []corev1.Container{testContainer}
-	return workloads.NewPodTemplate(containers, nil, nil, nil)
+	return extensionsworkloads.NewPodTemplate(containers, nil, nil, nil)
 }
 
 // newPodTemplateWithSecretVolume is a private constructor that returns pod template spec with volume option for workload creations
@@ -145,7 +146,7 @@ func newPodTemplateWithSecretVolume(secretName string) corev1.PodTemplateSpec {
 		},
 	}
 
-	return workloads.NewPodTemplate(containers, volumes, nil, nil)
+	return extensionsworkloads.NewPodTemplate(containers, volumes, nil, nil)
 }
 
 // newPodTemplateWithSecretEnvironmentVariable is a private constructor that returns pod template spec with envFrom option for workload creations
@@ -158,10 +159,10 @@ func newPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTe
 			},
 		},
 	}
-	container := workloads.NewContainer(containerName, containerImage, pullPolicy, nil, envFrom, nil, nil, nil)
+	container := extensionsworkloads.NewContainer(containerName, containerImage, pullPolicy, nil, envFrom, nil, nil, nil)
 	containers := []corev1.Container{container}
 
-	return workloads.NewPodTemplate(containers, nil, nil, nil)
+	return extensionsworkloads.NewPodTemplate(containers, nil, nil, nil)
 }
 
 // waitUntilIngressIsAccessible waits until the ingress is accessible

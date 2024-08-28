@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
-	"github.com/rancher/shepherd/extensions/charts"
+	extencharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
@@ -69,7 +70,7 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 			subSession := w.session.NewSession()
 			defer subSession.Cleanup()
 
-			initialWebhookChart, err := charts.GetChartStatus(w.client, clusterID, charts.RancherWebhookNamespace, charts.RancherWebhookName)
+			initialWebhookChart, err := extencharts.GetChartStatus(w.client, clusterID, charts.RancherWebhookNamespace, charts.RancherWebhookName)
 			require.NoError(w.T(), err)
 			chartVersion := initialWebhookChart.ChartDetails.Spec.Chart.Metadata.Version
 			require.NoError(w.T(), err)

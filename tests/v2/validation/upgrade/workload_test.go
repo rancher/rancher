@@ -5,17 +5,19 @@ package upgrade
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/secrets"
+	"github.com/rancher/rancher/tests/v2/actions/services"
+	"github.com/rancher/rancher/tests/v2/actions/upgradeinput"
+	"github.com/rancher/rancher/tests/v2/actions/workloads"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/charts"
+	extensioncharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	"github.com/rancher/shepherd/extensions/namespaces"
-	"github.com/rancher/shepherd/extensions/secrets"
-	"github.com/rancher/shepherd/extensions/services"
-	"github.com/rancher/shepherd/extensions/upgradeinput"
-	"github.com/rancher/shepherd/extensions/workloads"
+	extensionsworkloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,23 +99,23 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	testContainerPodTemplate := newPodTemplateWithTestContainer()
 
 	u.T().Logf("Creating a deployment with the test container with name [%v]", names.random["deploymentName"])
-	deploymentTemplate := workloads.NewDeploymentTemplate(names.random["deploymentName"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+	deploymentTemplate := extensionsworkloads.NewDeploymentTemplate(names.random["deploymentName"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 	createdDeployment, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	require.NoError(u.T(), err)
 	assert.Equal(u.T(), createdDeployment.Name, names.random["deploymentName"])
 
 	u.T().Logf("Waiting deployment [%v] to have expected number of available replicas", names.random["deploymentName"])
-	err = charts.WatchAndWaitDeployments(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensioncharts.WatchAndWaitDeployments(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(u.T(), err)
 
 	u.T().Logf("Creating a daemonset with the test container with name [%v]", names.random["daemonsetName"])
-	daemonsetTemplate := workloads.NewDaemonSetTemplate(names.random["daemonsetName"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+	daemonsetTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random["daemonsetName"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(u.T(), err)
 	assert.Equal(u.T(), createdDaemonSet.Name, names.random["daemonsetName"])
 
 	u.T().Logf("Waiting daemonset [%v] to have expected number of available replicas", names.random["daemonsetName"])
-	err = charts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensioncharts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(u.T(), err)
 
 	u.T().Logf("Validating daemonset[%v] available replicas number is equal to worker nodes number in the cluster [%v]", names.random["daemonsetName"], project.ClusterID)
@@ -129,19 +131,19 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	podTemplateWithSecretVolume := newPodTemplateWithSecretVolume(names.random["secretName"])
 
 	u.T().Logf("Creating a deployment with the test container and secret as volume with name [%v]", names.random["deploymentNameForVolumeSecret"])
-	deploymentWithSecretTemplate := workloads.NewDeploymentTemplate(names.random["deploymentNameForVolumeSecret"], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
+	deploymentWithSecretTemplate := extensionsworkloads.NewDeploymentTemplate(names.random["deploymentNameForVolumeSecret"], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
 	createdDeploymentWithSecretVolume, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentWithSecretTemplate)
 	require.NoError(u.T(), err)
 	assert.Equal(u.T(), createdDeploymentWithSecretVolume.Name, names.random["deploymentNameForVolumeSecret"])
 
 	u.T().Logf("Creating a daemonset with the test container and secret as volume with name [%v]", names.random["daemonsetNameForVolumeSecret"])
-	daemonsetWithSecretTemplate := workloads.NewDaemonSetTemplate(names.random["daemonsetNameForVolumeSecret"], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
+	daemonsetWithSecretTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random["daemonsetNameForVolumeSecret"], namespace.Name, podTemplateWithSecretVolume, isCattleLabeled, nil)
 	createdDaemonSetWithSecretVolume, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetWithSecretTemplate)
 	require.NoError(u.T(), err)
 	assert.Equal(u.T(), createdDaemonSetWithSecretVolume.Name, names.random["daemonsetNameForVolumeSecret"])
 
 	u.T().Logf("Waiting daemonset [%v] to have expected number of available replicas", names.random["daemonsetNameForVolumeSecret"])
-	err = charts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensioncharts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(u.T(), err)
 
 	u.T().Logf("Validating daemonset [%v] available replicas number is equal to worker nodes number in the cluster [%v]", names.random["daemonsetNameForVolumeSecret"], project.ClusterID)
@@ -150,19 +152,19 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	podTemplateWithSecretEnvironmentVariable := newPodTemplateWithSecretEnvironmentVariable(names.random["secretName"])
 
 	u.T().Logf("Creating a deployment with the test container and secret as environment variable with name [%v]", names.random["deploymentNameForEnvironmentVariableSecret"])
-	deploymentEnvironmentWithSecretTemplate := workloads.NewDeploymentTemplate(names.random["deploymentNameForEnvironmentVariableSecret"], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
+	deploymentEnvironmentWithSecretTemplate := extensionsworkloads.NewDeploymentTemplate(names.random["deploymentNameForEnvironmentVariableSecret"], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
 	createdDeploymentEnvironmentVariableSecret, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentEnvironmentWithSecretTemplate)
 	require.NoError(u.T(), err)
 	assert.Equal(u.T(), createdDeploymentEnvironmentVariableSecret.Name, names.random["deploymentNameForEnvironmentVariableSecret"])
 
 	u.T().Logf("Creating a daemonset with the test container and secret as environment variable with name [%v]", names.random["daemonsetNameForEnvironmentVariableSecret"])
-	daemonSetEnvironmentWithSecretTemplate := workloads.NewDaemonSetTemplate(names.random["daemonsetNameForEnvironmentVariableSecret"], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
+	daemonSetEnvironmentWithSecretTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random["daemonsetNameForEnvironmentVariableSecret"], namespace.Name, podTemplateWithSecretEnvironmentVariable, isCattleLabeled, nil)
 	createdDaemonSetEnvironmentVariableSecret, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonSetEnvironmentWithSecretTemplate)
 	require.NoError(u.T(), err)
 	assert.Equal(u.T(), createdDaemonSetEnvironmentVariableSecret.Name, names.random["daemonsetNameForEnvironmentVariableSecret"])
 
 	u.T().Logf("Waiting daemonset [%v] to have expected number of available replicas", names.random["daemonsetNameForEnvironmentVariableSecret"])
-	err = charts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = extensioncharts.WatchAndWaitDaemonSets(client, project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(u.T(), err)
 
 	u.T().Logf("Validating daemonset [%v] available replicas number is equal to worker nodes number in the cluster [%v]", names.random["daemonsetNameForEnvironmentVariableSecret"], project.ClusterID)
@@ -172,7 +174,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 		u.T().Log("Ingress tests are enabled")
 
 		u.T().Logf("Creating a deployment with the test container for ingress with name [%v]", names.random["deploymentNameForIngress"])
-		deploymentForIngressTemplate := workloads.NewDeploymentTemplate(names.random["deploymentNameForIngress"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+		deploymentForIngressTemplate := extensionsworkloads.NewDeploymentTemplate(names.random["deploymentNameForIngress"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 		createdDeploymentForIngress, err := steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentForIngressTemplate)
 		require.NoError(u.T(), err)
 		assert.Equal(u.T(), createdDeploymentForIngress.Name, names.random["deploymentNameForIngress"])
@@ -211,7 +213,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 		assert.True(u.T(), isIngressForDeploymentAccessible)
 
 		u.T().Logf("Creating a daemonset with the test container for ingress with name [%v]", names.random["daemonsetNameForIngress"])
-		daemonSetForIngressTemplate := workloads.NewDaemonSetTemplate(names.random["daemonsetNameForIngress"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
+		daemonSetForIngressTemplate := extensionsworkloads.NewDaemonSetTemplate(names.random["daemonsetNameForIngress"], namespace.Name, testContainerPodTemplate, isCattleLabeled, nil)
 		createdDaemonSetForIngress, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonSetForIngressTemplate)
 		require.NoError(u.T(), err)
 		assert.Equal(u.T(), createdDaemonSetForIngress.Name, names.random["daemonsetNameForIngress"])
@@ -255,7 +257,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 		u.T().Log("Charts tests are enabled")
 
 		u.T().Logf("Checking if the logging chart is installed in cluster [%v]", project.ClusterID)
-		loggingChart, err := charts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
+		loggingChart, err := extensioncharts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
 		require.NoError(u.T(), err)
 
 		if !loggingChart.IsAlreadyInstalled {
@@ -381,7 +383,7 @@ func (u *UpgradeWorkloadTestSuite) testPostUpgradeSingleCluster(clusterName stri
 		u.T().Logf("Chart tests are enabled")
 
 		u.T().Logf("Checking if the logging chart is installed")
-		loggingChart, err := charts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
+		loggingChart, err := extensioncharts.GetChartStatus(client, project.ClusterID, charts.RancherLoggingNamespace, charts.RancherLoggingName)
 		require.NoError(u.T(), err)
 		assert.True(u.T(), loggingChart.IsAlreadyInstalled)
 	}
