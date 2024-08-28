@@ -65,7 +65,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		return nil, err
 	}
 
-	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
+	metricsHandler := metrics.NewMetricsHandler(scaledContext.K8sClient, promhttp.Handler())
 
 	channelserver := channelserver.NewHandler(ctx)
 
