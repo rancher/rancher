@@ -101,7 +101,7 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStra
 		}
 
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot)
+			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
 		})
 	}
 }
@@ -111,7 +111,7 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStra
 		s.T().Skip()
 	}
 
-	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig)
+	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, containerImage)
 }
 
 // In order for 'go test' to run this suite, we need to create
