@@ -5,9 +5,9 @@ package nodescaling
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	nodepools "github.com/rancher/rancher/tests/v2/actions/rke1/nodepools"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
-	nodepools "github.com/rancher/shepherd/extensions/rke1/nodepools"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"

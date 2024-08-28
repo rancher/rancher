@@ -171,7 +171,8 @@ require (
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/cis-operator v1.0.11
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240613212755-3021cf92ff9f
-	github.com/rancher/shepherd v0.0.0-20240802142039-681264e3b6ef
+	github.com/rancher/shepherd v0.0.0-20240820200856-85fda01f1356
+	github.com/rancher/wrangler v1.1.1
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -203,7 +204,6 @@ require (
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
-	github.com/rancher/wrangler v1.1.1 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect

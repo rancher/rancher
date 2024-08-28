@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	settings "github.com/rancher/rancher/pkg/settings"
-	namespaces "github.com/rancher/shepherd/extensions/namespaces"
+	namespaces "github.com/rancher/rancher/tests/v2/actions/namespaces"
 	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/stretchr/testify/require"
 )

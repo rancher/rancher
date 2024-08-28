@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	settings "github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	namespaces "github.com/rancher/rancher/tests/v2/actions/namespaces"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/charts"
-	namespaces "github.com/rancher/shepherd/extensions/namespaces"
+	extencharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/stretchr/testify/assert"
 	require "github.com/stretchr/testify/require"
@@ -32,11 +33,11 @@ func (n *GateKeeperTestSuite) TestGateKeeperAllowedNamespaces() {
 	require.NoError(n.T(), err)
 
 	n.T().Log("Waiting for gatekeeper chart deployments to have expected number of available replicas")
-	err = charts.WatchAndWaitDeployments(client, n.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+	err = extencharts.WatchAndWaitDeployments(client, n.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 	require.NoError(n.T(), err)
 
 	n.T().Log("Waiting for gatekeeper chart DaemonSets to have expected number of available nodes")
-	err = charts.WatchAndWaitDaemonSets(client, n.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
+	err = extencharts.WatchAndWaitDaemonSets(client, n.project.ClusterID, charts.RancherGatekeeperNamespace, metav1.ListOptions{})
 	require.NoError(n.T(), err)
 
 	n.T().Log("creating constraint template")
@@ -54,7 +55,7 @@ func (n *GateKeeperTestSuite) TestGateKeeperAllowedNamespaces() {
 	// constraint must exclude cattle-gatekeeper-system and all namespaces that are dynamically generated during gatekeeper installation and upgrade
 	// for example: pod-impersonation-helm-op-f9pwc and cattle-impersonation-user-vhkst-token
 	n.T().Log("creating constraint")
-	yamlString, err := charts.GenerateGatekeeperConstraintYaml([]string{""},
+	yamlString, err := extencharts.GenerateGatekeeperConstraintYaml([]string{""},
 		[]string{"cattle-gatekeeper-system", "ingress-nginx-controller-admission", "kube-dns", "cattle-controllers", "rke-network-plugin", "extension-apiserver-authentication", "fleet-agent-lock", "udp-services", "cattle-impersonation-user*", "pod-impersonation-helm-op*", "local*", "default*", "test*", "canal*", "nginx-ingress-controller*", "rke*", "coredns*", "gatekeeper*", "calico-kube-controllers*", "kube-root*", "cattle*", "kube-root-ca*", "ingress-nginx-admission*", "metrics-server*"},
 		[]string{"Namespace"},
 		"ns-must-be-allowed", sysNamespacesSlice, "deny", "constraints.gatekeeper.sh/v1beta1", "K8sAllowedNamespaces")

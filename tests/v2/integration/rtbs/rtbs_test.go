@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	extnamespaces "github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/secrets"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
-	extnamespaces "github.com/rancher/shepherd/extensions/kubeapi/namespaces"
-	"github.com/rancher/shepherd/extensions/kubeapi/secrets"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/api/scheme"

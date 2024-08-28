@@ -5,8 +5,8 @@ package cli
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/cli"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/extensions/cli"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"

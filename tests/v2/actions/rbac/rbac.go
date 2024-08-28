@@ -5,7 +5,6 @@ import (
 
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/rbac"
 	"github.com/rancher/shepherd/extensions/users"
 )
 
@@ -38,8 +37,8 @@ func AddUserWithRoleToCluster(adminClient *rancher.Client, globalRole, role stri
 		return nil, nil, err
 	}
 
-	if globalRole == rbac.StandardUser.String() {
-		if strings.Contains(role, "project") || role == rbac.ReadOnly.String() {
+	if globalRole == StandardUser.String() {
+		if strings.Contains(role, "project") || role == ReadOnly.String() {
 			err := users.AddProjectMember(adminClient, project, user, role, nil)
 			if err != nil {
 				return nil, nil, err
