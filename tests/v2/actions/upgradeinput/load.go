@@ -38,63 +38,6 @@ func LoadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Cluster, er
 			cluster := new(Cluster)
 
 			cluster.Name = clusterList[i]
-			cluster.IsLatestVersion = true
-
-			clusters = append(clusters, *cluster)
-		}
-	} else if isUpgradeSomeClusters {
-		for _, c := range upgradeConfig.Clusters {
-			cluster := new(Cluster)
-
-			cluster.Name = c.Name
-			cluster.VersionToUpgrade = c.VersionToUpgrade
-			cluster.PSACT = c.PSACT
-
-			isVersionFieldLatest := cluster.VersionToUpgrade == LatestKey
-			if isVersionFieldLatest {
-				cluster.IsLatestVersion = true
-			}
-
-			isUpgradeDisabled := cluster.VersionToUpgrade == ""
-			if isUpgradeDisabled {
-				cluster.IsUpgradeDisabled = true
-			}
-
-			clusters = append(clusters, *cluster)
-		}
-	}
-
-	return
-}
-
-// loadUpgradeKubernetesConfig is a test helper function to get required slice of Clusters struct. Returns error if any.
-// Contains two different config options to workload upgrade test:
-//  1. A flag called “all” is only requirement, tests all clusters with ingrss and charts options disabled
-//  2. Some option that's up to user input
-func LoadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Cluster, err error) {
-	upgradeConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, upgradeConfig)
-
-	isConfigEmpty := len(upgradeConfig.Clusters) == 0
-	isFlagDeclared := client.Flags.GetValue(environmentflag.WorkloadUpgradeAllClusters)
-
-	if isConfigEmpty && !isFlagDeclared {
-		return clusters, errors.Wrap(err, "config doesn't match the requirements")
-	}
-
-	isUpgradeAllClusters := isFlagDeclared && isConfigEmpty
-	isUpgradeSomeClusters := !isConfigEmpty && !isUpgradeAllClusters
-
-	if isUpgradeAllClusters {
-		clusterList, err := listDownstreamClusters(client)
-		if err != nil {
-			return clusters, errors.Wrap(err, "couldn't list clusters")
-		}
-
-		for i := range clusterList {
-			cluster := new(Cluster)
-
-			cluster.Name = clusterList[i]
 			ingress := false
 			chart := false
 			cluster.FeaturesToTest = Features{
@@ -109,8 +52,8 @@ func LoadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Cluster, err 
 			cluster := new(Cluster)
 
 			cluster.Name = c.Name
+			cluster.ProvisioningInput = c.ProvisioningInput
 			cluster.FeaturesToTest = c.FeaturesToTest
-			cluster.PSACT = c.PSACT
 
 			clusters = append(clusters, *cluster)
 		}

@@ -29,7 +29,7 @@ import (
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extensionscharts "github.com/rancher/shepherd/extensions/charts"
 	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
-	extensionsworkloads "github.com/rancher/shepherd/extensions/workloads"
+	wloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/namegenerator"
@@ -449,9 +449,9 @@ func createNginxDeploymentWithPVC(steveclient *steveV1.Client, containerNamePref
 		},
 	}
 
-	containerTemplate := extensionsworkloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{volMount}, []corev1.EnvFromSource{}, nil, nil, nil)
-	podTemplate := extensionsworkloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{podVol}, []corev1.LocalObjectReference{}, nil)
-	deployment := extensionsworkloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
+	containerTemplate := wloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{volMount}, []corev1.EnvFromSource{}, nil, nil, nil)
+	podTemplate := wloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{podVol}, []corev1.LocalObjectReference{}, nil, nil)
+	deployment := wloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {
@@ -464,9 +464,10 @@ func createNginxDeploymentWithPVC(steveclient *steveV1.Client, containerNamePref
 // createNginxDeployment is a helper function that creates a nginx deployment in a cluster's default namespace
 func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix string) (*steveV1.SteveAPIObject, error) {
 	containerName := namegenerator.AppendRandomString(containerNamePrefix)
-	containerTemplate := extensionsworkloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
-	podTemplate := extensionsworkloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil)
-	deployment := extensionsworkloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
+
+	containerTemplate := wloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
+	podTemplate := wloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil, nil)
+	deployment := wloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {

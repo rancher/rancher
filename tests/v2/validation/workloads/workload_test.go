@@ -7,7 +7,7 @@ import (
 
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/cronjob"
-	"github.com/rancher/rancher/tests/v2/actions/workloads/deamonset"
+	deamonset "github.com/rancher/rancher/tests/v2/actions/workloads/daemonset"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/statefulset"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -104,7 +104,7 @@ func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
-	createdDaemonset, err := deamonset.CreateDeamonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	createdDaemonset, err := deamonset.CreateDaemonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
 	require.NoError(w.T(), err)
 
 	err = charts.WatchAndWaitDaemonSets(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
@@ -137,6 +137,7 @@ func (w *WorkloadTestSuite) TestWorkloadCronjob() {
 		[]corev1.Container{containerTemplate},
 		[]corev1.Volume{},
 		[]corev1.LocalObjectReference{},
+		nil,
 		nil,
 	)
 
@@ -171,6 +172,7 @@ func (w *WorkloadTestSuite) TestWorkloadStatefulset() {
 		[]corev1.Container{containerTemplate},
 		[]corev1.Volume{},
 		[]corev1.LocalObjectReference{},
+		nil,
 		nil,
 	)
 
