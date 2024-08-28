@@ -11,9 +11,5 @@ mkdir -p ../bin/chart/${CHART_REPO}
 
 helm_v3 package -d ../bin/chart/${CHART_REPO} ../build/chart/rancher
 
-if [[ "${CHART_REPO}" == "dev" ]]; then
-    echo "dev repo - skipping index"
-else
-    echo "updating index ... "
-    ./chart/index ${CHART_REPO}
-fi
+echo "updating index ... "
+./chart/index ${CHART_REPO}
