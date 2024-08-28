@@ -30,18 +30,6 @@ var (
 	)
 )
 
-type ClusterCounts struct {
-	AppRevisions            int `json:"appRevisions"`
-	CatalogTemplateVersions int `json:"catalogTemplateVersions"`
-	Projects                int `json:"projects"`
-	ConfigMaps              int `json:"configMaps"`
-	Secrets                 int `json:"secrets"`
-	Namespaces              int `json:"namespaces"`
-	Nodes                   int `json:"nodes"`
-	RoleBindings            int `json:"roleBindings"`
-	ClusterRoleBindings     int `json:"clusterRoleBindings"`
-}
-
 // NewMetricsHandler configures an HTTP middleware that verifies that the user making the request is allowed to read Rancher metrics
 func NewMetricsHandler(scaledContextClient kubernetes.Interface) func(handler http.Handler) http.Handler {
 	return sar.NewSubjectAccessReviewHandler(scaledContextClient.AuthorizationV1().SubjectAccessReviews(), &authorizationv1.ResourceAttributes{
