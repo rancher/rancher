@@ -4,10 +4,13 @@ import (
 	"fmt"
 
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/extensions/secrets"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
+)
+
+const (
+	SecretSteveType = "secret"
 )
 
 // CreateSecret is a helper to create a secret using wrangler client
@@ -25,7 +28,7 @@ func CreateSecret(client *rancher.Client, clusterID, namespaceName string, data 
 	}
 
 	secretName := namegen.AppendRandomString("testsecret")
-	secretTemplate := secrets.NewSecretTemplate(secretName, namespaceName, data, corev1.SecretTypeOpaque)
+	secretTemplate := NewSecretTemplate(secretName, namespaceName, data, corev1.SecretTypeOpaque)
 
 	createdSecret, err := ctx.Core.Secret().Create(&secretTemplate)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -16,7 +17,6 @@ import (
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/nodes"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/sshkeys"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/sirupsen/logrus"

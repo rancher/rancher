@@ -5,9 +5,9 @@ package deleting
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

@@ -3,10 +3,10 @@ package deleting
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/machinepools"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
-	"github.com/rancher/shepherd/extensions/machinepools"
 	"github.com/rancher/shepherd/extensions/steve"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"

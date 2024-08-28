@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rbacapi "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/secrets"
+	"github.com/rancher/rancher/tests/v2/actions/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	rbacapi "github.com/rancher/shepherd/extensions/kubeapi/rbac"
-	"github.com/rancher/shepherd/extensions/kubeapi/secrets"
-	"github.com/rancher/shepherd/extensions/namespaces"
-	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/users"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -457,7 +457,6 @@ func (ns *NamespacedRulesTestSuite) TestDeleteUserDeletesRolebindingsForNamespac
 	grbOwner, err := getGlobalRoleBindingForUserWrangler(ns.client, createdUser.ID)
 	require.NoError(ns.T(), err)
 	nameSelector := fmt.Sprintf("metadata.name=%s-%s", grbOwner, namespace)
-
 
 	log.Info("Deleting the user attached to the namespaced rules.")
 	err = ns.client.WranglerContext.Mgmt.User().Delete(createdUser.ID, &metav1.DeleteOptions{})

@@ -5,10 +5,9 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	rbacv2 "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	rbacv2 "github.com/rancher/shepherd/extensions/kubeapi/rbac"
-	"github.com/rancher/shepherd/extensions/rbac"
 	"github.com/rancher/shepherd/extensions/users"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -47,8 +46,8 @@ func AddUserWithRoleToCluster(adminClient *rancher.Client, globalRole, role stri
 		return nil, nil, err
 	}
 
-	if globalRole == rbac.StandardUser.String() {
-		if strings.Contains(role, "project") || role == rbac.ReadOnly.String() {
+	if globalRole == StandardUser.String() {
+		if strings.Contains(role, "project") || role == ReadOnly.String() {
 			err := users.AddProjectMember(adminClient, project, user, role, nil)
 			if err != nil {
 				return nil, nil, err
@@ -77,7 +76,7 @@ func SetupUser(client *rancher.Client, globalRole string) (user *management.User
 	return
 }
 
-//GetRoleBindings is a helper function to fetch rolebindings for a user
+// GetRoleBindings is a helper function to fetch rolebindings for a user
 func GetRoleBindings(rancherClient *rancher.Client, clusterID string, userID string) ([]rbacv1.RoleBinding, error) {
 	logrus.Infof("Getting role bindings for user %s in cluster %s", userID, clusterID)
 	listOpt := v1.ListOptions{}
@@ -99,7 +98,7 @@ func GetRoleBindings(rancherClient *rancher.Client, clusterID string, userID str
 	return userRoleBindings, nil
 }
 
-//GetBindings is a helper function to fetch bindings for a user
+// GetBindings is a helper function to fetch bindings for a user
 func GetBindings(rancherClient *rancher.Client, userID string) (map[string]interface{}, error) {
 	logrus.Infof("Getting all bindings for user %s", userID)
 	bindings := make(map[string]interface{})

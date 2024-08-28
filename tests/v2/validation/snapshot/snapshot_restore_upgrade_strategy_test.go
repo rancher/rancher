@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/etcdsnapshot"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/etcdsnapshot"
 
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
