@@ -2,10 +2,14 @@ package metrics
 
 import (
 	"context"
+	"net/http"
 	"time"
 
+	"github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
@@ -36,6 +40,15 @@ type ClusterCounts struct {
 	Nodes                   int `json:"nodes"`
 	RoleBindings            int `json:"roleBindings"`
 	ClusterRoleBindings     int `json:"clusterRoleBindings"`
+}
+
+// NewMetricsHandler configures an HTTP middleware that verifies that the user making the request is allowed to read Rancher metrics
+func NewMetricsHandler(scaledContextClient kubernetes.Interface) func(handler http.Handler) http.Handler {
+	return sar.NewSubjectAccessReviewHandler(scaledContextClient.AuthorizationV1().SubjectAccessReviews(), &authorizationv1.ResourceAttributes{
+		Verb:     "get",
+		Resource: "ranchermetrics",
+		Group:    "management.cattle.io",
+	})
 }
 
 func Register(ctx context.Context, scaledContext *config.ScaledContext) {

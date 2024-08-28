@@ -65,8 +65,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		return nil, err
 	}
 
-	metricsHandler := metrics.NewMetricsHandler(scaledContext.K8sClient, promhttp.Handler())
-
 	channelserver := channelserver.NewHandler(ctx)
 
 	supportConfigGenerator := supportconfigs.NewHandler(scaledContext)
@@ -130,8 +128,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	metricsAuthed.Use(mux.MiddlewareFunc(tokenReviewAuth.Chain(impersonatingAuth)))
 	metricsAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
 	metricsAuthed.Use(requests.NewAuthenticatedFilter)
-
-	metricsAuthed.Path("/metrics").Handler(metricsHandler)
+	metricsAuthed.Use(metrics.NewMetricsHandler(scaledContext.K8sClient))
+	metricsAuthed.Path("/metrics").Handler(promhttp.Handler())
 
 	unauthed.NotFoundHandler = saauthed
 	saauthed.NotFoundHandler = authed
