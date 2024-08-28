@@ -116,7 +116,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
-	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
