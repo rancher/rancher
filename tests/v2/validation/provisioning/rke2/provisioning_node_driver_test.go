@@ -3,6 +3,7 @@
 package rke2
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
@@ -72,16 +73,19 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
 	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesWindows := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool, provisioninginput.WindowsMachinePool}
 
 	tests := []struct {
 		name         string
 		machinePools []provisioninginput.MachinePools
 		client       *rancher.Client
+		isWindows    bool
 		runFlag      bool
 	}{
-		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRolesAll, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Short) || r.client.Flags.GetValue(environmentflag.Long)},
-		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Short) || r.client.Flags.GetValue(environmentflag.Long)},
-		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
+		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRolesAll, r.standardUserClient, false, r.client.Flags.GetValue(environmentflag.Short) || r.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, r.standardUserClient, false, r.client.Flags.GetValue(environmentflag.Short) || r.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, false, r.client.Flags.GetValue(environmentflag.Long)},
+		{"4 nodes - 1 role per node + 1 Windows worker " + provisioninginput.StandardClientName.String(), nodeRolesWindows, r.standardUserClient, true, r.client.Flags.GetValue(environmentflag.Long)},
 	}
 
 	for _, tt := range tests {
@@ -89,8 +93,14 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 			r.T().Logf("SKIPPED")
 			continue
 		}
+
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.MachinePools = tt.machinePools
+
+		if !slices.Contains(provisioningConfig.Providers, "vsphere") && tt.isWindows {
+			r.T().Skip("Windows test requires access to vsphere")
+		}
+
 		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }

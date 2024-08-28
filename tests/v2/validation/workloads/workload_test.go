@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
-	"github.com/rancher/rancher/tests/v2/actions/workloads/deamonset"
+	deamonset "github.com/rancher/rancher/tests/v2/actions/workloads/daemonset"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -102,7 +102,7 @@ func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
-	_, err = deamonset.CreateDeamonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	_, err = deamonset.CreateDaemonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
 	require.NoError(w.T(), err)
 }
 

@@ -21,7 +21,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusterrolebindings"
 	"github.com/rancher/shepherd/extensions/configmaps"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	extensionworkloads "github.com/rancher/shepherd/extensions/workloads"
+	wloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -444,7 +444,8 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	}
 
 	isCattleLabeled := true
-	deploymentTemplate := extensionworkloads.NewDeploymentTemplate(deploymentName, namespace, podSpecTemplate, isCattleLabeled, nil)
+
+	deploymentTemplate := wloads.NewDeploymentTemplate(deploymentName, namespace, podSpecTemplate, isCattleLabeled, nil)
 	deployment, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	if err != nil {
 		return deployment, err

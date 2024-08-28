@@ -40,7 +40,7 @@ const (
 	clusterLabel                 = "cluster.x-k8s.io/cluster-name"
 )
 
-func MatchNodeToRole(t *testing.T, client *rancher.Client, clusterID string, isEtcd bool, isControlPlane bool, isWorker bool) (int, []management.Node) {
+func MatchNodeToRole(t *testing.T, client *rancher.Client, clusterID string, isEtcd, isControlPlane, isWorker bool) (int, []management.Node) {
 	machines, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
 		"clusterId": clusterID,
 	}})

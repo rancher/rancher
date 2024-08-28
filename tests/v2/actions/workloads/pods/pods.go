@@ -75,7 +75,7 @@ func NewPodTemplateWithConfig(secretName, configMapName string, useEnvVars, useV
 
 	container := workloads.NewContainer(containerName, imageName, pullPolicy, nil, envFrom, nil, nil, nil)
 	containers := []corev1.Container{container}
-	return workloads.NewPodTemplate(containers, volumes, nil, nil)
+	return workloads.NewPodTemplate(containers, volumes, nil, nil, nil)
 }
 
 // CheckPodLogsForErrors is a helper to check pod logs for errors

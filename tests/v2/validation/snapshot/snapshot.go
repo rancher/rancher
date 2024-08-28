@@ -56,9 +56,11 @@ const (
 	RKE2                         = "rke2"
 	serviceAppendName            = "service-"
 	serviceType                  = "service"
+	windowsContainerImage        = "mcr.microsoft.com/windows/servercore/iis"
+	windowsContainerName         = "iis"
 )
 
-func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, etcdRestore *etcdsnapshot.Config) {
+func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, etcdRestore *etcdsnapshot.Config, containerImage string) {
 	initialIngressName := namegen.AppendRandomString(initialIngress)
 	initialWorkloadName := namegen.AppendRandomString(initialWorkload)
 
@@ -78,8 +80,11 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 		isRKE1 = true
 	}
 
-	containerTemplate := workloads.NewContainer(containerName, containerImage, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
-	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil)
+	var containerTemplate corev1.Container
+
+	containerTemplate = workloads.NewContainer(containerName, containerImage, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
+
+	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil, map[string]string{})
 	deployment := workloads.NewDeploymentTemplate(initialWorkloadName, defaultNamespace, podTemplate, isCattleLabeled, nil)
 
 	service := corev1.Service{
