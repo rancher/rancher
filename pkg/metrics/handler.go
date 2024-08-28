@@ -4,14 +4,15 @@ import (
 	"net/http"
 
 	"github.com/rancher/rancher/pkg/auth/util"
-	v2 "k8s.io/api/authorization/v1"
-	v3 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	authorizationv1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/typed/authorization/v1"
+	authorizationv1clients "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 type metricsHandler struct {
-	subjectAccessReviewClient v1.SubjectAccessReviewInterface
+	subjectAccessReviewClient authorizationv1clients.SubjectAccessReviewInterface
 	promHandler               http.Handler
 }
 
@@ -24,11 +25,11 @@ func NewMetricsHandler(scaledContextClient kubernetes.Interface, promHandler htt
 }
 
 func (h *metricsHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	review := v2.SubjectAccessReview{
-		Spec: v2.SubjectAccessReviewSpec{
+	review := authorizationv1.SubjectAccessReview{
+		Spec: authorizationv1.SubjectAccessReviewSpec{
 			User:   req.Header.Get("Impersonate-User"),
 			Groups: req.Header["Impersonate-Groups"],
-			ResourceAttributes: &v2.ResourceAttributes{
+			ResourceAttributes: &authorizationv1.ResourceAttributes{
 				Verb:     "get",
 				Resource: "ranchermetrics",
 				Group:    "management.cattle.io",
@@ -36,7 +37,7 @@ func (h *metricsHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		},
 	}
 
-	result, err := h.subjectAccessReviewClient.Create(req.Context(), &review, v3.CreateOptions{})
+	result, err := h.subjectAccessReviewClient.Create(req.Context(), &review, metav1.CreateOptions{})
 	if err != nil {
 		util.ReturnHTTPError(rw, req, 500, err.Error())
 		return
