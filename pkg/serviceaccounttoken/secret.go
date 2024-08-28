@@ -77,7 +77,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 		}
 	}
 
-	secret, err := serviceAccountSecret(ctx, sa, secretLister, secretClient)
+	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
 	if err != nil {
 		return nil, fmt.Errorf("error looking up secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 	}
@@ -156,10 +156,6 @@ func serviceAccountSecretPrefix(sa *corev1.ServiceAccount) string {
 // If there are more than one, it returns the first. Can return a nil secret
 // and a nil error if no secret is found
 func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {
-	return serviceAccountSecret(ctx, sa, secretLister, secretClient)
-}
-
-func serviceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("cannot get secret for nil service account")
 	}
@@ -209,18 +205,16 @@ func isSecretForServiceAccount(secret *corev1.Secret, sa *corev1.ServiceAccount)
 }
 
 func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface, lockKey string) (*corev1.Secret, error) {
-	if lockKey != "" {
-		mutex := getLock(lockKey)
-		mutex.Lock()
-		defer func(key string) {
-			mutex.Unlock()
-			lockMap.Delete(lockKey)
-		}(lockKey)
-	}
+	mutex := getLock(lockKey)
+	mutex.Lock()
+	defer func(key string) {
+		mutex.Unlock()
+		lockMap.Delete(lockKey)
+	}(lockKey)
 
 	// We could have been waiting for the Mutex to unlock in a parallel run of
 	// createServiceAccountSecret - check again for the secret existing.
-	secret, err := serviceAccountSecret(ctx, sa, secretLister, secretClient)
+	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
 	if err != nil {
 		return nil, err
 	}
