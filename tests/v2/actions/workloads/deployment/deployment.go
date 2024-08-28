@@ -47,6 +47,7 @@ func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, r
 			[]corev1.Volume{},
 			[]corev1.LocalObjectReference{},
 			nil,
+			nil,
 		)
 	}
 

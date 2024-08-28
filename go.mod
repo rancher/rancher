@@ -171,7 +171,7 @@ require (
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/cis-operator v1.0.11
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240613212755-3021cf92ff9f
-	github.com/rancher/shepherd v0.0.0-20240820200856-85fda01f1356
+	github.com/rancher/shepherd v0.0.0-20240829173047-5491ef6474e0
 	github.com/rancher/wrangler v1.1.1
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )

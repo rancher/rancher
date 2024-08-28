@@ -25,7 +25,8 @@ Note: To see the `provisioningInput` in further detail, please review over the [
 See below how to run the test:
 
 ### Kubernetes Upgrade
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/upgrade --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestKubernetesUpgradeTestSuite/TestUpgradeKubernetes"`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/upgrade --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestKubernetesUpgradeTestSuite/TestUpgradeKubernetes"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/upgrade --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestWindowsKubernetesUpgradeTestSuite/TestUpgradeWindowsKubernetes"`
 
 ## Cloud Provider Migration
 Migrates a cluster's cloud provider from in-tree to out-of-tree
