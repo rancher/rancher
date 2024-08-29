@@ -4,11 +4,13 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/rke1/nodetemplates"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/cloudcredentials"
 	"github.com/rancher/shepherd/extensions/cloudcredentials/linode"
 	"github.com/rancher/shepherd/pkg/config"
 )
 
 const linodeNodeTemplateNameBase = "linodeNodeConfig"
+const providerName = "linode"
 
 // CreateLinodeNodeTemplate is a helper function that takes the rancher Client as a parameter and creates
 // an Linode node template and returns the NodeTemplate response
@@ -16,7 +18,8 @@ func CreateLinodeNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.Nod
 	var linodeNodeTemplateConfig nodetemplates.LinodeNodeTemplateConfig
 	config.LoadConfig(nodetemplates.LinodeNodeTemplateConfigurationFileKey, &linodeNodeTemplateConfig)
 
-	cloudCredential, err := linode.CreateLinodeCloudCredentials(rancherClient)
+	cloudCredentialConfig := cloudcredentials.LoadCloudCredential(providerName)
+	cloudCredential, err := linode.CreateLinodeCloudCredentials(rancherClient, cloudCredentialConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +31,7 @@ func CreateLinodeNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.Nod
 	}
 
 	nodeTemplateConfig := &nodetemplates.NodeTemplate{
-		CloudCredentialID: cloudCredential.ID,
+		CloudCredentialID: cloudCredential.Namespace + ":" + cloudCredential.Name,
 	}
 
 	config.LoadConfig(nodetemplates.NodeTemplateConfigurationFileKey, nodeTemplateConfig)
