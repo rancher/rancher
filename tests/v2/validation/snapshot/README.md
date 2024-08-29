@@ -42,5 +42,11 @@ These tests utilize Go build tags. Due to this, see the below example on how to 
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreUpgradeStrategyTestSuite/TestSnapshotRestoreUpgradeStrategy"` \
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreUpgradeStrategyTestSuite/TestSnapshotRestoreUpgradeStrategyDynamicInput"`
 
+### Sanpshot restore - Windows clusters
+Note: This test will only work with Windows nodes existing in the cluster. Run this test with a vSphere Windows node driver cluster or a custom cluster with a Windows node present.
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreWindowsTestSuite/TestSnapshotRestoreWindows"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreWindowsTestSuite/TestSnapshotRestoreWindowsDynamicInput"`
+
 ### Sanpshot additional tests
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotAdditionalTestsTestSuite$"`
