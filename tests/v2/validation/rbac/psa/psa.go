@@ -12,6 +12,7 @@ import (
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	extensionsworkloads "github.com/rancher/shepherd/extensions/workloads"
+	wloads "github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	appv1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
@@ -44,8 +45,8 @@ func createDeploymentAndWait(steveclient *v1.Client, containerName string, image
 	deploymentName := namegen.AppendRandomString("rbac-")
 	containerTemplate := extensionsworkloads.NewContainer(containerName, image, coreV1.PullAlways, []coreV1.VolumeMount{}, []coreV1.EnvFromSource{}, nil, nil, nil)
 
-	podTemplate := extensionsworkloads.NewPodTemplate([]coreV1.Container{containerTemplate}, []coreV1.Volume{}, []coreV1.LocalObjectReference{}, nil)
-	deployment := extensionsworkloads.NewDeploymentTemplate(deploymentName, namespaceName, podTemplate, isCattleLabeled, nil)
+	podTemplate := wloads.NewPodTemplate([]coreV1.Container{containerTemplate}, []coreV1.Volume{}, []coreV1.LocalObjectReference{}, nil, nil)
+	deployment := wloads.NewDeploymentTemplate(deploymentName, namespaceName, podTemplate, isCattleLabeled, nil)
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {

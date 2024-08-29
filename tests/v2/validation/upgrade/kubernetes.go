@@ -36,7 +36,7 @@ const (
 )
 
 // upgradeLocalCluster is a function to upgrade a local cluster.
-func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster) {
+func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, containerImage string) {
 	clusterObject, err := extensionscluster.GetClusterIDByName(client, clusterName)
 	require.NoError(u.T(), err)
 
@@ -55,7 +55,7 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 	}
 
 	u.Run(testName, func() {
-		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest)
+		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest, nil, containerImage)
 
 		clusterMeta, err := extensionscluster.NewClusterMeta(client, clusterName)
 		require.NoError(u.T(), err)
@@ -84,7 +84,7 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 }
 
 // upgradeDownstreamCluster is a function to upgrade a downstream cluster.
-func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster) {
+func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, nodeSelector map[string]string, containerImage string) {
 	var isRKE1 = false
 
 	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(client, clusterName, namespace)
@@ -120,7 +120,7 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 	}
 
 	u.Run(testName, func() {
-		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest)
+		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest, nodeSelector, containerImage)
 
 		if isRKE1 {
 			upgradedCluster, err := upgradeRKE1Cluster(u.T(), client, cluster, testConfig)

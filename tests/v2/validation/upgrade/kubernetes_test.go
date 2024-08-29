@@ -1,3 +1,5 @@
+//go:build validation
+
 package upgrade
 
 import (
@@ -50,9 +52,9 @@ func (u *UpgradeKubernetesTestSuite) TestUpgradeKubernetes() {
 			testConfig := clusters.ConvertConfigToClusterConfig(&cluster.ProvisioningInput)
 
 			if cluster.Name == local {
-				upgradeLocalCluster(&u.Suite, tt.name, tt.client, cluster.Name, testConfig, cluster)
+				upgradeLocalCluster(&u.Suite, tt.name, tt.client, cluster.Name, testConfig, cluster, containerImage)
 			} else {
-				upgradeDownstreamCluster(&u.Suite, tt.name, tt.client, cluster.Name, testConfig, cluster)
+				upgradeDownstreamCluster(&u.Suite, tt.name, tt.client, cluster.Name, testConfig, cluster, nil, containerImage)
 			}
 		}
 	}
