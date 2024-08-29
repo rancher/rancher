@@ -22,6 +22,7 @@ import (
 
 const (
 	active                   = "active"
+	osAnnotation             = "cattle.io/os"
 	fleetNamespace           = "fleet-default"
 	initNodeLabelKey         = "rke.cattle.io/init-node"
 	local                    = "local"
@@ -31,6 +32,7 @@ const (
 	clusterNameLabelKey      = "cluster.x-k8s.io/cluster-name"
 	pool                     = "pool"
 	True                     = "true"
+	windows                  = "windows"
 
 	nodeRoleListLength = 4
 )
@@ -42,9 +44,11 @@ func MatchNodeRolesToMachinePool(nodeRoles NodeRoles, machinePools []apisV1.RKEM
 		if nodeRoles.ControlPlane != machinePoolConfig.ControlPlaneRole {
 			continue
 		}
+
 		if nodeRoles.Etcd != machinePoolConfig.EtcdRole {
 			continue
 		}
+
 		if nodeRoles.Worker != machinePoolConfig.WorkerRole {
 			continue
 		}
@@ -52,6 +56,17 @@ func MatchNodeRolesToMachinePool(nodeRoles NodeRoles, machinePools []apisV1.RKEM
 		count += *machinePoolConfig.Quantity
 
 		return index, count
+	}
+
+	// If the nodeRole is for a Windows node, this separate check is needed. This is because
+	// the machinePoolConfig does not account for Windows nodes. This results in a scaling
+	// issue when working with Windows nodes.
+	if nodeRoles.Windows {
+		for index, machinePoolConfig := range machinePools {
+			if machinePoolConfig.WorkerRole && machinePoolConfig.Labels[osAnnotation] == windows {
+				return index, count
+			}
+		}
 	}
 
 	return -1, count
@@ -76,7 +91,7 @@ func updateMachinePoolQuantity(client *rancher.Client, cluster *v1.SteveAPIObjec
 	newQuantity += nodeRoles.Quantity
 	updatedCluster.Spec.RKEConfig.MachinePools[machineConfig].Quantity = &newQuantity
 
-	logrus.Infof("Scaling the machine pool to %v total nodes", newQuantity)
+	logrus.Infof("Scaling machine pool %v to %v total nodes", updatedCluster.Spec.RKEConfig.MachinePools[machineConfig].Name, newQuantity)
 	cluster, err = client.Steve.SteveType("provisioning.cattle.io.cluster").Update(cluster, updatedCluster)
 	if err != nil {
 		return nil, err

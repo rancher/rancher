@@ -1,5 +1,7 @@
 package upgradeinput
 
+import "github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+
 type PSACT string
 
 const (
@@ -15,12 +17,10 @@ type Config struct {
 
 // Cluster is a struct that's used to configure a single cluster to be used in an upgrade test
 type Cluster struct {
-	Name              string   `json:"name" yaml:"name" default:""`
-	VersionToUpgrade  string   `json:"versionToUpgrade" yaml:"versionToUpgrade" default:""`
-	PSACT             string   `json:"psact" yaml:"psact" default:""`
-	FeaturesToTest    Features `json:"enabledFeatures" yaml:"enabledFeatures" default:""`
-	IsLatestVersion   bool
-	IsUpgradeDisabled bool
+	Name              string                   `json:"name" yaml:"name" default:""`
+	VersionToUpgrade  string                   `json:"versionToUpgrade" yaml:"versionToUpgrade" default:""`
+	FeaturesToTest    Features                 `json:"enabledFeatures" yaml:"enabledFeatures" default:""`
+	ProvisioningInput provisioninginput.Config `json:"provisioningInput" yaml:"provisioningInput"`
 }
 
 // Features is a struct that stores test case options for a single cluster

@@ -24,7 +24,8 @@ rancher:
 Node replacement tests require that the given pools have unique, distinct roles and more than 1 node per pool. Typically, a cluster with the following 3 pools is used for testing:
 ```yaml
 provisioningInput:
-  nodePools:      # nodePools is specific for RKE1 clusters.
+  providers: [""]     # Specify to vsphere if you have a Windows node in your cluster
+  nodePools:          # nodePools is specific for RKE1 clusters.
   - nodeRoles:
       etcd: true
       quantity: 3
@@ -34,7 +35,7 @@ provisioningInput:
   - nodeRoles:
       worker: true
       quantity: 3
-  machinePools:   # machienPools is specific for RKE2/K3s clusters.
+  machinePools:       # machinePools is specific for RKE2/K3s clusters.
   - machinePoolConfig:
       etcd: true
       quantity: 3
@@ -57,6 +58,8 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 ## Scaling Existing Node Pools
 Similar to the `provisioning` tests, the node scaling tests have static test cases as well as dynamicInput tests you can specify. In order to run the dynamicInput tests, you will need to define the `scalingInput` block in your config file. This block defines the quantity you would like the pool to be scaled up/down to. See an example below that accounts for node drivers, custom clusters and hosted clusters:
 ```yaml
+provisioningInput:        # Optional block, only use if using vsphere
+  providers: [""]         # Specify to vsphere if you have a Windows node in your cluster
 scalingInput:
   nodeProvider: "ec2"
   nodePools:

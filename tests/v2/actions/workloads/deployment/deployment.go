@@ -47,6 +47,7 @@ func CreateDeploymentWithConfigmap(client *rancher.Client, clusterID, namespaceN
 			[]corev1.Volume{},
 			[]corev1.LocalObjectReference{},
 			nil,
+			nil,
 		)
 	}
 

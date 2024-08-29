@@ -28,6 +28,12 @@ Please use one of the following links to check upgrade tests:
 1. [Kubernetes Upgrade](kubernetes_test.go)
 2. [Pre/Post Upgrade Workload](workload_test.go)
 
+<<<<<<< HEAD
+=======
+### Kubernetes Upgrade
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/upgrade --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestKubernetesUpgradeTestSuite/TestUpgradeKubernetes"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/upgrade --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestWindowsKubernetesUpgradeTestSuite/TestUpgradeWindowsKubernetes"`
+>>>>>>> 544edab0c (Expand Windows test coverage in nodescaling and provisioning)
 
 ## Cloud Provider Migration
 Migrates a cluster's cloud provider from in-tree to out-of-tree

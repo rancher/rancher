@@ -114,7 +114,7 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceWorkerNode() {
 		}
 
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot)
+			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
 		})
 	}
 }
@@ -173,7 +173,7 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotRecurringRestores() {
 		}
 
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot)
+			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
 		})
 	}
 }
