@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/machinepools"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/cloudcredentials"
 	"github.com/rancher/shepherd/extensions/cloudcredentials/aws"
 	"github.com/rancher/shepherd/extensions/cloudcredentials/azure"
@@ -23,7 +24,7 @@ import (
 	r1vsphere "github.com/rancher/rancher/tests/v2/actions/rke1/nodetemplates/vsphere"
 )
 
-type CloudCredFunc func(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error)
+type CloudCredFunc func(rancherClient *rancher.Client, credentials cloudcredentials.CloudCredential) (*v1.SteveAPIObject, error)
 type MachinePoolFunc func(generatedPoolName, namespace string) []unstructured.Unstructured
 
 type Provider struct {
