@@ -3,10 +3,11 @@ package sar
 import (
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/auth/util"
 	authv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
+
+	"github.com/rancher/rancher/pkg/auth/util"
 )
 
 // NewSubjectAccessReviewHandler provides an HTTP middleware validating that the user has access to the provided resource attributes.

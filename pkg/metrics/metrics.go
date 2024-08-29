@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rancher/rancher/pkg/auth/requests/sar"
-	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rancher/wrangler/v3/pkg/ticker"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rancher/wrangler/v3/pkg/ticker"
+	"github.com/rancher/rancher/pkg/auth/requests/sar"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 var (
