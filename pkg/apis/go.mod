@@ -34,7 +34,7 @@ require (
 	github.com/rancher/eks-operator v1.9.0
 	github.com/rancher/fleet/pkg/apis v0.10.0
 	github.com/rancher/gke-operator v1.9.0
-	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
+	github.com/rancher/norman v0.0.0-20240822182819-60ccfabc4ac5
 	github.com/rancher/rke v1.6.0
 	github.com/rancher/wrangler/v3 v3.0.0
 	github.com/sirupsen/logrus v1.9.3
