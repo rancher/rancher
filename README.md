@@ -2,22 +2,21 @@
 
 *This file is auto-generated from README-template.md, please make any changes there.*
 
-[![Build Status](https://drone-publish.rancher.io/api/badges/rancher/rancher/status.svg?branch=release/v2.8)](https://drone-publish.rancher.io/rancher/rancher)
 [![Docker Pulls](https://img.shields.io/docker/pulls/rancher/rancher.svg)](https://store.docker.com/community/images/rancher/rancher)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rancher/rancher)](https://goreportcard.com/report/github.com/rancher/rancher)
 
 Rancher is an open source container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
 
 ## Latest Release
+* v2.9
+  * Latest - v2.9.1 - `rancher/rancher:v2.9.1` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.9.1).
+  * Stable - v2.9.1 - `rancher/rancher:v2.9.1` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.9.1).
 * v2.8
-  * Latest - v2.8.5 - `rancher/rancher:v2.8.5` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.8.5).
-  * Stable - v2.8.5 - `rancher/rancher:v2.8.5` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.8.5).
+  * Latest - v2.8.5 - `rancher/rancher:v2.8.5` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.8.5).
+  * Stable - v2.8.5 - `rancher/rancher:v2.8.5` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.8.5).
 * v2.7
   * Latest - v2.7.10 - `rancher/rancher:v2.7.10` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.10).
   * Stable - v2.7.10 - `rancher/rancher:v2.7.10` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.10).
-* v2.6
-  * Latest - v2.6.14 - `rancher/rancher:v2.6.14` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.14).
-  * Stable - v2.6.14 - `rancher/rancher:v2.6.14` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.14).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
