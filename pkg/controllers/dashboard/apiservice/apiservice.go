@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appscontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -148,7 +149,7 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 	}
 
 	// create a secret-based token for the service account if one does not exist
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(h.ctx, h.secretsCache, h.k8s, sa)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(h.ctx, h.secretsCache, h.k8s, sa, utils.FormatPrefix("local"))
 	if err != nil {
 		return "", fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 	}

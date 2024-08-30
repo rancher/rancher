@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -104,7 +105,7 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 
 // GetToken accepts a service account and returns the service account's token.
 func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa, utils.FormatPrefix(i.clusterContext.ClusterName))
 	if err != nil {
 		return "", fmt.Errorf("error getting secret: %w", err)
 	}
@@ -170,7 +171,7 @@ func (i *Impersonator) createServiceAccount(role *rbacv1.ClusterRole) (*corev1.S
 		}
 	}
 	// create secret for service account if it was not automatically generated
-	_, err = serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa)
+	_, err = serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa, utils.FormatPrefix(i.clusterContext.ClusterName))
 	if err != nil {
 		return nil, fmt.Errorf("impersonation: error ensuring secret for service account %s: %w", name, err)
 	}
