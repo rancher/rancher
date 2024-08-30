@@ -300,7 +300,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 			continue
 		}
 
-		token, err := util.GenerateServiceAccountToken(clientset)
+		token, err := util.GenerateServiceAccountToken(clientset, "")
 		if err != nil {
 			lastErr = err
 			time.Sleep(2 * time.Second)
