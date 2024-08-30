@@ -365,7 +365,7 @@ func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 		return cluster, err
 	}
 
-	saToken, err := clusteroperator.GenerateSAToken(restConfig)
+	saToken, err := clusteroperator.GenerateSAToken(restConfig, cluster.Name)
 	if err != nil {
 		return cluster, fmt.Errorf("error generating service account token: %w", err)
 	}
@@ -444,7 +444,7 @@ func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 		return "", nil, err
 	}
 	requiresTunnel := new(bool)
-	serviceToken, err := clusteroperator.GenerateSAToken(restConfig)
+	serviceToken, err := clusteroperator.GenerateSAToken(restConfig, cluster.Name)
 	if err != nil {
 		*requiresTunnel = true
 		if strings.Contains(err.Error(), "dial tcp") {
