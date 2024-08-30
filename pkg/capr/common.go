@@ -24,6 +24,7 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/wrangler/v2/pkg/condition"
 	"github.com/rancher/wrangler/v2/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
@@ -296,7 +297,7 @@ func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretControl
 	if planSA == nil {
 		return nil, false, fmt.Errorf("planSA was nil")
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache(), k8s, planSA)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache(), k8s, planSA, utils.FormatPrefix("local"))
 	if err != nil {
 		return nil, false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", planSA.Namespace, planSA.Name, err)
 	}
