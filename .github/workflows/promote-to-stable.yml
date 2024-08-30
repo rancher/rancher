@@ -6,12 +6,19 @@ on:
         type: string
         description: "e.g: v2.8.4"
         required: true
+      promote-to:
+        type: choice
+        description: "Promote to latest or stable"
+        options:
+          - "latest"
+          - "stable"
+        required: true
 env:
   REGISTRY: "docker.io"
   IMAGE: ${{ github.repository }}
   TAG: ${{ github.event.inputs.tag }}
   GIT_TAG: ${{ github.event.inputs.tag }}
-  NEW_TAG: stable
+  NEW_TAG: ${{ github.event.inputs.promote-to }}
 jobs:
   promote-docker-image:
     runs-on: ubuntu-latest
@@ -32,6 +39,7 @@ jobs:
       - name: Copy image to new tag
         run: skopeo copy docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.NEW_TAG }} --all
   promote-chart:
+    if: ${{ github.event.inputs.promote-to }} == "stable" # Only promote the chart if it's being promoted to stable
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,7 +72,7 @@ jobs:
         uses: google-github-actions/upload-cloud-storage@v2
         with:
           destination: releases.rancher.com/server-charts
-          path: bin/chart
+          path: ./bin/chart
           parent: false
           process_gcloudignore: false
           predefinedAcl: publicRead
