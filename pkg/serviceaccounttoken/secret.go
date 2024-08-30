@@ -41,6 +41,8 @@ func getLock(key string) *sync.Mutex {
 // context for concurrent requests. No concurrent creates will be allowed for a
 // service account.
 //
+// The lockPrefix should be of the same format as a generateName e.g. cluster-
+//
 // For example, if this is "cluster-1" and the ServiceAccount is
 // "default:test-sa" subsequent requests to create a ServiceAccount with the
 // same name in "cluster-1" will be blocked until the first request has
@@ -55,12 +57,6 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	logrus.Tracef("EnsureSecretForServiceAccount for %s:%s", sa.Namespace, sa.Name)
 
 	lockKey := fmt.Sprintf("%v%v-%v", lockPrefix, sa.Namespace, sa.Name)
-	mutex := getLock(lockKey)
-	mutex.Lock()
-	defer func(key string) {
-		mutex.Unlock()
-		lockMap.Delete(key)
-	}(lockKey)
 
 	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
 	var secretLister secretLister
@@ -88,12 +84,12 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	}
 
 	if secret == nil {
-		sc := SecretTemplate(sa)
-		secret, err = secretClient.Create(ctx, sc, metav1.CreateOptions{})
+		secret, err = createServiceAccountSecret(ctx, sa, secretLister, secretClient, lockKey)
 		if err != nil {
-			return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
+			return nil, err
 		}
 	}
+
 	if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
 		return secret, nil
 	}
@@ -114,13 +110,13 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
 		if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
-			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start))
+			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s %s ", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start), lockPrefix)
 			return true, nil
 		}
 		return false, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
+		return nil, err // err is already wapped inside the Wait.
 	}
 
 	return secret, nil
@@ -164,6 +160,7 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 	if sa == nil {
 		return nil, fmt.Errorf("cannot get secret for nil service account")
 	}
+
 	secrets, err := secretLister(sa.Namespace, labels.SelectorFromSet(map[string]string{
 		ServiceAccountSecretLabel: sa.Name,
 	}))
@@ -176,6 +173,8 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 	}
 
 	var result *corev1.Secret
+	// There is an issue here  - multiple calls could result in multiple attempts
+	// to delete secrets while the secret deletion is ongoing.
 	for _, s := range secrets {
 		if isSecretForServiceAccount(s, sa) {
 			if result == nil {
@@ -204,4 +203,31 @@ func isSecretForServiceAccount(secret *corev1.Secret, sa *corev1.ServiceAccount)
 	annotation := annotations[serviceAccountSecretAnnotation]
 
 	return sa.Name == annotation
+}
+
+func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface, lockKey string) (*corev1.Secret, error) {
+	mutex := getLock(lockKey)
+	mutex.Lock()
+	defer func(key string) {
+		mutex.Unlock()
+		lockMap.Delete(lockKey)
+	}(lockKey)
+
+	// We could have been waiting for the Mutex to unlock in a parallel run of
+	// createServiceAccountSecret - check again for the secret existing.
+	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
+	if err != nil {
+		return nil, err
+	}
+	if secret != nil {
+		return secret, nil
+	}
+
+	sc := SecretTemplate(sa)
+	secret, err = secretClient.Create(ctx, sc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
+	}
+
+	return secret, nil
 }
