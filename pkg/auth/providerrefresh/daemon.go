@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -15,20 +14,20 @@ import (
 )
 
 var (
-	ref *refresher
-	c   = cron.New()
+	DefaultRefresher = &refresher{}
 )
 
 func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
 	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
 	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
-	ref = &refresher{
+	DefaultRefresher = &refresher{
 		tokenLister:         mgmtContext.Management.Tokens("").Controller().Lister(),
 		tokens:              mgmtContext.Management.Tokens(""),
 		userLister:          mgmtContext.Management.Users("").Controller().Lister(),
 		tokenMGR:            tokens.NewManager(ctx, scaledContext),
 		userAttributes:      mgmtContext.Management.UserAttributes(""),
 		userAttributeLister: mgmtContext.Management.UserAttributes("").Controller().Lister(),
+		cron:                *cron.New(),
 	}
 
 	UpdateRefreshMaxAge(maxAge)
@@ -37,7 +36,12 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 }
 
 func UpdateRefreshCronTime(refreshCronTime string) error {
-	if ref == nil || refreshCronTime == "" {
+	return DefaultRefresher.updateRefreshCronTime(refreshCronTime)
+}
+
+// this method is used just for testing purposes
+func (ref *refresher) updateRefreshCronTime(refreshCronTime string) error {
+	if refreshCronTime == "" {
 		return fmt.Errorf("refresh cron time must be provided")
 	}
 
@@ -46,19 +50,23 @@ func UpdateRefreshCronTime(refreshCronTime string) error {
 		return fmt.Errorf("parsing error: %v", err)
 	}
 
-	c.Stop()
-	c = cron.New()
+	ref.cron.Stop()
+	ref.cron = *cron.New()
 
 	if parsed != nil {
 		job := cron.FuncJob(RefreshAllForCron)
-		c.Schedule(parsed, job)
-		c.Start()
+		ref.cron.Schedule(parsed, job)
+		ref.cron.Start()
 	}
 	return nil
 }
 
 func UpdateRefreshMaxAge(maxAge string) error {
-	if ref == nil {
+	return DefaultRefresher.updateRefreshMaxAge(maxAge)
+}
+
+func (ref *refresher) updateRefreshMaxAge(maxAge string) error {
+	if maxAge == "" {
 		return fmt.Errorf("refresh max age must be provided")
 	}
 
@@ -67,19 +75,19 @@ func UpdateRefreshMaxAge(maxAge string) error {
 }
 
 func RefreshAllForCron() {
-	if ref == nil {
-		return
-	}
+	DefaultRefresher.refreshAllForCron()
+}
 
+func (ref *refresher) refreshAllForCron() {
 	logrus.Debug("Triggering auth refresh cron")
 	ref.refreshAll(false)
 }
 
 func RefreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
-	if ref == nil {
-		return nil, errors.Errorf("refresh daemon not yet initialized")
-	}
+	return DefaultRefresher.refreshUserAttributes(attribs)
+}
 
+func (ref *refresher) refreshUserAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 	logrus.Debugf("Starting refresh process for %v", attribs.Name)
 	modified, err := ref.refreshAttributes(attribs)
 	if err != nil {

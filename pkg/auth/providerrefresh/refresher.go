@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/robfig/cron"
 
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/settings"
@@ -47,6 +48,7 @@ type refresher struct {
 	intervalInSeconds   int64
 	unparsedMaxAge      string
 	maxAge              time.Duration
+	cron                cron.Cron
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
