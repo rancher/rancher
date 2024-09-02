@@ -76,8 +76,23 @@ var (
 				{
 					Status:  v1.ConditionTrue,
 					Message: "ok",
-					Reason:  "success",
+					Reason:  crtb.AuthV2PermissionsOk,
 				},
+			},
+		},
+	}
+	completeStatusCRTB = v3.ClusterRoleTemplateBinding{
+		Status: v31.ClusterRoleTemplateBindingStatus{
+			Conditions: []v1.Condition{
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.AuthV2PermissionsOk},
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.ClusterMembershipBindingForDeleteOk},
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.LocalBindingsExist},
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.LocalCRTBDeleteOk}, 
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.LocalLabelsSet},
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.RemoteBindingsExist},
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.RemoteCRTBDeleteOk},
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.RemoteLabelsSet},
+				{Status: v1.ConditionTrue, Message: "ok", Reason: crtb.SubjectExists},
 			},
 		},
 	}
@@ -87,7 +102,7 @@ var (
 				{
 					Status:  v1.ConditionFalse,
 					Message: "bad",
-					Reason:  "fail",
+					Reason:  crtb.FailedClusterMembershipBindingForDelete,
 				},
 			},
 		},
@@ -202,7 +217,7 @@ func TestSetCRTBAsCompleted(t *testing.T) {
 		stateSetup func(crtbTestState)
 		wantError  bool
 		crtb       *v3.ClusterRoleTemplateBinding
-		condition  reducedCondition
+		condition  []reducedCondition
 		summary    string
 	}{
 		{
@@ -214,16 +229,32 @@ func TestSetCRTBAsCompleted(t *testing.T) {
 			},
 		},
 		{
-			name:      "update success - ok conditions",
-			crtb:      statusCRTB.DeepCopy(),
-			condition: reducedCondition{reason: "success", status: "True"},
-			summary:   status.SummaryCompleted,
-		},
-		{
 			name:      "update success - fail conditions",
 			crtb:      badStatusCRTB.DeepCopy(),
-			condition: reducedCondition{reason: "fail", status: "False"},
+			condition: []reducedCondition{{reason: crtb.FailedClusterMembershipBindingForDelete, status: "False"}},
 			summary:   status.SummaryError,
+		},
+		{
+			name:      "update success - partial ok conditions",
+			crtb:      statusCRTB.DeepCopy(),
+			condition: []reducedCondition{{reason: crtb.AuthV2PermissionsOk, status: "True"}},
+			summary:   "",
+		},
+		{
+			name:      "update success - ok conditions",
+			crtb:      completeStatusCRTB.DeepCopy(),
+			condition: []reducedCondition{
+				{reason: crtb.AuthV2PermissionsOk, status: "True"},
+				{reason: crtb.ClusterMembershipBindingForDeleteOk, status: "True"},
+				{reason: crtb.LocalBindingsExist, status: "True"},
+				{reason: crtb.LocalCRTBDeleteOk, status: "True"},
+				{reason: crtb.LocalLabelsSet, status: "True"},
+				{reason: crtb.RemoteBindingsExist, status: "True"},
+				{reason: crtb.RemoteCRTBDeleteOk, status: "True"},
+				{reason: crtb.RemoteLabelsSet, status: "True"},
+				{reason: crtb.SubjectExists, status: "True"},
+			},
+			summary:  status.SummaryCompleted,
 		},
 	}
 
@@ -243,9 +274,10 @@ func TestSetCRTBAsCompleted(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Len(t, test.crtb.Status.Conditions, 1)
-				require.Equal(t, test.condition, rcOf(test.crtb.Status.Conditions[0]))
-				require.Equal(t, test.summary, test.crtb.Status.Summary)
+				require.Len(t, test.crtb.Status.Conditions, len(test.condition))
+				for idx, c := range test.condition {
+					require.Equal(t, c, rcOf(test.crtb.Status.Conditions[idx]))
+				}
 			}
 		})
 	}
