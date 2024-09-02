@@ -81,3 +81,61 @@ const (
 	// SubjectExists is a success indicator. The CRTB-related subject exists.
 	SubjectExists = "SubjectExists"
 )
+
+// RemoteConditions is a map listing all remote conditions for filtering
+var RemoteConditions = map[string]struct{}{
+	RemoteBindingsExist:                     struct{}{},
+	RemoteCRTBDeleteOk:                      struct{}{},
+	FailedToDeleteClusterRoleBindings:       struct{}{},
+	FailedToDeleteSAImpersonator:            struct{}{},
+	FailedToEnsureClusterRoleBindings:       struct{}{},
+	FailedToEnsureRoles:                     struct{}{},
+	FailedToEnsureSAImpersonator:            struct{}{},
+	RemoteFailedToGetClusterRoleBindings:    struct{}{},
+	RemoteFailedToGetLabelRequirements:      struct{}{},
+	FailedToGetRoleTemplate:                 struct{}{},
+	FailedToGetRoles:                        struct{}{},
+	RemoteFailedToUpdateCRTBLabels:          struct{}{},
+	RemoteFailedToUpdateClusterRoleBindings: struct{}{},
+	RemoteLabelsSet:                         struct{}{},
+}
+
+// LocalConditions is a map listing all remote conditions for filtering
+var LocalConditions = map[string]struct{}{
+	AuthV2PermissionsOk:                                          struct{}{},
+	BadRoleReferences:                                            struct{}{},
+	ClusterMembershipBindingForDeleteOk:                          struct{}{},
+	FailedClusterMembershipBindingForDelete:                      struct{}{},
+	FailedRemovalOfAuthV2Permissions:                             struct{}{},
+	FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace: struct{}{},
+	FailedToBuildSubject:                                         struct{}{},
+	FailedToEnsureClusterMembership:                              struct{}{},
+	FailedToGetCluster:                                           struct{}{},
+	FailedToGetNamespace:                                         struct{}{},
+	FailedToGetRoleBindings:                                      struct{}{},
+	FailedToGetSubject:                                           struct{}{},
+	FailedToGrantManagementClusterPrivileges:                     struct{}{},
+	FailedToGrantManagementPlanePrivileges:                       struct{}{},
+	FailedToUpdateRoleBindings:                                   struct{}{},
+	LocalBindingsExist:                                           struct{}{},
+	LocalCRTBDeleteOk:                                            struct{}{},
+	LocalFailedToGetClusterRoleBindings:                          struct{}{},
+	LocalFailedToGetLabelRequirements:                            struct{}{},
+	LocalFailedToUpdateCRTBLabels:                                struct{}{},
+	LocalFailedToUpdateClusterRoleBindings:                       struct{}{},
+	LocalLabelsSet:                                               struct{}{},
+	SubjectExists:                                                struct{}{},
+}
+
+// Successes is a map listing all local __and__ remote success conditions
+var Successes = map[string]struct{}{
+	AuthV2PermissionsOk:                 struct{}{},
+	ClusterMembershipBindingForDeleteOk: struct{}{},
+	LocalBindingsExist:                  struct{}{},
+	LocalCRTBDeleteOk:                   struct{}{},
+	LocalLabelsSet:                      struct{}{},
+	RemoteBindingsExist:                 struct{}{},
+	RemoteCRTBDeleteOk:                  struct{}{},
+	RemoteLabelsSet:                     struct{}{},
+	SubjectExists:                       struct{}{},
+}
