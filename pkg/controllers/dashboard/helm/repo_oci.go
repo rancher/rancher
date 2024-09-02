@@ -34,7 +34,12 @@ import (
 )
 
 var (
-	timeNow = time.Now
+	timeNow               = time.Now
+	defaultOCIRetryPolicy = retryPolicy{
+		MinWait:  1 * time.Second,
+		MaxWait:  5 * time.Second,
+		MaxRetry: 5,
+	}
 )
 
 const defaultOCIInterval = 24 * time.Hour
@@ -399,37 +404,37 @@ func calculateBackoff(clusterRepo *catalog.ClusterRepo, policy retryPolicy) time
 func getRetryPolicy(clusterRepo *catalog.ClusterRepo) (retryPolicy, error) {
 	// Default Values for exponentialBackOff function which is used
 	// to retry an HTTP call when 429 response code is hit.
-	defaultRetryPolicy := retryPolicy{
-		MinWait:  1 * time.Second,
-		MaxWait:  5 * time.Second,
-		MaxRetry: 5,
+
+	policy := defaultOCIRetryPolicy
+	if !registry.IsOCI(clusterRepo.Spec.URL) {
+		policy = defaultRetryPolicy
 	}
 
 	if clusterRepo.Spec.ExponentialBackOffValues != nil {
 		// Set MaxRetry if specified and valid
 		if clusterRepo.Spec.ExponentialBackOffValues.MaxRetries > 0 {
-			defaultRetryPolicy.MaxRetry = clusterRepo.Spec.ExponentialBackOffValues.MaxRetries
+			policy.MaxRetry = clusterRepo.Spec.ExponentialBackOffValues.MaxRetries
 		}
 
 		// Set MinWait if specified and valid
 		if clusterRepo.Spec.ExponentialBackOffValues.MinWait >= 1 {
-			defaultRetryPolicy.MinWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MinWait) * time.Second
+			policy.MinWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MinWait) * time.Second
 		} else if clusterRepo.Spec.ExponentialBackOffValues.MinWait != 0 {
-			return defaultRetryPolicy, errors.New("minWait must be at least 1 second")
+			return policy, errors.New("minWait must be at least 1 second")
 		}
 
 		// Set MaxWait if specified and valid
 		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait > 0 {
-			defaultRetryPolicy.MaxWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait) * time.Second
+			policy.MaxWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait) * time.Second
 		}
 	}
 
 	// Ensure MaxWait is not less than MinWait
-	if defaultRetryPolicy.MaxWait < defaultRetryPolicy.MinWait {
-		return defaultRetryPolicy, errors.New("maxWait must be greater than or equal to minWait")
+	if policy.MaxWait < policy.MinWait {
+		return policy, errors.New("maxWait must be greater than or equal to minWait")
 	}
 
-	return defaultRetryPolicy, nil
+	return policy, nil
 }
 
 // shouldSkip checks certain conditions to see if the handler should be skipped.
