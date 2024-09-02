@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -313,6 +314,10 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 	}
 
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
+
+	if utils.IsPlainIPV6(loopbackAddress) {
+		loopbackAddress = fmt.Sprintf("[%s]", loopbackAddress)
+	}
 
 	args := []string{
 		"server",
