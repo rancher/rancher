@@ -35,6 +35,8 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 
 }
 
+// UpdateRefreshMaxAge updates the current refresh cron time with the one provided as input.
+// Returns an error in case of failure.
 func UpdateRefreshCronTime(refreshCronTime string) error {
 	return DefaultRefresher.updateRefreshCronTime(refreshCronTime)
 }
@@ -61,10 +63,14 @@ func (ref *refresher) updateRefreshCronTime(refreshCronTime string) error {
 	return nil
 }
 
+// UpdateRefreshMaxAge parse the maxAge string given in input and set
+// the ref.maxAge attribute to the equivalent time.Duration
+// Returns an error in case of failure.
 func UpdateRefreshMaxAge(maxAge string) error {
 	return DefaultRefresher.updateRefreshMaxAge(maxAge)
 }
 
+// this method is used just for testing purposes
 func (ref *refresher) updateRefreshMaxAge(maxAge string) error {
 	if maxAge == "" {
 		return fmt.Errorf("refresh max age must be provided")
@@ -74,6 +80,7 @@ func (ref *refresher) updateRefreshMaxAge(maxAge string) error {
 	return nil
 }
 
+// RefreshAllForCron refresh all the users crons.
 func RefreshAllForCron() {
 	DefaultRefresher.refreshAllForCron()
 }
