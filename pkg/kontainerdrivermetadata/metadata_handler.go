@@ -101,12 +101,9 @@ func (m *MetadataController) sync(_ string, setting *v3.Setting) (*v3.Setting, e
 		return nil, fmt.Errorf("invalid number %v", interval)
 	}
 
-	// Enqueue refresh only on the Leader pod
-	if m.wranglerContext.PeerManager != nil {
-		if m.wranglerContext.PeerManager.IsLeader() && interval > 0 {
-			logrus.Infof("Refreshing driverMetadata in %v minutes", interval)
-			m.Settings.EnqueueAfter(setting.Name, time.Minute*time.Duration(interval))
-		}
+	if interval > 0 {
+		logrus.Infof("Refreshing driverMetadata in %v minutes", interval)
+		m.Settings.EnqueueAfter(setting.Name, time.Minute*time.Duration(interval))
 	}
 
 	// refresh to sync k3s/rke2 releases
