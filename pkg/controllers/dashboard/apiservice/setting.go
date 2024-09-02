@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -82,6 +83,9 @@ func (h *handler) getInternalServerAndURL() (string, string, error) {
 
 	if clusterIPService {
 		clusterIP, err := h.getClusterIP()
+		if utils.IsPlainIPV6(clusterIP) {
+			clusterIP = fmt.Sprintf("[%s]", clusterIP)
+		}
 		return fmt.Sprintf("https://%s", clusterIP), internalCA, err
 	}
 
