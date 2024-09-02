@@ -440,3 +440,60 @@ func TestMigrateNewFlowAnnotation(t *testing.T) {
 		})
 	}
 }
+
+func Test_validateCacheSize(t *testing.T) {
+	type args struct {
+		size string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "empty size value",
+			args: args{
+				size: "",
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "wrong size value",
+			args: args{
+				size: "abc",
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "negative size value",
+			args: args{
+				size: "-5",
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "right size value",
+			args: args{
+				size: "5",
+			},
+			want:    5,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateCacheSize(tt.args.size)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCacheSize() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("validateCacheSize() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
