@@ -248,7 +248,10 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 // Status field management, condition management
 
 func (c *crtbLifecycle) setCRTBAsInProgress(binding *v3.ClusterRoleTemplateBinding) error {
-	binding.Status.Conditions = []metav1.Condition{}
+	// Keep information managed by the local controller.
+	// Wipe only information managed here
+	binding.Status.Conditions = status.RemoveConditions(binding.Status.Conditions, crtb.RemoteConditions)
+
 	binding.Status.Summary = status.SummaryInProgress
 	binding.Status.LastUpdateTime = time.Now().String()
 	updatedCRTB, err := c.crtbClientM.UpdateStatus(binding)
@@ -261,13 +264,22 @@ func (c *crtbLifecycle) setCRTBAsInProgress(binding *v3.ClusterRoleTemplateBindi
 }
 
 func (c *crtbLifecycle) setCRTBAsCompleted(binding *v3.ClusterRoleTemplateBinding) error {
-	binding.Status.Summary = status.SummaryCompleted
+	// set summary based on error conditions
+	failed := false
 	for _, c := range binding.Status.Conditions {
 		if c.Status != metav1.ConditionTrue {
 			binding.Status.Summary = status.SummaryError
+			failed = true
 			break
 		}
 	}
+
+	// no error conditions. check for all (local and remote!) success conditions
+	// note: keep the status as in progress if only partial sucess was found
+	if !failed && status.HasAllOf(binding.Status.Conditions, crtb.Successes) {
+		binding.Status.Summary = status.SummaryCompleted
+	}
+
 	binding.Status.LastUpdateTime = time.Now().String()
 	binding.Status.ObservedGeneration = binding.ObjectMeta.Generation
 	updatedCRTB, err := c.crtbClientM.UpdateStatus(binding)
