@@ -52,8 +52,9 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	// If only the status has been updated and we have finished updating the status
 	// (status.Summary != "InProgress") we don't need to perform a reconcile as nothing has
 	// changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
-		obj.Status.Summary != status.SummaryInProgress {
+	if (obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
+		obj.Status.Summary != status.SummaryInProgress) ||
+		status.HasAllOf(obj.Status.Conditions, crtb.RemoteSuccesses) {
 		return obj, nil
 	}
 	if err := c.setCRTBAsInProgress(obj); err != nil {
@@ -71,8 +72,9 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 	// If only the status has been updated and we have finished updating the status
 	// (status.Summary != "InProgress") we don't need to perform a reconcile as nothing has
 	// changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
-		obj.Status.Summary != status.SummaryInProgress {
+	if (obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
+		obj.Status.Summary != status.SummaryInProgress) ||
+		status.HasAllOf(obj.Status.Conditions, crtb.RemoteSuccesses) {
 		return obj, nil
 	}
 	if err := c.setCRTBAsInProgress(obj); err != nil {
