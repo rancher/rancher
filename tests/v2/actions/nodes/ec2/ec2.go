@@ -8,8 +8,21 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	rancherEc2 "github.com/rancher/shepherd/clients/ec2"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/cloudcredentials"
+	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/stevestates"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
+	"github.com/rancher/shepherd/extensions/steve"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/nodes"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
+)
+
+const (
+	nodeBaseName      = "rancher-automation"
+	fleetNamespace    = "fleet-default"
+	nodeRebootCommand = "sudo reboot"
 )
 
 // CreateNodes creates `quantityPerPool[n]` number of ec2 instances
@@ -179,7 +192,47 @@ func DeleteNodes(client *rancher.Client, nodes []*nodes.Node) error {
 	return err
 }
 
+// GetAMI returns all info associated with an aws ami
+func GetAMI(client *rancher.Client, awsCredentials *cloudcredentials.AmazonEC2CredentialConfig, id string) (*ec2.DescribeImagesOutput, error) {
+	ec2Client, err := rancherEc2.NewClientFromConfig(awsCredentials)
+	if err != nil {
+		return nil, err
+	}
+
+	getAMIInput := ec2.DescribeImagesInput{
+		ImageIds: []*string{&id},
+	}
+
+	describeAMIOutput, err := ec2Client.SVC.DescribeImages(&getAMIInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return describeAMIOutput, nil
+}
+
 func getSSHKeyName(sshKeyName string) string {
 	stringSlice := strings.Split(sshKeyName, ".")
 	return stringSlice[0]
+}
+
+// RebootNode reboots a node and waits for the cluster to begin updating
+func RebootNode(client *rancher.Client, node nodes.Node, clusterID string) error {
+	logrus.Infof("Rebooting node %s", node.PublicIPAddress)
+	output, err := node.ExecuteCommand(nodeRebootCommand)
+	if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+		return errors.New(err.Error() + output)
+	}
+
+	cluster, err := client.Steve.SteveType(stevetypes.Provisioning).ByID(clusterID)
+	if err != nil {
+		return err
+	}
+
+	err = steve.WaitForResourceState(client.Steve, cluster, stevestates.Updating, defaults.FiveSecondTimeout, defaults.FiveMinuteTimeout)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

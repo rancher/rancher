@@ -14,6 +14,8 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
+	"github.com/rancher/shepherd/extensions/defaults/stevestates"
 	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/steve"
 	"github.com/rancher/shepherd/pkg/config"
@@ -61,7 +63,7 @@ func (r *ClusterTemplateTestSuite) SetupSuite() {
 }
 
 func (r *ClusterTemplateTestSuite) TestProvisionRKE2TemplateCluster() {
-	_, err := steve.CreateAndWaitForResource(r.client, stevetypes.ClusterRepo, r.templateConfig.Repo, true, 5*time.Second, defaults.FiveMinuteTimeout)
+	_, err := steve.CreateAndWaitForResource(r.client, namespaces.FleetLocal+"/"+localCluster, stevetypes.ClusterRepo, r.templateConfig.Repo, stevestates.Active, 5*time.Second, defaults.FiveMinuteTimeout)
 	require.NoError(r.T(), err)
 
 	k8sversions, err := kubernetesversions.Default(r.client, providerName, nil)
