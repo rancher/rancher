@@ -84,21 +84,35 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	// If only the status has been updated and we have finished updating the status
 	// (status.Summary != "InProgress") we don't need to perform a reconcile as nothing has
 	// changed.
+
+	logrus.Infof("ZZZ LOCAL CREATE %s/%s (%v) %d/%d c%d", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+		obj.Status.Summary, obj.Status.ObservedGeneration, obj.ObjectMeta.Generation,
+		len(obj.Status.Conditions))
+
 	if (obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
 		obj.Status.Summary != status.SummaryInProgress) ||
 		status.HasAllOf(obj.Status.Conditions, crtb.LocalSuccesses) {
+		logrus.Infof("ZZZ LOCAL CREATE %s/%s BAIL", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name)
 		return obj, nil
 	}
 	if err := c.setCRTBAsInProgress(obj); err != nil {
+		logrus.Infof("ZZZ LOCAL CREATE %s/%s FAIL/a (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.reconcileSubject(obj); err != nil {
+		logrus.Infof("ZZZ LOCAL CREATE %s/%s FAIL/b (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.reconcileBindings(obj); err != nil {
+		logrus.Infof("ZZZ LOCAL CREATE %s/%s FAIL/c (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	err := c.setCRTBAsCompleted(obj)
+
+	logrus.Infof("ZZZ LOCAL CREATE %s/%s DONE (%v) %v", obj, obj.Status.Summary, err)
 	return obj, err
 }
 
@@ -107,24 +121,41 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 	// If only the status has been updated and we have finished updating the status
 	// (status.Summary != "InProgress") we don't need to perform a reconcile as nothing has
 	// changed.
+
+	logrus.Infof("ZZZ LOCAL UPDATE %s/%s (%v) %d/%d c%d", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+		obj.Status.Summary, obj.Status.ObservedGeneration, obj.ObjectMeta.Generation,
+		len(obj.Status.Conditions))
+
 	if (obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
 		obj.Status.Summary != status.SummaryInProgress) ||
 		status.HasAllOf(obj.Status.Conditions, crtb.LocalSuccesses) {
+		logrus.Infof("ZZZ LOCAL UPDATE %s/%s BAIL", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name)
 		return obj, nil
 	}
 	if err := c.setCRTBAsInProgress(obj); err != nil {
+		logrus.Infof("ZZZ LOCAL UPDATE %s/%s FAIL/a (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.reconcileSubject(obj); err != nil {
+		logrus.Infof("ZZZ LOCAL UPDATE %s/%s FAIL/b (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.reconcileLabels(obj); err != nil {
+		logrus.Infof("ZZZ LOCAL UPDATE %s/%s FAIL/c (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.reconcileBindings(obj); err != nil {
+		logrus.Infof("ZZZ LOCAL UPDATE %s/%s FAIL/d (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	err := c.setCRTBAsCompleted(obj)
+
+	logrus.Infof("ZZZ LOCAL UPDATE %s/%s DONE (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+		obj.Status.Summary, err)
 	return obj, err
 }
 
@@ -414,6 +445,9 @@ func (c *crtbLifecycle) setCRTBAsInProgress(binding *v3.ClusterRoleTemplateBindi
 	// Wipe only information managed here
 	binding.Status.Conditions = status.RemoveConditions(binding.Status.Conditions, crtb.LocalConditions)
 
+	logrus.Infof("ZZZ LOCAL INP %s/%s ((%v))", binding.ObjectMeta.Namespace, binding.ObjectMeta.Name,
+		binding.Status.Conditions)
+
 	binding.Status.Summary = status.SummaryInProgress
 	binding.Status.LastUpdateTime = time.Now().String()
 	updatedCRTB, err := c.crtbClientM.UpdateStatus(binding)
@@ -441,6 +475,9 @@ func (c *crtbLifecycle) setCRTBAsCompleted(binding *v3.ClusterRoleTemplateBindin
 	if !failed && status.HasAllOf(binding.Status.Conditions, crtb.Successes) {
 		binding.Status.Summary = status.SummaryCompleted
 	}
+
+	logrus.Infof("ZZZ LOCAL COM %s/%s, (%v) ((%v))", binding.ObjectMeta.Namespace, binding.ObjectMeta.Name,
+		binding.Status.Summary, binding.Status.Conditions)
 
 	binding.Status.LastUpdateTime = time.Now().String()
 	binding.Status.ObservedGeneration = binding.ObjectMeta.Generation

@@ -52,18 +52,28 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	// If only the status has been updated and we have finished updating the status
 	// (status.Summary != "InProgress") we don't need to perform a reconcile as nothing has
 	// changed.
+
+	logrus.Infof("ZZZ REMOTE CREATE %s/%s (%v) %d/%d c%d", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+		obj.Status.Summary, obj.Status.ObservedGeneration, obj.ObjectMeta.Generation,
+		len(obj.Status.Conditions))
+
 	if (obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
 		obj.Status.Summary != status.SummaryInProgress) ||
 		status.HasAllOf(obj.Status.Conditions, crtb.RemoteSuccesses) {
+		logrus.Infof("ZZZ REMOTE CREATE %s/%s BAIL", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name)
 		return obj, nil
 	}
 	if err := c.setCRTBAsInProgress(obj); err != nil {
+		logrus.Infof("ZZZ REMOTE CREATE %s/%s FAIL/a (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name, obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.syncCRTB(obj); err != nil {
+		logrus.Infof("ZZZ REMOTE CREATE %s/%s FAIL/b (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name, obj.Status.Summary, err)
 		return obj, err
 	}
 	err := c.setCRTBAsCompleted(obj)
+
+	logrus.Infof("ZZZ REMOTE CREATE %s/%s DONE (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name, obj.Status.Summary, err)
 	return obj, err
 }
 
@@ -72,21 +82,36 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 	// If only the status has been updated and we have finished updating the status
 	// (status.Summary != "InProgress") we don't need to perform a reconcile as nothing has
 	// changed.
+
+	logrus.Infof("ZZZ REMOTE UPDATE %s/%s (%v) %d/%d c%d", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+		obj.Status.Summary, obj.Status.ObservedGeneration, obj.ObjectMeta.Generation,
+		len(obj.Status.Conditions))
+
 	if (obj.Status.ObservedGeneration == obj.ObjectMeta.Generation &&
 		obj.Status.Summary != status.SummaryInProgress) ||
 		status.HasAllOf(obj.Status.Conditions, crtb.RemoteSuccesses) {
+		logrus.Infof("ZZZ REMOTE UPDATE %s/%s BAIL", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name)
 		return obj, nil
 	}
 	if err := c.setCRTBAsInProgress(obj); err != nil {
+		logrus.Infof("ZZZ REMOTE UPDATE %s/%s FAIL/a (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.reconcileCRTBUserClusterLabels(obj); err != nil {
+		logrus.Infof("ZZZ REMOTE UPDATE %s/%s FAIL/b (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	if err := c.syncCRTB(obj); err != nil {
+		logrus.Infof("ZZZ REMOTE UPDATE %s/%s FAIL/b (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+			obj.Status.Summary, err)
 		return obj, err
 	}
 	err := c.setCRTBAsCompleted(obj)
+
+	logrus.Infof("ZZZ REMOTE UPDATE %s/%s DONE (%v) %v", obj.ObjectMeta.Namespace, obj.ObjectMeta.Name,
+		obj.Status.Summary, err)
 	return obj, err
 }
 
@@ -254,6 +279,9 @@ func (c *crtbLifecycle) setCRTBAsInProgress(binding *v3.ClusterRoleTemplateBindi
 	// Wipe only information managed here
 	binding.Status.Conditions = status.RemoveConditions(binding.Status.Conditions, crtb.RemoteConditions)
 
+	logrus.Infof("ZZZ REMOTE INP %s/%s ((%v))", binding.ObjectMeta.Namespace, binding.ObjectMeta.Name,
+		binding.Status.Conditions)
+
 	binding.Status.Summary = status.SummaryInProgress
 	binding.Status.LastUpdateTime = time.Now().String()
 	updatedCRTB, err := c.crtbClientM.UpdateStatus(binding)
@@ -281,6 +309,9 @@ func (c *crtbLifecycle) setCRTBAsCompleted(binding *v3.ClusterRoleTemplateBindin
 	if !failed && status.HasAllOf(binding.Status.Conditions, crtb.Successes) {
 		binding.Status.Summary = status.SummaryCompleted
 	}
+
+	logrus.Infof("ZZZ REMOTE COM %s/%s (%v), ((%v))", binding.ObjectMeta.Namespace, binding.ObjectMeta.Name,
+		binding.Status.Summary, binding.Status.Conditions)
 
 	binding.Status.LastUpdateTime = time.Now().String()
 	binding.Status.ObservedGeneration = binding.ObjectMeta.Generation
