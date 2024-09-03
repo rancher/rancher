@@ -22,6 +22,7 @@ print_usage() {
     echo "                          elapsed time (in seconds) and total attempts respectively."
     echo "  -i, --message-interval  The number of command attempts to make before each printing of the progress message"
     echo "                          (default: 5)."
+    echo " -e, --exit-command       Optional command to run before exiting (default: '')"
     echo
 }
 
@@ -49,6 +50,10 @@ while [[ $# -gt 0 ]]; do
         -i | --message-interval)
             shift
             messageInterval="$1"
+            ;;
+        -e | --exit-command)
+            shift
+            exitCommand="$1"
             ;;
         *)
             cmd="$@"
@@ -82,5 +87,8 @@ done
 # If we timed out, print the final progress message and exit with code 1.
 if [ "$elapsedSeconds" -gt "$timeoutSeconds" ]; then
   print_progress
+  if [ -n "$exitCommand" ]; then
+    eval "$exitCommand"
+  fi
   exit 1
 fi
