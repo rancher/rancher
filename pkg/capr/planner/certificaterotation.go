@@ -28,7 +28,10 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 		return status, nil
 	}
 
-	for _, node := range collect(clusterPlan, anyRole) {
+	// Assemble our list of nodes in order of etcd-only, etcd with controlplane, controlplane-only, and everything else
+	orderedEntriesToRotate := collectOrderedCertificateRotationEntries(clusterPlan)
+
+	for _, node := range orderedEntriesToRotate {
 		if !shouldRotateEntry(controlPlane.Spec.RotateCertificates, node) {
 			continue
 		}
@@ -54,6 +57,14 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 
 	status.CertificateRotationGeneration = controlPlane.Spec.RotateCertificates.Generation
 	return status, errWaiting("certificate rotation done")
+}
+
+func collectOrderedCertificateRotationEntries(clusterPlan *plan.Plan) []*planEntry {
+	orderedEntriesToRotate := collect(clusterPlan, IsOnlyEtcd)                                                        // etcd or etcd + worker
+	orderedEntriesToRotate = append(orderedEntriesToRotate, collect(clusterPlan, roleAnd(isControlPlane, isEtcd))...) // etcd + controlplane or etcd + controlplane+worker
+	orderedEntriesToRotate = append(orderedEntriesToRotate, collect(clusterPlan, isOnlyControlPlane)...)              // controlplane or controlplane + worker
+	orderedEntriesToRotate = append(orderedEntriesToRotate, collect(clusterPlan, isOnlyWorker)...)                    // worker
+	return orderedEntriesToRotate
 }
 
 // shouldRotate `true` if the cluster is ready and the generation is stale
@@ -93,6 +104,12 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 			capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion))...)
 		return rotatePlan, joinedServer, nil
 	}
+
+	rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentStopInstruction(
+		controlPlane,
+		"certificate-rotation/stop",
+		strconv.FormatInt(rotation.Generation, 10),
+		capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion)))
 
 	args := []string{
 		"certificate",
