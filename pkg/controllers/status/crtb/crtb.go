@@ -139,3 +139,20 @@ var Successes = map[string]struct{}{
 	RemoteLabelsSet:                     struct{}{},
 	SubjectExists:                       struct{}{},
 }
+
+// LocalSuccesses is a map listing all local success conditions
+var LocalSuccesses = map[string]struct{}{
+	AuthV2PermissionsOk:                 struct{}{},
+	ClusterMembershipBindingForDeleteOk: struct{}{},
+	LocalBindingsExist:                  struct{}{},
+	LocalCRTBDeleteOk:                   struct{}{},
+	LocalLabelsSet:                      struct{}{},
+	SubjectExists:                       struct{}{},
+}
+
+// RemoteSuccesses is a map listing all remote success conditions
+var RemoteSuccesses = map[string]struct{}{
+	RemoteBindingsExist: struct{}{},
+	RemoteCRTBDeleteOk:  struct{}{},
+	RemoteLabelsSet:     struct{}{},
+}
