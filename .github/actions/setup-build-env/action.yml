@@ -1,0 +1,97 @@
+name: "Setup Dependencies Variables"
+description: "Setup Dependencies Variables from other files"
+outputs:
+  CATTLE_KDM_BRANCH:
+    description: "CATTLE_KDM_BRANCH from package/Dockerfile"
+    value: ${{ steps.vars.outputs.CATTLE_KDM_BRANCH }} 
+  CATTLE_K3S_VERSION: 
+    description: "CATTLE_K3S_VERSION from package/Dockerfile"
+    value: ${{ steps.vars.outputs.CATTLE_K3S_VERSION }}
+  CATTLE_HELM_VERSION: 
+    description: "CATTLE_HELM_VERSION from package/Dockerfile"
+    value: ${{ steps.vars.outputs.CATTLE_HELM_VERSION }}
+  HELM_VERSION: 
+    description: "HELM_VERSION from package/Dockerfile"
+    value: ${{ steps.vars.outputs.HELM_VERSION }}
+  HELM_UNITTEST_VERSION: 
+    description: "HELM_UNITTEST_VERSION from Dockerfile.dapper"
+    value: ${{ steps.vars.outputs.HELM_UNITTEST_VERSION }}
+  RKE_VERSION: 
+    description: "RKE_VERSION from go.mod"
+    value: ${{ steps.vars.outputs.RKE_VERSION }}
+  CATTLE_RANCHER_WEBHOOK_VERSION: 
+    description: "CATTLE_RANCHER_WEBHOOK_VERSION from scripts/export-config"
+    value: ${{ steps.vars.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}
+  CATTLE_CSP_ADAPTER_MIN_VERSION: 
+    description: "CATTLE_CSP_ADAPTER_MIN_VERSION from scripts/export-config"
+    value: ${{ steps.vars.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}
+  CATTLE_FLEET_VERSION: 
+    description: "CATTLE_FLEET_VERSION from scripts/export-config"
+    value: ${{ steps.vars.outputs.CATTLE_FLEET_VERSION }}
+runs:
+  using: "composite"
+  steps:
+    - id: vars
+      shell: bash
+      run: |
+        source scripts/export-config
+        CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
+        CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
+        HELM_VERSION=$(grep -m1 'ENV HELM_VERSION' package/Dockerfile | awk '{print $3}')
+        CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION' package/Dockerfile | awk '{print $3}')
+        HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION' Dockerfile.dapper | awk '{print $3}')
+        RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
+        if [[ -z "$RKE_VERSION" ]]; then
+          RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
+        fi
+        RKE_VERSION=$RKE_VERSION
+        CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+        CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
+        CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
+
+        if [[ -z "$CATTLE_KDM_BRANCH" ]]; then
+          echo "CATTLE_KDM_BRANCH not found"
+          exit 1
+        fi
+        if [[ -z "$CATTLE_K3S_VERSION" ]]; then
+          echo "CATTLE_K3S_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$HELM_VERSION" ]]; then
+          echo "HELM_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$CATTLE_HELM_VERSION" ]]; then
+          echo "CATTLE_HELM_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$HELM_UNITTEST_VERSION" ]]; then
+          echo "HELM_UNITTEST_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$RKE_VERSION" ]]; then
+          echo "RKE_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$CATTLE_RANCHER_WEBHOOK_VERSION" ]]; then
+          echo "CATTLE_RANCHER_WEBHOOK_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$CATTLE_CSP_ADAPTER_MIN_VERSION" ]]; then
+          echo "CATTLE_CSP_ADAPTER_MIN_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$CATTLE_FLEET_VERSION" ]]; then
+          echo "CATTLE_FLEET_VERSION not found"
+          exit 1
+        fi
+        echo "CATTLE_KDM_BRANCH=$CATTLE_KDM_BRANCH" >> $GITHUB_OUTPUT
+        echo "CATTLE_K3S_VERSION=$CATTLE_K3S_VERSION" >> $GITHUB_OUTPUT 
+        echo "HELM_VERSION=$HELM_VERSION" >> $GITHUB_OUTPUT 
+        echo "CATTLE_HELM_VERSION=$CATTLE_HELM_VERSION" >> $GITHUB_OUTPUT 
+        echo "HELM_UNITTEST_VERSION=$HELM_UNITTEST_VERSION" >> $GITHUB_OUTPUT
+        echo "RKE_VERSION=$RKE_VERSION" >> $GITHUB_OUTPUT 
+        echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> $GITHUB_OUTPUT 
+        echo "CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION" >> $GITHUB_OUTPUT 
+        echo "CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION" >> $GITHUB_OUTPUT 
+
