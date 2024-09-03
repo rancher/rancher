@@ -16,18 +16,18 @@ import (
 )
 
 const (
-	commandFormat                        = "kubectl apply -f %s"
-	insecureCommandFormat                = "curl --insecure -sfL %s | kubectl apply -f -"
-	nodeCommandFormat                    = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
-	rke2NodeCommandFormat                = "%s curl -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
-	rke2WindowsNodeCommandFormat         = `%s curl.exe -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
-	rke2InsecureNodeCommandFormat        = "%s curl --insecure -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
-	rke2InsecureWindowsNodeCommandFormat = `%s curl.exe --insecure -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
-	loginCommandFormat                   = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
-	windowsNodeCommandFormat             = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
+	commandFormat                                  = "kubectl apply -f %s"
+	insecureCommandFormat                          = "curl --insecure -sfL %s | kubectl apply -f -"
+	nodeCommandFormat                              = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
+	provisioningV2NodeCommandFormat                = "%s curl -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
+	provisioningV2WindowsNodeCommandFormat         = `%s curl.exe -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
+	provisioningV2InsecureNodeCommandFormat        = "%s curl --insecure -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
+	provisioningV2InsecureWindowsNodeCommandFormat = `%s curl.exe --insecure -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
+	loginCommandFormat                             = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
+	windowsNodeCommandFormat                       = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
-func (h *handler) isRKE2(clusterID string) bool {
+func (h *handler) isProvisioningV2(clusterID string) bool {
 	cluster, err := h.clusters.Get(clusterID)
 	if err != nil {
 		return false
@@ -77,16 +77,16 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 	}
 
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	if h.isRKE2(clusterID) {
+	if h.isProvisioningV2(clusterID) {
 		// for linux
-		crtStatus.NodeCommand = fmt.Sprintf(rke2NodeCommandFormat,
+		crtStatus.NodeCommand = fmt.Sprintf(provisioningV2NodeCommandFormat,
 			AgentEnvVars(cluster, Linux),
 			rootURL+installer.SystemAgentInstallPath,
 			AgentEnvVars(cluster, Linux),
 			rootURL,
 			token,
 			ca)
-		crtStatus.InsecureNodeCommand = fmt.Sprintf(rke2InsecureNodeCommandFormat,
+		crtStatus.InsecureNodeCommand = fmt.Sprintf(provisioningV2InsecureNodeCommandFormat,
 			AgentEnvVars(cluster, Linux),
 			rootURL+installer.SystemAgentInstallPath,
 			AgentEnvVars(cluster, Linux),
@@ -103,14 +103,14 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 			ca)
 	}
 	// for windows
-	if h.isRKE2(clusterID) {
-		crtStatus.WindowsNodeCommand = fmt.Sprintf(rke2WindowsNodeCommandFormat,
+	if h.isProvisioningV2(clusterID) {
+		crtStatus.WindowsNodeCommand = fmt.Sprintf(provisioningV2WindowsNodeCommandFormat,
 			AgentEnvVars(cluster, PowerShell),
 			rootURL+installer.WindowsRke2InstallPath,
 			rootURL,
 			token,
 			caWindows)
-		crtStatus.InsecureWindowsNodeCommand = fmt.Sprintf(rke2InsecureWindowsNodeCommandFormat,
+		crtStatus.InsecureWindowsNodeCommand = fmt.Sprintf(provisioningV2InsecureWindowsNodeCommandFormat,
 			AgentEnvVars(cluster, PowerShell),
 			rootURL+installer.WindowsRke2InstallPath,
 			rootURL,
