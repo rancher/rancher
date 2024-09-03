@@ -11,6 +11,8 @@ import (
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	shepherdclusters "github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/config"
@@ -42,6 +44,9 @@ func (r *RKE2AgentCustomizationTestSuite) SetupSuite() {
 	require.NoError(r.T(), err)
 
 	r.client = client
+
+	r.provisioningConfig.RKE2KubernetesVersions, err = kubernetesversions.Default(r.client, shepherdclusters.RKE2ClusterType.String(), r.provisioningConfig.RKE2KubernetesVersions)
+	require.NoError(r.T(), err)
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")
