@@ -1,9 +1,9 @@
 package deployment
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
@@ -27,6 +27,7 @@ const (
 	revisionNumberIndex = 0
 	historyHeader       = "REVISION  CHANGE-CAUSE"
 	revisionsIndex      = 1
+	revisionAnnotation  = "deployment.kubernetes.io/revision"
 )
 
 // CreateDeployment is a helper to create a deployment with or without a secret/configmap
@@ -99,39 +100,35 @@ func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, d
 }
 
 // RolbackDeployment is a helper to rollback deployments
-func RollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment, revision int) (string, error) {
-	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deployment.Name)
+func RollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, revision int) (string, error) {
+	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deploymentName)
 	revisionCmd := fmt.Sprintf("--to-revision=%s", strconv.Itoa(revision))
 	execCmd := []string{"kubectl", "rollout", "undo", "-n", namespaceName, deploymentCmd, revisionCmd}
 	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
 	return logCmd, err
 }
 
-// GetRolloutHistoryDeployment is a helper to get rollout history deployment
-func GetRolloutHistoryDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment) ([]string, error) {
-	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deployment.Name)
-	execCmd := []string{"kubectl", "rollout", "history", "-n", namespaceName, deploymentCmd}
-	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
-
+// ValidateRolloutHistoryDeployment is a helper to validate rollout history deployment
+func ValidateRolloutHistoryDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, expectedRevision string) error {
+	wranglerContext, err := client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
 	if err != nil {
-		return []string{}, err
+		return err
 	}
 
-	historyHeaderSplit := strings.Split(logCmd, historyHeader)
-
-	if len(historyHeaderSplit) < historyHeaderLength {
-		return []string{}, err
+	latestDeployment, err := wranglerContext.Apps.Deployment().Get(namespaceName, deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
 	}
 
-	histories := strings.Split(historyHeaderSplit[revisionsIndex], "\n")
-	revisions := []string{}
-
-	for _, history := range histories {
-		revision := strings.SplitAfter(history, "")
-		if len(revision) > 0 {
-			revisions = append(revisions, revision[revisionNumberIndex])
-		}
+	if latestDeployment.ObjectMeta.Annotations == nil {
+		return errors.New("revision empty")
 	}
 
-	return revisions, err
+	revision := latestDeployment.ObjectMeta.Annotations[revisionAnnotation]
+
+	if revision == expectedRevision {
+		return nil
+	}
+
+	return errors.New("revision not found")
 }
