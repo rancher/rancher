@@ -114,3 +114,18 @@ func idempotentRestartInstructions(identifier, value, runtimeUnit string) []plan
 		),
 	}
 }
+
+// idempotentStopInstruction generates an idempotent stop instruction for the given runtimeUnit. It simply calls systemctl stop <runtime-unit>
+// identifier is expected to be a unique key for tracking, and value should be something like the generation of the attempt (and is what we track to determine whether we should run the instruction or not)
+func idempotentStopInstruction(identifier, value, runtimeUnit string) plan.OneTimeInstruction {
+	return idempotentInstruction(
+		identifier+"-stop",
+		value,
+		"systemctl",
+		[]string{
+			"stop",
+			runtimeUnit,
+		},
+		[]string{},
+	)
+}
