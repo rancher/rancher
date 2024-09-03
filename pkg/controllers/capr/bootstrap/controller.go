@@ -233,18 +233,6 @@ func (h *handler) getEnvVars(controlPlane *rkev1.RKEControlPlane) ([]corev1.EnvV
 			Value: dir,
 		})
 	}
-	switch capr.GetRuntime(controlPlane.Spec.KubernetesVersion) {
-	case capr.RuntimeRKE2:
-		result = append(result, corev1.EnvVar{
-			Name:  capr.SystemAgentFallbackPathEnvVar,
-			Value: "/opt/rke2/bin",
-		})
-	default:
-		result = append(result, corev1.EnvVar{
-			Name:  capr.SystemAgentFallbackPathEnvVar,
-			Value: "/opt/bin",
-		})
-	}
 
 	return result, nil
 }
