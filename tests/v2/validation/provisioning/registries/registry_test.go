@@ -15,9 +15,13 @@ import (
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/environmentflag"
+	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -38,6 +42,7 @@ type RegistryTestSuite struct {
 	suite.Suite
 	session                        *session.Session
 	client                         *rancher.Client
+	standardUserClient             *rancher.Client
 	clusterLocalID                 string
 	localClusterGlobalRegistryHost string
 	rancherUsesRegistry            bool
@@ -58,6 +63,26 @@ func (rt *RegistryTestSuite) SetupSuite() {
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(rt.T(), err)
 	rt.client = client
+
+	enabled := true
+	var testuser = namegenerator.AppendRandomString("testuser-")
+	var testpassword = password.GenerateUserPassword("testpass-")
+	user := &management.User{
+		Username: testuser,
+		Password: testpassword,
+		Name:     testuser,
+		Enabled:  &enabled,
+	}
+
+	newUser, err := users.CreateUserWithRole(client, user, "user")
+	require.NoError(rt.T(), err)
+
+	newUser.Password = user.Password
+
+	standardUserClient, err := client.AsUser(newUser)
+	require.NoError(rt.T(), err)
+
+	rt.standardUserClient = standardUserClient
 
 	corralConfig := corral.Configurations()
 	registriesConfig := new(Registries)
@@ -207,55 +232,71 @@ func (rt *RegistryTestSuite) TestRegistriesRKE() {
 	subSession := session.NewSession()
 	defer subSession.Cleanup()
 
-	subClient, err := rt.client.WithSession(subSession)
+	subClient, err := rt.standardUserClient.WithSession(subSession)
 	require.NoError(rt.T(), err)
+
+	if rt.provisioningConfig.RKE1KubernetesVersions == nil {
+		rke1Versions, err := kubernetesversions.ListK3SAllVersions(rt.client)
+		require.NoError(rt.T(), err)
+
+		rt.provisioningConfig.RKE1KubernetesVersions = rke1Versions
+	}
 
 	tests := []struct {
 		registry []management.PrivateRegistry
 		name     string
 	}{
-		{rt.privateRegistriesNoAuth, "RKE1 Registry No Auth"},
-		{rt.privateRegistriesAuth, "RKE1 Registry Auth"},
-		{rt.privateEcr, "RKE1 Registry ECR"},
+		{rt.privateRegistriesNoAuth, "RKE1 Registry No Auth "},
+		{rt.privateRegistriesAuth, "RKE1 Registry Auth "},
+		{rt.privateEcr, "RKE1 Registry ECR "},
 	}
 
 	for _, tt := range tests {
-		rt.Run(tt.name, func() {
-			testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
-			testConfig.KubernetesVersion = rt.provisioningConfig.RKE1KubernetesVersions[0]
-			testConfig.CNI = rt.provisioningConfig.CNIs[0]
+		for _, k8sVersion := range rt.provisioningConfig.RKE1KubernetesVersions {
+			rt.Run(tt.name+k8sVersion, func() {
+				testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
 
-			if testConfig.Registries == nil {
-				testConfig.Registries = &provisioninginput.Registries{}
-			}
-			testConfig.Registries.RKE1Registries = tt.registry
-			_, rke1Provider, _, _ := permutations.GetClusterProvider(permutations.RKE1ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
+				testConfig.KubernetesVersion = k8sVersion
+				testConfig.CNI = rt.provisioningConfig.CNIs[0]
 
-			nodeTemplate, err := rke1Provider.NodeTemplateFunc(subClient)
-			require.NoError(rt.T(), err)
-			clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(subClient, *rke1Provider, testConfig, nodeTemplate)
-			reports.TimeoutRKEReport(clusterObject, err)
-			require.NoError(rt.T(), err)
+				if testConfig.Registries == nil {
+					testConfig.Registries = &provisioninginput.Registries{}
+				}
+				testConfig.Registries.RKE1Registries = tt.registry
+				_, rke1Provider, _, _ := permutations.GetClusterProvider(permutations.RKE1ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-			provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
-		})
+				nodeTemplate, err := rke1Provider.NodeTemplateFunc(subClient)
+				require.NoError(rt.T(), err)
+
+				clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(subClient, *rke1Provider, testConfig, nodeTemplate)
+				reports.TimeoutRKEReport(clusterObject, err)
+				require.NoError(rt.T(), err)
+
+				provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
+			})
+		}
 	}
 
 	if rt.rancherUsesRegistry {
-		testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
-		testConfig.KubernetesVersion = rt.provisioningConfig.RKE1KubernetesVersions[0]
-		testConfig.CNI = rt.provisioningConfig.CNIs[0]
+		for _, k8sVersion := range rt.provisioningConfig.RKE1KubernetesVersions {
+			rt.Run("rke1 local cluster registry "+k8sVersion, func() {
+				testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
 
-		_, rke1Provider, _, _ := permutations.GetClusterProvider(permutations.RKE1ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
+				testConfig.KubernetesVersion = k8sVersion
+				testConfig.CNI = rt.provisioningConfig.CNIs[0]
 
-		nodeTemplate, err := rke1Provider.NodeTemplateFunc(subClient)
-		require.NoError(rt.T(), err)
+				_, rke1Provider, _, _ := permutations.GetClusterProvider(permutations.RKE1ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-		clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(subClient, *rke1Provider, testConfig, nodeTemplate)
-		reports.TimeoutRKEReport(clusterObject, err)
-		require.NoError(rt.T(), err)
+				nodeTemplate, err := rke1Provider.NodeTemplateFunc(subClient)
+				require.NoError(rt.T(), err)
 
-		provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
+				clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(subClient, *rke1Provider, testConfig, nodeTemplate)
+				reports.TimeoutRKEReport(clusterObject, err)
+				require.NoError(rt.T(), err)
+
+				provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
+			})
+		}
 	}
 
 	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
@@ -267,45 +308,62 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 	subSession := session.NewSession()
 	defer subSession.Cleanup()
 
-	subClient, err := rt.client.WithSession(subSession)
+	subClient, err := rt.standardUserClient.WithSession(subSession)
 	require.NoError(rt.T(), err)
+
+	if rt.provisioningConfig.K3SKubernetesVersions == nil {
+		k3sVersions, err := kubernetesversions.ListK3SAllVersions(rt.client)
+		require.NoError(rt.T(), err)
+
+		rt.provisioningConfig.K3SKubernetesVersions = k3sVersions
+	}
 
 	tests := []struct {
 		registry string
 		name     string
 	}{
-		{rt.privateRegistriesNoAuth[0].URL, "K3S Registry No Auth"},
-		{rt.privateRegistriesAuth[0].URL, "K3S Registry Auth"},
+		{rt.privateRegistriesNoAuth[0].URL, "K3S Registry No Auth "},
+		{rt.privateRegistriesAuth[0].URL, "K3S Registry Auth "},
 	}
 
 	for _, tt := range tests {
-		rt.Run(tt.name, func() {
-			testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
-			testConfig.KubernetesVersion = rt.provisioningConfig.K3SKubernetesVersions[0]
-			testConfig.CNI = rt.provisioningConfig.CNIs[0]
-			testConfig = rt.configureRKE2K3SRegistry(tt.registry, testConfig)
-			k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
-			clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
-			reports.TimeoutClusterReport(clusterObject, err)
-			require.NoError(rt.T(), err)
+		for _, k8sVersion := range rt.provisioningConfig.K3SKubernetesVersions {
+			rt.Run(tt.name+k8sVersion, func() {
+				testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
+				testConfig.KubernetesVersion = k8sVersion
+				testConfig.CNI = rt.provisioningConfig.CNIs[0]
 
-			provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
-		})
+				testConfig = rt.configureRKE2K3SRegistry(tt.registry, testConfig)
+
+				k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
+
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
+				reports.TimeoutClusterReport(clusterObject, err)
+				require.NoError(rt.T(), err)
+
+				provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
+			})
+		}
 	}
 
 	if rt.rancherUsesRegistry {
-		testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
-		testConfig.KubernetesVersion = rt.provisioningConfig.K3SKubernetesVersions[0]
-		testConfig.CNI = rt.provisioningConfig.CNIs[0]
-		testConfig = rt.configureRKE2K3SRegistry(rt.localClusterGlobalRegistryHost, testConfig)
+		for _, k8sVersion := range rt.provisioningConfig.K3SKubernetesVersions {
+			rt.Run("k3s local cluster registry "+k8sVersion, func() {
+				testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
+				testConfig.KubernetesVersion = rt.provisioningConfig.K3SKubernetesVersions[0]
+				testConfig.CNI = rt.provisioningConfig.CNIs[0]
 
-		k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
+				testConfig = rt.configureRKE2K3SRegistry(rt.localClusterGlobalRegistryHost, testConfig)
 
-		clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
-		reports.TimeoutClusterReport(clusterObject, err)
-		require.NoError(rt.T(), err)
+				k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
+				reports.TimeoutClusterReport(clusterObject, err)
+				require.NoError(rt.T(), err)
+
+				provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
+			})
+		}
 	}
 
 	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
@@ -317,45 +375,59 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 	subSession := session.NewSession()
 	defer subSession.Cleanup()
 
-	subClient, err := rt.client.WithSession(subSession)
+	subClient, err := rt.standardUserClient.WithSession(subSession)
 	require.NoError(rt.T(), err)
+
+	if rt.provisioningConfig.RKE2KubernetesVersions == nil {
+		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(rt.client)
+		require.NoError(rt.T(), err)
+
+		rt.provisioningConfig.RKE2KubernetesVersions = rke2Versions
+	}
+
 	tests := []struct {
 		registry string
 		name     string
 	}{
-		{rt.privateRegistriesNoAuth[0].URL, "RKE2 Registry No Auth"},
-		{rt.privateRegistriesAuth[0].URL, "RKE2 Registry Auth"},
+		{rt.privateRegistriesNoAuth[0].URL, "RKE2 Registry No Auth "},
+		{rt.privateRegistriesAuth[0].URL, "RKE2 Registry Auth "},
 	}
 
 	for _, tt := range tests {
-		rt.Run(tt.name, func() {
-			testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
-			testConfig.KubernetesVersion = rt.provisioningConfig.RKE2KubernetesVersions[0]
-			testConfig.CNI = rt.provisioningConfig.CNIs[0]
-			testConfig = rt.configureRKE2K3SRegistry(tt.registry, testConfig)
+		for _, k8sVersion := range rt.provisioningConfig.RKE2KubernetesVersions {
+			rt.Run(tt.name+k8sVersion, func() {
+				testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
+				testConfig.KubernetesVersion = k8sVersion
+				testConfig.CNI = rt.provisioningConfig.CNIs[0]
+				testConfig = rt.configureRKE2K3SRegistry(tt.registry, testConfig)
 
-			rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
+				rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-			clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
-			reports.TimeoutClusterReport(clusterObject, err)
-			require.NoError(rt.T(), err)
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
+				reports.TimeoutClusterReport(clusterObject, err)
+				require.NoError(rt.T(), err)
 
-			provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
-		})
+				provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
+			})
+		}
 	}
 	if rt.rancherUsesRegistry {
-		testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
-		testConfig.KubernetesVersion = rt.provisioningConfig.RKE2KubernetesVersions[0]
-		testConfig.CNI = rt.provisioningConfig.CNIs[0]
-		testConfig = rt.configureRKE2K3SRegistry(rt.localClusterGlobalRegistryHost, testConfig)
+		for _, k8sVersion := range rt.provisioningConfig.RKE2KubernetesVersions {
+			rt.Run("rke2 local cluster registry "+k8sVersion, func() {
+				testConfig := clusters.ConvertConfigToClusterConfig(rt.provisioningConfig)
+				testConfig.KubernetesVersion = rt.provisioningConfig.RKE2KubernetesVersions[0]
+				testConfig.CNI = rt.provisioningConfig.CNIs[0]
+				testConfig = rt.configureRKE2K3SRegistry(rt.localClusterGlobalRegistryHost, testConfig)
 
-		rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
+				rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-		clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
-		reports.TimeoutClusterReport(clusterObject, err)
-		require.NoError(rt.T(), err)
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
+				reports.TimeoutClusterReport(clusterObject, err)
+				require.NoError(rt.T(), err)
 
-		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
+				provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
+			})
+		}
 	}
 
 	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
