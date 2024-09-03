@@ -145,6 +145,7 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 	}
 	newConfig.ClusterAgentDeploymentCustomization = clustersConfig.ClusterAgent
 	newConfig.FleetAgentDeploymentCustomization = clustersConfig.FleetAgent
+	newConfig.AgentEnvVars = clustersConfig.AgentEnvVarsRKE1
 
 	if clustersConfig.Registries != nil {
 		if clustersConfig.Registries.RKE1Registries != nil {
@@ -183,6 +184,10 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 		newConfig.DefaultPodSecurityAdmissionConfigurationTemplateName = clustersConfig.PSACT
 	}
 
+	if clustersConfig.AgentEnvVars != nil {
+		newConfig.AgentEnvVars = clustersConfig.AgentEnvVarsRKE1
+	}
+
 	return newConfig
 }
 
@@ -200,6 +205,7 @@ func UpdateRKE1ClusterConfig(clusterName string, client *rancher.Client, cluster
 
 	newConfig.ClusterAgentDeploymentCustomization = clustersConfig.ClusterAgent
 	newConfig.FleetAgentDeploymentCustomization = clustersConfig.FleetAgent
+	newConfig.AgentEnvVars = clustersConfig.AgentEnvVarsRKE1
 
 	if clustersConfig.Registries != nil {
 		if clustersConfig.Registries.RKE1Registries != nil {
@@ -233,6 +239,10 @@ func UpdateRKE1ClusterConfig(clusterName string, client *rancher.Client, cluster
 
 	if clustersConfig.ETCDRKE1 != nil {
 		newConfig.RancherKubernetesEngineConfig.Services.Etcd = clustersConfig.ETCDRKE1
+	}
+
+	if clustersConfig.AgentEnvVars != nil {
+		newConfig.AgentEnvVars = clustersConfig.AgentEnvVarsRKE1
 	}
 
 	if clustersConfig.PSACT != "" {
@@ -384,6 +394,8 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 		MachinePools:         machinePools,
 	}
 
+	agentEnvVars := []rkev1.EnvVar{}
+
 	spec := apisV1.ClusterSpec{
 		CloudCredentialSecretName:           cloudCredentialSecretName,
 		KubernetesVersion:                   clustersConfig.KubernetesVersion,
@@ -391,6 +403,11 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 		RKEConfig:                           rkeConfig,
 		ClusterAgentDeploymentCustomization: clusterAgentDeploymentCustomization,
 		FleetAgentDeploymentCustomization:   fleetAgentDeploymentCustomization,
+		AgentEnvVars:                        agentEnvVars,
+	}
+
+	if clustersConfig.AgentEnvVars != nil {
+		spec.AgentEnvVars = clustersConfig.AgentEnvVars
 	}
 
 	if clustersConfig.PSACT != "" {
@@ -505,6 +522,10 @@ func UpdateK3SRKE2ClusterConfig(cluster *v1.SteveAPIObject, clustersConfig *Clus
 			},
 				nil),
 		)
+	}
+
+	if clustersConfig.AgentEnvVars != nil {
+		clusterSpec.AgentEnvVars = clustersConfig.AgentEnvVars
 	}
 
 	if clustersConfig.PSACT != "" {
