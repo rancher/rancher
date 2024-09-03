@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -44,9 +43,12 @@ func (r *RKE1PSACTTestSuite) SetupSuite() {
 
 	r.client = client
 
-	r.provisioningConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(
-		r.client, clusters.RKE1ClusterType.String(), r.provisioningConfig.RKE1KubernetesVersions)
-	require.NoError(r.T(), err)
+	if r.provisioningConfig.RKE1KubernetesVersions == nil {
+		rke1Versions, err := kubernetesversions.ListRKE1AllVersions(r.client)
+		require.NoError(r.T(), err)
+
+		r.provisioningConfig.RKE1KubernetesVersions = rke1Versions
+	}
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")

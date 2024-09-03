@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -44,9 +43,12 @@ func (r *RKE2CloudProviderTestSuite) SetupSuite() {
 	require.NoError(r.T(), err)
 	r.client = client
 
-	r.provisioningConfig.RKE2KubernetesVersions, err = kubernetesversions.Default(
-		r.client, clusters.RKE2ClusterType.String(), r.provisioningConfig.RKE2KubernetesVersions)
-	require.NoError(r.T(), err)
+	if r.provisioningConfig.RKE2KubernetesVersions == nil {
+		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(r.client)
+		require.NoError(r.T(), err)
+
+		r.provisioningConfig.RKE2KubernetesVersions = rke2Versions
+	}
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")

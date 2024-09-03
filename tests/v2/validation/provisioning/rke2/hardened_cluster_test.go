@@ -53,8 +53,12 @@ func (c *HardenedRKE2ClusterProvisioningTestSuite) SetupSuite() {
 
 	c.client = client
 
-	c.provisioningConfig.RKE2KubernetesVersions, err = kubernetesversions.Default(c.client, extensionscluster.RKE2ClusterType.String(), c.provisioningConfig.RKE2KubernetesVersions)
-	require.NoError(c.T(), err)
+	if c.provisioningConfig.RKE2KubernetesVersions == nil {
+		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(c.client)
+		require.NoError(c.T(), err)
+
+		c.provisioningConfig.RKE2KubernetesVersions = rke2Versions
+	}
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")

@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -44,9 +43,12 @@ func (k *K3SPSACTTestSuite) SetupSuite() {
 
 	k.client = client
 
-	k.provisioningConfig.K3SKubernetesVersions, err = kubernetesversions.Default(
-		k.client, clusters.K3SClusterType.String(), k.provisioningConfig.K3SKubernetesVersions)
-	require.NoError(k.T(), err)
+	if k.provisioningConfig.K3SKubernetesVersions == nil {
+		k3sVersions, err := kubernetesversions.ListK3SAllVersions(k.client)
+		require.NoError(k.T(), err)
+
+		k.provisioningConfig.K3SKubernetesVersions = k3sVersions
+	}
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")
