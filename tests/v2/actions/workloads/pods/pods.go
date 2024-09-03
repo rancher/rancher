@@ -151,14 +151,13 @@ func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespac
 		return err
 	}
 
-	countContainers := len(deploymentTemplate.Spec.Template.Spec.Containers)
-
 	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
 		podsResp, err := namespacedClient.List(nil)
 		if err != nil {
 			return false, err
 		}
-		count := 0
+
+		allContainerRunning := true
 		for _, podResp := range podsResp.Data {
 			podStatus := &corev1.PodStatus{}
 			err = v1.ConvertToK8sType(podResp.Status, podStatus)
@@ -167,19 +166,44 @@ func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespac
 			}
 
 			for _, containerStatus := range podStatus.ContainerStatuses {
-				if containerStatus.State.Running != nil {
-					count++
+				if containerStatus.State.Running == nil {
+					allContainerRunning = false
 				}
 			}
 		}
-		if countContainers == count {
-			return true, nil
-		}
-		return false, nil
+		return allContainerRunning, nil
 	})
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// CountPodContainerRunningByImage is a helper to count all pod containers running by image
+func CountPodContainerRunningByImage(client *rancher.Client, clusterID, namespaceName string, image string) (int, error) {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return 0, err
+	}
+
+	podsResp, err := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName).List(nil)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, podResp := range podsResp.Data {
+		podStatus := &corev1.PodStatus{}
+		err = v1.ConvertToK8sType(podResp.Status, podStatus)
+		if err != nil {
+			return 0, err
+		}
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			if containerStatus.State.Running != nil && strings.Contains(containerStatus.Image, image) {
+				count++
+			}
+		}
+	}
+	return count, nil
 }

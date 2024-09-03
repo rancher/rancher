@@ -1,10 +1,15 @@
 package deployment
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	appv1 "k8s.io/api/apps/v1"
@@ -18,6 +23,10 @@ const (
 	port                = "port"
 	DeploymentSteveType = "apps.deployment"
 	imageName           = "nginx"
+	historyHeaderLength = 2
+	revisionNumberIndex = 0
+	historyHeader       = "REVISION  CHANGE-CAUSE"
+	revisionsIndex      = 1
 )
 
 // CreateDeployment is a helper to create a deployment with or without a secret/configmap
@@ -87,4 +96,42 @@ func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, d
 	})
 
 	return updatedDeployment, err
+}
+
+// RolbackDeployment is a helper to rollback deployments
+func RollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment, revision int) (string, error) {
+	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deployment.Name)
+	revisionCmd := fmt.Sprintf("--to-revision=%s", strconv.Itoa(revision))
+	execCmd := []string{"kubectl", "rollout", "undo", "-n", namespaceName, deploymentCmd, revisionCmd}
+	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
+	return logCmd, err
+}
+
+// RolloutHistoryDeployment is a helper to get rollout history deployment
+func RolloutHistoryDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment) ([]string, error) {
+	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deployment.Name)
+	execCmd := []string{"kubectl", "rollout", "history", "-n", namespaceName, deploymentCmd}
+	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
+
+	if err != nil {
+		return []string{}, err
+	}
+
+	historyHeaderSplit := strings.Split(logCmd, historyHeader)
+
+	if len(historyHeaderSplit) < historyHeaderLength {
+		return []string{}, err
+	}
+
+	histories := strings.Split(historyHeaderSplit[revisionsIndex], "\n")
+	revisions := []string{}
+
+	for _, history := range histories {
+		revision := strings.SplitAfter(history, "")
+		if len(revision) > 0 {
+			revisions = append(revisions, revision[revisionNumberIndex])
+		}
+	}
+
+	return revisions, err
 }
