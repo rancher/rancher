@@ -21,12 +21,10 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/apply"
-	"github.com/rancher/wrangler/v3/pkg/condition"
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +40,10 @@ var (
 	}
 )
 
-const defaultOCIInterval = 24 * time.Hour
+const (
+	defaultOCIInterval = 24 * time.Hour
+	ociCondition       = catalog.OCIDownloaded
+)
 
 type OCIRepohandler struct {
 	clusterRepoController catalogcontrollers.ClusterRepoController
@@ -98,21 +99,22 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	retryPolicy, err := getRetryPolicy(clusterRepo)
 	if err != nil {
 		err = fmt.Errorf("failed to get retry policy: %w", err)
-		return o.setErrorCondition(clusterRepo, err, newStatus, ociInterval)
+		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
-	if o.shouldSkip(clusterRepo, retryPolicy, key, ociInterval) {
+
+	err = ensureIndexConfigMap(clusterRepo, newStatus, o.configMapController)
+	if err != nil {
+		err = fmt.Errorf("failed to ensure index configmap: %w", err)
+		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
+	}
+
+	if shouldSkip(clusterRepo, retryPolicy, ociCondition, ociInterval, o.clusterRepoController, newStatus) {
 		return clusterRepo, nil
 	}
 	newStatus.ShouldNotSkip = false
 
 	logrus.Debugf("OCIRepoHandler triggered for clusterrepo %s", clusterRepo.Name)
 	var index *repo.IndexFile
-
-	err = ensureIndexConfigMap(clusterRepo, newStatus, o.configMapController)
-	if err != nil {
-		err = fmt.Errorf("failed to ensure index configmap: %w", err)
-		return o.setErrorCondition(clusterRepo, err, newStatus, ociInterval)
-	}
 
 	secret, err := catalogv2.GetSecret(o.secretCacheController, &clusterRepo.Spec, clusterRepo.Namespace)
 	if err != nil {
@@ -121,7 +123,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		if reason != metav1.StatusReasonUnknown {
 			err = fmt.Errorf("failed to fetch secret: %s", reason)
 		}
-		return o.setErrorCondition(clusterRepo, err, newStatus, ociInterval)
+		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 
 	owner := metav1.OwnerReference{
@@ -134,12 +136,12 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	downloadTime := metav1.Now()
 	index, err = getIndexfile(clusterRepo.Status, clusterRepo.Spec, o.configMapController, owner, clusterRepo.Namespace)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, fmt.Errorf("error while getting indexfile: %w", err), newStatus, ociInterval)
+		return setErrorCondition(clusterRepo, fmt.Errorf("error while getting indexfile: %w", err), newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 	originalIndexBytes, err := json.Marshal(index)
 	if err != nil {
 		logrus.Errorf("Error while marshalling indexfile for cluster repo %s: %v", clusterRepo.Name, err)
-		return o.setErrorCondition(clusterRepo, fmt.Errorf("error while reading indexfile"), newStatus, ociInterval)
+		return setErrorCondition(clusterRepo, fmt.Errorf("error while reading indexfile"), newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 	// Create a new oci client
 	ociClient, err := oci.NewClient(clusterRepo.Spec.URL, clusterRepo.Spec, secret)
@@ -192,20 +194,20 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	}
 	if index == nil || len(index.Entries) <= 0 {
 		err = errors.New("there are no helm charts in the repository specified")
-		return o.setErrorCondition(clusterRepo, err, newStatus, ociInterval)
+		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 
 	newIndexBytes, err := json.Marshal(index)
 	if err != nil {
 		logrus.Errorf("Error while marshalling indexfile for cluster repo %s: %v", clusterRepo.Name, err)
-		return o.setErrorCondition(clusterRepo, fmt.Errorf("error while reading indexfile"), newStatus, ociInterval)
+		return setErrorCondition(clusterRepo, fmt.Errorf("error while reading indexfile"), newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 	// Only update, if the index got updated
 	if !bytes.Equal(originalIndexBytes, newIndexBytes) {
 		index.SortEntries()
 		cm, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
 		if err != nil {
-			return o.setErrorCondition(clusterRepo, fmt.Errorf("error while creating or updating confimap"), newStatus, ociInterval)
+			return setErrorCondition(clusterRepo, fmt.Errorf("error while creating or updating confimap"), newStatus, ociInterval, ociCondition, o.clusterRepoController)
 		}
 
 		newStatus.URL = clusterRepo.Spec.URL
@@ -215,88 +217,29 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		newStatus.DownloadTime = downloadTime
 	}
 
-	return o.setErrorCondition(clusterRepo, nil, newStatus, ociInterval)
-}
-
-// setErrorCondition is only called when error happens in the handler, and
-// we need to depend on wrangler to requeue the handler
-func (o *OCIRepohandler) setErrorCondition(clusterRepo *catalog.ClusterRepo, err error, newStatus *catalog.RepoStatus, ociInterval time.Duration) (*catalog.ClusterRepo, error) {
-	var statusErr error
-	newStatus.NumberOfRetries = 0
-	newStatus.NextRetryAt = metav1.Time{}
-	if err != nil {
-		newStatus.ShouldNotSkip = true
-	}
-	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
-	if apierrors.IsConflict(err) {
-		ociDownloaded.SetError(newStatus, "", nil)
-	} else {
-		ociDownloaded.SetError(newStatus, "", err)
-	}
-	newStatus.ObservedGeneration = clusterRepo.Generation
-
-	if !equality.Semantic.DeepEqual(newStatus, &clusterRepo.Status) {
-		ociDownloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
-
-		clusterRepo.Status = *newStatus
-		clusterRepo, statusErr = o.clusterRepoController.UpdateStatus(clusterRepo)
-		if statusErr != nil {
-			err = statusErr
-		}
-		if err == nil {
-			o.clusterRepoController.EnqueueAfter(clusterRepo.Name, ociInterval)
-		}
-		return clusterRepo, err
-	}
-
-	if err == nil {
-		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, ociInterval)
-	}
-	return clusterRepo, err
+	return setErrorCondition(clusterRepo, nil, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 }
 
 // setConditionWithInterval is called to reenqueue the object
 // after the interval of 24 hours.
 func (o *OCIRepohandler) setConditionWithInterval(clusterRepo *catalog.ClusterRepo, err error, newStatus *catalog.RepoStatus, backoff *time.Duration, ociInterval time.Duration) (*catalog.ClusterRepo, error) {
 	var errResp *errcode.ErrorResponse
-	var newErr error
+	var errorMsg string
 	if errors.As(err, &errResp) {
-		errorMsg := fmt.Sprintf("error %d: %s", errResp.StatusCode, http.StatusText(errResp.StatusCode))
+		errorMsg = fmt.Sprintf("error %d: %s", errResp.StatusCode, http.StatusText(errResp.StatusCode))
 		if backoff != nil {
 			errorMsg = fmt.Sprintf("%s. %s", errorMsg, fmt.Sprintf("Will retry after %s", backoff.Round(time.Second)))
 		} else {
 			errorMsg = fmt.Sprintf("%s. %s", errorMsg, fmt.Sprintf("Will retry after %s", ociInterval.Round(time.Second)))
 		}
-		newErr = fmt.Errorf(errorMsg)
 	} else {
-		newErr = err
+		errorMsg = err.Error()
 	}
-	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
-	if apierrors.IsConflict(err) {
-		ociDownloaded.SetError(newStatus, "", nil)
-	} else {
-		ociDownloaded.SetError(newStatus, "", newErr)
-	}
-	newStatus.ObservedGeneration = clusterRepo.Generation
-
-	if !equality.Semantic.DeepEqual(newStatus, &clusterRepo.Status) {
-		// Since status has changed, update the lastUpdatedTime
-		ociDownloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
-
-		clusterRepo.Status = *newStatus
-
-		_, statusErr := o.clusterRepoController.UpdateStatus(clusterRepo)
-		if statusErr != nil {
-			return clusterRepo, statusErr
-		}
-	}
-
+	backoffInterval := ociInterval.Round(time.Second)
 	if backoff != nil {
-		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, *backoff)
-	} else {
-		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, ociInterval)
+		backoffInterval = backoff.Round(time.Second)
 	}
-	return clusterRepo, nil
+	return setConditionWithInterval(clusterRepo, err, newStatus, backoffInterval, ociCondition, errorMsg, o.clusterRepoController)
 }
 
 // getIndexfile fetches the indexfile if it already exits for the clusterRepo
@@ -404,7 +347,7 @@ func getRetryPolicy(clusterRepo *catalog.ClusterRepo) (retryPolicy, error) {
 
 	policy := defaultOCIRetryPolicy
 	if !registry.IsOCI(clusterRepo.Spec.URL) {
-		policy = defaultRetryPolicy
+		policy = defaultHandlerErrRetryPolicy
 	}
 
 	if clusterRepo.Spec.ExponentialBackOffValues != nil {
@@ -432,42 +375,4 @@ func getRetryPolicy(clusterRepo *catalog.ClusterRepo) (retryPolicy, error) {
 	}
 
 	return policy, nil
-}
-
-// shouldSkip checks certain conditions to see if the handler should be skipped.
-// For information regarding the conditions, check the comments in the implementation.
-func (o *OCIRepohandler) shouldSkip(clusterRepo *catalog.ClusterRepo, policy retryPolicy, key string, ociInterval time.Duration) bool {
-	// this is to prevent the handler from making calls when the crd is outdated.
-	updatedRepo, err := o.clusterRepoController.Get(key, metav1.GetOptions{})
-	if err == nil && updatedRepo.ResourceVersion != clusterRepo.ResourceVersion {
-		return true
-	}
-
-	if clusterRepo.Status.ObservedGeneration < clusterRepo.Generation {
-		clusterRepo.Status.NumberOfRetries = 0
-		clusterRepo.Status.NextRetryAt = metav1.Time{}
-		return false
-	}
-
-	// The handler is triggered immediately after any changes, including when updating the number of retries done.
-	// This check is to prevent the handler from executing before the backoff time has passed
-	if !clusterRepo.Status.NextRetryAt.IsZero() && clusterRepo.Status.NextRetryAt.Time.After(timeNow().UTC()) {
-		return true
-	}
-
-	if clusterRepo.Status.ShouldNotSkip { //checks if we should skip running the handler or not
-		return false
-	}
-
-	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
-	ociDownloadedUpdateTime, _ := time.Parse(time.RFC3339, ociDownloaded.GetLastUpdated(clusterRepo))
-
-	if (clusterRepo.Status.NumberOfRetries > policy.MaxRetry || clusterRepo.Status.NumberOfRetries == 0) && // checks if it's not retrying
-		clusterRepo.Generation == clusterRepo.Status.ObservedGeneration && // checks if the generation has not changed
-		ociDownloadedUpdateTime.Add(ociInterval).After(timeNow().UTC()) { // checks if the interval has not passed
-
-		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, ociInterval)
-		return true
-	}
-	return false
 }
