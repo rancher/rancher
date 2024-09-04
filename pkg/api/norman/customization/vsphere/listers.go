@@ -51,6 +51,35 @@ func processSoapFinder(ctx context.Context, fieldName string, cc *v1.Secret, dc 
 	return data, err
 }
 
+func processSoapFinderExtended(ctx context.Context, fieldName string, cc *v1.Secret, dc string) ([]map[string]interface{}, error) {
+	finder, err := getSoapFinder(ctx, cc, dc)
+	if err != nil {
+		return nil, fmt.Errorf("error getting soap finder: %v", err)
+	}
+	var data []map[string]interface{}
+	switch fieldName {
+	case "networks-extended":
+		data, err = listNetworksExtended(ctx, finder)
+	}
+	return data, err
+}
+
+func listNetworksExtended(ctx context.Context, finder *find.Finder) ([]map[string]interface{}, error) {
+	networks, err := finder.NetworkList(ctx, "*")
+	if err != nil {
+		return nil, fmt.Errorf("error listing networks: %v", err)
+	}
+
+	data := make([]map[string]interface{}, len(networks))
+	for i, net := range networks {
+		data[i] = map[string]interface{}{
+			"name": net.GetInventoryPath(),
+			"moid": net.Reference().String(),
+		}
+	}
+	return data, nil
+}
+
 func processTagsManager(ctx context.Context, fieldName string, cc *v1.Secret, cat string) ([]map[string]string, error) {
 	tagsManager, err := getTagsManager(ctx, cc)
 	if err != nil {
@@ -295,7 +324,7 @@ func listHosts(ctx context.Context, finder *find.Finder) ([]string, error) {
 		return nil, err
 	}
 
-	data := []string{""} //blank default
+	data := []string{""} // blank default
 
 	for _, h := range hosts {
 		data = append(data, h.InventoryPath)
