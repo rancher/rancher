@@ -165,6 +165,8 @@ jobs:
           sudo rm -rf /usr/local/lib/android
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Setup TAG Variables
+        uses: ./.github/actions/setup-tag-env
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
