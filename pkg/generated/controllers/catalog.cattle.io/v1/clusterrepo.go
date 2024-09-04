@@ -106,7 +106,7 @@ func (a *clusterRepoStatusHandler) sync(key string, obj *v1.ClusterRepo) (*v1.Cl
 	if a.condition != "" {
 		if errors.IsConflict(err) {
 			a.condition.SetError(&newStatus, "", nil)
-		} else { //this will reset any reason
+		} else {
 			a.condition.SetError(&newStatus, "", err)
 		}
 	}
