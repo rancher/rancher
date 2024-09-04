@@ -52,7 +52,7 @@ var (
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
-	opts := &server.ListenOpts{}
+	opts := &server.ListenOpts{DisplayServerLogs: true}
 	var err error
 
 	core, err := core.NewFactoryFromConfig(restConfig)
