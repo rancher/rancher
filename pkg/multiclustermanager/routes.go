@@ -65,8 +65,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		return nil, err
 	}
 
-	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
-
 	channelserver := channelserver.NewHandler(ctx)
 
 	supportConfigGenerator := supportconfigs.NewHandler(scaledContext)
@@ -116,7 +114,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
-	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
@@ -131,8 +128,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	metricsAuthed.Use(mux.MiddlewareFunc(tokenReviewAuth.Chain(impersonatingAuth)))
 	metricsAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
 	metricsAuthed.Use(requests.NewAuthenticatedFilter)
-
-	metricsAuthed.Path("/metrics").Handler(metricsHandler)
+	metricsAuthed.Use(metrics.NewMetricsHandler(scaledContext.K8sClient))
+	metricsAuthed.Path("/metrics").Handler(promhttp.Handler())
 
 	unauthed.NotFoundHandler = saauthed
 	saauthed.NotFoundHandler = authed
