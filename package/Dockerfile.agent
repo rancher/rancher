@@ -81,8 +81,8 @@ COPY --from=build /app/agent /usr/bin/
 COPY package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
-LABEL "io.artifacthub.package.logo-url"="https://github.com/rancher/ui/blob/master/public/assets/images/logos/welcome-cow.svg" \
-      "io.artifacthub.package.readme-url"="https://github.com/rancher/rancher/blob/${VERSION}/README.md" \
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
       "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
       "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
       "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
