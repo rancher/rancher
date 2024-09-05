@@ -136,7 +136,7 @@ func impersonateExtrasFromHeaders(headers http.Header) map[string][]string {
 func unescapeExtraKey(encodedKey string) string {
 	key, err := url.PathUnescape(encodedKey) // Decode %-encoded bytes.
 	if err != nil {
-		return encodedKey // Always record extra strings, even if malformed/unencoded.
+		return encodedKey // Always try even if unencoded.
 	}
 	return key
 }
