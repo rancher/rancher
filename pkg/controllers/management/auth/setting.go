@@ -53,7 +53,7 @@ func (c *SettingController) sync(key string, obj *v3.Setting) (runtime.Object, e
 		settings.DeleteInactiveUserAfter.Name,
 		settings.UserLastLoginDefault.Name:
 		if err := c.ensureUserRetentionLabels(); err != nil {
-			logrus.Errorf("error updating retention labels for users: %w", err)
+			logrus.Errorf("error updating retention labels for users: %v", err)
 		}
 	}
 	return nil, nil
