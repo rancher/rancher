@@ -1,6 +1,8 @@
 package k3s
 
 import (
+	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/rancher/shepherd/pkg/nodes"
@@ -41,12 +43,14 @@ func HardenK3SNodes(nodes []*nodes.Node, nodeRoles []string, kubeVersion string)
 		}
 
 		if strings.Contains(nodeRoles[key], "--controlplane") {
-			_, err = node.ExecuteCommand(`sudo bash -c 'cat << EOF > /home/` + node.SSHUser + `/audit.yaml
-apiVersion: audit.k8s.io/v1
-kind: Policy
-rules:
-- level: Metadata
-EOF'`)
+			logrus.Infof("Copying over files to node %s", node.NodeID)
+			user, err := user.Current()
+			if err != nil {
+				return nil
+			}
+
+			dirPath := filepath.Join(user.HomeDir, "go/src/github.com/rancher/rancher/tests/v2/actions/hardening/k3s")
+			err = node.SCPFileToNode(dirPath+"/audit.yaml", "/home/"+node.SSHUser+"/audit.yaml")
 			if err != nil {
 				return err
 			}
