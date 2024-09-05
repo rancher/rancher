@@ -27,7 +27,9 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
   {{- printf "%s-%s" .Chart.Name .Chart.Version | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-# Render Values in configurationSnippet
+{{/*
+Render Values in configurationSnippet
+*/}}
 {{- define "configurationSnippet" -}}
   {{- tpl (.Values.ingress.configurationSnippet) . | nindent 6 -}}
 {{- end -}}
