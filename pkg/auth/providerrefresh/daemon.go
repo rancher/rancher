@@ -63,7 +63,7 @@ func (ref *refresher) updateRefreshCronTime(refreshCronTime string) error {
 	return nil
 }
 
-// UpdateRefreshMaxAge parse the maxAge string given in input and set
+// UpdateRefreshMaxAge parse the maxAge string given in input and sets
 // the ref.maxAge attribute to the equivalent time.Duration
 // Returns an error in case of failure.
 func UpdateRefreshMaxAge(maxAge string) error {
