@@ -76,3 +76,14 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
 {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+    Select correct auditLog image
+*/}}
+{{- define "auditLog_image" -}}
+  {{- if .Values.busyboxImage }}
+    {{- .Values.busyboxImage}}
+  {{- else }}
+    {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
+  {{- end }}
+{{- end -}}
