@@ -35,7 +35,7 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 
 }
 
-// UpdateRefreshMaxAge updates the current refresh cron time with the one provided as input.
+// UpdateRefreshCronTime updates the current refresh cron time with the one provided as input.
 // Returns an error in case of failure.
 func UpdateRefreshCronTime(refreshCronTime string) error {
 	return DefaultRefresher.updateRefreshCronTime(refreshCronTime)
