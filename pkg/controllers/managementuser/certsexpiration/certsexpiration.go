@@ -149,7 +149,7 @@ func (c Controller) getCertsFromUserCluster() (map[string]pki.CertificatePKI, er
 		FieldSelector: fmt.Sprintf("type=%s", corev1.SecretTypeOpaque),
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting certificate secrets for cluster [%s]: %w", c.ClusterName, err)
 	}
 	for _, secret := range secrets.Items {
 		if strings.HasPrefix(secret.GetName(), "kube-") {
