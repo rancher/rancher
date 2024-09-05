@@ -66,7 +66,7 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 		if len(reqGroup) > 0 {
 			for _, g := range reqGroup {
 				if slices.Contains(groups, g) {
-					//user belongs to the group that's trying to impersonate
+					//user belongs to the group they are trying to impersonate
 					continue
 				}
 				canDo, err := h.sar.UserCanImpersonateGroup(req, user, g)
