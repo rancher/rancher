@@ -20,6 +20,16 @@
           "description": "auditLog.level must be a number 0-3; 0 to disable, 3 for most verbose"
         }
       }
+    },
+    "busyboxImage": {
+      "type": "string",
+      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.repository` & `auditLog.image.tag` instead.",
+      "deprecated": true
+    },
+    "busyboxImagePullPolicy": {
+      "type": "string",
+      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.pullPolicy` instead.",
+      "deprecated": true
     }
   },
   "required": [],
