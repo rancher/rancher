@@ -1,13 +1,15 @@
-//go:build (validation || infra.rke2k3s || cluster.nodedriver || extended) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !sanity && !stress
+//go:build (validation || infra.rke1 || cluster.nodedriver || extended) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !cluster.any && !cluster.custom && !sanity && !stress
 
 package nodescaling
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/machinepools"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/rancher/tests/v2/actions/scalinginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -20,9 +22,10 @@ import (
 
 type NodeScalingTestSuite struct {
 	suite.Suite
-	client        *rancher.Client
-	session       *session.Session
-	scalingConfig *scalinginput.Config
+	client             *rancher.Client
+	session            *session.Session
+	scalingConfig      *scalinginput.Config
+	provisioningConfig *provisioninginput.Config
 }
 
 func (s *NodeScalingTestSuite) TearDownSuite() {
@@ -35,6 +38,9 @@ func (s *NodeScalingTestSuite) SetupSuite() {
 
 	s.scalingConfig = new(scalinginput.Config)
 	config.LoadConfig(scalinginput.ConfigurationFileKey, s.scalingConfig)
+
+	s.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, s.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(s.T(), err)
@@ -58,20 +64,21 @@ func (s *NodeScalingTestSuite) TestScalingNodePools() {
 		Quantity: 1,
 	}
 
-	nodeRolesTwoWorkers := machinepools.NodeRoles{
-		Worker:   true,
-		Quantity: 2,
+	nodeRolesWindows := machinepools.NodeRoles{
+		Windows:  true,
+		Quantity: 1,
 	}
 
 	tests := []struct {
 		name      string
 		nodeRoles machinepools.NodeRoles
 		client    *rancher.Client
+		isWindows bool
 	}{
-		{"control plane by 1", nodeRolesControlPlane, s.client},
-		{"etcd by 1", nodeRolesEtcd, s.client},
-		{"worker by 1", nodeRolesWorker, s.client},
-		{"worker by 2", nodeRolesTwoWorkers, s.client},
+		{"control plane by 1", nodeRolesControlPlane, s.client, false},
+		{"etcd by 1", nodeRolesEtcd, s.client, false},
+		{"worker by 1", nodeRolesWorker, s.client, false},
+		{"Windows worker by 1", nodeRolesWindows, s.client, true},
 	}
 
 	for _, tt := range tests {
@@ -87,8 +94,16 @@ func (s *NodeScalingTestSuite) TestScalingNodePools() {
 
 		if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
 			tt.name = "Scaling RKE2 " + tt.name
+
+			if !slices.Contains(s.provisioningConfig.Providers, "vsphere") && tt.isWindows {
+				s.T().Skip("Windows test requires access to vSphere")
+			}
 		} else {
 			tt.name = "Scaling K3S " + tt.name
+
+			if tt.isWindows {
+				s.T().Skip("Skipping Windows tests - not supported on K3S")
+			}
 		}
 
 		s.Run(tt.name, func() {

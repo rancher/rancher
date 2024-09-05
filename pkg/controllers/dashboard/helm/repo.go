@@ -29,11 +29,8 @@ import (
 )
 
 const (
-	maxSize = 100_000
-)
-
-var (
-	interval = 6 * time.Hour
+	maxSize         = 100_000
+	defaultInterval = 6 * time.Hour
 )
 
 type repoHandler struct {
@@ -80,6 +77,12 @@ func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.Clust
 	if registry.IsOCI(repo.Spec.URL) {
 		return status, nil
 	}
+
+	interval := defaultInterval
+	if repo.Spec.RefreshInterval > 0 {
+		interval = time.Duration(repo.Spec.RefreshInterval) * time.Second
+	}
+
 	r.clusterRepos.EnqueueAfter(repo.Name, interval)
 	return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
 }
@@ -90,11 +93,16 @@ func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo
 		return status, nil
 	}
 
+	interval := defaultInterval
+	if repo.Spec.RefreshInterval > 0 {
+		interval = time.Duration(repo.Spec.RefreshInterval) * time.Second
+	}
+
 	err := ensureIndexConfigMap(repo, &status, r.configMaps)
 	if err != nil {
 		return status, err
 	}
-	if !shouldRefresh(&repo.Spec, &status) {
+	if !shouldRefresh(&repo.Spec, &status, interval) {
 		r.clusterRepos.EnqueueAfter(repo.Name, interval)
 		return status, nil
 	}
@@ -289,7 +297,7 @@ func ensureIndexConfigMap(repo *catalog.ClusterRepo, status *catalog.RepoStatus,
 	return nil
 }
 
-func shouldRefresh(spec *catalog.RepoSpec, status *catalog.RepoStatus) bool {
+func shouldRefresh(spec *catalog.RepoSpec, status *catalog.RepoStatus, interval time.Duration) bool {
 	if spec.GitRepo != "" && status.Branch != spec.GitBranch {
 		return true
 	}

@@ -128,6 +128,10 @@ spec:
                   InsecureSkipTLSverify will disable the TLS verification when downloading the Helm repository's index file.
                   Defaults is false. Enabling this is not recommended for production due to the security implications.
                 type: boolean
+              refreshInterval:
+                description: RefreshInterval is the interval at which the Helm repository
+                  should be refreshed.
+                type: integer
               serviceAccount:
                 description: |-
                   ServiceAccount when specified will be used in creating Helm operation pods which in turn

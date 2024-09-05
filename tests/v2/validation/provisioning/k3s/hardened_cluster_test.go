@@ -53,8 +53,12 @@ func (c *HardenedK3SClusterProvisioningTestSuite) SetupSuite() {
 
 	c.client = client
 
-	c.provisioningConfig.K3SKubernetesVersions, err = kubernetesversions.Default(c.client, extensionscluster.K3SClusterType.String(), c.provisioningConfig.K3SKubernetesVersions)
-	require.NoError(c.T(), err)
+	if c.provisioningConfig.K3SKubernetesVersions == nil {
+		k3sVersions, err := kubernetesversions.ListK3SAllVersions(c.client)
+		require.NoError(c.T(), err)
+
+		c.provisioningConfig.K3SKubernetesVersions = k3sVersions
+	}
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")

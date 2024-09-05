@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/url"
 	"sort"
 	"strconv"
@@ -21,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
@@ -242,26 +242,6 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 
 	if joinedTo, ok := secret.Annotations[capr.JoinedToAnnotation]; ok {
 		result.JoinedTo = joinedTo
-	} else {
-		if configFirstHalf, configSecondHalf, found := strings.Cut(ConfigYamlFileName, "%s"); found {
-			for _, v := range result.Plan.Files {
-				if strings.Contains(v.Path, configFirstHalf) && strings.Contains(v.Path, configSecondHalf) {
-					// We found our config file, process it to look for the joined node and then break
-					cfr, err := base64.StdEncoding.DecodeString(v.Content)
-					if err != nil {
-						return nil, err
-					}
-					var cf = map[string]interface{}{}
-					if err := json.Unmarshal(cfr, &cf); err != nil {
-						return nil, err
-					}
-					if server, ok := cf["server"]; ok {
-						result.JoinedTo = server.(string)
-					}
-					break
-				}
-			}
-		}
 	}
 
 	if len(output) > 0 {
@@ -514,6 +494,7 @@ func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan 
 	return nil
 }
 
+// setMachineJoinURL determines and updates a machine plan secret with the join URL/joined URL for the provided node.
 func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluster, controlPlane *rkev1.RKEControlPlane) error {
 	var (
 		err     error
@@ -546,32 +527,63 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 				}
 			}
 		}
-
-		joinURL = joinURLFromAddress(address, capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion))
+		if address != "" {
+			joinURL = joinURLFromAddress(address, capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion))
+		}
 	}
+
+	updateRequired := false
 
 	if joinURL != "" && entry.Metadata.Annotations[capr.JoinURLAnnotation] != joinURL {
 		entry.Metadata.Annotations[capr.JoinURLAnnotation] = joinURL
+		updateRequired = true
+	}
+
+	// In certain cases, it is possible that the joined-to annotation is not set. Attempt to determine the joined to
+	// annotation based on the delivered plan.
+	if !isInitNode(entry) && entry.Metadata.Annotations[capr.JoinedToAnnotation] == "" {
+		if configFirstHalf, configSecondHalf, found := strings.Cut(ConfigYamlFileName, "%s"); found {
+			for _, v := range entry.Plan.Plan.Files {
+				if strings.Contains(v.Path, configFirstHalf) && strings.Contains(v.Path, configSecondHalf) {
+					// We found our config file, process it to look for the joined node and then break
+					cfr, err := base64.StdEncoding.DecodeString(v.Content)
+					if err != nil {
+						return err
+					}
+					var cf = map[string]interface{}{}
+					if err := json.Unmarshal(cfr, &cf); err != nil {
+						return err
+					}
+					if server, ok := cf["server"]; ok {
+						entry.Metadata.Annotations[capr.JoinedToAnnotation] = server.(string)
+						updateRequired = true
+					}
+					break
+				}
+			}
+		}
+	}
+
+	if updateRequired {
 		if err := p.updatePlanSecretLabelsAndAnnotations(entry); err != nil {
 			return err
 		}
-
 		return generic.ErrSkip
 	}
 
 	return nil
 }
 
+// joinURLFromAddress accepts both an address (IPv4, IPv6, hostname) and returns a fully rendered join URL including `https://` and the supervisor port
 func joinURLFromAddress(address string, port int) string {
 	// ipv6 addresses need to be enclosed in brackets in URLs, and hostnames will fail to be parsed as IPs
-	if net.ParseIP(address) != nil && strings.Count(address, ":") >= 2 {
-		if !strings.HasPrefix(address, "[") && !strings.HasSuffix(address, "]") {
-			address = fmt.Sprintf("[%s]", address)
-		}
+	if utils.IsPlainIPV6(address) {
+		address = fmt.Sprintf("[%s]", address)
 	}
 	return fmt.Sprintf("https://%s:%d", address, port)
 }
 
+// getJoinURLFromOutput parses the periodic output from a given entry and determines the full join URL including `https://` and the supervisor port
 func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (string, error) {
 	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) || capiCluster.Spec.ControlPlaneRef == nil || rkeControlPlane == nil {
 		return "", nil

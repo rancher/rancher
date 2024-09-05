@@ -1,253 +1,70 @@
+ssh_key_path: .ssh/$AWS_SSH_KEY_NAME
+kubernetes_version: $KUBERNETES_VERSION
+nodes:
+  - address: $ip1
+    internal_address: $internalIp1 
+    user: $user1
+    role: [etcd, controlplane,worker]
+  - address: $ip2
+    internal_address: $internalIp2
+    user: $user2
+    role: [etcd, controlplane,worker]
+  - address: $ip3 
+    internal_address: $internalIp3
+    user: $user3
+    role: [etcd, controlplane,worker]
 services:
-  etcd:
-    image: ""
-    extra_args: {}
-    extra_binds: []
-    extra_env: []
-    win_extra_args: {}
-    win_extra_binds: []
-    win_extra_env: []
-    external_urls: []
-    ca_cert: ""
-    cert: ""
-    key: ""
-    path: ""
-    uid: 52034
-    gid: 52034
-    snapshot: true
-    retention: ""
-    creation: ""
-    backup_config: null
-  kube-api:
-    image: ""
-    extra_args: {}
-    extra_binds: []
-    extra_env: []
-    win_extra_args: {}
-    win_extra_binds: []
-    win_extra_env: []
-    service_cluster_ip_range: ""
-    service_node_port_range: ""
-    pod_security_policy: true
-    always_pull_images: false
-    secrets_encryption_config:
-      enabled: true
-      custom_config: null
-    audit_log:
-      enabled: true
-      configuration: null
-    admission_configuration: null
-    event_rate_limit:
-      enabled: true
-      configuration: null
-  kube-controller:
-    image: ""
-    extra_args:
-      feature-gates: RotateKubeletServerCertificate=true
-    extra_binds: []
-    extra_env: []
-    win_extra_args: {}
-    win_extra_binds: []
-    win_extra_env: []
-    cluster_cidr: ""
-    service_cluster_ip_range: ""
-  scheduler:
-    image: ""
-    extra_args: {}
-    extra_binds: []
-    extra_env: []
-    win_extra_args: {}
-    win_extra_binds: []
-    win_extra_env: []
-  kubelet:
-    image: ""
-    extra_args:
-      feature-gates: RotateKubeletServerCertificate=true
-      protect-kernel-defaults: "true"
-      tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256
-    extra_binds: []
-    extra_env: []
-    win_extra_args: {}
-    win_extra_binds: []
-    win_extra_env: []
-    cluster_domain: cluster.local
-    infra_container_image: ""
-    cluster_dns_server: ""
-    fail_swap_on: false
-    generate_serving_certificate: true
-  kubeproxy:
-    image: ""
-    extra_args: {}
-    extra_binds: []
-    extra_env: []
-    win_extra_args: {}
-    win_extra_binds: []
-    win_extra_env: []
-network:
-  plugin: ""
-  options: {}
-  mtu: 0
-  node_selector: {}
-  update_strategy: null
-authentication:
-  strategy: ""
-  sans: []
-  webhook: null
-addons: |
-  apiVersion: policy/v1beta1
-  kind: PodSecurityPolicy
-  metadata:
-    name: restricted
-  spec:
-    requiredDropCapabilities:
-    - NET_RAW
-    privileged: false
-    allowPrivilegeEscalation: false
-    defaultAllowPrivilegeEscalation: false
-    fsGroup:
-      rule: RunAsAny
-    runAsUser:
-      rule: MustRunAsNonRoot
-    seLinux:
-      rule: RunAsAny
-    supplementalGroups:
-      rule: RunAsAny
-    volumes:
-    - emptyDir
-    - secret
-    - persistentVolumeClaim
-    - downwardAPI
-    - configMap
-    - projected
-  ---
-  apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRole
-  metadata:
-    name: psp:restricted
-  rules:
-  - apiGroups:
-    - extensions
-    resourceNames:
-    - restricted
-    resources:
-    - podsecuritypolicies
-    verbs:
-    - use
-  ---
-  apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRoleBinding
-  metadata:
-    name: psp:restricted
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: psp:restricted
-  subjects:
-  - apiGroup: rbac.authorization.k8s.io
-    kind: Group
-    name: system:serviceaccounts
-  - apiGroup: rbac.authorization.k8s.io
-    kind: Group
-    name: system:authenticated
-  ---
-  apiVersion: networking.k8s.io/v1
-  kind: NetworkPolicy
-  metadata:
-    name: default-allow-all
-  spec:
-    podSelector: {}
-    ingress:
-    - {}
-    egress:
-    - {}
-    policyTypes:
-    - Ingress
-    - Egress
-  ---
-  apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: default
-  automountServiceAccountToken: false
-addons_include: []
-system_images:
-  etcd: ""
-  alpine: ""
-  nginx_proxy: ""
-  cert_downloader: ""
-  kubernetes_services_sidecar: ""
-  kubedns: ""
-  dnsmasq: ""
-  kubedns_sidecar: ""
-  kubedns_autoscaler: ""
-  coredns: ""
-  coredns_autoscaler: ""
-  nodelocal: ""
-  kubernetes: ""
-  flannel: ""
-  flannel_cni: ""
-  calico_node: ""
-  calico_cni: ""
-  calico_controllers: ""
-  calico_ctl: ""
-  calico_flexvol: ""
-  canal_node: ""
-  canal_cni: ""
-  canal_controllers: ""
-  canal_flannel: ""
-  canal_flexvol: ""
-  weave_node: ""
-  weave_cni: ""
-  pod_infra_container: ""
-  ingress: ""
-  ingress_backend: ""
-  metrics_server: ""
-  windows_pod_infra_container: ""
-authorization:
-  mode: ""
-  options: {}
-ignore_docker_version: false
-private_registries: []
-ingress:
-  provider: ""
-  options: {}
-  node_selector: {}
-  extra_args: {}
-  dns_policy: ""
-  extra_envs: []
-  extra_volumes: []
-  extra_volume_mounts: []
-  update_strategy: null
-  http_port: 0
-  https_port: 0
-  network_mode: ""
-cluster_name:
-cloud_provider:
-  name: ""
-prefix_path: ""
-win_prefix_path: ""
-addon_job_timeout: 0
-bastion_host:
-  address: ""
-  port: ""
-  user: ""
-  ssh_key: ""
-  ssh_key_path: ""
-  ssh_cert: ""
-  ssh_cert_path: ""
-monitoring:
-  provider: ""
-  options: {}
-  node_selector: {}
-  update_strategy: null
-  replicas: null
-restore:
-  restore: false
-  snapshot_name: ""
-dns: null
-upgrade_strategy:
-  max_unavailable_worker: ""
-  max_unavailable_controlplane: ""
-  drain: null
-  node_drain_input: null
-  
+   kube-api:
+     admission_configuration:
+       apiVersion: apiserver.config.k8s.io/v1
+       kind: AdmissionConfiguration
+       plugins:
+         - name: PodSecurity
+           configuration:
+             apiVersion: pod-security.admission.config.k8s.io/v1beta1
+             kind: PodSecurityConfiguration
+             defaults:
+               enforce: restricted
+               enforce-version: latest
+             exemptions:
+               namespaces: 
+               - cattle-provisioning-capi-system
+               - calico-apiserver
+               - calico-system
+               - cattle-alerting
+               - cattle-csp-adapter-system
+               - cattle-elemental-system
+               - cattle-epinio-system
+               - cattle-externalip-system
+               - cattle-fleet-local-system
+               - cattle-fleet-system
+               - cattle-gatekeeper-system
+               - cattle-global-data
+               - cattle-global-nt
+               - cattle-impersonation-system
+               - cattle-istio
+               - cattle-istio-system
+               - cattle-logging
+               - cattle-logging-system
+               - cattle-monitoring-system
+               - cattle-neuvector-system
+               - cattle-prometheus
+               - cattle-resources-system
+               - cattle-sriov-system
+               - cattle-system
+               - cattle-ui-plugin-system
+               - cattle-windows-gmsa-system
+               - cert-manager
+               - cis-operator-system
+               - fleet-default
+               - ingress-nginx
+               - istio-system
+               - kube-node-lease
+               - kube-public
+               - kube-system
+               - longhorn-system
+               - rancher-alerting-drivers
+               - security-scan
+               - tigera-operator
+               runtimeClasses: []
+               usernames: []

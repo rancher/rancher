@@ -63,6 +63,9 @@ type RepoSpec struct {
 	// GitBranch is the git branch where the helm repository is hosted.
 	GitBranch string `json:"gitBranch,omitempty"`
 
+	// RefreshInterval is the interval at which the Helm repository should be refreshed.
+	RefreshInterval int `json:"refreshInterval,omitempty"`
+
 	// ExponentialBackOffValues are values given to the Rancher manager to handle
 	// 429 TOOMANYREQUESTS response code from the OCI registry.
 	ExponentialBackOffValues *ExponentialBackOffValues `json:"exponentialBackOffValues,omitempty"`
