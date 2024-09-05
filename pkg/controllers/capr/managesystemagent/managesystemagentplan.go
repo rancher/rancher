@@ -117,6 +117,14 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 		logrus.Errorf("[managesystemagentplan] rkecluster %s/%s: error encountered while retrieving bundle %s: %v", obj.Namespace, obj.Name, bundleName, err)
 		return status, err
 	}
+
+	if sucBundle.Spec.Helm.Version != settings.SystemUpgradeControllerChartVersion.Get() && settings.SystemUpgradeControllerChartVersion.Get() != "" {
+		capr.SystemUpgradeControllerReady.Message(&status, "")
+		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for system-upgrade-controller bundle to update to the latest version %s", settings.SystemUpgradeControllerChartVersion.Get()))
+		capr.SystemUpgradeControllerReady.False(&status)
+		return status, nil
+	}
+
 	// determine if the SUC deployment has been rolled out fully, and if there were any errors encountered
 	if sucBundle.Status.Summary.Ready != sucBundle.Status.Summary.DesiredReady || sucBundle.Status.Summary.DesiredReady == 0 {
 		if sucBundle.Status.Summary.ErrApplied != 0 && len(sucBundle.Status.Summary.NonReadyResources) > 0 {

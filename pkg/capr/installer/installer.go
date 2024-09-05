@@ -174,6 +174,11 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		server = fmt.Sprintf("$env:CATTLE_SERVER=\"%s\"", settings.ServerURL.Get())
 	}
 
+	strictVerify := "false"
+	if settings.AgentTLSMode.Get() == settings.AgentTLSModeStrict {
+		strictVerify = "true"
+	}
+
 	return []byte(fmt.Sprintf(`%s
 
 %s
@@ -186,8 +191,9 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 $env:CSI_PROXY_URL = "%s"
 $env:CSI_PROXY_VERSION = "%s"
 $env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
+$env:STRICT_VERIFY = "%s"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion, strictVerify)), nil
 }

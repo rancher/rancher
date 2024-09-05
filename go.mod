@@ -69,7 +69,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.23
 	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
-	github.com/Masterminds/semver/v3 v3.2.1
+	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/aws/aws-sdk-go v1.49.24
 	github.com/bep/debounce v1.2.0
@@ -125,7 +125,7 @@ require (
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.5.12
 	github.com/rancher/steve v0.0.0-20240529152548-9fb3e50aa806
-	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
+	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
