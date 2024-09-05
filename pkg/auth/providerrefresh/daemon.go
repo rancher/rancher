@@ -36,14 +36,14 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 
 }
 
-func UpdateRefreshCronTime(refreshCronTime string) error {
+func UpdateRefreshCronTime(refreshCronTime string) {
 	if ref == nil || refreshCronTime == "" {
-		return fmt.Errorf("refresh cron time must be provided")
+		return
 	}
 
 	parsed, err := ParseCron(refreshCronTime)
 	if err != nil {
-		return fmt.Errorf("parsing error: %v", err)
+		logrus.Errorf("%v", err)
 	}
 
 	c.Stop()
@@ -54,16 +54,14 @@ func UpdateRefreshCronTime(refreshCronTime string) error {
 		c.Schedule(parsed, job)
 		c.Start()
 	}
-	return nil
 }
 
-func UpdateRefreshMaxAge(maxAge string) error {
+func UpdateRefreshMaxAge(maxAge string) {
 	if ref == nil {
-		return fmt.Errorf("refresh max age must be provided")
+		return
 	}
 
 	ref.ensureMaxAgeUpToDate(maxAge)
-	return nil
 }
 
 func RefreshAllForCron() {
