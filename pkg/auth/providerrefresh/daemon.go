@@ -80,7 +80,7 @@ func (ref *refresher) updateRefreshMaxAge(maxAge string) error {
 	return nil
 }
 
-// RefreshAllForCron refresh all the users crons.
+// RefreshAllForCron refreshes all the users crons.
 func RefreshAllForCron() {
 	DefaultRefresher.refreshAllForCron()
 }
