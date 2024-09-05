@@ -2,7 +2,6 @@ package managesystemagent
 
 import (
 	"fmt"
-
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -95,8 +94,16 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 		logrus.Errorf("[managesystemagentplan] rkecluster %s/%s: error encountered while retrieving bundle %s: %v", obj.Namespace, obj.Name, bundleName, err)
 		return status, err
 	}
+
+	if sucBundle.Spec.Helm.Version != settings.SystemUpgradeControllerChartVersion.Get() && settings.SystemUpgradeControllerChartVersion.Get() != "" {
+		capr.SystemUpgradeControllerReady.Message(&status, "")
+		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for system-upgrade-controller bundle to update to the latest version %s", settings.SystemUpgradeControllerChartVersion.Get()))
+		capr.SystemUpgradeControllerReady.False(&status)
+		return status, nil
+	}
+
 	// determine if the SUC deployment has been rolled out fully, and if there were any errors encountered
-	if sucBundle.Status.Summary.Ready != sucBundle.Status.Summary.DesiredReady || sucBundle.Status.Summary.DesiredReady == 0 {
+	if sucBundle.Status.Summary.Ready != sucBundle.Status.Summary.DesiredReady || sucBundle.Status.Summary.DesiredReady == 0 || sucBundle.Status.Summary.Pending != 0 {
 		if sucBundle.Status.Summary.ErrApplied != 0 && len(sucBundle.Status.Summary.NonReadyResources) > 0 {
 			nonReady := sucBundle.Status.Summary.NonReadyResources
 			capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("error encountered waiting for system-upgrade-controller bundle roll out: %s", nonReady[0].Message))
