@@ -124,7 +124,6 @@ var (
 	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.10")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
-	FleetManagementByDefault            = NewSetting("fleet-management-by-default", "true")                               // instructs defaulting behavior for management clusters with empty FleetWorkspaceName
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                      = NewSetting("no-default-admin", "")

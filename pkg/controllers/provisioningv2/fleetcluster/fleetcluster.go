@@ -28,6 +28,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const (
+	turtlesOwnedLab = "cluster-api.cattle.io/owned"
+)
+
 // ClusterHostGetter provides cluster API server URL retrieval.
 type ClusterHostGetter interface {
 	GetClusterHost(clientcmd.ClientConfig) (string, []byte, error)
@@ -106,7 +110,10 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 		return cluster, nil
 	}
 
-	if cluster.Spec.FleetWorkspaceName == "" && settings.FleetManagementByDefault.Get() == "true" {
+	// Clusters labeled with turtlesOwned label will manage fleet deployment externally
+	_, turtlesOwned := cluster.Labels[turtlesOwnedLab]
+
+	if cluster.Spec.FleetWorkspaceName == "" && !turtlesOwned {
 		def := settings.FleetDefaultWorkspaceName.Get()
 		if def == "" {
 			return cluster, nil

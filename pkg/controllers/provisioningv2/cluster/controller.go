@@ -45,6 +45,7 @@ const (
 	administratedAnn      = "provisioning.cattle.io/administrated"
 	mgmtClusterNameAnn    = "provisioning.cattle.io/management-cluster-name"
 	fleetWorkspaceNameAnn = "provisioning.cattle.io/fleet-workspace-name"
+	turtlesOwnedLab       = "cluster-api.cattle.io/owned"
 )
 
 var (
@@ -190,7 +191,11 @@ func (h *handler) isLegacyCluster(cluster interface{}) bool {
 // cluster FleetWorkspaceName is empty or if the cluster name does not match (c-XXXXX|local) where XXXXX is a random
 // string of characters.
 func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
-	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
+	// Clusters labeled with turtlesOwned label will ensure provisioning cluster is created
+	// when the fleet workspace defaulting is disabled
+	_, turtlesOwned := cluster.Labels[turtlesOwnedLab]
+
+	if !h.isLegacyCluster(cluster) || (cluster.Spec.FleetWorkspaceName == "" && !turtlesOwned) {
 		return nil, status, nil
 	}
 	provCluster := &v1.Cluster{

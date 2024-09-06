@@ -10,7 +10,6 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
@@ -204,11 +203,6 @@ func TestAssignWorkspace(t *testing.T) {
 
 	h := &handler{}
 
-	settings.FleetManagementByDefault.Set("false")
-	defer func() {
-		settings.FleetManagementByDefault.Set("true")
-	}()
-
 	tests := []struct {
 		name    string
 		cluster *apimgmtv3.Cluster
@@ -219,6 +213,9 @@ func TestAssignWorkspace(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: "fleet-default",
+					Labels: map[string]string{
+						turtlesOwnedLab: "",
+					},
 				},
 				Spec: apimgmtv3.ClusterSpec{},
 			},
@@ -229,6 +226,9 @@ func TestAssignWorkspace(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "local-cluster",
 					Namespace: "fleet-local",
+					Labels: map[string]string{
+						turtlesOwnedLab: "",
+					},
 				},
 				Spec: apimgmtv3.ClusterSpec{
 					FleetWorkspaceName: "specific-name",
