@@ -61,9 +61,7 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 				return nil, false, errors.New("not allowed to impersonate user")
 			}
 			impersonateUser = true
-		}
 
-		if len(reqGroup) > 0 {
 			for _, g := range reqGroup {
 				if slices.Contains(groups, g) {
 					//user belongs to the group they are trying to impersonate
@@ -77,29 +75,27 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 				}
 				impersonateGroup = true
 			}
-		}
 
-		if reqExtras != nil && len(reqExtras) > 0 {
-			canDo, err := h.sar.UserCanImpersonateExtras(req, user, reqExtras)
-			if err != nil {
-				return nil, false, err
-			} else if !canDo {
-				return nil, false, errors.New("not allowed to impersonate extras")
+			if len(reqExtras) > 0 {
+				canDo, err := h.sar.UserCanImpersonateExtras(req, user, reqExtras)
+				if err != nil {
+					return nil, false, err
+				} else if !canDo {
+					return nil, false, errors.New("not allowed to impersonate extras")
+				}
+				impersonateExtras = true
 			}
-			impersonateExtras = true
 		}
 	}
 
 	var extras map[string][]string
 
 	if impersonateUser {
-		if impersonateUser {
-			user = reqUser
-		}
+		user = reqUser
+		groups = nil
+
 		if impersonateGroup {
 			groups = reqGroup
-		} else {
-			groups = nil
 		}
 		if impersonateExtras {
 			extras = reqExtras
