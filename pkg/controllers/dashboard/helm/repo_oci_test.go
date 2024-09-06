@@ -348,6 +348,7 @@ func TestGetRetryPolicy(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			clusterRepo := &catalog.ClusterRepo{
 				Spec: catalog.RepoSpec{
+					URL:                      "oci://dp.apps.rancher.io",
 					ExponentialBackOffValues: testCase.backOffValues,
 				},
 			}
@@ -468,7 +469,7 @@ func TestShouldSkip(t *testing.T) {
 			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
 				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
 				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
-				mockController.EXPECT().EnqueueAfter("", ociInterval).Return()
+				mockController.EXPECT().EnqueueAfter("clusterRepo", ociInterval).Return()
 				return mockController
 			},
 			generation:         1,
@@ -507,12 +508,14 @@ func TestShouldSkip(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation:      testCase.generation,
 					ResourceVersion: "1",
+					Name:            "clusterRepo",
 				},
 				Status: catalog.RepoStatus{
 					ObservedGeneration: testCase.observedGeneration,
 					NumberOfRetries:    testCase.numberOfRetries,
 					NextRetryAt:        testCase.nextRetryAt,
 					ShouldNotSkip:      testCase.shouldNotSkip,
+					IndexConfigMapName: "indexConfigMap",
 					Conditions: []genericcondition.GenericCondition{
 						{
 							Type:           string(catalog.OCIDownloaded),
@@ -520,7 +523,7 @@ func TestShouldSkip(t *testing.T) {
 						},
 					}},
 			}
-			assert.Equal(t, testCase.expected, handler.shouldSkip(clusterRepo, policy, "clusterRepo", ociInterval))
+			assert.Equal(t, testCase.expected, shouldSkip(clusterRepo, policy, catalog.OCIDownloaded, ociInterval, handler.clusterRepoController, &clusterRepo.Status))
 		})
 	}
 }
