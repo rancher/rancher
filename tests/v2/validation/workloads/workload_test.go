@@ -21,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -199,24 +200,10 @@ func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
-	nginxDeployment, err := deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 2, "", "", false, false)
+	upgradeDeployment, err := deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 2, "", "", false, false)
 	require.NoError(w.T(), err)
 
-	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + nginxDeployment.Name,
-	})
-	require.NoError(w.T(), err)
-
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, nginxDeployment)
-	require.NoError(w.T(), err)
-
-	revisions, err := deployment.GetRolloutHistoryDeployment(w.client, w.cluster.ID, namespace.Name, nginxDeployment)
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), []string{"1"}, revisions)
-
-	countPods, err := pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespace.Name, "nginx")
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), 2, countPods)
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "1", "nginx", 2)
 
 	containerName := namegen.AppendRandomString("updatetestcontainer")
 	newContainerTemplate := workloads.NewContainer(containerName,
@@ -228,27 +215,12 @@ func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
 		nil,
 		nil,
 	)
-	redisDeployment := nginxDeployment.DeepCopy()
-	redisDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
+	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
 
-	redisDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, redisDeployment)
+	upgradeDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment)
 	require.NoError(w.T(), err)
 
-	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + redisDeployment.Name,
-	})
-	require.NoError(w.T(), err)
-
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, redisDeployment)
-	require.NoError(w.T(), err)
-
-	revisions, err = deployment.GetRolloutHistoryDeployment(w.client, w.cluster.ID, namespace.Name, redisDeployment)
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), []string{"1", "2"}, revisions)
-
-	countPods, err = pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespace.Name, "redis")
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), 2, countPods)
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "2", "redis", 2)
 
 	containerName = namegen.AppendRandomString("updatetestcontainertwo")
 	newContainerTemplate = workloads.NewContainer(containerName,
@@ -262,87 +234,47 @@ func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
 	)
 	newContainerTemplate.TTY = true
 	newContainerTemplate.Stdin = true
-	ubuntuDeployment := redisDeployment.DeepCopy()
-	ubuntuDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
+	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
 
-	_, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, ubuntuDeployment)
+	_, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment)
 	require.NoError(w.T(), err)
 
-	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + ubuntuDeployment.Name,
-	})
-	require.NoError(w.T(), err)
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "3", "ubuntu", 2)
 
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, ubuntuDeployment)
-	require.NoError(w.T(), err)
-
-	revisions, err = deployment.GetRolloutHistoryDeployment(w.client, w.cluster.ID, namespace.Name, ubuntuDeployment)
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), []string{"1", "2", "3"}, revisions)
-
-	countPods, err = pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespace.Name, "ubuntu")
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), 2, countPods)
-
-	logRollback, err := deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, nginxDeployment, 1)
+	logRollback, err := deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 1)
 	require.NoError(w.T(), err)
 	require.NotEmpty(w.T(), logRollback)
 
-	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + nginxDeployment.Name,
-	})
-	require.NoError(w.T(), err)
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "4", "nginx", 2)
 
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, nginxDeployment)
-	require.NoError(w.T(), err)
-
-	revisions, err = deployment.GetRolloutHistoryDeployment(w.client, w.cluster.ID, namespace.Name, nginxDeployment)
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), []string{"2", "3", "4"}, revisions)
-
-	countPods, err = pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespace.Name, "nginx")
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), 2, countPods)
-
-	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, redisDeployment, 2)
+	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 2)
 	require.NoError(w.T(), err)
 	require.NotEmpty(w.T(), logRollback)
 
-	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + redisDeployment.Name,
-	})
-	require.NoError(w.T(), err)
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "5", "redis", 2)
 
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, redisDeployment)
-	require.NoError(w.T(), err)
-
-	revisions, err = deployment.GetRolloutHistoryDeployment(w.client, w.cluster.ID, namespace.Name, redisDeployment)
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), []string{"3", "4", "5"}, revisions)
-
-	countPods, err = pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespace.Name, "redis")
-	require.NoError(w.T(), err)
-	require.Equal(w.T(), 2, countPods)
-
-	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, ubuntuDeployment, 3)
+	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 3)
 	require.NoError(w.T(), err)
 	require.NotEmpty(w.T(), logRollback)
 
-	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + ubuntuDeployment.Name,
+	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "6", "ubuntu", 2)
+}
+
+func validateDeploymentUpgrade(w *WorkloadTestSuite, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedContainerCount int) {
+	err := charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + appv1Deployment.Name,
 	})
 	require.NoError(w.T(), err)
 
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, ubuntuDeployment)
+	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespaceName, appv1Deployment)
 	require.NoError(w.T(), err)
 
-	revisions, err = deployment.GetRolloutHistoryDeployment(w.client, w.cluster.ID, namespace.Name, ubuntuDeployment)
+	err = deployment.ValidateRolloutHistoryDeployment(w.client, w.cluster.ID, namespaceName, appv1Deployment.Name, expectedRevision)
 	require.NoError(w.T(), err)
-	require.Equal(w.T(), []string{"4", "5", "6"}, revisions)
 
-	countPods, err = pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespace.Name, "ubuntu")
+	countPods, err := pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespaceName, image)
 	require.NoError(w.T(), err)
-	require.Equal(w.T(), 2, countPods)
+	require.Equal(w.T(), expectedContainerCount, countPods)
 }
 
 func TestWorkloadTestSuite(t *testing.T) {
