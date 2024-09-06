@@ -74,7 +74,6 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | OPTIMUS_CHARTS_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | OPTIMUS_CHARTS_SECRET_KEY ;
-            ## TODO: UPDATE CREDENTIALS
             secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
             secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
       - name: Upload chart to bucket
