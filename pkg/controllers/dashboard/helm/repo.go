@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	interval = 6 * time.Hour
+	interval = 1 * time.Hour
 )
 
 type repoHandler struct {
