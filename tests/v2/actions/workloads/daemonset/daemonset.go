@@ -1,4 +1,4 @@
-package deamonset
+package daemonset
 
 import (
 	"context"
@@ -12,13 +12,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var DeamonsetGroupVersionResource = schema.GroupVersionResource{
+var DaemonsetGroupVersionResource = schema.GroupVersionResource{
 	Group:    "apps",
 	Version:  "v1",
 	Resource: "daemonsets",
 }
 
-// CreateDaemonset is a helper to create a deamonset
+// CreateDaemonset is a helper to create a daemonset
 func CreateDaemonset(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes bool) (*appv1.DaemonSet, error) {
 	deploymentTemplate, err := deployment.CreateDeploymentWithConfigmap(client, clusterID, namespaceName, replicaCount, secretName, configMapName, useEnvVars, useVolumes)
 	if err != nil {
@@ -32,9 +32,9 @@ func CreateDaemonset(client *rancher.Client, clusterID, namespaceName string, re
 		return nil, err
 	}
 
-	deamonsetResource := dynamicClient.Resource(DeamonsetGroupVersionResource).Namespace(namespaceName)
+	daemonsetResource := dynamicClient.Resource(DaemonsetGroupVersionResource).Namespace(namespaceName)
 
-	_, err = deamonsetResource.Create(context.TODO(), unstructured.MustToUnstructured(createdDaemonset), metav1.CreateOptions{})
+	_, err = daemonsetResource.Create(context.TODO(), unstructured.MustToUnstructured(createdDaemonset), metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}

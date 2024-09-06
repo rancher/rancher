@@ -101,7 +101,7 @@ def test_wl_cronjob():
                                             "successfulJobsHistoryLimit": 10})
     validate_workload(p_client, workload, "cronJob", ns.name)
 
-
+#Converted to go test in TestWorkloadUpgrade
 def test_wl_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
