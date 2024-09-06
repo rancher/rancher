@@ -1,6 +1,8 @@
 package rke2
 
 import (
+	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/rancher/shepherd/pkg/nodes"
@@ -55,13 +57,19 @@ func HardenRKE2Nodes(nodes []*nodes.Node, nodeRoles []string) error {
 func PostRKE2HardeningConfig(nodes []*nodes.Node, nodeRoles []string) error {
 	for key, node := range nodes {
 		if strings.Contains(nodeRoles[key], "--controlplane") {
-			_, err := node.ExecuteCommand(`sudo bash -c 'cat << EOF > /home/` + node.SSHUser + `/account-update.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: default
-automountServiceAccountToken: false
-EOF'`)
+			logrus.Infof("Copying over files to node %s", node.NodeID)
+			user, err := user.Current()
+			if err != nil {
+				return nil
+			}
+
+			dirPath := filepath.Join(user.HomeDir, "go/src/github.com/rancher/rancher/tests/v2/actions/hardening/rke2")
+			err = node.SCPFileToNode(dirPath+"/account-update.yaml", "/home/"+node.SSHUser+"/account-update.yaml")
+			if err != nil {
+				return err
+			}
+
+			err = node.SCPFileToNode(dirPath+"/account-update.sh", "/home/"+node.SSHUser+"/account-update.sh")
 			if err != nil {
 				return err
 			}
@@ -71,12 +79,17 @@ EOF'`)
 				return err
 			}
 
-			command := `for namespace in $(kubectl get namespaces -A -o=jsonpath="{.items[*]['metadata.name']}"); do 
-    						echo -n "Patching namespace $namespace - "; 
-    						kubectl patch serviceaccount default -n ${namespace} -p "$(cat /var/lib/rancher/rke2/server/account-update.yaml)"; 
-						done`
+			_, err = node.ExecuteCommand("sudo bash -c 'mv /home/" + node.SSHUser + "/account-update.sh /var/lib/rancher/rke2/server/account-update.sh'")
+			if err != nil {
+				return err
+			}
 
-			_, err = node.ExecuteCommand("sudo bash -c '" + command + "'")
+			_, err = node.ExecuteCommand("sudo bash -c 'chmod +x /var/lib/rancher/rke2/server/account-update.sh'")
+			if err != nil {
+				return err
+			}
+
+			_, err = node.ExecuteCommand("sudo bash -c 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml && /var/lib/rancher/rke2/server/account-update.sh'")
 			if err != nil {
 				return err
 			}
