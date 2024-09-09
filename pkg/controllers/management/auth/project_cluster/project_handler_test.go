@@ -6,6 +6,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,4 +50,52 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 	}
 	c.enqueueCrtbs(&newProject)
 	assert.Equal(t, len(existingCrtbs), len(mockedClusterRoleTemplateBindingController.EnqueueCalls()))
+}
+
+func TestReconcileProjectCreatorRTBRespectsUserPrincipleName(t *testing.T) {
+	var prtbs []*v3.ProjectRoleTemplateBinding
+
+	lifecycle := &projectLifecycle{
+		prtbLister: &fakes.ProjectRoleTemplateBindingListerMock{
+			GetFunc: func(namespace string, name string) (*v3.ProjectRoleTemplateBinding, error) {
+				return nil, nil
+			},
+		},
+		prtbClient: &fakes.ProjectRoleTemplateBindingInterfaceMock{
+			CreateFunc: func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+				prtbs = append(prtbs, obj)
+				return obj, nil
+			},
+		},
+		projects: &fakes.ProjectInterfaceMock{
+			UpdateFunc: func(obj *v3.Project) (*v3.Project, error) {
+				return obj, nil
+			},
+		},
+	}
+
+	userPrincipalName := "keycloak_user@12345"
+
+	project := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "p-abcdef",
+			Namespace: clusterID,
+			Annotations: map[string]string{
+				CreatorIDAnnotation:             "u-abcdef",
+				creatorPrincipleNameAnnotation:  userPrincipalName,
+				roleTemplatesRequiredAnnotation: `{"created":["project-owner"],"required":["project-owner"]}`,
+			},
+		},
+	}
+
+	obj, err := lifecycle.reconcileProjectCreatorRTB(project)
+	require.NoError(t, err)
+	require.NotNil(t, obj)
+
+	require.Len(t, prtbs, 1)
+	assert.Equal(t, "creator-project-owner", prtbs[0].Name)
+	assert.Equal(t, "p-abcdef", prtbs[0].Namespace)
+	assert.Equal(t, clusterID+":p-abcdef", prtbs[0].ProjectName)
+	assert.Equal(t, "", prtbs[0].UserName)
+	assert.Equal(t, userPrincipalName, prtbs[0].UserPrincipalName)
 }
