@@ -11,11 +11,24 @@ import (
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extensionsfleet "github.com/rancher/shepherd/extensions/fleet"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
+	"github.com/rancher/shepherd/pkg/config"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
+
+// The json/yaml config key for the corral package to be build ..
+const (
+	gitRepoConfigConfigurationFileKey = "gitRepo"
+)
+
+// GitRepoConfig is a function that reads in the gitRepo object from the config file
+func GitRepoConfig() *v1alpha1.GitRepo {
+	var gitRepo v1alpha1.GitRepo
+	config.LoadConfig(gitRepoConfigConfigurationFileKey, &gitRepo)
+	return &gitRepo
+}
 
 const (
 	DeploymentResourceSteveType = "apps.deployment"
