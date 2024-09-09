@@ -82,7 +82,6 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 
 	n := &NamespaceController{
 		clusterSecretsClient: clusterSecretsClient,
-		clusterSecretsLister: clusterSecretsClient.Controller().Lister(),
 		managementSecrets:    cluster.Management.Core.Secrets("").Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler(ctx, "secretsController", n.sync)
@@ -118,7 +117,6 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 
 type NamespaceController struct {
 	clusterSecretsClient v1.SecretInterface
-	clusterSecretsLister v1.SecretLister
 	managementSecrets    v1.SecretLister
 }
 
@@ -149,7 +147,7 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 					continue
 				}
 				namespacedSecret := getNamespacedSecret(secret, obj.Name)
-				if _, err := n.clusterSecretsLister.Get(namespacedSecret.Namespace, namespacedSecret.Name); err == nil {
+				if _, err := n.clusterSecretsClient.GetNamespaced(namespacedSecret.Namespace, namespacedSecret.Name, metav1.GetOptions{}); err == nil {
 					continue
 				}
 				logrus.Infof("Creating secret [%s] into namespace [%s]", namespacedSecret.Name, obj.Name)
