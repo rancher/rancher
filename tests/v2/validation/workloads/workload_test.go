@@ -1,10 +1,11 @@
-//go:build (validation || infra.any || cluster.any || sanity) && !stress
+//go:build (validation || infra.any || cluster.any || sanity) && !stress && !extended
 
 package workloads
 
 import (
 	"testing"
 
+	"github.com/rancher/norman/types"
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/cronjob"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/daemonset"
@@ -54,12 +55,21 @@ func (w *WorkloadTestSuite) SetupSuite() {
 
 	w.cluster, err = w.client.Management.Cluster.ByID(clusterID)
 	require.NoError(w.T(), err)
+
+	log.Info("Getting cluster names")
+	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
+	require.NoError(w.T(), err)
+
+	for _, cluster := range clusterList.Data {
+		log.Infof("Cluster name %s", cluster.Name)
+	}
 }
 
 func (w *WorkloadTestSuite) TestWorkloadDeployment() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
 
+	log.Infof("Cluster ID %s", w.cluster.ID)
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
@@ -71,6 +81,7 @@ func (w *WorkloadTestSuite) TestWorkloadSideKick() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
 
+	log.Infof("Cluster ID %s", w.cluster.ID)
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
@@ -109,6 +120,7 @@ func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
 
+	log.Infof("Cluster ID %s", w.cluster.ID)
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
@@ -125,6 +137,7 @@ func (w *WorkloadTestSuite) TestWorkloadCronjob() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
 
+	log.Infof("Cluster ID %s", w.cluster.ID)
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
@@ -160,6 +173,7 @@ func (w *WorkloadTestSuite) TestWorkloadStatefulset() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
 
+	log.Infof("Cluster ID %s", w.cluster.ID)
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
@@ -197,6 +211,7 @@ func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
 
+	log.Infof("Cluster ID %s", w.cluster.ID)
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
 	require.NoError(w.T(), err)
 
