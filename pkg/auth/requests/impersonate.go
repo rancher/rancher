@@ -2,6 +2,7 @@ package requests
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"

@@ -1,15 +1,15 @@
 package sar
 
 import (
-	"context"
+	"net/http"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/requests/mocks"
 	"github.com/stretchr/testify/assert"
 	authV1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
-	"testing"
 )
 
 func TestUserCanImpersonateUser(t *testing.T) {
@@ -38,7 +38,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 						},
 					},
 				}
-				sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
+				sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
 					Status: authV1.SubjectAccessReviewStatus{
 						Allowed: true,
 					},
@@ -67,7 +67,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 						},
 					},
 				}
-				sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
+				sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
 					Status: authV1.SubjectAccessReviewStatus{
 						Allowed: false,
 					},
@@ -96,7 +96,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 						},
 					},
 				}
-				sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(nil, err)
+				sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(nil, err)
 
 				return sarMock
 			},
@@ -146,7 +146,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 						},
 					},
 				}
-				sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
+				sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
 					Status: authV1.SubjectAccessReviewStatus{
 						Allowed: true,
 					},
@@ -175,7 +175,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 						},
 					},
 				}
-				sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
+				sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
 					Status: authV1.SubjectAccessReviewStatus{
 						Allowed: false,
 					},
@@ -204,7 +204,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 						},
 					},
 				}
-				sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(nil, err)
+				sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(nil, err)
 
 				return sarMock
 			},
@@ -256,7 +256,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 								},
 							},
 						}
-						sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
+						sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
 							Status: authV1.SubjectAccessReviewStatus{
 								Allowed: true,
 							},
@@ -290,7 +290,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 								},
 							},
 						}
-						sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
+						sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(&authV1.SubjectAccessReview{
 							Status: authV1.SubjectAccessReviewStatus{
 								Allowed: false,
 							},
@@ -324,7 +324,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 								},
 							},
 						}
-						sarClientMock.EXPECT().Create(context.TODO(), &sar, metav1.CreateOptions{}).Return(nil, err)
+						sarClientMock.EXPECT().Create(req.Context(), &sar, metav1.CreateOptions{}).Return(nil, err)
 					}
 				}
 

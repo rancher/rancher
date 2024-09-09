@@ -39,7 +39,7 @@ func (sar subjectAccessReview) UserCanImpersonateUser(req *http.Request, user, i
 	if err != nil {
 		return false, err
 	}
-	return sar.checkUserCanImpersonateUser(userContext, user, impUser)
+	return sar.checkUserCanImpersonateUser(req.Context(), userContext, user, impUser)
 }
 
 func (sar subjectAccessReview) UserCanImpersonateGroup(req *http.Request, user string, group string) (bool, error) {
@@ -47,7 +47,7 @@ func (sar subjectAccessReview) UserCanImpersonateGroup(req *http.Request, user s
 	if err != nil {
 		return false, err
 	}
-	return sar.checkUserCanImpersonateGroup(userContext, user, group)
+	return sar.checkUserCanImpersonateGroup(req.Context(), userContext, user, group)
 }
 
 func (sar subjectAccessReview) UserCanImpersonateExtras(req *http.Request, user string, impExtras map[string][]string) (bool, error) {
@@ -55,10 +55,10 @@ func (sar subjectAccessReview) UserCanImpersonateExtras(req *http.Request, user 
 	if err != nil {
 		return false, err
 	}
-	return sar.checkUserCanImpersonateExtras(userContext, user, impExtras)
+	return sar.checkUserCanImpersonateExtras(req.Context(), userContext, user, impExtras)
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateUser(sarClient v1.SubjectAccessReviewInterface, user, impUser string) (bool, error) {
+func (sar subjectAccessReview) checkUserCanImpersonateUser(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user, impUser string) (bool, error) {
 	review := authV1.SubjectAccessReview{
 		Spec: authV1.SubjectAccessReviewSpec{
 			User: user,
@@ -70,7 +70,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateUser(sarClient v1.SubjectA
 		},
 	}
 
-	result, err := sarClient.Create(context.TODO(), &review, metav1.CreateOptions{})
+	result, err := sarClient.Create(ctx, &review, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -78,7 +78,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateUser(sarClient v1.SubjectA
 	return result.Status.Allowed, nil
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateGroup(sarClient v1.SubjectAccessReviewInterface, user string, group string) (bool, error) {
+func (sar subjectAccessReview) checkUserCanImpersonateGroup(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user string, group string) (bool, error) {
 	review := authV1.SubjectAccessReview{
 		Spec: authV1.SubjectAccessReviewSpec{
 			User: user,
@@ -90,7 +90,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateGroup(sarClient v1.Subject
 		},
 	}
 
-	result, err := sarClient.Create(context.TODO(), &review, metav1.CreateOptions{})
+	result, err := sarClient.Create(ctx, &review, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -99,7 +99,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateGroup(sarClient v1.Subject
 	return result.Status.Allowed, nil
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateExtras(sarClient v1.SubjectAccessReviewInterface, user string, extras map[string][]string) (bool, error) {
+func (sar subjectAccessReview) checkUserCanImpersonateExtras(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user string, extras map[string][]string) (bool, error) {
 	for name, values := range extras {
 		for _, value := range values {
 			review := authV1.SubjectAccessReview{
@@ -113,7 +113,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateExtras(sarClient v1.Subjec
 				},
 			}
 
-			result, err := sarClient.Create(context.TODO(), &review, metav1.CreateOptions{})
+			result, err := sarClient.Create(ctx, &review, metav1.CreateOptions{})
 			if err != nil {
 				return false, err
 			}
