@@ -53,6 +53,8 @@ const (
 	LatestHTTPRepoURL   = "https://releases.rancher.com/server-charts/latest"
 	StableHTTPRepoURL   = "https://releases.rancher.com/server-charts/stable"
 
+	GitClusterSmallForkName = "test-git-small-fork-cluster-repo"
+	GitClusterSmallForkURL  = "https://github.com/rancher/charts-small-fork"
 	GitClusterRepoName      = "test-git-cluster-repo"
 	RancherChartsGitRepoURL = "https://github.com/rancher/charts"
 	RKE2ChartsGitRepoURL    = "https://github.com/rancher/rke2-charts"
@@ -133,6 +135,14 @@ func (c *ClusterRepoTestSuite) TestGitRepo() {
 		Name: GitClusterRepoName,
 		URL1: RancherChartsGitRepoURL,
 		URL2: RKE2ChartsGitRepoURL,
+		Type: Git,
+	})
+}
+
+func (c *ClusterRepoTestSuite) TestGitRepoRetries() {
+	c.testClusterRepoRetries(ClusterRepoParams{
+		Name: GitClusterSmallForkName,
+		URL1: GitClusterSmallForkURL,
 		Type: Git,
 	})
 }
@@ -749,6 +759,61 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 
 	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(params.Name)
 	require.Error(c.T(), err)
+}
+
+// testClusterRepoRetries takes in ClusterRepoParams and creates a ClusterRepo with a bad branch name,
+// then updates the branch name to a valid branch name after retries are done
+func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) {
+	// Create a ClusterRepo
+	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
+	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
+	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
+	cr.Spec.GitBranch = "invalid-branch"
+	expoValues := v1.ExponentialBackOffValues{
+		MinWait:    2,
+		MaxWait:    4,
+		MaxRetries: 2,
+	}
+	cr.Spec.ExponentialBackOffValues = &expoValues
+	cr, err := c.catalogClient.ClusterRepos().Create(context.TODO(), cr, metav1.CreateOptions{})
+	require.NoError(c.T(), err)
+
+	retryNumber := 1
+	err = wait.Poll(200*time.Millisecond, 30*time.Second, func() (done bool, err error) {
+		cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
+		assert.NoError(c.T(), err)
+
+		for _, condition := range cr.Status.Conditions {
+			if v1.RepoCondition(condition.Type) == v1.RepoDownloaded {
+				logrus.Infof("Condition: %v, retryNumber %d, number of retries %d", condition, retryNumber, cr.Status.NumberOfRetries)
+				if condition.Status == corev1.ConditionFalse && cr.Status.NumberOfRetries == retryNumber {
+					retryNumber++
+					return false, nil
+				}
+				return condition.Status == corev1.ConditionFalse && cr.Status.NumberOfRetries == 0 && retryNumber == cr.Spec.ExponentialBackOffValues.MaxRetries+1, nil
+			}
+		}
+
+		return false, nil
+	})
+	require.NoError(c.T(), err)
+
+	downloadTime := cr.Status.DownloadTime
+	cr.Spec.GitBranch = "main"
+	cr, err = c.catalogClient.ClusterRepos().Update(context.TODO(), cr, metav1.UpdateOptions{})
+	require.NoError(c.T(), err)
+	// Validate the ClusterRepo was created and resources were downloaded
+	clusterRepo, err := c.pollUntilDownloaded(params.Name, metav1.Time{})
+	require.NoError(c.T(), err)
+
+	status := c.getStatusFromClusterRepo(clusterRepo)
+	assert.Greater(c.T(), status.DownloadTime.Time, downloadTime.Time)
+
+	err = c.catalogClient.ClusterRepos().Delete(context.TODO(), params.Name, metav1.DeleteOptions{})
+	assert.NoError(c.T(), err)
+
+	_, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
+	assert.Error(c.T(), err)
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
