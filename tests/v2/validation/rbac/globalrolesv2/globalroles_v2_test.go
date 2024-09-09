@@ -46,6 +46,7 @@ func (gr *GlobalRolesV2TestSuite) SetupSuite() {
 
 	gr.client = client
 
+	provisioning.DisableUpdateConfig(gr.client)
 }
 
 func (gr *GlobalRolesV2TestSuite) validateRBACResources(createdUser *management.User, inheritedRoles []string) (string, int) {
