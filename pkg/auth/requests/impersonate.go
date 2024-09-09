@@ -69,7 +69,7 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 				}
 				canDo, err := h.sar.UserCanImpersonateGroup(req, user, g)
 				if err != nil {
-					return nil, false, err
+					return nil, false, fmt.Errorf("error checking if user can impersonate group: %w", err)
 				} else if !canDo {
 					return nil, false, errors.New("not allowed to impersonate group")
 				}
@@ -79,7 +79,7 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 			if len(reqExtras) > 0 {
 				canDo, err := h.sar.UserCanImpersonateExtras(req, user, reqExtras)
 				if err != nil {
-					return nil, false, err
+					return nil, false, fmt.Errorf("error checking if user can impersonate extras: %w", err)
 				} else if !canDo {
 					return nil, false, errors.New("not allowed to impersonate extras")
 				}
