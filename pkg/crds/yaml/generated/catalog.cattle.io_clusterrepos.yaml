@@ -18,6 +18,9 @@ spec:
     - jsonPath: .spec.url
       name: HTTP URL
       type: string
+    - jsonPath: .spec.enabled
+      name: Enabled
+      type: string
     - jsonPath: .spec.gitRepo
       name: Git Repo
       type: string
@@ -89,8 +92,8 @@ spec:
                   in production environments due to the security implications.
                 type: boolean
               enabled:
-                description: If disabled the repo clone will not be updated or allowed
-                  to be installed from.
+                description: If disabled the repo will not be updated and won't pick
+                  up new changes.
                 type: boolean
               exponentialBackOffValues:
                 description: |-

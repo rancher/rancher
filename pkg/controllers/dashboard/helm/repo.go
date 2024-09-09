@@ -127,6 +127,11 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 	}
 	newStatus.ShouldNotSkip = false
 
+	// If repo is disabled, then don't update the clusterrepo
+	if repo.Spec.Enabled != nil && !*repo.Spec.Enabled {
+		return setErrorCondition(repo, err, newStatus, interval, ociCondition, r.clusterRepos)
+	}
+
 	return r.download(repo, newStatus, metav1.OwnerReference{
 		APIVersion: catalog.SchemeGroupVersion.Group + "/" + catalog.SchemeGroupVersion.Version,
 		Kind:       "ClusterRepo",
@@ -219,6 +224,11 @@ func createOrUpdateMap(namespace string, index *repo.IndexFile, owner metav1.Own
 
 func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta) (catalog.RepoStatus, error) {
 	if status.Commit == "" {
+		return status, nil
+	}
+
+	// If repo is disabled, skip updating the replicas.
+	if repoSpec.Enabled != nil && !*repoSpec.Enabled {
 		return status, nil
 	}
 
