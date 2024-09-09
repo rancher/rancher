@@ -6,18 +6,19 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RancherToken
-type RancherToken struct {
+// Token is the new extension Token structure
+type Token struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the spec of RancherToken
-	Spec RancherTokenSpec `json:"spec"`
+	Spec TokenSpec `json:"spec"`
 	// +optional
-	Status RancherTokenStatus `json:"status"`
+	Status TokenStatus `json:"status"`
 }
 
-type RancherTokenSpec struct {
+// TokenSpec contains the user-specifiable parts of the Token
+type TokenSpec struct {
 	// UserID is the user id
 	UserID string `json:"userID"`
 	// Human readable description
@@ -36,7 +37,8 @@ type RancherTokenSpec struct {
 	IsDerived bool `json:"isDerived"`
 }
 
-type RancherTokenStatus struct {
+// TokenStatus contains the data derived from the specification or otherwise generated.
+type TokenStatus struct {
 	// TokenValue is the access key. Shown only on token creation. Not saved.
 	TokenValue string `json:"tokenValue,omitempty"`
 	// TokenHash is the hash of the value. Only thing saved.
@@ -61,9 +63,10 @@ type RancherTokenStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type RancherTokenList struct {
+// TokenList is the standard structure for a list of Tokens in the kube API
+type TokenList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []RancherToken `json:"items"`
+	Items []Token `json:"items"`
 }

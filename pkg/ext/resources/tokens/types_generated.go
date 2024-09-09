@@ -8,15 +8,15 @@ import (
 )
 
 var (
-	RancherTokenName = "ranchertokens"
+	TokenName = "tokens"
 )
 
 var SchemeGroupVersion = schema.GroupVersion{Group: "ext.cattle.io", Version: "v1alpha1"}
 var TokenAPIResource = metav1.APIResource{
-	Name:         "ranchertokens",
-	SingularName: "ranchertoken",
+	Name:         "tokens",
+	SingularName: "token",
 	Namespaced:   false,
-	Kind:         "RancherToken",
+	Kind:         "Token",
 	Verbs: metav1.Verbs{
 		"create",
 		"update",
@@ -43,8 +43,8 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&RancherToken{},
-		&RancherTokenList{},
+		&Token{},
+		&TokenList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

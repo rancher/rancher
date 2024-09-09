@@ -29,7 +29,7 @@ type TokenStore struct {
 	sar          authzv1.SubjectAccessReviewInterface
 }
 
-func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar authzv1.SubjectAccessReviewInterface) types.Store[*RancherToken, *RancherTokenList] {
+func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar authzv1.SubjectAccessReviewInterface) types.Store[*Token, *TokenList] {
 	tokenStore := TokenStore{
 		secretClient: secretClient,
 		secretCache:  secretCache,
@@ -38,7 +38,7 @@ func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar
 	return &tokenStore
 }
 
-func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *RancherToken, opts *metav1.CreateOptions) (*RancherToken, error) {
+func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Token, opts *metav1.CreateOptions) (*Token, error) {
 	if err := t.checkAdmin("create", token, userInfo); err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Ranc
 	return token, nil
 }
 
-func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *RancherToken, opts *metav1.UpdateOptions) (*RancherToken, error) {
+func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Token, opts *metav1.UpdateOptions) (*Token, error) {
 	if err := t.checkAdmin("update", token, userInfo); err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Ranc
 	return newToken, nil
 }
 
-func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*RancherToken, error) {
+func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*Token, error) {
 	// have to get token first before we can check permissions on user mismatch
 	currentSecret, err := t.secretCache.Get(TokenNamespace, name)
 	if err != nil {
@@ -126,7 +126,7 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 	return token, nil
 }
 
-func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (*RancherTokenList, error) {
+func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (*TokenList, error) {
 	// cannot use checkAdmin here. we have lots of tokens to check, with the same admin value.
 	isadmin, err := t.userHasFullPermissions(userInfo)
 	if err != nil {
@@ -136,7 +136,7 @@ func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.
 	if err != nil {
 		return nil, fmt.Errorf("unable to list tokens: %w", err)
 	}
-	var tokens []RancherToken
+	var tokens []Token
 	for _, secret := range secrets.Items {
 		token, err := tokenFromSecret(&secret)
 		if err != nil {
@@ -149,7 +149,7 @@ func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.
 		}
 		tokens = append(tokens, *token)
 	}
-	list := RancherTokenList{
+	list := TokenList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: secrets.ResourceVersion,
 		},
@@ -159,14 +159,14 @@ func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.
 }
 
 // TODO: Close channel
-func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (<-chan types.WatchEvent[*RancherToken], error) {
+func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (<-chan types.WatchEvent[*Token], error) {
 	// cannot use checkAdmin here. we have lots of tokens to check, with the same admin value.
 	isadmin, err := t.userHasFullPermissions(userInfo)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if user has full permissions on tokens: %w", err)
 	}
 
-	ch := make(chan types.WatchEvent[*RancherToken])
+	ch := make(chan types.WatchEvent[*Token])
 
 	go func() {
 		watcher, err := t.secretClient.Watch(TokenNamespace, metav1.ListOptions{
@@ -193,7 +193,7 @@ func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1
 				continue
 			}
 
-			watchEvent := types.WatchEvent[*RancherToken]{
+			watchEvent := types.WatchEvent[*Token]{
 				Event:  event.Type,
 				Object: token,
 			}
@@ -224,9 +224,9 @@ func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string
 	return nil
 }
 
-var _ types.TableConvertor[*RancherTokenList] = (*TokenStore)(nil)
+var _ types.TableConvertor[*TokenList] = (*TokenStore)(nil)
 
-func (t *TokenStore) ConvertToTable(list *RancherTokenList, opts *metav1.TableOptions) *metav1.Table {
+func (t *TokenStore) ConvertToTable(list *TokenList, opts *metav1.TableOptions) *metav1.Table {
 	table := &metav1.Table{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Table",
@@ -293,7 +293,7 @@ func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
 
 // Internal supporting functionality
 
-func(t *TokenStore) checkAdmin(verb string, token *RancherToken, userInfo user.Info) error {
+func(t *TokenStore) checkAdmin(verb string, token *Token, userInfo user.Info) error {
 	if token.Spec.UserID == userInfo.GetName() {
 		return nil
 	}
@@ -307,7 +307,7 @@ func(t *TokenStore) checkAdmin(verb string, token *RancherToken, userInfo user.I
 	return nil
 }
 
-func secretFromToken(token *RancherToken) (*corev1.Secret, error) {
+func secretFromToken(token *Token) (*corev1.Secret, error) {
 
 	// UserPrincipal (future), GroupPrincipals, ProviderInfo
 	// Encode the complex data into JSON for storage as string.
@@ -351,7 +351,7 @@ func secretFromToken(token *RancherToken) (*corev1.Secret, error) {
 	return secret, nil
 }
 
-func tokenFromSecret(secret *corev1.Secret) (*RancherToken, error) {
+func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 
 	enabled, err :=	strconv.ParseBool(string(secret.Data["enabled"]))
 	if err != nil {
@@ -376,9 +376,9 @@ func tokenFromSecret(secret *corev1.Secret) (*RancherToken, error) {
 		return nil, err
 	}
 
-	token := &RancherToken{
+	token := &Token{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "RancherToken",
+			Kind:       "Token",
 			APIVersion: "ext.cattle.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -387,7 +387,7 @@ func tokenFromSecret(secret *corev1.Secret) (*RancherToken, error) {
 			Labels:            secret.Labels,
 			Annotations:       secret.Annotations,
 		},
-		Spec: RancherTokenSpec{
+		Spec: TokenSpec{
 			UserID:      string(secret.Data["userID"]),
 			Description: string(secret.Data["description"]),
 			ClusterName: string(secret.Data["clusterName"]),
@@ -395,7 +395,7 @@ func tokenFromSecret(secret *corev1.Secret) (*RancherToken, error) {
 			Enabled:     enabled,
 			IsDerived:   derived,
 		},
-		Status: RancherTokenStatus{
+		Status: TokenStatus{
 			TokenHash:       string(secret.Data["hashedToken"]),
 			Expired:         expired,
 			ExpiredAt:       string(secret.Data["expired-at"]),
