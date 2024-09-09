@@ -51,17 +51,11 @@ func (rb *RBTestSuite) SetupSuite() {
 	log.Info("Getting cluster names")
 	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
 	require.NoError(rb.T(), err)
-
-	for _, cluster := range clusterList.Data {
-		log.Infof("Cluster name %s", cluster.Name)
-	}
 }
 
 func (rb *RBTestSuite) sequentialTestRBAC(role rbac.Role, member string, user *management.User) {
 	standardClient, err := rb.client.AsUser(user)
 	require.NoError(rb.T(), err)
-
-	log.Infof("Cluster ID %s", rb.cluster.ID)
 
 	adminProject, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 	require.NoError(rb.T(), err)
@@ -81,8 +75,6 @@ func (rb *RBTestSuite) sequentialTestRBAC(role rbac.Role, member string, user *m
 
 	additionalUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), rbac.StandardUser.String())
 	require.NoError(rb.T(), err)
-
-	log.Infof("Cluster ID %s", rb.cluster.ID)
 
 	rb.Run("Validating Global Role Binding is created for "+role.String(), func() {
 		rbac.VerifyGlobalRoleBindingsForUser(rb.T(), user, rb.client)

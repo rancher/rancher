@@ -28,6 +28,7 @@ type RestrictedAdminTestSuite struct {
 }
 
 func (ra *RestrictedAdminTestSuite) TearDownSuite() {
+	provisioning.SetUpdateConfig(true)
 	ra.session.Cleanup()
 }
 
@@ -38,6 +39,8 @@ func (ra *RestrictedAdminTestSuite) SetupSuite() {
 	require.NoError(ra.T(), err)
 
 	ra.client = client
+
+	provisioning.SetUpdateConfig(false)
 
 	log.Info("Getting cluster name from the config file and append cluster details in the struct.")
 	clusterName := client.RancherConfig.ClusterName

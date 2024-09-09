@@ -34,6 +34,7 @@ type GlobalRolesV2TestSuite struct {
 }
 
 func (gr *GlobalRolesV2TestSuite) TearDownSuite() {
+	provisioning.SetUpdateConfig(true)
 	gr.session.Cleanup()
 }
 
@@ -46,6 +47,7 @@ func (gr *GlobalRolesV2TestSuite) SetupSuite() {
 
 	gr.client = client
 
+	provisioning.SetUpdateConfig(false)
 }
 
 func (gr *GlobalRolesV2TestSuite) validateRBACResources(createdUser *management.User, inheritedRoles []string) (string, int) {
