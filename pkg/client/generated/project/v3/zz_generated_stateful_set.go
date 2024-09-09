@@ -62,6 +62,7 @@ const (
 	StatefulSetFieldStatefulSetConfig                    = "statefulSetConfig"
 	StatefulSetFieldStatefulSetStatus                    = "statefulSetStatus"
 	StatefulSetFieldSubdomain                            = "subdomain"
+	StatefulSetFieldSupplementalGroupsPolicy             = "supplementalGroupsPolicy"
 	StatefulSetFieldSysctls                              = "sysctls"
 	StatefulSetFieldTerminationGracePeriodSeconds        = "terminationGracePeriodSeconds"
 	StatefulSetFieldTopologySpreadConstraints            = "topologySpreadConstraints"
@@ -132,6 +133,7 @@ type StatefulSet struct {
 	StatefulSetConfig                    *StatefulSetConfig                               `json:"statefulSetConfig,omitempty" yaml:"statefulSetConfig,omitempty"`
 	StatefulSetStatus                    *StatefulSetStatus                               `json:"statefulSetStatus,omitempty" yaml:"statefulSetStatus,omitempty"`
 	Subdomain                            string                                           `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	SupplementalGroupsPolicy             string                                           `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Sysctls                              []Sysctl                                         `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TerminationGracePeriodSeconds        *int64                                           `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	TopologySpreadConstraints            []TopologySpreadConstraint                       `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`

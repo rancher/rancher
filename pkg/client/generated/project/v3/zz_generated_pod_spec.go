@@ -37,6 +37,7 @@ const (
 	PodSpecFieldSetHostnameAsFQDN             = "setHostnameAsFQDN"
 	PodSpecFieldShareProcessNamespace         = "shareProcessNamespace"
 	PodSpecFieldSubdomain                     = "subdomain"
+	PodSpecFieldSupplementalGroupsPolicy      = "supplementalGroupsPolicy"
 	PodSpecFieldSysctls                       = "sysctls"
 	PodSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	PodSpecFieldTopologySpreadConstraints     = "topologySpreadConstraints"
@@ -81,6 +82,7 @@ type PodSpec struct {
 	SetHostnameAsFQDN             *bool                          `json:"setHostnameAsFQDN,omitempty" yaml:"setHostnameAsFQDN,omitempty"`
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	SupplementalGroupsPolicy      string                         `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraint     `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`

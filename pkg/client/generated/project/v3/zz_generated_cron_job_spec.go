@@ -47,6 +47,7 @@ const (
 	CronJobSpecFieldShareProcessNamespace         = "shareProcessNamespace"
 	CronJobSpecFieldSubdomain                     = "subdomain"
 	CronJobSpecFieldSuccessPolicy                 = "successPolicy"
+	CronJobSpecFieldSupplementalGroupsPolicy      = "supplementalGroupsPolicy"
 	CronJobSpecFieldSysctls                       = "sysctls"
 	CronJobSpecFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -103,6 +104,7 @@ type CronJobSpec struct {
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	SuccessPolicy                 *SuccessPolicy                 `json:"successPolicy,omitempty" yaml:"successPolicy,omitempty"`
+	SupplementalGroupsPolicy      string                         `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

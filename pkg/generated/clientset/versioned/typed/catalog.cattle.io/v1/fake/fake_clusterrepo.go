@@ -40,20 +40,22 @@ var clusterreposKind = v1.SchemeGroupVersion.WithKind("ClusterRepo")
 
 // Get takes name of the clusterRepo, and returns the corresponding clusterRepo object, and an error if there is any.
 func (c *FakeClusterRepos) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterRepo, err error) {
+	emptyResult := &v1.ClusterRepo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterreposResource, name), &v1.ClusterRepo{})
+		Invokes(testing.NewRootGetActionWithOptions(clusterreposResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRepo), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterRepos that match those selectors.
 func (c *FakeClusterRepos) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterRepoList, err error) {
+	emptyResult := &v1.ClusterRepoList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterreposResource, clusterreposKind, opts), &v1.ClusterRepoList{})
+		Invokes(testing.NewRootListActionWithOptions(clusterreposResource, clusterreposKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -72,36 +74,39 @@ func (c *FakeClusterRepos) List(ctx context.Context, opts metav1.ListOptions) (r
 // Watch returns a watch.Interface that watches the requested clusterRepos.
 func (c *FakeClusterRepos) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(clusterreposResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(clusterreposResource, opts))
 }
 
 // Create takes the representation of a clusterRepo and creates it.  Returns the server's representation of the clusterRepo, and an error, if there is any.
 func (c *FakeClusterRepos) Create(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.CreateOptions) (result *v1.ClusterRepo, err error) {
+	emptyResult := &v1.ClusterRepo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterreposResource, clusterRepo), &v1.ClusterRepo{})
+		Invokes(testing.NewRootCreateActionWithOptions(clusterreposResource, clusterRepo, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRepo), err
 }
 
 // Update takes the representation of a clusterRepo and updates it. Returns the server's representation of the clusterRepo, and an error, if there is any.
 func (c *FakeClusterRepos) Update(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.UpdateOptions) (result *v1.ClusterRepo, err error) {
+	emptyResult := &v1.ClusterRepo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterreposResource, clusterRepo), &v1.ClusterRepo{})
+		Invokes(testing.NewRootUpdateActionWithOptions(clusterreposResource, clusterRepo, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRepo), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterRepos) UpdateStatus(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.UpdateOptions) (*v1.ClusterRepo, error) {
+func (c *FakeClusterRepos) UpdateStatus(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.UpdateOptions) (result *v1.ClusterRepo, err error) {
+	emptyResult := &v1.ClusterRepo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clusterreposResource, "status", clusterRepo), &v1.ClusterRepo{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(clusterreposResource, "status", clusterRepo, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRepo), err
 }
@@ -115,7 +120,7 @@ func (c *FakeClusterRepos) Delete(ctx context.Context, name string, opts metav1.
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeClusterRepos) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clusterreposResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(clusterreposResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ClusterRepoList{})
 	return err
@@ -123,10 +128,11 @@ func (c *FakeClusterRepos) DeleteCollection(ctx context.Context, opts metav1.Del
 
 // Patch applies the patch and returns the patched clusterRepo.
 func (c *FakeClusterRepos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRepo, err error) {
+	emptyResult := &v1.ClusterRepo{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterreposResource, name, pt, data, subresources...), &v1.ClusterRepo{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clusterreposResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRepo), err
 }
