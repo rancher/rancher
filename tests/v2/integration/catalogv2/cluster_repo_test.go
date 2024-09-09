@@ -327,8 +327,8 @@ func Start429Registry(t assert.TestingT, rateLimitedHeader bool) (*httptest.Serv
 	return ts, nil
 }
 
-func AddHelmChart(u *url.URL) error {
-	chartTar, err := os.ReadFile("../../../testdata/testingchart-0.1.0.tgz")
+func AddHelmChart(u *url.URL, repoName, path, tag string) error {
+	chartTar, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -364,12 +364,12 @@ func AddHelmChart(u *url.URL) error {
 	target.Push(context.Background(), configDesc, bytes.NewReader(configBlob))
 	target.Push(context.Background(), layerDesc, bytes.NewReader(chartTar))
 	target.Push(context.Background(), manifestDesc, bytes.NewReader(manifestJSON))
-	err = target.Tag(context.Background(), manifestDesc, "0.1.0")
+	err = target.Tag(context.Background(), manifestDesc, tag)
 	if err != nil {
 		return err
 	}
 
-	ociClient, err := oci.NewClient(fmt.Sprintf("oci://%s/rancher/testingchart", u.Host), v1.RepoSpec{}, nil)
+	ociClient, err := oci.NewClient(fmt.Sprintf("oci://%s/rancher/%s", u.Host, repoName), v1.RepoSpec{}, nil)
 	if err != nil {
 		return err
 	}
@@ -380,7 +380,7 @@ func AddHelmChart(u *url.URL) error {
 	}
 	orasRepository.PlainHTTP = true
 
-	_, err = oras.Copy(context.Background(), target, "0.1.0", orasRepository, "", oras.DefaultCopyOptions)
+	_, err = oras.Copy(context.Background(), target, tag, orasRepository, "", oras.DefaultCopyOptions)
 	if err != nil {
 		return err
 	}
@@ -400,7 +400,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo() {
 	require.NoError(c.T(), err)
 
 	//push testingchart helm chart
-	err = AddHelmChart(u)
+	err = AddHelmChart(u, "testingchart", "../../../testdata/testingchart-0.1.0.tgz", "0.1.0")
 	require.NoError(c.T(), err)
 
 	c.testClusterRepo(ClusterRepoParams{
@@ -424,7 +424,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo2() {
 	require.NoError(c.T(), err)
 
 	//push testingchart helm chart
-	err = AddHelmChart(u)
+	err = AddHelmChart(u, "testingchart", "../../../testdata/testingchart-0.1.0.tgz", "0.1.0")
 	require.NoError(c.T(), err)
 
 	c.testClusterRepo(ClusterRepoParams{
@@ -624,7 +624,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	require.NoError(c.T(), err)
 
 	//push testingchart helm chart
-	err = AddHelmChart(u)
+	err = AddHelmChart(u, "testingchart", "../../../testdata/testingchart-0.1.0.tgz", "0.1.0")
 	require.NoError(c.T(), err)
 
 	repoName := "oci"
@@ -712,6 +712,118 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	assert.NoError(c.T(), err)
 
 	err = catalogClient.ClusterRepos().Delete(context.Background(), "oci", metav1.DeleteOptions{})
+	assert.Error(c.T(), err)
+}
+
+// TestOCIEnableRepo tests the enable/disable feature of clusterrepo
+func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
+	//start registry
+	ts, err := StartRegistry()
+	assert.NoError(c.T(), err)
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	require.NoError(c.T(), err)
+
+	repoName := "oci"
+
+	// Add a single helm chart
+	err = AddHelmChart(u, "testingchart", "../../../testdata/testingchart-0.1.0.tgz", "0.1.0")
+	require.NoError(c.T(), err)
+
+	// Create a ClusterRepo
+	clusterRepo := &v1.ClusterRepo{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: repoName,
+		},
+		Spec: v1.RepoSpec{
+			URL:               fmt.Sprintf("oci://%s/rancher", u.Host),
+			InsecurePlainHTTP: true,
+		},
+	}
+	_, err = c.catalogClient.ClusterRepos().Create(context.Background(), clusterRepo, metav1.CreateOptions{})
+	assert.NoError(c.T(), err)
+	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	require.NoError(c.T(), err)
+
+	// Disable the clusterrepo
+	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.Background(), repoName, metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+	enabled := false
+	clusterRepo.Spec.Enabled = &enabled
+	_, err = c.catalogClient.ClusterRepos().Update(context.Background(), clusterRepo, metav1.UpdateOptions{})
+	assert.NoError(c.T(), err)
+	err = wait.Poll(200*time.Millisecond, 1*time.Minute, func() (done bool, err error) {
+		cr, err := c.catalogClient.ClusterRepos().Get(context.TODO(), repoName, metav1.GetOptions{})
+		assert.NoError(c.T(), err)
+		return *cr.Spec.Enabled == false, nil
+	})
+	require.NoError(c.T(), err)
+
+	// Add a second helm chart
+	err = AddHelmChart(u, "testchart", "../../../testdata/testchart-1.0.0.tgz", "1.0.0")
+	require.NoError(c.T(), err)
+
+	// ForceRefresh the clusterrepo
+	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.Background(), repoName, metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
+	clusterRepo, err = c.catalogClient.ClusterRepos().Update(context.Background(), clusterRepo, metav1.UpdateOptions{})
+	assert.NoError(c.T(), err)
+	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	require.NoError(c.T(), err)
+
+	// Check configmap for chart or version and the new chart should not exist
+	cfgMap, err := c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+	gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
+	c.Require().NoError(err)
+	defer gz.Close()
+	data, err := io.ReadAll(gz)
+	c.Require().NoError(err)
+	index := &repo.IndexFile{}
+	c.Require().NoError(json.Unmarshal(data, index))
+	assert.Equal(c.T(), len(index.Entries), 1)
+
+	// Enable the clusterrepo
+	enabled = true
+	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.Background(), repoName, metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+	clusterRepo.Spec.Enabled = &enabled
+	_, err = c.catalogClient.ClusterRepos().Update(context.Background(), clusterRepo, metav1.UpdateOptions{})
+	assert.NoError(c.T(), err)
+	err = wait.Poll(200*time.Millisecond, 1*time.Minute, func() (done bool, err error) {
+		cr, err := c.catalogClient.ClusterRepos().Get(context.TODO(), repoName, metav1.GetOptions{})
+		assert.NoError(c.T(), err)
+		return *cr.Spec.Enabled == true, nil
+	})
+	require.NoError(c.T(), err)
+
+	// ForceRefresh the clusterrepo
+	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.Background(), repoName, metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
+	_, err = c.catalogClient.ClusterRepos().Update(context.Background(), clusterRepo, metav1.UpdateOptions{})
+	assert.NoError(c.T(), err)
+	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	require.NoError(c.T(), err)
+
+	// Check configmap for chart or version and 2 charts must exist now
+	cfgMap, err = c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+	gz, err = gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
+	c.Require().NoError(err)
+	defer gz.Close()
+	data, err = io.ReadAll(gz)
+	c.Require().NoError(err)
+	index = &repo.IndexFile{}
+	c.Require().NoError(json.Unmarshal(data, index))
+	assert.Equal(c.T(), 2, len(index.Entries))
+
+	// Validate deleting the ClusterRepo
+	err = c.catalogClient.ClusterRepos().Delete(context.Background(), repoName, metav1.DeleteOptions{})
+	assert.NoError(c.T(), err)
+
+	err = c.catalogClient.ClusterRepos().Delete(context.Background(), repoName, metav1.DeleteOptions{})
 	assert.Error(c.T(), err)
 }
 
