@@ -11,6 +11,7 @@ import (
 // +kubebuilder:resource:scope=Cluster,path=clusterrepos
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="HTTP URL",type=string,JSONPath=`.spec.url`
+// +kubebuilder:printcolumn:name="Enabled",type=string,JSONPath=`.spec.enabled`
 // +kubebuilder:printcolumn:name="Git Repo",type=string,JSONPath=`.spec.gitRepo`
 // +kubebuilder:printcolumn:name="Git Branch",type=string,JSONPath=`.spec.gitBranch`
 // +kubebuilder:printcolumn:name="Download Time",type=string,JSONPath=`.status.downloadTime`
@@ -99,7 +100,7 @@ type RepoSpec struct {
 	// ServiceAccountNamespace is the namespace of the service account to use.
 	ServiceAccountNamespace string `json:"serviceAccountNamespace,omitempty"`
 
-	// If disabled the repo clone will not be updated or allowed to be installed from.
+	// If disabled the repo will not be updated and won't pick up new changes.
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// DisableSameOriginCheck if true attaches the Basic Auth Header to all Helm client API calls

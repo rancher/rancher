@@ -119,6 +119,11 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	logrus.Debugf("OCIRepoHandler triggered for clusterrepo %s", clusterRepo.Name)
 	var index *repo.IndexFile
 
+	// If repo is disabled, then don't update the clusterrepo
+	if clusterRepo.Spec.Enabled != nil && !*clusterRepo.Spec.Enabled {
+		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
+	}
+
 	secret, err := catalogv2.GetSecret(o.secretCacheController, &clusterRepo.Spec, clusterRepo.Namespace)
 	if err != nil {
 		logrus.Errorf("Error while fetching secret for cluster repo %s: %v", clusterRepo.Name, err)
