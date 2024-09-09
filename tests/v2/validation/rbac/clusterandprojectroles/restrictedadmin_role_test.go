@@ -28,6 +28,7 @@ type RestrictedAdminTestSuite struct {
 }
 
 func (ra *RestrictedAdminTestSuite) TearDownSuite() {
+	provisioning.SetUpdateConfig(true)
 	ra.session.Cleanup()
 }
 
