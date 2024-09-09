@@ -60,6 +60,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
     steps:
       - name: Download chart
         uses: actions/download-artifact@v4
@@ -72,9 +74,15 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | OPTIMUS_CHARTS_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | OPTIMUS_CHARTS_SECRET_KEY ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
       - name: Upload chart to bucket
         run: |
           AWS_ACCESS_KEY_ID=${{ env.OPTIMUS_CHARTS_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.OPTIMUS_CHARTS_SECRET_KEY }} aws s3 cp --recursive ${{ runner.temp }}/charts s3://charts.optimus.rancher.io/server-charts
+      - name: Invalidate Cloudfront cache
+        shell: bash
+        run: |
+          AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }} aws cloudfront create-invalidation --distribution-id ${{ env.CHARTS_DISTRIBUTION_ID }} --paths "/*"
   build-server:
     runs-on: ubuntu-latest
     strategy:
