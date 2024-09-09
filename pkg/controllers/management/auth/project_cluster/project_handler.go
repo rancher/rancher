@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8scorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -29,12 +30,13 @@ const (
 )
 
 type projectLifecycle struct {
-	mgr                  *config.ManagementContext
 	crtbClient           v3.ClusterRoleTemplateBindingInterface
 	crtbLister           v3.ClusterRoleTemplateBindingLister
 	nsLister             corev1.NamespaceLister
+	nsClient             k8scorev1.NamespaceInterface
 	projects             v3.ProjectInterface
 	prtbLister           v3.ProjectRoleTemplateBindingLister
+	prtbClient           v3.ProjectRoleTemplateBindingInterface
 	rbLister             rbacv1.RoleBindingLister
 	roleBindings         rbacv1.RoleBindingInterface
 	systemAccountManager *systemaccount.Manager
@@ -43,12 +45,13 @@ type projectLifecycle struct {
 // NewProjectLifecycle creates and returns a projectLifecycle from a given ManagementContext
 func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle {
 	return &projectLifecycle{
-		mgr:                  management,
 		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
 		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		nsLister:             management.Core.Namespaces("").Controller().Lister(),
+		nsClient:             management.K8sClient.CoreV1().Namespaces(),
 		projects:             management.Management.Projects(""),
 		prtbLister:           management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		prtbClient:           management.Management.ProjectRoleTemplateBindings(""),
 		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
 		roleBindings:         management.RBAC.RoleBindings(""),
 		systemAccountManager: systemaccount.NewManager(management),
@@ -74,7 +77,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.mgr.K8sClient.CoreV1().Namespaces())
+	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -138,8 +141,10 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
-	err = deleteNamespace(obj, ProjectRemoveController, l.mgr.K8sClient.CoreV1().Namespaces())
+
+	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
 	returnErr = errors.Join(returnErr, err)
+
 	return obj, returnErr
 }
 
@@ -175,7 +180,6 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 		}
 
 		var createdRoles []string
-
 		for _, role := range roleMap["required"] {
 			rtbName := "creator-" + role
 			if rtb, _ := l.prtbLister.Get(project.Name, rtbName); rtb != nil {
@@ -204,10 +208,11 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			}
 
 			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %s for project %s", ProjectCreateController, creatorID, project.Name)
-			_, err := l.mgr.Management.ProjectRoleTemplateBindings(project.Name).Create(prtb)
+			_, err := l.prtbClient.Create(prtb)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return obj, err
 			}
+
 			createdRoles = append(createdRoles, role)
 		}
 
@@ -225,9 +230,9 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			apisv3.ProjectConditionInitialRolesPopulated.True(project)
 			logrus.Infof("[%s] Setting InitialRolesPopulated condition on project %s", ProjectCreateController, project.Name)
 		}
-		if _, err := l.projects.Update(project); err != nil {
-			return obj, err
-		}
-		return obj, nil
+
+		_, err = l.projects.Update(project)
+
+		return obj, err
 	})
 }
