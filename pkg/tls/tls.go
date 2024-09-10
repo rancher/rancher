@@ -52,7 +52,7 @@ var (
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, bindHost string, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
-	opts := &server.ListenOpts{DisplayServerLogs: true}
+	opts := &server.ListenOpts{}
 	var err error
 
 	core, err := core.NewFactoryFromConfig(restConfig)
@@ -70,6 +70,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 			return errors.Wrap(err, "failed to setup TLS listener")
 		}
 	}
+	opts.DisplayServerLogs = true
 
 	opts.BindHost = bindHost
 
