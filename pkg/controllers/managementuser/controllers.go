@@ -46,10 +46,10 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	}
 	cavalidator.Register(ctx, cluster)
 
+	registerImpersonationCaches(cluster)
+
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()
-	// register secrets controller for impersonation
-	cluster.Core.Secrets("").Controller()
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
@@ -59,15 +59,21 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		clusterauthtoken.Register(ctx, cluster)
 	}
 
-	// Ensure these caches are started
-	cluster.Core.Namespaces("").Controller()
-	cluster.Core.Secrets("").Controller()
-	cluster.Core.ServiceAccounts("").Controller()
-
 	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
 }
 
 func RegisterFollower(cluster *config.UserContext) error {
+	registerImpersonationCaches(cluster)
+	cluster.RBAC.ClusterRoleBindings("").Controller()
+	cluster.RBAC.ClusterRoles("").Controller()
+	cluster.RBAC.RoleBindings("").Controller()
+	cluster.RBAC.Roles("").Controller()
+	return nil
+}
+
+// registerImpersonationCaches configures the context to only cache impersonation-related secrets and service accounts
+// it then ensures all the necessary caches are started.
+func registerImpersonationCaches(cluster *config.UserContext) {
 	cluster.KindNamespaces[schema.GroupVersionKind{
 		Version: "v1",
 		Kind:    "Secret",
@@ -76,15 +82,9 @@ func RegisterFollower(cluster *config.UserContext) error {
 		Version: "v1",
 		Kind:    "ServiceAccount",
 	}] = impersonation.ImpersonationNamespace
-
-	cluster.Core.Namespaces("").Controller()
 	cluster.Core.Secrets("").Controller()
 	cluster.Core.ServiceAccounts("").Controller()
-	cluster.RBAC.ClusterRoleBindings("").Controller()
-	cluster.RBAC.ClusterRoles("").Controller()
-	cluster.RBAC.RoleBindings("").Controller()
-	cluster.RBAC.Roles("").Controller()
-	return nil
+	cluster.Core.Namespaces("").Controller()
 }
 
 // PreBootstrap is a list of functions that _need_ to be run before the rest of the controllers start
