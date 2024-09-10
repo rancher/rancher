@@ -3,6 +3,7 @@ package pods
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -206,4 +207,64 @@ func CountPodContainerRunningByImage(client *rancher.Client, clusterID, namespac
 		}
 	}
 	return count, nil
+}
+
+// GetPodByName is a helper to retrieve Pod information by Pod name
+func GetPodByName(client *rancher.Client, clusterID, namespaceName, podName string) (*corev1.Pod, error) {
+	downstreamContext, err := client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedPodList, err := downstreamContext.Core.Pod().List(namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + podName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(updatedPodList.Items) == 0 {
+		return nil, fmt.Errorf("deployment %s not found", podName)
+	}
+	updatedPod := updatedPodList.Items[0]
+
+	return &updatedPod, nil
+}
+
+// GetPodNamesFromDeployment is a helper to get names of the pod in a deployment
+func GetPodNamesFromDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string) ([]string, error) {
+	deploymentList, err := deployments.ListDeployments(client, clusterID, namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + deploymentName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(deploymentList.Items) == 0 {
+		return nil, fmt.Errorf("deployment %s not found", deploymentName)
+	}
+	deployment := deploymentList.Items[0]
+	selector := deployment.Spec.Selector
+	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return nil, err
+	}
+
+	var podNames []string
+	downstreamContext, err := client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
+	if err != nil {
+		return nil, err
+	}
+	pods, err := downstreamContext.Core.Pod().List(namespaceName, metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pod := range pods.Items {
+		podNames = append(podNames, pod.Name)
+	}
+
+	return podNames, nil
 }
