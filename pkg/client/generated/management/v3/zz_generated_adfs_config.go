@@ -19,6 +19,7 @@ const (
 	ADFSConfigFieldRemoved             = "removed"
 	ADFSConfigFieldSpCert              = "spCert"
 	ADFSConfigFieldSpKey               = "spKey"
+	ADFSConfigFieldStatus              = "status"
 	ADFSConfigFieldType                = "type"
 	ADFSConfigFieldUIDField            = "uidField"
 	ADFSConfigFieldUUID                = "uuid"
@@ -43,6 +44,7 @@ type ADFSConfig struct {
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	SpCert              string            `json:"spCert,omitempty" yaml:"spCert,omitempty"`
 	SpKey               string            `json:"spKey,omitempty" yaml:"spKey,omitempty"`
+	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UIDField            string            `json:"uidField,omitempty" yaml:"uidField,omitempty"`
 	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

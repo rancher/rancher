@@ -3,7 +3,7 @@ package machinerole
 import (
 	"context"
 
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +44,7 @@ func (h *handler) WorkerLabelSync(_ string, node *corev1.Node) (runtime.Object, 
 		return node, nil
 	}
 
-	secrets, err := h.secretsLister.List(machineNS, labels.SelectorFromSet(labels.Set{rke2.MachineNameLabel: machineName, rke2.WorkerRoleLabel: "true"}))
+	secrets, err := h.secretsLister.List(machineNS, labels.SelectorFromSet(labels.Set{capr.MachineNameLabel: machineName, capr.WorkerRoleLabel: "true"}))
 	if err != nil || len(secrets) == 0 {
 		return node, err
 	}

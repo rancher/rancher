@@ -15,7 +15,6 @@ type RKECommonNodeConfig struct {
 
 type RKEMachineStatus struct {
 	Conditions                []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	JobComplete               bool                                `json:"jobComplete,omitempty"`
 	JobName                   string                              `json:"jobName,omitempty"`
 	Ready                     bool                                `json:"ready,omitempty"`
 	DriverHash                string                              `json:"driverHash,omitempty"`
@@ -27,6 +26,7 @@ type RKEMachineStatus struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type CustomMachine struct {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
@@ -27,17 +27,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -115,7 +112,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
-	generic := &v32.GenericLogin{}
+	generic := &apiv3.GenericLogin{}
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
@@ -134,46 +131,46 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	var providerName string
 	switch request.Type {
 	case client.LocalProviderType:
-		input = &v32.BasicLogin{}
+		input = &apiv3.BasicLogin{}
 		providerName = local.Name
 	case client.GithubProviderType:
-		input = &v32.GithubLogin{}
+		input = &apiv3.GithubLogin{}
 		providerName = github.Name
 	case client.ActiveDirectoryProviderType:
-		input = &v32.BasicLogin{}
+		input = &apiv3.BasicLogin{}
 		providerName = activedirectory.Name
 	case client.AzureADProviderType:
-		input = &v32.AzureADLogin{}
+		input = &apiv3.AzureADLogin{}
 		providerName = azure.Name
 	case client.OpenLdapProviderType:
-		input = &v32.BasicLogin{}
+		input = &apiv3.BasicLogin{}
 		providerName = ldap.OpenLdapName
 	case client.FreeIpaProviderType:
-		input = &v32.BasicLogin{}
+		input = &apiv3.BasicLogin{}
 		providerName = ldap.FreeIpaName
 	case client.PingProviderType:
-		input = &v32.SamlLoginInput{}
+		input = &apiv3.SamlLoginInput{}
 		providerName = saml.PingName
 	case client.ADFSProviderType:
-		input = &v32.SamlLoginInput{}
+		input = &apiv3.SamlLoginInput{}
 		providerName = saml.ADFSName
 	case client.KeyCloakProviderType:
-		input = &v32.SamlLoginInput{}
+		input = &apiv3.SamlLoginInput{}
 		providerName = saml.KeyCloakName
 	case client.OKTAProviderType:
-		input = &v32.SamlLoginInput{}
+		input = &apiv3.SamlLoginInput{}
 		providerName = saml.OKTAName
 	case client.ShibbolethProviderType:
-		input = &v32.SamlLoginInput{}
+		input = &apiv3.SamlLoginInput{}
 		providerName = saml.ShibbolethName
 	case client.GoogleOAuthProviderType:
-		input = &v32.GoogleOauthLogin{}
+		input = &apiv3.GoogleOauthLogin{}
 		providerName = googleoauth.Name
 	case client.OIDCProviderType:
-		input = &v32.OIDCLogin{}
+		input = &apiv3.OIDCLogin{}
 		providerName = oidc.Name
 	case client.KeyCloakOIDCProviderType:
-		input = &v32.OIDCLogin{}
+		input = &apiv3.OIDCLogin{}
 		providerName = keycloakoidc.Name
 	default:
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
@@ -205,12 +202,48 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	if displayName == "" {
 		displayName = userPrincipal.LoginName
 	}
-	currUser, err := h.userMGR.EnsureUser(userPrincipal.Name, displayName)
-	if err != nil {
-		return v3.Token{}, "", "", err
+
+	var backoff = wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   2,
+		Jitter:   .2,
+		Steps:    5,
 	}
 
-	if currUser.Enabled != nil && !*currUser.Enabled {
+	var (
+		enabled  bool
+		currUser *v3.User
+	)
+
+	err = wait.ExponentialBackoffWithContext(ctx, backoff, func(_ context.Context) (bool, error) {
+		var err error
+
+		currUser, err = h.userMGR.EnsureUser(userPrincipal.Name, displayName)
+		if err != nil {
+			logrus.Warnf("Error creating or updating user for %s, retrying: %v", currUser.Name, err)
+			return false, nil
+		}
+
+		enabled = pointer.BoolDeref(currUser.Enabled, true)
+		if !enabled {
+			return true, nil
+		}
+
+		loginTime := time.Now()
+		userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+		err = h.tokenMGR.UserAttributeCreateOrUpdate(currUser.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
+		if err != nil {
+			logrus.Warnf("Error creating or updating userAttribute for %s, retrying: %v", currUser.Name, err)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return v3.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", currUser.Name, err)
+	}
+
+	if !enabled {
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
@@ -219,84 +252,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
-
-		if err := h.createClusterAuthTokenIfNeeded(token, tokenValue); err != nil {
-			return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError,
-				fmt.Sprintf("Failed to create cluster auth token for cluster [%s], cluster auth endpoint may fail: %v", token.ClusterName, err))
-		}
 		return *token, tokenValue, responseType, nil
 	}
 
-	userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
-
-	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description, userExtraInfo)
+	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
 	return rToken, unhashedTokenKey, responseType, err
-}
-
-// createClusterAuthTokenIfNeeded checks if local cluster auth endpoint is enabled. If it is, a cluster auth token
-// is created.
-func (h *loginHandler) createClusterAuthTokenIfNeeded(token *v3.Token, tokenValue string) error {
-	clusterID := token.ClusterName
-	if clusterID == "" {
-		// Cluster ID being empty is likely because cluster auth endpoint is not being used.
-		// Custer auth token is not necessary in the aforementioned scenario.
-		return nil
-	}
-	cluster, err := h.clusterLister.Get("", clusterID)
-	if err != nil {
-		return err
-	}
-
-	if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-		return nil
-	}
-	clusterConfig, err := clustermanager.ToRESTConfig(cluster, h.scaledContext, h.secretLister)
-	if err != nil {
-		return err
-	}
-
-	clusterContext, err := config.NewUserContext(h.scaledContext, *clusterConfig, clusterID)
-	if err != nil {
-		return err
-	}
-
-	clusterAuthToken, err := common.NewClusterAuthToken(token, tokenValue)
-	if err != nil {
-		return err
-	}
-
-	_, err = clusterContext.Cluster.ClusterAuthTokens("").Controller().Lister().Get("cattle-system", clusterAuthToken.Name)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	if err == nil {
-		err = clusterContext.Cluster.ClusterAuthTokens("cattle-system").Delete(clusterAuthToken.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				return err
-			}
-		}
-	}
-
-	var backoff = wait.Backoff{
-		Duration: 100 * time.Millisecond,
-		Factor:   1,
-		Jitter:   0,
-		Steps:    7,
-	}
-
-	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if _, err := clusterContext.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
-			if errors.IsAlreadyExists(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	})
-
-	return err
 }

@@ -92,8 +92,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 	if err := creator.addCustomDriver(
 		"oraclecontainerengine",
-		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.7.1/kontainer-engine-driver-oke-linux",
-		"5a708bfc01c67558adc887258615900082263ca7d6f4160efb1a58501b0cc608",
+		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.8.3/kontainer-engine-driver-oke-linux",
+		"7bfde567e6d478f1da8d36531f765d348bff1cd3abe83c70ddf7766f46112170",
 		"",
 		false,
 		"*.oraclecloud.com",
@@ -102,8 +102,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 	if err := creator.addCustomDriver(
 		"linodekubernetesengine",
-		"https://github.com/linode/kontainer-engine-driver-lke/releases/download/v0.0.6/kontainer-engine-driver-lke-linux-amd64",
-		"233cbd550a93ded322906b9fc6ebc88b8791e53d31f0d21d501feb0bad77461c",
+		"https://github.com/linode/kontainer-engine-driver-lke/releases/download/v0.0.9/kontainer-engine-driver-lke-linux-amd64",
+		"f489f3b354280f8a2859945de27c76b0a70a888976d4cebcb58a30fe161f4b97",
 		"",
 		false,
 		"api.linode.com",

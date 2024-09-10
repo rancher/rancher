@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	app2 "github.com/rancher/rancher/pkg/app"
-
+	"github.com/coreos/go-semver/semver"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-
-	"github.com/coreos/go-semver/semver"
+	app2 "github.com/rancher/rancher/pkg/app"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
@@ -19,6 +17,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+const (
+	// PSPAnswersField is passed to the helm --set command and denotes if we want to enable PodSecurityPolicies
+	// when deploying the app, overriding the default value of 'true'.
+	// In clusters >= 1.25 PSP's are not available, however we should
+	// continue to deploy them in sub 1.25 clusters as they are required for cluster hardening.
+	PSPAnswersField = "global.cattle.psp.enabled"
 )
 
 func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
@@ -53,6 +59,8 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		return cluster, nil
 	}
 
+	// Check if the cluster is undergoing a Kubernetes version upgrade, and that
+	// all downstream nodes also need the upgrade
 	isNewer, err := IsNewerVersion(cluster.Status.Version.GitVersion, updateVersion)
 	if err != nil {
 		return cluster, err
@@ -73,6 +81,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		}
 
 	}
+
 	// set cluster upgrading status
 	cluster, err = h.modifyClusterCondition(cluster, planv1.Plan{}, planv1.Plan{}, strategy)
 	if err != nil {
@@ -80,7 +89,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	}
 
 	// create or update k3supgradecontroller if necessary
-	if err = h.deployK3sBasedUpgradeController(cluster.Name, isK3s, isRke2); err != nil {
+	if err = h.deployK3sBasedUpgradeController(cluster.Name, updateVersion, isK3s, isRke2); err != nil {
 		return cluster, err
 	}
 
@@ -94,7 +103,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 
 // deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
-func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isRke2 bool) error {
+func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion string, isK3s, isRke2 bool) error {
 	userCtx, err := h.manager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
@@ -130,6 +139,18 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 		return err
 	}
 
+	// determine what version of Kubernetes we are updating to
+	is125OrAbove, err := Is125OrAbove(updateVersion)
+	if err != nil {
+		return err
+	}
+
+	// if we are using a version above or equal to 1.25 we need to explicitly disable PSPs
+	enablePSPInChart := "false"
+	if !is125OrAbove {
+		enablePSPInChart = "true"
+	}
+
 	appLister := userCtx.Management.Project.Apps("").Controller().Lister()
 	appClient := userCtx.Management.Project.Apps("")
 
@@ -158,9 +179,12 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 				Description:     "Upgrade controller for k3s based clusters",
 				ExternalID:      latestVersionID,
 				ProjectName:     appProjectName,
+				Answers:         make(map[string]string),
 				TargetNamespace: systemUpgradeNS,
 			},
 		}
+
+		desiredApp.Spec.Answers[PSPAnswersField] = enablePSPInChart
 
 		// k3s upgrader doesn't exist yet, so it will need to be created
 		if _, err = appClient.Create(desiredApp); err != nil {
@@ -177,13 +201,24 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 			}
 		}
 
-		if app.Spec.ExternalID == latestVersionID {
-			// app is up to date, no action needed
+		externalIDIsCorrect := app.Spec.ExternalID == latestVersionID
+		pspValuesHaveBeenSet := false
+		if app.Spec.Answers != nil {
+			pspValuesHaveBeenSet = app.Spec.Answers[PSPAnswersField] == enablePSPInChart
+		}
+
+		// everything is up-to-date and PSP attributes are set up properly, no need to update.
+		if externalIDIsCorrect && pspValuesHaveBeenSet {
 			return nil
 		}
+
 		desiredApp := app.DeepCopy()
+		if desiredApp.Spec.Answers == nil {
+			desiredApp.Spec.Answers = make(map[string]string)
+		}
+		desiredApp.Spec.Answers[PSPAnswersField] = enablePSPInChart
 		desiredApp.Spec.ExternalID = latestVersionID
-		// new version of k3s upgrade available, update app
+		// new version of k3s upgrade available, or the valuesYaml have changed, update app
 		if _, err = appClient.Update(desiredApp); err != nil {
 			return err
 		}
@@ -192,7 +227,13 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 	return nil
 }
 
-// isNewerVersion returns true if updated versions semver is newer and false if its
+// Is125OrAbove determines if a particular Kubernetes version is
+// equal to or greater than 1.25.0
+func Is125OrAbove(version string) (bool, error) {
+	return IsNewerVersion("v1.24.99", version)
+}
+
+// IsNewerVersion returns true if updated versions semver is newer and false if its
 // semver is older. If semver is equal then metadata is alphanumerically compared.
 func IsNewerVersion(prevVersion, updatedVersion string) (bool, error) {
 	parseErrMsg := "failed to parse version: %v"
@@ -238,10 +279,5 @@ func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster, version string) (bool, e
 }
 
 func checkDeployed(app *v33.App) bool {
-
-	if v33.AppConditionDeployed.IsTrue(app) || v33.AppConditionInstalled.IsTrue(app) {
-		return true
-	}
-
-	return false
+	return v33.AppConditionDeployed.IsTrue(app) || v33.AppConditionInstalled.IsTrue(app)
 }

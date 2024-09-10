@@ -197,13 +197,13 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.volumes
 - it: should not create custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.volumes
 - it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim
   set:
@@ -323,13 +323,13 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.containers[0].volumeMounts
 - it: should not mount custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.containers[0].volumeMounts
 - it: should set priorityClassName=system-node-critical
   set:
@@ -342,7 +342,7 @@ tests:
   set:
     priorityClassName: ""
   asserts:
-    - isNull:
+    - isNullOrEmpty:
         path: spec.template.spec.priorityClassName
 - it: should default priorityClassName="rancher-critical"
   asserts:
@@ -397,3 +397,39 @@ tests:
     - equal:
         path: spec.template.spec.containers[0].readinessProbe.periodSeconds
         value: 60
+- it: should set startupProbe periodSeconds to 60
+  set:
+    startupProbe.periodSeconds: 60
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.periodSeconds
+        value: 60
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.failureThreshold
+        value: 1
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.httpGet.port
+        value: 80
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.httpGet.path
+        value: /healthz
+- it: should set startupProbe failureThreshold to 10
+  set:
+    startupProbe.failureThreshold: 10
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.periodSeconds
+        value: 30
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.failureThreshold
+        value: 10
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.httpGet.port
+        value: 80
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.httpGet.path
+        value: /healthz
+- it: should not have startupProbe if no startupProbe fields set
+  asserts:
+    - isNull:
+        path: spec.template.spec.containers[0].startupProbe

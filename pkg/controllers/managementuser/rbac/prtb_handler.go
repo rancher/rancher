@@ -3,6 +3,7 @@ package rbac
 import (
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -161,7 +162,11 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 }
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
-	_, err := p.m.reconcileProjectAccessToGlobalResources(binding, rts)
+	roles, err := p.m.ensureGlobalResourcesRolesForPRTB(parseProjectName(binding.ProjectName), rts)
+	if err != nil {
+		return err
+	}
+	_, err = p.m.reconcileProjectAccessToGlobalResources(binding, roles)
 	if err != nil {
 		return err
 	}
@@ -277,7 +282,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 
 // Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rules for the given resource and verbs
 func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
-	clusterRoles := m.workload.RBAC.ClusterRoles("")
+	clusterRoles := m.clusterRoles
 	roleName := rt.Name + "-promoted"
 	if role, err := m.crLister.Get("", roleName); err == nil && role != nil {
 		currentVerbs := map[string]bool{}
@@ -389,7 +394,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 	if err != nil {
 		return err
 	}
-	reqNsAndNameLabel, err := labels.NewRequirement(binding.Namespace+"_"+binding.Name, selection.DoesNotExist, []string{})
+	reqNsAndNameLabel, err := labels.NewRequirement(pkgrbac.GetRTBLabel(binding.ObjectMeta), selection.DoesNotExist, []string{})
 	if err != nil {
 		return err
 	}
@@ -464,4 +469,12 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 		return err
 	})
 	return retryErr
+}
+
+func parseProjectName(id string) string {
+	parts := strings.SplitN(id, ":", 2)
+	if len(parts) != 2 || len(parts[1]) == 0 {
+		return ""
+	}
+	return parts[1]
 }

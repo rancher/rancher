@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
+	"github.com/rancher/rancher/pkg/features"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -720,13 +721,17 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string, apiGroup string) (map[string]string, error) {
 	var rules []v1.PolicyRule
 	if role.External {
-		externalRole, err := m.crLister.Get("", role.Name)
-		if err != nil && !apierrors.IsNotFound(err) {
-			// dont error if it doesnt exist
-			return nil, err
-		}
-		if externalRole != nil {
-			rules = externalRole.Rules
+		if features.ExternalRules.Enabled() && role.ExternalRules != nil {
+			rules = append(rules, role.ExternalRules...)
+		} else {
+			externalRole, err := m.crLister.Get("", role.Name)
+			if err != nil && !apierrors.IsNotFound(err) {
+				// dont error if it doesnt exist
+				return nil, err
+			}
+			if externalRole != nil {
+				rules = externalRole.Rules
+			}
 		}
 	} else {
 		rules = role.Rules
@@ -903,12 +908,12 @@ func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext str
 	return isOwnerRole, nil
 }
 
-func getLabelRequirements(bindingNamespace, bindingName string) ([]labels.Requirement, error) {
+func getLabelRequirements(objMeta metav1.ObjectMeta) ([]labels.Requirement, error) {
 	reqUpdatedLabel, err := labels.NewRequirement(rtbLabelUpdated, selection.DoesNotExist, []string{})
 	if err != nil {
 		return []labels.Requirement{}, err
 	}
-	reqNsAndNameLabel, err := labels.NewRequirement(bindingNamespace+"_"+bindingName, selection.DoesNotExist, []string{})
+	reqNsAndNameLabel, err := labels.NewRequirement(pkgrbac.GetRTBLabel(objMeta), selection.DoesNotExist, []string{})
 	if err != nil {
 		return []labels.Requirement{}, err
 	}

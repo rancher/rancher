@@ -53,10 +53,10 @@ const (
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
 	ClusterConditionNoMemoryPressure condition.Cond = "NoMemoryPressure"
-	// ClusterConditionconditionDefaultProjectCreated true when default project has been created
-	ClusterConditionconditionDefaultProjectCreated condition.Cond = "DefaultProjectCreated"
-	// ClusterConditionconditionSystemProjectCreated true when system project has been created
-	ClusterConditionconditionSystemProjectCreated condition.Cond = "SystemProjectCreated"
+	// ClusterConditionDefaultProjectCreated true when default project has been created
+	ClusterConditionDefaultProjectCreated condition.Cond = "DefaultProjectCreated"
+	// ClusterConditionSystemProjectCreated true when system project has been created
+	ClusterConditionSystemProjectCreated condition.Cond = "SystemProjectCreated"
 	// Deprecated: ClusterConditionDefaultNamespaceAssigned true when cluster's default namespace has been initially assigned
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// Deprecated: ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to
@@ -74,6 +74,8 @@ const (
 	ClusterConditionSecretsMigrated                      condition.Cond = "SecretsMigrated"
 	ClusterConditionServiceAccountSecretsMigrated        condition.Cond = "ServiceAccountSecretsMigrated"
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
+	ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
+	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -91,6 +93,7 @@ const (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -123,6 +126,14 @@ type ClusterSpecBase struct {
 	WindowsPreferedCluster                               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
 	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
 	ClusterSecrets                                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
+	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization           `json:"clusterAgentDeploymentCustomization,omitempty"`
+	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization           `json:"fleetAgentDeploymentCustomization,omitempty"`
+}
+
+type AgentDeploymentCustomization struct {
+	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
+	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
 }
 
 type ClusterSpec struct {
@@ -197,6 +208,8 @@ type ClusterStatus struct {
 	OpenStackSecret                      string                    `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.OpenStackSecret instead
 	AADClientSecret                      string                    `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.AADClientSecret instead
 	AADClientCertSecret                  string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
+
+	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
 }
 
 type ClusterComponentStatus struct {
@@ -242,6 +255,7 @@ func (m *MapStringInterface) DeepCopy() *MapStringInterface {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterRegistrationToken struct {
@@ -402,15 +416,22 @@ type GKEStatus struct {
 }
 
 type ClusterSecrets struct {
-	PrivateRegistrySecret string `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
-	PrivateRegistryURL    string `json:"privateRegistryURL,omitempty" norman:"nocreate,noupdate"`
-	S3CredentialSecret    string `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
-	WeavePasswordSecret   string `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
-	VsphereSecret         string `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
-	VirtualCenterSecret   string `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
-	OpenStackSecret       string `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientSecret       string `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientCertSecret   string `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistrySecret            string `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistryURL               string `json:"privateRegistryURL,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret               string `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret              string `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
+	VsphereSecret                    string `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
+	VirtualCenterSecret              string `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
+	OpenStackSecret                  string `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientSecret                  string `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientCertSecret              string `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	ACIAPICUserKeySecret             string `json:"aciAPICUserKeySecret,omitempty" norman:"nocreate,noupdate"`
+	ACITokenSecret                   string `json:"aciTokenSecret,omitempty" norman:"nocreate,noupdate"`
+	ACIKafkaClientKeySecret          string `json:"aciKafkaClientKeySecret,omitempty" norman:"nocreate,noupdate"`
+	SecretsEncryptionProvidersSecret string `json:"secretsEncryptionProvidersSecret,omitempty" norman:"nocreate,noupdate"`
+	BastionHostSSHKeySecret          string `json:"bastionHostSSHKeySecret,omitempty" norman:"nocreate,noupdate"`
+	KubeletExtraEnvSecret            string `json:"kubeletExtraEnvSecret,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistryECRSecret         string `json:"privateRegistryECRSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 // GetSecret gets a reference to a secret by its field name, either from the ClusterSecrets field or the Status field.

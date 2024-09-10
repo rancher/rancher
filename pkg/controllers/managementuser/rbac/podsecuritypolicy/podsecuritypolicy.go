@@ -39,12 +39,12 @@ func (p *pspHandler) sync(key string, obj *v1beta1.PodSecurityPolicy) (runtime.O
 		return obj, nil
 	}
 
-	err := checkClusterVersion(p.clusterName, p.clusterLister)
+	err := CheckClusterVersion(p.clusterName, p.clusterLister)
 	if err != nil {
-		if errors.Is(err, errVersionIncompatible) {
+		if errors.Is(err, ErrClusterVersionIncompatible) {
 			return obj, nil
 		}
-		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+		return obj, fmt.Errorf("error checking cluster version for PodSecurityPolicy controller: %w", err)
 	}
 
 	if templateID, ok := obj.Annotations[podSecurityPolicyTemplateParentAnnotation]; ok {

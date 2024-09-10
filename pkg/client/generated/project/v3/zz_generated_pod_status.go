@@ -14,6 +14,7 @@ const (
 	PodStatusFieldPodIp                      = "podIp"
 	PodStatusFieldQOSClass                   = "qosClass"
 	PodStatusFieldReason                     = "reason"
+	PodStatusFieldResize                     = "resize"
 	PodStatusFieldStartTime                  = "startTime"
 )
 
@@ -30,5 +31,6 @@ type PodStatus struct {
 	PodIp                      string            `json:"podIp,omitempty" yaml:"podIp,omitempty"`
 	QOSClass                   string            `json:"qosClass,omitempty" yaml:"qosClass,omitempty"`
 	Reason                     string            `json:"reason,omitempty" yaml:"reason,omitempty"`
+	Resize                     string            `json:"resize,omitempty" yaml:"resize,omitempty"`
 	StartTime                  string            `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 }

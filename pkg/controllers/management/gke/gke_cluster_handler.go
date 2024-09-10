@@ -203,6 +203,10 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 					if err != nil {
 						return cluster, err
 					}
+					if secret == nil {
+						logrus.Debugf("Empty service account token secret returned for cluster [%s]", cluster.Name)
+						return cluster, fmt.Errorf("failed to create or update service account token secret, secret can't be empty")
+					}
 					cluster.Status.ServiceAccountTokenSecret = secret.Name
 					cluster.Status.ServiceAccountToken = ""
 				}
@@ -346,7 +350,7 @@ func (e *gkeOperatorController) updateGKEClusterConfig(cluster *mgmtv3.Cluster, 
 
 // generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is then copied to the cluster status.
 func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name, true)
 	if err != nil {
 		return cluster, err
 	}

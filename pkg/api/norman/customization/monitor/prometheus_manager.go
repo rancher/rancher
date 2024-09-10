@@ -40,7 +40,7 @@ func NewPrometheusQuery(ctx context.Context, clusterName, authToken, svcNamespac
 		return nil, fmt.Errorf("failed to pick endpoint address")
 	}
 
-	dial, err := dialerFactory.ClusterDialer(clusterName)
+	dial, err := dialerFactory.ClusterDialer(clusterName, true)
 	if err != nil {
 		return nil, fmt.Errorf("get dail from usercontext failed, %v", err)
 	}

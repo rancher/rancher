@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 )
 
-func gatherIngressEndpoints(ingressEps []v1.LoadBalancerIngress) []string {
+func gatherIngressEndpoints(ingressEps []networkingv1.IngressLoadBalancerIngress) []string {
 	var endpoints []string
 	for _, ep := range ingressEps {
 		if ep.IP != "" {

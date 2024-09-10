@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base32"
@@ -12,6 +13,8 @@ import (
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -20,6 +23,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,9 +33,8 @@ import (
 )
 
 const (
-	userIDLabel     = "authn.management.cattle.io/token-userId"
-	tokenKindLabel  = "authn.management.cattle.io/kind"
-	tokenHashedAnno = "authn.management.cattle.io/token-hashed"
+	userIDLabel    = "authn.management.cattle.io/token-userId"
+	tokenKindLabel = "authn.management.cattle.io/kind"
 
 	hashFormat = "$%d:%s:%s" // $version:salt:hash -> $1:abc:def
 	Version    = 2
@@ -41,6 +44,7 @@ type Manager struct {
 	deploymentCache  appcontroller.DeploymentCache
 	daemonsetCache   appcontroller.DaemonSetCache
 	tokens           mgmtcontrollers.TokenClient
+	tokensCache      mgmtcontrollers.TokenCache
 	userCache        mgmtcontrollers.UserCache
 	users            mgmtcontrollers.UserClient
 	secretCache      corecontrollers.SecretCache
@@ -53,6 +57,7 @@ func New(clients *wrangler.Context) *Manager {
 		deploymentCache: clients.Apps.Deployment().Cache(),
 		daemonsetCache:  clients.Apps.DaemonSet().Cache(),
 		tokens:          clients.Mgmt.Token(),
+		tokensCache:     clients.Mgmt.Token().Cache(),
 		userCache:       clients.Mgmt.User().Cache(),
 		users:           clients.Mgmt.User(),
 		secretCache:     clients.Core.Secret().Cache(),
@@ -84,9 +89,24 @@ func (m *Manager) getToken(clusterNamespace, clusterName string) (string, error)
 	return m.createUserToken(userName)
 }
 
-func (m *Manager) EnsureUser(clusterNamespace, clusterName string) (string, error) {
+// getCachedToken retrieves the token for a given cluster without manipulating the token itself. This function is
+// primary to ensure the kubeconfig for a cluster remains valid.
+func (m *Manager) getCachedToken(clusterNamespace, clusterName string) (string, *v3.Token, error) {
+	_, userName := getPrincipalAndUserName(clusterNamespace, clusterName)
+	token, err := m.tokensCache.Get(userName)
+	if err != nil {
+		return "", nil, err
+	}
+	return userName, token, nil
+}
+
+func getPrincipalAndUserName(clusterNamespace, clusterName string) (string, string) {
 	principalID := getPrincipalID(clusterNamespace, clusterName)
-	userName := getUserNameForPrincipal(principalID)
+	return principalID, getUserNameForPrincipal(principalID)
+}
+
+func (m *Manager) EnsureUser(clusterNamespace, clusterName string) (string, error) {
+	principalID, userName := getPrincipalAndUserName(clusterNamespace, clusterName)
 	return userName, m.createUser(principalID, userName)
 }
 
@@ -188,12 +208,10 @@ func (m *Manager) createUserToken(userName string) (string, error) {
 	}
 
 	if features.TokenHashing.Enabled() {
-		tokenHash, err := createSHA256Hash(tokenValue)
+		err := tokens.ConvertTokenKeyToHash(token)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("unable to hash token: %w", err)
 		}
-		token.Token = tokenHash
-		token.Annotations[tokenHashedAnno] = "true"
 	}
 
 	_, err = m.tokens.Create(token)
@@ -230,10 +248,66 @@ func (m *Manager) GetCRTBForClusterOwner(cluster *v1.Cluster, status v1.ClusterS
 	}, nil
 }
 
+// kubeConfigValid accepts a kubeconfig and corresponding data, and validates that the kubeconfig is valid for the
+// cluster in question. It returns two booleans, the first of which is whether an error occurred parsing the kubeconfig
+// or retrieving information related to the kubeconfig, and the second which indicates whether the kubeconfig is valid.
+func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentServerURL, currentServerCA, currentManagementClusterName string) (bool, bool) {
+	if len(kcData) == 0 {
+		return true, false
+	}
+	kc, err := clientcmd.Load(kcData)
+	if err != nil {
+		logrus.Errorf("error while loading kubeconfig in kubeconfigmanager for validation: %v", err)
+		return true, false
+	}
+	var serverURL, managementCluster string
+	splitServer := strings.Split(kc.Clusters["cluster"].Server, "/k8s/clusters/")
+	if len(splitServer) != 2 {
+		return true, false
+	}
+
+	serverURL = splitServer[0]
+	managementCluster = splitServer[1]
+	logrus.Tracef("[kubeconfigmanager] cluster %s/%s: parsed serverURL: %s and managementServer: %s from existing kubeconfig", cluster.Namespace, cluster.Name, serverURL, managementCluster)
+
+	userName, token, err := m.getCachedToken(cluster.Namespace, cluster.Name)
+	if err != nil {
+		logrus.Errorf("error while retrieving cached token in kubeconfigmanager for validation: %v", err)
+		return true, false
+	}
+
+	tokenMatches := fmt.Sprintf("%s:%s", userName, token.Token) == kc.AuthInfos["user"].Token
+	if token.Annotations[tokens.TokenHashed] == "true" {
+		// if tokenHashing is enabled, the stored token will be hashed. So we instead make sure it's up-to-date by checking if the token is valid for the hash
+		hasher, err := hashers.GetHasherForHash(token.Token)
+		if err != nil {
+			logrus.Errorf("[kubeconfigmanager] error when retrieving hasher for token hash, %s", err.Error())
+			return true, false
+		}
+		_, tokenKey := tokens.SplitTokenParts(kc.AuthInfos["user"].Token)
+		err = hasher.VerifyHash(token.Token, tokenKey)
+		tokenMatches = err == nil
+	}
+
+	if serverURL != currentServerURL || !bytes.Equal([]byte(strings.TrimSpace(currentServerCA)), kc.Clusters["cluster"].CertificateAuthorityData) || managementCluster != currentManagementClusterName || !tokenMatches {
+		logrus.Tracef("[kubeconfigmanager] cluster %s/%s: kubeconfig secret failed validation, did not match provided data", cluster.Namespace, cluster.Name)
+		return false, false
+	}
+	logrus.Tracef("[kubeconfigmanager] cluster %s/%s: kubeconfig secret passed validation", cluster.Namespace, cluster.Name)
+	return false, true
+}
+
 func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementClusterName string) (map[string][]byte, error) {
+	serverURL, cacert := settings.InternalServerURL.Get(), settings.InternalCACerts.Get()
+	if serverURL == "" {
+		return nil, errors.New("server url is missing, can't generate kubeconfig for fleet import cluster")
+	}
+
 	secret, err := m.secretCache.Get(cluster.Namespace, secretName)
 	if err == nil {
-		if secret.Data == nil || secret.Data["token"] == nil || len(secret.OwnerReferences) == 0 {
+		retrievalError, isValid := m.kubeConfigValid(secret.Data["value"], cluster, serverURL, cacert, managementClusterName)
+		if (!retrievalError && !isValid) || secret.Data == nil || secret.Data["token"] == nil || len(secret.OwnerReferences) == 0 {
+			logrus.Infof("[kubeconfigmanager] deleting kubeconfig secret for cluster %s/%s", cluster.Namespace, cluster.Name)
 			// Check if we require a new secret based on the token value and annotation(s). We delete the old secret since it may contain
 			// annotations, owner references, etc. that are out of date. We will then continue to create the new secret.
 			if err := m.secrets.Delete(cluster.Namespace, secretName, &metav1.DeleteOptions{}); err != nil && !apierror.IsNotFound(err) {
@@ -258,11 +332,6 @@ func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementC
 	tokenValue, err := m.getToken(cluster.Namespace, cluster.Name)
 	if err != nil {
 		return nil, err
-	}
-
-	serverURL, cacert := settings.InternalServerURL.Get(), settings.InternalCACerts.Get()
-	if serverURL == "" {
-		return nil, errors.New("server url is missing, can't generate kubeconfig for fleet import cluster")
 	}
 
 	data, err := clientcmd.Write(clientcmdapi.Config{

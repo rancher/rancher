@@ -35,6 +35,7 @@ const (
 	StatefulSetFieldNamespaceId                          = "namespaceId"
 	StatefulSetFieldNodeID                               = "nodeId"
 	StatefulSetFieldOS                                   = "os"
+	StatefulSetFieldOrdinals                             = "ordinals"
 	StatefulSetFieldOverhead                             = "overhead"
 	StatefulSetFieldOwnerReferences                      = "ownerReferences"
 	StatefulSetFieldPersistentVolumeClaimRetentionPolicy = "persistentVolumeClaimRetentionPolicy"
@@ -43,12 +44,14 @@ const (
 	StatefulSetFieldPublicEndpoints                      = "publicEndpoints"
 	StatefulSetFieldReadinessGates                       = "readinessGates"
 	StatefulSetFieldRemoved                              = "removed"
+	StatefulSetFieldResourceClaims                       = "resourceClaims"
 	StatefulSetFieldRestartPolicy                        = "restartPolicy"
 	StatefulSetFieldRunAsGroup                           = "runAsGroup"
 	StatefulSetFieldRunAsNonRoot                         = "runAsNonRoot"
 	StatefulSetFieldRuntimeClassName                     = "runtimeClassName"
 	StatefulSetFieldScale                                = "scale"
 	StatefulSetFieldScheduling                           = "scheduling"
+	StatefulSetFieldSchedulingGates                      = "schedulingGates"
 	StatefulSetFieldSeccompProfile                       = "seccompProfile"
 	StatefulSetFieldSelector                             = "selector"
 	StatefulSetFieldServiceAccountName                   = "serviceAccountName"
@@ -101,6 +104,7 @@ type StatefulSet struct {
 	NamespaceId                          string                                           `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                               string                                           `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                                   *PodOS                                           `json:"os,omitempty" yaml:"os,omitempty"`
+	Ordinals                             *StatefulSetOrdinals                             `json:"ordinals,omitempty" yaml:"ordinals,omitempty"`
 	Overhead                             map[string]string                                `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences                      []OwnerReference                                 `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" yaml:"persistentVolumeClaimRetentionPolicy,omitempty"`
@@ -109,12 +113,14 @@ type StatefulSet struct {
 	PublicEndpoints                      []PublicEndpoint                                 `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	ReadinessGates                       []PodReadinessGate                               `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	Removed                              string                                           `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ResourceClaims                       []PodResourceClaim                               `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
 	RestartPolicy                        string                                           `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                           *int64                                           `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                         *bool                                            `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName                     string                                           `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scale                                *int64                                           `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                           *Scheduling                                      `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	SchedulingGates                      []PodSchedulingGate                              `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
 	SeccompProfile                       *SeccompProfile                                  `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                             *LabelSelector                                   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName                   string                                           `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`

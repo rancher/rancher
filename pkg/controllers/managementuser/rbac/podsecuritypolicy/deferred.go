@@ -3,6 +3,7 @@ package podsecuritypolicy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -17,15 +18,15 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		clusterName := userContext.ClusterName
 		logrus.Infof("Checking cluster [%s] compatibility before registering podsecuritypolicy controllers.", clusterName)
 		clusterLister := userContext.Management.Management.Clusters("").Controller().Lister()
-		err := checkClusterVersion(clusterName, clusterLister)
+		err := CheckClusterVersion(clusterName, clusterLister)
 		if err != nil {
-			if errors.Is(err, errVersionIncompatible) {
-				logrus.Errorf("%v - will not register podsecuritypolicy controllers for cluster [%s].", err, clusterName)
+			if errors.Is(err, ErrClusterVersionIncompatible) {
+				logrus.Infof("%v - will not register podsecuritypolicy controllers for cluster [%s].", err, clusterName)
 				return nil
 			}
-			return err
+			return fmt.Errorf("unable to parse version of cluster %s: %w", clusterName, err)
 		}
-		logrus.Infof("cluster [%s] compatibility for podsecuritypolicy controllers check succeeded.", clusterName)
+		logrus.Infof("Cluster [%s] is compatible with PSPs, will run PSP controllers.", clusterName)
 		registerDeferred(ctx, userContext)
 		return nil
 	})

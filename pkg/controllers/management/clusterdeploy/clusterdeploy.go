@@ -12,17 +12,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/fleet"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -44,11 +43,13 @@ const (
 	clusterImage        = "clusterImage"
 )
 
+var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
+
 var (
 	agentImagesMutex sync.RWMutex
 	agentImages      = map[string]map[string]string{
-		nodeImage:    map[string]string{},
-		clusterImage: map[string]string{},
+		nodeImage:    {},
+		clusterImage: {},
 	}
 	controlPlaneTaintsMutex sync.RWMutex
 	controlPlaneTaints      = make(map[string][]corev1.Taint)
@@ -68,6 +69,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 		secretLister:         management.Core.Secrets("").Controller().Lister(),
+		ctx:                  ctx,
 	}
 
 	management.Management.Clusters("").AddHandler(ctx, "cluster-deploy", c.sync)
@@ -81,9 +83,10 @@ type clusterDeploy struct {
 	mgmt                 *config.ManagementContext
 	nodeLister           v3.NodeLister
 	secretLister         v1.SecretLister
+	ctx                  context.Context
 }
 
-func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
 	logrus.Tracef("clusterDeploy: sync called for key [%s]", key)
 	var (
 		err, updateErr error
@@ -100,7 +103,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	original := cluster
 	cluster = original.DeepCopy()
 
-	if cluster.Status.Driver == v32.ClusterDriverRKE {
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
 		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
 		} else {
@@ -121,12 +124,24 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	return nil, updateErr
 }
 
-func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 	logrus.Tracef("clusterDeploy: doSync called for cluster [%s]", cluster.Name)
 
-	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
 		return nil
+	}
+
+	// Skip further work if the cluster's API is not reachable according to HealthSyncer criteria
+	// Note that we don't check the cluster's ClusterConditionReady status here, as HealthSyncer is not running
+	// prior deployment of the cluster agent
+	uc, err := cd.clusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
+	if err != nil {
+		return err
+	}
+	if err := healthsyncer.IsAPIUp(cd.ctx, uc.K8sClient.CoreV1().Namespaces()); err != nil {
+		logrus.Tracef("clusterDeploy: doSync: cannot connect to API for cluster [%s]", cluster.Name)
+		return ErrCantConnectToAPI
 	}
 
 	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
@@ -139,7 +154,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	_, err = v32.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err = apimgmtv3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
@@ -186,9 +201,9 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	return false
 }
 
-func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
+func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
-	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
@@ -198,7 +213,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
 			if len(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
-				desiredRepo := util.GetPrivateRepo(cluster)
+				desiredRepo := util.GetPrivateRegistry(cluster)
 				appliedRepo := &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
 
 				if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
@@ -210,6 +225,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 			}
 		}
 	}
+
 	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
 			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
@@ -221,7 +237,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	}
 
 	na, ca := getAgentImages(cluster.Name)
-	if (cluster.Status.AgentImage != na && cluster.Status.Driver == v32.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
+	if (cluster.Status.AgentImage != na && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
 			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
@@ -230,8 +246,8 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	}
 
 	// Taints/tolerations
-	// Current taints are cached for comparison
-	currentTaints := getCachedTaints(cluster.Name)
+	// Current control plane taints are cached for comparison
+	currentTaints := getCachedControlPlaneTaints(cluster.Name)
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] currentTaints: [%v]", cluster.Name, currentTaints)
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] desiredTaints: [%v]", cluster.Name, desiredTaints)
 	toAdd, toDelete := taints.GetToDiffTaints(currentTaints, desiredTaints)
@@ -248,20 +264,17 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 		return true
 	}
 
+	if !reflect.DeepEqual(cluster.Spec.ClusterAgentDeploymentCustomization, cluster.Status.AppliedClusterAgentDeploymentCustomization) {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent customization mismatch for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedClusterAgentDeploymentCustomization, cluster.Spec.ClusterAgentDeploymentCustomization)
+		return true
+	}
+
 	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
 }
 
-func getDesiredImage(cluster *v3.Cluster) string {
-	if cluster.Spec.AgentImageOverride != "" {
-		return cluster.Spec.AgentImageOverride
-	}
-
-	return cluster.Spec.DesiredAgentImage
-}
-
-func (cd *clusterDeploy) getDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+func (cd *clusterDeploy) getDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	return map[string]bool{
 		features.MCM.Name():                false,
 		features.MCMAgent.Name():           true,
@@ -273,7 +286,7 @@ func (cd *clusterDeploy) getDesiredFeatures(cluster *v3.Cluster) map[string]bool
 	}
 }
 
-func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
 	}
@@ -290,11 +303,6 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
 
-	privateRegistrySecretData, err := cd.getPrivateRegistrySecretData(cluster)
-	if err != nil {
-		return err
-	}
-
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
 		return nil
 	}
@@ -309,8 +317,8 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		}
 	}()
 
-	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, privateRegistrySecretData)
+	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
 		if err != nil {
 			return cluster, err
 		}
@@ -331,7 +339,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		if err != nil {
 			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Error while applying agent YAML, it will be retried automatically")
 		}
-		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
@@ -344,7 +352,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
-		if cluster.Status.Driver != v32.ClusterDriverRKE {
+		if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE {
 			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
 				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
 				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
@@ -369,9 +377,9 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Timeout waiting rollout agent daemonset")
 			}
 			logrus.Debugf("clusterDeploy: deployAgent: successfully rollout agent daemonset for cluster [%s]", cluster.Name)
-			v32.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
+			apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
 		}
-		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
 		return err
@@ -396,10 +404,12 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
 
+	cluster.Status.AppliedClusterAgentDeploymentCustomization = cluster.Spec.ClusterAgentDeploymentCustomization
+
 	return nil
 }
 
-func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.EnableNetworkPolicy != nil {
 		return nil
 	}
@@ -413,7 +423,7 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 	return nil
 }
 
-func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, string, error) {
+func (cd *clusterDeploy) getKubeConfig(cluster *apimgmtv3.Cluster) (*clientcmdapi.Config, string, error) {
 	logrus.Tracef("clusterDeploy: getKubeConfig called for cluster [%s]", cluster.Name)
 	systemUser, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
@@ -430,7 +440,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries map[string][]byte) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
@@ -449,7 +459,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url, cluster.Spec.WindowsPreferedCluster,
-		cluster, features, taints, privateRegistries)
+		cluster, features, taints, cd.secretLister)
 
 	return buf.Bytes(), err
 }
@@ -518,45 +528,6 @@ func (cd *clusterDeploy) cacheAgentImages(name string) error {
 	return nil
 }
 
-// getPrivateRegistrySecretData will retrieve the contents of the clusters PrivateRegistrySecret, which contains
-// the credentials for a private registry which system images and custom work loads may be pulled from. For RKE1 clusters, the secret
-// is queried and then returned with the format that it was stored in. For RKE2/K3s clusters the secret is retrieved
-// and then transformed into the .dockerconfigjson format. In either case, the credentials can be accessed via the .dockerconfigjson key.
-func (cd *clusterDeploy) getPrivateRegistrySecretData(cluster *v3.Cluster) (map[string][]byte, error) {
-	var privateRegistries *corev1.Secret
-	var err error
-
-	registrySecret := cluster.GetSecret(v32.ClusterPrivateRegistrySecret)
-	if registrySecret == "" { // no private registry configured
-		return nil, nil
-	}
-
-	// check for the RKE1 registry secret first
-	privateRegistries, err = cd.secretLister.Get(namespace.GlobalNamespace, registrySecret)
-	if err == nil {
-		return privateRegistries.Data, nil
-	}
-	if err != nil && !apierrors.IsNotFound(err) { // ignore secret not found errors as we need to check ProvV2 namespace as well
-		return nil, err
-	}
-
-	// This is the only place that ProvV2 stores the system-default-registry URL on the v3.Cluster object.
-	// Without it, we cannot generate the registry credentials (.dockerconfigjson)
-	registryURL := cluster.GetSecret(v32.ClusterPrivateRegistryURL)
-	if registryURL == "" {
-		return nil, nil
-	}
-
-	privateRegistries, err = cd.secretLister.Get(fleet.ClustersDefaultNamespace, registrySecret)
-	if err != nil {
-		return nil, err
-	}
-
-	// ProvV2 PrivateRegistrySecret is not in proper .dockerconfigjson format as-is, so we have to transform it into that format
-	// so that the SystemTemplate generates the cluster agent manifest properly.
-	return util.TransformProvV2RegistryCredentialsToDockerConfigJSON(registryURL, privateRegistries)
-}
-
 func agentImagesCached(name string) bool {
 	na, ca := getAgentImages(name)
 	return na != "" && ca != ""
@@ -577,7 +548,7 @@ func getAgentImages(name string) (string, string) {
 	return agentImages[nodeImage][name], agentImages[clusterImage][name]
 }
 
-func getCachedTaints(name string) []corev1.Taint {
+func getCachedControlPlaneTaints(name string) []corev1.Taint {
 	controlPlaneTaintsMutex.RLock()
 	defer controlPlaneTaintsMutex.RUnlock()
 	if _, ok := controlPlaneTaints[name]; ok {

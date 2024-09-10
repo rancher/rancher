@@ -10,7 +10,6 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/image"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -94,7 +93,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 		// Registries don't allow "+", so image names will have these substituted.
 		upgradeImage := fmt.Sprintf("rancher/%s-upgrade:%s", source, strings.ReplaceAll(release, "+", "-"))
 		externalImagesMap[upgradeImage] = true
-		systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", settings.SystemAgentInstallerImage.Default, source, strings.ReplaceAll(release, "+", "-"))
+		systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", "rancher/system-agent-installer-", source, strings.ReplaceAll(release, "+", "-"))
 		externalImagesMap[systemAgentInstallerImage] = true
 
 		images, err := downloadExternalSupportingImages(release, source, osType)

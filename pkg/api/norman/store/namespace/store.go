@@ -14,7 +14,7 @@ import (
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/resourcequota"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"github.com/rancher/rancher/pkg/utils"
 )
 
 const quotaField = "resourceQuota"
@@ -166,7 +166,7 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		return err
 	}
 
-	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds projectLimit on fields: %s", format.ResourceList(exceeded)))
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds projectLimit on fields: %s", utils.FormatResourceList(exceeded)))
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v32.ResourceQuotaLimit, error) {

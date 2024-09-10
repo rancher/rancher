@@ -1,15 +1,21 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
+const (
+	UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
+	AuthConfigConditionSecretsMigrated condition.Cond = "SecretsMigrated"
+)
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -39,6 +45,7 @@ func (t *Token) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -56,6 +63,22 @@ type User struct {
 	Enabled            *bool      `json:"enabled,omitempty" norman:"default=true"`
 	Spec               UserSpec   `json:"spec,omitempty"`
 	Status             UserStatus `json:"status"`
+}
+
+// IsSystem returns true if the user is a system user.
+func (u *User) IsSystem() bool {
+	for _, principalID := range u.PrincipalIDs {
+		if strings.HasPrefix(principalID, "system:") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsDefaultAdmin returns true if the user is the default admin user.
+func (u *User) IsDefaultAdmin() bool {
+	return u.Username == "admin"
 }
 
 type UserStatus struct {
@@ -80,6 +103,7 @@ type UserCondition struct {
 type UserSpec struct{}
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -93,6 +117,9 @@ type UserAttribute struct {
 	LastRefresh     string
 	NeedsRefresh    bool
 	ExtraByProvider map[string]map[string][]string // extra information for the user to print in audit logs, stored per authProvider. example: map[openldap:map[principalid:[openldap_user://uid=testuser1,ou=dev,dc=us-west-2,dc=compute,dc=internal]]]
+	LastLogin       *metav1.Time                   `json:"lastLogin,omitempty"`
+	DisableAfter    *metav1.Duration               `json:"disableAfter,omitempty"` // Overrides DisableInactiveUserAfter setting.
+	DeleteAfter     *metav1.Duration               `json:"deleteAfter,omitempty"`  // Overrides DeleteInactiveUserAfter setting.
 }
 
 type Principals struct {
@@ -100,6 +127,7 @@ type Principals struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -111,6 +139,7 @@ type Group struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -123,6 +152,7 @@ type GroupMember struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -156,20 +186,47 @@ type SetPasswordInput struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AuthConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta   `json:",inline" mapstructure:",squash"`
+	metav1.ObjectMeta `json:"metadata,omitempty" mapstructure:"metadata"`
 
-	Type                string   `json:"type" norman:"noupdate"`
-	Enabled             bool     `json:"enabled,omitempty"`
-	AccessMode          string   `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
-	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
+	Type                string           `json:"type" norman:"noupdate"`
+	Enabled             bool             `json:"enabled,omitempty"`
+	AccessMode          string           `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
+	AllowedPrincipalIDs []string         `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
+	Status              AuthConfigStatus `json:"status"`
+}
+
+type AuthConfigStatus struct {
+	Conditions []AuthConfigConditions `json:"conditions"`
+}
+
+type AuthConfigConditions struct {
+	// Type of condition
+	Type condition.Cond `json:"type"`
+
+	// Status of condition (one of True, False, Unknown)
+	Status v1.ConditionStatus `json:"status"`
+
+	// Last time the condition was updated
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	// Last time the condition transitioned from one status to another
+	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
+
+	// The reason for the condition's last transition
+	Reason string `json:"reason,omitempty"`
+
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -189,6 +246,7 @@ type LocalConfig struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -397,12 +455,13 @@ type KeyCloakConfig struct {
 }
 
 type OKTAConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
+	SamlConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
 }
 
 type ShibbolethConfig struct {
 	SamlConfig     `json:",inline" mapstructure:",squash"`
-	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type AuthSystemImages struct {

@@ -19,9 +19,9 @@ import (
 	"github.com/rancher/rancher/pkg/resourcequota"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const roleTemplatesRequired = "authz.management.cattle.io/creator-role-bindings"
@@ -174,7 +174,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField, fmt.Sprintf("exceeds %s on fields: %s",
-			quotaField, format.ResourceList(exceeded)))
+			quotaField, utils.FormatResourceList(exceeded)))
 	}
 
 	if id == "" {
@@ -236,7 +236,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("is below the used limit on fields: %s",
-			format.ResourceList(exceeded)))
+			utils.FormatResourceList(exceeded)))
 	}
 
 	if len(limitToAdd) == 0 && len(limitToRemove) == 0 {
@@ -272,7 +272,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
 			fmt.Sprintf("exceeds project limit on fields %s when applied to all namespaces in a project",
-				format.ResourceList(exceeded)))
+				utils.FormatResourceList(exceeded)))
 	}
 
 	return nil
@@ -284,7 +284,7 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 		return 0, err
 	}
 
-	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext, s.secretLister)
+	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext, s.secretLister, true)
 	if kubeConfig == nil || err != nil {
 		return 0, err
 	}

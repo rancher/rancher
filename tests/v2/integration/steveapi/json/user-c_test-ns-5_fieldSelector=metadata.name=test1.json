@@ -1,7 +1,7 @@
 {
   "actions": {},
   "links": {
-    "self": "https://localhost:8443/v1/secrets/test-ns-5"
+    "self": "https://rancherurl/v1/secrets/test-ns-5"
   },
   "resourceType": "secret",
   "revision": "100",

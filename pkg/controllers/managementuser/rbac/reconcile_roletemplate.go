@@ -2,7 +2,6 @@ package rbac
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -13,69 +12,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) (map[string]bool, error) {
-	var role string
-	var createNSPerms bool
-	var roles []string
-	if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		projectName := parts[1]
-		var roleVerb, roleSuffix string
-		for _, r := range rts {
-			for _, rule := range r.Rules {
-				if slice.ContainsString(rule.Resources, "namespaces") && len(rule.ResourceNames) == 0 {
-					if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
-						roleVerb = "*"
-						createNSPerms = true
-						break
-					}
-				}
-
-			}
-		}
-		if roleVerb == "" {
-			roleVerb = "get"
-		}
-		roleSuffix = projectNSVerbToSuffix[roleVerb]
-		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
-		roles = append(roles, role)
-
-		for _, rt := range rts {
-			for resource, baseRule := range globalResourceRulesNeededInProjects {
-				verbs, err := m.checkForGlobalResourceRules(rt, resource, baseRule)
-				if err != nil {
-					return nil, err
-				}
-				if len(verbs) > 0 {
-					roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
-					if err != nil {
-						return nil, err
-					}
-					roles = append(roles, roleName)
-				}
-			}
-		}
-	}
-
+func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, roles []string) (map[string]bool, error) {
 	if len(roles) == 0 {
 		return nil, nil
 	}
 
 	bindingCli := m.workload.RBAC.ClusterRoleBindings("")
 
-	if createNSPerms {
-		roles = append(roles, "create-ns")
-		if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
-			createNSRT, err := m.rtLister.Get("", "create-ns")
-			if err != nil {
-				return nil, err
-			}
-			if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
-				return nil, err
-			}
-		}
-	}
-
-	rtbUID := binding.Namespace + "_" + binding.Name
+	rtbUID := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return nil, err
@@ -146,4 +90,63 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 	}
 
 	return crbsToKeep, nil
+}
+
+// EnsureGlobalResourcesRolesForPRTB ensures that all necessary roles exist and contain the rules needed to
+// enforce permissions described by RoleTemplate rules. A slice of strings indicating role names is returned.
+func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[string]*v3.RoleTemplate) ([]string, error) {
+	var role string
+	var roles []string
+
+	if projectName == "" {
+		return nil, nil
+	}
+
+	var roleVerb, roleSuffix string
+	for _, r := range rts {
+		for _, rule := range r.Rules {
+			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
+			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
+			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
+				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
+					roleVerb = "*"
+					roles = append(roles, "create-ns")
+					if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
+						createNSRT, err := m.rtLister.Get("", "create-ns")
+						if err != nil {
+							return nil, err
+						}
+						if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
+							return nil, err
+						}
+					}
+					break
+				}
+			}
+
+		}
+	}
+	if roleVerb == "" {
+		roleVerb = "get"
+	}
+	roleSuffix = projectNSVerbToSuffix[roleVerb]
+	role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
+	roles = append(roles, role)
+
+	for _, rt := range rts {
+		for resource, baseRule := range globalResourceRulesNeededInProjects {
+			verbs, err := m.checkForGlobalResourceRules(rt, resource, baseRule)
+			if err != nil {
+				return nil, err
+			}
+			if len(verbs) > 0 {
+				roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
+				if err != nil {
+					return nil, err
+				}
+				roles = append(roles, roleName)
+			}
+		}
+	}
+	return roles, nil
 }

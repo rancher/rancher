@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"reflect"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
@@ -19,12 +18,12 @@ import (
 
 const DriverNameField = "driverName"
 
-func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v32.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionProvisioned)
+func (p *Provisioner) driverCreate(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec) (api string, token string, cert string, err error) {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
-	spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
+	spec, err = assemblers.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -41,7 +40,7 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 	return p.engineService.Create(ctx, cluster.Name, kontainerDriver, spec)
 }
 
-func (p *Provisioner) getKontainerDriver(spec v32.ClusterSpec) (*v3.KontainerDriver, error) {
+func (p *Provisioner) getKontainerDriver(spec apimgmtv3.ClusterSpec) (*apimgmtv3.KontainerDriver, error) {
 	if spec.GenericEngineConfig != nil {
 		return p.KontainerDriverLister.Get("", (*spec.GenericEngineConfig)[DriverNameField].(string))
 	}
@@ -57,15 +56,25 @@ func (p *Provisioner) getKontainerDriver(spec v32.ClusterSpec) (*v3.KontainerDri
 	return nil, fmt.Errorf("no kontainer driver for cluster %v", spec.DisplayName)
 }
 
-func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (api string, token string, cert string, updateTriggered bool, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
+// driverUpdate updates the given cluster with the new config from `spec` using its driver. If `forceUpdate` is true,
+// the update will be performed regardless of whether the spec has changed at all. Otherwise, the update will only
+// occur if the spec has changed.
+func (p *Provisioner) driverUpdate(
+	cluster *apimgmtv3.Cluster,
+	spec apimgmtv3.ClusterSpec,
+	forceUpdate bool,
+) (api string, token string, cert string, updateTriggered bool, err error) {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
 	applied := cleanRKE(cluster.Status.AppliedSpec)
 
-	if spec.RancherKubernetesEngineConfig != nil && cluster.Status.APIEndpoint != "" && cluster.Status.ServiceAccountTokenSecret != "" &&
-		reflect.DeepEqual(applied.RancherKubernetesEngineConfig, spec.RancherKubernetesEngineConfig) {
+	configUnchanged := spec.RancherKubernetesEngineConfig != nil &&
+		cluster.Status.APIEndpoint != "" &&
+		cluster.Status.ServiceAccountTokenSecret != "" &&
+		reflect.DeepEqual(applied.RancherKubernetesEngineConfig, spec.RancherKubernetesEngineConfig)
+	if configUnchanged && !forceUpdate {
 		secret, err := p.Secrets.GetNamespaced("cattle-global-data", cluster.Status.ServiceAccountTokenSecret, v1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("Could not find service account token secret %s for cluster %s: [%v]", cluster.Status.ServiceAccountTokenSecret, cluster.Name, err)
@@ -80,7 +89,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot = &_false
 	}
 
-	spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
+	spec, err = assemblers.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
 	if err != nil {
 		return "", "", "", false, err
 	}
@@ -98,13 +107,13 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 	return api, token, cert, true, err
 }
 
-func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionProvisioned)
+func (p *Provisioner) driverRemove(cluster *apimgmtv3.Cluster, forceRemove bool) error {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec := cleanRKE(cluster.Spec)
 
-	_, err := v32.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
+	_, err := apimgmtv3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
 		if newCluster, err := p.Clusters.Update(cluster); err == nil {
 			cluster = newCluster
 		}
@@ -124,21 +133,20 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error 
 	return err
 }
 
-func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, snapshot string) (string, string, string, error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
+func (p *Provisioner) driverRestore(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, snapshot string) (string, string, string, error) {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
-	spec, err := secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
+	spec, err := assemblers.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
 	if err != nil {
 		return "", "", "", err
 	}
 
 	newCluster, err := p.Clusters.Update(cluster)
-	if err != nil {
-		return "", "", "", err
+	if err == nil {
+		cluster = newCluster
 	}
-	cluster = newCluster
 
 	kontainerDriver, err := p.getKontainerDriver(spec)
 	if err != nil {
@@ -148,8 +156,8 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, s
 
 }
 
-func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v32.ClusterSpec) (string, error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
+func (p *Provisioner) generateServiceAccount(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec) (string, error) {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -162,8 +170,8 @@ func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v32.Clust
 	return p.engineService.GenerateServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
 }
 
-func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v32.ClusterSpec) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
+func (p *Provisioner) removeLegacyServiceAccount(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec) error {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -176,7 +184,7 @@ func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v32.C
 	return p.engineService.RemoveLegacyServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
 }
 
-func cleanRKE(spec v32.ClusterSpec) v32.ClusterSpec {
+func cleanRKE(spec apimgmtv3.ClusterSpec) apimgmtv3.ClusterSpec {
 	if spec.RancherKubernetesEngineConfig == nil {
 		return spec
 	}

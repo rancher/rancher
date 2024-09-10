@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
@@ -17,11 +18,12 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/needacert"
 )
 
-func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) error {
+func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, registryOverride string) error {
 	helm.Register(ctx, wrangler)
 	kubernetesprovider.Register(ctx,
 		wrangler.Mgmt.Cluster(),
@@ -35,7 +37,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) er
 		wrangler.Admission.ValidatingWebhookConfiguration(),
 		wrangler.CRD.CustomResourceDefinition())
 	scaleavailable.Register(ctx, wrangler)
-	if err := systemcharts.Register(ctx, wrangler); err != nil {
+	if err := systemcharts.Register(ctx, wrangler, registryOverride); err != nil {
 		return err
 	}
 
@@ -60,9 +62,11 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) er
 	}
 
 	if features.ProvisioningV2.Enabled() {
+		kubeconfigManager := kubeconfig.New(wrangler)
 		clusterindex.Register(ctx, wrangler)
-		if err := provisioningv2.Register(ctx, wrangler); err != nil {
-			return err
+		provisioningv2.Register(ctx, wrangler, kubeconfigManager)
+		if features.RKE2.Enabled() {
+			capr.Register(ctx, wrangler, kubeconfigManager)
 		}
 	}
 

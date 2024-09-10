@@ -14,11 +14,19 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
+// operation implements the http handler interface.
 type operation struct {
-	ops           *helmop.Operations
+	// ops is the Operation struct which contains functions
+	// related to helm such as helm install, helm uninstall etc.
+	ops *helmop.Operations
+	// imageOveride is the location of the rancher shell image which is used
+	// for running helm commands such as install, upgrade and uninstall.
 	imageOverride string
 }
 
+// newOperation parses and returns an object operation updating the imageOverride field
+// based on the clusterRegistry parameter. If clusterRegistry is not an empty string
+// the imageOverride value will be prefixed with clusterRegistry value.
 func newOperation(
 	helmop *helmop.Operations, clusterRegistry string) *operation {
 	var imageOverride string
@@ -31,7 +39,19 @@ func newOperation(
 	}
 }
 
+// ServeHTTP calls corresponding Operation functions based on the type of the api request.
+// It uses the rancher apiserver package to parse the request and know the type of it.
+// The types are documented in the rancher apiserver package. After parsing, it then
+// checks if the request is authorised by checking the user field in the request.
+//
+// For example, if the api request is for installing a chart, then it will call the
+// install function of the Operation struct.
+//
+// All chart actions (install, upgrade, and uninstall) are served through this method.
 func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	// Get the APIContext from the current request's context. This APIContext
+	// encapsulates the details of the API request, which will be used to
+	// determine the necessary operation and respond accordingly.
 	apiRequest := types.GetAPIContext(req.Context())
 
 	user, ok := request.UserFrom(req.Context())
@@ -79,10 +99,18 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	})
 }
 
+// OnAdd is registered as a callback of a Kubernetes Informer.
+// It is invoked when a new object is added to the Kubernetes cluster.
+// It purges old roles related to the object being added.
+// These old roles will be purged upon timeout.
 func (o *operation) OnAdd(gvk schema2.GroupVersionKind, key string, obj runtime.Object) error {
 	return o.ops.Impersonator.PurgeOldRoles(gvk, key, obj)
 }
 
+// OnChange is registered as a callback of a Kubernetes Informer.
+// It is invoked when an existing object is modified inside the Kubernetes cluster.
+// It purges old roles related to the object being modified.
+// These old roles will be purged upon timeout.
 func (o *operation) OnChange(gvk schema2.GroupVersionKind, key string, obj, oldObj runtime.Object) error {
 	return o.ops.Impersonator.PurgeOldRoles(gvk, key, obj)
 }

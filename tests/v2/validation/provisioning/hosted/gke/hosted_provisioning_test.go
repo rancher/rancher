@@ -1,24 +1,23 @@
+//go:build validation
+
 package gke
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/google"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/stretchr/testify/assert"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	"github.com/rancher/rancher/tests/v2/actions/reports"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters/gke"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/config"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type HostedGKEClusterProvisioningTestSuite struct {
@@ -33,7 +32,7 @@ func (h *HostedGKEClusterProvisioningTestSuite) TearDownSuite() {
 }
 
 func (h *HostedGKEClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(h.T())
+	testSession := session.NewSession()
 	h.session = testSession
 
 	client, err := rancher.NewClient("", testSession)
@@ -64,58 +63,27 @@ func (h *HostedGKEClusterProvisioningTestSuite) SetupSuite() {
 
 func (h *HostedGKEClusterProvisioningTestSuite) TestProvisioningHostedGKE() {
 	tests := []struct {
-		name            string
-		client          *rancher.Client
-		clusterName     string
-		cloudCredential *cloudcredentials.CloudCredential
+		name   string
+		client *rancher.Client
 	}{
-		{"Admin User", h.client, "", nil},
-		{"Standard User", h.standardUserClient, "", nil},
+		{provisioninginput.AdminClientName.String(), h.client},
+		{provisioninginput.StandardClientName.String(), h.standardUserClient},
 	}
 
 	for _, tt := range tests {
-		h.Run(tt.name, func() {
-			subSession := h.session.NewSession()
-			defer subSession.Cleanup()
+		var gkeClusterConfig gke.ClusterConfig
+		config.LoadConfig(gke.GKEClusterConfigConfigurationFileKey, &gkeClusterConfig)
+		clusterObject, err := provisioning.CreateProvisioningGKEHostedCluster(tt.client, gkeClusterConfig)
+		reports.TimeoutRKEReport(clusterObject, err)
+		require.NoError(h.T(), err)
 
-			client, err := tt.client.WithSession(subSession)
-			require.NoError(h.T(), err)
-
-			h.testProvisioningHostedGKECluster(client, tt.clusterName, tt.cloudCredential)
-		})
+		provisioning.VerifyHostedCluster(h.T(), tt.client, clusterObject)
 	}
-}
-
-func (h *HostedGKEClusterProvisioningTestSuite) testProvisioningHostedGKECluster(rancherClient *rancher.Client, clusterName string, cloudcredential *cloudcredentials.CloudCredential) (*management.Cluster, error) {
-	cloudCredential, err := google.CreateGoogleCloudCredentials(rancherClient)
-	require.NoError(h.T(), err)
-
-	clusterName = namegen.AppendRandomString("gkehostcluster")
-	clusterResp, err := gke.CreateGKEHostedCluster(rancherClient, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
-	require.NoError(h.T(), err)
-
-	opts := metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + clusterResp.ID,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	}
-	watchInterface, err := h.client.GetManagementWatchInterface(management.ClusterType, opts)
-	require.NoError(h.T(), err)
-
-	checkFunc := clusters.IsHostedProvisioningClusterReady
-
-	err = wait.WatchWait(watchInterface, checkFunc)
-	require.NoError(h.T(), err)
-	assert.Equal(h.T(), clusterName, clusterResp.Name)
-
-	clusterToken, err := clusters.CheckServiceAccountTokenSecret(rancherClient, clusterName)
-	require.NoError(h.T(), err)
-	assert.NotEmpty(h.T(), clusterToken)
-
-	return clusterResp, nil
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestHostedGKEClusterProvisioningTestSuite(t *testing.T) {
+	t.Skip("This test has been deprecated; check https://github.com/rancher/hosted-providers-e2e for updated tests")
 	suite.Run(t, new(HostedGKEClusterProvisioningTestSuite))
 }

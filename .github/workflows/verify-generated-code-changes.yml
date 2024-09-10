@@ -1,0 +1,46 @@
+name: Verify generated code changes
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+    - 'release/*'
+
+env:
+  MAIN_BRANCH: origin/master
+  GOARCH: amd64
+  CGO_ENABLED: 0
+  SETUP_GO_VERSION: '1.20.*'
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      -
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.SETUP_GO_VERSION }}
+      -
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      -
+        name: Verify go.mod status
+        run: ./.github/scripts/check-for-go-mod-changes.sh
+      -
+        name: Install controller-gen
+        run: go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0     
+      -
+        name: Verify auto-generated changes
+        run: ./.github/scripts/check-for-auto-generated-changes.sh

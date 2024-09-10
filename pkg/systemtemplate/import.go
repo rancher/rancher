@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -15,11 +16,10 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/templates"
-	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -44,17 +44,11 @@ type context struct {
 	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
+	AppendTolerations     string
+	Affinity              string
+	ResourceRequirements  string
 	ClusterRegistry       string
 }
-
-var (
-	staticFeatures = features.MCM.Name() + "=false," +
-		features.MCMAgent.Name() + "=true," +
-		features.Fleet.Name() + "=false," +
-		features.RKE2.Name() + "=false," +
-		features.ProvisioningV2.Name() + "=false," +
-		features.EmbeddedClusterAPI.Name() + "=false"
-)
 
 func toFeatureString(features map[string]bool) string {
 	buf := &strings.Builder{}
@@ -80,8 +74,8 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries map[string][]byte) error {
-	var tolerations, agentEnvVars string
+	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister) error {
+	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -89,27 +83,9 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		authImage = settings.AuthImage.Get()
 	}
 
-	privateRepo := util.GetPrivateRepo(cluster)
-
-	// cluster.GetSecret("PrivateRegistryURL") will be empty if the cluster is
-	// RKE1, imported, or RKE2 with no cluster level registry configured.
-	// For RKE2 with a cluster level registry configured, this is the
-	// only reference to the registry URL available on the v3.Cluster.
-	if privateRegistryURL := cluster.GetSecret(apimgmtv3.ClusterPrivateRegistryURL); privateRegistryURL != "" {
-		privateRepo = &rketypes.PrivateRegistry{
-			URL: privateRegistryURL,
-		}
-	}
-
-	// Generate the private registry access credentials.
-	// The 'privateRegistries' secret takes precedence over the 'privateRepo'
-	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(privateRepo, privateRegistries[".dockerconfigjson"])
+	registryURL, registryConfig, err := util.GeneratePrivateRegistryEncodedDockerConfig(cluster, secretLister)
 	if err != nil {
 		return err
-	}
-	var clusterRegistry string
-	if privateRepo != nil {
-		clusterRegistry = privateRepo.URL
 	}
 
 	if taints != nil {
@@ -122,6 +98,29 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	}
 
 	agentEnvVars = templates.ToYAML(envVars)
+
+	if appendTolerations := util.GetClusterAgentTolerations(cluster); appendTolerations != nil {
+		agentAppendTolerations = templates.ToYAML(appendTolerations)
+		if agentAppendTolerations == "" {
+			return fmt.Errorf("error converting agent append tolerations to YAML")
+		}
+	}
+
+	affinity, err := util.GetClusterAgentAffinity(cluster)
+	if err != nil {
+		return err
+	}
+	agentAffinity = templates.ToYAML(affinity)
+	if agentAffinity == "" {
+		return fmt.Errorf("error converting agent affinity to YAML")
+	}
+
+	if resourceRequirements := util.GetClusterAgentResourceRequirements(cluster); resourceRequirements != nil {
+		agentResourceRequirements = templates.ToYAML(resourceRequirements)
+		if agentResourceRequirements == "" {
+			return fmt.Errorf("error converting agent resource requirements to YAML")
+		}
+	}
 
 	context := &context{
 		Features:              toFeatureString(features),
@@ -136,15 +135,18 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		URLPlain:              url,
 		IsWindowsCluster:      isWindowsCluster,
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
-		PrivateRegistryConfig: privateRegistryConfig,
+		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
-		ClusterRegistry:       clusterRegistry,
+		AppendTolerations:     agentAppendTolerations,
+		Affinity:              agentAffinity,
+		ResourceRequirements:  agentResourceRequirements,
+		ClusterRegistry:       registryURL,
 	}
 
 	return t.Execute(resp, context)
 }
 
-func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	return map[string]bool{
 		features.MCM.Name():                false,
 		features.MCMAgent.Name():           true,
@@ -156,12 +158,12 @@ func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
 	}
 }
 
-func ForCluster(cluster *v3.Cluster, token string, taints []corev1.Taint, privateRegistries map[string][]byte) ([]byte, error) {
+func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		cluster, GetDesiredFeatures(cluster), taints, privateRegistries)
+		cluster, GetDesiredFeatures(cluster), taints, secretLister)
 	return buf.Bytes(), err
 }
 
@@ -189,7 +191,7 @@ func CAChecksum() string {
 	return ""
 }
 
-func GetDesiredAgentImage(cluster *v3.Cluster) string {
+func GetDesiredAgentImage(cluster *apimgmtv3.Cluster) string {
 	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
 	desiredAgent := cluster.Spec.DesiredAgentImage
 	if cluster.Spec.AgentImageOverride != "" {
@@ -202,7 +204,7 @@ func GetDesiredAgentImage(cluster *v3.Cluster) string {
 	return desiredAgent
 }
 
-func GetDesiredAuthImage(cluster *v3.Cluster) string {
+func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	var desiredAuth string
 	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 		desiredAuth = cluster.Spec.DesiredAuthImage

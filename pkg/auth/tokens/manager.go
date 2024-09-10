@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/util"
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -27,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -571,44 +571,61 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 	return attribs, true, nil
 }
 
-func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string) error {
+func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
 	}
 
+	if attribs.GroupPrincipals == nil {
+		attribs.GroupPrincipals = make(map[string]v32.Principals)
+	}
+
+	if attribs.ExtraByProvider == nil {
+		attribs.ExtraByProvider = make(map[string]map[string][]string)
+	}
 	if userExtraInfo == nil {
 		userExtraInfo = make(map[string][]string)
 	}
+
+	shouldUpdate := m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals)
+	if len(loginTime) > 0 && !loginTime[0].IsZero() {
+		// Login time is truncated to seconds as the corresponding user label is set as epoch time.
+		lastLogin := metav1.NewTime(loginTime[0].Truncate(time.Second))
+		attribs.LastLogin = &lastLogin
+		shouldUpdate = true
+	}
+
+	attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
+	attribs.ExtraByProvider[provider] = userExtraInfo
+
 	if needCreate {
-		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
-		attribs.ExtraByProvider[provider] = userExtraInfo
-		_, err := m.userAttributes.Create(attribs)
+		_, err = m.userAttributes.Create(attribs)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create UserAttribute: %w", err)
 		}
+
 		return nil
 	}
 
-	// Exists, just update if necessary
-	if m.UserAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
-		if attribs.ExtraByProvider == nil {
-			attribs.ExtraByProvider = make(map[string]map[string][]string)
-		}
-		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
-		attribs.ExtraByProvider[provider] = userExtraInfo
-		_, err := m.userAttributes.Update(attribs)
+	if shouldUpdate {
+		_, err = m.userAttributes.Update(attribs)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to update UserAttribute: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v32.Principal) bool {
+func (m *Manager) userAttributeChanged(attribs *v32.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v32.Principal) bool {
 	oldSet := []string{}
 	newSet := []string{}
+
+	if len(attribs.GroupPrincipals[provider].Items) != len(groupPrincipals) {
+		return true
+	}
+
 	for _, principal := range attribs.GroupPrincipals[provider].Items {
 		oldSet = append(oldSet, principal.ObjectMeta.Name)
 	}
@@ -617,10 +634,6 @@ func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider stri
 	}
 	sort.Strings(oldSet)
 	sort.Strings(newSet)
-
-	if len(oldSet) != len(newSet) {
-		return true
-	}
 
 	for i := range oldSet {
 		if oldSet[i] != newSet[i] {
@@ -631,40 +644,21 @@ func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider stri
 	if attribs.ExtraByProvider == nil && extraInfo != nil {
 		return true
 	}
-	if !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo) {
-		return true
-	}
 
-	return false
+	return !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo)
 }
 
-var uaBackoff = wait.Backoff{
-	Duration: time.Millisecond * 100,
-	Factor:   2,
-	Jitter:   .2,
-	Steps:    5,
-}
+// PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
+var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string, userExtraInfo map[string][]string) (v3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
-	if (provider == "github" || provider == "azuread" || provider == "googleoauth" || provider == "oidc" || provider == "keycloakoidc") && providerToken != "" {
+	if utils.Contains(PerUserCacheProviders, provider) && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
 			return v3.Token{}, "", fmt.Errorf("unable to create secret: %s", err)
 		}
-	}
-
-	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
-		err := m.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo)
-		if err != nil {
-			logrus.Warnf("Problem creating or updating userAttribute for %v: %v", userID, err)
-		}
-		return err == nil, nil
-	})
-
-	if err != nil {
-		return v3.Token{}, "", errors.New("unable to create userAttribute")
 	}
 
 	token := &v3.Token{
@@ -680,6 +674,7 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 			},
 		},
 	}
+
 	return m.createToken(token)
 }
 
@@ -701,18 +696,14 @@ func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal 
 		for provider, y := range attribs.GroupPrincipals {
 			if provider == token.AuthProvider {
 				hitProvider = true
-				for _, principal := range y.Items {
-					groups = append(groups, principal)
-				}
+				groups = append(groups, y.Items...)
 			}
 		}
 	}
 
 	// fallback to legacy token groupPrincipals
 	if !hitProvider {
-		for _, principal := range token.GroupPrincipals {
-			groups = append(groups, principal)
-		}
+		groups = append(groups, token.GroupPrincipals...)
 	}
 
 	return groups
@@ -747,8 +738,8 @@ func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
 	return groups[group.Name]
 }
 
-func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext, userExtraInfo map[string][]string) error {
-	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description, userExtraInfo)
+func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
+	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)
 		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))

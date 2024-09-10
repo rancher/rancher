@@ -41,12 +41,14 @@ const (
 	DeploymentFieldPublicEndpoints               = "publicEndpoints"
 	DeploymentFieldReadinessGates                = "readinessGates"
 	DeploymentFieldRemoved                       = "removed"
+	DeploymentFieldResourceClaims                = "resourceClaims"
 	DeploymentFieldRestartPolicy                 = "restartPolicy"
 	DeploymentFieldRunAsGroup                    = "runAsGroup"
 	DeploymentFieldRunAsNonRoot                  = "runAsNonRoot"
 	DeploymentFieldRuntimeClassName              = "runtimeClassName"
 	DeploymentFieldScale                         = "scale"
 	DeploymentFieldScheduling                    = "scheduling"
+	DeploymentFieldSchedulingGates               = "schedulingGates"
 	DeploymentFieldSeccompProfile                = "seccompProfile"
 	DeploymentFieldSelector                      = "selector"
 	DeploymentFieldServiceAccountName            = "serviceAccountName"
@@ -105,12 +107,14 @@ type Deployment struct {
 	PublicEndpoints               []PublicEndpoint               `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	Removed                       string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ResourceClaims                []PodResourceClaim             `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
 	RestartPolicy                 string                         `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                         `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scale                         *int64                         `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`

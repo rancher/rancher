@@ -75,6 +75,22 @@ func ReadFromSecretData(secrets corev1.SecretInterface, secretInfo string) (map[
 	return nil, nil
 }
 
-func GetName(configType string, field string) string {
+// GetFullSecretName returns a formatted name for a secret associated with an auth provider,
+// given a config type and its field.
+func GetFullSecretName(configType string, field string) string {
 	return fmt.Sprintf("%s:%s-%s", SecretsNamespace, strings.ToLower(configType), field)
+}
+
+// DeleteSecret deletes a secret associated with an auth provider.
+func DeleteSecret(secrets corev1.SecretInterface, configType string, field string) error {
+	secretName := fmt.Sprintf("%s-%s", strings.ToLower(configType), strings.ToLower(field))
+	return secrets.DeleteNamespaced(SecretsNamespace, secretName, &metav1.DeleteOptions{})
+}
+
+// SavePasswordSecret creates a secret out of a password, config type, and field name.
+func SavePasswordSecret(secrets corev1.SecretInterface, password string, fieldName string, authType string) (string, error) {
+	if err := CreateOrUpdateSecrets(secrets, password, strings.ToLower(fieldName), strings.ToLower(authType)); err != nil {
+		return "", err
+	}
+	return GetFullSecretName(authType, fieldName), nil
 }

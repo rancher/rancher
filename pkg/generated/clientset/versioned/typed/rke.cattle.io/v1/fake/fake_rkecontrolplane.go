@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package fake
 import (
 	"context"
 
-	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +35,25 @@ type FakeRKEControlPlanes struct {
 	ns   string
 }
 
-var rkecontrolplanesResource = schema.GroupVersionResource{Group: "rke.cattle.io", Version: "v1", Resource: "rkecontrolplanes"}
+var rkecontrolplanesResource = v1.SchemeGroupVersion.WithResource("rkecontrolplanes")
 
-var rkecontrolplanesKind = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKEControlPlane"}
+var rkecontrolplanesKind = v1.SchemeGroupVersion.WithKind("RKEControlPlane")
 
 // Get takes name of the rKEControlPlane, and returns the corresponding rKEControlPlane object, and an error if there is any.
-func (c *FakeRKEControlPlanes) Get(ctx context.Context, name string, options v1.GetOptions) (result *rkecattleiov1.RKEControlPlane, err error) {
+func (c *FakeRKEControlPlanes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RKEControlPlane, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rkecontrolplanesResource, c.ns, name), &rkecattleiov1.RKEControlPlane{})
+		Invokes(testing.NewGetAction(rkecontrolplanesResource, c.ns, name), &v1.RKEControlPlane{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEControlPlane), err
+	return obj.(*v1.RKEControlPlane), err
 }
 
 // List takes label and field selectors, and returns the list of RKEControlPlanes that match those selectors.
-func (c *FakeRKEControlPlanes) List(ctx context.Context, opts v1.ListOptions) (result *rkecattleiov1.RKEControlPlaneList, err error) {
+func (c *FakeRKEControlPlanes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RKEControlPlaneList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rkecontrolplanesResource, rkecontrolplanesKind, c.ns, opts), &rkecattleiov1.RKEControlPlaneList{})
+		Invokes(testing.NewListAction(rkecontrolplanesResource, rkecontrolplanesKind, c.ns, opts), &v1.RKEControlPlaneList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +63,8 @@ func (c *FakeRKEControlPlanes) List(ctx context.Context, opts v1.ListOptions) (r
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rkecattleiov1.RKEControlPlaneList{ListMeta: obj.(*rkecattleiov1.RKEControlPlaneList).ListMeta}
-	for _, item := range obj.(*rkecattleiov1.RKEControlPlaneList).Items {
+	list := &v1.RKEControlPlaneList{ListMeta: obj.(*v1.RKEControlPlaneList).ListMeta}
+	for _, item := range obj.(*v1.RKEControlPlaneList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +73,69 @@ func (c *FakeRKEControlPlanes) List(ctx context.Context, opts v1.ListOptions) (r
 }
 
 // Watch returns a watch.Interface that watches the requested rKEControlPlanes.
-func (c *FakeRKEControlPlanes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRKEControlPlanes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rkecontrolplanesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a rKEControlPlane and creates it.  Returns the server's representation of the rKEControlPlane, and an error, if there is any.
-func (c *FakeRKEControlPlanes) Create(ctx context.Context, rKEControlPlane *rkecattleiov1.RKEControlPlane, opts v1.CreateOptions) (result *rkecattleiov1.RKEControlPlane, err error) {
+func (c *FakeRKEControlPlanes) Create(ctx context.Context, rKEControlPlane *v1.RKEControlPlane, opts metav1.CreateOptions) (result *v1.RKEControlPlane, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rkecontrolplanesResource, c.ns, rKEControlPlane), &rkecattleiov1.RKEControlPlane{})
+		Invokes(testing.NewCreateAction(rkecontrolplanesResource, c.ns, rKEControlPlane), &v1.RKEControlPlane{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEControlPlane), err
+	return obj.(*v1.RKEControlPlane), err
 }
 
 // Update takes the representation of a rKEControlPlane and updates it. Returns the server's representation of the rKEControlPlane, and an error, if there is any.
-func (c *FakeRKEControlPlanes) Update(ctx context.Context, rKEControlPlane *rkecattleiov1.RKEControlPlane, opts v1.UpdateOptions) (result *rkecattleiov1.RKEControlPlane, err error) {
+func (c *FakeRKEControlPlanes) Update(ctx context.Context, rKEControlPlane *v1.RKEControlPlane, opts metav1.UpdateOptions) (result *v1.RKEControlPlane, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rkecontrolplanesResource, c.ns, rKEControlPlane), &rkecattleiov1.RKEControlPlane{})
+		Invokes(testing.NewUpdateAction(rkecontrolplanesResource, c.ns, rKEControlPlane), &v1.RKEControlPlane{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEControlPlane), err
+	return obj.(*v1.RKEControlPlane), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeRKEControlPlanes) UpdateStatus(ctx context.Context, rKEControlPlane *rkecattleiov1.RKEControlPlane, opts v1.UpdateOptions) (*rkecattleiov1.RKEControlPlane, error) {
+func (c *FakeRKEControlPlanes) UpdateStatus(ctx context.Context, rKEControlPlane *v1.RKEControlPlane, opts metav1.UpdateOptions) (*v1.RKEControlPlane, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(rkecontrolplanesResource, "status", c.ns, rKEControlPlane), &rkecattleiov1.RKEControlPlane{})
+		Invokes(testing.NewUpdateSubresourceAction(rkecontrolplanesResource, "status", c.ns, rKEControlPlane), &v1.RKEControlPlane{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEControlPlane), err
+	return obj.(*v1.RKEControlPlane), err
 }
 
 // Delete takes name of the rKEControlPlane and deletes it. Returns an error if one occurs.
-func (c *FakeRKEControlPlanes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeRKEControlPlanes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(rkecontrolplanesResource, c.ns, name, opts), &rkecattleiov1.RKEControlPlane{})
+		Invokes(testing.NewDeleteActionWithOptions(rkecontrolplanesResource, c.ns, name, opts), &v1.RKEControlPlane{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRKEControlPlanes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeRKEControlPlanes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(rkecontrolplanesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &rkecattleiov1.RKEControlPlaneList{})
+	_, err := c.Fake.Invokes(action, &v1.RKEControlPlaneList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched rKEControlPlane.
-func (c *FakeRKEControlPlanes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKEControlPlane, err error) {
+func (c *FakeRKEControlPlanes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RKEControlPlane, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rkecontrolplanesResource, c.ns, name, pt, data, subresources...), &rkecattleiov1.RKEControlPlane{})
+		Invokes(testing.NewPatchSubresourceAction(rkecontrolplanesResource, c.ns, name, pt, data, subresources...), &v1.RKEControlPlane{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEControlPlane), err
+	return obj.(*v1.RKEControlPlane), err
 }

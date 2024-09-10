@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kontainerdriver"
+	"github.com/rancher/rancher/pkg/namespace"
 
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -306,13 +307,20 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
+	var currentSecret *corev1.Secret
+	migrator := secretmigrator.NewMigrator(t.SecretLister, t.Secrets)
 	if importDrivers[cluster.Status.Driver] {
+		currentSecret, _ := t.SecretLister.Get(namespace.GlobalNamespace, cluster.Status.ServiceAccountTokenSecret)
 		if cluster.Status.APIEndpoint != apiEndpoint ||
+			cluster.Status.CACert != caCert ||
 			cluster.Status.ServiceAccountTokenSecret == "" ||
-			cluster.Status.CACert != caCert {
-			secret, err := secretmigrator.NewMigrator(t.SecretLister, t.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, token, cluster)
+			tokenChanged(currentSecret, token) {
+			secret, err := migrator.CreateOrUpdateServiceAccountTokenSecret("", token, cluster)
 			if err != nil {
 				return cluster, true, err
+			}
+			if currentSecret != nil && secret.GetResourceVersion() != currentSecret.GetResourceVersion() {
+				logrus.Infof("updated service account token for cluster %s (%s)", cluster.Name, cluster.Spec.DisplayName)
 			}
 			cluster.Status.APIEndpoint = apiEndpoint
 			cluster.Status.ServiceAccountTokenSecret = secret.Name
@@ -324,9 +332,16 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 
 	if changed {
 		_, err = t.clusters.Update(cluster)
+		if currentSecret != nil {
+			migrator.CleanupKnownSecrets([]*corev1.Secret{currentSecret})
+		}
 	}
 
 	return cluster, true, err
+}
+
+func tokenChanged(secret *corev1.Secret, token string) bool {
+	return secret != nil && string(secret.Data[secretmigrator.SecretKey]) != token
 }
 
 func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, error) {

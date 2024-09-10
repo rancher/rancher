@@ -5,6 +5,7 @@ import (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type RKEBootstrap struct {
@@ -28,6 +29,7 @@ type RKEBootstrapStatus struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type RKEBootstrapTemplate struct {

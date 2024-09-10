@@ -29,6 +29,7 @@ const (
 	ActiveDirectoryConfigFieldServiceAccountPassword       = "serviceAccountPassword"
 	ActiveDirectoryConfigFieldServiceAccountUsername       = "serviceAccountUsername"
 	ActiveDirectoryConfigFieldStartTLS                     = "starttls"
+	ActiveDirectoryConfigFieldStatus                       = "status"
 	ActiveDirectoryConfigFieldTLS                          = "tls"
 	ActiveDirectoryConfigFieldType                         = "type"
 	ActiveDirectoryConfigFieldUUID                         = "uuid"
@@ -70,6 +71,7 @@ type ActiveDirectoryConfig struct {
 	ServiceAccountPassword       string            `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
 	ServiceAccountUsername       string            `json:"serviceAccountUsername,omitempty" yaml:"serviceAccountUsername,omitempty"`
 	StartTLS                     bool              `json:"starttls,omitempty" yaml:"starttls,omitempty"`
+	Status                       *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	TLS                          bool              `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Type                         string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UUID                         string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

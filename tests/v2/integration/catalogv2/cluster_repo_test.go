@@ -5,10 +5,10 @@ import (
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
-	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -22,8 +22,10 @@ const (
 	StableHTTPRepoURL   = "https://releases.rancher.com/server-charts/stable"
 
 	GitClusterRepoName      = "test-git-cluster-repo"
-	RancherChartsGitRepoURL = "https://git.rancher.io/charts"
-	RKE2ChartsGitRepoURL    = "https://git.rancher.io/rke2-charts"
+	RancherChartsGitRepoURL = "https://github.com/rancher/charts"
+	RKE2ChartsGitRepoURL    = "https://github.com/rancher/rke2-charts"
+
+	OCIClusterRepoName = "test-oci-cluster-repo"
 )
 
 var (
@@ -42,7 +44,7 @@ func (c *ClusterRepoTestSuite) TearDownSuite() {
 }
 
 func (c *ClusterRepoTestSuite) SetupSuite() {
-	testSession := session.NewSession(c.T())
+	testSession := session.NewSession()
 	c.session = testSession
 
 	client, err := rancher.NewClient("", testSession)
@@ -134,6 +136,9 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 	var clusterRepo *stevev1.SteveAPIObject
 	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
 		clusterRepo, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(ClusterRepoName)
+		if err != nil {
+			return false, err
+		}
 		status := c.getStatusFromClusterRepo(clusterRepo)
 		if clusterRepo.Name != ClusterRepoName {
 			return false, nil

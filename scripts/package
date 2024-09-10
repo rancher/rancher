@@ -15,13 +15,23 @@ cp ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 cp ../bin/data.json ../bin/rancher-data.json
 
 if [ ${ARCH} == arm64 ]; then
-    sed -i -e '$a\' -e 'ENV ETCD_UNSUPPORTED_ARCH=arm64' Dockerfile
+    ETCD_UNSUPPORTED_ARCH=arm64
 fi
 if [ ${ARCH} == s390x ]; then
-    sed -i -e '$a\' -e 'ENV ETCD_UNSUPPORTED_ARCH=s390x' Dockerfile
+    ETCD_UNSUPPORTED_ARCH=s390x
 fi
 
-docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} -t ${IMAGE} .
+docker build \
+    --build-arg VERSION=${TAG} \
+    --build-arg ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH} \
+    --build-arg ARCH=${ARCH} \
+    --build-arg IMAGE_REPO=${REPO} \
+    --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} \
+    --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} \
+    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
+    --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
+    --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
+    -t ${IMAGE} .
 
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 
@@ -44,7 +54,7 @@ fi
 
 if [ ${ARCH} == amd64 ]; then
     # Move this out of ARCH check for local dev on non-amd64 hardware.
-    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
+    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
 fi
 
 # Create components file used for pre-release notes

@@ -2,12 +2,16 @@ package pspdelete
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1beta12 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -25,6 +29,17 @@ type handler struct {
 
 func Register(ctx context.Context, userContext *config.UserContext) {
 	starter := userContext.DeferredStart(ctx, func(ctx context.Context) error {
+		clusterName := userContext.ClusterName
+		clusterLister := userContext.Management.Management.Clusters("").Controller().Lister()
+		err := podsecuritypolicy.CheckClusterVersion(clusterName, clusterLister)
+		if err != nil {
+			if errors.Is(err, podsecuritypolicy.ErrClusterVersionIncompatible) {
+				logrus.Debugf("%v - will not register pspdelete controller for cluster [%s].", err, clusterName)
+				return nil
+			}
+			return fmt.Errorf("unable to parse version of cluster %s: %w", clusterName, err)
+		}
+		logrus.Debugf("Cluster [%s] is compatible with PSPs, will run pspdelete controller.", clusterName)
 		registerDeferred(ctx, userContext)
 		return nil
 	})

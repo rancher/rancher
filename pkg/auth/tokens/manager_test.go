@@ -8,12 +8,16 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 )
 
 type DummyIndexer struct {
@@ -62,7 +66,8 @@ func TestTokenStreamTransformer(t *testing.T) {
 	if err != nil {
 		testManager.assert.FailNow(fmt.Sprintf("unable to generate token for token stream transformer test: %v", err))
 	}
-	tokenHashed, err = CreateSHA256Hash(token)
+	sha256Hasher := hashers.Sha256Hasher{}
+	tokenHashed, err = sha256Hasher.CreateHash(token)
 	if err != nil {
 		testManager.assert.FailNow(fmt.Sprintf("unable to hash token for token stream transformer test: %v", err))
 	}
@@ -194,4 +199,100 @@ func (d *DummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
 
 func (d *DummyIndexer) SetTokenHashed(enabled bool) {
 	d.hashedEnabled = enabled
+}
+
+func TestUserAttributeCreateOrUpdateSetsLastLoginTime(t *testing.T) {
+	createdUserAttribute := &v3.UserAttribute{}
+
+	userID := "u-abcdef"
+	manager := Manager{
+		userLister: &mgmtFakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*v3.User, error) {
+				return &v3.User{
+					ObjectMeta: v1.ObjectMeta{
+						Name: userID,
+					},
+					Enabled: pointer.BoolPtr(true),
+				}, nil
+			},
+		},
+		userAttributeLister: &mgmtFakes.UserAttributeListerMock{
+			GetFunc: func(namespace, name string) (*v3.UserAttribute, error) {
+				return &v3.UserAttribute{}, nil
+			},
+		},
+		userAttributes: &mgmtFakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				return userAttribute.DeepCopy(), nil
+			},
+			CreateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				createdUserAttribute = userAttribute.DeepCopy()
+				return createdUserAttribute, nil
+			},
+		},
+	}
+
+	groupPrincipals := []v3.Principal{}
+	userExtraInfo := map[string][]string{}
+
+	loginTime := time.Now()
+	err := manager.UserAttributeCreateOrUpdate(userID, "provider", groupPrincipals, userExtraInfo, loginTime)
+	assert.NoError(t, err)
+
+	// Make sure login time is set and truncated to seconds.
+	assert.Equal(t, loginTime.Truncate(time.Second), createdUserAttribute.LastLogin.Time)
+}
+
+func TestUserAttributeCreateOrUpdateUpdatesGroups(t *testing.T) {
+	updatedUserAttribute := &v3.UserAttribute{}
+
+	userID := "u-abcdef"
+	manager := Manager{
+		userLister: &mgmtFakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*v3.User, error) {
+				return &v3.User{
+					ObjectMeta: v1.ObjectMeta{
+						Name: userID,
+					},
+					Enabled: pointer.BoolPtr(true),
+				}, nil
+			},
+		},
+		userAttributeLister: &mgmtFakes.UserAttributeListerMock{
+			GetFunc: func(namespace, name string) (*v3.UserAttribute, error) {
+				return &v3.UserAttribute{
+					ObjectMeta: v1.ObjectMeta{
+						Name: userID,
+					},
+				}, nil
+			},
+		},
+		userAttributes: &mgmtFakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				updatedUserAttribute = userAttribute.DeepCopy()
+				return updatedUserAttribute, nil
+			},
+			CreateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				return userAttribute.DeepCopy(), nil
+			},
+		},
+	}
+
+	groupPrincipals := []v3.Principal{
+		{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "group1",
+			},
+		},
+	}
+	userExtraInfo := map[string][]string{}
+
+	err := manager.UserAttributeCreateOrUpdate(userID, "provider", groupPrincipals, userExtraInfo)
+	assert.NoError(t, err)
+
+	require.Len(t, updatedUserAttribute.GroupPrincipals, 1)
+	principals := updatedUserAttribute.GroupPrincipals["provider"]
+	require.NotEmpty(t, principals)
+	require.Len(t, principals.Items, 1)
+	assert.Equal(t, principals.Items[0].Name, "group1")
 }

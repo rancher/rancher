@@ -119,8 +119,8 @@ func TestConfigureTest(t *testing.T) {
 				Version:        &managementschema.Version,
 			}
 
-			provider := azureProvider{}
-			err = provider.ConfigureTest("configureTest", nil, r)
+			provider := Provider{}
+			err = provider.ConfigureTest(r)
 			assert.NoError(t, err)
 
 			res := rr.Result()
@@ -217,7 +217,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 	}
 
-	var provider azureProvider
+	var provider Provider
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			authProvider, err := provider.TransformToAuthProvider(test.authConfig)

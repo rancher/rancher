@@ -1,6 +1,7 @@
 package utilities
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -55,8 +56,8 @@ type ImageTargetsAndSources struct {
 	TargetWindowsImagesAndSources []string
 }
 
-// GatherTargetImagesAndSources queries KDM and charts/system-charts to gather all the images used by Rancher and their source.
-// it an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
+// GatherTargetImagesAndSources queries KDM, charts and system-charts to gather all the images used by Rancher and their source.
+// It returns an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
 // as the source of each image.
 func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
 	rancherVersion, ok := os.LookupEnv("TAG")
@@ -323,15 +324,31 @@ func checkImage(image string) error {
 
 func writeSliceToFile(filename string, versions []string) error {
 	log.Printf("Creating %s\n", filename)
+
+	dir := filepath.Dir(filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directories: %w", err)
+	}
+
 	save, err := os.Create(filename)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer save.Close()
-	save.Chmod(0755)
+
+	defer func() {
+		if cerr := save.Close(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
+
+	if err := save.Chmod(0755); err != nil {
+		return fmt.Errorf("failed to set file permissions: %w", err)
+	}
 
 	for _, version := range versions {
-		fmt.Fprintln(save, version)
+		if _, err := fmt.Fprintln(save, version); err != nil {
+			return fmt.Errorf("failed to write to file: %w", err)
+		}
 	}
 
 	return nil

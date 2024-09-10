@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -291,14 +290,14 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 		if err = common.CreateOrUpdateSecrets(o.Secrets, config.PrivateKey, privateKeyField, strings.ToLower(config.Type)); err != nil {
 			return err
 		}
-		config.PrivateKey = common.GetName(config.Type, privateKeyField)
+		config.PrivateKey = common.GetFullSecretName(config.Type, privateKeyField)
 	}
 
 	secretField := strings.ToLower(client.OIDCConfigFieldClientSecret)
 	if err := common.CreateOrUpdateSecrets(o.Secrets, convert.ToString(config.ClientSecret), secretField, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
-	config.ClientSecret = common.GetName(config.Type, secretField)
+	config.ClientSecret = common.GetFullSecretName(config.Type, secretField)
 
 	logrus.Debugf("[generic oidc] saveOIDCConfig: updating config")
 	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -318,15 +317,10 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	storedOidcConfigMap := u.UnstructuredContent()
 
 	storedOidcConfig := &v32.OIDCConfig{}
-	mapstructure.Decode(storedOidcConfigMap, storedOidcConfig)
-
-	metadataMap, ok := storedOidcConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve OIDCConfig metadata, cannot read k8s Unstructured data")
+	err = common.Decode(storedOidcConfigMap, storedOidcConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode OidcConfig: %w", err)
 	}
-	objectMeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, objectMeta)
-	storedOidcConfig.ObjectMeta = *objectMeta
 
 	if storedOidcConfig.PrivateKey != "" {
 		value, err := common.ReadFromSecret(o.Secrets, storedOidcConfig.PrivateKey, strings.ToLower(client.OIDCConfigFieldPrivateKey))
@@ -482,9 +476,4 @@ func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !oidcConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the OIDC auth provider.
-func (o *OpenIDCProvider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }

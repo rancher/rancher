@@ -9,8 +9,8 @@ import (
 
 const secretKey = "credential"
 
-// AssembleDingtalkCredential looks up the Dingtalk Secret and inserts the keys into the Notifier.
-// It returns a new copy of the Notifier without modifying the original. The Notifier is never updated.
+// AssembleCatalogCredential looks up the Catalog Secret and inserts the value into the catalog spec.
+// It returns a new copy of the Spec without modifying the original. The Catalog is never updated.
 func AssembleCatalogCredential(catalog *apimgmtv3.Catalog, secretLister v1.SecretLister) (apimgmtv3.CatalogSpec, error) {
 	if catalog.GetSecret() == "" {
 		if catalog.Spec.Password != "" {

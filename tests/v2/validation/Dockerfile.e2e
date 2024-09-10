@@ -1,0 +1,39 @@
+FROM registry.suse.com/bci/golang:1.20
+
+# Configure Go
+ENV GOPATH /root/go
+ENV PATH ${PATH}:/root/go/bin
+
+ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
+ENV WORKSPACE2 ${GOPATH}/src/github.com/rancherlabs/corral-packages
+
+WORKDIR $WORKSPACE
+
+COPY ["./rancher", "$WORKSPACE"]
+COPY ["./corral-packages", "$WORKSPACE2"]
+
+ARG CORRAL_VERSION=v1.1.1
+
+RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
+RUN go mod download && \
+    go install gotest.tools/gotestsum@latest && \
+    go install github.com/rancherlabs/corral@${CORRAL_VERSION}
+
+# necessary to run if statements using [[ ]]
+SHELL ["/bin/bash", "-c"] 
+
+ARG RKE_VERSION
+RUN if [[ -n "$RKE_VERSION" ]] ; then echo installing latest version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/latest/download/rke_linux-amd64 > rke ; else echo installing ${RKE_VERSION} version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 > rke; fi;
+RUN mv rke /bin/rke && \
+    chmod +x /bin/rke
+
+ARG CLI_VERSION
+RUN if [[ -n "$CLI_VERSION" ]] ; then  \
+        echo installing CLI version $CLI_VERSION ; \
+        curl -LO https://github.com/rancher/cli/releases/download/$CLI_VERSION/rancher-linux-amd64-$CLI_VERSION.tar.gz ; \
+        tar -xf rancher-linux-amd64-$CLI_VERSION.tar.gz && \
+        mv rancher-$CLI_VERSION/rancher /bin/rancher && \
+        chmod +x /bin/rancher; fi;

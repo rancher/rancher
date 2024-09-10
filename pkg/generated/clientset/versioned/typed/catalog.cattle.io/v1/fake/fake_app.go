@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package fake
 import (
 	"context"
 
-	catalogcattleiov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +35,25 @@ type FakeApps struct {
 	ns   string
 }
 
-var appsResource = schema.GroupVersionResource{Group: "catalog.cattle.io", Version: "v1", Resource: "apps"}
+var appsResource = v1.SchemeGroupVersion.WithResource("apps")
 
-var appsKind = schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "App"}
+var appsKind = v1.SchemeGroupVersion.WithKind("App")
 
 // Get takes name of the app, and returns the corresponding app object, and an error if there is any.
-func (c *FakeApps) Get(ctx context.Context, name string, options v1.GetOptions) (result *catalogcattleiov1.App, err error) {
+func (c *FakeApps) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.App, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(appsResource, c.ns, name), &catalogcattleiov1.App{})
+		Invokes(testing.NewGetAction(appsResource, c.ns, name), &v1.App{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.App), err
+	return obj.(*v1.App), err
 }
 
 // List takes label and field selectors, and returns the list of Apps that match those selectors.
-func (c *FakeApps) List(ctx context.Context, opts v1.ListOptions) (result *catalogcattleiov1.AppList, err error) {
+func (c *FakeApps) List(ctx context.Context, opts metav1.ListOptions) (result *v1.AppList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(appsResource, appsKind, c.ns, opts), &catalogcattleiov1.AppList{})
+		Invokes(testing.NewListAction(appsResource, appsKind, c.ns, opts), &v1.AppList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +63,8 @@ func (c *FakeApps) List(ctx context.Context, opts v1.ListOptions) (result *catal
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &catalogcattleiov1.AppList{ListMeta: obj.(*catalogcattleiov1.AppList).ListMeta}
-	for _, item := range obj.(*catalogcattleiov1.AppList).Items {
+	list := &v1.AppList{ListMeta: obj.(*v1.AppList).ListMeta}
+	for _, item := range obj.(*v1.AppList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +73,69 @@ func (c *FakeApps) List(ctx context.Context, opts v1.ListOptions) (result *catal
 }
 
 // Watch returns a watch.Interface that watches the requested apps.
-func (c *FakeApps) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeApps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(appsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a app and creates it.  Returns the server's representation of the app, and an error, if there is any.
-func (c *FakeApps) Create(ctx context.Context, app *catalogcattleiov1.App, opts v1.CreateOptions) (result *catalogcattleiov1.App, err error) {
+func (c *FakeApps) Create(ctx context.Context, app *v1.App, opts metav1.CreateOptions) (result *v1.App, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(appsResource, c.ns, app), &catalogcattleiov1.App{})
+		Invokes(testing.NewCreateAction(appsResource, c.ns, app), &v1.App{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.App), err
+	return obj.(*v1.App), err
 }
 
 // Update takes the representation of a app and updates it. Returns the server's representation of the app, and an error, if there is any.
-func (c *FakeApps) Update(ctx context.Context, app *catalogcattleiov1.App, opts v1.UpdateOptions) (result *catalogcattleiov1.App, err error) {
+func (c *FakeApps) Update(ctx context.Context, app *v1.App, opts metav1.UpdateOptions) (result *v1.App, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(appsResource, c.ns, app), &catalogcattleiov1.App{})
+		Invokes(testing.NewUpdateAction(appsResource, c.ns, app), &v1.App{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.App), err
+	return obj.(*v1.App), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeApps) UpdateStatus(ctx context.Context, app *catalogcattleiov1.App, opts v1.UpdateOptions) (*catalogcattleiov1.App, error) {
+func (c *FakeApps) UpdateStatus(ctx context.Context, app *v1.App, opts metav1.UpdateOptions) (*v1.App, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(appsResource, "status", c.ns, app), &catalogcattleiov1.App{})
+		Invokes(testing.NewUpdateSubresourceAction(appsResource, "status", c.ns, app), &v1.App{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.App), err
+	return obj.(*v1.App), err
 }
 
 // Delete takes name of the app and deletes it. Returns an error if one occurs.
-func (c *FakeApps) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeApps) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(appsResource, c.ns, name, opts), &catalogcattleiov1.App{})
+		Invokes(testing.NewDeleteActionWithOptions(appsResource, c.ns, name, opts), &v1.App{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeApps) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeApps) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(appsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &catalogcattleiov1.AppList{})
+	_, err := c.Fake.Invokes(action, &v1.AppList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched app.
-func (c *FakeApps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *catalogcattleiov1.App, err error) {
+func (c *FakeApps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.App, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(appsResource, c.ns, name, pt, data, subresources...), &catalogcattleiov1.App{})
+		Invokes(testing.NewPatchSubresourceAction(appsResource, c.ns, name, pt, data, subresources...), &v1.App{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.App), err
+	return obj.(*v1.App), err
 }

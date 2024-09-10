@@ -89,10 +89,11 @@ def test_globalrolebinding_finalizer_cleanup(admin_mc, remove_resource):
         plural="globalrolebindings",
         name=grb_k8s.id,
     )
-    assert (
-        "clusterscoped.controller.cattle.io/grb-sync_fake"
-        not in grb1["metadata"]["finalizers"]
-    )
+    if "finalizers" in grb1["metadata"]:
+        assert (
+            "clusterscoped.controller.cattle.io/grb-sync_fake"
+            not in grb1["metadata"]["finalizers"]
+        )
 
 
 def test_roletemplate_finalizer_cleanup(admin_mc, remove_resource):

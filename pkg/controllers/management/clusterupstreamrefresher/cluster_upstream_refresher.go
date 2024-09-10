@@ -146,7 +146,7 @@ func nextRefreshTime(refreshInterval time.Duration, lastRefreshTime string) (tim
 }
 
 func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cluster, cloudDriver string) (*mgmtv3.Cluster, error) {
-	logrus.Infof("checking cluster [%s] upstream state for changes", cluster.Name)
+	logrus.Debugf("checking cluster [%s] upstream state for changes", cluster.Name)
 
 	// In this call, it is possible to get errors back with non-nil upstreamSpec.
 	// If upstreamSpec is nil then the syncing failed for some reason. This is reported to the user, and this function returns at the end of this if-statement.
@@ -196,7 +196,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	// compare saved cluster.Status...UpstreamSpec with upstreamSpec,
 	// if there is difference then update cluster.Status...UpstreamSpec
 	if !reflect.DeepEqual(upstreamClusterConfig, upstreamSpec) {
-		logrus.Infof("updating cluster [%s], upstream change detected", cluster.Name)
+		logrus.Debugf("updating cluster [%s], upstream change detected", cluster.Name)
 		cluster = cluster.DeepCopy()
 		// for other cloud drivers, please edit HERE
 		switch cloudDriver {
@@ -211,7 +211,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 
 	// check if cluster is still updating changes
 	if !reflect.DeepEqual(initialClusterConfig, appliedClusterConfig) {
-		logrus.Infof("cluster [%s] currently updating, skipping spec sync", cluster.Name)
+		logrus.Debugf("cluster [%s] currently updating, skipping spec sync", cluster.Name)
 		return c.updateCluster(cluster)
 	}
 
@@ -239,7 +239,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	}
 
 	if updateClusterConfig {
-		logrus.Infof("change detected for cluster [%s], updating spec", cluster.Name)
+		logrus.Debugf("change detected for cluster [%s], updating spec", cluster.Name)
 		// for other cloud drivers, please edit HERE
 		switch cloudDriver {
 		case apimgmtv3.ClusterDriverAKS:
@@ -259,7 +259,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 			}
 		}
 	} else {
-		logrus.Infof("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
+		logrus.Debugf("cluster [%s] matches upstream, skipping spec sync", cluster.Name)
 	}
 
 	return c.updateCluster(cluster)

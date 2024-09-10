@@ -143,7 +143,7 @@ func syncCatalogs(management *config.ManagementContext) error {
 			}
 			return doAddCatalogs(management, helm3LibraryName, helm3LibraryURL, helm3LibraryBranch, helm3HelmVersion, bundledMode)
 		},
-		// add rancher-charts
+		// add system-charts
 		func() error {
 			if err := doAddCatalogs(management, systemLibraryName, systemLibraryURL, systemLibraryBranch, "", bundledMode); err != nil {
 				return err

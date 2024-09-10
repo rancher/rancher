@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -15,6 +14,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/util/retry"
 )
 
 func (p *adProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -32,20 +32,20 @@ func (p *adProvider) actionHandler(actionName string, action *types.Action, requ
 	}
 
 	if actionName == "testAndApply" {
-		return p.testAndApply(actionName, action, request)
+		return p.testAndApply(request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (p *adProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (p *adProvider) testAndApply(request *types.APIContext) error {
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		client.ActiveDirectoryTestAndApplyInputType))
 	if err != nil {
 		return err
 	}
 	configApplyInput := &v32.ActiveDirectoryTestAndApplyInput{}
-	if err := mapstructure.Decode(input, configApplyInput); err != nil {
+	if err := common.Decode(input, configApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
@@ -80,7 +80,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return err
 	}
 
-	//if this works, save adConfig CR adding enabled flag
+	// if this works, save adConfig CR adding enabled flag
 	config.Enabled = configApplyInput.Enabled
 	err = p.saveActiveDirectoryConfig(config)
 	if err != nil {
@@ -93,8 +93,13 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return p.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	}); err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
+	}
 
-	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request, userExtraInfo)
+	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request)
 }
 
 func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig) error {
@@ -112,7 +117,7 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig
 		return err
 	}
 
-	config.ServiceAccountPassword = common.GetName(config.Type, field)
+	config.ServiceAccountPassword = common.GetFullSecretName(config.Type, field)
 
 	logrus.Debugf("updating activeDirectoryConfig")
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

@@ -1,0 +1,68 @@
+suite: Test ConfigMap
+templates:
+  - configMap.yaml
+
+tests:
+  - it: should set webhook value from string
+    set:
+      webhook: |-
+        hostNetwork: true
+        newKey: newValue
+        newlist:
+          - list1
+          - list2
+          - list3
+        newMap:
+          entry1: 1
+          entry2: 2
+          entry3:
+            sub3: "sub"
+    asserts:
+      - equal:
+          path: data.rancher-webhook
+          value: |-
+            hostNetwork: true
+            newKey: newValue
+            newlist:
+              - list1
+              - list2
+              - list3
+            newMap:
+              entry1: 1
+              entry2: 2
+              entry3:
+                sub3: "sub"
+
+  - it: should set webhook value from map
+    set:
+      webhook.hostNetwork: true
+      webhook.newKey: 2
+      webhook.innerMap:
+        foo: bar
+    asserts:
+      - equal:
+          path: data.rancher-webhook
+          value: |-
+            hostNetwork: true
+            innerMap:
+              foo: bar
+            newKey: 2
+
+  - it: should not set webhook values
+    asserts:
+      - notExists:
+          path: data.rancher-webhook
+
+  - it: should set priorityClassName
+    set:
+      priorityClassName: "super"
+    asserts:
+      - equal:
+          path: data.priorityClassName
+          value: "super"
+
+  - it: should set default priorityClassName
+    asserts:
+      - equal:
+          path: data.priorityClassName
+          value: "rancher-critical"

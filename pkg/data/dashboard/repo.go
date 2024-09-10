@@ -38,6 +38,7 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 	return err
 }
 
+// addRepos upserts the rancher-charts, rancher-partner-charts and rancher-rke2-charts ClusterRepos
 func addRepos(ctx context.Context, wrangler *wrangler.Context) error {
 	if err := addRepo(wrangler, "rancher-charts", settings.ChartDefaultBranch.Get()); err != nil {
 		return err

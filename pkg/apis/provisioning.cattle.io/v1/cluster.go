@@ -3,10 +3,12 @@ package v1
 import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/genericcondition"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Cluster struct {
@@ -24,13 +26,21 @@ type ClusterSpec struct {
 	RKEConfig                *RKEConfig                     `json:"rkeConfig,omitempty"`
 	LocalClusterAuthEndpoint rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 
-	AgentEnvVars                                         []rkev1.EnvVar `json:"agentEnvVars,omitempty"`
-	DefaultPodSecurityAdmissionConfigurationTemplateName string         `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultPodSecurityPolicyTemplateName                 string         `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
-	DefaultClusterRoleForProjectMembers                  string         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
-	EnableNetworkPolicy                                  *bool          `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
+	AgentEnvVars                                         []rkev1.EnvVar                `json:"agentEnvVars,omitempty"`
+	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization `json:"clusterAgentDeploymentCustomization,omitempty"`
+	DefaultPodSecurityAdmissionConfigurationTemplateName string                        `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
+	DefaultPodSecurityPolicyTemplateName                 string                        `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
+	DefaultClusterRoleForProjectMembers                  string                        `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	EnableNetworkPolicy                                  *bool                         `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
+	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization `json:"fleetAgentDeploymentCustomization,omitempty"`
 
 	RedeploySystemAgentGeneration int64 `json:"redeploySystemAgentGeneration,omitempty"`
+}
+
+type AgentDeploymentCustomization struct {
+	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
+	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
 }
 
 type ClusterStatus struct {

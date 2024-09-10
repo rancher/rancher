@@ -4,25 +4,33 @@ import (
 	"errors"
 	"fmt"
 
-	mVersion "github.com/mcuadros/go-version"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
-var errVersionIncompatible = errors.New("podsecuritypolicies are not available in Kubernetes v1.25 and above")
-var clusterVersionCheckErrorString = "failed to check cluster version compatibility for podsecuritypolicy controllers: %v"
+var ErrClusterVersionIncompatible = errors.New("podsecuritypolicies are not available in Kubernetes v1.25 and above")
 
-// checkClusterVersion tries to fetch a cluster by name, extract its Kubernetes version,
-// and check if the version is less than v1.25.
-func checkClusterVersion(clusterName string, clusterLister v3.ClusterLister) error {
+// CheckClusterVersion tries to fetch a management.cattle.io Cluster by name, extract its Kubernetes version,
+// and check if the cluster supports PodSecurityPolicies. If the version can be parsed, the function checks if it's
+// at least 1.25.x. If yes, it returns a special ErrClusterVersionIncompatible error.
+func CheckClusterVersion(clusterName string, clusterLister v3.ClusterLister) error {
 	cluster, err := clusterLister.Get("", clusterName)
 	if err != nil {
-		return fmt.Errorf("failed to get cluster [%s]: %w", clusterName, err)
+		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
 	}
 	if cluster.Status.Version == nil {
-		return fmt.Errorf("cannot validate Kubernetes version for podsecuritypolicy capability: cluster [%s] status version is not available yet", clusterName)
+		return fmt.Errorf("cluster %s version is not available yet", clusterName)
 	}
-	if mVersion.Compare(cluster.Status.Version.String(), "v1.25", ">=") {
-		return errVersionIncompatible
+	v, err := version.ParseSemantic(cluster.Status.Version.String())
+	if err != nil {
+		return err
+	}
+	v125, err := version.ParseSemantic("v1.25.0")
+	if err != nil {
+		return err
+	}
+	if v.AtLeast(v125) {
+		return ErrClusterVersionIncompatible
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -40,12 +41,12 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		authImage = authImages[0]
 	}
 
-	var cluster *v3.Cluster
+	var cluster *apimgmtv3.Cluster
 	if clusterID != "" {
 		cluster, _ = ch.Clusters.Get(clusterID, metav1.GetOptions{})
 	}
 
-	if err := systemtemplate.SystemTemplate(resp, image.Resolve(settings.AgentImage.Get()), authImage, "", token, url,
+	if err = systemtemplate.SystemTemplate(resp, image.Resolve(settings.AgentImage.Get()), authImage, "", token, url,
 		false, cluster, nil, nil, nil); err != nil {
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))

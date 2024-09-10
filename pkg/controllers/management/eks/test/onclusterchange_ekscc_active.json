@@ -30,6 +30,7 @@
             "f:privateAccess": {},
             "f:publicAccess": {},
             "f:publicAccessSources": {},
+            "f:ebsCSIDriver": {},
             "f:region": {},
             "f:secretsEncryption": {},
             "f:securityGroups": {},
@@ -137,6 +138,7 @@
     "publicAccessSources": [
       "0.0.0.0/0"
     ],
+    "ebsCSIDriver": false,
     "region": "us-east-2",
     "secretsEncryption": false,
     "securityGroups": [],

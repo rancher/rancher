@@ -46,6 +46,7 @@
     "privateAccess": false,
     "publicAccess": true,
     "publicAccessSources": [],
+    "ebsCSIDriver": false,
     "region": "us-east-2",
     "secretsEncryption": false,
     "securityGroups": [],

@@ -8,7 +8,9 @@ import (
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +27,7 @@ type testCase struct {
 var settingsETCD = make(map[string]*v3.Setting)
 
 func TestSetAll(t *testing.T) {
-	settingClient := NewMockSettingClient(gomock.NewController(t))
+	settingClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	testSettingsProvider := settingsProvider{
 		settings: settingClient,
 	}
@@ -95,7 +97,7 @@ func TestSetAll(t *testing.T) {
 
 		assert.Equal(t, expectedFallbackVal, fallbackValue, fallbackFailMsg)
 	}
-	cannotCreateClient := NewMockSettingClient(gomock.NewController(t))
+	cannotCreateClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	testSettingsProvider = settingsProvider{
 		settings: cannotCreateClient,
 	}
@@ -121,7 +123,7 @@ func TestSetAll(t *testing.T) {
 	err = testSettingsProvider.SetAll(settingMap)
 	assert.NotNilf(t, err, "SetAll should return an error if setting client's Create returns an error that is IsAlreadyExists.")
 
-	cannotUpdateClient := NewMockSettingClient(gomock.NewController(t))
+	cannotUpdateClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	testSettingsProvider = settingsProvider{
 		settings: cannotCreateClient,
 	}
@@ -149,7 +151,7 @@ func TestSetAll(t *testing.T) {
 	err = testSettingsProvider.SetAll(settingMap)
 	assert.NotNilf(t, err, "SetAll should return an error if setting client's Update returns an error.")
 
-	alreadyExistsCreateClient := NewMockSettingClient(gomock.NewController(t))
+	alreadyExistsCreateClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	testSettingsProvider = settingsProvider{
 		settings: alreadyExistsCreateClient,
 	}

@@ -237,7 +237,7 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 	}
 
 	var returnErr error
-	requirements, err := getLabelRequirements(binding.Namespace, binding.Name)
+	requirements, err := getLabelRequirements(binding.ObjectMeta)
 	if err != nil {
 		return err
 	}

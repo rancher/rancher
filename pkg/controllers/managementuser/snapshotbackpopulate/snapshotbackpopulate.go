@@ -9,8 +9,8 @@ import (
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
@@ -107,7 +107,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 
 	actualEtcdSnapshots := h.configMapToSnapshots(configMap, cluster)
 
-	ls, err := labels.Parse(fmt.Sprintf("%s=%s", rke2.ClusterNameLabel, cluster.Name))
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capr.ClusterNameLabel, cluster.Name))
 	if err != nil {
 		return configMap, err
 	}
@@ -141,16 +141,16 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				var listSuccessful bool
 				var machine *capi.Machine
 
-				if existingSnapshotCR.Labels[rke2.MachineIDLabel] == "" {
-					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s was missing machine ID label: %s", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, rke2.MachineIDLabel)
+				if existingSnapshotCR.Labels[capr.MachineIDLabel] == "" {
+					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s was missing machine ID label: %s", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, capr.MachineIDLabel)
 					// If the machineID label was not set, fall back to looking up the machine by node name, as this may be a snapshot from an earlier version of Rancher that created local snapshots using the snapshotbackpopulate controller, which means the snapshot should not have the machine ID label.
-					listSuccessful, machine, err = rke2.GetMachineFromNode(h.machineCache, existingSnapshotCR.SnapshotFile.NodeName, cluster)
+					listSuccessful, machine, err = capr.GetMachineFromNode(h.machineCache, existingSnapshotCR.SnapshotFile.NodeName, cluster)
 				} else {
-					listSuccessful, machine, err = rke2.GetMachineByID(h.machineCache, existingSnapshotCR.Labels[rke2.MachineIDLabel], cluster.Namespace, cluster.Name)
+					listSuccessful, machine, err = capr.GetMachineByID(h.machineCache, existingSnapshotCR.Labels[capr.MachineIDLabel], cluster.Namespace, cluster.Name)
 				}
 				if listSuccessful && machine == nil && err != nil {
 					// delete the CR because we don't have a corresponding machine for it
-					logrus.Infof("[snapshotbackpopulate] rkecluster %s/%s: deleting snapshot %s as corresponding machine (ID: %s) was not found", cluster.Namespace, cluster.Name, existingSnapshotCR.Name, existingSnapshotCR.Labels[rke2.MachineIDLabel])
+					logrus.Infof("[snapshotbackpopulate] rkecluster %s/%s: deleting snapshot %s as corresponding machine (ID: %s) was not found", cluster.Namespace, cluster.Name, existingSnapshotCR.Name, existingSnapshotCR.Labels[capr.MachineIDLabel])
 					if err := h.etcdSnapshots.Delete(existingSnapshotCR.Namespace, existingSnapshotCR.Name, &metav1.DeleteOptions{}); err != nil {
 						if !apierrors.IsNotFound(err) {
 							return configMap, err
@@ -204,7 +204,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				snapshot.Spec.ClusterName = cmGeneratedSnapshot.Spec.ClusterName
 				updated = true
 			}
-			if labelsUpdated := reconcileStringMaps(snapshot.Labels, cmGeneratedSnapshot.Labels, []string{rke2.ClusterNameLabel, rke2.NodeNameLabel, rke2.MachineIDLabel}); labelsUpdated {
+			if labelsUpdated := reconcileStringMaps(snapshot.Labels, cmGeneratedSnapshot.Labels, []string{capr.ClusterNameLabel, capr.NodeNameLabel, capr.MachineIDLabel}); labelsUpdated {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s labels did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
 				updated = true
 			}
@@ -275,8 +275,8 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					rke2.ClusterNameLabel: cluster.Name,
-					rke2.NodeNameLabel:    file.NodeName,
+					capr.ClusterNameLabel: cluster.Name,
+					capr.NodeNameLabel:    file.NodeName,
 				},
 				Annotations: map[string]string{
 					SnapshotNameKey:                   file.Name,
@@ -321,13 +321,13 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 			}}
 			snapshot.Annotations[StorageAnnotationKey] = StorageS3
 		} else {
-			listSuccessful, machine, err := rke2.GetMachineFromNode(h.machineCache, file.NodeName, cluster)
+			listSuccessful, machine, err := capr.GetMachineFromNode(h.machineCache, file.NodeName, cluster)
 			if listSuccessful && err != nil {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: error getting machine from node (%s) for snapshot (%s/%s): %v", cluster.Namespace, cluster.Name, file.NodeName, snapshot.Namespace, snapshot.Name, err)
-			} else if listSuccessful && machine != nil && machine.Labels[rke2.MachineIDLabel] == "" {
+			} else if listSuccessful && machine != nil && machine.Labels[capr.MachineIDLabel] == "" {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: machine (%s/%s) for snapshot %s on node: %s had empty Machine ID label", cluster.Namespace, cluster.Name, machine.Namespace, machine.Name, file.Name, file.NodeName)
 			} else {
-				snapshot.Labels[rke2.MachineIDLabel] = machine.Labels[rke2.MachineIDLabel]
+				snapshot.Labels[capr.MachineIDLabel] = machine.Labels[capr.MachineIDLabel]
 			}
 		}
 		snapshot.Name = name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(snapshot.SnapshotFile.Name, "-")), fileSuffix)

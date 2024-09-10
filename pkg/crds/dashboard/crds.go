@@ -7,6 +7,7 @@ import (
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	uiv1 "github.com/rancher/rancher/pkg/apis/ui.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/crds"
 	"github.com/rancher/rancher/pkg/crds/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
@@ -21,8 +22,9 @@ import (
 
 var (
 	bootstrapFleet = map[string]interface{}{
-		"bundles.fleet.cattle.io":  fleetv1alpha1api.Bundle{},
-		"clusters.fleet.cattle.io": fleetv1alpha1api.Cluster{},
+		"bundles.fleet.cattle.io":       fleetv1alpha1api.Bundle{},
+		"clusters.fleet.cattle.io":      fleetv1alpha1api.Cluster{},
+		"clustergroups.fleet.cattle.io": fleetv1alpha1api.ClusterGroup{},
 	}
 )
 
@@ -123,6 +125,12 @@ func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 
 	if features.ProvisioningV2.Enabled() {
 		result = append(result, provisioningv2.List()...)
+	}
+	for i := len(result) - 1; i >= 0; i-- {
+		if crds.MigratedResources[result[i].Name()] {
+			// remove the migrated resource from the result slice so we do not install a dynamic definition
+			result = append(result[:i], result[i+1:]...)
+		}
 	}
 	return result, nil
 }

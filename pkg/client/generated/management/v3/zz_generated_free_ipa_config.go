@@ -27,6 +27,7 @@ const (
 	FreeIpaConfigFieldServiceAccountDistinguishedName = "serviceAccountDistinguishedName"
 	FreeIpaConfigFieldServiceAccountPassword          = "serviceAccountPassword"
 	FreeIpaConfigFieldStartTLS                        = "starttls"
+	FreeIpaConfigFieldStatus                          = "status"
 	FreeIpaConfigFieldTLS                             = "tls"
 	FreeIpaConfigFieldType                            = "type"
 	FreeIpaConfigFieldUUID                            = "uuid"
@@ -67,6 +68,7 @@ type FreeIpaConfig struct {
 	ServiceAccountDistinguishedName string            `json:"serviceAccountDistinguishedName,omitempty" yaml:"serviceAccountDistinguishedName,omitempty"`
 	ServiceAccountPassword          string            `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
 	StartTLS                        bool              `json:"starttls,omitempty" yaml:"starttls,omitempty"`
+	Status                          *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	TLS                             bool              `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Type                            string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UUID                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

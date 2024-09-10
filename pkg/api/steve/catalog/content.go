@@ -13,11 +13,23 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 )
 
+// contentDownload implements the http handler interface.
 type contentDownload struct {
+	// contentManager struct functions helps in retrieving information
+	// related to helm repositories such as chart asset,icon,info, helm repo index file
+	// suitable to the current cluster and logs
 	contentManager *content.Manager
 }
 
+// ServeHTTP is the main entry point for Apps & MarketPlace content service.
+// It parses the request into apicontext to determine the type of content that
+// needs to be served. The type of content being served is determined by the
+// link field of the API context. It then calls the appropriate function of
+// contentManager to serve the information.
 func (i *contentDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	// Get the APIContext from the current request's context. This APIContext
+	// encapsulates the details of the API request, which will be used to
+	// determine the necessary operation and respond accordingly.
 	apiContext := types.GetAPIContext(req.Context())
 	switch apiContext.Link {
 	case "index":
@@ -39,6 +51,8 @@ func (i *contentDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// serveIndex retrieves the index file from the Helm repository, translates the URLs based on the current domain name,
+// and sends the index file to the client.
 func (i *contentDownload) serveIndex(apiContext *types.APIRequest, rw http.ResponseWriter, req *http.Request) error {
 	index, err := i.getIndex(apiContext)
 	if err != nil {
@@ -58,6 +72,7 @@ func (i *contentDownload) serveIndex(apiContext *types.APIRequest, rw http.Respo
 	return json.NewEncoder(rw).Encode(index)
 }
 
+// serveInfo provides detailed information about a specific chart
 func (i *contentDownload) serveInfo(apiContext *types.APIRequest, rw http.ResponseWriter, req *http.Request) error {
 	query := apiContext.Request.URL.Query()
 	chartName := query.Get("chartName")
@@ -77,6 +92,7 @@ func (i *contentDownload) serveInfo(apiContext *types.APIRequest, rw http.Respon
 	return json.NewEncoder(rw).Encode(info)
 }
 
+// serveIcon retrieves and serves the icon for a specific chart.
 func (i *contentDownload) serveIcon(apiContext *types.APIRequest, rw http.ResponseWriter, req *http.Request) error {
 	query := apiContext.Request.URL.Query()
 	chartName := query.Get("chartName")
@@ -98,6 +114,7 @@ func (i *contentDownload) serveIcon(apiContext *types.APIRequest, rw http.Respon
 	return err
 }
 
+// setIconHeaders sets headers necessary for the correct display of the icon image in most browsers.
 func setIconHeaders(rw http.ResponseWriter, suffix string) {
 	if suffix == ".svg" {
 		rw.Header().Set("Content-Type", "image/svg+xml")
@@ -107,6 +124,8 @@ func setIconHeaders(rw http.ResponseWriter, suffix string) {
 	rw.Header().Set("X-Content-Type-Options", "nosniff")
 }
 
+// serveChart retrieves and serves a specific chart.
+// The chart and its version are determined by the query parameters of the API request.
 func (i *contentDownload) serveChart(apiContext *types.APIRequest, rw http.ResponseWriter, req *http.Request) error {
 	query := apiContext.Request.URL.Query()
 	chartName := query.Get("chartName")
@@ -129,11 +148,14 @@ func (i *contentDownload) serveChart(apiContext *types.APIRequest, rw http.Respo
 	return err
 }
 
+// getIndex retrieves the index file from the Helm repository
 func (i *contentDownload) getIndex(apiContext *types.APIRequest) (*repo.IndexFile, error) {
 	namespace, name := nsAndName(apiContext)
 	return i.contentManager.Index(namespace, name, false)
 }
 
+// nsAndName returns the namespace and name from the API context. If the
+// API context corresponds to the cluster repository, the namespace is an empty string.
 func nsAndName(apiContext *types.APIRequest) (string, string) {
 	if isClusterRepo(apiContext.Type) {
 		return "", apiContext.Name

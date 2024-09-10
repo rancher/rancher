@@ -8,33 +8,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
-)
-
-var (
-	TypeToFields = map[string][]string{
-		client.GithubConfigType:          {client.GithubConfigFieldClientSecret},
-		client.ActiveDirectoryConfigType: {client.ActiveDirectoryConfigFieldServiceAccountPassword},
-		client.AzureADConfigType:         {client.AzureADConfigFieldApplicationSecret},
-		client.OpenLdapConfigType:        {client.LdapConfigFieldServiceAccountPassword},
-		client.FreeIpaConfigType:         {client.LdapConfigFieldServiceAccountPassword},
-		client.PingConfigType:            {client.PingConfigFieldSpKey},
-		client.ADFSConfigType:            {client.ADFSConfigFieldSpKey},
-		client.KeyCloakConfigType:        {client.KeyCloakConfigFieldSpKey},
-		client.OKTAConfigType:            {client.OKTAConfigFieldSpKey},
-		client.ShibbolethConfigType:      {client.ShibbolethConfigFieldSpKey},
-		client.GoogleOauthConfigType:     {client.GoogleOauthConfigFieldOauthCredential, client.GoogleOauthConfigFieldServiceAccountCredential},
-		client.OIDCConfigType:            {client.OIDCConfigFieldPrivateKey},
-		client.KeyCloakOIDCConfigType:    {client.KeyCloakOIDCConfigFieldPrivateKey},
-	}
-
-	SubTypeToFields = map[string]map[string][]string{
-		client.ShibbolethConfigType: {
-			client.ShibbolethConfigFieldOpenLdapConfig: {client.LdapConfigFieldServiceAccountPassword},
-		},
-	}
 )
 
 func Wrap(store types.Store, secrets corev1.SecretInterface) types.Store {

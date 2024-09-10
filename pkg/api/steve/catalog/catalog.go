@@ -1,3 +1,12 @@
+/*
+Package catalog implements API handlers for Rancher's catalog functionality.
+
+It registers handlers for Helm-related operations and content management.
+
+It also links the custom resouces with the handlers with the help of Templates in the apiserver package.
+
+The package is used to facilitate interactions with Helm charts within a Rancher server environment.
+*/
 package catalog
 
 import (
@@ -17,13 +26,18 @@ import (
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 )
 
+// Register is used to register the two handlers with the apiserver
 func Register(ctx context.Context, server *steve.Server,
 	helmop *helmop.Operations,
 	contentManager *content.Manager) error {
+
 	ops := newOperation(helmop, server.ClusterRegistry)
+
+	// Informer callbacks for Steve server
 	server.ClusterCache.OnAdd(ctx, ops.OnAdd)
 	server.ClusterCache.OnChange(ctx, ops.OnChange)
 
+	// App's & marketplace-related data
 	index := &contentDownload{
 		contentManager: contentManager,
 	}
@@ -32,7 +46,17 @@ func Register(ctx context.Context, server *steve.Server,
 	return nil
 }
 
+// addSchemas adds and customizes API schemas for operations, app, repo, and clusterrepo.
+// It adds action handlers and resource actions for install, upgrade, and uninstall operations of Charts.
+// It also sets up handlers for byID and link requests.
+//
+// The function uses predefined structure templates for API schemas, allowing for customization
+// of behavior at runtime. It associates specific operations with specific routes, and
+// defines how to handle different action requests made on different resources.
+//
+// The handlers for retrieving resources by their IDs are also customized.
 func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
+	// Imports and generates API schemas to be handled by as requests by the Rancher API server.
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUninstallAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgradeAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgrade{}, nil)
@@ -87,16 +111,21 @@ func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
 					Output: "chartActionOutput",
 				},
 			}
+			// Customize the handler for retrieving a Repo resource by its ID.
 			apiSchema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
 				if request.Name == "index.yaml" {
 					request.Name = request.Namespace
 					request.Namespace = ""
 					request.Link = "index"
+					// Serve the HTTP response using the 'index' handler.
 					index.ServeHTTP(request.Response, request.Request)
+					// The request has been fully handled and no further processing is required
 					return types.APIObject{}, validation.ErrComplete
 				}
+				// For all other requests, use default ByIDHandler to retrieve a resource by its ID.
 				return handlers.ByIDHandler(request)
 			}
+			// Define handlers for different links on the Repo resource that can be used to serve additional information.
 			apiSchema.LinkHandlers = map[string]http.Handler{
 				"index": index,
 				"info":  index,

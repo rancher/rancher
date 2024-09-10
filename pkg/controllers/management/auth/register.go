@@ -64,7 +64,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	n := newTokenController(management.WithAgent(tokenController))
 	ac := newAuthConfigController(ctx, management, clusterManager.ScaledContext)
 	ua := newUserAttributeController(management.WithAgent(userAttributeController))
-	s := newAuthSettingController(management)
+	s := newAuthSettingController(ctx, management)
 	rt := newRoleTemplateLifecycle(management, clusterManager)
 	grbLegacy := newLegacyGRBCleaner(management)
 	rtLegacy := newLegacyRTCleaner(management)

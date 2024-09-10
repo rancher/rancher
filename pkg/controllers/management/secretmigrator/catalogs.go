@@ -14,11 +14,7 @@ func (h *handler) syncCatalog(key string, catalog *v3.Catalog) (runtime.Object, 
 		return catalog, nil
 	}
 
-	if apimgmtv3.CatalogConditionSecretsMigrated.IsTrue(catalog) {
-		logrus.Tracef("[secretmigrator] catalog %s already migrated", catalog.Name)
-		return catalog, nil
-	}
-	obj, err := apimgmtv3.CatalogConditionSecretsMigrated.Do(catalog, func() (runtime.Object, error) {
+	obj, err := apimgmtv3.CatalogConditionSecretsMigrated.DoUntilTrue(catalog, func() (runtime.Object, error) {
 		if catalog.Status.CredentialSecret == "" && catalog.Spec.Password != "" {
 			logrus.Tracef("[secretmigrator] migrating secrets for global catalog %s", catalog.Name)
 			secret, err := h.migrator.CreateOrUpdateCatalogSecret("", catalog.Spec.Password, catalog)

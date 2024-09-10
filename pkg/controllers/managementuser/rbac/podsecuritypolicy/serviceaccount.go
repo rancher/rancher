@@ -118,12 +118,12 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) (runtim
 		return nil, nil
 	}
 
-	err := checkClusterVersion(m.clusterName, m.clusterLister)
+	err := CheckClusterVersion(m.clusterName, m.clusterLister)
 	if err != nil {
-		if errors.Is(err, errVersionIncompatible) {
+		if errors.Is(err, ErrClusterVersionIncompatible) {
 			return obj, nil
 		}
-		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+		return obj, fmt.Errorf("error checking cluster version for ServiceAccount controller: %w", err)
 	}
 
 	namespace, err := m.namespaceLister.Get("", obj.Namespace)

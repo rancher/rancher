@@ -65,6 +65,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
+	mux.PathPrefix("/api").MatcherFunc(proxyHandler.matchManagementCRDs()).HandlerFunc(proxyHandler.authLocalCluster(mux))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
@@ -128,6 +129,28 @@ func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
 		match.Vars["clusterID"] = clusterID
 
 		return true
+	}
+}
+
+func (h *Handler) authLocalCluster(router *gmux.Router) func(rw http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		authed := h.userCanAccessCluster(req, "local")
+		if !authed {
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
+		router.NotFoundHandler.ServeHTTP(rw, req)
+	}
+}
+
+func (h *Handler) matchManagementCRDs() gmux.MatcherFunc {
+	return func(req *http.Request, match *gmux.RouteMatch) bool {
+		splitPath := strings.Split(req.URL.Path, "/")
+		if len(splitPath) < 3 {
+			return false
+		}
+		apiGroup := splitPath[2]
+		return apiGroup == managementv3.GroupName
 	}
 }
 

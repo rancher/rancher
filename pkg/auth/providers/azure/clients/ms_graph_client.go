@@ -78,6 +78,9 @@ func (c azureMSGraphClient) GetGroup(id string) (v3.Principal, error) {
 // ListGroups fetches all group principals in a directory from the Microsoft Graph API.
 func (c azureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 	groups, _, err := c.groupClient.List(context.Background(), odata.Query{Filter: filter})
+	if err != nil {
+		return nil, err
+	}
 	var principals []v3.Principal
 	for _, u := range *groups {
 		principal, err := c.groupToPrincipal(u)

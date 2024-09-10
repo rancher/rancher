@@ -18,10 +18,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var errorDebounceTime = time.Second * 30
+var (
+	errorDebounceTime = time.Second * 30
+)
 
 func NewAuditLogMiddleware(auditWriter *LogWriter) (func(http.Handler) http.Handler, error) {
-	sensitiveRegex, err := constructKeyConcealRegex()
+	sensitiveRegex, err := constructKeyRedactRegex()
 	return func(next http.Handler) http.Handler {
 		return &auditHandler{
 			next:            next,
@@ -33,8 +35,8 @@ func NewAuditLogMiddleware(auditWriter *LogWriter) (func(http.Handler) http.Hand
 	}, err
 }
 
-// constructKeyConcealRegex builds a regex for matching non-public fields from management.DriverData as well as fields that end with [pP]assword or [tT]oken.
-func constructKeyConcealRegex() (*regexp.Regexp, error) {
+// constructKeyRedactRegex builds a regex for matching non-public fields from management.DriverData as well as fields that end with [pP]assword or [tT]oken.
+func constructKeyRedactRegex() (*regexp.Regexp, error) {
 	s := strings.Builder{}
 	s.WriteRune('(')
 	for _, v := range management.DriverData {
@@ -47,7 +49,7 @@ func constructKeyConcealRegex() (*regexp.Regexp, error) {
 			}
 		}
 	}
-	s.WriteString(`[pP]assword|[tT]oken)`)
+	s.WriteString(`[pP]assword|[tT]oken|[kK]ube[cC]onfig)`)
 
 	return regexp.Compile(s.String())
 }

@@ -73,6 +73,7 @@ rules:
     resources:
       - rolebindings
       - clusterrolebindings
+      - roles
     verbs:
       - list
       - get

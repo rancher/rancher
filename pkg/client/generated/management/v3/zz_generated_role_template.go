@@ -15,6 +15,7 @@ const (
 	RoleTemplateFieldCreatorID             = "creatorId"
 	RoleTemplateFieldDescription           = "description"
 	RoleTemplateFieldExternal              = "external"
+	RoleTemplateFieldExternalRules         = "externalRules"
 	RoleTemplateFieldHidden                = "hidden"
 	RoleTemplateFieldLabels                = "labels"
 	RoleTemplateFieldLocked                = "locked"
@@ -38,6 +39,7 @@ type RoleTemplate struct {
 	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description           string            `json:"description,omitempty" yaml:"description,omitempty"`
 	External              bool              `json:"external,omitempty" yaml:"external,omitempty"`
+	ExternalRules         []PolicyRule      `json:"externalRules,omitempty" yaml:"externalRules,omitempty"`
 	Hidden                bool              `json:"hidden,omitempty" yaml:"hidden,omitempty"`
 	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Locked                bool              `json:"locked,omitempty" yaml:"locked,omitempty"`

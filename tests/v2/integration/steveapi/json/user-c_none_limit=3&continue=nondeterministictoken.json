@@ -8,12 +8,13 @@
       "id": "test-ns-2/test2",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-2/test2",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-2/secrets/test2"
+        "self": "https://rancherurl/v1/secrets/test-ns-2/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-2/secrets/test2"
       },
       "metadata": {
         "labels": {
-          "test-label": "2"
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test2",
         "namespace": "test-ns-2",
@@ -31,10 +32,13 @@
       "id": "test-ns-3/test1",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-3/test1",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test1"
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test1"
       },
       "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
         "name": "test1",
         "namespace": "test-ns-3",
         "resourceVersion": "1000",
@@ -51,12 +55,13 @@
       "id": "test-ns-3/test2",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-3/test2",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test2"
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test2"
       },
       "metadata": {
         "labels": {
-          "test-label": "2"
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test2",
         "namespace": "test-ns-3",
@@ -70,10 +75,10 @@
     }
   ],
   "links": {
-    "self": "https://localhost:8443/v1/secrets"
+    "self": "https://rancherurl/v1/secrets"
   },
   "pagination": {
-    "first": "https://localhost:8443/v1/secrets",
+    "first": "https://rancherurl/v1/secrets",
     "partial": true
   },
   "resourceType": "secret",

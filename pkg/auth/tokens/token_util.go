@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
@@ -132,23 +133,28 @@ func extractClusterIDFromResponseType(responseType string) string {
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
 func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error) {
 	invalidAuthTokenErr := errors.New("Invalid auth token value")
-	if storedToken.ObjectMeta.Name != tokenName {
-		return 422, invalidAuthTokenErr
+	if storedToken == nil || storedToken.Name != tokenName {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
 	if storedToken.Annotations != nil && storedToken.Annotations[TokenHashed] == "true" {
-		if err := VerifySHA256Hash(storedToken.Token, tokenKey); err != nil {
-			logrus.Errorf("VerifySHA256Hash failed with error: %v", err)
-			return 422, invalidAuthTokenErr
+		hasher, err := hashers.GetHasherForHash(storedToken.Token)
+		if err != nil {
+			logrus.Errorf("unable to get a hasher for token with error %v", err)
+			return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+		}
+		if err := hasher.VerifyHash(storedToken.Token, tokenKey); err != nil {
+			logrus.Errorf("VerifyHash failed with error: %v", err)
+			return http.StatusUnprocessableEntity, invalidAuthTokenErr
 		}
 	} else {
 		if storedToken.Token != tokenKey {
-			return 422, invalidAuthTokenErr
+			return http.StatusUnprocessableEntity, invalidAuthTokenErr
 		}
 	}
 	if IsExpired(*storedToken) {
-		return 410, errors.New("must authenticate")
+		return http.StatusGone, errors.New("must authenticate")
 	}
-	return 200, nil
+	return http.StatusOK, nil
 }
 
 // ConvertTokenKeyToHash takes a token with an un-hashed key and converts it to a hashed key
@@ -157,7 +163,8 @@ func ConvertTokenKeyToHash(token *v3.Token) error {
 		return nil
 	}
 	if token != nil && len(token.Token) > 0 {
-		hashedToken, err := CreateSHA256Hash(token.Token)
+		hasher := hashers.GetHasher()
+		hashedToken, err := hasher.CreateHash(token.Token)
 		if err != nil {
 			logrus.Errorf("Failed to generate hash from token: %v", err)
 			return errors.New("failed to generate hash from token")

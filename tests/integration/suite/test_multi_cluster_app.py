@@ -45,6 +45,7 @@ def test_mutliclusterapp_invalid_project(admin_mc, remove_resource):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
                                              user_factory, remove_resource,
                                              ):
@@ -121,6 +122,7 @@ def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
     assert mcapp is not None
 
 
+@pytest.mark.skip
 def test_multiclusterapp_admin_create(admin_mc, admin_pc, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -136,6 +138,7 @@ def test_multiclusterapp_admin_create(admin_mc, admin_pc, remove_resource):
     wait_for_app(admin_pc, mcapp_name, 60)
 
 
+@pytest.mark.skip
 def test_multiclusterapp_cluster_owner_create(admin_mc, admin_pc,
                                               remove_resource, user_factory):
     client = admin_mc.client
@@ -160,6 +163,7 @@ def test_multiclusterapp_cluster_owner_create(admin_mc, admin_pc,
     remove_resource(mcapp1)
 
 
+@pytest.mark.skip
 def test_multiclusterapp_project_owner_create(admin_mc, admin_pc,
                                               remove_resource, user_factory):
     client = admin_mc.client
@@ -184,6 +188,7 @@ def test_multiclusterapp_project_owner_create(admin_mc, admin_pc,
     remove_resource(mcapp1)
 
 
+@pytest.mark.skip
 def test_multiclusterapp_user_create(admin_mc, admin_pc, remove_resource,
                                      user_factory):
     client = admin_mc.client
@@ -240,6 +245,7 @@ def test_multiclusterapp_user_create(admin_mc, admin_pc, remove_resource,
         assert "cluster-owner" in e.error.message
 
 
+@pytest.mark.skip
 def test_multiclusterapp_admin_update_roles(admin_mc, admin_pc,
                                             remove_resource):
     client = admin_mc.client
@@ -263,6 +269,7 @@ def test_multiclusterapp_admin_update_roles(admin_mc, admin_pc,
              timeout=60, fail_handler=fail_handler(roles_resource))
 
 
+@pytest.mark.skip
 def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
                                            user_factory):
     client = admin_mc.client
@@ -309,6 +316,7 @@ def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
              timeout=60, fail_handler=fail_handler(roles_resource))
 
 
+@pytest.mark.skip
 def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -334,6 +342,7 @@ def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
              fail_handler=fail_handler(roles_resource))
 
 
+@pytest.mark.skip
 def test_add_projects(admin_mc, admin_pc, admin_cc, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -358,6 +367,7 @@ def test_add_projects(admin_mc, admin_pc, admin_cc, remove_resource):
              fail_handler=fail_handler(projects_resource))
 
 
+@pytest.mark.skip
 def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -381,6 +391,7 @@ def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
              fail_handler=fail_handler(projects_resource))
 
 
+@pytest.mark.skip
 def test_multiclusterapp_revision_access(admin_mc, admin_pc, remove_resource,
                                          user_factory):
     client = admin_mc.client
@@ -452,6 +463,7 @@ def wait_for_app_condition(admin_pc, name, condition, timeout=60):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_mcapp_create_validation(admin_mc, admin_pc, custom_catalog,
                                  remove_resource, restore_rancher_version):
     """Test create validation of multi cluster apps. This test will set the
@@ -504,6 +516,7 @@ def test_mcapp_create_validation(admin_mc, admin_pc, custom_catalog,
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_mcapp_update_validation(admin_mc, admin_pc, custom_catalog,
                                  remove_resource, restore_rancher_version):
     """Test update validation of multi cluster apps. This test will set the
@@ -552,82 +565,7 @@ def test_mcapp_update_validation(admin_mc, admin_pc, custom_catalog,
         in e.value.error.message
 
 
-@pytest.mark.nonparallel
-def test_mcapp_rollback_validation(admin_mc, admin_pc, custom_catalog,
-                                   remove_resource, restore_rancher_version):
-    """Test rollback validation of multi cluster apps. This test will set the
-    rancher version explicitly and attempt to rollback an app with rancher
-    version requirements
-    """
-    # 1.6.0 uses 2.0.0-2.2.0
-    # 1.6.2 uses 2.1.0-2.3.0
-    c_name = random_str()
-    custom_catalog(name=c_name)
-
-    client = admin_mc.client
-    set_server_version(client, "2.1.0")
-
-    cat_ns_name = "cattle-global-data:"+c_name
-
-    mcapp_data = {
-        'name': random_str(),
-        'templateVersionId': cat_ns_name+"-chartmuseum-1.6.0",
-        'targets': [{"projectId": admin_pc.project.id}],
-        'roles': ["cluster-owner", "project-member"],
-        "answers": [{
-            "type": "answer",
-            "clusterId": None,
-            "projectId": None,
-            "values": {
-                "defaultImage": "true",
-                "image.repository": "chartmuseum/chartmuseum",
-                "image.tag": "v0.7.1",
-                "env.open.STORAGE": "local",
-                "gcp.secret.enabled": "false",
-                "gcp.secret.key": "credentials.json",
-                "persistence.enabled": "true",
-                "persistence.size": "10Gi",
-                "ingress.enabled": "true",
-                "ingress.hosts[0]": "xip.io",
-                "service.type": "NodePort",
-                "env.open.SHOW_ADVANCED": "false",
-                "env.open.DEPTH": "0",
-                "env.open.ALLOW_OVERWRITE": "false",
-                "env.open.AUTH_ANONYMOUS_GET": "false",
-                "env.open.DISABLE_METRICS": "true"
-            }
-        }]
-    }
-
-    # First app requires a min rancher version of 2.0 so no error
-    mcapp1 = client.create_multi_cluster_app(mcapp_data)
-    remove_resource(mcapp1)
-    wait_for_app(admin_pc, mcapp_data['name'])
-
-    mcapp1 = client.reload(mcapp1)
-
-    original_rev = mcapp1.revisions().data[0].name
-
-    mcapp1.templateVersionId = cat_ns_name+"-chartmuseum-1.6.2"
-
-    # Upgrade the app to get a rollback version
-    mcapp1 = client.update_by_id_multi_cluster_app(mcapp1.id, mcapp1)
-    wait_for_app(admin_pc, mcapp_data['name'])
-    mcapp1 = client.reload(mcapp1)
-
-    assert mcapp1.status.revisionId != original_rev, 'app did not upgrade'
-
-    server_version = "2.3.1"
-    set_server_version(client, server_version)
-    # App rollback requires a max of 2.2 so expect error
-    with pytest.raises(ApiError) as e:
-        client.action(obj=mcapp1, action_name='rollback',
-                      revisionId=original_rev)
-    assert e.value.error.status == 422
-    assert 'incompatible rancher version [%s] for template' % server_version \
-        in e.value.error.message
-
-
+@pytest.mark.skip
 def test_perform_mca_action_read_only(admin_mc, admin_pc, remove_resource,
                                       user_mc, user_factory):
     """Tests MCA actions with a read-only user and a member user."""

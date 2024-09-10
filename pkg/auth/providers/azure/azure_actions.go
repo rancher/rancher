@@ -17,16 +17,17 @@ import (
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
-func (ap *azureProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (ap *Provider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	common.AddCommonActions(apiContext, resource)
 	resource.AddAction(apiContext, "configureTest")
 	resource.AddAction(apiContext, "testAndApply")
 	resource.AddAction(apiContext, "upgrade")
 }
 
-func (ap *azureProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+func (ap *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	handled, err := common.HandleCommonAction(actionName, action, request, Name, ap.authConfigs)
 	if err != nil {
 		return err
@@ -36,9 +37,9 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	}
 
 	if actionName == "configureTest" {
-		return ap.ConfigureTest(actionName, action, request)
+		return ap.ConfigureTest(request)
 	} else if actionName == "testAndApply" {
-		return ap.testAndApply(actionName, action, request)
+		return ap.testAndApply(request)
 	} else if actionName == "upgrade" {
 		return ap.migrateToMicrosoftGraph()
 	}
@@ -46,7 +47,7 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (ap *azureProvider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (ap *Provider) ConfigureTest(request *types.APIContext) error {
 	// Verify the body has all required fields
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		client.AzureADConfigType))
@@ -63,7 +64,7 @@ func (ap *azureProvider) ConfigureTest(actionName string, action *types.Action, 
 	return nil
 }
 
-func (ap *azureProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (ap *Provider) testAndApply(request *types.APIContext) error {
 	var err error
 	// On any error, delete the cached secret containing the access token to the Microsoft Graph, in case it had been
 	// cached without having sufficient API permissions. Rancher has no precise control over when this secret is cached.
@@ -83,7 +84,7 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 
 	azureADConfig := &azureADConfigApplyInput.Config
 
-	currentConfig, err := ap.getAzureConfigK8s()
+	currentConfig, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		logrus.Errorf("Failed to fetch Azure AD Config from Kubernetes: %v", err)
 		return httperror.NewAPIError(httperror.ServerError, "failed to fetch Azure AD Config from Kubernetes")
@@ -102,7 +103,7 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 		}
 		azureADConfig.ApplicationSecret = value
 	}
-	//Call provider
+	// Call provider
 	userPrincipal, groupPrincipals, providerToken, err := ap.loginUser(azureADConfig, azureLogin, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
@@ -122,14 +123,19 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 	}
 
 	userExtraInfo := ap.GetUserExtraAttributes(userPrincipal)
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return ap.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	}); err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
+	}
 
-	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request, userExtraInfo)
+	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request)
 }
 
 // Check the current auth config and make sure that the proposed one submitted through the API has up-to-date annotations.
 // Rancher relies on GraphEndpointMigratedAnnotation to choose the right authentication flow and Graph API.
 func migrateNewFlowAnnotation(current, proposed *v32.AzureADConfig) {
-	if isConfigDeprecated(current) {
+	if IsConfigDeprecated(current) {
 		return
 	}
 	// This covers the case where admins upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.

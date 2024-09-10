@@ -39,12 +39,12 @@ func (c *clusterRoleHandler) sync(key string, obj *v1.ClusterRole) (runtime.Obje
 		return obj, nil
 	}
 
-	err := checkClusterVersion(c.clusterName, c.clusterLister)
+	err := CheckClusterVersion(c.clusterName, c.clusterLister)
 	if err != nil {
-		if errors.Is(err, errVersionIncompatible) {
+		if errors.Is(err, ErrClusterVersionIncompatible) {
 			return obj, nil
 		}
-		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+		return obj, fmt.Errorf("error checking cluster version for ClusterRole controller: %w", err)
 	}
 
 	if templateID, ok := obj.Annotations[podSecurityPolicyTemplateParentAnnotation]; ok {

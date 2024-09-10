@@ -42,11 +42,13 @@ const (
 	CronJobFieldPublicEndpoints               = "publicEndpoints"
 	CronJobFieldReadinessGates                = "readinessGates"
 	CronJobFieldRemoved                       = "removed"
+	CronJobFieldResourceClaims                = "resourceClaims"
 	CronJobFieldRestartPolicy                 = "restartPolicy"
 	CronJobFieldRunAsGroup                    = "runAsGroup"
 	CronJobFieldRunAsNonRoot                  = "runAsNonRoot"
 	CronJobFieldRuntimeClassName              = "runtimeClassName"
 	CronJobFieldScheduling                    = "scheduling"
+	CronJobFieldSchedulingGates               = "schedulingGates"
 	CronJobFieldSeccompProfile                = "seccompProfile"
 	CronJobFieldSelector                      = "selector"
 	CronJobFieldServiceAccountName            = "serviceAccountName"
@@ -108,11 +110,13 @@ type CronJob struct {
 	PublicEndpoints               []PublicEndpoint               `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	Removed                       string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ResourceClaims                []PodResourceClaim             `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
 	RestartPolicy                 string                         `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                         `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`

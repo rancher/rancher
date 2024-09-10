@@ -1,10 +1,10 @@
 {
   "actions": {},
   "createTypes": {
-    "secret": "https://localhost:8443/v1/secrets"
+    "secret": "https://rancherurl/v1/secrets"
   },
   "links": {
-    "self": "https://localhost:8443/v1/secrets/test-ns-2"
+    "self": "https://rancherurl/v1/secrets/test-ns-2"
   },
   "resourceType": "secret",
   "revision": "100",

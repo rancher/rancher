@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package fake
 import (
 	"context"
 
-	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +35,25 @@ type FakeRKEClusters struct {
 	ns   string
 }
 
-var rkeclustersResource = schema.GroupVersionResource{Group: "rke.cattle.io", Version: "v1", Resource: "rkeclusters"}
+var rkeclustersResource = v1.SchemeGroupVersion.WithResource("rkeclusters")
 
-var rkeclustersKind = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKECluster"}
+var rkeclustersKind = v1.SchemeGroupVersion.WithKind("RKECluster")
 
 // Get takes name of the rKECluster, and returns the corresponding rKECluster object, and an error if there is any.
-func (c *FakeRKEClusters) Get(ctx context.Context, name string, options v1.GetOptions) (result *rkecattleiov1.RKECluster, err error) {
+func (c *FakeRKEClusters) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RKECluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rkeclustersResource, c.ns, name), &rkecattleiov1.RKECluster{})
+		Invokes(testing.NewGetAction(rkeclustersResource, c.ns, name), &v1.RKECluster{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKECluster), err
+	return obj.(*v1.RKECluster), err
 }
 
 // List takes label and field selectors, and returns the list of RKEClusters that match those selectors.
-func (c *FakeRKEClusters) List(ctx context.Context, opts v1.ListOptions) (result *rkecattleiov1.RKEClusterList, err error) {
+func (c *FakeRKEClusters) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RKEClusterList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rkeclustersResource, rkeclustersKind, c.ns, opts), &rkecattleiov1.RKEClusterList{})
+		Invokes(testing.NewListAction(rkeclustersResource, rkeclustersKind, c.ns, opts), &v1.RKEClusterList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +63,8 @@ func (c *FakeRKEClusters) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rkecattleiov1.RKEClusterList{ListMeta: obj.(*rkecattleiov1.RKEClusterList).ListMeta}
-	for _, item := range obj.(*rkecattleiov1.RKEClusterList).Items {
+	list := &v1.RKEClusterList{ListMeta: obj.(*v1.RKEClusterList).ListMeta}
+	for _, item := range obj.(*v1.RKEClusterList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +73,69 @@ func (c *FakeRKEClusters) List(ctx context.Context, opts v1.ListOptions) (result
 }
 
 // Watch returns a watch.Interface that watches the requested rKEClusters.
-func (c *FakeRKEClusters) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRKEClusters) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rkeclustersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a rKECluster and creates it.  Returns the server's representation of the rKECluster, and an error, if there is any.
-func (c *FakeRKEClusters) Create(ctx context.Context, rKECluster *rkecattleiov1.RKECluster, opts v1.CreateOptions) (result *rkecattleiov1.RKECluster, err error) {
+func (c *FakeRKEClusters) Create(ctx context.Context, rKECluster *v1.RKECluster, opts metav1.CreateOptions) (result *v1.RKECluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rkeclustersResource, c.ns, rKECluster), &rkecattleiov1.RKECluster{})
+		Invokes(testing.NewCreateAction(rkeclustersResource, c.ns, rKECluster), &v1.RKECluster{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKECluster), err
+	return obj.(*v1.RKECluster), err
 }
 
 // Update takes the representation of a rKECluster and updates it. Returns the server's representation of the rKECluster, and an error, if there is any.
-func (c *FakeRKEClusters) Update(ctx context.Context, rKECluster *rkecattleiov1.RKECluster, opts v1.UpdateOptions) (result *rkecattleiov1.RKECluster, err error) {
+func (c *FakeRKEClusters) Update(ctx context.Context, rKECluster *v1.RKECluster, opts metav1.UpdateOptions) (result *v1.RKECluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rkeclustersResource, c.ns, rKECluster), &rkecattleiov1.RKECluster{})
+		Invokes(testing.NewUpdateAction(rkeclustersResource, c.ns, rKECluster), &v1.RKECluster{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKECluster), err
+	return obj.(*v1.RKECluster), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeRKEClusters) UpdateStatus(ctx context.Context, rKECluster *rkecattleiov1.RKECluster, opts v1.UpdateOptions) (*rkecattleiov1.RKECluster, error) {
+func (c *FakeRKEClusters) UpdateStatus(ctx context.Context, rKECluster *v1.RKECluster, opts metav1.UpdateOptions) (*v1.RKECluster, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(rkeclustersResource, "status", c.ns, rKECluster), &rkecattleiov1.RKECluster{})
+		Invokes(testing.NewUpdateSubresourceAction(rkeclustersResource, "status", c.ns, rKECluster), &v1.RKECluster{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKECluster), err
+	return obj.(*v1.RKECluster), err
 }
 
 // Delete takes name of the rKECluster and deletes it. Returns an error if one occurs.
-func (c *FakeRKEClusters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeRKEClusters) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(rkeclustersResource, c.ns, name, opts), &rkecattleiov1.RKECluster{})
+		Invokes(testing.NewDeleteActionWithOptions(rkeclustersResource, c.ns, name, opts), &v1.RKECluster{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRKEClusters) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeRKEClusters) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(rkeclustersResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &rkecattleiov1.RKEClusterList{})
+	_, err := c.Fake.Invokes(action, &v1.RKEClusterList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched rKECluster.
-func (c *FakeRKEClusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKECluster, err error) {
+func (c *FakeRKEClusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RKECluster, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rkeclustersResource, c.ns, name, pt, data, subresources...), &rkecattleiov1.RKECluster{})
+		Invokes(testing.NewPatchSubresourceAction(rkeclustersResource, c.ns, name, pt, data, subresources...), &v1.RKECluster{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKECluster), err
+	return obj.(*v1.RKECluster), err
 }

@@ -2,23 +2,13 @@
 
 *This file is auto-generated from README-template.md, please make any changes there.*
 
-[![Build Status](https://drone-publish.rancher.io/api/badges/rancher/rancher/status.svg?branch=release/v2.6)](https://drone-publish.rancher.io/rancher/rancher)
+[![Build Status](https://drone-publish.rancher.io/api/badges/rancher/rancher/status.svg?branch=release/v2.7)](https://drone-publish.rancher.io/rancher/rancher)
 [![Docker Pulls](https://img.shields.io/docker/pulls/rancher/rancher.svg)](https://store.docker.com/community/images/rancher/rancher)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rancher/rancher)](https://goreportcard.com/report/github.com/rancher/rancher)
 
 Rancher is an open source container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
 
 > Looking for Rancher 1.6.x info? [Click here](https://github.com/rancher/rancher/blob/master/README_1_6.md)
-
-## Latest Release
-* v2.6
-  * Latest - v2.6.9 - `rancher/rancher:v2.6.9` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.9).
-  * Stable - v2.6.9 - `rancher/rancher:v2.6.9` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.9).
-* v2.5
-  * Latest - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
-  * Stable - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
-
-To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
 ## Quick Start
 
@@ -52,11 +42,11 @@ If you need any help with Rancher, please join us at either our [Rancher forums]
 
 Please submit any Rancher bugs, issues, and feature requests to [rancher/rancher](https://github.com/rancher/rancher/issues).
 
-For security issues, please first check our [security policy](SECURITY.md) and email security-rancher@suse.com instead of posting a public issue in GitHub.  You may (but are not required to) use the GPG key located on [Keybase](https://keybase.io/rancher).
+For security issues, please first check our [security policy](https://github.com/rancher/rancher/security) and email security-rancher@suse.com instead of posting a public issue in GitHub.  You may (but are not required to) use the GPG key located on [Keybase](https://keybase.io/rancher).
 
 # License
 
-Copyright (c) 2014-2022 [Rancher Labs, Inc.](http://rancher.com)
+Copyright (c) 2014-2023 [Rancher Labs, Inc.](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

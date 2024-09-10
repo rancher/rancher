@@ -25,10 +25,20 @@ const RancherVersionAnnotationKey = "catalog.cattle.io/rancher-version"
 // Rancher version constraints to allow support for multiple version lines of a chart in airgap setups. If a chart is
 // not defined here, only the latest version of it will be checked for images.
 // Note: CRD charts need to be added as well.
-var chartsToCheckConstraints = map[string]struct{}{}
+var chartsToCheckConstraints = map[string]struct{}{
+	"rancher-istio": {},
+}
 var systemChartsToCheckConstraints = map[string]struct{}{
 	"rancher-monitoring": {},
 }
+
+// chartsToIgnoreTags and systemChartsToIgnoreTags defines the charts and system charts in which a specified
+// image tag should be ignored.
+var chartsToIgnoreTags = map[string]string{
+	"rancher-vsphere-csi": "latest",
+	"rancher-vsphere-cpi": "latest",
+}
+var systemChartsToIgnoreTags = map[string]string{}
 
 type Charts struct {
 	Config ExportConfig
@@ -77,9 +87,10 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 			logrus.Info(err)
 			continue
 		}
+		tag, _ := chartsToIgnoreTags[version.Name]
 		chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
 		for _, values := range versionValues {
-			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType); err != nil {
+			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType, tag); err != nil {
 				return err
 			}
 		}
@@ -159,8 +170,9 @@ func (sc SystemCharts) FetchImages(imagesSet map[string]map[string]struct{}) err
 			if err != nil {
 				return err
 			}
+			tag, _ := systemChartsToIgnoreTags[version.Name]
 			chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
-			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, sc.Config.OsType); err != nil {
+			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, sc.Config.OsType, tag); err != nil {
 				return err
 			}
 		}
@@ -236,7 +248,7 @@ func minMaxToConstraintStr(min, max string) string {
 }
 
 // pickImagesFromValuesMap walks a values map to find images, and add them to imagesSet.
-func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values map[interface{}]interface{}, chartNameAndVersion string, osType OSType) error {
+func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values map[interface{}]interface{}, chartNameAndVersion string, osType OSType, tagToIgnore string) error {
 	walkMap(values, func(inputMap map[interface{}]interface{}) {
 		repository, ok := inputMap["repository"].(string)
 		if !ok {
@@ -245,6 +257,9 @@ func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values ma
 		// No string type assertion because some charts have float typed image tags
 		tag, ok := inputMap["tag"]
 		if !ok {
+			return
+		}
+		if fmt.Sprintf("%v", tag) == tagToIgnore {
 			return
 		}
 		imageName := fmt.Sprintf("%s:%v", repository, tag)

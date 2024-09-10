@@ -1,0 +1,34 @@
+{{- if eq (include "rancher.chart_psp_enabled" . ) "true" -}}
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ include "rancher.fullname" . }}-post-delete
+  labels: {{ include "rancher.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  privileged: false
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'RunAsAny'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: false
+  volumes:
+    - 'secret'
+    - 'configMap'
+{{- end }}

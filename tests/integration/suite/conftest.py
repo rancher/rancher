@@ -4,7 +4,6 @@ import requests
 import time
 import urllib3
 import yaml
-import socket
 import subprocess
 import json
 import rancher
@@ -25,21 +24,9 @@ from .cluster_common import \
 urllib3.disable_warnings()
 
 
-def get_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        s.connect(('10.255.255.255', 1))
-        IP = s.getsockname()[0]
-    except Exception:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
-    return IP
-
-
-IP = get_ip()
-SERVER_URL = 'https://' + IP + ':8443'
+IP = "localhost"
+SERVER_URL = os.environ.get('CATTLE_TEST_URL', 'https://' + IP + ':443')
+SERVER_PASSWORD = os.environ.get('RANCHER_SERVER_PASSWORD', 'admin')
 BASE_URL = SERVER_URL + '/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
 DEFAULT_TIMEOUT = 120
@@ -101,7 +88,7 @@ def admin_mc():
     """Returns a ManagementContext for the default global admin user."""
     r = requests.post(AUTH_URL, json={
         'username': 'admin',
-        'password': 'admin',
+        'password': SERVER_PASSWORD,
         'responseType': 'json',
     }, verify=False)
     protect_response(r)
@@ -192,7 +179,6 @@ def user_mc(user_factory):
 def user_factory(admin_mc, remove_resource):
     """Returns a factory for creating new users which a ManagementContext for
     a newly created standard user is returned.
-
     This user and globalRoleBinding will be cleaned up automatically by the
     fixture remove_resource.
     """
@@ -560,7 +546,7 @@ def kubernetes_api_client(rancher_client, cluster_name):
 
 def protect_response(r):
     if r.status_code >= 300:
-        message = 'Server responded with {r.status_code}\nbody:\n{r.text}'
+        message = f'Server responded with {r.status_code}\nbody:\n{r.text}'
         raise ValueError(message)
 
 

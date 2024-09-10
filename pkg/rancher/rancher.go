@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/hashicorp/go-multierror"
@@ -25,8 +26,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/controllers/nodedriver"
 	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
-	crds "github.com/rancher/rancher/pkg/crds/dashboard"
+	"github.com/rancher/rancher/pkg/crds"
+	dashboardcrds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -46,10 +49,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -135,7 +140,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 
 	// Initialize Features as early as possible
-	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
+	if err := dashboardcrds.CreateFeatureCRD(ctx, restConfig); err != nil {
 		return nil, err
 	}
 
@@ -153,8 +158,19 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		provisioningv2.RegisterIndexers(wranglerContext)
 	}
 
-	if err := crds.Create(ctx, restConfig); err != nil {
-		return nil, err
+	clientSet, err := clientset.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new clientset: %w", err)
+	}
+
+	// ensure migrated CRDs
+	if err := crds.EnsureRequired(ctx, clientSet.ApiextensionsV1().CustomResourceDefinitions()); err != nil {
+		return nil, fmt.Errorf("failed to ensure CRDs: %w", err)
+	}
+
+	// install all non migrated CRDs
+	if err := dashboardcrds.Create(ctx, restConfig); err != nil {
+		return nil, fmt.Errorf("failed to create CRDs: %w", err)
 	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
@@ -251,6 +267,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 	}
 
 	if features.MCM.Enabled() {
+		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
+		nodedriver.Register(ctx, r.Wrangler)
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}
@@ -260,8 +278,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
-
-		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error { return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded) }); err != nil {
+		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
+			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
+		}); err != nil {
 			return err
 		}
 
@@ -461,7 +480,11 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 // This should only be called when Rancher is run in a Docker container because the Kubernetes version and Rancher version
 // are bumped at the same time. In a Kubernetes cluster, usually the Rancher version is bumped when the cluster is upgraded.
 func bumpRancherWebhookIfNecessary(ctx context.Context, restConfig *rest.Config) error {
-	webhookVersionParts := strings.Split(os.Getenv("CATTLE_RANCHER_WEBHOOK_MIN_VERSION"), "+up")
+	v := os.Getenv("CATTLE_RANCHER_WEBHOOK_MIN_VERSION")
+	if v == "" {
+		v = os.Getenv("CATTLE_RANCHER_WEBHOOK_VERSION")
+	}
+	webhookVersionParts := strings.Split(v, "+up")
 	if len(webhookVersionParts) != 2 {
 		return nil
 	} else if !strings.HasPrefix(webhookVersionParts[1], "v") {
@@ -527,26 +550,26 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 	var allErrors error
 
 	for _, c := range clusters.Items {
-		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		err := wait.PollImmediateInfinite(100*time.Millisecond, func() (bool, error) {
 			rawDynamicCluster, err := clusterDynamicClient.Get(ctx, c.GetName(), metav1.GetOptions{})
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			annotations := rawDynamicCluster.GetAnnotations()
 			if annotations != nil && annotations[encryptionConfigUpdate] == "true" {
-				return nil
+				return true, nil
 			}
 
 			clusterBytes, err := rawDynamicCluster.MarshalJSON()
 			if err != nil {
-				return errors.Wrap(err, "error trying to Marshal dynamic cluster")
+				return false, errors.Wrap(err, "error trying to Marshal dynamic cluster")
 			}
 
 			var cluster *v3.Cluster
 
 			if err := json.Unmarshal(clusterBytes, &cluster); err != nil {
-				return errors.Wrap(err, "error trying to Unmarshal dynamicCluster into v3 cluster")
+				return false, errors.Wrap(err, "error trying to Unmarshal dynamicCluster into v3 cluster")
 			}
 
 			if cluster.Annotations == nil {
@@ -556,11 +579,17 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 
 			u, err := unstructured.ToUnstructured(cluster)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			_, err = clusterDynamicClient.Update(ctx, u, metav1.UpdateOptions{})
-			return err
+			if err == nil {
+				return true, nil
+			}
+			if k8serror.IsConflict(err) || k8serror.IsServiceUnavailable(err) || k8serror.IsInternalError(err) {
+				return false, nil
+			}
+			return false, err
 		})
 		if err != nil {
 			allErrors = multierror.Append(err, allErrors)

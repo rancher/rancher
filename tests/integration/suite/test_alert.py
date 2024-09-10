@@ -3,15 +3,16 @@ from rancher import ApiError
 from .common import random_str
 from .conftest import wait_for
 from .alert_common import MockReceiveAlert
+from .alert_common import LOCAL_IP
 
 dingtalk_config = {
     "type": "/v3/schemas/dingtalkConfig",
-    "url": "http://127.0.0.1:4050/dingtalk/test/",
+    "url": "http://%s:4050/dingtalk/test/" % LOCAL_IP,
 }
 
 microsoft_teams_config = {
     "type": "/v3/schemas/msTeamsConfig",
-    "url": "http://127.0.0.1:4050/microsoftTeams",
+    "url": "http://%s:4050/microsoftTeams" % LOCAL_IP,
 }
 
 MOCK_RECEIVER_ALERT_PORT = 4050
@@ -53,7 +54,7 @@ def mock_receiver_alert():
     server = MockReceiveAlert(port=MOCK_RECEIVER_ALERT_PORT)
     server.start()
     yield server
-    server.shutdown_server()
+    server.stop()
 
 
 def test_add_notifier(admin_mc, remove_resource, mock_receiver_alert):

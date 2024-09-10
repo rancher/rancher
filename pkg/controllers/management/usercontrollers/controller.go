@@ -23,6 +23,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	WebhookClusterRoleBindingName = "rancher-webhook"
+	WebhookConfigurationName      = "rancher.cattle.io"
+)
+
 var (
 	// There is a mirror list in pkg/agent/clean/clean.go. If these are getting
 	// updated consider if that update needs to apply to the user cluster as well
@@ -206,29 +211,35 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRole(userContext *config.U
 
 	rules := []rbacV1.PolicyRule{
 		// This is needed to check for cattle-system, remove finalizers and delete
-		rbacV1.PolicyRule{
+		{
 			Verbs:     []string{"list", "get", "update", "delete"},
 			APIGroups: []string{""},
 			Resources: []string{"namespaces"},
 		},
-		rbacV1.PolicyRule{
+		{
 			Verbs:     []string{"list", "get", "delete"},
 			APIGroups: []string{"rbac.authorization.k8s.io"},
 			Resources: []string{"roles", "rolebindings", "clusterroles", "clusterrolebindings"},
 		},
 		// The job is going to delete itself after running to trigger ownerReference
 		// cleanup of the clusterRole, serviceAccount and clusterRoleBinding
-		rbacV1.PolicyRule{
+		{
 			Verbs:     []string{"list", "get", "delete"},
 			APIGroups: []string{"batch"},
 			Resources: []string{"jobs"},
 		},
 		// The job checks for the presence of the rancher service first
-		rbacV1.PolicyRule{
+		{
 			Verbs:         []string{"get"},
 			APIGroups:     []string{""},
 			Resources:     []string{"services"},
 			ResourceNames: []string{"rancher"},
+		},
+		{
+			Verbs:         []string{"delete"},
+			APIGroups:     []string{"admissionregistration.k8s.io"},
+			Resources:     []string{"validatingwebhookconfigurations", "mutatingwebhookconfigurations"},
+			ResourceNames: []string{WebhookConfigurationName},
 		},
 	}
 	clusterRole := rbacV1.ClusterRole{

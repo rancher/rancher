@@ -23,5 +23,4 @@ type AuthProvider interface {
 	CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error)
 	GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string
 	IsDisabledProvider() (bool, error)
-	CleanupResources(config *v3.AuthConfig) error
 }

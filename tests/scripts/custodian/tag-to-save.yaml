@@ -1,0 +1,40 @@
+policies:
+# note: userkeys here is an override var.
+- name: tag-instances-til-friday
+  resource: aws.ec2
+  filters:
+    - and:
+      - type: value
+        key: tag:Name
+        op: regex
+        value:  "^.*USERKEYS.*$"
+      - not:
+        - 'tag:doNotDelete': present
+        - 'tag:DoNotDelete': present
+        - type: value
+          key: tag:Name
+          op: regex
+          value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: tag
+      tags:
+        DeletesOnFriday: 'true'
+- name: tag-nlbs-til-friday
+  resource: app-elb
+  filters:
+    - and:
+      - type: value
+        key: LoadBalancerArn
+        op: regex
+        value: "^.*USERKEYS.*$"
+      - not:
+        - 'tag:doNotDelete': present
+        - 'tag:DoNotDelete': present
+        - type: value
+          key: tag:Name
+          op: regex
+          value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: tag
+      tags:
+        DeletesOnFriday: 'true'

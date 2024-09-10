@@ -289,7 +289,7 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 
 	logrus.Infof("Creating token for user %v", input.UserName)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		// Backoff was added here because it is possible the token is the process of deleting.
+		// Backoff was added here because it is possible the token is in the process of deleting.
 		// This should cause the create to retry until the delete is finished.
 		newToken, err := m.tokens.Create(token)
 		if err != nil {
@@ -301,7 +301,6 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		token = newToken
 		return true, nil
 	})
-
 	if err != nil {
 		return "", err
 	}
@@ -323,7 +322,6 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 	}
 
 	ttlMilli := tokenTTL.Milliseconds()
-	logrus.Infof("Creating token for user %v", userName)
 	input := user.TokenInput{
 		TokenName:     tokenName,
 		Description:   description,
@@ -334,11 +332,8 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 		Randomize:     true,
 		UserPrincipal: userPrincipal,
 	}
-	fullToken, err := m.EnsureClusterToken(clusterName, input)
-	if err != nil {
-		return "", err
-	}
-	return fullToken, nil
+
+	return m.EnsureClusterToken(clusterName, input)
 }
 
 // GetKubeconfigToken creates a new token for use in a kubeconfig generated through the CLI.
@@ -419,6 +414,13 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 	}
 
 	if user != nil {
+		if displayName != "" && user.DisplayName == "" {
+			user.DisplayName = displayName
+			if _, err := m.users.Update(user); err != nil {
+				return nil, err
+			}
+		}
+
 		// If the user does not have the annotation it indicates the user was created
 		// through the UI or from a previous rancher version so don't add the
 		// default bindings.

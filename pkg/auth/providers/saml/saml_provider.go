@@ -6,12 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/crewjam/saml"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
@@ -158,20 +156,14 @@ func (s *Provider) getSamlConfig() (*v32.SamlConfig, error) {
 	storedSamlConfigMap := u.UnstructuredContent()
 
 	storedSamlConfig := &v32.SamlConfig{}
-	mapstructure.Decode(storedSamlConfigMap, storedSamlConfig)
+	err = common.Decode(storedSamlConfigMap, storedSamlConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode Saml Config: %w", err)
+	}
 
 	if enabled, ok := storedSamlConfigMap["enabled"].(bool); ok {
 		storedSamlConfig.Enabled = enabled
 	}
-
-	metadataMap, ok := storedSamlConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("SAML: failed to retrieve SamlConfig metadata, cannot read k8s Unstructured data")
-	}
-
-	objectMeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, objectMeta)
-	storedSamlConfig.ObjectMeta = *objectMeta
 
 	if storedSamlConfig.SpKey != "" {
 		value, err := common.ReadFromSecret(s.secrets, storedSamlConfig.SpKey,
@@ -212,16 +204,28 @@ func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
 	storedSamlConfig.Annotations = config.Annotations
 	config.ObjectMeta = storedSamlConfig.ObjectMeta
 
-	field := strings.ToLower(secrets.TypeToFields[configType][0])
+	var field string
+	// This assumes the provider needs to create only one secret. If there are new entries
+	// in the secret collection, this code that creates the actual secrets would need to be updated.
+	if fields, ok := secrets.TypeToFields[configType]; ok && len(fields) > 0 {
+		field = strings.ToLower(fields[0])
+	}
 	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey,
 		field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
 
-	config.SpKey = common.GetName(config.Type, field)
+	config.SpKey = common.GetFullSecretName(config.Type, field)
 	if s.hasLdapGroupSearch() {
-		_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, s.combineSamlAndLdapConfig(config))
-		return err
+		combinedConfig, err := s.combineSamlAndLdapConfig(config)
+		if err != nil {
+			logrus.Warnf("problem combining saml and ldap config, saving partial configuration %s", err.Error())
+		}
+		_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, combinedConfig)
+		if err != nil {
+			return fmt.Errorf("unable to update authconfig: %w", err)
+		}
+		return nil
 	}
 
 	_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -354,7 +358,7 @@ func splitPrincipalID(principalID string) (string, string) {
 	return externalID, parts[0]
 }
 
-func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) runtime.Object {
+func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) (runtime.Object, error) {
 	// if errors we might not want to turn on ldap
 	ldapConfig, _, err := ldap.GetLDAPConfig(s.ldapProvider)
 
@@ -364,36 +368,50 @@ func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) runtime.Obje
 
 		// if the the config subkey not in the crd
 		if ldapConfig == nil {
-			return config
+			return config, nil
 		}
 
 		// only return the saml config on other errors
 		// if not configured it might have data in it we want to keep
 		if !ldap.IsNotConfigured(err) {
-			return config
+			return config, nil
 		}
 	}
 
 	var fullConfig runtime.Object
 	samlConfig := v32.SamlConfig{}
 	config.DeepCopyInto(&samlConfig)
-
 	switch s.name {
 	case ShibbolethName:
+		secretName, err := common.SavePasswordSecret(
+			s.secrets,
+			ldapConfig.LdapFields.ServiceAccountPassword,
+			client.LdapConfigFieldServiceAccountPassword,
+			samlConfig.Type,
+		)
+		if err != nil {
+			return config, fmt.Errorf("unable to save ldap service account password: %w", err)
+		}
+
+		ldapConfig.LdapFields.ServiceAccountPassword = secretName
+		// Set the status for SecretsMigrated to True so it doesn't get re-migrated
+		v32.AuthConfigConditionSecretsMigrated.SetStatus(&samlConfig, "True")
 		fullConfig = &v32.ShibbolethConfig{
+			SamlConfig:     samlConfig,
+			OpenLdapConfig: ldapConfig.LdapFields,
+		}
+	case OKTAName:
+		fullConfig = &v32.OKTAConfig{
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
 	}
 
-	return fullConfig
+	return fullConfig, nil
 }
 
 func (s *Provider) hasLdapGroupSearch() bool {
-	if s.name == ShibbolethName {
-		return true
-	}
-	return false
+	return ShibbolethName == s.name || OKTAName == s.name
 }
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
@@ -414,9 +432,4 @@ func (s *Provider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !samlConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the SAML auth provider.
-func (s *Provider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }

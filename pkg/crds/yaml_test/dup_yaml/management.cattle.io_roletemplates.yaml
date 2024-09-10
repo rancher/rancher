@@ -1,0 +1,120 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.0
+  name: roletemplates.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: RoleTemplate
+    listKind: RoleTemplateList
+    plural: roletemplates
+    singular: roletemplate
+  scope: Namespaced
+  versions:
+    - name: v3
+      schema:
+        openAPIV3Schema:
+          properties:
+            administrative:
+              type: boolean
+            apiVersion:
+              description:
+                "APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+              type: string
+            builtin:
+              type: boolean
+            clusterCreatorDefault:
+              type: boolean
+            context:
+              type: string
+            description:
+              type: string
+            displayName:
+              type: string
+            external:
+              type: boolean
+            hidden:
+              type: boolean
+            kind:
+              description:
+                "Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+              type: string
+            locked:
+              type: boolean
+            metadata:
+              type: object
+            projectCreatorDefault:
+              type: boolean
+            roleTemplateNames:
+              items:
+                type: string
+              type: array
+            rules:
+              items:
+                description:
+                  PolicyRule holds information that describes a policy rule,
+                  but does not contain information about who the rule applies to or
+                  which namespace the rule applies to.
+                properties:
+                  apiGroups:
+                    description:
+                      APIGroups is the name of the APIGroup that contains
+                      the resources.  If multiple API groups are specified, any action
+                      requested against one of the enumerated resources in any API group
+                      will be allowed. "" represents the core API group and "*" represents
+                      all API groups.
+                    items:
+                      type: string
+                    type: array
+                  nonResourceURLs:
+                    description:
+                      NonResourceURLs is a set of partial urls that a user
+                      should have access to.  *s are allowed, but only as the full,
+                      final step in the path Since non-resource URLs are not namespaced,
+                      this field is only applicable for ClusterRoles referenced from
+                      a ClusterRoleBinding. Rules can either apply to API resources
+                      (such as "pods" or "secrets") or non-resource URL paths (such
+                      as "/api"),  but not both.
+                    items:
+                      type: string
+                    type: array
+                  resourceNames:
+                    description:
+                      ResourceNames is an optional white list of names that
+                      the rule applies to.  An empty set means that everything is allowed.
+                    items:
+                      type: string
+                    type: array
+                  resources:
+                    description:
+                      Resources is a list of resources this rule applies
+                      to. '*' represents all resources.
+                    items:
+                      type: string
+                    type: array
+                  verbs:
+                    description:
+                      Verbs is a list of Verbs that apply to ALL the ResourceKinds
+                      contained in this rule. '*' represents all verbs.
+                    items:
+                      type: string
+                    type: array
+                required:
+                  - verbs
+                type: object
+              type: array
+          required:
+            - builtin
+            - context
+            - description
+            - external
+            - hidden
+          type: object
+      served: true
+      storage: true

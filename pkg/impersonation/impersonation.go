@@ -2,6 +2,7 @@
 package impersonation
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/types/config"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -36,6 +38,7 @@ type Impersonator struct {
 	clusterContext      *config.UserContext
 	userLister          v3.UserLister
 	userAttributeLister v3.UserAttributeLister
+	secretsCache        corecontrollers.SecretCache
 }
 
 // New creates an Impersonator from a kubernetes user.Info object and a UserContext for the cluster.
@@ -44,6 +47,7 @@ func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, 
 		clusterContext:      clusterContext,
 		userLister:          clusterContext.Management.Management.Users("").Controller().Lister(),
 		userAttributeLister: clusterContext.Management.Management.UserAttributes("").Controller().Lister(),
+		secretsCache:        clusterContext.Corew.Secret().Cache(),
 	}
 	user, err := impersonator.getUser(userInfo)
 	impersonator.user = user
@@ -100,28 +104,9 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 
 // GetToken accepts a service account and returns the service account's token.
 func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
-	name := serviceaccounttoken.ServiceAccountSecretName(sa)
-	secret, err := i.clusterContext.Core.Secrets(ImpersonationNamespace).Get(name, metav1.GetOptions{})
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
-			return "", fmt.Errorf("error getting secret: %w", err)
-		}
-		// create the secret
-		sc := serviceaccounttoken.SecretTemplate(sa)
-		secret, err = i.clusterContext.Core.Secrets(ImpersonationNamespace).Create(sc)
-		if err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
-				return "", fmt.Errorf("error creating secret: %w", err)
-			}
-			secret, err = i.clusterContext.Core.Secrets(ImpersonationNamespace).Get(name, metav1.GetOptions{})
-			if err != nil {
-				logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
-				logrus.Tracef("impersonation: secrret already exists")
-				return "", fmt.Errorf("error getting secret: %w", err)
-			}
-		}
+		return "", fmt.Errorf("error getting secret: %w", err)
 	}
 	token, ok := secret.Data["token"]
 	if !ok {
@@ -156,6 +141,9 @@ func (i *Impersonator) getServiceAccount() (*corev1.ServiceAccount, error) {
 func (i *Impersonator) createServiceAccount(role *rbacv1.ClusterRole) (*corev1.ServiceAccount, error) {
 	name := ImpersonationPrefix + i.user.GetUID()
 	sa, err := i.clusterContext.Core.ServiceAccounts("").Controller().Lister().Get(ImpersonationNamespace, name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("impersonation: error getting service account [%s:%s]: %w", ImpersonationNamespace, name, err)
+	}
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("impersonation: creating service account %s", name)
 		sa, err = i.clusterContext.Core.ServiceAccounts(ImpersonationNamespace).Create(&corev1.ServiceAccount{
@@ -177,16 +165,16 @@ func (i *Impersonator) createServiceAccount(role *rbacv1.ClusterRole) (*corev1.S
 			// in case cache isn't synced yet, use raw client
 			sa, err = i.clusterContext.Core.ServiceAccounts(ImpersonationNamespace).Get(name, metav1.GetOptions{})
 		}
-	}
-	if sa != nil {
-		// create secret for service account
-		sc := serviceaccounttoken.SecretTemplate(sa)
-		_, secretErr := i.clusterContext.Core.Secrets(ImpersonationNamespace).Create(sc)
-		if secretErr != nil && !apierrors.IsAlreadyExists(secretErr) {
-			return nil, fmt.Errorf("impersonation: error creating secret for service account %s", name)
+		if err != nil {
+			return nil, fmt.Errorf("impersonation: error getting service account [%s:%s]: %w", ImpersonationNamespace, name, err)
 		}
 	}
-	return sa, err
+	// create secret for service account if it was not automatically generated
+	_, err = serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa)
+	if err != nil {
+		return nil, fmt.Errorf("impersonation: error ensuring secret for service account %s: %w", name, err)
+	}
+	return sa, nil
 }
 
 func (i *Impersonator) createNamespace() error {
@@ -360,13 +348,12 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 		if err != nil {
 			return false, err
 		}
-		secretName := serviceaccounttoken.ServiceAccountSecretName(sa)
-		secret, err := i.clusterContext.Core.Secrets(ImpersonationNamespace).Get(secretName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
+		secret, err := serviceaccounttoken.ServiceAccountSecret(context.Background(), sa, i.secretsCache.List, i.clusterContext.K8sClient.CoreV1().Secrets(sa.Namespace))
 		if err != nil {
 			return false, err
+		}
+		if secret == nil {
+			return false, nil
 		}
 		if _, found := secret.Data[corev1.ServiceAccountTokenKey]; found {
 			return true, nil

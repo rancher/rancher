@@ -26,12 +26,14 @@ const (
 	ReplicationControllerSpecFieldPreemptionPolicy              = "preemptionPolicy"
 	ReplicationControllerSpecFieldReadinessGates                = "readinessGates"
 	ReplicationControllerSpecFieldReplicationControllerConfig   = "replicationControllerConfig"
+	ReplicationControllerSpecFieldResourceClaims                = "resourceClaims"
 	ReplicationControllerSpecFieldRestartPolicy                 = "restartPolicy"
 	ReplicationControllerSpecFieldRunAsGroup                    = "runAsGroup"
 	ReplicationControllerSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	ReplicationControllerSpecFieldRuntimeClassName              = "runtimeClassName"
 	ReplicationControllerSpecFieldScale                         = "scale"
 	ReplicationControllerSpecFieldScheduling                    = "scheduling"
+	ReplicationControllerSpecFieldSchedulingGates               = "schedulingGates"
 	ReplicationControllerSpecFieldSeccompProfile                = "seccompProfile"
 	ReplicationControllerSpecFieldSelector                      = "selector"
 	ReplicationControllerSpecFieldServiceAccountName            = "serviceAccountName"
@@ -71,12 +73,14 @@ type ReplicationControllerSpec struct {
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	ReplicationControllerConfig   *ReplicationControllerConfig   `json:"replicationControllerConfig,omitempty" yaml:"replicationControllerConfig,omitempty"`
+	ResourceClaims                []PodResourceClaim             `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
 	RestartPolicy                 string                         `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                         `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scale                         *int64                         `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      map[string]string              `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`

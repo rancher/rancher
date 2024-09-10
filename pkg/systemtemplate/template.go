@@ -124,55 +124,10 @@ spec:
       labels:
         app: cattle-cluster-agent
     spec:
+      {{- if .Affinity }}
       affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - cattle-cluster-agent
-              topologyKey: kubernetes.io/hostname
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                - key: beta.kubernetes.io/os
-                  operator: NotIn
-                  values:
-                    - windows
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - preference:
-              matchExpressions:
-              - key: node-role.kubernetes.io/controlplane
-                operator: In
-                values:
-                - "true"
-            weight: 100
-          - preference:
-              matchExpressions:
-              - key: node-role.kubernetes.io/control-plane
-                operator: In
-                values:
-                - "true"
-            weight: 100
-          - preference:
-              matchExpressions:
-              - key: node-role.kubernetes.io/master
-                operator: In
-                values:
-                - "true"
-            weight: 100
-          - preference:
-              matchExpressions:
-              - key: cattle.io/cluster-agent
-                operator: In
-                values:
-                - "true"
-            weight: 1
+{{ .Affinity | indent 8 }}
+      {{- end }}
       serviceAccountName: cattle
       tolerations:
       {{- if .Tolerations }}
@@ -190,9 +145,16 @@ spec:
         key: "node-role.kubernetes.io/master"
         operator: "Exists"
       {{- end }}
+      {{- if .AppendTolerations }}
+{{ .AppendTolerations | indent 6 }}
+      {{- end }}
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
+          {{- if .ResourceRequirements }}
+          resources:
+{{ .ResourceRequirements | indent 12 }}
+          {{- end }}
           env:
           {{- if ne .Features "" }}
           - name: CATTLE_FEATURES

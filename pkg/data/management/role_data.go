@@ -48,6 +48,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
@@ -97,12 +98,14 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("globalroles", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("update", "patch", "security-enable").resourceNames("external-rules")
 
 	// restricted-admin can edit settings if rancher is bootstrapped with restricted-admin role
 	if settings.RestrictedDefaultAdmin.Get() == "true" {
@@ -113,7 +116,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	userRole := addUserRules(rb.addRole("User", "user"))
 	userRole.
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
@@ -126,7 +130,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO enable when groups are "in". they need to be self-service
 
-	if err := rb.reconcileGlobalRoles(management); err != nil {
+	if err := rb.reconcileGlobalRoles(wrangler.Mgmt.GlobalRole()); err != nil {
 		return "", errors.Wrap(err, "problem reconciling global roles")
 	}
 
@@ -425,9 +429,25 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		setRoleTemplateNames("view")
 
-	rb.addRoleTemplate("View Monitoring", "monitoring-ui-view", "project", true, false, false)
+	proxyNames := []string{
+		"http:rancher-monitoring-prometheus:9090",
+		"https:rancher-monitoring-prometheus:9090",
+		"http:rancher-monitoring-alertmanager:9093",
+		"https:rancher-monitoring-alertmanager:9093",
+		"http:rancher-monitoring-grafana:80",
+		"https:rancher-monitoring-grafana:80",
+	}
+	endpointNames := []string{
+		"rancher-monitoring-prometheus",
+		"rancher-monitoring-alertmanager",
+		"rancher-monitoring-grafana",
+	}
 
-	rb.addRoleTemplate("View Navlinks", "navlinks-view", "project", true, false, false).
+	rb.addRoleTemplate("View Monitoring", "monitoring-ui-view", "project", true, false, false).
+		addExternalRule().apiGroups("").resources("services/proxy").verbs("get", "create").resourceNames(proxyNames...).
+		addExternalRule().apiGroups("").resources("endpoints").verbs("list").resourceNames(endpointNames...)
+
+	rb.addRoleTemplate("View Navlinks", "navlinks-view", "project", false, false, false).
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch")
 
 	// Not specific to project or cluster
@@ -436,7 +456,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	//	addRule().apiGroups("").resources("events").verbs("get", "list", "watch").
 	//	addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 
-	if err := rb.reconcileRoleTemplates(management); err != nil {
+	if err := rb.reconcileRoleTemplates(wrangler.Mgmt.RoleTemplate()); err != nil {
 		return "", errors.Wrap(err, "problem reconciling role templates")
 	}
 

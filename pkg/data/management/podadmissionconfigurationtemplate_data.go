@@ -10,25 +10,28 @@ import (
 )
 
 var FeatureAppNS = []string{
-	"ingress-nginx",              // This is for Ingress, not feature app
-	"kube-system",                // Harvester, vSphere CPI, vSphere CSI
-	"cattle-system",              // AKS/GKE/EKS Operator, Webhook, System Upgrade Controller
-	"cattle-epinio-system",       // Epinio
-	"cattle-fleet-system",        // Fleet
-	"longhorn-system",            // Longhorn
-	"cattle-neuvector-system",    // Neuvector
-	"cattle-monitoring-system",   // Monitoring and Sub-charts
-	"rancher-alerting-drivers",   // Alert Driver
-	"cis-operator-system",        // CIS Benchmark
-	"cattle-csp-adapter-system",  // CSP Adapter
-	"cattle-externalip-system",   // External IP Webhook
-	"cattle-gatekeeper-system",   // Gatekeeper
-	"istio-system",               // Istio and Sub-charts
-	"cattle-istio-system",        // Kiali
-	"cattle-logging-system",      // Logging
-	"cattle-windows-gmsa-system", // Windows GMSA
-	"cattle-sriov-system",        // Sriov
-	"cattle-ui-plugin-system",    // UI Plugin System
+	"ingress-nginx",                   // This is for Ingress, not feature app
+	"kube-system",                     // Harvester, vSphere CPI, vSphere CSI, RKE2 restricted PSA Config
+	"cattle-system",                   // AKS/GKE/EKS Operator, Webhook, System Upgrade Controller
+	"cattle-epinio-system",            // Epinio
+	"cattle-fleet-system",             // Fleet
+	"cattle-fleet-local-system",       // Fleet for the local cluster
+	"longhorn-system",                 // Longhorn
+	"cattle-neuvector-system",         // Neuvector
+	"cattle-monitoring-system",        // Monitoring and Sub-charts
+	"rancher-alerting-drivers",        // Alert Driver
+	"cis-operator-system",             // CIS Benchmark, RKE2 restricted PSA Config
+	"cattle-csp-adapter-system",       // CSP Adapter
+	"cattle-externalip-system",        // External IP Webhook
+	"cattle-gatekeeper-system",        // Gatekeeper
+	"istio-system",                    // Istio and Sub-charts
+	"cattle-istio-system",             // Kiali
+	"cattle-logging-system",           // Logging
+	"cattle-windows-gmsa-system",      // Windows GMSA
+	"cattle-sriov-system",             // Sriov
+	"cattle-ui-plugin-system",         // UI Plugin System
+	"tigera-operator",                 // RKE2 restricted PSA Config, source: https://github.com/rancher/rke2/blob/34633dcc188d3a79744636fe21529ef6f5d64d71/pkg/rke2/psa.go#L58
+	"cattle-provisioning-capi-system", // CAPI core controller manager
 }
 
 func addDefaultPodSecurityAdmissionConfigurationTemplates(management *config.ManagementContext) error {
@@ -48,9 +51,11 @@ func addDefaultPodSecurityAdmissionConfigurationTemplates(management *config.Man
 func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdmissionConfigurationTemplate {
 	return &v3.PodSecurityAdmissionConfigurationTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "restricted",
+			Name: "rancher-restricted",
 		},
-		Description: "The default restricted pod security admission configuration template",
+		Description: "This is the built-in restricted Pod Security Admission Configuration Template. " +
+			"It defines a heavily restricted policy, based on current Pod hardening best practices. " +
+			"This policy contains namespace level exemptions for Rancher components.",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
 			Defaults: v3.PodSecurityAdmissionConfigurationTemplateDefaults{
 				Enforce:        "restricted",
@@ -72,9 +77,11 @@ func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdm
 func newPodSecurityAdmissionConfigurationTemplatePrivileged() *v3.PodSecurityAdmissionConfigurationTemplate {
 	return &v3.PodSecurityAdmissionConfigurationTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "privileged",
+			Name: "rancher-privileged",
 		},
-		Description: "The default privileged pod security admission configuration template",
+		Description: "This is the built-in unrestricted Pod Security Admission Configuration Template. " +
+			"It defines the most permissive PSS policy, allowing for known privilege escalations. " +
+			"This policy contains no exemptions.",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
 			Defaults: v3.PodSecurityAdmissionConfigurationTemplateDefaults{
 				Enforce:        "privileged",

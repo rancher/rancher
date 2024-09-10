@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package fake
 import (
 	"context"
 
-	catalogcattleiov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,24 +34,24 @@ type FakeClusterRepos struct {
 	Fake *FakeCatalogV1
 }
 
-var clusterreposResource = schema.GroupVersionResource{Group: "catalog.cattle.io", Version: "v1", Resource: "clusterrepos"}
+var clusterreposResource = v1.SchemeGroupVersion.WithResource("clusterrepos")
 
-var clusterreposKind = schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "ClusterRepo"}
+var clusterreposKind = v1.SchemeGroupVersion.WithKind("ClusterRepo")
 
 // Get takes name of the clusterRepo, and returns the corresponding clusterRepo object, and an error if there is any.
-func (c *FakeClusterRepos) Get(ctx context.Context, name string, options v1.GetOptions) (result *catalogcattleiov1.ClusterRepo, err error) {
+func (c *FakeClusterRepos) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterRepo, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterreposResource, name), &catalogcattleiov1.ClusterRepo{})
+		Invokes(testing.NewRootGetAction(clusterreposResource, name), &v1.ClusterRepo{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.ClusterRepo), err
+	return obj.(*v1.ClusterRepo), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterRepos that match those selectors.
-func (c *FakeClusterRepos) List(ctx context.Context, opts v1.ListOptions) (result *catalogcattleiov1.ClusterRepoList, err error) {
+func (c *FakeClusterRepos) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterRepoList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterreposResource, clusterreposKind, opts), &catalogcattleiov1.ClusterRepoList{})
+		Invokes(testing.NewRootListAction(clusterreposResource, clusterreposKind, opts), &v1.ClusterRepoList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -61,8 +60,8 @@ func (c *FakeClusterRepos) List(ctx context.Context, opts v1.ListOptions) (resul
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &catalogcattleiov1.ClusterRepoList{ListMeta: obj.(*catalogcattleiov1.ClusterRepoList).ListMeta}
-	for _, item := range obj.(*catalogcattleiov1.ClusterRepoList).Items {
+	list := &v1.ClusterRepoList{ListMeta: obj.(*v1.ClusterRepoList).ListMeta}
+	for _, item := range obj.(*v1.ClusterRepoList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -71,63 +70,63 @@ func (c *FakeClusterRepos) List(ctx context.Context, opts v1.ListOptions) (resul
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRepos.
-func (c *FakeClusterRepos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterRepos) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(clusterreposResource, opts))
 }
 
 // Create takes the representation of a clusterRepo and creates it.  Returns the server's representation of the clusterRepo, and an error, if there is any.
-func (c *FakeClusterRepos) Create(ctx context.Context, clusterRepo *catalogcattleiov1.ClusterRepo, opts v1.CreateOptions) (result *catalogcattleiov1.ClusterRepo, err error) {
+func (c *FakeClusterRepos) Create(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.CreateOptions) (result *v1.ClusterRepo, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterreposResource, clusterRepo), &catalogcattleiov1.ClusterRepo{})
+		Invokes(testing.NewRootCreateAction(clusterreposResource, clusterRepo), &v1.ClusterRepo{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.ClusterRepo), err
+	return obj.(*v1.ClusterRepo), err
 }
 
 // Update takes the representation of a clusterRepo and updates it. Returns the server's representation of the clusterRepo, and an error, if there is any.
-func (c *FakeClusterRepos) Update(ctx context.Context, clusterRepo *catalogcattleiov1.ClusterRepo, opts v1.UpdateOptions) (result *catalogcattleiov1.ClusterRepo, err error) {
+func (c *FakeClusterRepos) Update(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.UpdateOptions) (result *v1.ClusterRepo, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterreposResource, clusterRepo), &catalogcattleiov1.ClusterRepo{})
+		Invokes(testing.NewRootUpdateAction(clusterreposResource, clusterRepo), &v1.ClusterRepo{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.ClusterRepo), err
+	return obj.(*v1.ClusterRepo), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterRepos) UpdateStatus(ctx context.Context, clusterRepo *catalogcattleiov1.ClusterRepo, opts v1.UpdateOptions) (*catalogcattleiov1.ClusterRepo, error) {
+func (c *FakeClusterRepos) UpdateStatus(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.UpdateOptions) (*v1.ClusterRepo, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clusterreposResource, "status", clusterRepo), &catalogcattleiov1.ClusterRepo{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clusterreposResource, "status", clusterRepo), &v1.ClusterRepo{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.ClusterRepo), err
+	return obj.(*v1.ClusterRepo), err
 }
 
 // Delete takes name of the clusterRepo and deletes it. Returns an error if one occurs.
-func (c *FakeClusterRepos) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterRepos) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clusterreposResource, name, opts), &catalogcattleiov1.ClusterRepo{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterreposResource, name, opts), &v1.ClusterRepo{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterRepos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterRepos) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clusterreposResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &catalogcattleiov1.ClusterRepoList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterRepoList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterRepo.
-func (c *FakeClusterRepos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *catalogcattleiov1.ClusterRepo, err error) {
+func (c *FakeClusterRepos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRepo, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterreposResource, name, pt, data, subresources...), &catalogcattleiov1.ClusterRepo{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterreposResource, name, pt, data, subresources...), &v1.ClusterRepo{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*catalogcattleiov1.ClusterRepo), err
+	return obj.(*v1.ClusterRepo), err
 }

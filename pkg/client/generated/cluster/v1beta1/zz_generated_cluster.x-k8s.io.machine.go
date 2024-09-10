@@ -5,51 +5,53 @@ import (
 )
 
 const (
-	MachineType                      = "cluster.x-k8s.io.machine"
-	MachineFieldAnnotations          = "annotations"
-	MachineFieldBootstrap            = "bootstrap"
-	MachineFieldClusterName          = "clusterName"
-	MachineFieldCreated              = "created"
-	MachineFieldCreatorID            = "creatorId"
-	MachineFieldFailureDomain        = "failureDomain"
-	MachineFieldInfrastructureRef    = "infrastructureRef"
-	MachineFieldLabels               = "labels"
-	MachineFieldName                 = "name"
-	MachineFieldNodeDeletionTimeout  = "nodeDeletionTimeout"
-	MachineFieldNodeDrainTimeout     = "nodeDrainTimeout"
-	MachineFieldOwnerReferences      = "ownerReferences"
-	MachineFieldProviderID           = "providerID"
-	MachineFieldRemoved              = "removed"
-	MachineFieldState                = "state"
-	MachineFieldStatus               = "status"
-	MachineFieldTransitioning        = "transitioning"
-	MachineFieldTransitioningMessage = "transitioningMessage"
-	MachineFieldUUID                 = "uuid"
-	MachineFieldVersion              = "version"
+	MachineType                         = "cluster.x-k8s.io.machine"
+	MachineFieldAnnotations             = "annotations"
+	MachineFieldBootstrap               = "bootstrap"
+	MachineFieldClusterName             = "clusterName"
+	MachineFieldCreated                 = "created"
+	MachineFieldCreatorID               = "creatorId"
+	MachineFieldFailureDomain           = "failureDomain"
+	MachineFieldInfrastructureRef       = "infrastructureRef"
+	MachineFieldLabels                  = "labels"
+	MachineFieldName                    = "name"
+	MachineFieldNodeDeletionTimeout     = "nodeDeletionTimeout"
+	MachineFieldNodeDrainTimeout        = "nodeDrainTimeout"
+	MachineFieldNodeVolumeDetachTimeout = "nodeVolumeDetachTimeout"
+	MachineFieldOwnerReferences         = "ownerReferences"
+	MachineFieldProviderID              = "providerID"
+	MachineFieldRemoved                 = "removed"
+	MachineFieldState                   = "state"
+	MachineFieldStatus                  = "status"
+	MachineFieldTransitioning           = "transitioning"
+	MachineFieldTransitioningMessage    = "transitioningMessage"
+	MachineFieldUUID                    = "uuid"
+	MachineFieldVersion                 = "version"
 )
 
 type Machine struct {
 	types.Resource
-	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Bootstrap            *Bootstrap        `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty"`
-	ClusterName          string            `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
-	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	FailureDomain        string            `json:"failureDomain,omitempty" yaml:"failureDomain,omitempty"`
-	InfrastructureRef    *ObjectReference  `json:"infrastructureRef,omitempty" yaml:"infrastructureRef,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NodeDeletionTimeout  *Duration         `json:"nodeDeletionTimeout,omitempty" yaml:"nodeDeletionTimeout,omitempty"`
-	NodeDrainTimeout     *Duration         `json:"nodeDrainTimeout,omitempty" yaml:"nodeDrainTimeout,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	ProviderID           string            `json:"providerID,omitempty" yaml:"providerID,omitempty"`
-	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
-	Status               *MachineStatus    `json:"status,omitempty" yaml:"status,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	Version              string            `json:"version,omitempty" yaml:"version,omitempty"`
+	Annotations             map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Bootstrap               *Bootstrap        `json:"bootstrap,omitempty" yaml:"bootstrap,omitempty"`
+	ClusterName             string            `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
+	Created                 string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID               string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	FailureDomain           string            `json:"failureDomain,omitempty" yaml:"failureDomain,omitempty"`
+	InfrastructureRef       *ObjectReference  `json:"infrastructureRef,omitempty" yaml:"infrastructureRef,omitempty"`
+	Labels                  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                    string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NodeDeletionTimeout     *Duration         `json:"nodeDeletionTimeout,omitempty" yaml:"nodeDeletionTimeout,omitempty"`
+	NodeDrainTimeout        *Duration         `json:"nodeDrainTimeout,omitempty" yaml:"nodeDrainTimeout,omitempty"`
+	NodeVolumeDetachTimeout *Duration         `json:"nodeVolumeDetachTimeout,omitempty" yaml:"nodeVolumeDetachTimeout,omitempty"`
+	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	ProviderID              string            `json:"providerID,omitempty" yaml:"providerID,omitempty"`
+	Removed                 string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                   string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                  *MachineStatus    `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning           string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage    string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                    string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Version                 string            `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 type MachineCollection struct {

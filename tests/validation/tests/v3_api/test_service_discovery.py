@@ -35,7 +35,7 @@ from .common import rbac_get_user_token_by_role
 from .common import rbac_get_workload
 from .common import skip_test_windows_os
 from .common import TEST_IMAGE
-from .common import TEST_IMAGE_NGINX
+from .common import TEST_IMAGE_REDIS
 from .common import time
 from .common import USER_TOKEN
 from .common import validate_dns_record
@@ -172,7 +172,7 @@ def test_service_discovery_when_workload_upgrade():
 
     # upgrade
     con = [{"name": "test1",
-            "image": TEST_IMAGE_NGINX}]
+            "image": TEST_IMAGE_REDIS}]
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)
@@ -262,7 +262,7 @@ def test_dns_record_type_workload_when_workload_upgrade():
 
     # upgrade the workload
     con = [{"name": "test1",
-            "image": TEST_IMAGE_NGINX}]
+            "image": TEST_IMAGE_REDIS}]
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)

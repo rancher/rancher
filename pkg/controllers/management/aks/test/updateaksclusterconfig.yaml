@@ -37,6 +37,7 @@ spec:
       vmSize: Standard_DS2_v2
     podCidr: null
     privateCluster: false
+    privateDnsZone: null
     resourceGroup: aks-resource-group
     resourceLocation: eastus
     serviceCidr: null
@@ -44,6 +45,9 @@ spec:
     tags: null
     virtualNetwork: null
     virtualNetworkResourceGroup: null
+    outboundType: null
+    managedIdentity: null
+    userAssignedIdentity: null
   answers: {}
   clusterSecrets: {}
   description: ""
@@ -106,6 +110,7 @@ status:
         vmSize: Standard_DS2_v2
       podCidr: 10.244.0.0/16
       privateCluster: false
+      privateDnsZone: null
       resourceGroup: aks-resource-group
       resourceLocation: eastus
       serviceCidr: 10.0.0.0/16
@@ -121,6 +126,8 @@ status:
         Stakeholder: stakeholder@suse.com
       virtualNetwork: null
       virtualNetworkResourceGroup: null
+      managedIdentity: null
+      userAssignedIdentity: null
   allocatable:
     cpu: 1900m
     memory: 4670932Ki

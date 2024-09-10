@@ -1,24 +1,27 @@
 package rancher
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
-	controllerapiextv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,11 +38,15 @@ const (
 	forceSystemNamespacesAssignment            = "forcesystemnamespaceassignment"
 	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
 	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
+	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
+	migrateRKEClusterState                     = "migraterkeclusterstate"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
 	capiMigratedKey                            = "capiMigrated"
 	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
+	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
+	rkeClustersAnnotatedForMigrationKey        = "rkeClustersAnnotatedForMigration"
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -57,12 +64,6 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	if features.EmbeddedClusterAPI.Enabled() {
-		if err := addWebhookConfigToCAPICRDs(wranglerContext.CRD.CustomResourceDefinition()); err != nil {
-			return err
-		}
-	}
-
 	if features.RKE2.Enabled() {
 		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(wranglerContext); err != nil {
 			return err
@@ -70,9 +71,12 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		if err := migrateEncryptionKeyRotationLeader(wranglerContext); err != nil {
 			return err
 		}
+		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return migrateRKEClusterStates(wranglerContext)
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -177,8 +181,8 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 			return err
 		}
 
-		v32.ClusterConditionconditionDefaultProjectCreated.Unknown(localCluster)
-		v32.ClusterConditionconditionSystemProjectCreated.Unknown(localCluster)
+		v32.ClusterConditionDefaultProjectCreated.Unknown(localCluster)
+		v32.ClusterConditionSystemProjectCreated.Unknown(localCluster)
 
 		_, err = clusterClient.Update(localCluster)
 		return err
@@ -237,42 +241,67 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 	return nil
 }
 
-func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefinitionClient) error {
-	crds, err := crdClient.List(metav1.ListOptions{
-		LabelSelector: "auth.cattle.io/cluster-indexed=true",
-	})
+// migrateRKEClusterStates sets the `RKEForceUpdate` annotation on all management cluster objects for
+// RKE-provisioned clusters.
+func migrateRKEClusterStates(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateRKEClusterState)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting configmap %s: %w", migrateRKEClusterState, err)
+	} else if cm == nil {
+		return nil
 	}
-	for _, crd := range crds.Items {
-		if crd.Spec.Group != "cluster.x-k8s.io" || (crd.Spec.Conversion != nil && crd.Spec.Conversion.Strategy != apiextv1.NoneConverter) {
+
+	// Check if this migration has already run.
+	if cm.Data[rkeClustersAnnotatedForMigrationKey] == "true" {
+		return nil
+	}
+
+	// Collect all RKE clusters that need migration.
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("error listing management clusters: %w", err)
+	}
+
+	// Mark all RKE clusters for migration.
+	for _, cluster := range mgmtClusters.Items {
+		// Skip this cluster if it's not RKE-provisioned.
+		if cluster.Spec.RancherKubernetesEngineConfig == nil {
 			continue
 		}
-		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			latestCrd, err := crdClient.Get(crd.Name, metav1.GetOptions{})
+
+		// Retry the cluster object status update on conflict in case something else is updating it at the same time.
+		if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			c, err := w.Mgmt.Cluster().Get(cluster.Name, metav1.GetOptions{})
 			if err != nil {
-				return err
+				return fmt.Errorf("error getting cluster %s: %w", cluster.Name, err)
 			}
 
-			latestCrd.Spec.Conversion = &apiextv1.CustomResourceConversion{
-				Strategy: apiextv1.WebhookConverter,
-				Webhook: &apiextv1.WebhookConversion{
-					ClientConfig: &apiextv1.WebhookClientConfig{
-						Service: &apiextv1.ServiceReference{
-							Namespace: "cattle-system",
-							Name:      "webhook-service",
-							Path:      &[]string{"/convert"}[0],
-							Port:      &[]int32{443}[0],
-						},
-					},
-					ConversionReviewVersions: []string{"v1", "v1beta1"},
-				},
+			clusterCopy := c.DeepCopy()
+			clusterCopy.Annotations[clusterprovisioner.RKEForceUpdate] = "true"
+
+			if _, err = w.Mgmt.Cluster().Update(clusterCopy); err != nil {
+				return fmt.Errorf("error updating cluster %s: %w", cluster.Name, err)
 			}
-			_, err = crdClient.Update(&crd)
-			return err
+
+			return nil
 		}); err != nil {
+			logrus.Errorf("error updating annotation for cluster %s: %s", cluster.Name, err)
 			return err
 		}
+	}
+
+	cm.Data = map[string]string{
+		rkeClustersAnnotatedForMigrationKey: "true",
+	}
+
+	// Update the configmap that indicates that this migration is complete.
+	if err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		// Retry all errors.
+		return true
+	}, func() error {
+		return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+	}); err != nil {
+		return fmt.Errorf("error updating configmap %s: %w", cm.Name, err)
 	}
 
 	return nil
@@ -294,17 +323,17 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	}
 
 	bootstrapLabelExcludes := map[string]struct{}{
-		rke2.InitNodeMachineIDLabel: {},
-		rke2.InitNodeLabel:          {},
+		capr.InitNodeMachineIDLabel: {},
+		capr.InitNodeLabel:          {},
 	}
 
 	boostrapAnnotationExcludes := map[string]struct{}{
-		rke2.DrainAnnotation:     {},
-		rke2.DrainDoneAnnotation: {},
-		rke2.JoinURLAnnotation:   {},
-		rke2.PostDrainAnnotation: {},
-		rke2.PreDrainAnnotation:  {},
-		rke2.UnCordonAnnotation:  {},
+		capr.DrainAnnotation:     {},
+		capr.DrainDoneAnnotation: {},
+		capr.JoinURLAnnotation:   {},
+		capr.PostDrainAnnotation: {},
+		capr.PreDrainAnnotation:  {},
+		capr.UnCordonAnnotation:  {},
 	}
 
 	for _, mgmtCluster := range mgmtClusters.Items {
@@ -316,12 +345,12 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 		}
 
 		for _, provCluster := range provClusters.Items {
-			machines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterLabelName: provCluster.Name}.String()})
+			machines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterNameLabel: provCluster.Name}.String()})
 			if err != nil {
 				return err
 			}
 
-			otherMachines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{rke2.ClusterNameLabel: provCluster.Name}.String()})
+			otherMachines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capr.ClusterNameLabel: provCluster.Name}.String()})
 			if err != nil {
 				return err
 			}
@@ -329,11 +358,11 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 			allMachines := append(machines.Items, otherMachines.Items...)
 
 			for _, machine := range allMachines {
-				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != rke2.RKEAPIVersion {
+				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != capr.RKEAPIVersion {
 					continue
 				}
 
-				planSecrets, err := w.Core.Secret().List(machine.Namespace, metav1.ListOptions{LabelSelector: labels.Set{rke2.MachineNameLabel: machine.Name}.String()})
+				planSecrets, err := w.Core.Secret().List(machine.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capr.MachineNameLabel: machine.Name}.String()})
 				if err != nil {
 					return err
 				}
@@ -349,8 +378,8 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 						}
 
 						secret = secret.DeepCopy()
-						rke2.CopyMap(secret.Labels, machine.Labels)
-						rke2.CopyMap(secret.Annotations, machine.Annotations)
+						capr.CopyMap(secret.Labels, machine.Labels)
+						capr.CopyMap(secret.Annotations, machine.Annotations)
 						_, err = w.Core.Secret().Update(secret)
 						return err
 					}); err != nil {
@@ -364,12 +393,12 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 						return err
 					}
 					bootstrap = bootstrap.DeepCopy()
-					rke2.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
-					rke2.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
+					capr.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
+					capr.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
 					if bootstrap.Spec.ClusterName == "" {
 						// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
 						// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-						if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+						if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
 							bootstrap.Spec.ClusterName = v
 						}
 					}
@@ -379,7 +408,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 					return err
 				}
 
-				if machine.Spec.InfrastructureRef.APIVersion == rke2.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == rke2.RKEMachineAPIVersion {
+				if machine.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == capr.RKEMachineAPIVersion {
 					gv, err := schema.ParseGroupVersion(machine.Spec.InfrastructureRef.APIVersion)
 					if err != nil {
 						// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
@@ -468,6 +497,79 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
 	}
 
 	cm.Data[encryptionKeyRotationStatusMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateDynamicSchemaToMachinePools)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[dynamicSchemaMachinePoolsMigratedKey] == "true" {
+		return nil
+	}
+
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, mgmtCluster := range mgmtClusters.Items {
+		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
+		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
+			continue
+		} else if err != nil {
+			return err
+		}
+		for _, provCluster := range provClusters.Items {
+			if provCluster.Spec.RKEConfig == nil {
+				continue
+			}
+			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+				if k8serror.IsNotFound(err) {
+					return nil
+				} else if err != nil {
+					return err
+				}
+				cluster = cluster.DeepCopy()
+				// search for machine pools without the `dynamic-schema-spec` annotation and apply it
+				for i, machinePool := range cluster.Spec.RKEConfig.MachinePools {
+					var spec v32.DynamicSchemaSpec
+					if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
+						continue
+					}
+					nodeConfig := machinePool.NodeConfig
+					if nodeConfig == nil {
+						return fmt.Errorf("machine pool node config must not be nil")
+					}
+					apiVersion := nodeConfig.APIVersion
+					if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
+						continue
+					}
+					ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					specJSON, err := json.Marshal(ds.Spec)
+					if err != nil {
+						return err
+					}
+					cluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
+				}
+				_, err = w.Provisioning.Cluster().Update(cluster)
+				if err != nil {
+					return err
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	cm.Data[dynamicSchemaMachinePoolsMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
