@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 )
 
 const (
@@ -548,6 +549,11 @@ func (m MockFactory) ClusterDialer(clusterName string, retryOnError bool) (diale
 		return nil, nil
 	}
 	return dialer, nil
+}
+
+func (m MockFactory) ClusterDialHolder(clusterName string, retryOnError bool) (*transport.DialHolder, error) {
+	clusterDialer, err := m.ClusterDialer(clusterName, retryOnError)
+	return &transport.DialHolder{Dial: clusterDialer}, err
 }
 
 func (m MockFactory) DockerDialer(clusterName, machineName string) (dialer.Dialer, error) {
