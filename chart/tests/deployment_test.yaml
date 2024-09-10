@@ -545,3 +545,12 @@ tests:
         content:
           name: CATTLE_NAMESPACE
           value: NAMESPACE
+- it: sets extraTolerations
+  set:
+    extraTolerations:
+      - key: "node.cloudprovider.kubernetes.io/uninitialized"
+        value: "true"
+        effect: "NoSchedule"
+  asserts:
+    - exists:
+        path: spec.template.spec.tolerations[1]

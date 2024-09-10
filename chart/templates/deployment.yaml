@@ -63,6 +63,9 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
       tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
+{{- if .Values.extraTolerations }}
+{{ toYaml .Values.extraTolerations | indent 8 }}
+{{- end }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
