@@ -4,13 +4,14 @@ package connectivity
 
 import (
 	"errors"
+	"github.com/rancher/rancher/tests/v2/actions/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	"github.com/rancher/rancher/tests/v2/actions/workloads"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/namespaces"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/sshkeys"
-	"github.com/rancher/shepherd/extensions/workloads"
+	shepworkloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +76,7 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 	testContainerPodTemplate := newPodTemplateWithTestContainer()
 
 	n.T().Logf("Creating a daemonset with the test container with name [%v]", names.random["daemonsetName"])
-	daemonsetTemplate := workloads.NewDaemonSetTemplate(names.random["daemonsetName"], namespace.Name, testContainerPodTemplate, true, nil)
+	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(names.random["daemonsetName"], namespace.Name, testContainerPodTemplate, true, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(n.T(), err)
 	assert.Equal(n.T(), createdDaemonSet.Name, names.random["daemonsetName"])
@@ -117,10 +118,11 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 
 	n.T().Logf("Running ping on [%v]", firstMachine.Name)
 
-	_, err = sshNode.ExecuteCommand(pingExecCmd)
+	excmd, err := sshNode.ExecuteCommand(pingExecCmd)
 	if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
 		assert.NoError(n.T(), err)
 	}
+	n.T().Logf("Log of the ping command {%v}", excmd)
 
 	//execCmd := []string{"kubectl", "exec", pod1Name, "-n", namespace.Name, " -- ", pingCmd, pod2Ip}
 	//execCmd := []string{namespace.Name, pod1Name, pingCmd, pod2Ip}

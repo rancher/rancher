@@ -58,7 +58,7 @@ func newNames() *resourceNames {
 func newPodTemplateWithTestContainer() corev1.PodTemplateSpec {
 	testContainer := newTestContainerMinimal()
 	containers := []corev1.Container{testContainer}
-	return workloads.NewPodTemplate(containers, nil, nil, nil)
+	return workloads.NewPodTemplate(containers, nil, []corev1.LocalObjectReference{}, nil, nil)
 }
 
 // newTestContainerMinimal is a private constructor that returns container for minimal workload creations
