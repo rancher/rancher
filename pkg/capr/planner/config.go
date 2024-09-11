@@ -91,7 +91,9 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		}
 	}
 
-	filterConfigData(config, controlPlane, entry)
+	if err := filterConfigData(config, controlPlane, entry); err != nil {
+		return err
+	}
 
 	// "data-dir" is explicitly not added to KDM for filtering because it is mapped to a field in the provisioning cluster
 	// CRD. While technically possible to add feature gates and update KDM, there is nothing to be gained from such an
