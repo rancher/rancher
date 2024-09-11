@@ -198,6 +198,9 @@ func GetKDMReleaseData(ctx context.Context, controlPlane *rkev1.RKEControlPlane)
 		return nil
 	}
 	release := channelserver.GetReleaseConfigByRuntimeAndVersion(ctx, GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Spec.KubernetesVersion)
+	if len(release.ServerArgs) == 0 || len(release.AgentArgs) == 0 {
+		return nil
+	}
 	return &release
 }
 

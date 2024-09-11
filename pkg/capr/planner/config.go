@@ -90,7 +90,10 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		}
 	}
 
-	filterConfigData(config, controlPlane, entry)
+	if err := filterConfigData(config, controlPlane, entry); err != nil {
+		return err
+	}
+
 	return nil
 }
 
