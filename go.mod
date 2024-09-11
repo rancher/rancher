@@ -128,7 +128,7 @@ require (
 	github.com/rancher/aks-operator v1.9.0
 	github.com/rancher/apiserver v0.0.0-20240708202538-39a6f2535146
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.6.0
+	github.com/rancher/dynamiclistener v0.6.1-rc.1
 	github.com/rancher/eks-operator v1.9.0
 	github.com/rancher/fleet/pkg/apis v0.10.0
 	github.com/rancher/gke-operator v1.9.0
@@ -139,7 +139,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.6.0
-	github.com/rancher/steve v0.0.0-20240830125833-ea6c83b279c0
+	github.com/rancher/steve v0.0.0-20240906202532-e930ae3691b2
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.0.0
