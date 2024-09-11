@@ -29,8 +29,8 @@ type TokenSpec struct {
 	// can be used for all clusters.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
-	// TTL is the time-to-live of the token.
-	TTL string `json:"ttl"`
+	// TTL is the time-to-live of the token, in milliseconds
+	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`

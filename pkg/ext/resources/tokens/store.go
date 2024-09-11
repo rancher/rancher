@@ -339,7 +339,7 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 
 	secret.StringData["userID"] = token.Spec.UserID
 	secret.StringData["clusterName"] = token.Spec.ClusterName
-	secret.StringData["ttl"] = token.Spec.TTL
+	secret.StringData["ttl"] = fmt.Sprintf("%d", token.Spec.TTL)
 	secret.StringData["enabled"] = fmt.Sprintf("%t", token.Spec.Enabled)
 	secret.StringData["description"] = token.Spec.Description
 	secret.StringData["is-derived"] = fmt.Sprintf("%t", token.Spec.IsDerived)
@@ -385,6 +385,10 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	if err != nil {
 		return nil, err
 	}
+	ttl, err := strconv.ParseInt(string(secret.Data["ttl"]), 10, 64)
+	if err != nil {
+		return nil, err
+	}
 
 	token := &Token{
 		TypeMeta: metav1.TypeMeta{
@@ -401,7 +405,7 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			UserID:      string(secret.Data["userID"]),
 			Description: string(secret.Data["description"]),
 			ClusterName: string(secret.Data["clusterName"]),
-			TTL:         string(secret.Data["ttl"]),
+			TTL:         ttl,
 			Enabled:     enabled,
 			IsDerived:   derived,
 		},
