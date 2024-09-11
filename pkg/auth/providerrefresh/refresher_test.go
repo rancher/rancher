@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
@@ -531,12 +532,12 @@ func (p *mockLocalProvider) AuthenticateUser(ctx context.Context, input interfac
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return token.UserPrincipal, nil
+func (p *mockLocalProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+	return token.GetUserPrincipal(), nil
 }
 
 func (p *mockLocalProvider) CustomizeSchema(schema *types.Schema) {
@@ -583,12 +584,12 @@ func (p *mockShibbolethProvider) AuthenticateUser(ctx context.Context, input int
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return token.UserPrincipal, nil
+func (p *mockShibbolethProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+	return token.GetUserPrincipal(), nil
 }
 
 func (p *mockShibbolethProvider) CustomizeSchema(schema *types.Schema) {

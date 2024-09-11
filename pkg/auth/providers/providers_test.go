@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
@@ -163,11 +164,11 @@ func (f fakeProvider) AuthenticateUser(_ context.Context, _ interface{}) (v3.Pri
 	panic("implement me")
 }
 
-func (f fakeProvider) SearchPrincipals(_, _ string, _ v3.Token) ([]v3.Principal, error) {
+func (f fakeProvider) SearchPrincipals(_, _ string, _ accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("implement me")
 }
 
-func (f fakeProvider) GetPrincipal(_ string, _ v3.Token) (v3.Principal, error) {
+func (f fakeProvider) GetPrincipal(_ string, _ accessor.TokenAccessor) (v3.Principal, error) {
 	panic("implement me")
 }
 
