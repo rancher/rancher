@@ -118,18 +118,13 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 
 	n.T().Logf("Running ping on [%v]", firstMachine.Name)
 
-	excmd, err := sshNode.ExecuteCommand(pingExecCmd)
+	excmdlog, err := sshNode.ExecuteCommand(pingExecCmd)
 	if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
 		assert.NoError(n.T(), err)
 	}
-	n.T().Logf("Log of the ping command {%v}", excmd)
+	n.T().Logf("Log of the ping command {%v}", excmdlog)
 
-	//execCmd := []string{"kubectl", "exec", pod1Name, "-n", namespace.Name, " -- ", pingCmd, pod2Ip}
-	//execCmd := []string{namespace.Name, pod1Name, pingCmd, pod2Ip}
-
-	//cmdLog, err := kubectl.Command(n.client, nil, n.project.ClusterID, execCmd, "")
-	//require.NoError(n.T(), err)
-	//n.T().Logf("Log of the kubectl command {%v]", cmdLog)
+	assert.Contains(n.T(), excmdlog, "0% packet loss", "Unable to ping the pod")
 
 }
 
