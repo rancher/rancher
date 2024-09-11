@@ -8,6 +8,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -145,9 +146,9 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 	var (
 		derivedTokenList      []*v3.Token
-		derivedTokens         map[string][]*v3.Token
+		derivedTokens         map[string][]accessor.TokenAccessor
 		loginTokenList        []*v3.Token
-		loginTokens           map[string][]*v3.Token
+		loginTokens           map[string][]accessor.TokenAccessor
 		canLogInAtAll         bool
 		errorConfirmingLogins bool
 	)
@@ -159,8 +160,8 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		return nil, err
 	}
 
-	loginTokens = make(map[string][]*v3.Token)
-	derivedTokens = make(map[string][]*v3.Token)
+	loginTokens = make(map[string][]accessor.TokenAccessor)
+	derivedTokens = make(map[string][]accessor.TokenAccessor)
 
 	allTokens, err := r.tokenLister.List("", labels.Everything())
 	if err != nil {
@@ -168,8 +169,8 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	for providerName := range providers.ProviderNames {
-		loginTokens[providerName] = []*v3.Token{}
-		derivedTokens[providerName] = []*v3.Token{}
+		loginTokens[providerName] = []accessor.TokenAccessor{}
+		derivedTokens[providerName] = []accessor.TokenAccessor{}
 	}
 
 	for _, token := range allTokens {
@@ -273,11 +274,11 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		// If the user cannot access the auth provider, the derived tokens are deactivated below and should not be used to determine extra attributes.
 		if principalID != "" && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccessProvider || errorConfirmingLogins))) {
 			// A user is 1:1 with its principal for a given provider, no need to get principals from tokens beyond the first one
-			var token v3.Token
+			var token accessor.TokenAccessor
 			if len(loginTokens[providerName]) > 0 {
-				token = *loginTokens[providerName][0]
+				token = loginTokens[providerName][0]
 			} else {
-				token = *derivedTokens[providerName][0]
+				token = derivedTokens[providerName][0]
 			}
 			userPrincipal, err := providers.GetPrincipal(principalID, token)
 			if err != nil {
@@ -295,7 +296,8 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		// If the user doesn't have access through this provider, we want to remove their login tokens for this provider
 		if !canAccessProvider && !errorConfirmingLogins {
 			for _, token := range loginTokens[providerName] {
-				err := r.tokens.Delete(token.Name, &metav1.DeleteOptions{})
+				/// XXX TODO AK deletion is type dependent - mgmt vs ext token
+				err := r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						continue

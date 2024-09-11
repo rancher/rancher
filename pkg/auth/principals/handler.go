@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -55,7 +56,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 		return err
 	}
 
-	ps, err := providers.SearchPrincipals(input.Name, input.PrincipalType, *token)
+	ps, err := providers.SearchPrincipals(input.Name, input.PrincipalType, token)
 	if err != nil {
 		return err
 	}
@@ -85,7 +86,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 	}
 
 	if apiContext.ID != "" {
-		princ, err := providers.GetPrincipal(apiContext.ID, *token)
+		princ, err := providers.GetPrincipal(apiContext.ID, token)
 		if err != nil {
 			return err
 		}
@@ -101,7 +102,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		return nil
 	}
 
-	p, err := convertPrincipal(apiContext.Schema, token.UserPrincipal)
+	p, err := convertPrincipal(apiContext.Schema, token.GetUserPrincipal())
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func convertPrincipal(schema *types.Schema, principal v3.Principal) (map[string]
 	return data, nil
 }
 
-func (h *principalsHandler) getToken(request *http.Request) (*v3.Token, error) {
+func (h *principalsHandler) getToken(request *http.Request) (accessor.TokenAccessor, error) {
 	token, err := h.auth.TokenFromRequest(request)
 	return token, errors.Wrap(err, requests.ErrMustAuthenticate.Error())
 }

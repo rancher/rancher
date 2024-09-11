@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -27,7 +28,7 @@ var (
 
 type Authenticator interface {
 	Authenticate(req *http.Request) (*AuthenticatorResponse, error)
-	TokenFromRequest(req *http.Request) (*v3.Token, error)
+	TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error)
 }
 
 type AuthenticatorResponse struct {
@@ -108,32 +109,38 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, err
 	}
 
-	if token.Enabled != nil && !*token.Enabled {
+	if !token.IsEnabled() {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "user's token is not enabled")
 	}
-	if token.ClusterName != "" && token.ClusterName != a.clusterRouter(req) {
+	cluster := token.ObjClusterName()
+	if cluster != "" && cluster != a.clusterRouter(req) {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
 	// If the auth provider is specified make sure it exists and enabled.
-	if token.AuthProvider != "" {
-		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
+	if token.GetAuthProvider() != "" {
+		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider())
 		if err != nil {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "error checking if provider %s is disabled: %v", token.AuthProvider, err)
+			return nil, errors.Wrapf(ErrMustAuthenticate,
+				"error checking if provider %s is disabled: %v",
+				token.GetAuthProvider(), err)
 		}
 		if disabled {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled", token.AuthProvider)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled",
+				token.GetAuthProvider())
 		}
 	}
 
-	attribs, err := a.userAttributeLister.Get("", token.UserID)
+	attribs, err := a.userAttributeLister.Get("", token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve userattribute %s: %v", token.UserID, err)
+		return nil, errors.Wrapf(ErrMustAuthenticate,
+			"failed to retrieve userattribute %s: %v", token.GetUserID(), err)
 	}
 
-	authUser, err := a.userLister.Get("", token.UserID)
+	authUser, err := a.userLister.Get("", token.GetUserID())
 	if err != nil {
-		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve user %s: %v", token.UserID, err)
+		return nil, errors.Wrapf(ErrMustAuthenticate,
+			"failed to retrieve user %s: %v", token.GetUserID(), err)
 	}
 
 	if authUser.Enabled != nil && !*authUser.Enabled {
@@ -143,8 +150,9 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	var groups []string
 	hitProvider := false
 	if attribs != nil {
+		authp := token.GetAuthProvider()
 		for provider, gps := range attribs.GroupPrincipals {
-			if provider == token.AuthProvider {
+			if provider == authp {
 				hitProvider = true
 			}
 			for _, principal := range gps.Items {
@@ -156,7 +164,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	// fallback to legacy token.GroupPrincipals
 	if !hitProvider {
-		for _, principal := range token.GroupPrincipals {
+		for _, principal := range token.GetGroupPrincipals() {
 			// TODO This is a short cut for now. Will actually need to lookup groups in future
 			name := strings.TrimPrefix(principal.Name, "local://")
 			groups = append(groups, name)
@@ -164,13 +172,13 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
 
-	if !(authUser.IsSystem() || strings.HasPrefix(token.UserID, "system:")) {
-		a.refreshUser(token.UserID, false)
+	if !(authUser.IsSystem() || strings.HasPrefix(token.GetUserID(), "system:")) {
+		a.refreshUser(token.GetUserID(), false)
 	}
 
 	authResp.IsAuthed = true
-	authResp.User = token.UserID
-	authResp.UserPrincipal = token.UserPrincipal.Name
+	authResp.User = token.GetUserID()
+	authResp.UserPrincipal = token.GetUserPrincipal().Name
 	authResp.Groups = groups
 	authResp.Extras = getUserExtraInfo(token, authUser, attribs)
 	logrus.Debugf("Extras returned %v", authResp.Extras)
@@ -178,11 +186,12 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	return authResp, nil
 }
 
-func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
+func getUserExtraInfo(token accessor.TokenAccessor, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
 	extraInfo := make(map[string][]string)
 
+	ap := token.GetAuthProvider()
 	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
-		if token.AuthProvider == "local" || token.AuthProvider == "" {
+		if ap == "local" || ap == "" {
 			//gather all extraInfo for all external auth providers present in the userAttributes
 			for _, extra := range attribs.ExtraByProvider {
 				for key, value := range extra {
@@ -192,12 +201,12 @@ func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) ma
 			return extraInfo
 		}
 		//authProvider is set in token
-		if extraInfo, ok := attribs.ExtraByProvider[token.AuthProvider]; ok {
+		if extraInfo, ok := attribs.ExtraByProvider[ap]; ok {
 			return extraInfo
 		}
 	}
 
-	extraInfo = providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
+	extraInfo = providers.GetUserExtraAttributes(ap, token.GetUserPrincipal())
 	//if principalid is not set in extra, read from user
 	if extraInfo != nil {
 		if len(extraInfo[common.UserAttributePrincipalID]) == 0 {
@@ -211,7 +220,7 @@ func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) ma
 	return extraInfo
 }
 
-func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
+func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 	if tokenAuthValue == "" {
 		return nil, ErrMustAuthenticate

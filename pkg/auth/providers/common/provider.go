@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
@@ -21,8 +22,8 @@ const (
 type AuthProvider interface {
 	GetName() string
 	AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error)
-	SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error)
-	GetPrincipal(principalID string, token v3.Token) (v3.Principal, error)
+	SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error)
+	GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error)
 	CustomizeSchema(schema *types.Schema)
 	TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error)
 	RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error)

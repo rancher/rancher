@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -148,7 +149,7 @@ func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) 
 }
 
 // searchKey can be user PrincipalID e.g. shibboleth_user://username with principalType of group for group search by user
-func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -172,11 +173,11 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
-				if p.isThisUserMe(myToken.UserPrincipal, principal) {
+				if p.isThisUserMe(myToken.GetUserPrincipal(), principal) {
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
-				if p.isMemberOf(myToken.GroupPrincipals, principal) {
+				if p.isMemberOf(myToken.GetGroupPrincipals(), principal) {
 					principal.MemberOf = true
 				}
 			}
@@ -186,7 +187,7 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 	return principals, nil
 }
 
-func (p *ldapProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		if IsNotConfigured(err) {
@@ -211,7 +212,7 @@ func (p *ldapProvider) GetPrincipal(principalID string, token v3.Token) (v3.Prin
 		return v3.Principal{}, err
 	}
 
-	if p.isThisUserMe(token.UserPrincipal, *principal) {
+	if p.isThisUserMe(token.GetUserPrincipal(), *principal) {
 		principal.Me = true
 	}
 	return *principal, err

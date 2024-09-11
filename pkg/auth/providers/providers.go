@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -173,10 +174,10 @@ func AuthenticateUser(ctx context.Context, input interface{}, providerName strin
 	return Providers[providerName].AuthenticateUser(ctx, input)
 }
 
-func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
-	principal, err := Providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
+func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (v3.Principal, error) {
+	principal, err := Providers[myToken.GetAuthProvider()].GetPrincipal(principalID, myToken)
 
-	if err != nil && myToken.AuthProvider != LocalProvider {
+	if err != nil && myToken.GetAuthProvider() != LocalProvider {
 		p2, e2 := Providers[LocalProvider].GetPrincipal(principalID, myToken)
 		if e2 == nil {
 			return p2, nil
@@ -186,18 +187,19 @@ func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
 	return principal, err
 }
 
-func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
-	if myToken.AuthProvider == "" {
+func SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
+	ap := myToken.GetAuthProvider()
+	if ap == "" {
 		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] no authProvider specified in token")
 	}
-	if Providers[myToken.AuthProvider] == nil {
-		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] authProvider %v not initialized", myToken.AuthProvider)
+	if Providers[ap] == nil {
+		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] authProvider %v not initialized", ap)
 	}
-	principals, err := Providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
+	principals, err := Providers[ap].SearchPrincipals(name, principalType, myToken)
 	if err != nil {
 		return principals, err
 	}
-	if myToken.AuthProvider != LocalProvider {
+	if ap != LocalProvider {
 		lp := Providers[LocalProvider]
 		if lpDedupe, _ := lp.(*local.Provider); lpDedupe != nil {
 			localPrincipals, err := lpDedupe.SearchPrincipalsDedupe(name, principalType, myToken, principals)
