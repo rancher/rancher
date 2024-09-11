@@ -171,8 +171,8 @@ func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTe
 	cluster, err := client.Management.Cluster.ByID(clusterID)
 	require.NoError(t, err)
 
-	if etcdRestore.ReplaceWorkerNode {
-		scaling.ReplaceRKE1Nodes(t, client, clusterName, false, false, true)
+	if etcdRestore.ReplaceRoles != nil && cluster.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
+		scaling.ReplaceRKE1Nodes(t, client, clusterName, etcdRestore.ReplaceRoles.Etcd, etcdRestore.ReplaceRoles.ControlPlane, etcdRestore.ReplaceRoles.Worker)
 	}
 
 	podErrors := pods.StatusPods(client, clusterID)
@@ -276,8 +276,8 @@ func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.Pod
 	cluster, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
 	require.NoError(t, err)
 
-	if etcdRestore.ReplaceWorkerNode {
-		scaling.ReplaceNodes(t, client, clusterName, false, false, true)
+	if etcdRestore.ReplaceRoles != nil && cluster.Spec.RKEConfig.ETCD.S3 != nil {
+		scaling.ReplaceNodes(t, client, clusterName, etcdRestore.ReplaceRoles.Etcd, etcdRestore.ReplaceRoles.ControlPlane, etcdRestore.ReplaceRoles.Worker)
 	}
 
 	podErrors := pods.StatusPods(client, clusterID)

@@ -24,6 +24,10 @@ snapshotInput:
   controlPlaneUnavailableValue: "1"
   workerUnavailableValue: "10%"
   recurringRestores: 1                # By default, this is set to 1 if this field is not included in the config.
+  replaceRoles:                       # If selected, S3 must be properly configured on the cluster. This test is specific to S3 etcd snapshots.
+    etcd: false
+    controlplane: false
+    worker: false
 ```
 
 Additionally, S3 is a supported restore option. If you choose to use S3, then you must have it already enabled on the downstream cluster.
