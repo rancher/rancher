@@ -2,8 +2,10 @@ package requests
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
@@ -12,6 +14,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
@@ -73,6 +77,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		refreshUser: func(userID string, force bool) {
 			go providerRefresher.TriggerUserRefresh(userID, force)
 		},
+		// XXX TODO AK init extToken... fields
 	}
 }
 
@@ -80,6 +85,8 @@ type tokenAuthenticator struct {
 	ctx                 context.Context
 	tokenIndexer        cache.Indexer
 	tokenClient         v3.TokenInterface
+	extTokenIndexer     cache.Indexer
+	extTokenClient      v3.TokenInterface // XXX TODO AK proper interface!
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
 	userLister          v3.UserLister
@@ -232,6 +239,50 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	}
 
 	lookupUsingClient := false
+
+	// General process:
+	// 1. look for token in the indexer. use that if found.
+	// 2. in all other cases (not found, or error), retrieve directly via kube client
+
+	if extTokenName, found := strings.CutPrefix(tokenName, "ext-"); found {
+		// Process ext token
+		// Same process as for legacy tokens, using different indexer, client, and type cast
+
+		objs, err := a.extTokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				lookupUsingClient = true
+			} else {
+				return nil, errors.Wrapf(ErrMustAuthenticate,
+					"failed to retrieve ext auth token from cache, error: %v", err)
+			}
+		} else if len(objs) == 0 {
+			lookupUsingClient = true
+		}
+
+		var storedToken *exttokens.Token
+		if lookupUsingClient {
+			storedToken, err = a.extTokenClient.Get(extTokenName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return nil, ErrMustAuthenticate
+				}
+				return nil, errors.Wrapf(ErrMustAuthenticate,
+					"failed to retrieve auth token, error: %#v", err)
+			}
+		} else {
+			storedToken = objs[0].(*exttokens.Token)
+		}
+
+		if _, err := extVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
+		}
+
+		return storedToken, nil
+	}
+
+	// Process legacy norman/v3 token
+
 	objs, err := a.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -261,4 +312,43 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	}
 
 	return storedToken, nil
+}
+
+// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
+func extVerifyToken(storedToken *exttokens.Token, tokenName, tokenKey string) (int, error) {
+	invalidAuthTokenErr := errors.New("Invalid auth token value")
+
+	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	// Ext token always has a hash. Only a hash.
+
+	hasher, err := hashers.GetHasherForHash(storedToken.Status.TokenHash)
+	if err != nil {
+		logrus.Errorf("unable to get a hasher for token with error %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+	}
+
+	if err := hasher.VerifyHash(storedToken.Status.TokenHash, tokenKey); err != nil {
+		logrus.Errorf("VerifyHash failed with error: %v", err)
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	if extIsExpired(storedToken) {
+		return http.StatusGone, errors.New("must authenticate")
+	}
+	return http.StatusOK, nil
+}
+
+func extIsExpired(token *exttokens.Token) bool {
+	if token.Spec.TTL == 0 {
+		return false
+	}
+
+	created := token.ObjectMeta.CreationTimestamp.Time
+	durationElapsed := time.Since(created)
+	ttlDuration := time.Duration(token.Spec.TTL) * time.Millisecond
+
+	return durationElapsed.Seconds() >= ttlDuration.Seconds()
 }
