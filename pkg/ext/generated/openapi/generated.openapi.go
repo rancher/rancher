@@ -289,9 +289,8 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 					"userPrincipal": {
 						SchemaProps: spec.SchemaProps{
 							Description: "UserPrincipal holds the detailed user data",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"),
 						},
 					},
 					"groupsPrincipals": {
@@ -301,9 +300,8 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"),
 									},
 								},
 							},
@@ -337,6 +335,8 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 				Required: []string{"expired", "expiredAt", "authProvider", "userPrincipal", "groupsPrincipals", "providerInfo", "lastUpdateTime"},
 			},
 		},
+		Dependencies: []string{
+			"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"},
 	}
 }
 

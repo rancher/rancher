@@ -7,6 +7,7 @@ import (
 	"time"
 	"strconv"
 
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -309,10 +310,14 @@ func(t *TokenStore) checkAdmin(verb string, token *Token, userInfo user.Info) er
 
 func secretFromToken(token *Token) (*corev1.Secret, error) {
 
-	// UserPrincipal (future), GroupPrincipals, ProviderInfo
+	// UserPrincipal, GroupPrincipals, ProviderInfo
 	// Encode the complex data into JSON for storage as string.
 
 	gps, err := json.Marshal(token.Status.GroupPrincipals)
+	if err != nil {
+		return nil, err
+	}
+	up, err := json.Marshal(token.Status.UserPrincipal)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +348,7 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 	secret.StringData["expired"] = fmt.Sprintf("%t", token.Status.Expired)
 	secret.StringData["expired-at"] = token.Status.ExpiredAt
 	secret.StringData["auth-provider"] = token.Status.AuthProvider
-	secret.StringData["user-principal"] = token.Status.UserPrincipal
+	secret.StringData["user-principal"] = string(up)
 	secret.StringData["group-principals"] = string(gps)
 	secret.StringData["provider-info"] = string(pi)
 	secret.StringData["last-update-time"] = token.Status.LastUpdateTime
@@ -365,7 +370,12 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	var gps []string
+	var up apiv3.Principal
+	err = json.Unmarshal(secret.Data["user-principals"], &up)
+	if err != nil {
+		return nil, err
+	}
+	var gps []apiv3.Principal
 	err = json.Unmarshal(secret.Data["group-principals"], &gps)
 	if err != nil {
 		return nil, err
@@ -400,7 +410,7 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			Expired:         expired,
 			ExpiredAt:       string(secret.Data["expired-at"]),
 			AuthProvider:    string(secret.Data["auth-provider"]),
-			UserPrincipal:   string(secret.Data["user-principal"]),
+			UserPrincipal:   up,
 			GroupPrincipals: gps,
 			ProviderInfo:    pi,
 			LastUpdateTime:  string(secret.Data["last-update-time"]),

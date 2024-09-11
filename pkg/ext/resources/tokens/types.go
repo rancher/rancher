@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -52,9 +53,9 @@ type TokenStatus struct {
 	// AuthProvider names the auth provider managing the user
 	AuthProvider string `json:"authProvider"`
 	// UserPrincipal holds the detailed user data
-	UserPrincipal string `json:"userPrincipal"` // TODO: see above
+	UserPrincipal apiv3.Principal `json:"userPrincipal"`
 	// GroupPrincipals holds detailed group information
-	GroupPrincipals []string `json:"groupsPrincipals"` // TODO: Proper Principal structs
+	GroupPrincipals []apiv3.Principal `json:"groupsPrincipals"`
 	// ProviderInfo provides provider-specific details
 	ProviderInfo map[string]string `json:"providerInfo"`
 	// Time of last change to the token
@@ -69,4 +70,38 @@ type TokenList struct {
 	metav1.ListMeta `json:"metadata"`
 
 	Items []Token `json:"items"`
+}
+
+// Implement the TokenAccessor interface
+
+func (t *Token) GetName() string {
+	return t.ObjectMeta.Name
+}
+
+func (t *Token) IsEnabled() bool {
+	return t.Spec.Enabled
+}
+
+func (t *Token) GetUserID() string {
+	return t.Spec.UserID
+}
+
+func (t *Token) ObjClusterName() string {
+	return t.Spec.ClusterName
+}
+
+func (t *Token) GetAuthProvider() string {
+	return t.Status.AuthProvider
+}
+
+func (t *Token) GetUserPrincipal() apiv3.Principal {
+	return t.Status.UserPrincipal
+}
+
+func (t *Token) GetGroupPrincipals() []apiv3.Principal {
+	return t.Status.GroupPrincipals
+}
+
+func (t *Token) GetProviderInfo() map[string]string {
+	return t.Status.ProviderInfo
 }
