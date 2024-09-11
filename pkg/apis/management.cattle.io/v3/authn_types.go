@@ -47,8 +47,36 @@ type Token struct {
 	Enabled         *bool             `json:"enabled,omitempty" norman:"default=true"`
 }
 
+func (t *Token) GetName() string {
+	return t.ObjectMeta.Name
+}
+
+func (t *Token) IsEnabled() bool {
+	return t.Enabled == nil || *t.Enabled
+}
+
+func (t *Token) GetAuthProvider() string {
+	return t.AuthProvider
+}
+
+func (t *Token) GetUserID() string {
+	return t.UserID
+}
+
+func (t *Token) GetUserPrincipal() Principal {
+	return t.UserPrincipal
+}
+
 func (t *Token) ObjClusterName() string {
 	return t.ClusterName
+}
+
+func (t *Token) GetGroupPrincipals() []Principal {
+	return t.GroupPrincipals
+}
+
+func (t *Token) GetProviderInfo() map[string]string {
+	return t.ProviderInfo
 }
 
 // +genclient
