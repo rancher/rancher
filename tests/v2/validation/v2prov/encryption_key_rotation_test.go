@@ -17,6 +17,7 @@ import (
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/kubeapi"
+	"github.com/rancher/shepherd/extensions/vai"
 	"github.com/rancher/shepherd/pkg/environmentflag"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -79,7 +80,9 @@ func setEncryptSecret(t *testing.T, client *rancher.Client, steveID string) {
 	updatedCluster := *cluster
 
 	secretEncryption := clusterSpec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"]
-	if secretEncryption == nil {
+
+	isEncryptionDisabled := secretEncryption == nil || secretEncryption == false
+	if isEncryptionDisabled {
 		clusterSpec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"] = true
 
 		updatedCluster.Spec = *clusterSpec
@@ -94,8 +97,8 @@ func setEncryptSecret(t *testing.T, client *rancher.Client, steveID string) {
 	}
 }
 
-func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, generation int64, timeout time.Duration) {
-	t.Logf("Applying encryption key rotation generation %d for cluster %s", generation, steveID)
+func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, timeout time.Duration) {
+	t.Logf("Applying encryption key rotation for cluster %s", steveID)
 
 	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
 	require.NoError(t, err)
@@ -109,8 +112,17 @@ func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, 
 
 	updatedCluster := *cluster
 
+	rotateEncryptionKeys := clusterSpec.RKEConfig.RotateEncryptionKeys
+
+	if rotateEncryptionKeys == nil {
+		clusterSpec.RKEConfig.RotateEncryptionKeys = &rkev1.RotateEncryptionKeys{
+			Generation: 0,
+		}
+	}
+
+	nextGeneration := clusterSpec.RKEConfig.RotateEncryptionKeys.Generation + 1
 	clusterSpec.RKEConfig.RotateEncryptionKeys = &rkev1.RotateEncryptionKeys{
-		Generation: generation,
+		Generation: nextGeneration,
 	}
 
 	updatedCluster.Spec = *clusterSpec
@@ -160,6 +172,26 @@ func createSecretsForCluster(t *testing.T, client *rancher.Client, steveID strin
 	}
 }
 
+func getClusterType(client *rancher.Client, clusterID string) (string, error) {
+	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
+	if err != nil {
+		return "", err
+	}
+
+	clusterDetails := new(apiv1.Cluster)
+	err = v1.ConvertToK8sType(cluster, &clusterDetails)
+	if err != nil {
+		return "", err
+	}
+
+	if strings.Contains(clusterDetails.Spec.KubernetesVersion, "rke2") {
+		return "RKE2", nil
+	} else {
+		return "K3s", nil
+	}
+
+}
+
 func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
@@ -169,9 +201,12 @@ func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 
 	setEncryptSecret(r.T(), r.client, id)
 
-	prefix := "encryption-key-rotation-"
-	r.Run(prefix+"new-cluster", func() {
-		rotateEncryptionKeys(r.T(), r.client, id, 1, 10*time.Minute)
+	clusterType, err := getClusterType(r.client, id)
+	require.NoError(r.T(), err)
+	prefix := clusterType + "-encryption-key-rotation"
+
+	r.Run(prefix, func() {
+		rotateEncryptionKeys(r.T(), r.client, id, 10*time.Minute)
 	})
 
 	if r.client.Flags.GetValue(environmentflag.Long) {
@@ -179,7 +214,36 @@ func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 		createSecretsForCluster(r.T(), r.client, id, totalSecrets)
 
 		r.Run(prefix+"stress-test", func() {
-			rotateEncryptionKeys(r.T(), r.client, id, 2, 1*time.Hour) // takes ~45 minutes for HA
+			rotateEncryptionKeys(r.T(), r.client, id, 1*time.Hour) // takes ~45 minutes for HA
+		})
+	}
+}
+
+func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotationWithVaiEnabled() {
+	subSession := r.session.NewSession()
+	defer subSession.Cleanup()
+
+	id, err := clusters.GetV1ProvisioningClusterByName(r.client, r.clusterName)
+	require.NoError(r.T(), err)
+
+	setEncryptSecret(r.T(), r.client, id)
+	err = vai.EnableVaiCaching(r.client)
+	require.NoError(r.T(), err)
+
+	clusterType, err := getClusterType(r.client, id)
+	require.NoError(r.T(), err)
+	prefix := clusterType + "-encryption-key-rotation-vai-enabled"
+
+	r.Run(prefix, func() {
+		rotateEncryptionKeys(r.T(), r.client, id, 10*time.Minute)
+	})
+
+	if r.client.Flags.GetValue(environmentflag.Long) {
+		// create 10k secrets for stress test, takes ~30 minutes
+		createSecretsForCluster(r.T(), r.client, id, totalSecrets)
+
+		r.Run(prefix+"stress-test", func() {
+			rotateEncryptionKeys(r.T(), r.client, id, 1*time.Hour) // takes ~45 minutes for HA
 		})
 	}
 }
