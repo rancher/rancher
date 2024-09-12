@@ -106,6 +106,7 @@ const (
 	AciNetworkProviderFieldTenant                               = "tenant"
 	AciNetworkProviderFieldToken                                = "token"
 	AciNetworkProviderFieldTolerationSeconds                    = "tolerationSeconds"
+	AciNetworkProviderFieldUnknownMacUnicastAction              = "unknownMacUnicastAction"
 	AciNetworkProviderFieldUseAciAnywhereCRD                    = "useAciAnywhereCrd"
 	AciNetworkProviderFieldUseAciCniPriorityClass               = "useAciCniPriorityClass"
 	AciNetworkProviderFieldUseClusterRole                       = "useClusterRole"
@@ -224,6 +225,7 @@ type AciNetworkProvider struct {
 	Tenant                               string              `json:"tenant,omitempty" yaml:"tenant,omitempty"`
 	Token                                string              `json:"token,omitempty" yaml:"token,omitempty"`
 	TolerationSeconds                    string              `json:"tolerationSeconds,omitempty" yaml:"tolerationSeconds,omitempty"`
+	UnknownMacUnicastAction              string              `json:"unknownMacUnicastAction,omitempty" yaml:"unknownMacUnicastAction,omitempty"`
 	UseAciAnywhereCRD                    string              `json:"useAciAnywhereCrd,omitempty" yaml:"useAciAnywhereCrd,omitempty"`
 	UseAciCniPriorityClass               string              `json:"useAciCniPriorityClass,omitempty" yaml:"useAciCniPriorityClass,omitempty"`
 	UseClusterRole                       string              `json:"useClusterRole,omitempty" yaml:"useClusterRole,omitempty"`
