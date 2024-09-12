@@ -199,7 +199,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 				UserName:         creatorID,
 			}
 
-			if principalName := project.Annotations[creatorPrincipleNameAnnotation]; principalName != "" {
+			if principalName := project.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
 				if !strings.HasPrefix(principalName, "local") {
 					// Setting UserPrincipalName only makes sense for non-local users.
 					prtb.UserPrincipalName = principalName

@@ -198,8 +198,8 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 			annotations[CreatorIDAnnotation] = creatorID
 		}
 
-		if creatorPrincipleName := clusterAnnotations[creatorPrincipleNameAnnotation]; creatorPrincipleName != "" {
-			annotations[creatorPrincipleNameAnnotation] = creatorPrincipleName
+		if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
+			annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
 		}
 
 		if name == project.System {
@@ -381,7 +381,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 				UserName:         creatorID,
 			}
 
-			if principalName := cluster.Annotations[creatorPrincipleNameAnnotation]; principalName != "" {
+			if principalName := cluster.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
 				if !strings.HasPrefix(principalName, "local") {
 					// Setting UserPrincipalName only makes sense for non-local users.
 					crtb.UserPrincipalName = principalName

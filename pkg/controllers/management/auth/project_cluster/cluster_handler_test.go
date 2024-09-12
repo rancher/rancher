@@ -48,7 +48,7 @@ func TestClusterLifecycleCreateProjectRespectsUserPrincipalName(t *testing.T) {
 			Name: clusterName,
 			Annotations: map[string]string{
 				CreatorIDAnnotation:            userID,
-				creatorPrincipleNameAnnotation: userPrincipalName,
+				creatorPrincipalNameAnnotation: userPrincipalName,
 			},
 		},
 	}
@@ -61,7 +61,7 @@ func TestClusterLifecycleCreateProjectRespectsUserPrincipalName(t *testing.T) {
 	assert.Equal(t, clusterName, project.Spec.ClusterName)
 	assert.Equal(t, projectName, project.Spec.DisplayName)
 	assert.Equal(t, userID, project.Annotations[CreatorIDAnnotation])
-	assert.Equal(t, userPrincipalName, project.Annotations[creatorPrincipleNameAnnotation])
+	assert.Equal(t, userPrincipalName, project.Annotations[creatorPrincipalNameAnnotation])
 }
 
 func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
@@ -77,7 +77,7 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 			Annotations: map[string]string{
 				roleTemplatesRequiredAnnotation: `{"created":["cluster-owner"],"required":["cluster-owner"]}`,
 				CreatorIDAnnotation:             userID,
-				creatorPrincipleNameAnnotation:  userPrincipalName,
+				creatorPrincipalNameAnnotation:  userPrincipalName,
 			},
 		},
 	}

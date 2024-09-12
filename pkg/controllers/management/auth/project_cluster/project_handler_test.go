@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -52,7 +51,7 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 	assert.Equal(t, len(existingCrtbs), len(mockedClusterRoleTemplateBindingController.EnqueueCalls()))
 }
 
-func TestReconcileProjectCreatorRTBRespectsUserPrincipleName(t *testing.T) {
+func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	var prtbs []*v3.ProjectRoleTemplateBinding
 
 	lifecycle := &projectLifecycle{
@@ -82,7 +81,7 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipleName(t *testing.T) {
 			Namespace: clusterID,
 			Annotations: map[string]string{
 				CreatorIDAnnotation:             "u-abcdef",
-				creatorPrincipleNameAnnotation:  userPrincipalName,
+				creatorPrincipalNameAnnotation:  userPrincipalName,
 				roleTemplatesRequiredAnnotation: `{"created":["project-owner"],"required":["project-owner"]}`,
 			},
 		},
