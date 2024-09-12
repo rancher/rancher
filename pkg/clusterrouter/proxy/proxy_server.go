@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -20,6 +21,8 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -28,6 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/rest"
 )
+
+const minExpirationTime = 600
 
 type ClusterContextGetter interface {
 	UserContext(string) (*config.UserContext, error)
@@ -40,12 +45,14 @@ type RemoteService struct {
 	transport transportGetter
 	url       urlGetter
 
-	factory              dialer.Factory
-	clusterLister        v3.ClusterLister
-	caCert               string
-	localAuth            string
-	httpTransport        *http.Transport
-	clusterContextGetter ClusterContextGetter
+	factory                        dialer.Factory
+	clusterLister                  v3.ClusterLister
+	caCert                         string
+	localAuth                      string
+	httpTransport                  *http.Transport
+	clusterContextGetter           ClusterContextGetter
+	tokenCreator                   tokenCreator
+	impersonatorAccountTokenGetter impersonatorAccountTokenGetter
 }
 
 var (
@@ -57,6 +64,10 @@ type urlGetter func() (url.URL, error)
 type authGetter func() (string, error)
 
 type transportGetter func() (http.RoundTripper, error)
+
+type tokenCreator func(context.Context, ClusterContextGetter, string, string) (string, error)
+
+type impersonatorAccountTokenGetter func(user.Info, ClusterContextGetter, string) (string, error)
 
 type errorResponder struct {
 }
@@ -114,6 +125,28 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
 
+	tokenCreator := func(ctx context.Context, clusterContextGetter ClusterContextGetter, clusterName, sa string) (string, error) {
+		sa, ns, err := getNameAndNamespaceFromSA(sa)
+		if err != nil {
+			return "", fmt.Errorf("can't get ServiceAccount name and namespace: %w", err)
+		}
+		clusterContext, err := clusterContextGetter.UserContext(clusterName)
+		if err != nil {
+			return "", fmt.Errorf("can't get cluster context: %w", err)
+		}
+		tokenReq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				ExpirationSeconds: &[]int64{minExpirationTime}[0],
+			},
+		}
+		tokenReq, err = clusterContext.K8sClient.CoreV1().ServiceAccounts(ns).CreateToken(ctx, sa, tokenReq, metav1.CreateOptions{})
+		if err != nil {
+			return "", fmt.Errorf("can't create token: %w", err)
+		}
+
+		return tokenReq.Status.Token, nil
+	}
+
 	urlGetter := func() (url.URL, error) {
 		newCluster, err := clusterLister.Get("", cluster.Name)
 		if err != nil {
@@ -128,11 +161,13 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 	}
 
 	return &RemoteService{
-		cluster:              cluster,
-		url:                  urlGetter,
-		clusterLister:        clusterLister,
-		factory:              factory,
-		clusterContextGetter: clusterContextGetter,
+		cluster:                        cluster,
+		url:                            urlGetter,
+		clusterLister:                  clusterLister,
+		factory:                        factory,
+		clusterContextGetter:           clusterContextGetter,
+		tokenCreator:                   tokenCreator,
+		impersonatorAccountTokenGetter: getImpersonatorAccountToken,
 	}, nil
 }
 
@@ -236,14 +271,33 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		if !authcontext.IsSAAuthenticated(req.Context()) {
-			// If the request is not authenticated as a service account,
-			// we need to use an impersonation token.
-			// This is because the impersonator service account does exist on the downstream cluster, and
-			// it has sufficient permissions to perform the TokenReview.
-			token, err := r.getImpersonatorAccountToken(userInfo)
-			if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
-				er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
-				return
+			// If a ServiceAccount is being impersonated, we need to get a token for this sa. This token will be added
+			// to the Authorization header.
+			token := ""
+			impSA := authcontext.GetSAImpersonation(req.Context())
+			if impSA != "" {
+				token, err = r.tokenCreator(req.Context(), r.clusterContextGetter, r.cluster.Name, impSA)
+				if err != nil {
+					er.Error(rw, req, fmt.Errorf("unable to create token for impersonated ServiceAccount: %w", err))
+					return
+				}
+				req.Header.Del("Impersonate-User")
+				req.Header.Del("Impersonate-Group")
+				for k, _ := range req.Header {
+					if strings.HasPrefix(k, "Impersonate-Extra") {
+						req.Header.Del(k)
+					}
+				}
+			} else {
+				// If the request is not authenticated as a service account,
+				// we need to use an impersonation token.
+				// This is because the impersonator service account does exist on the downstream cluster, and
+				// it has sufficient permissions to perform the TokenReview.
+				token, err = r.impersonatorAccountTokenGetter(userInfo, r.clusterContextGetter, r.cluster.Name)
+				if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
+					er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
+					return
+				}
 			}
 
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -291,8 +345,8 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // getImpersonatorAccountToken creates, if not already present, a service account and role bindings
 // whose only permission is to impersonate the given user, and returns the bearer token for the account.
-func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, error) {
-	clusterContext, err := r.clusterContextGetter.UserContext(r.cluster.Name)
+func getImpersonatorAccountToken(user user.Info, clusterContextGetter ClusterContextGetter, clusterName string) (string, error) {
+	clusterContext, err := clusterContextGetter.UserContext(clusterName)
 	if err != nil {
 		return "", err
 	}
@@ -312,4 +366,13 @@ func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, err
 	}
 
 	return saToken, nil
+}
+
+func getNameAndNamespaceFromSA(sa string) (string, string, error) {
+	split := strings.Split(sa, ":")
+	if len(split) < 4 {
+		return "", "", fmt.Errorf("invalid service account token format: %s", sa)
+	}
+
+	return split[3], split[2], nil
 }

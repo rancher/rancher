@@ -129,6 +129,28 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			expectedAuthed: true,
 			expectedErr:    "",
 		},
+		"impersonate serviceaccount": {
+			req: func() *http.Request {
+				ctx := request.WithUser(context.Background(), userInfo)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User": {"system:serviceaccount:default:test"},
+					},
+				}
+				req = req.WithContext(ctx)
+
+				return req
+			},
+			sarMock: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(true, nil)
+
+				return mock
+			},
+			expectedInfo:   userInfo,
+			expectedAuthed: true,
+			expectedErr:    "",
+		},
 		"impersonate user not allowed": {
 			req: func() *http.Request {
 				ctx := request.WithUser(context.Background(), userInfo)
@@ -199,6 +221,28 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			expectedAuthed: false,
 			expectedErr:    "not allowed to impersonate extra",
 		},
+		"impersonate serviceaccount not allowed": {
+			req: func() *http.Request {
+				ctx := request.WithUser(context.Background(), userInfo)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User": {"system:serviceaccount:default:test"},
+					},
+				}
+				req = req.WithContext(ctx)
+
+				return req
+			},
+			sarMock: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(false, nil)
+
+				return mock
+			},
+			expectedInfo:   nil,
+			expectedAuthed: false,
+			expectedErr:    "not allowed to impersonate service account",
+		},
 		"impersonate user error": {
 			req: func() *http.Request {
 				ctx := request.WithUser(context.Background(), userInfo)
@@ -262,6 +306,28 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
 				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
 				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{"foo": {"bar"}}).Return(false, errors.New("unexpected error"))
+
+				return mock
+			},
+			expectedInfo:   nil,
+			expectedAuthed: false,
+			expectedErr:    "unexpected error",
+		},
+		"impersonate service account error": {
+			req: func() *http.Request {
+				ctx := request.WithUser(context.Background(), userInfo)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User": {"system:serviceaccount:default:test"},
+					},
+				}
+				req = req.WithContext(ctx)
+
+				return req
+			},
+			sarMock: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
