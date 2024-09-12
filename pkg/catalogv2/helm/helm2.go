@@ -11,10 +11,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	rspb "k8s.io/helm/pkg/proto/hapi/release"
-	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -83,7 +81,6 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 			Notes:         release.GetInfo().GetStatus().GetNotes(),
 		},
 		Chart: &v1.Chart{
-			Values: toMap(release.Namespace, release.Name, release.GetChart().GetValues().GetRaw()),
 			Metadata: &v1.Metadata{
 				Name:        release.GetChart().GetMetadata().GetName(),
 				Home:        release.GetChart().GetMetadata().GetHome(),
@@ -100,7 +97,6 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 				KubeVersion: release.GetChart().GetMetadata().GetKubeVersion(),
 			},
 		},
-		Values:           toMap(release.Namespace, release.Name, release.GetConfig().GetRaw()),
 		Version:          int(release.Version),
 		Namespace:        release.Namespace,
 		HelmMajorVersion: 2,
@@ -128,23 +124,6 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 
 	hr.Resources, err = resourcesFromManifest(release.Namespace, release.Manifest, isNamespaced)
 	return hr, err
-}
-
-// toMap receives the namespace, name and manifest of a release.
-// If the manifest is a valid yaml, returns a map representing it,
-// otherwise returns an empty map
-func toMap(namespace, name string, manifest string) map[string]interface{} {
-	values := map[string]interface{}{}
-
-	if manifest == "" {
-		return values
-	}
-
-	if err := yaml.Unmarshal([]byte(manifest), &values); err != nil {
-		logrus.Errorf("failed to unmarshal yaml for %s/%s", namespace, name)
-	}
-
-	return values
 }
 
 // decodeHelm2 receives a helm2 release data and returns the corresponding helm2 release proto struct
