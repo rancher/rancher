@@ -43,26 +43,32 @@ func (s *SnapshotAdditionalTestsTestSuite) SetupSuite() {
 	s.client = client
 }
 
-func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceWorkerNode() {
-	snapshotRestoreAll := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion: "",
-		SnapshotRestore:          "all",
-		RecurringRestores:        1,
-		ReplaceWorkerNode:        true,
-	}
-
-	snapshotRestoreK8sVersion := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion: "",
-		SnapshotRestore:          "kubernetesVersion",
-		RecurringRestores:        1,
-		ReplaceWorkerNode:        true,
-	}
-
-	snapshotRestoreNone := &etcdsnapshot.Config{
+func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceNodes() {
+	controlPlaneSnapshotRestore := &etcdsnapshot.Config{
 		UpgradeKubernetesVersion: "",
 		SnapshotRestore:          "none",
 		RecurringRestores:        1,
-		ReplaceWorkerNode:        true,
+		ReplaceRoles: &etcdsnapshot.ReplaceRoles{
+			ControlPlane: true,
+		},
+	}
+
+	etcdSnapshotRestore := &etcdsnapshot.Config{
+		UpgradeKubernetesVersion: "",
+		SnapshotRestore:          "none",
+		RecurringRestores:        1,
+		ReplaceRoles: &etcdsnapshot.ReplaceRoles{
+			Etcd: true,
+		},
+	}
+
+	workerSnapshotRestore := &etcdsnapshot.Config{
+		UpgradeKubernetesVersion: "",
+		SnapshotRestore:          "none",
+		RecurringRestores:        1,
+		ReplaceRoles: &etcdsnapshot.ReplaceRoles{
+			Worker: true,
+		},
 	}
 
 	tests := []struct {
@@ -70,9 +76,9 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceWorkerNode() {
 		etcdSnapshot *etcdsnapshot.Config
 		client       *rancher.Client
 	}{
-		{"Replace worker nodes and restore cluster config, Kubernetes version and etcd", snapshotRestoreAll, s.client},
-		{"Replace worker nodes and restore Kubernetes version and etcd", snapshotRestoreK8sVersion, s.client},
-		{"Replace worker nodes and restore etcd only", snapshotRestoreNone, s.client},
+		{"Replace control plane nodes", controlPlaneSnapshotRestore, s.client},
+		{"Replace etcd nodes", etcdSnapshotRestore, s.client},
+		{"Replace worker nodes", workerSnapshotRestore, s.client},
 	}
 
 	for _, tt := range tests {
@@ -113,9 +119,13 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceWorkerNode() {
 			}
 		}
 
-		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
-		})
+		if strings.Contains(tt.name, "S3") {
+			s.Run(tt.name, func() {
+				snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
+			})
+		} else {
+			s.T().Skip("Skipping test; only S3 enabled clusters are enabled for this test")
+		}
 	}
 }
 
