@@ -68,7 +68,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 			projectID = splits[1]
 		}
 		// remove the system account created for this project
-		logrus.Debugf("Deleting system user for project %v", projectID)
+		logrus.Debugf("Deleting system user for project %s", projectID)
 		if err := l.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
 			return nil, err
 		}
@@ -89,7 +89,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating project %v", ProjectCreateController, orig.Name)
+		logrus.Infof("[%s] Updating project %s", ProjectCreateController, orig.Name)
 		obj, err = l.projects.ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
@@ -207,7 +207,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 				}
 			}
 
-			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %s for project %s", ProjectCreateController, creatorID, project.Name)
+			logrus.Infof("[%s] Creating creator projectRoleTemplateBinding for user %s for project %s", ProjectCreateController, creatorID, project.Name)
 			_, err := l.prtbClient.Create(prtb)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return obj, err
