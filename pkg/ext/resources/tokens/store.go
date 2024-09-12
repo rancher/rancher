@@ -21,6 +21,7 @@ import (
 )
 
 const TokenNamespace = "cattle-tokens"
+const ThirtyDays = 30*24*60*60*100 // 30 days in milliseconds.
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
@@ -40,7 +41,7 @@ func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar
 }
 
 func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Token, opts *metav1.CreateOptions) (*Token, error) {
-	if err := t.checkAdmin("create", token, userInfo); err != nil {
+	if _, err := t.checkAdmin("create", token, userInfo); err != nil {
 		return nil, err
 	}
 	// reject user-provided token values
@@ -59,6 +60,10 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	}
 	token.Status.TokenHash = hashedValue
 
+	if err := setExpired(token); err != nil {
+		return nil, fmt.Errorf("unable set expiration: %w", err)
+	}
+
 	secret, err := secretFromToken(token)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal secret for token: %w", err)
@@ -73,7 +78,8 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 }
 
 func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Token, opts *metav1.UpdateOptions) (*Token, error) {
-	if err := t.checkAdmin("update", token, userInfo); err != nil {
+	isadmin, err := t.checkAdmin("update", token, userInfo)
+	if err != nil {
 		return nil, err
 	}
 
@@ -86,8 +92,31 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 		return nil, fmt.Errorf("unable to retrieve token %s: %w", token.Name, err)
 	}
 
-	token.Status.TokenHash = currentToken.Status.TokenHash
+	if token.Spec.UserID != currentToken.Spec.UserID {
+		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit user id", token.Name)
+	}
+	if token.Spec.ClusterName != currentToken.Spec.ClusterName {
+		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit cluster name", token.Name)
+	}
+	if token.Spec.IsDerived != currentToken.Spec.IsDerived {
+		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit flag is-derived", token.Name)
+	}
+	if !isadmin && (token.Spec.TTL > currentToken.Spec.TTL) {
+		return nil, fmt.Errorf ("unable to change token %s: non-admin forbidden to extend time-to-live", token.Name)
+	}
+
+	// Keep status ...
+	token.Status = currentToken.Status
 	token.Status.TokenValue = ""
+
+	// Recompute derived data, if needed
+	if token.Spec.TTL != currentToken.Spec.TTL {
+		if err := setExpired(token); err != nil {
+			return nil, fmt.Errorf("unable set expiration: %w", err)
+		}
+	}
+
+	// Save changes to backing secret
 	secret, err := secretFromToken(token)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal secret for token: %w", err)
@@ -96,14 +125,14 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 	if err != nil {
 		return nil, fmt.Errorf("unable to update token %s: %w", token.Name, err)
 	}
+
+	// Read changes back to return what was truly saved, not what we thought we saved
 	newToken, err := tokenFromSecret(newSecret)
 	if err != nil {
 		return nil, fmt.Errorf("unable to regenerate token %s: %w", token.Name, err)
 	}
 
-	newToken.Status.TokenHash = ""
 	newToken.Status.TokenValue = ""
-
 	return newToken, nil
 }
 
@@ -120,9 +149,10 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 	if err != nil {
 		return nil, fmt.Errorf("unable to extract token %s: %w", name, err)
 	}
-	if err := t.checkAdmin("get", token, userInfo); err != nil {
+	if _, err := t.checkAdmin("get", token, userInfo); err != nil {
 		return nil, err
 	}
+
 	token.Status.TokenValue = ""
 	return token, nil
 }
@@ -215,7 +245,7 @@ func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string
 	// ignore errors here, only in the conversion of the non-string fields.
 	// user id needed for the admin check will be ok.
 	token, _ := tokenFromSecret(secret)
-	if err := t.checkAdmin("delete", token, userInfo); err != nil {
+	if _, err := t.checkAdmin("delete", token, userInfo); err != nil {
 		return err
 	}
 	err = t.secretClient.Delete(TokenNamespace, name, &metav1.DeleteOptions{})
@@ -294,18 +324,38 @@ func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
 
 // Internal supporting functionality
 
-func(t *TokenStore) checkAdmin(verb string, token *Token, userInfo user.Info) error {
-	if token.Spec.UserID == userInfo.GetName() {
+func setExpired(token *Token) error {
+	if token.Spec.TTL < 0 {
+		token.Status.Expired = false
+		token.Status.ExpiredAt = ""
 		return nil
+	}
+
+	expiresAt := token.ObjectMeta.CreationTimestamp.Add (time.Duration(token.Spec.TTL)*time.Millisecond)
+	isExpired := time.Now().After(expiresAt)
+
+	eAt, err := metav1.NewTime(expiresAt).MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	token.Status.Expired = isExpired
+	token.Status.ExpiredAt = string(eAt)
+	return nil
+}
+
+func(t *TokenStore) checkAdmin(verb string, token *Token, userInfo user.Info) (bool, error) {
+	if token.Spec.UserID == userInfo.GetName() {
+		return false, nil
 	}
 	isadmin, err := t.userHasFullPermissions(userInfo)
 	if err != nil {
-		return fmt.Errorf("unable to check if user has full permissions on tokens: %w", err)
+		return false, fmt.Errorf("unable to check if user has full permissions on tokens: %w", err)
 	}
 	if !isadmin {
-		return fmt.Errorf("cannot %s token for other user %s since user %s does not have full permissons on tokens", verb, userInfo.GetName(), token.Spec.UserID)
+		return false, fmt.Errorf("cannot %s token for other user %s since user %s does not have full permissons on tokens", verb, userInfo.GetName(), token.Spec.UserID)
 	}
-	return nil
+	return true, nil
 }
 
 func secretFromToken(token *Token) (*corev1.Secret, error) {
@@ -326,6 +376,12 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 		return nil, err
 	}
 
+	// inject default on creation
+	ttl := token.Spec.TTL
+	if ttl == 0 {
+		ttl = ThirtyDays
+	}
+
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   TokenNamespace,
@@ -339,7 +395,7 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 
 	secret.StringData["userID"] = token.Spec.UserID
 	secret.StringData["clusterName"] = token.Spec.ClusterName
-	secret.StringData["ttl"] = fmt.Sprintf("%d", token.Spec.TTL)
+	secret.StringData["ttl"] = fmt.Sprintf("%d", ttl)
 	secret.StringData["enabled"] = fmt.Sprintf("%t", token.Spec.Enabled)
 	secret.StringData["description"] = token.Spec.Description
 	secret.StringData["is-derived"] = fmt.Sprintf("%t", token.Spec.IsDerived)
@@ -388,6 +444,11 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	ttl, err := strconv.ParseInt(string(secret.Data["ttl"]), 10, 64)
 	if err != nil {
 		return nil, err
+	}
+
+	// inject default on retrieval
+	if ttl == 0 {
+		ttl = ThirtyDays
 	}
 
 	token := &Token{
