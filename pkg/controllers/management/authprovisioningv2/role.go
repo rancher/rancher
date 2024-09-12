@@ -158,6 +158,30 @@ func (h *handler) OnChange(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, e
 	return rt, nil
 }
 
+func isProtectedRBACResource(obj runtime.Object) bool {
+	var isClusterRole bool
+	switch obj.(type) {
+	case *rbacv1.ClusterRole, *rbacv1.ClusterRoleBinding:
+		isClusterRole = true
+	}
+
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		return false
+	}
+	annotations := m.GetAnnotations()
+
+	if _, ok := annotations[clusterNameLabel]; !ok {
+		return false
+	}
+
+	if _, ok := annotations[clusterNamespaceLabel]; !ok && !isClusterRole {
+		return false
+	}
+
+	return true
+}
+
 func (h *handler) hasAnnotationsForDeletingCluster(annotations map[string]string, isClusterRole bool) (bool, error) {
 	clusterName, cOK := annotations[clusterNameLabel]
 	clusterNamespace, cnOK := annotations[clusterNamespaceLabel]
