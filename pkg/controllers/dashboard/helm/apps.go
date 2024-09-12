@@ -2,7 +2,7 @@ package helm
 
 import (
 	"context"
-
+	"errors"
 	"github.com/moby/locker"
 	"github.com/rancher/lasso/pkg/client"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -168,7 +168,7 @@ func (a *appHandler) OnConfigMapChange(key string, configMap *corev1.ConfigMap) 
 
 func (a *appHandler) OnSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
 	spec, err := helm.ToRelease(secret, a.isNamespaced)
-	if err == helm.ErrNotHelmRelease {
+	if errors.Is(err, helm.ErrNotHelmRelease) {
 		return secret, nil
 	} else if err != nil {
 		logrus.Errorf("Failed to process secret %s for helm data: %v", key, err)
