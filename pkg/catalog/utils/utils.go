@@ -87,7 +87,7 @@ func GetCatalogImageCacheName(catalogName string) string {
 func GetCatalogChartPath(catalog *v3.Catalog, bundledMode bool) (string, error) {
 	if bundledMode {
 		switch catalog.Name {
-		case "helm3-library", "library", "system-library":
+		case "library", "system-library":
 			return filepath.Join(helmlib.InternalCatalog, catalog.Name), nil
 		case "rancher-charts", "rancher-partner-charts", "rancher-rke2-charts":
 			return filepath.Join(helmlib.InternalCatalog, "v2", catalog.Name), nil

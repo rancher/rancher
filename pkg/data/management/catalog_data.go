@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/settings"
@@ -32,11 +31,6 @@ const (
 	systemLibraryBranch = "master"
 	systemLibraryName   = "system-library"
 	defSystemChartVer   = "management.cattle.io/default-system-chart-version"
-
-	helm3LibraryURL    = "https://git.rancher.io/helm3-charts"
-	helm3LibraryBranch = "master"
-	helm3LibraryName   = "helm3-library"
-	helm3HelmVersion   = common.HelmV3
 )
 
 // updateCatalogURL updates annotations if they are outdated and system catalog url/branch if it matches outdated defaults
@@ -134,14 +128,6 @@ func syncCatalogs(management *config.ManagementContext) error {
 				return nil
 			}
 			return doAddCatalogs(management, libraryName, libraryURL, libraryBranch, "", bundledMode)
-		},
-		// add helm3 charts
-		func() error {
-			// If running in bundled mode don't turn on the normal library by default
-			if bundledMode {
-				return nil
-			}
-			return doAddCatalogs(management, helm3LibraryName, helm3LibraryURL, helm3LibraryBranch, helm3HelmVersion, bundledMode)
 		},
 		// add system-charts
 		func() error {
