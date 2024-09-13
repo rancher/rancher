@@ -224,7 +224,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 		currUser, err = h.userMGR.EnsureUser(userPrincipal.Name, displayName)
 		if err != nil {
-			logrus.Warnf("Error creating or updating user for %s, retrying: %v", currUser.Name, err)
+			logrus.Warnf("Error creating or updating user for %s, retrying: %v", userPrincipal.Name, err)
 			return false, nil
 		}
 
@@ -237,14 +237,14 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
 		err = h.tokenMGR.UserAttributeCreateOrUpdate(currUser.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
 		if err != nil {
-			logrus.Warnf("Error creating or updating userAttribute for %s, retrying: %v", currUser.Name, err)
+			logrus.Warnf("Error creating or updating userAttribute for %s, retrying: %v", userPrincipal.Name, err)
 			return false, nil
 		}
 
 		return true, nil
 	})
 	if err != nil {
-		return v3.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", currUser.Name, err)
+		return v3.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", userPrincipal.Name, err)
 	}
 
 	if !enabled {
