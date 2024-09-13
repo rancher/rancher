@@ -136,6 +136,20 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 
 func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*Token, error) {
 	// have to get token first before we can check permissions on user mismatch
+
+	token, err := t.GetCore (name, opts)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := t.checkAdmin("get", token, userInfo); err != nil {
+		return nil, err
+	}
+
+	return token, nil
+}
+
+func (t *TokenStore) GetCore(name string, opts *metav1.GetOptions) (*Token, error) {
+	// Core token retrieval from backing secrets
 	currentSecret, err := t.secretCache.Get(TokenNamespace, name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -147,10 +161,6 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 	if err != nil {
 		return nil, fmt.Errorf("unable to extract token %s: %w", name, err)
 	}
-	if _, err := t.checkAdmin("get", token, userInfo); err != nil {
-		return nil, err
-	}
-
 	token.Status.TokenValue = ""
 	return token, nil
 }
