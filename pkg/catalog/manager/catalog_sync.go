@@ -33,7 +33,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 
 	// When setting SystemCatalog is set to bundled, always force our catalogs to keep running that way
 	if m.bundledMode {
-		if (catalog.Name == "helm3-library" || catalog.Name == "library" || catalog.Name == "system-library") && catalog.Spec.CatalogKind != helmlib.KindHelmInternal {
+		if (catalog.Name == "library" || catalog.Name == "system-library") && catalog.Spec.CatalogKind != helmlib.KindHelmInternal {
 			catalog.Spec.CatalogKind = helmlib.KindHelmInternal
 			catalog, err = m.catalogClient.Update(catalog)
 			if err != nil {
