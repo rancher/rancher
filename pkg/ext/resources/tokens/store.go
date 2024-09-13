@@ -367,9 +367,9 @@ func(t *TokenStore) checkAdmin(verb string, token *Token, userInfo user.Info) (b
 }
 
 func secretFromToken(token *Token) (*corev1.Secret, error) {
-
 	// UserPrincipal, GroupPrincipals, ProviderInfo
-	// Encode the complex data into JSON for storage as string.
+	// Encode the complex data into JSON foprmatting strings for storage in the secret.
+	// See also note below on why this derived information is stored.
 
 	gps, err := json.Marshal(token.Status.GroupPrincipals)
 	if err != nil {
@@ -415,8 +415,11 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 	secret.StringData["hash"] = token.Status.TokenHash
 	secret.StringData["last-update-time"] = token.Status.LastUpdateTime
 
-	// derived data - store ?
-	// note: expiratation information is not stored
+	// Note:
+	// - While the derived expiration data is not stored, the user-related information is.
+	// - The expiration data is computed trivially from spec and resource data.
+	// - Getting the user-related information on the other hand is expensive.
+	// - It is better to cache it in the backing secret
 
 	secret.StringData["auth-provider"] = token.Status.AuthProvider
 	secret.StringData["user-principal"] = string(up)
