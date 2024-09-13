@@ -668,6 +668,19 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, clusterNamespace)
 }
 
+// gatherAndDedupeRoles takes the name of a RoleTemplate, gathers all referenced RoleTemplates (including those
+// nested within other RoleTemplates), and returns a deduplicated map of RoleTemplates.
+//
+// This function first retrieves the root RoleTemplate by name and gathers all referenced RoleTemplates using
+// gatherRoleTemplates. It then deduplicates the results.
+//
+// Parameters:
+//   - roleTemplateName: The name of the root RoleTemplate from which to start gathering all referenced RoleTemplates.
+//
+// Returns:
+//   - A deduplicated map of RoleTemplates, keyed by their names, with all names converted to lowercase.
+//   - An error if there is an issue retrieving or gathering the RoleTemplates. If no errors occur, the function
+//     returns the deduplicated map of RoleTemplates and nil for the error.
 func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.RoleTemplate, error) {
 	rt, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
@@ -867,6 +880,21 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 	return nil
 }
 
+// gatherRoleTemplates traverses the hierarchy of RoleTemplates, starting from the given root RoleTemplate (rt),
+// and recursively adds each RoleTemplate and its children to the provided roleTemplates map.
+//
+// Parameters:
+//   - rt: A pointer to the root RoleTemplate object to start traversing from.
+//   - roleTemplates: A map that stores RoleTemplate objects, keyed by their name. The function will populate
+//     this map with RoleTemplates from the hierarchy starting at the root RoleTemplate.
+//
+// The function retrieves each child RoleTemplate using the RoleTemplateLister (m.rtLister) and recursively
+// gathers its RoleTemplates as well. If any RoleTemplate is missing or there is an error during retrieval,
+// an error is returned.
+//
+// Returns:
+//   - An error if the function encounters any issues fetching RoleTemplates or recursively gathering them.
+//     If no errors occur, it returns nil.
 func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
 	roleTemplates[rt.Name] = rt
 

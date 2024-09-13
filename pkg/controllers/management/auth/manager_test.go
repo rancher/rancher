@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -715,6 +716,161 @@ func Test_reconcileManagementPlaneRole(t *testing.T) {
 			}
 			if test.stateAssertions != nil {
 				test.stateAssertions(*state.stateChanges)
+			}
+		})
+	}
+}
+
+func Test_gatherAndDedupeRoles(t *testing.T) {
+	tests := []struct {
+		name             string
+		roleTemplateName string
+		wantRTErr        bool
+		wantErr          bool
+		want             map[string]*v3.RoleTemplate
+	}{
+		{
+			name:             "Role with no inheritance",
+			roleTemplateName: "non-recursive",
+			wantErr:          false,
+			want: map[string]*v3.RoleTemplate{
+				"non-recursive": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "non-recursive",
+					},
+				},
+			},
+		},
+		{
+			name:      "RT get error",
+			wantRTErr: true,
+			wantErr:   true,
+		},
+		{
+			name:             "Role with dupe roletemplates",
+			roleTemplateName: "rolewithdupes",
+			want: map[string]*v3.RoleTemplate{
+				"rolewithdupes": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rolewithdupes",
+					},
+					RoleTemplateNames: []string{"rt1", "rt2", "rt1"},
+				},
+				"rt1": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rt1",
+					},
+				},
+				"rt2": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rt2",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := &manager{
+				rtLister: &fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
+						if tt.wantRTErr {
+							return nil, fmt.Errorf("error getting role template")
+						}
+						if name == "rolewithdupes" {
+							return &v3.RoleTemplate{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "rolewithdupes",
+								},
+								RoleTemplateNames: []string{"rt1", "rt2", "rt1"},
+							}, nil
+						}
+						return &v3.RoleTemplate{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+						}, nil
+					},
+				},
+			}
+			got, err := manager.gatherAndDedupeRoles(tt.roleTemplateName)
+			if tt.wantErr {
+				assert.Error(t, err, "expected an error, got none")
+			} else {
+				assert.NoError(t, err, fmt.Sprintf("expected no error, got: %v", err))
+				assert.Equal(t, tt.want, got, "expected roles to be %v, got: %v", tt.want, got)
+			}
+		})
+	}
+}
+
+func Test_gatherRoleTemplates(t *testing.T) {
+	roleTemplates := map[string]*v3.RoleTemplate{
+		"root": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "root",
+			},
+			RoleTemplateNames: []string{"child1"},
+		},
+		"child1": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "child1",
+			},
+			RoleTemplateNames: []string{"child2"},
+		},
+		"child2": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "child2",
+			},
+			RoleTemplateNames: []string{},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		roleTemplateName string
+		wantErr          bool
+		want             map[string]*v3.RoleTemplate
+	}{
+		{
+			name:             "hierarchy of roletemplates",
+			roleTemplateName: "root",
+			wantErr:          false,
+			want: map[string]*v3.RoleTemplate{
+				"root":   roleTemplates["root"],
+				"child1": roleTemplates["child1"],
+				"child2": roleTemplates["child2"],
+			},
+		},
+		{
+			name:             "error getting roletemplate",
+			roleTemplateName: "root",
+			wantErr:          true,
+			want:             nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := &manager{
+				rtLister: &fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
+						rt, _ := roleTemplates[name]
+						if tt.wantErr {
+							return nil, fmt.Errorf("RoleTemplate not found")
+						}
+						return rt, nil
+					},
+				},
+			}
+			got := map[string]*v3.RoleTemplate{}
+			err := manager.gatherRoleTemplates(roleTemplates[tt.roleTemplateName], got)
+			if tt.wantErr {
+				assert.Error(t, err, "expected an error, got none")
+			} else {
+				assert.NoError(t, err, fmt.Sprintf("expected no error, got: %v", err))
+				assert.Equal(t, tt.want, got, "expected roles to be %v, got: %v", tt.want, got)
 			}
 		})
 	}
