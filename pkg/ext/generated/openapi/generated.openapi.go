@@ -213,10 +213,10 @@ func schema_pkg_ext_resources_tokens_TokenSpec(ref common.ReferenceCallback) com
 					},
 					"ttl": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TTL is the time-to-live of the token.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "TTL is the time-to-live of the token, in milliseconds",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 					"enabled": {
