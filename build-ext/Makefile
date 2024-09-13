@@ -62,7 +62,12 @@ deepcopy-gen:
 	@$(DEEPCOPY_GEN) --go-header-file ../scripts/boilerplate.go.txt ../pkg/ext/resources/tokens/
 
 openapi-gen:
-	@$(OPENAPI_GEN) --output-pkg github.com/rancher/rancher/pkg/ext/generated/openapi --output-dir ../pkg/ext/generated/openapi --go-header-file ../scripts/boilerplate.go.txt  ../pkg/ext/resources/tokens/ k8s.io/apimachinery/pkg/apis/meta/v1
+	@$(OPENAPI_GEN) \
+		--output-pkg 	 github.com/rancher/rancher/pkg/ext/generated/openapi \
+		--output-dir 	 ../pkg/ext/generated/openapi \
+		--go-header-file ../scripts/boilerplate.go.txt  \
+		../pkg/ext/resources/tokens/ \
+		k8s.io/apimachinery/pkg/apis/meta/v1
 
 gen:
 	@$(MAKE) deepcopy-gen
