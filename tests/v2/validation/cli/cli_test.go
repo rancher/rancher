@@ -63,16 +63,6 @@ func (c *CLITestSuite) TestNamespaces() {
 	require.NoError(c.T(), err)
 }
 
-func (c *CLITestSuite) TestCatalog() {
-	var catalogName = namegen.AppendRandomString("catalog")
-
-	err := cli.CreateCatalogs(c.client.CLI, catalogName)
-	require.NoError(c.T(), err)
-
-	err = cli.DeleteCatalogs(c.client.CLI, catalogName)
-	require.NoError(c.T(), err)
-}
-
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestCLITestSuite(t *testing.T) {

@@ -109,31 +109,3 @@ func DeleteNamespaces(client *ranchercli.Client, namespaceName, projectName stri
 
 	return nil
 }
-
-// CreateCatalogs will create and delete catalogs in the specified cluster.
-func CreateCatalogs(client *ranchercli.Client, catalogName string) error {
-	logrus.Infof("Creating a catalog...")
-	err := client.ExecuteCommand(rancher, catalog, "add", catalogName, "https://git.rancher.io/helm3-charts")
-	if err != nil {
-		return err
-	}
-
-	logrus.Infof("Validating the catalog exists...")
-	err = client.Exists(rancher, catalog, catalogName)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// DeleteCatalogs will delete catalogs in the specified cluster.
-func DeleteCatalogs(client *ranchercli.Client, catalogName string) error {
-	logrus.Infof("Deleting the catalog...")
-	err := client.Delete(catalog, catalogName)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
