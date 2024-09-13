@@ -60,21 +60,26 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	}
 	token.Status.TokenHash = hashedValue
 
-	if err := setExpired(token); err != nil {
-		return nil, fmt.Errorf("unable set expiration: %w", err)
-	}
-
 	secret, err := secretFromToken(token)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal secret for token: %w", err)
 	}
-	_, err = t.secretClient.Create(secret)
+
+	// Save new secret
+	newSecret, err := t.secretClient.Create(secret)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create secret for token: %w", err)
 	}
+
+	// Read changes back to return what was truly created, not what we thought we created
+	newToken, err := tokenFromSecret(newSecret)
+	if err != nil {
+		return nil, fmt.Errorf("unable to regenerate token %s: %w", token.Name, err)
+	}
+
 	// users don't care about the hashed value
-	token.Status.TokenHash = ""
-	return token, nil
+	newToken.Status.TokenHash = ""
+	return newToken, nil
 }
 
 func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Token, opts *metav1.UpdateOptions) (*Token, error) {
@@ -105,16 +110,9 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 		return nil, fmt.Errorf ("unable to change token %s: non-admin forbidden to extend time-to-live", token.Name)
 	}
 
-	// Keep status ...
+	// Keep status, never store the token value
 	token.Status = currentToken.Status
 	token.Status.TokenValue = ""
-
-	// Recompute derived data, if needed
-	if token.Spec.TTL != currentToken.Spec.TTL {
-		if err := setExpired(token); err != nil {
-			return nil, fmt.Errorf("unable set expiration: %w", err)
-		}
-	}
 
 	// Save changes to backing secret
 	secret, err := secretFromToken(token)
@@ -380,6 +378,8 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 	ttl := token.Spec.TTL
 	if ttl == 0 {
 		ttl = ThirtyDays
+		// pass back to caller (Create)
+		token.Spec.TTL = ttl
 	}
 
 	secret := &corev1.Secret{
@@ -393,6 +393,7 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 		Data:       make(map[string][]byte),
 	}
 
+	// spec
 	secret.StringData["userID"] = token.Spec.UserID
 	secret.StringData["clusterName"] = token.Spec.ClusterName
 	secret.StringData["ttl"] = fmt.Sprintf("%d", ttl)
@@ -400,20 +401,23 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 	secret.StringData["description"] = token.Spec.Description
 	secret.StringData["is-derived"] = fmt.Sprintf("%t", token.Spec.IsDerived)
 
+	// status
 	secret.StringData["hash"] = token.Status.TokenHash
-	secret.StringData["expired"] = fmt.Sprintf("%t", token.Status.Expired)
-	secret.StringData["expired-at"] = token.Status.ExpiredAt
+	secret.StringData["last-update-time"] = token.Status.LastUpdateTime
+
+	// derived data - store ?
+	// note: expiratation information is not stored
+
 	secret.StringData["auth-provider"] = token.Status.AuthProvider
 	secret.StringData["user-principal"] = string(up)
 	secret.StringData["group-principals"] = string(gps)
 	secret.StringData["provider-info"] = string(pi)
-	secret.StringData["last-update-time"] = token.Status.LastUpdateTime
 
 	return secret, nil
 }
 
 func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
-
+	// spec
 	enabled, err :=	strconv.ParseBool(string(secret.Data["enabled"]))
 	if err != nil {
 		return nil, err
@@ -422,10 +426,16 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	expired, err := strconv.ParseBool(string(secret.Data["expired"]))
+	ttl, err := strconv.ParseInt(string(secret.Data["ttl"]), 10, 64)
 	if err != nil {
 		return nil, err
 	}
+	// inject default on retrieval
+	if ttl == 0 {
+		ttl = ThirtyDays
+	}
+
+	// status
 	var up apiv3.Principal
 	err = json.Unmarshal(secret.Data["user-principals"], &up)
 	if err != nil {
@@ -440,15 +450,6 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	err = json.Unmarshal(secret.Data["provider-info"], &pi)
 	if err != nil {
 		return nil, err
-	}
-	ttl, err := strconv.ParseInt(string(secret.Data["ttl"]), 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	// inject default on retrieval
-	if ttl == 0 {
-		ttl = ThirtyDays
 	}
 
 	token := &Token{
@@ -472,14 +473,16 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 		},
 		Status: TokenStatus{
 			TokenHash:       string(secret.Data["hashedToken"]),
-			Expired:         expired,
-			ExpiredAt:       string(secret.Data["expired-at"]),
 			AuthProvider:    string(secret.Data["auth-provider"]),
 			UserPrincipal:   up,
 			GroupPrincipals: gps,
 			ProviderInfo:    pi,
 			LastUpdateTime:  string(secret.Data["last-update-time"]),
 		},
+	}
+
+	if err := setExpired(token); err != nil {
+		return nil, fmt.Errorf("unable to set expiration information: %w", err)
 	}
 
 	return token, nil
