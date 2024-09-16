@@ -31,6 +31,7 @@ const (
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
 	projectNSEditVerb              = "*"
+	cleanupRBACDelaySeconds        = 5
 )
 
 var projectNSVerbToSuffix = map[string]string{
@@ -87,6 +88,10 @@ func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
+	if obj.Status.Phase == v1.NamespaceTerminating {
+		n.asyncCleanupRBAC(obj.Name)
+		return obj, nil
+	}
 	err := n.reconcileNamespaceProjectClusterRole(obj)
 	return obj, err
 }
@@ -566,4 +571,27 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		}
 	}
 
+}
+
+// asyncCleanupRBAC will wait for a Terminating namespace to be fully deleted before removing the associated RBAC.
+func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
+	go func() {
+		for {
+			time.Sleep(cleanupRBACDelaySeconds * time.Second)
+			_, err := n.m.nsLister.Get("", namespaceName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					err := n.reconcileNamespaceProjectClusterRole(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
+					if err != nil {
+						logrus.Errorf("error cleaning up RBAC for namespace %s: %v", namespaceName, err)
+					} else {
+						logrus.Debugf("successfully cleaned up RBAC for namespace %s", namespaceName)
+					}
+					return
+				}
+			} else {
+				logrus.Debugf("namespace %s is still in Terminating state. Will recheck in %d seconds.", namespaceName, cleanupRBACDelaySeconds)
+			}
+		}
+	}()
 }
