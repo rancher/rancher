@@ -156,6 +156,8 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		labels["management.cattle.io/cluster-display-name"] = mgmtCluster.Spec.DisplayName
 	}
 
+	annotations := yaml.CleanAnnotationsForExport(mgmtCluster.Annotations)
+
 	agentNamespace := ""
 	clientSecret := status.ClientSecretName
 
@@ -191,9 +193,10 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 
 	return append(objs, &fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: mgmtCluster.Spec.FleetWorkspaceName,
-			Labels:    labels,
+			Name:        cluster.Name,
+			Namespace:   mgmtCluster.Spec.FleetWorkspaceName,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: fleet.ClusterSpec{
 			KubeConfigSecret:          clientSecret,
