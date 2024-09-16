@@ -7,8 +7,6 @@ import (
 )
 
 const (
-	pingCmd = "ping -c 1 -W 1"
-	//pingCmd            = "/bin/sh -c"
 	pingPodProjectName = "ping-project"
 
 	containerName  = "test1"

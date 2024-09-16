@@ -1,4 +1,4 @@
-//go:build validation
+//go:build (validation || infra.rke2k3s || cluster.any || sanity) && !stress && !extended
 
 package connectivity
 
@@ -31,6 +31,13 @@ type NetworkPolicyTestSuite struct {
 	project     *management.Project
 	clusterName string
 }
+
+const (
+	nodeRole = "control-plane"
+	// Ping once
+	pingCmd       = "ping -c 1"
+	succesfulPing = "0% packet loss"
+)
 
 func (n *NetworkPolicyTestSuite) TearDownSuite() {
 	n.session.Cleanup()
@@ -65,23 +72,27 @@ func (n *NetworkPolicyTestSuite) SetupSuite() {
 
 func (n *NetworkPolicyTestSuite) TestPingPods() {
 	names := newNames()
-	n.T().Logf("Creating namespace with name [%v]", names.random["namespaceName"])
-	namespace, err := namespaces.CreateNamespace(n.client, names.random["namespaceName"], "{}", map[string]string{}, map[string]string{}, n.project)
+
+	namespaceName := names.random["namespaceName"]
+	daemonsetName := names.random["daemonsetName"]
+
+	n.T().Logf("Creating namespace with name [%v]", namespaceName)
+	namespace, err := namespaces.CreateNamespace(n.client, namespaceName, "{}", map[string]string{}, map[string]string{}, n.project)
 	require.NoError(n.T(), err)
-	assert.Equal(n.T(), namespace.Name, names.random["namespaceName"])
+	assert.Equal(n.T(), namespace.Name, namespaceName)
 
 	steveClient, err := n.client.Steve.ProxyDownstream(n.project.ClusterID)
 	require.NoError(n.T(), err)
 
 	testContainerPodTemplate := newPodTemplateWithTestContainer()
 
-	n.T().Logf("Creating a daemonset with the test container with name [%v]", names.random["daemonsetName"])
-	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(names.random["daemonsetName"], namespace.Name, testContainerPodTemplate, true, nil)
+	n.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
+	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, namespace.Name, testContainerPodTemplate, true, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(n.T(), err)
-	assert.Equal(n.T(), createdDaemonSet.Name, names.random["daemonsetName"])
+	assert.Equal(n.T(), createdDaemonSet.Name, daemonsetName)
 
-	n.T().Logf("Waiting daemonset [%v] to have expected number of available replicas", names.random["daemonsetName"])
+	n.T().Logf("Waiting for daemonset [%v] to have expected number of available replicas", daemonsetName)
 	err = charts.WatchAndWaitDaemonSets(n.client, n.project.ClusterID, namespace.Name, metav1.ListOptions{})
 	require.NoError(n.T(), err)
 
@@ -92,10 +103,9 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 	assert.NoError(n.T(), err)
 	assert.NotEmpty(n.T(), pods)
 
-	//pod1Name := pods.Items[0].ObjectMeta.Name
 	pod2Ip := pods.Items[1].Status.PodIP
 	pingExecCmd := pingCmd + " " + pod2Ip
-	nodeRole := "control-plane"
+	nodeRole := nodeRole
 	_, stevecluster, err := clusters.GetProvisioningClusterByName(n.client, n.clusterName, provisioninginput.Namespace)
 
 	query, err := url.ParseQuery("labelSelector=node-role.kubernetes.io/" + nodeRole + "=true")
@@ -118,13 +128,13 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 
 	n.T().Logf("Running ping on [%v]", firstMachine.Name)
 
-	excmdlog, err := sshNode.ExecuteCommand(pingExecCmd)
+	excmdLog, err := sshNode.ExecuteCommand(pingExecCmd)
 	if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
 		assert.NoError(n.T(), err)
 	}
-	n.T().Logf("Log of the ping command {%v}", excmdlog)
+	n.T().Logf("Log of the ping command {%v}", excmdLog)
 
-	assert.Contains(n.T(), excmdlog, "0% packet loss", "Unable to ping the pod")
+	assert.Contains(n.T(), excmdLog, succesfulPing, "Unable to ping the pod")
 
 }
 
