@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
+	exttypes "github.com/rancher/rancher/pkg/ext/resources/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
@@ -66,6 +67,11 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
+	// Rancher Backend direct Ext Token Access via in-built custom handler store instance
+	wContext := mgmtCtx.Wrangler
+	extTokenStore := exttokens.NewTokenStore(wContext.Core.Secret(), wContext.Core.Secret().Cache(),
+		wContext.K8s.AuthorizationV1().SubjectAccessReviews())
+
 	return &tokenAuthenticator{
 		ctx:                 ctx,
 		tokenIndexer:        tokenInformer.GetIndexer(),
@@ -77,7 +83,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		refreshUser: func(userID string, force bool) {
 			go providerRefresher.TriggerUserRefresh(userID, force)
 		},
-		// XXX TODO AK init extToken... fields
+		extTokenStore: extTokenStore,
 	}
 }
 
@@ -85,13 +91,12 @@ type tokenAuthenticator struct {
 	ctx                 context.Context
 	tokenIndexer        cache.Indexer
 	tokenClient         v3.TokenInterface
-	extTokenIndexer     cache.Indexer
-	extTokenClient      v3.TokenInterface // XXX TODO AK proper interface!
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
 	userLister          v3.UserLister
 	clusterRouter       ClusterRouter
 	refreshUser         func(userID string, force bool)
+	extTokenStore       exttypes.Store[*exttokens.Token, *exttokens.TokenList]
 }
 
 const (
@@ -246,34 +251,17 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 
 	if extTokenName, found := strings.CutPrefix(tokenName, "ext-"); found {
 		// Process ext token
-		// Same process as for legacy tokens, using different indexer, client, and type cast
+		// Roughly the same process as for legacy tokens, using a different store.
+		// No indexer/cache in play here.
 
-		objs, err := a.extTokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
+		storedToken, err := a.extTokenStore.GetCore(extTokenName, &metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				lookupUsingClient = true
-			} else {
-				return nil, errors.Wrapf(ErrMustAuthenticate,
-					"failed to retrieve ext auth token from cache, error: %v", err)
+				return nil, ErrMustAuthenticate
 			}
-		} else if len(objs) == 0 {
-			lookupUsingClient = true
+			return nil, errors.Wrapf(ErrMustAuthenticate,
+				"failed to retrieve auth token, error: %#v", err)
 		}
-
-		var storedToken *exttokens.Token
-		if lookupUsingClient {
-			storedToken, err = a.extTokenClient.Get(extTokenName, metav1.GetOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					return nil, ErrMustAuthenticate
-				}
-				return nil, errors.Wrapf(ErrMustAuthenticate,
-					"failed to retrieve auth token, error: %#v", err)
-			}
-		} else {
-			storedToken = objs[0].(*exttokens.Token)
-		}
-
 		if _, err := extVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
 			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
 		}
