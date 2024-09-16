@@ -53,6 +53,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		token                            string
 		url                              string
 		isWindowsCluster                 bool
+		isPreBootstrap                   bool
 		features                         map[string]bool
 		taints                           []corev1.Taint
 		secrets                          map[string]*corev1.Secret
@@ -183,7 +184,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 
 			mockSecrets = tt.secrets
 			var b bytes.Buffer
-			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isWindowsCluster, tt.cluster, tt.features, tt.taints, secretLister)
+			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isWindowsCluster, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister)
 
 			assert.Nil(t, err)
 			decoder := scheme.Codecs.UniversalDeserializer()

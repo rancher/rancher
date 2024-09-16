@@ -248,6 +248,10 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 
 	genericSetup := func(mp *mockPlanner) {
 		mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(clusterRegToken, "somecluster").Return([]*v3.ClusterRegistrationToken{{Status: v3.ClusterRegistrationTokenStatus{Token: "lol"}}}, nil)
+		mp.managementClusters.EXPECT().Get("somecluster").MinTimes(2).Return(&v3.Cluster{}, nil)
+	}
+
+	singleCallToMgmtClusterSetup := func(mp *mockPlanner) {
 		mp.managementClusters.EXPECT().Get("somecluster").Return(&v3.Cluster{}, nil)
 	}
 
@@ -361,6 +365,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+rke2r1",
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
+			setup:               singleCallToMgmtClusterSetup,
 			expected: expected{
 				otiIndex: 1,
 				oti: &[]plan.OneTimeInstruction{idempotentRestartInstructions(
@@ -377,6 +382,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+k3s1",
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
+			setup:               singleCallToMgmtClusterSetup,
 			expected: expected{
 				otiIndex: 1,
 				oti: &[]plan.OneTimeInstruction{idempotentRestartInstructions(
