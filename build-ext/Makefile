@@ -67,6 +67,7 @@ openapi-gen:
 		--output-dir 	 ../pkg/ext/generated/openapi \
 		--go-header-file ../scripts/boilerplate.go.txt  \
 		../pkg/ext/resources/tokens/ \
+		github.com/rancher/rancher/pkg/apis/management.cattle.io/v3 \
 		k8s.io/apimachinery/pkg/apis/meta/v1
 
 gen:
