@@ -7,7 +7,6 @@ import (
 	"time"
 
 	jwtv4 "github.com/golang-jwt/jwt/v4"
-	"github.com/golang/mock/gomock"
 	"github.com/gorilla/mux"
 	v3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -16,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

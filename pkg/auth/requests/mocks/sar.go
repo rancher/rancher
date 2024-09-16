@@ -5,7 +5,7 @@ import (
 	http "net/http"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
