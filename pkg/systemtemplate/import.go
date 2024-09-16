@@ -181,6 +181,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.ProvisioningV2.Name():     false,
 		features.EmbeddedClusterAPI.Name(): false,
 		features.UISQLCache.Name():         features.UISQLCache.Enabled(),
+		features.PreBootstrap.Name():       !apimgmtv3.ClusterConditionBootstrapped.IsTrue(cluster),
 	}
 }
 

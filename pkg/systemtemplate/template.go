@@ -660,8 +660,6 @@ spec:
           - name: CATTLE_FEATURES
             value: "{{.Features}}"
           {{- end }}
-          - name: CATTLE_PRE_BOOSTRAP
-            value: "true"
           - name: CATTLE_IS_RKE
             value: "{{.IsRKE}}"
           - name: CATTLE_SERVER

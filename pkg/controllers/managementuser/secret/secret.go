@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	rt "runtime"
+	"slices"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/rancher/norman/controller"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/capr"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -34,6 +36,18 @@ const (
 	update                     = "update"
 	projectNamespaceAnnotation = "management.cattle.io/system-namespace"
 	userSecretAnnotation       = "secret.user.cattle.io/secret"
+
+	syncAnnotation             = "provisioning.cattle.io/sync"
+	syncPreBootstrapAnnotation = "provisioning.cattle.io/sync-bootstrap"
+	syncNamespaceAnnotation    = "provisioning.cattle.io/sync-target-namespace"
+	syncNameAnnotation         = "provisioning.cattle.io/sync-target-name"
+	syncedAtAnnotation         = "provisioning.cattle.io/synced-at"
+)
+
+var (
+	// as of right now kube-system is the only appropriate target for this functionality.
+	// also included is "" to support copying into the same ns the secret is in
+	approvedPreBootstrapTargetNamespaces = []string{"kube-system", ""}
 )
 
 type Controller struct {
@@ -44,44 +58,23 @@ type Controller struct {
 	clusterName               string
 }
 
-func RegisterBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) {
-	// TODO: clean this up a lot, move to a real controller style rather than just doing it inline
-	secrets, _ := mgmt.Core.Secrets("").ListNamespaced("kube-system", metav1.ListOptions{})
-
-	for _, sec := range secrets.Items {
-		if sec.Annotations["provisioning.cattle.io/sync-to-cluster"] == "" {
-			continue
-		}
-		// if sec.Annotations["provisioning.cattle.io/sync-to-cluster"] != cluster.ClusterName {
-		// 	continue
-		// }
-
-		n, err := cluster.Core.Secrets("kube-system").Create(&corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      sec.Name,
-				Namespace: sec.Namespace,
-			},
-			Data: sec.Data,
-		})
-
-		if !errors.IsAlreadyExists(err) && err != nil {
-			rt.Breakpoint()
-			logrus.Warnf("holy hell failed creating secret")
-			return
-		}
-
-		logrus.Infof("successfully synced secret %v/%v", n.Namespace, n.Name)
-	}
-
-	apimgmtv3.ClusterConditionBootstrapped.True(clusterRec)
-	_, err := mgmt.Management.Clusters("").Update(clusterRec)
-	if err != nil {
-		rt.Breakpoint()
-		logrus.Warn("holy hell failed updating cluster")
-	}
+type DirectSyncController struct {
+	upstreamSecrets   v1.SecretInterface
+	downstreamSecrets v1.SecretInterface
+	clusterName       string
 }
 
-func Register(ctx context.Context, cluster *config.UserContext) {
+func Bootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) error {
+	dsc := &DirectSyncController{
+		upstreamSecrets:   mgmt.Core.Secrets("fleet-default"),
+		downstreamSecrets: cluster.Core.Secrets(""),
+		clusterName:       clusterRec.Spec.DisplayName,
+	}
+
+	return dsc.bootstrap(mgmt.Management.Clusters(""), clusterRec)
+}
+
+func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
 		registerDeferred(ctx, cluster)
 		return nil
@@ -107,6 +100,135 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 		return obj, nil
 	})
+
+	directSyncController := &DirectSyncController{
+		upstreamSecrets:   mgmt.Core.Secrets("fleet-default"),
+		downstreamSecrets: cluster.Core.Secrets(""),
+		clusterName:       clusterRec.Spec.DisplayName,
+	}
+
+	directSyncController.upstreamSecrets.AddHandler(ctx, "secret-direct-synced", directSyncController.sync)
+}
+
+func (dsc *DirectSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface, mgmtCluster *apimgmtv3.Cluster) error {
+	secrets, err := dsc.upstreamSecrets.List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list secrets in fleet-default namespace: %v", err)
+	}
+
+	logrus.Debugf("[pre-bootstrap][secrets] looking for secrets-to synchronize to cluster %v", dsc.clusterName)
+
+	for _, sec := range secrets.Items {
+		if !dsc.bootstrapSyncable(&sec) {
+			continue
+		}
+
+		logrus.Debugf("[pre-bootstrap-sync][secrets] syncing secret %v/%v to cluster %v", sec.Namespace, sec.Name, dsc.clusterName)
+
+		_, err := dsc.sync("", &sec)
+		if err != nil {
+			return fmt.Errorf("[pre-bootstrap][secret] failed to synchronize secret %v/%v to cluster %v: %w", sec.Namespace, sec.Name, dsc.clusterName, err)
+		}
+
+		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", sec.Namespace, sec.Name, dsc.clusterName)
+	}
+
+	apimgmtv3.ClusterConditionBootstrapped.True(mgmtCluster)
+	_, err = mgmtClusterClient.Update(mgmtCluster)
+	if err != nil {
+		return fmt.Errorf("failed to update cluster bootstrap condition for %v: %v", dsc.clusterName, err)
+	}
+
+	return nil
+}
+
+func (dsc *DirectSyncController) syncable(obj *corev1.Secret) bool {
+	// no sync annotations, we don't care about this secret
+	if obj.Annotations[syncAnnotation] == "" && obj.Annotations[syncPreBootstrapAnnotation] == "" {
+		return false
+	}
+
+	// if secret is authorized to be synchronized to the cluster
+	if !slices.Contains(strings.Split(obj.Annotations[capr.AuthorizedObjectAnnotation], ","), dsc.clusterName) {
+		return false
+	}
+
+	// if the secret is not in a namespace that we are allowed to sync to
+	if !slices.Contains(approvedPreBootstrapTargetNamespaces, obj.Annotations[syncNamespaceAnnotation]) {
+		return false
+	}
+
+	return true
+}
+
+func (dsc *DirectSyncController) bootstrapSyncable(obj *corev1.Secret) bool {
+	// only difference between sync and bootstrapSync is requiring the boostrap sync annotation to be set to "true"
+	return dsc.syncable(obj) && obj.Annotations[syncPreBootstrapAnnotation] == "true"
+}
+
+func (dsc *DirectSyncController) sync(key string, obj *corev1.Secret) (runtime.Object, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	if !dsc.syncable(obj) {
+		return obj, nil
+	}
+
+	name := obj.Annotations[syncNameAnnotation]
+	if name == "" {
+		name = obj.Name
+	}
+	ns := obj.Annotations[syncNamespaceAnnotation]
+	if ns == "" {
+		ns = obj.Namespace
+	}
+
+	logrus.Debugf("[direct-sync][secret] synchronizing %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, dsc.clusterName)
+
+	op := "update"
+	// fetching every time due to the fact that we don't have a downstream cache in the upstream cluster anymore
+	targetSecret, err := dsc.downstreamSecrets.GetNamespaced(ns, name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logrus.Debugf("[direct-sync][secret] secret %v/%v not found for for cluster %v, creating", ns, name, dsc.clusterName)
+			op = "create"
+		} else {
+			return nil, fmt.Errorf("failed to get downstream secret %v/%v in cluster %v: %v", ns, name, dsc.clusterName, err)
+		}
+	}
+
+	if targetSecret != nil && reflect.DeepEqual(targetSecret.Data, obj.Data) {
+		logrus.Debugf("[direct-sync][secret] skipping downstream update - contents are the same")
+		return obj, nil
+	}
+
+	if op == "create" {
+		logrus.Debugf("[direct-sync][secret] creating secret %v/%v in cluster %v", ns, name, dsc.clusterName)
+
+		targetSecret, err = dsc.downstreamSecrets.Create(
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+				Data:       obj.Data,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create secret %v/%v in cluster %v: %v", ns, name, dsc.clusterName, err)
+		}
+	} else {
+		logrus.Debugf("[direct-sync][secret] updating secret %v/%v in cluster %v", ns, name, dsc.clusterName)
+
+		targetSecret.Data = obj.Data
+		_, err = dsc.downstreamSecrets.Update(targetSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update secret %v/%v in cluster %v: %v", ns, name, dsc.clusterName, err)
+		}
+	}
+
+	logrus.Debugf("[direct-sync][secret] successfully synchronized secret %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, dsc.clusterName)
+
+	obj.Annotations[syncedAtAnnotation] = time.Now().Format(time.RFC3339)
+	return obj, nil
 }
 
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {

@@ -132,6 +132,12 @@ var (
 		true,
 		true,
 		true)
+	PreBootstrap = newFeature(
+		"prebootstrap",
+		"Run the Bootstrap-Sync controllers only",
+		false,
+		false,
+		false)
 )
 
 type Feature struct {

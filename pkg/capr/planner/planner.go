@@ -868,6 +868,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		return err
 	}
 
+	mgmCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
+	if err != nil {
+		return err
+	}
+
 	for _, r := range reconcilables {
 		logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - processing machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name)
 		// we exclude here and not in collect to ensure that include matched at least one node
@@ -961,6 +966,10 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, r.entry.Machine) {
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
 			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for kubelet to update")
+		} else if isControlPlane(r.entry) && !controlPlane.Status.AgentConnected && !v3.ClusterConditionBootstrapped.IsTrue(mgmCluster) {
+			// basically the same logic as below - just changing the message.
+			outOfSync = append(outOfSync, r.entry.Machine.Name)
+			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for cluster pre-bootstrap to complete")
 		} else if isControlPlane(r.entry) && !controlPlane.Status.AgentConnected {
 			// If the control plane nodes are currently being provisioned/updated, then it should be ensured that cluster-agent is connected.
 			// Without the agent connected, the controllers running in Rancher, including CAPI, can't communicate with the downstream cluster.
