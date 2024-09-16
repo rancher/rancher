@@ -106,6 +106,7 @@ func TestClusterCustomization(t *testing.T) {
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
+					nil,
 					apimgmtv3.ClusterSpec{
 						FleetWorkspaceName: "fleet-default",
 					},
@@ -125,6 +126,7 @@ func TestClusterCustomization(t *testing.T) {
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
+					nil,
 					apimgmtv3.ClusterSpec{
 						FleetWorkspaceName: "fleet-default",
 						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
@@ -153,6 +155,7 @@ func TestClusterCustomization(t *testing.T) {
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
+					nil,
 					apimgmtv3.ClusterSpec{
 						FleetWorkspaceName: "fleet-default",
 						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
@@ -195,7 +198,6 @@ func TestClusterCustomization(t *testing.T) {
 			require.Equal(tt.expectedFleet.Spec.AgentTolerations, fleetCluster.Spec.AgentTolerations)
 		})
 	}
-
 }
 
 func TestCreateCluster(t *testing.T) {
@@ -204,11 +206,13 @@ func TestCreateCluster(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		cluster        *provv1.Cluster
-		status         provv1.ClusterStatus
-		cachedClusters map[string]*apimgmtv3.Cluster
-		expectedLen    int
+		name                string
+		cluster             *provv1.Cluster
+		status              provv1.ClusterStatus
+		cachedClusters      map[string]*apimgmtv3.Cluster
+		expectedLen         int
+		expectedLabels      map[string]string
+		expectedAnnotations map[string]string
 	}{
 		{
 			name: "creates only cluster when external",
@@ -230,6 +234,7 @@ func TestCreateCluster(t *testing.T) {
 					map[string]string{
 						"cluster-group": "cluster-group-name",
 					},
+					nil,
 					apimgmtv3.ClusterSpec{
 						FleetWorkspaceName: "fleet-default",
 						Internal:           false,
@@ -237,6 +242,11 @@ func TestCreateCluster(t *testing.T) {
 				),
 			},
 			expectedLen: 1, // cluster only
+			expectedLabels: map[string]string{
+				"management.cattle.io/cluster-name":         "cluster-name",
+				"management.cattle.io/cluster-display-name": "cluster-name",
+				"cluster-group": "cluster-group-name",
+			},
 		},
 		{
 			name: "creates internal cluster and cluster group",
@@ -255,8 +265,9 @@ func TestCreateCluster(t *testing.T) {
 				"local-cluster": newMgmtCluster(
 					"local-cluster",
 					map[string]string{
-						"cluster-group": "default",
+						"cluster-group": "cluster-group-name",
 					},
+					nil,
 					apimgmtv3.ClusterSpec{
 						FleetWorkspaceName: "fleet-local",
 						Internal:           true,
@@ -264,6 +275,69 @@ func TestCreateCluster(t *testing.T) {
 				),
 			},
 			expectedLen: 2, // cluster and cluster group
+			expectedLabels: map[string]string{
+				"management.cattle.io/cluster-name":         "local-cluster",
+				"management.cattle.io/cluster-display-name": "local-cluster",
+				"name":          "local",
+				"cluster-group": "cluster-group-name",
+			},
+		},
+		{
+			name: "creates cluster with filtered labels and annotations from management cluster",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+					Labels: map[string]string{
+						"foo-label":                 "bar",
+						"kubectl.kubernetes.io/foo": "foovalue",
+						"blah.cattle.io/meh":        "bleh",
+					},
+					Annotations: map[string]string{
+						"foo-annotation":            "bar",
+						"kubectl.kubernetes.io/foo": "foovalue",
+						"blah.cattle.io/meh":        "bleh",
+					},
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "cluster-name",
+				ClientSecretName: "client-secret-name",
+			},
+
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					map[string]string{
+						"cluster-group":             "cluster-group-name",
+						"kubectl.kubernetes.io/foo": "foovalue", // should be filtered out
+						"blah.cattle.io/meh":        "bleh",     // should be filtered out
+						"foo-label":                 "bar",
+					},
+					map[string]string{
+						"test-annotation-key":       "test-value",
+						"kubectl.kubernetes.io/foo": "foovalue", // should be filtered out
+						"blah.cattle.io/meh":        "bleh",     // should be filtered out
+						"foo-annotation":            "bar",
+					},
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						Internal:           false,
+					},
+				),
+			},
+			expectedLen: 1, // cluster only
+			expectedLabels: map[string]string{
+				"management.cattle.io/cluster-name":         "cluster-name",
+				"management.cattle.io/cluster-display-name": "cluster-name",
+				"cluster-group": "cluster-group-name",
+				"foo-label":     "bar",
+			},
+			expectedAnnotations: map[string]string{
+				"foo-annotation":      "bar",
+				"test-annotation-key": "test-value",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -294,24 +368,41 @@ func TestCreateCluster(t *testing.T) {
 					continue
 				}
 
-				if cluster.Name == tt.cluster.Name && cluster.Namespace == tt.cluster.Namespace {
-					foundCluster = true
+				if cluster.Name != tt.cluster.Name || cluster.Namespace != tt.cluster.Namespace {
+					continue
+				}
+
+				foundCluster = true
+
+				require.Equal(t, tt.expectedLabels, cluster.Labels)
+
+				if len(tt.expectedAnnotations) == 0 {
+					require.Empty(t, cluster.Annotations)
+				} else {
+					require.Equal(t, tt.expectedAnnotations, cluster.Annotations)
 				}
 			}
 
 			if !foundCluster {
 				t.Errorf("Did not find expected cluster %v among created objects %v", tt.cluster, objs)
 			}
+
 		})
 	}
 }
 
-func newMgmtCluster(name string, labels map[string]string, spec apimgmtv3.ClusterSpec) *apimgmtv3.Cluster {
+func newMgmtCluster(
+	name string,
+	labels map[string]string,
+	annotations map[string]string,
+	spec apimgmtv3.ClusterSpec,
+) *apimgmtv3.Cluster {
 	spec.DisplayName = name
 	mgmtCluster := &apimgmtv3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: labels,
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: spec,
 	}
