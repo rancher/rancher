@@ -21,6 +21,8 @@ type Store[T runtime.Object, TList runtime.Object] interface {
 	Create(ctx context.Context, userInfo user.Info, obj T, opts *metav1.CreateOptions) (T, error)
 	Update(ctx context.Context, userInfo user.Info, obj T, opts *metav1.UpdateOptions) (T, error)
 	Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (T, error)
+	// token retrieval without access perm checks - see auth/requests/authenticate.go for use.
+	GetCore(name string, opts *metav1.GetOptions) (T, error)
 	List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (TList, error)
 	// XXX: There's no way to safely close the channel outside of this call.
 	// We should probably return an interface instead like k8s.io/apimachinery/pkg/watch.Interface
@@ -33,12 +35,13 @@ type TableConvertor[TList runtime.Object] interface {
 }
 
 type backingStore[T runtime.Object, TList runtime.Object] struct {
-	createFunc func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.CreateOptions) (T, error)
-	updateFunc func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.UpdateOptions) (T, error)
-	getFunc    func(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (T, error)
-	listFunc   func(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (TList, error)
-	watchFunc  func(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (<-chan WatchEvent[T], error)
-	deleteFunc func(ctx context.Context, userInfo user.Info, name string, opts *metav1.DeleteOptions) error
+	createFunc  func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.CreateOptions) (T, error)
+	updateFunc  func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.UpdateOptions) (T, error)
+	getFunc     func(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (T, error)
+	getCoreFunc func(name string, opts *metav1.GetOptions) (T, error)
+	listFunc    func(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (TList, error)
+	watchFunc   func(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (<-chan WatchEvent[T], error)
+	deleteFunc  func(ctx context.Context, userInfo user.Info, name string, opts *metav1.DeleteOptions) error
 }
 
 func (b *backingStore[T, TList]) Create(ctx context.Context, userInfo user.Info, obj T, opts *metav1.CreateOptions) (T, error) {
@@ -51,6 +54,10 @@ func (b *backingStore[T, TList]) Update(ctx context.Context, userInfo user.Info,
 
 func (b *backingStore[T, TList]) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (T, error) {
 	return b.getFunc(ctx, userInfo, name, opts)
+}
+
+func (b *backingStore[T, TList]) GetCore(name string, opts *metav1.GetOptions) (T, error) {
+	return b.getCoreFunc(name, opts)
 }
 
 func (b *backingStore[T, TList]) List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (TList, error) {
@@ -69,16 +76,18 @@ func NewStore[T runtime.Object, TList runtime.Object](
 	createFunc func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.CreateOptions) (T, error),
 	updateFunc func(ctx context.Context, userInfo user.Info, obj T, opts *metav1.UpdateOptions) (T, error),
 	getFunc func(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (T, error),
+	getCoreFunc func(name string, opts *metav1.GetOptions) (T, error),
 	listFunc func(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (TList, error),
 	watchFunc func(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (<-chan WatchEvent[T], error),
 	deleteFunc func(ctx context.Context, userInfo user.Info, name string, opts *metav1.DeleteOptions) error,
 ) Store[T, TList] {
 	return &backingStore[T, TList]{
-		createFunc: createFunc,
-		updateFunc: updateFunc,
-		getFunc:    getFunc,
-		listFunc:   listFunc,
-		watchFunc:  watchFunc,
-		deleteFunc: deleteFunc,
+		createFunc:  createFunc,
+		updateFunc:  updateFunc,
+		getFunc:     getFunc,
+		getCoreFunc: getCoreFunc,
+		listFunc:    listFunc,
+		watchFunc:   watchFunc,
+		deleteFunc:  deleteFunc,
 	}
 }
