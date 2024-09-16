@@ -319,7 +319,8 @@ func (o *Client) IsOrasRepository() (bool, error) {
 
 		err = repository.Tags(context.Background(), "", tagsFunc)
 		if err != nil {
-			if IsErrorCode(err, errcode.ErrorCodeNameUnknown) {
+			if IsErrorCode(err, errcode.ErrorCodeNameUnknown) ||
+				IsErrorMessage(err, "invalid repository name") {
 				return false, nil
 			}
 			return false, err
@@ -333,4 +334,10 @@ func (o *Client) IsOrasRepository() (bool, error) {
 func IsErrorCode(err error, code string) bool {
 	var ec errcode.Error
 	return errors.As(err, &ec) && ec.Code == code
+}
+
+// IsErrorMessage returns true if err is an Error and its message is found.
+func IsErrorMessage(err error, message string) bool {
+	var ec errcode.Error
+	return errors.As(err, &ec) && strings.Contains(ec.Message, message)
 }
