@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -49,11 +50,13 @@ func NewHeaderAuth() (*Server, error) {
 	}, nil
 }
 
-func NewServer(ctx context.Context, cfg *rest.Config) (*Server, error) {
+func NewServer(ctx context.Context, cfg *rest.Config, wContext *wrangler.Context) (*Server, error) {
 	sc, err := config.NewScaledContext(*cfg, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	sc.Wrangler = wContext
 
 	sc.UserManager, err = common.NewUserManagerNoBindings(sc)
 	if err != nil {

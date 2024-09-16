@@ -38,6 +38,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 	if err != nil {
 		return err
 	}
+	sc.Wrangler = wrangler
 
 	userManager, err := common.NewUserManagerNoBindings(sc)
 	if err != nil {
