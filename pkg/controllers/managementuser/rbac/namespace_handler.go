@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
@@ -576,22 +578,36 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 // asyncCleanupRBAC will wait for a Terminating namespace to be fully deleted before removing the associated RBAC.
 func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 	go func() {
-		for {
-			time.Sleep(cleanupRBACDelaySeconds * time.Second)
+		backoff := wait.Backoff{
+			Duration: cleanupRBACDelaySeconds * time.Second,
+			Factor:   2.0,
+			Jitter:   0.1,
+			Steps:    10,
+			Cap:      5 * time.Minute,
+		}
+
+		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 			_, err := n.m.nsLister.Get("", namespaceName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
+					// Namespace is fully deleted, clean up RBAC
 					err := n.reconcileNamespaceProjectClusterRole(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
 					if err != nil {
 						logrus.Errorf("error cleaning up RBAC for namespace %s: %v", namespaceName, err)
-					} else {
-						logrus.Debugf("successfully cleaned up RBAC for namespace %s", namespaceName)
+						return false, err
 					}
-					return
+					logrus.Debugf("successfully cleaned up RBAC for namespace %s", namespaceName)
+					return true, nil
 				}
-			} else {
-				logrus.Debugf("namespace %s is still in Terminating state. Will recheck in %d seconds.", namespaceName, cleanupRBACDelaySeconds)
+				return false, err
 			}
+
+			logrus.Debugf("namespace %s is still present. Will recheck.", namespaceName)
+			return false, nil
+		})
+
+		if err != nil {
+			logrus.Errorf("async cleanup of RBAC for namespace %s failed: %v", namespaceName, err)
 		}
 	}()
 }
