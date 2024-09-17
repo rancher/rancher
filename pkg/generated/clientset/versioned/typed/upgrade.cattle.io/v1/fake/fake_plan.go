@@ -41,22 +41,24 @@ var plansKind = v1.SchemeGroupVersion.WithKind("Plan")
 
 // Get takes name of the plan, and returns the corresponding plan object, and an error if there is any.
 func (c *FakePlans) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Plan, err error) {
+	emptyResult := &v1.Plan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(plansResource, c.ns, name), &v1.Plan{})
+		Invokes(testing.NewGetActionWithOptions(plansResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Plan), err
 }
 
 // List takes label and field selectors, and returns the list of Plans that match those selectors.
 func (c *FakePlans) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PlanList, err error) {
+	emptyResult := &v1.PlanList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(plansResource, plansKind, c.ns, opts), &v1.PlanList{})
+		Invokes(testing.NewListActionWithOptions(plansResource, plansKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,40 +77,43 @@ func (c *FakePlans) List(ctx context.Context, opts metav1.ListOptions) (result *
 // Watch returns a watch.Interface that watches the requested plans.
 func (c *FakePlans) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(plansResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(plansResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a plan and creates it.  Returns the server's representation of the plan, and an error, if there is any.
 func (c *FakePlans) Create(ctx context.Context, plan *v1.Plan, opts metav1.CreateOptions) (result *v1.Plan, err error) {
+	emptyResult := &v1.Plan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(plansResource, c.ns, plan), &v1.Plan{})
+		Invokes(testing.NewCreateActionWithOptions(plansResource, c.ns, plan, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Plan), err
 }
 
 // Update takes the representation of a plan and updates it. Returns the server's representation of the plan, and an error, if there is any.
 func (c *FakePlans) Update(ctx context.Context, plan *v1.Plan, opts metav1.UpdateOptions) (result *v1.Plan, err error) {
+	emptyResult := &v1.Plan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(plansResource, c.ns, plan), &v1.Plan{})
+		Invokes(testing.NewUpdateActionWithOptions(plansResource, c.ns, plan, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Plan), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePlans) UpdateStatus(ctx context.Context, plan *v1.Plan, opts metav1.UpdateOptions) (*v1.Plan, error) {
+func (c *FakePlans) UpdateStatus(ctx context.Context, plan *v1.Plan, opts metav1.UpdateOptions) (result *v1.Plan, err error) {
+	emptyResult := &v1.Plan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(plansResource, "status", c.ns, plan), &v1.Plan{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(plansResource, "status", c.ns, plan, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Plan), err
 }
@@ -123,7 +128,7 @@ func (c *FakePlans) Delete(ctx context.Context, name string, opts metav1.DeleteO
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePlans) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(plansResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(plansResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.PlanList{})
 	return err
@@ -131,11 +136,12 @@ func (c *FakePlans) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 
 // Patch applies the patch and returns the patched plan.
 func (c *FakePlans) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Plan, err error) {
+	emptyResult := &v1.Plan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(plansResource, c.ns, name, pt, data, subresources...), &v1.Plan{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(plansResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Plan), err
 }

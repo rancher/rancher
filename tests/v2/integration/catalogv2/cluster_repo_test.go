@@ -56,7 +56,7 @@ const (
 	GitClusterSmallForkName = "test-git-small-fork-cluster-repo"
 	GitClusterSmallForkURL  = "https://github.com/rancher/charts-small-fork"
 	GitClusterRepoName      = "test-git-cluster-repo"
-	RancherChartsGitRepoURL = "https://github.com/rancher/charts"
+	RancherChartsGitRepoURL = "https://github.com/krunalhinguu/charts"
 	RKE2ChartsGitRepoURL    = "https://github.com/rancher/rke2-charts"
 
 	OCIClusterRepoName = "test-oci-cluster-repo"

@@ -20,14 +20,13 @@ package v1
 
 import (
 	"context"
-	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // OperationsGetter has a method to return a OperationInterface.
@@ -40,6 +39,7 @@ type OperationsGetter interface {
 type OperationInterface interface {
 	Create(ctx context.Context, operation *v1.Operation, opts metav1.CreateOptions) (*v1.Operation, error)
 	Update(ctx context.Context, operation *v1.Operation, opts metav1.UpdateOptions) (*v1.Operation, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, operation *v1.Operation, opts metav1.UpdateOptions) (*v1.Operation, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -52,144 +52,18 @@ type OperationInterface interface {
 
 // operations implements OperationInterface
 type operations struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*v1.Operation, *v1.OperationList]
 }
 
 // newOperations returns a Operations
 func newOperations(c *CatalogV1Client, namespace string) *operations {
 	return &operations{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*v1.Operation, *v1.OperationList](
+			"operations",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.Operation { return &v1.Operation{} },
+			func() *v1.OperationList { return &v1.OperationList{} }),
 	}
-}
-
-// Get takes name of the operation, and returns the corresponding operation object, and an error if there is any.
-func (c *operations) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Operation, err error) {
-	result = &v1.Operation{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("operations").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Operations that match those selectors.
-func (c *operations) List(ctx context.Context, opts metav1.ListOptions) (result *v1.OperationList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.OperationList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("operations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested operations.
-func (c *operations) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("operations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a operation and creates it.  Returns the server's representation of the operation, and an error, if there is any.
-func (c *operations) Create(ctx context.Context, operation *v1.Operation, opts metav1.CreateOptions) (result *v1.Operation, err error) {
-	result = &v1.Operation{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("operations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(operation).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a operation and updates it. Returns the server's representation of the operation, and an error, if there is any.
-func (c *operations) Update(ctx context.Context, operation *v1.Operation, opts metav1.UpdateOptions) (result *v1.Operation, err error) {
-	result = &v1.Operation{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("operations").
-		Name(operation.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(operation).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *operations) UpdateStatus(ctx context.Context, operation *v1.Operation, opts metav1.UpdateOptions) (result *v1.Operation, err error) {
-	result = &v1.Operation{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("operations").
-		Name(operation.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(operation).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the operation and deletes it. Returns an error if one occurs.
-func (c *operations) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("operations").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *operations) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("operations").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched operation.
-func (c *operations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Operation, err error) {
-	result = &v1.Operation{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("operations").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

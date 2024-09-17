@@ -83,6 +83,7 @@ const (
 	WorkloadFieldStatefulSetStatus                    = "statefulSetStatus"
 	WorkloadFieldSubdomain                            = "subdomain"
 	WorkloadFieldSuccessPolicy                        = "successPolicy"
+	WorkloadFieldSupplementalGroupsPolicy             = "supplementalGroupsPolicy"
 	WorkloadFieldSuspend                              = "suspend"
 	WorkloadFieldSysctls                              = "sysctls"
 	WorkloadFieldTTLSecondsAfterFinished              = "ttlSecondsAfterFinished"
@@ -177,6 +178,7 @@ type Workload struct {
 	StatefulSetStatus                    *StatefulSetStatus                               `json:"statefulSetStatus,omitempty" yaml:"statefulSetStatus,omitempty"`
 	Subdomain                            string                                           `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	SuccessPolicy                        *SuccessPolicy                                   `json:"successPolicy,omitempty" yaml:"successPolicy,omitempty"`
+	SupplementalGroupsPolicy             string                                           `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Suspend                              *bool                                            `json:"suspend,omitempty" yaml:"suspend,omitempty"`
 	Sysctls                              []Sysctl                                         `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished              *int64                                           `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`

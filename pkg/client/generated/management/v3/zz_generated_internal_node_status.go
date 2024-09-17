@@ -6,6 +6,7 @@ const (
 	InternalNodeStatusFieldCapacity          = "capacity"
 	InternalNodeStatusFieldConfig            = "config"
 	InternalNodeStatusFieldExternalIPAddress = "externalIpAddress"
+	InternalNodeStatusFieldFeatures          = "features"
 	InternalNodeStatusFieldHostname          = "hostname"
 	InternalNodeStatusFieldIPAddress         = "ipAddress"
 	InternalNodeStatusFieldInfo              = "info"
@@ -20,6 +21,7 @@ type InternalNodeStatus struct {
 	Capacity          map[string]string         `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	Config            *NodeConfigStatus         `json:"config,omitempty" yaml:"config,omitempty"`
 	ExternalIPAddress string                    `json:"externalIpAddress,omitempty" yaml:"externalIpAddress,omitempty"`
+	Features          *NodeFeatures             `json:"features,omitempty" yaml:"features,omitempty"`
 	Hostname          string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddress         string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
 	Info              *NodeInfo                 `json:"info,omitempty" yaml:"info,omitempty"`

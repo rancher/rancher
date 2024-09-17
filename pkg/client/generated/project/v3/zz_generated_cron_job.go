@@ -62,6 +62,7 @@ const (
 	CronJobFieldState                         = "state"
 	CronJobFieldSubdomain                     = "subdomain"
 	CronJobFieldSuccessPolicy                 = "successPolicy"
+	CronJobFieldSupplementalGroupsPolicy      = "supplementalGroupsPolicy"
 	CronJobFieldSysctls                       = "sysctls"
 	CronJobFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -136,6 +137,7 @@ type CronJob struct {
 	State                         string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	SuccessPolicy                 *SuccessPolicy                 `json:"successPolicy,omitempty" yaml:"successPolicy,omitempty"`
+	SupplementalGroupsPolicy      string                         `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
