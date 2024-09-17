@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/ext/resources/tokens"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	wapiv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
@@ -84,7 +85,7 @@ func must(err error) {
 	}
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context, sc *config.ScaledContext) {
 	h := &handler{
 		apiClient:        clients.API.APIService(),
 		serviceClient:    clients.Core.Service(),
@@ -141,7 +142,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				next.ServeHTTP(w, req)
 			})
 		})
-		ext.RegisterSubRoutes(router, clients)
+		ext.RegisterSubRoutes(router, clients, sc)
 
 		stopCh := make(chan struct{})
 		secureServingInfo.Serve(router, time.Second*5, stopCh)

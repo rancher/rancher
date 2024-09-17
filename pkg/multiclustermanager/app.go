@@ -190,7 +190,7 @@ func (m *mcm) Start(ctx context.Context) error {
 
 	m.wranglerContext.OnLeader(func(ctx context.Context) error {
 		// Run ASAP to prevent Rancher startup deadlock (which we should probably fix in another way)
-		extController.Register(ctx, m.wranglerContext)
+		extController.Register(ctx, m.wranglerContext, m.ScaledContext)
 
 		err := m.wranglerContext.StartWithTransaction(ctx, func(ctx context.Context) error {
 			var (
