@@ -8,11 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	rancherEc2 "github.com/rancher/shepherd/clients/ec2"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/nodes"
-)
-
-const (
-	nodeBaseName = "rancher-automation"
 )
 
 // CreateNodes creates `quantityPerPool[n]` number of ec2 instances
@@ -29,6 +26,11 @@ func CreateNodes(client *rancher.Client, rolesPerPool []string, quantityPerPool 
 		config := MatchRoleToConfig(rolesPerPool[i], ec2Client.ClientConfig.AWSEC2Config)
 		if config == nil {
 			return nil, errors.New("No matching nodesAndRole for AWSEC2Config with role:" + rolesPerPool[i])
+		}
+
+		nodeBaseName := config.AWSCICDInstanceTag
+		if nodeBaseName == "" {
+			nodeBaseName = "rancher-qa-automation"
 		}
 		sshName := getSSHKeyName(config.AWSSSHKeyName)
 		runInstancesInput := &ec2.RunInstancesInput{
@@ -64,7 +66,7 @@ func CreateNodes(client *rancher.Client, rolesPerPool []string, quantityPerPool 
 					Tags: []*ec2.Tag{
 						{
 							Key:   aws.String("Name"),
-							Value: aws.String(nodeBaseName),
+							Value: aws.String(nodeBaseName + namegenerator.RandStringLower(5)),
 						},
 						{
 							Key:   aws.String("CICD"),
