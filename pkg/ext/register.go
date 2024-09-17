@@ -4,14 +4,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/ext/generated/openapi"
 	"github.com/rancher/rancher/pkg/ext/resources/tokens"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kube-openapi/pkg/common"
 )
 
-func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context, sc *config.ScaledContext) {
+func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 	apiServer := NewAPIServer(getDefinitions)
 
 	ns := &corev1.Namespace{

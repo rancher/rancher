@@ -143,7 +143,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	extAuthed.Use(func(next http.Handler) http.Handler {
 		return http.StripPrefix("/ext", next)
 	})
-	ext.RegisterSubRoutes(extAuthed, scaledContext.Wrangler.WithAgent("extensions"), scaledContext)
+	ext.RegisterSubRoutes(extAuthed, scaledContext.Wrangler.WithAgent("extensions"))
 
 	unauthed.NotFoundHandler = extAuthed
 	extAuthed.NotFoundHandler = saauthed
