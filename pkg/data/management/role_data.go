@@ -332,16 +332,23 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("").resources("namespaces").verbs("create")
 
 	rb.addRoleTemplate("Manage Workloads", "workloads-manage", "project", false, false, false).
-		addRule().apiGroups("").resources("pods", "pods/attach", "pods/exec", "pods/portforward", "pods/proxy", "replicationcontrollers",
-		"replicationcontrollers/scale").verbs("*").
-		addRule().apiGroups("apps").resources("daemonsets", "deployments", "deployments/rollback", "deployments/scale", "replicasets",
-		"replicasets/scale", "statefulsets", "statefulsets/scale").verbs("*").
-		addRule().apiGroups("autoscaling").resources("horizontalpodautoscalers").verbs("*").
-		addRule().apiGroups("batch").resources("cronjobs", "jobs").verbs("*").
+		addRule().
+		apiGroups("").
+		resources("pods", "pods/attach", "pods/exec", "pods/portforward", "pods/proxy", "replicationcontrollers", "replicationcontrollers/scale").
+		verbs("get", "list", "watch", "create", "delete", "deletecollection", "patch", "update").
+		addRule().
+		apiGroups("apps").
+		resources("daemonsets", "deployments", "deployments/scale", "replicasets", "replicasets/scale", "statefulsets", "statefulsets/scale").
+		verbs("get", "list", "watch", "create", "delete", "deletecollection", "patch", "update").
+		addRule().
+		apiGroups("apps").resources("deployments/rollback").verbs("create", "delete", "deletecollection", "patch", "update").
+		addRule().apiGroups("autoscaling").resources("horizontalpodautoscalers").verbs("get", "list", "watch", "create", "delete", "deletecollection", "patch", "update").
+		addRule().apiGroups("batch").resources("cronjobs", "jobs").verbs("get", "list", "watch", "create", "delete", "deletecollection", "patch", "update").
 		addRule().apiGroups("").resources("limitranges", "pods/log", "pods/status", "replicationcontrollers/status", "resourcequotas", "resourcequotas/status", "bindings").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("*").
-		rb.addRoleTemplate("View Workloads", "workloads-view", "project", false, false, false).
+		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("*")
+
+	rb.addRoleTemplate("View Workloads", "workloads-view", "project", false, false, false).
 		addRule().apiGroups("").resources("pods", "replicationcontrollers", "replicationcontrollers/scale").verbs("get", "list", "watch").
 		addRule().apiGroups("apps").resources("daemonsets", "deployments", "deployments/rollback", "deployments/scale", "replicasets",
 		"replicasets/scale", "statefulsets").verbs("get", "list", "watch").
@@ -349,8 +356,9 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("batch").resources("cronjobs", "jobs").verbs("get", "list", "watch").
 		addRule().apiGroups("").resources("limitranges", "pods/log", "pods/status", "replicationcontrollers/status", "resourcequotas", "resourcequotas/status", "bindings").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("get", "list", "watch").
-		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("get", "list", "watch").
-		rb.addRoleTemplate("Manage Ingress", "ingress-manage", "project", false, false, false).
+		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("get", "list", "watch")
+
+	rb.addRoleTemplate("Manage Ingress", "ingress-manage", "project", false, false, false).
 		addRule().apiGroups("extensions").resources("ingresses").verbs("*").
 		addRule().apiGroups("networking.k8s.io").resources("ingresses").verbs("*")
 
