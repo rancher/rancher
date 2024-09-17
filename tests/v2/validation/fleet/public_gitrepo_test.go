@@ -1,4 +1,4 @@
-//go:build validation || airgap
+//go:build validation
 
 package fleet
 
@@ -28,10 +28,9 @@ import (
 
 type FleetPublicRepoTestSuite struct {
 	suite.Suite
-	client             *rancher.Client
-	session            *session.Session
-	clusterID          string
-	provisioningConfig *provisioninginput.Config
+	client    *rancher.Client
+	session   *session.Session
+	clusterID string
 }
 
 func (f *FleetPublicRepoTestSuite) TearDownSuite() {
@@ -49,9 +48,7 @@ func (f *FleetPublicRepoTestSuite) SetupSuite() {
 	userConfig := new(provisioninginput.Config)
 	config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
 
-	f.provisioningConfig = userConfig
-
-	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(f.client, f.client.RancherConfig.ClusterName, "fleet-default")
+	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(f.client, f.client.RancherConfig.ClusterName, fleet.Namespace)
 	if clusterObject != nil {
 		status := &provv1.ClusterStatus{}
 		err := steveV1.ConvertToK8sType(clusterObject.Status, status)
@@ -70,10 +67,10 @@ func (f *FleetPublicRepoTestSuite) SetupSuite() {
 func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 	defer f.session.Cleanup()
 
-	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, "local")
+	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, fleet.LocalName)
 	require.NoError(f.T(), err)
 
-	chartVersion, err := f.client.Catalog.GetLatestChartVersion("fleet", catalog.RancherChartRepo)
+	chartVersion, err := f.client.Catalog.GetLatestChartVersion(fleet.FleetName, catalog.RancherChartRepo)
 	require.NoError(f.T(), err)
 
 	// fleet chart version may contain chart version info that is a superset of the version reported by the fleet deployment.
@@ -95,13 +92,13 @@ func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 	f.Run("fleet "+fleetVersion, func() {
 		fleetGitRepo := v1alpha1.GitRepo{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "automatedrepo-" + namegenerator.RandStringLower(5),
-				Namespace: "fleet-default",
+				Name:      fleet.FleetMetaName + namegenerator.RandStringLower(5),
+				Namespace: fleet.Namespace,
 			},
 			Spec: v1alpha1.GitRepoSpec{
-				Repo:            "https://github.com/rancher/fleet-examples",
-				Branch:          "master",
-				Paths:           []string{"simple"},
+				Repo:            fleet.ExampleRepo,
+				Branch:          fleet.BranchName,
+				Paths:           []string{fleet.GitRepoPathLinux},
 				CorrectDrift:    &v1alpha1.CorrectDrift{},
 				ImageScanCommit: v1alpha1.CommitSpec{AuthorName: "", AuthorEmail: ""},
 				Targets:         []v1alpha1.GitTarget{{ClusterName: f.client.RancherConfig.ClusterName}},
@@ -109,7 +106,7 @@ func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 		}
 
 		if len(winsNodeList.Data) > 0 {
-			fleetGitRepo.Spec.Paths = []string{"multi-cluster/windows-helm"}
+			fleetGitRepo.Spec.Paths = []string{fleet.GitRepoPathWindows}
 		}
 
 		f.client, err = f.client.ReLogin()
@@ -119,7 +116,8 @@ func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 		gitRepoObject, err := extensionsfleet.CreateFleetGitRepo(f.client, &fleetGitRepo)
 		require.NoError(f.T(), err)
 
-		fleet.VerifyGitRepo(f.T(), f.client, gitRepoObject.ID, f.clusterID, "fleet-default/"+f.client.RancherConfig.ClusterName)
+		err = fleet.VerifyGitRepo(f.client, gitRepoObject.ID, f.clusterID, fleet.Namespace+"/"+f.client.RancherConfig.ClusterName)
+		require.NoError(f.T(), err)
 
 	})
 }
@@ -138,10 +136,10 @@ func (f *FleetPublicRepoTestSuite) TestDynamicGitRepoDeployment() {
 		}
 	}
 
-	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, "local")
+	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, fleet.LocalName)
 	require.NoError(f.T(), err)
 
-	chartVersion, err := f.client.Catalog.GetLatestChartVersion("fleet", catalog.RancherChartRepo)
+	chartVersion, err := f.client.Catalog.GetLatestChartVersion(fleet.FleetName, catalog.RancherChartRepo)
 	require.NoError(f.T(), err)
 	require.Contains(f.T(), chartVersion, fleetVersion[1:])
 
@@ -155,7 +153,8 @@ func (f *FleetPublicRepoTestSuite) TestDynamicGitRepoDeployment() {
 	require.NoError(f.T(), err)
 
 	// expects dynamicGitRepo.GitRepoSpec.Targets to include RancherConfig.ClusterName
-	fleet.VerifyGitRepo(f.T(), f.client, gitRepoObject.ID, f.clusterID, "fleet-default/"+f.client.RancherConfig.ClusterName)
+	err = fleet.VerifyGitRepo(f.client, gitRepoObject.ID, f.clusterID, fleet.Namespace+"/"+f.client.RancherConfig.ClusterName)
+	require.NoError(f.T(), err)
 
 }
 
