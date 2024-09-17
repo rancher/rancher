@@ -3,17 +3,16 @@ package fleet
 import (
 	"errors"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+
 	extensionsfleet "github.com/rancher/shepherd/extensions/fleet"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -21,6 +20,19 @@ import (
 // The json/yaml config key for the corral package to be build ..
 const (
 	gitRepoConfigConfigurationFileKey = "gitRepo"
+
+	FleetName          = "fleet"
+	LocalName          = "local"
+	HarvesterName      = "harvester"
+	ExampleRepo        = "https://github.com/rancher/fleet-examples"
+	BranchName         = "master"
+	MatchKey           = "provider.cattle.io"
+	MatchOperator      = "NotIn"
+	FleetMetaName      = "automatedrepo-"
+	Namespace          = "fleet-default"
+	GitRepoPathLinux   = "simple"
+	GitRepoPathWindows = "multi-cluster/windows-helm"
+	CniCalico          = "calico"
 )
 
 // GitRepoConfig is a function that reads in the gitRepo object from the config file
@@ -36,20 +48,26 @@ const (
 	FleetControllerName         = "cattle-fleet-system/fleet-controller"
 )
 
-func VerifyGitRepo(t *testing.T, client *rancher.Client, gitRepoID, k8sClusterID, steveClusterID string) {
+// VerifyGitRepo will verify that the gitRepo itself comes to an active state along with fleetCluster resources
+// and the steve Cluster's resources from said gitRepo come to an active state. This is limited to work with
+// a single cluster. If multiple clusters are targeted in the gitRepo, only the specified steve Cluster's
+// resources will be validated. However the gitRepo's fleetCluster will still be validated for its targets.
+func VerifyGitRepo(client *rancher.Client, gitRepoID, k8sClusterID, steveClusterID string) error {
 	backoff := kwait.Backoff{
 		Duration: 1 * time.Second,
 		Factor:   1.1,
 		Jitter:   0.1,
 		Steps:    20,
 	}
+
 	err := kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		client, err = client.ReLogin()
 		if err != nil {
 			return false, err
 		}
 
-		// after checking clusterStatus, check gitRepoStatus. gitRepoStatus starts in a healthy state, so if errors come up during clusterBundle deployments, its status will update to a negative / error state
+		// after checking clusterStatus, check gitRepoStatus. gitRepoStatus starts in a healthy state,
+		// so if errors come up during clusterBundle deployments, its status will update to a negative / error state
 		gitRepo, err := client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(gitRepoID)
 		if err != nil {
 			return false, err
@@ -69,17 +87,16 @@ func VerifyGitRepo(t *testing.T, client *rancher.Client, gitRepoID, k8sClusterID
 			return true, errors.New(gitRepo.State.Message)
 		}
 
-		logrus.Info(gitStatus.Summary)
-
 		if gitStatus.Summary.NotReady > 0 || gitStatus.Summary.DesiredReady == 0 || gitStatus.ReadyClusters == 0 {
 			return false, nil
 		}
 
 		return true, nil
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
-	// this hits a currently known issue because the fleetCluster only updates every 15 mins. So unless we want the test to have this part be 15+ minutes, it will fail here for now. Possibly something for the team to fix?
 	logrus.Info("waiting for bundles to deploy to ", steveClusterID)
 	err = kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		client, err = client.ReLogin()
@@ -98,7 +115,6 @@ func VerifyGitRepo(t *testing.T, client *rancher.Client, gitRepoID, k8sClusterID
 			return false, err
 		}
 
-		logrus.Info(status.Summary.NonReadyResources)
 		for _, nonReadyResource := range status.Summary.NonReadyResources {
 			logrus.Info(nonReadyResource.Message)
 			if strings.Contains(nonReadyResource.Message, "error") || strings.Contains(nonReadyResource.Message, "Unable to continue") {
@@ -106,7 +122,8 @@ func VerifyGitRepo(t *testing.T, client *rancher.Client, gitRepoID, k8sClusterID
 			}
 		}
 
-		// after checking clusterStatus, check gitRepoStatus. gitRepoStatus can start in a healthy state, so if errors come up during clusterBundle deployments, its status will update to a negative / error state that aren'
+		// after checking clusterStatus, check gitRepoStatus. gitRepoStatus can start in a healthy state,
+		// so if errors come up during clusterBundle deployments, its status will update to a negative / error state that aren'
 		gitRepo, err := client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(gitRepoID)
 		if err != nil {
 			return false, err
@@ -136,13 +153,22 @@ func VerifyGitRepo(t *testing.T, client *rancher.Client, gitRepoID, k8sClusterID
 
 		return true, nil
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
 	// validate all resources on the cluster are actually in a good state, regardless of what fleet is reporting
 	podErrors := pods.StatusPods(client, k8sClusterID)
-	require.Empty(t, podErrors)
+	if len(podErrors) > 0 {
+		for _, err := range podErrors {
+			logrus.Errorf(err.Error())
+		}
+		return errors.New("pods are not healthy in " + steveClusterID)
+	}
+	return err
 }
 
+// GetDeploymentVersion is a helper that gets the image version from a deployment ID in a given cluster.
 func GetDeploymentVersion(client *rancher.Client, deploymentID, clusterName string) (string, error) {
 	var deploymentVersion string
 
