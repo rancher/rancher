@@ -537,9 +537,8 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	assert.Equal(c.T(), len(index.Entries), 2)
 	assert.Equal(c.T(), len(index.Entries["testingchart"]), 2)
 	assert.NotEmpty(c.T(), index.Entries["testingchart"][0].Digest)
-	time.Sleep(65 * time.Second)
 
-	err = wait.Poll(PollInterval, 5*time.Second, func() (done bool, err error) {
+	err = wait.Poll(PollInterval, 3*time.Minute, func() (done bool, err error) {
 		clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 		assert.NoError(c.T(), err)
 
@@ -555,7 +554,7 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 	assert.NoError(c.T(), err)
 	assert.Equal(c.T(), clusterRepo.Status.NumberOfRetries, 0, "Number of retries should be 0 since there were no 429s")
-	configMap, err = c.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
+	configMap, err = c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
 	assert.NoError(c.T(), err)
 
 	data = configMap.BinaryData["content"]
