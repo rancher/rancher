@@ -7,10 +7,10 @@ import (
 
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	provisioning "github.com/rancher/rancher/tests/v2/actions/provisioning"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/rancher/tests/v2/actions/reports"
 	"github.com/rancher/rancher/tests/v2/validation/pipeline/rancherha/corralha"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/registries"
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"github.com/rancher/shepherd/extensions/clusters"
