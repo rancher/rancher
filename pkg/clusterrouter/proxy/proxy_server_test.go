@@ -28,8 +28,7 @@ func TestServeHTTP(t *testing.T) {
 		"get impersonation token": {
 			header: map[string][]string{},
 			ctx: func() context.Context {
-				ctx := context.TODO()
-				return request.WithUser(ctx, &user.DefaultInfo{
+				return request.WithUser(context.TODO(), &user.DefaultInfo{
 					Name: "user",
 					UID:  "user",
 				})

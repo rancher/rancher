@@ -60,7 +60,7 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 			if strings.HasPrefix(reqUser, serviceaccount.ServiceAccountUsernamePrefix) {
 				canDo, err := h.sar.UserCanImpersonateServiceAccount(req, user, reqUser)
 				if err != nil {
-					return nil, false, err
+					return nil, false, fmt.Errorf("error checking if user can impersonate service account: %w", err)
 				} else if !canDo {
 					return nil, false, errors.New("not allowed to impersonate service account")
 				}
@@ -69,7 +69,7 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 			} else {
 				canDo, err := h.sar.UserCanImpersonateUser(req, user, reqUser)
 				if err != nil {
-					return nil, false, err
+					return nil, false, fmt.Errorf("error checking if user can impersonate another user: %w", err)
 				} else if !canDo {
 					return nil, false, errors.New("not allowed to impersonate user")
 				}
