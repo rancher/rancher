@@ -10,11 +10,12 @@ replace (
 	github.com/rancher/dynamiclistener => github.com/krunalhinguu/dynamiclistener v1.31.0-rancher1
 	github.com/rancher/eks-operator => github.com/krunalhinguu/eks-operator v1.31.0-rancher2
 	github.com/rancher/gke-operator => github.com/krunalhinguu/gke-operator v1.31.0-rancher2
+	github.com/rancher/helm/v3 => github.com/krunalhinguu/helm/v3 v3.16.0-rancher1
 	github.com/rancher/lasso => github.com/krunalhinguu/lasso v0.0.0-20240822033348-bb8b64be7fb1
 	github.com/rancher/machine => github.com/krunalhinguu/machine v1.31.0-rancher1
 	github.com/rancher/norman => github.com/krunalhinguu/norman v1.31.0-rancher1
 	github.com/rancher/rke => github.com/krunalhinguu/rke v1.31.0-rancher1
-	github.com/rancher/shepherd => github.com/krunalhinguu/shepherd v1.31.0-rancher1
+	github.com/rancher/shepherd => github.com/krunalhinguu/shepherd v1.31.0-rancher4
 	github.com/rancher/steve => github.com/krunalhinguu/steve v1.31.0-rancher1
 	github.com/rancher/wrangler/v3 => github.com/krunalhinguu/wrangler/v3 v3.31.0-rancher1
 )
@@ -72,7 +73,7 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.31.0
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.8.1
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.8.3
 )
 
 require (
@@ -193,7 +194,7 @@ require (
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
-	sigs.k8s.io/cluster-api v1.8.1
+	sigs.k8s.io/cluster-api v1.8.3
 	sigs.k8s.io/controller-runtime v0.19.0
 	sigs.k8s.io/yaml v1.4.0
 )

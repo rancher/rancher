@@ -619,8 +619,8 @@ github.com/krunalhinguu/norman v1.31.0-rancher1 h1:UzpT/f4qUfS/NZ1sjNzZa2jNt4s+C
 github.com/krunalhinguu/norman v1.31.0-rancher1/go.mod h1:UoTH1hZKDxS/+u0TgEOzXOT/bLyp9gwlAksviGfgtsM=
 github.com/krunalhinguu/rke v1.31.0-rancher1 h1:UJ/8lgC38ftmxntufxE4bywvQRLKREvb2SCxxtA6ylw=
 github.com/krunalhinguu/rke v1.31.0-rancher1/go.mod h1:MYWTXAY/JDD6NHO//WWMPh3JApqFsVI0lxu4QrdrWSk=
-github.com/krunalhinguu/shepherd v1.31.0-rancher1 h1:YNB5p4cv0EWwV/WR6GXoLHVXZjEXNbM2/PqPnty/zzc=
-github.com/krunalhinguu/shepherd v1.31.0-rancher1/go.mod h1:0Jo8qtzvvH2JBHuFcZhcN97ik2JVVNv5OQ3vnw3cFD8=
+github.com/krunalhinguu/shepherd v1.31.0-rancher4 h1:cRAClewAUBFcVoBy2QMdf7KcoSDnhMw38mJmfjAgXhQ=
+github.com/krunalhinguu/shepherd v1.31.0-rancher4/go.mod h1:VBJMqF5Ygcd/NgJC/uoc/8Ie4qwlcLkBENfw9Psb7PY=
 github.com/krunalhinguu/steve v1.31.0-rancher1 h1:pKeAO0UjFQ0gdzToZXFG8+ClID0q5w5yVMJgOJdomz8=
 github.com/krunalhinguu/steve v1.31.0-rancher1/go.mod h1:5ZqpkMqJbPNc2ZBBI3iQF2iCMCvoKTj51w/eD2zYKqI=
 github.com/krunalhinguu/wrangler/v3 v3.31.0-rancher1 h1:HvpVdNC4a9tR+5lieP5JNp/NRXF6yAzABdmFjn2JFTg=
@@ -1570,8 +1570,8 @@ sigs.k8s.io/aws-iam-authenticator v0.6.17 h1:YV/4D1XRzstuKTK2f3XD2nPA9rIKyi3YVdH
 sigs.k8s.io/aws-iam-authenticator v0.6.17/go.mod h1:CnvFyzR/xeLHmUY/BD0qW6q0wp6KIwXmFp4eTfrHdP8=
 sigs.k8s.io/cli-utils v0.37.2 h1:GOfKw5RV2HDQZDJlru5KkfLO1tbxqMoyn1IYUxqBpNg=
 sigs.k8s.io/cli-utils v0.37.2/go.mod h1:V+IZZr4UoGj7gMJXklWBg6t5xbdThFBcpj4MrZuCYco=
-sigs.k8s.io/cluster-api v1.8.1 h1:OA3w1CjCmXXXDL7aY3WDe+seL0mdFVJX1K5mZwqKbDE=
-sigs.k8s.io/cluster-api v1.8.1/go.mod h1:pXv5LqLxuIbhGIXykyNKiJh+KrLweSBajVHHitPLyoY=
+sigs.k8s.io/cluster-api v1.8.3 h1:N6i25rF5QMadwVg2UPfuO6CzmNXjqnF2r1MAO+kcsro=
+sigs.k8s.io/cluster-api v1.8.3/go.mod h1:pXv5LqLxuIbhGIXykyNKiJh+KrLweSBajVHHitPLyoY=
 sigs.k8s.io/controller-runtime v0.19.0 h1:nWVM7aq+Il2ABxwiCizrVDSlmDcshi9llbaFbC0ji/Q=
 sigs.k8s.io/controller-runtime v0.19.0/go.mod h1:iRmWllt8IlaLjvTTDLhRBXIEtkCK6hwVBJJsYS9Ajf4=
 sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=
