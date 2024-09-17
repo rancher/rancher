@@ -3,13 +3,13 @@ package globalroles
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
 	genv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

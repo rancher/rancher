@@ -4,15 +4,14 @@ import (
 	"testing"
 	"time"
 
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-
-	"github.com/golang/mock/gomock"
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	fleetv1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
