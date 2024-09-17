@@ -10,6 +10,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	authv1 "k8s.io/api/authorization/v1"
@@ -26,16 +27,18 @@ const ThirtyDays = 30*24*60*60*100 // 30 days in milliseconds.
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 type TokenStore struct {
-	secretClient v1.SecretClient
-	secretCache  v1.SecretCache
-	sar          authzv1.SubjectAccessReviewInterface
+	secretClient        v1.SecretClient
+	secretCache         v1.SecretCache
+	sar                 authzv1.SubjectAccessReviewInterface
+	userAttributeLister v3.UserAttributeLister
 }
 
-func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar authzv1.SubjectAccessReviewInterface) types.Store[*Token, *TokenList] {
+func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar authzv1.SubjectAccessReviewInterface, uaLister v3.UserAttributeLister) types.Store[*Token, *TokenList] {
 	tokenStore := TokenStore{
-		secretClient: secretClient,
-		secretCache:  secretCache,
-		sar:          sar,
+		secretClient:        secretClient,
+		secretCache:         secretCache,
+		sar:                 sar,
+		userAttributeLister: uaLister,
 	}
 	return &tokenStore
 }
@@ -44,22 +47,64 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	if _, err := t.checkAdmin("create", token, userInfo); err != nil {
 		return nil, err
 	}
-	// reject user-provided token values
+	// reject user-provided token value, or hash
 	if token.Status.TokenValue != "" {
 		return nil, fmt.Errorf("User provided token value is not permitted")
+	}
+	if token.Status.TokenHash != "" {
+		return nil, fmt.Errorf("User provided token hash is not permitted")
 	}
 
 	tokenValue, err := randomtoken.Generate()
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate token value: %w", err)
 	}
-	token.Status.TokenValue = tokenValue
 	hashedValue, err := hashers.GetHasher().CreateHash(tokenValue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to hash token value: %w", err)
 	}
+
+	token.Status.TokenValue = tokenValue
 	token.Status.TokenHash = hashedValue
 
+	// XXX TODO AK // Fill UserPrincipal
+	// XXX TODO AK // Fill ProviderInfo
+
+	// Get derived User information for the token.
+	//
+	// NOTE: The creation process is not given User- and GroupPrincipals.
+	// ..... They have to be retrieved from somewhere else in the system.
+	// ..... This is in contrast to Norman token which get this information
+	// ..... either as part of the Login process, or by copying the information
+	// ..... out of the base token the new one is derived from.
+	// ..... None of that is possible here.
+	//
+	// A User's AuthProvider and GroupPrincipal information is generally
+	// captured in their associated UserAttribute resource. This is what we
+	// retrieve and use here now to fill these fields of the token to be.
+
+	attribs, err := t.userAttributeLister.Get("", token.Spec.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve user attributes: %w", err)
+	}
+	if attribs != nil {
+		return nil, fmt.Errorf("failed to get user attributes: %w", err)
+	}
+
+	if len(attribs.ExtraByProvider) != 1 {
+		return nil, fmt.Errorf("bad user attributes: bogus ExtraByProvider, empty or ambigous")
+	}
+	// len == 1 => The single key in the map names the auth provider, and where to look in GPs.
+	var authProvider string
+	for ap, _ := range attribs.ExtraByProvider {
+		authProvider = ap
+		break
+	}
+
+	token.Status.AuthProvider = authProvider
+	token.Status.GroupPrincipals = attribs.GroupPrincipals[authProvider].Items
+
+	token.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 	secret, err := secretFromToken(token)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal secret for token: %w", err)
@@ -110,9 +155,10 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 		return nil, fmt.Errorf ("unable to change token %s: non-admin forbidden to extend time-to-live", token.Name)
 	}
 
-	// Keep status, never store the token value
+	// Keep status, never store the token value, refresh time
 	token.Status = currentToken.Status
 	token.Status.TokenValue = ""
+	token.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 
 	// Save changes to backing secret
 	secret, err := secretFromToken(token)
