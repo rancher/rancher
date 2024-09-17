@@ -72,7 +72,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	extTokenStore := exttokens.NewTokenStore(wContext.Core.Secret(),
 		wContext.Core.Secret().Cache(),
 		wContext.K8s.AuthorizationV1().SubjectAccessReviews(),
-		mgmtCtx.Management.UserAttributes("").Controller().Lister())
+		wContext.Mgmt.UserAttribute())
 
 	return &tokenAuthenticator{
 		ctx:                 ctx,

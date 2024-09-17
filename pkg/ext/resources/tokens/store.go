@@ -10,7 +10,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	authv1 "k8s.io/api/authorization/v1"
@@ -30,15 +30,18 @@ type TokenStore struct {
 	secretClient        v1.SecretClient
 	secretCache         v1.SecretCache
 	sar                 authzv1.SubjectAccessReviewInterface
-	userAttributeLister v3.UserAttributeLister
+	userAttributeClient v3.UserAttributeController
 }
 
-func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar authzv1.SubjectAccessReviewInterface, uaLister v3.UserAttributeLister) types.Store[*Token, *TokenList] {
+func NewTokenStore(secretClient v1.SecretClient,
+	secretCache v1.SecretCache,
+	sar authzv1.SubjectAccessReviewInterface,
+	uaClient v3.UserAttributeController) types.Store[*Token, *TokenList] {
 	tokenStore := TokenStore{
 		secretClient:        secretClient,
 		secretCache:         secretCache,
 		sar:                 sar,
-		userAttributeLister: uaLister,
+		userAttributeClient: uaClient,
 	}
 	return &tokenStore
 }
@@ -83,7 +86,7 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	// captured in their associated UserAttribute resource. This is what we
 	// retrieve and use here now to fill these fields of the token to be.
 
-	attribs, err := t.userAttributeLister.Get("", token.Spec.UserID)
+	attribs, err := t.userAttributeClient.Get(token.Spec.UserID, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user attributes: %w", err)
 	}

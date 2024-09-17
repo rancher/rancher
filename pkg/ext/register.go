@@ -22,7 +22,7 @@ func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 
 	tokenStore := tokens.NewTokenStore(wContext.Core.Secret(), wContext.Core.Secret().Cache(),
 		wContext.K8s.AuthorizationV1().SubjectAccessReviews(),
-		sc.Management.UserAttributes("").Controller().Lister())
+		wContext.Mgmt.UserAttribute())
 	tokenHandler := NewStoreDelegate(tokenStore, tokens.SchemeGroupVersion.WithKind(tokens.TokenAPIResource.Kind))
 	tokenWebService := tokenHandler.WebService(tokens.TokenName, tokens.TokenAPIResource.Namespaced)
 
