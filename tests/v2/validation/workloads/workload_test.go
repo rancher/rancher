@@ -5,7 +5,6 @@ package workloads
 import (
 	"testing"
 
-	"github.com/rancher/norman/types"
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/cronjob"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/daemonset"
@@ -58,10 +57,6 @@ func (w *WorkloadTestSuite) SetupSuite() {
 	require.NoError(w.T(), err, "Error getting cluster ID")
 
 	w.cluster, err = w.client.Management.Cluster.ByID(clusterID)
-	require.NoError(w.T(), err)
-
-	log.Info("Getting cluster names")
-	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
 	require.NoError(w.T(), err)
 }
 

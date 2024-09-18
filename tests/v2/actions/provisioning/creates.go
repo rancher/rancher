@@ -1063,6 +1063,11 @@ func DeleteRKE1CustomClusterNodes(client *rancher.Client, cluster *management.Cl
 	return nil
 }
 
-func SetUpdateConfig(b bool) {
-	updateConfig = b
+// DisableUpdateConfig is a function that disable cattle config update and clean updateConfig for true to don't affect next tests.
+func DisableUpdateConfig(client *rancher.Client) {
+	updateConfig = false
+	client.Session.RegisterCleanupFunc(func() error {
+		updateConfig = true
+		return nil
+	})
 }

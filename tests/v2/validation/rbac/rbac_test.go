@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -46,10 +45,6 @@ func (rb *RBTestSuite) SetupSuite() {
 	clusterID, err := clusters.GetClusterIDByName(rb.client, clusterName)
 	require.NoError(rb.T(), err, "Error getting cluster ID")
 	rb.cluster, err = rb.client.Management.Cluster.ByID(clusterID)
-	require.NoError(rb.T(), err)
-
-	log.Info("Getting cluster names")
-	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
 	require.NoError(rb.T(), err)
 }
 
