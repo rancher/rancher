@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
@@ -25,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -33,7 +32,6 @@ const (
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
 	projectNSEditVerb              = "*"
-	cleanupRBACDelaySeconds        = 5
 )
 
 var projectNSVerbToSuffix = map[string]string{
@@ -90,12 +88,8 @@ func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
-	if obj.Status.Phase == v1.NamespaceTerminating {
-		n.asyncCleanupRBAC(obj.Name)
-		return obj, nil
-	}
-	err := n.reconcileNamespaceProjectClusterRole(obj)
-	return obj, err
+	n.asyncCleanupRBAC(obj.Name)
+	return obj, nil
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
@@ -579,7 +573,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 	go func() {
 		backoff := wait.Backoff{
-			Duration: cleanupRBACDelaySeconds * time.Second,
+			Duration: 5 * time.Second,
 			Factor:   2.0,
 			Jitter:   0.1,
 			Steps:    10,
