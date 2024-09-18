@@ -18,7 +18,7 @@ type Factory interface {
 	ClusterDialer(clusterName string, retryOnError bool) (Dialer, error)
 	// ClusterDialHolder returns a ClusterDialer, wrapped inside a Kubernetes' transport struct
 	// used to allow caching of transports.
-	// Using a custom Dial in rest.Config will this cache to grow indefinitely.
+	// Using a custom Dial in rest.Config will cause this cache to grow indefinitely.
 	// see: https://github.com/kubernetes/kubernetes/issues/125818
 	ClusterDialHolder(clusterName string, retryOnError bool) (*transport.DialHolder, error)
 	DockerDialer(clusterName, machineName string) (Dialer, error)
