@@ -59,18 +59,14 @@ var (
 	er = &errorResponder{}
 )
 
-type urlGetter func() (url.URL, error)
-
-type authGetter func() (string, error)
-
-type transportGetter func() (http.RoundTripper, error)
-
-type tokenCreator func(context.Context, ClusterContextGetter, string, string) (string, error)
-
-type impersonatorAccountTokenGetter func(user.Info, ClusterContextGetter, string) (string, error)
-
-type errorResponder struct {
-}
+type (
+	urlGetter                      func() (url.URL, error)
+	transportGetter                func() (http.RoundTripper, error)
+	tokenCreator                   func(context.Context, ClusterContextGetter, string, string) (string, error)
+	impersonatorAccountTokenGetter func(user.Info, ClusterContextGetter, string) (string, error)
+	errorResponder                 struct {
+	}
+)
 
 func (e *errorResponder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
