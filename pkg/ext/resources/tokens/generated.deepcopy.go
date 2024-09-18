@@ -22,7 +22,6 @@ limitations under the License.
 package tokens
 
 import (
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -107,13 +106,6 @@ func (in *TokenSpec) DeepCopy() *TokenSpec {
 func (in *TokenStatus) DeepCopyInto(out *TokenStatus) {
 	*out = *in
 	in.UserPrincipal.DeepCopyInto(&out.UserPrincipal)
-	if in.GroupPrincipals != nil {
-		in, out := &in.GroupPrincipals, &out.GroupPrincipals
-		*out = make([]v3.Principal, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	if in.ProviderInfo != nil {
 		in, out := &in.ProviderInfo, &out.ProviderInfo
 		*out = make(map[string]string, len(*in))

@@ -326,7 +326,7 @@ func schema_pkg_ext_resources_tokens_TokenSpec(ref common.ReferenceCallback) com
 					},
 					"isDerived": {
 						SchemaProps: spec.SchemaProps{
-							Description: "??",
+							Description: "Indicates a token which was derived from some other token",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -391,20 +391,6 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"),
 						},
 					},
-					"groupsPrincipals": {
-						SchemaProps: spec.SchemaProps{
-							Description: "GroupPrincipals holds detailed group information",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"),
-									},
-								},
-							},
-						},
-					},
 					"providerInfo": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ProviderInfo provides provider-specific details",
@@ -430,7 +416,7 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"expired", "expiredAt", "authProvider", "userPrincipal", "groupsPrincipals", "providerInfo", "lastUpdateTime"},
+				Required: []string{"expired", "expiredAt", "authProvider", "userPrincipal", "providerInfo", "lastUpdateTime"},
 			},
 		},
 		Dependencies: []string{

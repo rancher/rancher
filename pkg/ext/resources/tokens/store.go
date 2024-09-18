@@ -75,16 +75,15 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 
 	// Get derived User information for the token.
 	//
-	// NOTE: The creation process is not given User- and GroupPrincipals.
-	// ..... They have to be retrieved from somewhere else in the system.
-	// ..... This is in contrast to Norman token which get this information
-	// ..... either as part of the Login process, or by copying the information
-	// ..... out of the base token the new one is derived from.
-	// ..... None of that is possible here.
+	// NOTE: The creation process is not given AuthProvider, User- and GroupPrincipals.
+	// ..... This information have to be retrieved from somewhere else in the system.
+	// ..... This is in contrast to the Norman tokens who get this information either
+	// ..... as part of the Login process, or by copying the information out of the
+	// ..... base token the new one is derived from. None of that is possible here.
 	//
-	// A User's AuthProvider and GroupPrincipal information is generally
-	// captured in their associated UserAttribute resource. This is what we
-	// retrieve and use here now to fill these fields of the token to be.
+	// A User's AuthProvider information is generally captured in their associated UserAttribute
+	// resource. This is what we retrieve and use here now to fill these fields of the token to
+	// be.
 
 	attribs, err := t.userAttributeClient.Get(token.Spec.UserID, metav1.GetOptions{})
 	if err != nil {
@@ -105,7 +104,6 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	}
 
 	token.Status.AuthProvider = authProvider
-	token.Status.GroupPrincipals = attribs.GroupPrincipals[authProvider].Items
 
 	token.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 	secret, err := secretFromToken(token)
@@ -420,10 +418,6 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 	// Encode the complex data into JSON foprmatting strings for storage in the secret.
 	// See also note below on why this derived information is stored.
 
-	gps, err := json.Marshal(token.Status.GroupPrincipals)
-	if err != nil {
-		return nil, err
-	}
 	up, err := json.Marshal(token.Status.UserPrincipal)
 	if err != nil {
 		return nil, err
@@ -472,7 +466,6 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 
 	secret.StringData["auth-provider"] = token.Status.AuthProvider
 	secret.StringData["user-principal"] = string(up)
-	secret.StringData["group-principals"] = string(gps)
 	secret.StringData["provider-info"] = string(pi)
 
 	return secret, nil
@@ -500,11 +493,6 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	// status
 	var up apiv3.Principal
 	err = json.Unmarshal(secret.Data["user-principals"], &up)
-	if err != nil {
-		return nil, err
-	}
-	var gps []apiv3.Principal
-	err = json.Unmarshal(secret.Data["group-principals"], &gps)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +525,6 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			TokenHash:       string(secret.Data["hashedToken"]),
 			AuthProvider:    string(secret.Data["auth-provider"]),
 			UserPrincipal:   up,
-			GroupPrincipals: gps,
 			ProviderInfo:    pi,
 			LastUpdateTime:  string(secret.Data["last-update-time"]),
 		},

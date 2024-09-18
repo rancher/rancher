@@ -128,8 +128,13 @@ type TokenStatus struct {
 	AuthProvider string `json:"authProvider"`
 	// UserPrincipal holds the detailed user data
 	UserPrincipal apiv3.Principal `json:"userPrincipal"`
+
 	// GroupPrincipals holds detailed group information
-	GroupPrincipals []apiv3.Principal `json:"groupsPrincipals"`
+	// This is not supported here.
+	// The primary location for this information are the UserAttribute resources.
+	// The norman Token maintains GPs only as legacy.
+	// The ext tokens here shed this legacy.
+
 	// ProviderInfo provides provider-specific details
 	ProviderInfo map[string]string `json:"providerInfo"`
 
@@ -174,7 +179,7 @@ func (t *Token) GetUserPrincipal() apiv3.Principal {
 }
 
 func (t *Token) GetGroupPrincipals() []apiv3.Principal {
-	return t.Status.GroupPrincipals
+	return nil
 }
 
 func (t *Token) GetProviderInfo() map[string]string {
