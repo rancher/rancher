@@ -367,7 +367,7 @@ func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 	}
 	clientset, err := clusteroperator.NewClientSetForConfig(restConfig, clusteroperator.WithDialHolder(clusterDialer))
 	if err != nil {
-		return nil, fmt.Errorf("error creating clientset for cluster %s: %v", cluster.Name, err)
+		return nil, fmt.Errorf("error creating clientset for cluster %s: %w", cluster.Name, err)
 	}
 
 	saToken, err := util.GenerateServiceAccountToken(clientset, cluster.Name)
@@ -454,7 +454,7 @@ func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 	}
 	clientset, err := clusteroperator.NewClientSetForConfig(restConfig, clusteroperator.WithDialHolder(publicDialer))
 	if err != nil {
-		return "", nil, fmt.Errorf("error creating clientset for cluster %s: %v", cluster.Name, err)
+		return "", nil, fmt.Errorf("error creating clientset for cluster %s: %w", cluster.Name, err)
 	}
 
 	requiresTunnel := new(bool)
