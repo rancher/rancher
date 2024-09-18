@@ -258,7 +258,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 func (r *Rancher) Start(ctx context.Context) error {
 	if features.PreBootstrap.Enabled() {
-		// bail early if we are pre-bootstrapping
+		logrus.Debugf("not starting mini-rancher due to pre-bootstrap...")
 		return nil
 	}
 

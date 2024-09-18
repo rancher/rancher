@@ -25,9 +25,8 @@ import (
 )
 
 var (
-	templateFuncMap      = sprig.TxtFuncMap()
-	t                    = template.Must(template.New("import").Funcs(templateFuncMap).Parse(templateSource))
-	preBootstrapTemplate = template.Must(template.New("import").Funcs(templateFuncMap).Parse(preBootstrapTemplateSource))
+	templateFuncMap = sprig.TxtFuncMap()
+	t               = template.Must(template.New("import").Funcs(templateFuncMap).Parse(templateSource))
 )
 
 type context struct {
@@ -42,6 +41,7 @@ type context struct {
 	Namespace             string
 	URLPlain              string
 	IsWindowsCluster      bool
+	IsPreBootstrap        bool
 	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
@@ -156,6 +156,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
 		IsWindowsCluster:      isWindowsCluster,
+		IsPreBootstrap:        isPreBootstrap,
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
@@ -165,11 +166,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		ClusterRegistry:       registryURL,
 	}
 
-	if isPreBootstrap {
-		return preBootstrapTemplate.Execute(resp, context)
-	} else {
-		return t.Execute(resp, context)
-	}
+	return t.Execute(resp, context)
 }
 
 func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
@@ -181,7 +178,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.ProvisioningV2.Name():     false,
 		features.EmbeddedClusterAPI.Name(): false,
 		features.UISQLCache.Name():         features.UISQLCache.Enabled(),
-		features.PreBootstrap.Name():       !apimgmtv3.ClusterConditionBootstrapped.IsTrue(cluster),
+		features.PreBootstrap.Name():       !apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(cluster),
 	}
 }
 
@@ -191,7 +188,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(),
 		cluster.Spec.WindowsPreferedCluster,
-		!apimgmtv3.ClusterConditionBootstrapped.IsTrue(cluster),
+		!apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(cluster),
 		cluster, GetDesiredFeatures(cluster), taints, secretLister)
 	return buf.Bytes(), err
 }

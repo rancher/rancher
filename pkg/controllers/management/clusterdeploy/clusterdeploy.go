@@ -446,7 +446,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url,
-		cluster.Spec.WindowsPreferedCluster, !apimgmtv3.ClusterConditionBootstrapped.IsTrue(cluster),
+		cluster.Spec.WindowsPreferedCluster, !apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(cluster),
 		cluster, features, taints, cd.secretLister)
 
 	return buf.Bytes(), err

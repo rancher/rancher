@@ -3,7 +3,6 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"path"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -37,12 +36,12 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 	}
 	result = append(result, clusterAgent)
 
-	mgmtCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
+	preBootstrap, err := p.retrievalFunctions.PreBootstrapCluster(controlPlane)
 	if err != nil {
 		return nil, err
 	}
 	// if we're bootstrapping - just return the cluster-agent manifest
-	if !v3.ClusterConditionBootstrapped.IsTrue(mgmtCluster) {
+	if preBootstrap {
 		return result, nil
 	}
 

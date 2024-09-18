@@ -135,6 +135,7 @@ type InfoFunctions struct {
 	ReleaseData             func(context.Context, *rkev1.RKEControlPlane) *model.Release
 	SystemAgentImage        func() string
 	SystemPodLabelSelectors func(plane *rkev1.RKEControlPlane) []string
+	PreBootstrapCluster     func(plane *rkev1.RKEControlPlane) (bool, error)
 }
 
 func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
@@ -868,7 +869,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		return err
 	}
 
-	mgmCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
+	preBootstrap, err := p.retrievalFunctions.PreBootstrapCluster(controlPlane)
 	if err != nil {
 		return err
 	}
@@ -966,8 +967,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, r.entry.Machine) {
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
 			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for kubelet to update")
-		} else if isControlPlane(r.entry) && !controlPlane.Status.AgentConnected && !v3.ClusterConditionBootstrapped.IsTrue(mgmCluster) {
-			// basically the same logic as below - just changing the message.
+		} else if isControlPlane(r.entry) && preBootstrap {
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
 			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for cluster pre-bootstrap to complete")
 		} else if isControlPlane(r.entry) && !controlPlane.Status.AgentConnected {
@@ -1054,13 +1054,15 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		return nodePlan, config, joinedServer, err
 	}
 
-	mgmtCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
+	preBootstrap, err := p.retrievalFunctions.PreBootstrapCluster(controlPlane)
 	if err != nil {
+		logrus.Debugf("error getting pre-bootstrap cluster data: %v", err)
 		return nodePlan, config, joinedServer, err
 	}
-	if !v3.ClusterConditionBootstrapped.IsTrue(mgmtCluster) {
-		// returning no matter what - even if err because we should end here and don't want the rest of the manifests to get added to the plan if this condition is not set.
-		return nodePlan, config, joinedServer, err
+
+	if preBootstrap {
+		// exit early as adding remaining manifests before bootstrapping may cause thrashing or operational failures
+		return nodePlan, config, joinedServer, nil
 	}
 
 	nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry)

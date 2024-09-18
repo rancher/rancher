@@ -221,8 +221,8 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 
 	// pre-bootstrap the cluster if it's not already bootstrapped
-	apimgmtv3.ClusterConditionBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
-	if !apimgmtv3.ClusterConditionBootstrapped.IsTrue(rec.clusterRec) {
+	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
+	if !apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(rec.clusterRec) {
 		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
 		if err != nil {
 			transaction.Rollback()

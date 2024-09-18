@@ -58,20 +58,20 @@ type Controller struct {
 	clusterName               string
 }
 
-type DirectSyncController struct {
+type ResourceSyncController struct {
 	upstreamSecrets   v1.SecretInterface
 	downstreamSecrets v1.SecretInterface
 	clusterName       string
 }
 
 func Bootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) error {
-	dsc := &DirectSyncController{
-		upstreamSecrets:   mgmt.Core.Secrets("fleet-default"),
+	c := &ResourceSyncController{
+		upstreamSecrets:   mgmt.Core.Secrets(clusterRec.Spec.FleetWorkspaceName),
 		downstreamSecrets: cluster.Core.Secrets(""),
 		clusterName:       clusterRec.Spec.DisplayName,
 	}
 
-	return dsc.bootstrap(mgmt.Management.Clusters(""), clusterRec)
+	return c.bootstrap(mgmt.Management.Clusters(""), clusterRec)
 }
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) {
@@ -101,55 +101,55 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		return obj, nil
 	})
 
-	directSyncController := &DirectSyncController{
+	resourceSyncController := &ResourceSyncController{
 		upstreamSecrets:   mgmt.Core.Secrets("fleet-default"),
 		downstreamSecrets: cluster.Core.Secrets(""),
 		clusterName:       clusterRec.Spec.DisplayName,
 	}
 
-	directSyncController.upstreamSecrets.AddHandler(ctx, "secret-direct-synced", directSyncController.sync)
+	resourceSyncController.upstreamSecrets.AddHandler(ctx, "secret-resource-synced", resourceSyncController.sync)
 }
 
-func (dsc *DirectSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface, mgmtCluster *apimgmtv3.Cluster) error {
-	secrets, err := dsc.upstreamSecrets.List(metav1.ListOptions{})
+func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface, mgmtCluster *apimgmtv3.Cluster) error {
+	secrets, err := c.upstreamSecrets.List(metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list secrets in fleet-default namespace: %v", err)
+		return fmt.Errorf("failed to list secrets in fleet-default namespace: %w", err)
 	}
 
-	logrus.Debugf("[pre-bootstrap][secrets] looking for secrets-to synchronize to cluster %v", dsc.clusterName)
+	logrus.Debugf("[pre-bootstrap][secrets] looking for secrets-to synchronize to cluster %v", c.clusterName)
 
 	for _, sec := range secrets.Items {
-		if !dsc.bootstrapSyncable(&sec) {
+		if !c.bootstrapSyncable(&sec) {
 			continue
 		}
 
-		logrus.Debugf("[pre-bootstrap-sync][secrets] syncing secret %v/%v to cluster %v", sec.Namespace, sec.Name, dsc.clusterName)
+		logrus.Debugf("[pre-bootstrap-sync][secrets] syncing secret %v/%v to cluster %v", sec.Namespace, sec.Name, c.clusterName)
 
-		_, err := dsc.sync("", &sec)
+		_, err = c.sync("", &sec)
 		if err != nil {
-			return fmt.Errorf("[pre-bootstrap][secret] failed to synchronize secret %v/%v to cluster %v: %w", sec.Namespace, sec.Name, dsc.clusterName, err)
+			return fmt.Errorf("[pre-bootstrap][secret] failed to synchronize secret %v/%v to cluster %v: %w", sec.Namespace, sec.Name, c.clusterName, err)
 		}
 
-		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", sec.Namespace, sec.Name, dsc.clusterName)
+		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", sec.Namespace, sec.Name, c.clusterName)
 	}
 
-	apimgmtv3.ClusterConditionBootstrapped.True(mgmtCluster)
+	apimgmtv3.ClusterConditionPreBootstrapped.True(mgmtCluster)
 	_, err = mgmtClusterClient.Update(mgmtCluster)
 	if err != nil {
-		return fmt.Errorf("failed to update cluster bootstrap condition for %v: %v", dsc.clusterName, err)
+		return fmt.Errorf("failed to update cluster bootstrap condition for %v: %w", c.clusterName, err)
 	}
 
 	return nil
 }
 
-func (dsc *DirectSyncController) syncable(obj *corev1.Secret) bool {
+func (c *ResourceSyncController) syncable(obj *corev1.Secret) bool {
 	// no sync annotations, we don't care about this secret
 	if obj.Annotations[syncAnnotation] == "" && obj.Annotations[syncPreBootstrapAnnotation] == "" {
 		return false
 	}
 
 	// if secret is authorized to be synchronized to the cluster
-	if !slices.Contains(strings.Split(obj.Annotations[capr.AuthorizedObjectAnnotation], ","), dsc.clusterName) {
+	if !slices.Contains(strings.Split(obj.Annotations[capr.AuthorizedObjectAnnotation], ","), c.clusterName) {
 		return false
 	}
 
@@ -161,17 +161,17 @@ func (dsc *DirectSyncController) syncable(obj *corev1.Secret) bool {
 	return true
 }
 
-func (dsc *DirectSyncController) bootstrapSyncable(obj *corev1.Secret) bool {
+func (c *ResourceSyncController) bootstrapSyncable(obj *corev1.Secret) bool {
 	// only difference between sync and bootstrapSync is requiring the boostrap sync annotation to be set to "true"
-	return dsc.syncable(obj) && obj.Annotations[syncPreBootstrapAnnotation] == "true"
+	return c.syncable(obj) && obj.Annotations[syncPreBootstrapAnnotation] == "true"
 }
 
-func (dsc *DirectSyncController) sync(key string, obj *corev1.Secret) (runtime.Object, error) {
+func (c *ResourceSyncController) sync(key string, obj *corev1.Secret) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
-	if !dsc.syncable(obj) {
+	if !c.syncable(obj) {
 		return obj, nil
 	}
 
@@ -184,48 +184,40 @@ func (dsc *DirectSyncController) sync(key string, obj *corev1.Secret) (runtime.O
 		ns = obj.Namespace
 	}
 
-	logrus.Debugf("[direct-sync][secret] synchronizing %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, dsc.clusterName)
+	logrus.Debugf("[resource-sync][secret] synchronizing %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, c.clusterName)
 
-	op := "update"
-	// fetching every time due to the fact that we don't have a downstream cache in the upstream cluster anymore
-	targetSecret, err := dsc.downstreamSecrets.GetNamespaced(ns, name, metav1.GetOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			logrus.Debugf("[direct-sync][secret] secret %v/%v not found for for cluster %v, creating", ns, name, dsc.clusterName)
-			op = "create"
-		} else {
-			return nil, fmt.Errorf("failed to get downstream secret %v/%v in cluster %v: %v", ns, name, dsc.clusterName, err)
-		}
+	var targetSecret *corev1.Secret
+	var err error
+	if targetSecret, err = c.downstreamSecrets.GetNamespaced(ns, name, metav1.GetOptions{}); err != nil && !errors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get downstream secret %v/%v in cluster %v: %w", ns, name, c.clusterName, err)
 	}
 
-	if targetSecret != nil && reflect.DeepEqual(targetSecret.Data, obj.Data) {
-		logrus.Debugf("[direct-sync][secret] skipping downstream update - contents are the same")
-		return obj, nil
-	}
+	if targetSecret == nil || errors.IsNotFound(err) {
+		logrus.Debugf("[resource-sync][secret] creating secret %v/%v in cluster %v", ns, name, c.clusterName)
 
-	if op == "create" {
-		logrus.Debugf("[direct-sync][secret] creating secret %v/%v in cluster %v", ns, name, dsc.clusterName)
-
-		targetSecret, err = dsc.downstreamSecrets.Create(
+		_, err = c.downstreamSecrets.Create(
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
 				Data:       obj.Data,
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create secret %v/%v in cluster %v: %v", ns, name, dsc.clusterName, err)
+			return nil, fmt.Errorf("failed to create secret %v/%v in cluster %v: %w", ns, name, c.clusterName, err)
 		}
-	} else {
-		logrus.Debugf("[direct-sync][secret] updating secret %v/%v in cluster %v", ns, name, dsc.clusterName)
+	} else if !reflect.DeepEqual(targetSecret.Data, obj.Data) {
+		logrus.Debugf("[resource-sync][secret] updating secret %v/%v in cluster %v", ns, name, c.clusterName)
 
 		targetSecret.Data = obj.Data
-		_, err = dsc.downstreamSecrets.Update(targetSecret)
+		_, err = c.downstreamSecrets.Update(targetSecret)
 		if err != nil {
-			return nil, fmt.Errorf("failed to update secret %v/%v in cluster %v: %v", ns, name, dsc.clusterName, err)
+			return nil, fmt.Errorf("failed to update secret %v/%v in cluster %v: %w", ns, name, c.clusterName, err)
 		}
+	} else {
+		logrus.Debugf("[resource-sync][secret] skipping downstream update - contents are the same")
+		return obj, nil
 	}
 
-	logrus.Debugf("[direct-sync][secret] successfully synchronized secret %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, dsc.clusterName)
+	logrus.Debugf("[resource-sync][secret] successfully synchronized secret %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, c.clusterName)
 
 	obj.Annotations[syncedAtAnnotation] = time.Now().Format(time.RFC3339)
 	return obj, nil

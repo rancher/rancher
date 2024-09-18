@@ -104,7 +104,7 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	}
 
 	// wait to update the connected condition until it is bootstrapped
-	if v3.ClusterConditionBootstrapped.IsUnknown(cluster) || v3.ClusterConditionBootstrapped.IsFalse(cluster) {
+	if !v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
 		// overriding it to be disconnected until bootstrapping is done
 		return c.updateClusterConnectedCondition(cluster, false)
 	}

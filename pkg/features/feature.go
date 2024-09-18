@@ -134,10 +134,10 @@ var (
 		true)
 	PreBootstrap = newFeature(
 		"prebootstrap",
-		"Run the Bootstrap-Sync controllers only",
+		"Support running pre-bootstrap workloads on downstream clusters",
 		false,
-		false,
-		false)
+		true,
+		true)
 )
 
 type Feature struct {
