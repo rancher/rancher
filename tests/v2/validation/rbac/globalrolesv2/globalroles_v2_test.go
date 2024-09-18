@@ -34,7 +34,6 @@ type GlobalRolesV2TestSuite struct {
 }
 
 func (gr *GlobalRolesV2TestSuite) TearDownSuite() {
-	provisioning.SetUpdateConfig(true)
 	gr.session.Cleanup()
 }
 
