@@ -7,11 +7,11 @@ import (
 
 	coreFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 
-	"github.com/golang/mock/gomock"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
