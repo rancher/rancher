@@ -1,38 +1,17 @@
-// mocks created with the following commands
-//
-// mockgen --build_flags=--mod=mod -package cavalidator -destination ./v3mgmntMocks_test.go github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3 ClusterInterface,ClusterLister
-// mockgen --build_flags=--mod=mod -package cavalidator -destination ./v1coreMocks_test.go github.com/rancher/rancher/pkg/generated/norman/core/v1 SecretController
-
 package cavalidator
 
 import (
-	"github.com/golang/mock/gomock"
+	"testing"
+
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
-
-type testMocks struct {
-	t                 *testing.T
-	mockCluster       *MockClusterInterface
-	mockClusterLister *MockClusterLister
-	mockSecret        *MockSecretController
-}
-
-func newMocks(t *testing.T) *testMocks {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	return &testMocks{
-		t:                 t,
-		mockCluster:       NewMockClusterInterface(ctrl),
-		mockClusterLister: NewMockClusterLister(ctrl),
-		mockSecret:        NewMockSecretController(ctrl),
-	}
-}
 
 func TestCAValidator_clusterConditionManipulation(t *testing.T) {
 	type args struct {
@@ -133,22 +112,16 @@ func TestCAValidator_clusterConditionManipulation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mocks := newMocks(t)
-			cav := &CertificateAuthorityValidator{
-				clusterName:   tt.args.cluster.Name,
-				clusterLister: mocks.mockClusterLister,
-				clusters:      mocks.mockCluster,
-				secrets:       mocks.mockSecret,
-			}
-
-			a := assert.New(t)
-
+			mockClusterLister := &fakes.ClusterListerMock{}
 			if tt.args.secret != nil && tt.args.secret.Name == "stv-aggregation" && tt.args.secret.Namespace == namespace.System {
-				mocks.mockClusterLister.EXPECT().Get("", tt.args.cluster.Name).Return(tt.args.cluster, nil)
+				mockClusterLister.GetFunc = func(namespace, name string) (*mgmtv3.Cluster, error) {
+					return tt.args.cluster, nil
+				}
 			}
 
+			mockCluster := &fakes.ClusterInterfaceMock{}
 			if tt.args.conditionSet {
-				mocks.mockCluster.EXPECT().Update(gomock.Any()).DoAndReturn(func(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+				mockCluster.UpdateFunc = func(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 					if tt.args.conditionSet {
 						require.Len(t, cluster.Status.Conditions, 1)
 						require.Equal(t, string(CertificateAuthorityValid), string(cluster.Status.Conditions[0].Type), "incorrect condition set")
@@ -157,8 +130,17 @@ func TestCAValidator_clusterConditionManipulation(t *testing.T) {
 						require.Len(t, cluster.Status.Conditions, 0)
 					}
 					return cluster, nil
-				})
+
+				}
 			}
+
+			cav := &CertificateAuthorityValidator{
+				clusterName:   tt.args.cluster.Name,
+				clusterLister: mockClusterLister,
+				clusters:      mockCluster,
+			}
+
+			a := assert.New(t)
 
 			_, err := cav.onStvAggregationSecret(tt.args.secret.Name, tt.args.secret)
 			a.NoError(err)

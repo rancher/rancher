@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/rancher/rancher/pkg/auth/requests/mocks"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )

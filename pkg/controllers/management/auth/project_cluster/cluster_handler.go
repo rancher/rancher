@@ -3,6 +3,7 @@ package project_cluster
 import (
 	"errors"
 	"reflect"
+	"strings"
 
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8scorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -46,10 +48,11 @@ var (
 )
 
 type clusterLifecycle struct {
-	mgr                *config.ManagementContext
 	clusterClient      v3.ClusterInterface
 	crtbLister         v3.ClusterRoleTemplateBindingLister
+	crtbClient         v3.ClusterRoleTemplateBindingInterface
 	nsLister           corev1.NamespaceLister
+	nsClient           k8scorev1.NamespaceInterface
 	projects           wranglerv3.ProjectClient
 	projectLister      v3.ProjectLister
 	rbLister           rbacv1.RoleBindingLister
@@ -60,10 +63,11 @@ type clusterLifecycle struct {
 // NewClusterLifecycle creates and returns a clusterLifecycle from a given ManagementContext
 func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle {
 	return &clusterLifecycle{
-		mgr:                management,
 		clusterClient:      management.Management.Clusters(""),
 		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		crtbClient:         management.Management.ClusterRoleTemplateBindings(""),
 		nsLister:           management.Core.Namespaces("").Controller().Lister(),
+		nsClient:           management.K8sClient.CoreV1().Namespaces(),
 		projects:           management.Wrangler.Mgmt.Project(),
 		projectLister:      management.Management.Projects("").Controller().Lister(),
 		rbLister:           management.RBAC.RoleBindings("").Controller().Lister(),
@@ -80,7 +84,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, l.nsLister, l.mgr.K8sClient.CoreV1().Namespaces())
+	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +105,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating cluster %v", ClusterCreateController, orig.Name)
+		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
 		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
@@ -115,7 +119,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating cluster %v", ClusterCreateController, orig.Name)
+		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
 		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
@@ -153,7 +157,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	}
 	returnErr = errors.Join(
 		l.deleteSystemProject(obj, ClusterRemoveController),
-		deleteNamespace(obj, ClusterRemoveController, l.mgr.K8sClient.CoreV1().Namespaces()),
+		deleteNamespace(obj, ClusterRemoveController, l.nsClient),
 	)
 	return obj, returnErr
 }
@@ -172,23 +176,30 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		if err != nil {
 			return obj, fmt.Errorf("error accessing project object %v: %w", obj, err)
 		}
+
+		clusterName := metaAccessor.GetName()
+
 		// Attempt to use the cache first
-		projects, err := l.projectLister.List(metaAccessor.GetName(), labels.AsSelector())
+		projects, err := l.projectLister.List(clusterName, labels.AsSelector())
 		if err != nil || len(projects) > 0 {
 			return obj, err
 		}
 
 		// Cache failed, try the API
-		projects2, err := l.projects.List(metaAccessor.GetName(), metav1.ListOptions{LabelSelector: labels.String()})
+		projects2, err := l.projects.List(clusterName, metav1.ListOptions{LabelSelector: labels.String()})
 		if err != nil || len(projects2.Items) > 0 {
 			return obj, err
 		}
 
-		annotation := map[string]string{}
+		clusterAnnotations := metaAccessor.GetAnnotations()
+		annotations := map[string]string{}
 
-		creatorID := metaAccessor.GetAnnotations()[CreatorIDAnnotation]
-		if creatorID != "" {
-			annotation[CreatorIDAnnotation] = creatorID
+		if creatorID := clusterAnnotations[CreatorIDAnnotation]; creatorID != "" {
+			annotations[CreatorIDAnnotation] = creatorID
+		}
+
+		if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
+			annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
 		}
 
 		if name == project.System {
@@ -196,31 +207,33 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 			if err != nil {
 				return obj, err
 			}
-			annotation[project.SystemImageVersionAnnotation] = latestSystemVersion
+			annotations[project.SystemImageVersionAnnotation] = latestSystemVersion
 		}
 
 		project := &apisv3.Project{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "p-",
-				Annotations:  annotation,
+				Annotations:  annotations,
 				Labels:       labels,
+				Namespace:    clusterName,
 			},
 			Spec: apisv3.ProjectSpec{
 				DisplayName: name,
-				Description: fmt.Sprintf("%s project created for the cluster", name),
-				ClusterName: metaAccessor.GetName(),
+				Description: name + " project created for the cluster",
+				ClusterName: clusterName,
 			},
 		}
 		updated, err := l.addRTAnnotation(project, "project")
 		if err != nil {
 			return obj, err
 		}
+
 		project = updated.(*apisv3.Project)
-		logrus.Infof("[%v] Creating %s project for cluster %v", ClusterCreateController, name, metaAccessor.GetName())
-		if _, err = l.mgr.Management.Projects(metaAccessor.GetName()).Create(project); err != nil {
-			return obj, err
-		}
-		return obj, nil
+
+		logrus.Infof("[%s] Creating %s project for cluster %s", ClusterCreateController, name, clusterName)
+		_, err = l.projects.Create(project)
+
+		return obj, err
 	})
 }
 
@@ -319,66 +332,69 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 
 func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
-		metaAccessor, err := meta.Accessor(obj)
-		if err != nil {
-			return obj, fmt.Errorf("error accessing cluster object %v: %w", obj, err)
+		cluster, ok := obj.(*apisv3.Cluster)
+		if !ok {
+			return obj, fmt.Errorf("expected cluster, got %T", obj)
 		}
 
-		typeAccessor, err := meta.TypeAccessor(obj)
-		if err != nil {
-			return obj, err
-		}
-
-		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnnotation]
-		if !ok || creatorID == "" {
-			logrus.Warnf("[%v] %v %v has no creatorId annotation. Cannot add creator as owner", ClusterCreateController, typeAccessor.GetKind(), metaAccessor.GetName())
+		creatorID := cluster.Annotations[CreatorIDAnnotation]
+		if creatorID == "" {
+			logrus.Warnf("[%s] cluster %s has no creatorId annotation. Cannot add creator as owner", ClusterCreateController, cluster.Name)
 			return obj, nil
 		}
-		cluster := obj.(*apisv3.Cluster)
 
 		if apisv3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 			// The clusterRoleBindings are already completed, no need to check
 			return obj, nil
 		}
 
-		roleJSON := cluster.Annotations[roleTemplatesRequiredAnnotation]
-		if roleJSON == "" {
+		creatorRoleBindings := cluster.Annotations[roleTemplatesRequiredAnnotation]
+		if creatorRoleBindings == "" {
 			return cluster, nil
 		}
 
 		roleMap := make(map[string][]string)
-		err = json.Unmarshal([]byte(roleJSON), &roleMap)
+		err := json.Unmarshal([]byte(creatorRoleBindings), &roleMap)
 		if err != nil {
 			return obj, err
 		}
 
 		var createdRoles []string
-
 		for _, role := range roleMap["required"] {
 			rtbName := "creator-" + role
 
-			if rtb, _ := l.crtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
+			if rtb, _ := l.crtbLister.Get(cluster.Name, rtbName); rtb != nil {
 				createdRoles = append(createdRoles, role)
 				// This clusterRoleBinding exists, need to check all of them so keep going
 				continue
 			}
 
 			// The clusterRoleBinding doesn't exist yet so create it
-			om := metav1.ObjectMeta{
-				Name:      rtbName,
-				Namespace: metaAccessor.GetName(),
-			}
-			om.Annotations = crtbCreatorOwnerAnnotations
-
-			logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", ClusterCreateController, creatorID, metaAccessor.GetName())
-			if _, err := l.mgr.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ClusterRoleTemplateBinding{
-				ObjectMeta:       om,
-				ClusterName:      metaAccessor.GetName(),
+			crtb := &apisv3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        rtbName,
+					Namespace:   cluster.Name,
+					Annotations: crtbCreatorOwnerAnnotations,
+				},
+				ClusterName:      cluster.Name,
 				RoleTemplateName: role,
 				UserName:         creatorID,
-			}); err != nil && !apierrors.IsAlreadyExists(err) {
+			}
+
+			if principalName := cluster.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
+				if !strings.HasPrefix(principalName, "local") {
+					// Setting UserPrincipalName only makes sense for non-local users.
+					crtb.UserPrincipalName = principalName
+					crtb.UserName = ""
+				}
+			}
+
+			logrus.Infof("[%s] Creating creator clusterRoleTemplateBinding for user %s for cluster %s", ClusterCreateController, creatorID, cluster.Name)
+			_, err := l.crtbClient.Create(crtb)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return obj, err
 			}
+
 			createdRoles = append(createdRoles, role)
 		}
 
@@ -391,15 +407,13 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 		updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
 
 		err = l.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
-		if err != nil {
-			return obj, err
-		}
-		return obj, nil
+
+		return obj, err
 	})
 }
 
 func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, annotation string, updateCondition bool) error {
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		c, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -410,20 +424,16 @@ func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.C
 		if updateCondition {
 			apisv3.ClusterConditionInitialRolesPopulated.True(c)
 		}
+
 		_, err = l.clusterClient.Update(c)
 		if err != nil {
 			return err
 		}
 		// Only log if we successfully updated the cluster
 		if updateCondition {
-			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ClusterCreateController, cluster.Name)
+			logrus.Infof("[%s] Setting InitialRolesPopulated condition on cluster %s", ClusterCreateController, cluster.Name)
 		}
+
 		return nil
 	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

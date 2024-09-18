@@ -16,10 +16,10 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8scorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -30,12 +30,13 @@ const (
 )
 
 type projectLifecycle struct {
-	mgr                  *config.ManagementContext
 	crtbClient           v3.ClusterRoleTemplateBindingInterface
 	crtbLister           v3.ClusterRoleTemplateBindingLister
 	nsLister             corev1.NamespaceLister
+	nsClient             k8scorev1.NamespaceInterface
 	projects             v3.ProjectInterface
 	prtbLister           v3.ProjectRoleTemplateBindingLister
+	prtbClient           v3.ProjectRoleTemplateBindingInterface
 	rbLister             rbacv1.RoleBindingLister
 	roleBindings         rbacv1.RoleBindingInterface
 	systemAccountManager *systemaccount.Manager
@@ -44,12 +45,13 @@ type projectLifecycle struct {
 // NewProjectLifecycle creates and returns a projectLifecycle from a given ManagementContext
 func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle {
 	return &projectLifecycle{
-		mgr:                  management,
 		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
 		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		nsLister:             management.Core.Namespaces("").Controller().Lister(),
+		nsClient:             management.K8sClient.CoreV1().Namespaces(),
 		projects:             management.Management.Projects(""),
 		prtbLister:           management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		prtbClient:           management.Management.ProjectRoleTemplateBindings(""),
 		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
 		roleBindings:         management.RBAC.RoleBindings(""),
 		systemAccountManager: systemaccount.NewManager(management),
@@ -66,7 +68,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 			projectID = splits[1]
 		}
 		// remove the system account created for this project
-		logrus.Debugf("Deleting system user for project %v", projectID)
+		logrus.Debugf("Deleting system user for project %s", projectID)
 		if err := l.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
 			return nil, err
 		}
@@ -75,7 +77,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.mgr.K8sClient.CoreV1().Namespaces())
+	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +89,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating project %v", ProjectCreateController, orig.Name)
+		logrus.Infof("[%s] Updating project %s", ProjectCreateController, orig.Name)
 		obj, err = l.projects.ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
@@ -139,29 +141,25 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
-	err = deleteNamespace(obj, ProjectRemoveController, l.mgr.K8sClient.CoreV1().Namespaces())
+
+	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
 	returnErr = errors.Join(returnErr, err)
+
 	return obj, returnErr
 }
 
 func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
-		metaAccessor, err := meta.Accessor(obj)
-		if err != nil {
-			return obj, fmt.Errorf("error accessing project object %v: %w", obj, err)
+		project, ok := obj.(*apisv3.Project)
+		if !ok {
+			return obj, fmt.Errorf("expected project, got %T", obj)
 		}
 
-		typeAccessor, err := meta.TypeAccessor(obj)
-		if err != nil {
-			return obj, err
-		}
-
-		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnnotation]
-		if !ok || creatorID == "" {
-			logrus.Warnf("[%v] %v %v has no creatorId annotation. Cannot add creator as owner", ProjectCreateController, typeAccessor.GetKind(), metaAccessor.GetName())
+		creatorID := project.Annotations[CreatorIDAnnotation]
+		if creatorID == "" {
+			logrus.Warnf("[%s] project %s has no creatorId annotation. Cannot add creator as owner", ProjectCreateController, project.Name)
 			return obj, nil
 		}
-		project := obj.(*apisv3.Project)
 
 		if apisv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 			// The projectRoleBindings are already completed, no need to check
@@ -171,43 +169,50 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 		// If the project does not have the annotation it indicates the
 		// project is from a previous rancher version so don't add the
 		// default bindings.
-		bindingAnnotation := project.Annotations[roleTemplatesRequiredAnnotation]
-		if bindingAnnotation == "" {
+		creatorRoleBindings := project.Annotations[roleTemplatesRequiredAnnotation]
+		if creatorRoleBindings == "" {
 			return project, nil
 		}
 
 		roleMap := make(map[string][]string)
-		err = json.Unmarshal([]byte(bindingAnnotation), &roleMap)
-		if err != nil {
+		if err := json.Unmarshal([]byte(creatorRoleBindings), &roleMap); err != nil {
 			return obj, err
 		}
 
 		var createdRoles []string
-
 		for _, role := range roleMap["required"] {
 			rtbName := "creator-" + role
-
-			if rtb, _ := l.prtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
+			if rtb, _ := l.prtbLister.Get(project.Name, rtbName); rtb != nil {
 				createdRoles = append(createdRoles, role)
 				// This projectRoleBinding exists, need to check all of them so keep going
 				continue
 			}
 
 			// The projectRoleBinding doesn't exist yet so create it
-			om := metav1.ObjectMeta{
-				Name:      rtbName,
-				Namespace: metaAccessor.GetName(),
-			}
-
-			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", ProjectCreateController, creatorID, metaAccessor.GetName())
-			if _, err := l.mgr.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ProjectRoleTemplateBinding{
-				ObjectMeta:       om,
-				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
+			prtb := &apisv3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      rtbName,
+					Namespace: project.Name,
+				},
+				ProjectName:      project.Namespace + ":" + project.Name,
 				RoleTemplateName: role,
 				UserName:         creatorID,
-			}); err != nil && !apierrors.IsAlreadyExists(err) {
+			}
+
+			if principalName := project.Annotations[creatorPrincipalNameAnnotation]; principalName != "" {
+				if !strings.HasPrefix(principalName, "local") {
+					// Setting UserPrincipalName only makes sense for non-local users.
+					prtb.UserPrincipalName = principalName
+					prtb.UserName = ""
+				}
+			}
+
+			logrus.Infof("[%s] Creating creator projectRoleTemplateBinding for user %s for project %s", ProjectCreateController, creatorID, project.Name)
+			_, err := l.prtbClient.Create(prtb)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return obj, err
 			}
+
 			createdRoles = append(createdRoles, role)
 		}
 
@@ -223,11 +228,11 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 		if reflect.DeepEqual(roleMap["required"], createdRoles) {
 			apisv3.ProjectConditionInitialRolesPopulated.True(project)
-			logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ProjectCreateController, project.Name)
+			logrus.Infof("[%s] Setting InitialRolesPopulated condition on project %s", ProjectCreateController, project.Name)
 		}
-		if _, err := l.projects.Update(project); err != nil {
-			return obj, err
-		}
-		return obj, nil
+
+		_, err = l.projects.Update(project)
+
+		return obj, err
 	})
 }
