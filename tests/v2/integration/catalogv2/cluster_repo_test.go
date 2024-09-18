@@ -798,6 +798,9 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	require.NoError(c.T(), err)
 
 	downloadTime := cr.Status.DownloadTime
+
+	cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), cr.Name, metav1.GetOptions{})
+	require.NoError(c.T(), err)
 	cr.Spec.GitBranch = "main"
 	cr, err = c.catalogClient.ClusterRepos().Update(context.TODO(), cr, metav1.UpdateOptions{})
 	require.NoError(c.T(), err)
