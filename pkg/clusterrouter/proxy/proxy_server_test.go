@@ -2,18 +2,19 @@ package proxy
 
 import (
 	"context"
-	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	auth "github.com/rancher/rancher/pkg/auth/context"
-	"github.com/stretchr/testify/assert"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	auth "github.com/rancher/rancher/pkg/auth/context"
+	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestServeHTTP(t *testing.T) {
