@@ -496,6 +496,7 @@ func (e *gkeOperatorController) getRestConfig(cluster *mgmtv3.Cluster) (*rest.Co
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: decodedCA,
 		},
+		UserAgent: util.UserAgentForCluster(cluster),
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			return &oauth2.Transport{
 				Source: ts,

@@ -465,7 +465,7 @@ func (e *aksOperatorController) getRestConfig(cluster *apimgmtv3.Cluster) (*rest
 		return nil, err
 	}
 	if restConfig.UserAgent == "" {
-		restConfig.UserAgent = rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name
+		restConfig.UserAgent = util.UserAgentForCluster(cluster)
 	}
 
 	// Get the CACert from the cluster because it will have any additional CAs added to Rancher.

@@ -635,6 +635,7 @@ func (e *eksOperatorController) getRestConfig(cluster *mgmtv3.Cluster) (*rest.Co
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: decodedCA,
 		},
+		UserAgent:   util.UserAgentForCluster(cluster),
 		BearerToken: accessToken,
 	}, nil
 }
