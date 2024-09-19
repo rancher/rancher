@@ -76,8 +76,8 @@ node {
                           string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
                           string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
                           
-                          string(credentialsId: 'AWS_RSA_KEY_NAME', variable: 'AWS_RSA_KEY_NAME'),
-                          string(credentialsId: 'AWS_SSH_RSA_KEY', variable: 'AWS_SSH_RSA_KEY'),
+                          //string(credentialsId: 'AWS_RSA_KEY_NAME', variable: 'AWS_RSA_KEY_NAME'),
+                          //string(credentialsId: 'AWS_SSH_RSA_KEY', variable: 'AWS_SSH_RSA_KEY'),
 
                           string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
@@ -125,7 +125,7 @@ node {
               config = config.replace('${AZURE_SUBSCRIPTION_ID}', env.AZURE_SUBSCRIPTION_ID)
 
               config = config.replace('${AWS_SSH_PEM_KEY}', env.AWS_SSH_KEY_NAME)
-              config = config.replace('${AWS_SSH_RSA_KEY}', env.AWS_SSH_RSA_KEY)
+              //config = config.replace('${AWS_SSH_RSA_KEY}', env.AWS_SSH_RSA_KEY)
               config = config.replace('${RANCHER_LINODE_ACCESSKEY}', env.RANCHER_LINODE_ACCESSKEY)
 
               if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
