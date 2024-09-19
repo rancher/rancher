@@ -300,6 +300,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
+		if err := runPreflightMigrations(r.Wrangler); err != nil {
+			return err
+		}
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {

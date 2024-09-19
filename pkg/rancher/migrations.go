@@ -47,6 +47,7 @@ const (
 	migrateRKEClusterState                          = "migraterkeclusterstate"
 	migrateSystemAgentVarDirToDataDirectory         = "migratesystemagentvardirtodatadirectory"
 	migrateHarvesterCloudCredentialExpirationConfig = "migrateharvestercloudcredentialexpiration"
+	rancherVersionTombstoneConfig                   = "rancherversion"
 	rancherVersionKey                               = "rancherVersion"
 	projectsCreatedKey                              = "projectsCreated"
 	namespacesAssignedKey                           = "namespacesAssigned"
@@ -99,6 +100,14 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	return migrateRKEClusterStates(wranglerContext)
 }
 
+// runPreflightMigrations runs migrations that are required *before* dashboard controllers are allowed to start.
+func runPreflightMigrations(wranglerContext *wrangler.Context) error {
+	if err := versionTombstone(wranglerContext.Core.ConfigMap()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
 	cm, err := configMapController.Cache().Get(cattleNamespace, configMapName)
 	if err != nil && !k8serror.IsNotFound(err) {
@@ -133,6 +142,33 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 	}
 
 	return err
+}
+
+func versionTombstone(configMapController controllerv1.ConfigMapController) error {
+	cm, err := getConfigMap(configMapController, rancherVersionTombstoneConfig)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if !semver.IsValid(rancherversion.Version) {
+		logrus.Errorf("rancher version %s is not semver compliant, skipping tombstone validation", rancherversion.Version)
+		return nil
+	}
+
+	lastVersion := cm.Data[rancherVersionKey]
+	if lastVersion != "" {
+		if !semver.IsValid(lastVersion) {
+			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation", lastVersion)
+			lastVersion = ""
+		}
+		if semver.Compare(lastVersion, rancherversion.Version) == 1 {
+			logrus.Fatalf("Detected Rancher downgrade from %s to %s. In order to perform a rollback of Rancher, use the Rancher Backup Restore Operator. If a suitable backup is unavailable, version tombstone validation can be temporarily disabled by deleting the rancherVersionTombstone config map in the cattle-system namespace.",
+				lastVersion, rancherversion.Version)
+		}
+	}
+
+	cm.Data[rancherVersionKey] = rancherversion.Version
+	return createOrUpdateConfigMap(configMapController, cm)
 }
 
 // forceUpgradeLogout will delete all dashboard tokens forcing a logout.  This is useful when there is a major frontend
