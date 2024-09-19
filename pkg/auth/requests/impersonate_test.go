@@ -3,7 +3,9 @@ package requests
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/auth/requests/mocks"
@@ -23,11 +25,11 @@ func TestAuthenticateImpersonation(t *testing.T) {
 		Extra:  nil,
 	}
 	tests := map[string]struct {
-		req            func() *http.Request
-		sarMock        func(req *http.Request) sar.SubjectAccessReview
-		expectedInfo   user.Info
-		expectedAuthed bool
-		expectedErr    string
+		req                   func() *http.Request
+		sarMock               func(req *http.Request) sar.SubjectAccessReview
+		wantUserInfo          *user.DefaultInfo
+		wantNextHandlerCalled bool
+		wantErr               string
 	}{
 		"no impersonation": {
 			req: func() *http.Request {
@@ -40,9 +42,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			sarMock: func(_ *http.Request) sar.SubjectAccessReview {
 				return mocks.NewMockSubjectAccessReview(ctrl)
 			},
-			expectedInfo:   userInfo,
-			expectedAuthed: true,
-			expectedErr:    "",
+			wantNextHandlerCalled: true,
 		},
 		"impersonate user": {
 			req: func() *http.Request {
@@ -62,14 +62,13 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo: &user.DefaultInfo{
+			wantUserInfo: &user.DefaultInfo{
 				Name:   "impUser",
 				UID:    "impUser",
 				Groups: []string{"system:authenticated"},
 				Extra:  nil,
 			},
-			expectedAuthed: true,
-			expectedErr:    "",
+			wantNextHandlerCalled: true,
 		},
 		"impersonate group": {
 			req: func() *http.Request {
@@ -91,14 +90,13 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo: &user.DefaultInfo{
+			wantUserInfo: &user.DefaultInfo{
 				Name:   "impUser",
 				UID:    "impUser",
 				Groups: []string{"impGroup", "system:authenticated"},
 				Extra:  nil,
 			},
-			expectedAuthed: true,
-			expectedErr:    "",
+			wantNextHandlerCalled: true,
 		},
 		"impersonate extras": {
 			req: func() *http.Request {
@@ -120,14 +118,13 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo: &user.DefaultInfo{
+			wantUserInfo: &user.DefaultInfo{
 				Name:   "impUser",
 				UID:    "impUser",
 				Groups: []string{"system:authenticated"},
 				Extra:  map[string][]string{"foo": {"bar"}},
 			},
-			expectedAuthed: true,
-			expectedErr:    "",
+			wantNextHandlerCalled: true,
 		},
 		"impersonate serviceaccount": {
 			req: func() *http.Request {
@@ -147,9 +144,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   userInfo,
-			expectedAuthed: true,
-			expectedErr:    "",
+			wantUserInfo:          userInfo,
+			wantNextHandlerCalled: true,
 		},
 		"impersonate user not allowed": {
 			req: func() *http.Request {
@@ -169,9 +165,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "not allowed to impersonate user",
+			wantErr: "not allowed to impersonate user",
 		},
 		"impersonate group not allowed": {
 			req: func() *http.Request {
@@ -193,9 +187,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "not allowed to impersonate group",
+			wantErr: "not allowed to impersonate group",
 		},
 		"impersonate extras not allowed": {
 			req: func() *http.Request {
@@ -217,9 +209,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "not allowed to impersonate extra",
+			wantErr: "not allowed to impersonate extra",
 		},
 		"impersonate serviceaccount not allowed": {
 			req: func() *http.Request {
@@ -239,9 +229,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "not allowed to impersonate service account",
+			wantErr: "not allowed to impersonate service account",
 		},
 		"impersonate user error": {
 			req: func() *http.Request {
@@ -261,9 +249,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "unexpected error",
+			wantErr: "error checking if user can impersonate user: unexpected error",
 		},
 		"impersonate group error": {
 			req: func() *http.Request {
@@ -285,9 +271,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "unexpected error",
+			wantErr: "error checking if user can impersonate group: unexpected error",
 		},
 		"impersonate extras error": {
 			req: func() *http.Request {
@@ -309,9 +293,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "unexpected error",
+			wantErr: "error checking if user can impersonate extras: unexpected error",
 		},
 		"impersonate service account error": {
 			req: func() *http.Request {
@@ -331,9 +313,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			expectedInfo:   nil,
-			expectedAuthed: false,
-			expectedErr:    "unexpected error",
+			wantErr: "error checking if user can impersonate service account: unexpected error",
 		},
 	}
 
@@ -344,15 +324,33 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 			req := test.req()
 			ia := NewImpersonatingAuth(test.sarMock(req))
-			info, authed, err := ia.Authenticate(req)
+			mh := &mockHandler{}
+			rw := httptest.NewRecorder()
+			h := ia.ImpersonationMiddleware(mh)
 
-			if test.expectedErr == "" {
+			h.ServeHTTP(rw, req)
+
+			assert.Equal(t, test.wantNextHandlerCalled, mh.serveHTTPWasCalled)
+			if test.wantErr != "" {
+				bodyBytes, err := io.ReadAll(rw.Body)
 				assert.NoError(t, err)
-			} else {
-				assert.ErrorContains(t, err, test.expectedErr)
+				assert.Contains(t, string(bodyBytes), test.wantErr)
 			}
-			assert.Equal(t, test.expectedAuthed, authed)
-			assert.Equal(t, test.expectedInfo, info)
+			if test.wantUserInfo != nil {
+				info, _ := request.UserFrom(req.Context())
+				assert.Equal(t, test.wantUserInfo, info)
+			} else {
+				info, _ := request.UserFrom(req.Context())
+				assert.Equal(t, userInfo, info)
+			}
 		})
 	}
+}
+
+type mockHandler struct {
+	serveHTTPWasCalled bool
+}
+
+func (m *mockHandler) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {
+	m.serveHTTPWasCalled = true
 }

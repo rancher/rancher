@@ -1,7 +1,6 @@
 package requests
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,124 +10,114 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
-	"github.com/rancher/steve/pkg/auth"
+	"github.com/rancher/rancher/pkg/auth/util"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	k8sUser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-type impersonatingAuth struct {
-	sar sar.SubjectAccessReview
+type ImpersonatingAuth struct {
+	sar  sar.SubjectAccessReview
+	next http.Handler
 }
 
-func NewImpersonatingAuth(sar sar.SubjectAccessReview) auth.Authenticator {
-	return &impersonatingAuth{
+func NewImpersonatingAuth(sar sar.SubjectAccessReview) *ImpersonatingAuth {
+	return &ImpersonatingAuth{
 		sar: sar,
 	}
 }
 
-func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool, error) {
-	userInfo, authed := request.UserFrom(req.Context())
-	if !authed {
-		return nil, false, nil
-	}
-	user := userInfo.GetName()
-	groups := userInfo.GetGroups()
+func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		userInfo, authed := request.UserFrom(req.Context())
+		if !authed {
+			util.WriteError(rw, http.StatusUnauthorized, ErrMustAuthenticate)
+			return
+		}
+		user := userInfo.GetName()
+		groups := userInfo.GetGroups()
 
-	var impersonateUser bool
-	var impersonateGroup bool
-	var impersonateExtras bool
+		reqUser := req.Header.Get("Impersonate-User")
+		var reqGroup []string
+		if g, ok := req.Header["Impersonate-Group"]; ok {
+			reqGroup = g
+		}
+		var reqExtras = impersonateExtrasFromHeaders(req.Header)
 
-	reqUser := req.Header.Get("Impersonate-User")
-	var reqGroup []string
-	if g, ok := req.Header["Impersonate-Group"]; ok {
-		reqGroup = g
-	}
-	var reqExtras = impersonateExtrasFromHeaders(req.Header)
+		auditUser, ok := audit.FromContext(req.Context())
+		if ok {
+			auditUser.RequestUser = reqUser
+			auditUser.RequestGroups = reqGroup
+		}
 
-	auditUser, ok := audit.FromContext(req.Context())
-	if ok {
-		auditUser.RequestUser = reqUser
-		auditUser.RequestGroups = reqGroup
-	}
-
-	// If there is an impersonate header, the incoming request is attempting to
-	// impersonate a different user, verify the token user is authz to impersonate
-	if h.sar != nil {
-		if reqUser != "" && reqUser != user {
+		// If there is an impersonate header, the incoming request is attempting to
+		// impersonate a different user, verify the token user is authz to impersonate
+		if i.sar != nil && reqUser != "" && reqUser != user {
 			if strings.HasPrefix(reqUser, serviceaccount.ServiceAccountUsernamePrefix) {
-				canDo, err := h.sar.UserCanImpersonateServiceAccount(req, user, reqUser)
+				canDo, err := i.sar.UserCanImpersonateServiceAccount(req, user, reqUser)
 				if err != nil {
-					return nil, false, fmt.Errorf("error checking if user can impersonate service account: %w", err)
+					util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate service account: %w", err))
+					return
 				} else if !canDo {
-					return nil, false, errors.New("not allowed to impersonate service account")
+					util.WriteError(rw, http.StatusForbidden, fmt.Errorf("not allowed to impersonate service account"))
+					return
 				}
 				// add impersonated SA to context
 				*req = *req.WithContext(authcontext.SetSAImpersonation(req.Context(), reqUser))
 			} else {
-				canDo, err := h.sar.UserCanImpersonateUser(req, user, reqUser)
+				canDo, err := i.sar.UserCanImpersonateUser(req, user, reqUser)
 				if err != nil {
-					return nil, false, fmt.Errorf("error checking if user can impersonate another user: %w", err)
+					util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate user: %w", err))
+					return
 				} else if !canDo {
-					return nil, false, errors.New("not allowed to impersonate user")
+					util.WriteError(rw, http.StatusForbidden, fmt.Errorf("not allowed to impersonate user"))
+					return
 				}
-				impersonateUser = true
 
 				for _, g := range reqGroup {
 					if slices.Contains(groups, g) {
 						//user belongs to the group they are trying to impersonate
 						continue
 					}
-					canDo, err := h.sar.UserCanImpersonateGroup(req, user, g)
+					canDo, err := i.sar.UserCanImpersonateGroup(req, user, g)
 					if err != nil {
-						return nil, false, fmt.Errorf("error checking if user can impersonate group: %w", err)
+						util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate group: %w", err))
+						return
 					} else if !canDo {
-						return nil, false, errors.New("not allowed to impersonate group")
+						util.WriteError(rw, http.StatusForbidden, fmt.Errorf("not allowed to impersonate group"))
+						return
 					}
-					impersonateGroup = true
 				}
 
 				if len(reqExtras) > 0 {
-					canDo, err := h.sar.UserCanImpersonateExtras(req, user, reqExtras)
+					canDo, err := i.sar.UserCanImpersonateExtras(req, user, reqExtras)
 					if err != nil {
-						return nil, false, fmt.Errorf("error checking if user can impersonate extras: %w", err)
+						util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate extras: %w", err))
+						return
 					} else if !canDo {
-						return nil, false, errors.New("not allowed to impersonate extras")
+						util.WriteError(rw, http.StatusForbidden, fmt.Errorf("not allowed to impersonate extras"))
+						return
 					}
-					impersonateExtras = true
 				}
+				reqGroup = append(reqGroup, k8sUser.AllAuthenticated)
+
+				userInfo := &k8sUser.DefaultInfo{
+					Name:   reqUser,
+					UID:    reqUser,
+					Groups: reqGroup,
+					Extra:  reqExtras,
+				}
+				*req = *req.WithContext(request.WithUser(req.Context(), userInfo))
 			}
 		}
-	}
 
-	var extras map[string][]string
-
-	if impersonateUser {
-		user = reqUser
-		groups = nil
-
-		if impersonateGroup {
-			groups = reqGroup
-		}
-		if impersonateExtras {
-			extras = reqExtras
-		}
-		groups = append(groups, k8sUser.AllAuthenticated)
-	} else {
-		extras = userInfo.GetExtra()
-	}
-
-	return &k8sUser.DefaultInfo{
-		Name:   user,
-		UID:    user,
-		Groups: groups,
-		Extra:  extras,
-	}, true, nil
+		next.ServeHTTP(rw, req)
+	})
 }
 
 func impersonateExtrasFromHeaders(headers http.Header) map[string][]string {
-	extras := make(map[string][]string)
+	var extras map[string][]string
 	for headerName, values := range headers {
 		if !strings.HasPrefix(headerName, authenticationv1.ImpersonateUserExtraHeaderPrefix) {
 			continue
