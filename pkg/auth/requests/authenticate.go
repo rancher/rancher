@@ -25,18 +25,17 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var (
-	ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
-)
+const tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 
-// Do not record lastUsedAt at the full possible precision
-const lastUsedAtGranularity = time.Minute
+var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 
+// Authenticator authenticates a request.
 type Authenticator interface {
 	Authenticate(req *http.Request) (*AuthenticatorResponse, error)
 	TokenFromRequest(req *http.Request) (*v3.Token, error)
 }
 
+// AuthenticatorResponse is the response returned by an Authenticator.
 type AuthenticatorResponse struct {
 	IsAuthed      bool
 	User          string
@@ -45,6 +44,22 @@ type AuthenticatorResponse struct {
 	Extras        map[string][]string
 }
 
+// ClusterRouter returns the cluster ID based on the request URL's path.
+type ClusterRouter func(req *http.Request) string
+
+type tokenAuthenticator struct {
+	ctx                 context.Context
+	tokenIndexer        cache.Indexer
+	tokenClient         mgmtcontrollers.TokenClient
+	userAttributes      v3.UserAttributeInterface
+	userAttributeLister v3.UserAttributeLister
+	userLister          v3.UserLister
+	clusterRouter       ClusterRouter
+	refreshUser         func(userID string, force bool)
+	now                 func() time.Time // Make it easier to test.
+}
+
+// ToAuthMiddleware converts an Authenticator to an auth.Middleware.
 func ToAuthMiddleware(a Authenticator) auth.Middleware {
 	f := func(req *http.Request) (user.Info, bool, error) {
 		authResp, err := a.Authenticate(req)
@@ -61,25 +76,16 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
 
-type ClusterRouter func(req *http.Request) string
-
+// NewAuthenticator creates a new token authenticator instance.
 func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx *config.ScaledContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
-	// This can be called without a wrangler set.
-	// After the fix done in the previous commit this is reduced to 1 of 8 calls.
-	var token mgmtcontrollers.TokenController
-	if mgmtCtx.Wrangler != nil {
-		token = mgmtCtx.Wrangler.Mgmt.Token()
-	}
-
 	return &tokenAuthenticator{
 		ctx:                 ctx,
 		tokenIndexer:        tokenInformer.GetIndexer(),
-		tokenClient:         mgmtCtx.Management.Tokens(""),
-		tokenWClient:        token,
+		tokenClient:         mgmtCtx.Wrangler.Mgmt.Token(),
 		userAttributeLister: mgmtCtx.Management.UserAttributes("").Controller().Lister(),
 		userAttributes:      mgmtCtx.Management.UserAttributes(""),
 		userLister:          mgmtCtx.Management.Users("").Controller().Lister(),
@@ -87,24 +93,9 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		refreshUser: func(userID string, force bool) {
 			go providerRefresher.TriggerUserRefresh(userID, force)
 		},
+		now: time.Now,
 	}
 }
-
-type tokenAuthenticator struct {
-	ctx                 context.Context
-	tokenIndexer        cache.Indexer
-	tokenClient         v3.TokenInterface
-	tokenWClient        mgmtcontrollers.TokenController
-	userAttributes      v3.UserAttributeInterface
-	userAttributeLister v3.UserAttributeLister
-	userLister          v3.UserLister
-	clusterRouter       ClusterRouter
-	refreshUser         func(userID string, force bool)
-}
-
-const (
-	tokenKeyIndex = "authn.management.cattle.io/token-key-index"
-)
 
 func tokenKeyIndexer(obj interface{}) ([]string, error) {
 	token, ok := obj.(*v3.Token)
@@ -115,6 +106,7 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 	return []string{token.Token}, nil
 }
 
+// Authenticate authenticates a request using a request's token.
 func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResponse, error) {
 	authResp := &AuthenticatorResponse{
 		Extras: make(map[string][]string),
@@ -191,74 +183,46 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp.Extras = getUserExtraInfo(token, authUser, attribs)
 	logrus.Debugf("Extras returned %v", authResp.Extras)
 
-	logrus.Debugf("Token %v, lastUsedAt: started update", token.ObjectMeta.Name)
-
-	// While the fix in the previous commit should have made this impossible maybe better to keep a guard.
-	if a.tokenWClient == nil {
-		logrus.Errorf("Token %v, lastUsedAt: skipping update, no wrangler client", token.ObjectMeta.Name)
-		return authResp, nil
-	}
-
-	now := time.Now().Truncate(lastUsedAtGranularity)
-	logrus.Debugf("Token %v, lastUsedAt: now is %v", token.ObjectMeta.Name, now)
-
+	now := a.now().Truncate(time.Second) // Use the second precision.
 	if token.LastUsedAt != nil {
-		lastRecorded := token.LastUsedAt.Time.Truncate(lastUsedAtGranularity)
-		logrus.Debugf("Token %v, lastUsedAt: recorded %v", token.ObjectMeta.Name, lastRecorded)
-
-		// throttle ... skip update if the recorded/known last use is not
-		// strictly in the past, relative to us. IOW if the token is already
-		// at the minute we want, or even ahead, then we have nothing to do.
-
-		if now.Before(lastRecorded) || now.Equal(lastRecorded) {
-			logrus.Debugf("Token %v, lastUsedAt: now <= recorded, skipped update",
-				token.ObjectMeta.Name)
+		if now.Equal(token.LastUsedAt.Time.Truncate(time.Second)) {
+			// Throttle subsecond updates.
 			return authResp, nil
 		}
 	}
 
-	// green light for patch
+	if err := func() error {
+		patch, err := json.Marshal([]struct {
+			Op    string `json:"op"`
+			Path  string `json:"path"`
+			Value any    `json:"value"`
+		}{{
+			Op:    "replace",
+			Path:  "/lastUsedAt",
+			Value: metav1.NewTime(now),
+		}})
+		if err != nil {
+			return err
+		}
 
-	lastUsed := metav1.NewTime(now)
-	patch, err := makeLastUsedPatch(lastUsed)
-	if err != nil {
-		// Just logging this error, not reporting it. Operation was ok, do not wish to force a retry.
-		// IOW the field lastUsedAt is updated only with best effort.
-		logrus.Errorf("Token %v, lastUsedAt: patch creation failed: %v", token.ObjectMeta.Name, err)
+		_, err = a.tokenClient.Patch(token.Name, types.JSONPatchType, patch)
+		return err
+	}(); err != nil {
+		// Log the error and move on to avoid failing the request.
+		logrus.Errorf("Error updating lastUsedAt for token %s: %v", token.ObjectMeta.Name, err)
 		return authResp, nil
 	}
 
-	_, err = a.tokenWClient.Patch(token.ObjectMeta.Name, types.JSONPatchType, patch)
-	if err != nil {
-		// Just logging this error, not reporting it. Operation was ok, do not wish to force a retry.
-		// IOW the field lastUsedAt is updated only with best effort.
-		logrus.Errorf("Token %v, lastUsedAt: patch application failed: %v", token.ObjectMeta.Name, err)
-		return authResp, nil
-	}
-
-	logrus.Debugf("Token %v, lastUsedAt: successfully completed update", token.ObjectMeta.Name)
+	logrus.Debugf("Updated lastUsedAt for token %s", token.ObjectMeta.Name)
 	return authResp, nil
 }
 
-func makeLastUsedPatch(lu metav1.Time) ([]byte, error) {
-	operations := []struct {
-		Op    string      `json:"op"`
-		Path  string      `json:"path"`
-		Value metav1.Time `json:"value"`
-	}{{
-		Op:    "replace",
-		Path:  "/lastUsedAt",
-		Value: lu,
-	}}
-	return json.Marshal(operations)
-}
-
-func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
+func getUserExtraInfo(token *v3.Token, user *v3.User, attribs *v3.UserAttribute) map[string][]string {
 	extraInfo := make(map[string][]string)
 
 	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
 		if token.AuthProvider == "local" || token.AuthProvider == "" {
-			//gather all extraInfo for all external auth providers present in the userAttributes
+			// Gather all extraInfo for all external auth providers present in the userAttributes.
 			for _, extra := range attribs.ExtraByProvider {
 				for key, value := range extra {
 					extraInfo[key] = append(extraInfo[key], value...)
@@ -266,26 +230,27 @@ func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) ma
 			}
 			return extraInfo
 		}
-		//authProvider is set in token
+		// AuthProvider is set in the token.
 		if extraInfo, ok := attribs.ExtraByProvider[token.AuthProvider]; ok {
 			return extraInfo
 		}
 	}
 
 	extraInfo = providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
-	//if principalid is not set in extra, read from user
+	// If principal id is not set in extra, read from user.
 	if extraInfo != nil {
 		if len(extraInfo[common.UserAttributePrincipalID]) == 0 {
-			extraInfo[common.UserAttributePrincipalID] = u.PrincipalIDs
+			extraInfo[common.UserAttributePrincipalID] = user.PrincipalIDs
 		}
 		if len(extraInfo[common.UserAttributeUserName]) == 0 {
-			extraInfo[common.UserAttributeUserName] = []string{u.DisplayName}
+			extraInfo[common.UserAttributeUserName] = []string{user.DisplayName}
 		}
 	}
 
 	return extraInfo
 }
 
+// TokenFromRequest retrieves and verifies the token from the request.
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 	if tokenAuthValue == "" {
@@ -316,7 +281,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 			if apierrors.IsNotFound(err) {
 				return nil, ErrMustAuthenticate
 			}
-			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token, error: %#v", err)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token, error: %v", err)
 		}
 	} else {
 		storedToken = objs[0].(*v3.Token)
