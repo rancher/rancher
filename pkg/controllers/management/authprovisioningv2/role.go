@@ -322,8 +322,12 @@ func (h *handler) objects(rt *v3.RoleTemplate, enqueue bool, cluster *v1.Cluster
 	return nil
 }
 
-func (h *handler) getResourceNames(resourceMatch resourceMatch, cluster *v1.Cluster) ([]string, error) {
-	objs, err := h.dynamic.GetByIndex(resourceMatch.GVK, clusterIndexed, fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name))
+type indexGetter interface {
+	GetByIndex(gvk schema.GroupVersionKind, indexName, key string) ([]runtime.Object, error)
+}
+
+func getResourceNames(indexer indexGetter, resourceMatch resourceMatch, cluster *v1.Cluster) ([]string, error) {
+	objs, err := indexer.GetByIndex(resourceMatch.GVK, clusterIndexed, fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name))
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +369,7 @@ func (h *handler) createRoleForCluster(rt *v3.RoleTemplate, matches []match, clu
 	}
 
 	for _, match := range matches {
-		names, err := h.getResourceNames(match.Match, cluster)
+		names, err := getResourceNames(h.dynamic, match.Match, cluster)
 		if err != nil {
 			return err
 		}
