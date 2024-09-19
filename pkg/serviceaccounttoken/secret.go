@@ -3,14 +3,16 @@ package serviceaccounttoken
 import (
 	"context"
 	"fmt"
-	"sync"
+	"strings"
 	"time"
 
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -21,6 +23,8 @@ const (
 	ServiceAccountSecretLabel = "cattle.io/service-account.name"
 
 	serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
+
+	serviceAccountSecretRefAnnotation = "rancher.io/service-account.secret-ref"
 )
 
 // secretLister is an abstraction over any kind of secret lister.
@@ -28,35 +32,13 @@ const (
 // as long as it can wrap it in a simplified lambda with this signature.
 type secretLister func(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
 
-var lockMap sync.Map
-
-func getLock(key string) *sync.Mutex {
-	actual, _ := lockMap.LoadOrStore(key, &sync.Mutex{})
-	return actual.(*sync.Mutex)
-}
-
 // EnsureSecretForServiceAccount gets or creates a service account token Secret for the provided Service Account.
-//
-// If lockPrefix is provided, this is used as a prefix for the lock to provide
-// context for concurrent requests. No concurrent creates will be allowed for a
-// service account.
-//
-// The lockPrefix should be of the same format as a generateName e.g. cluster-
-//
-// For example, if this is "cluster-1" and the ServiceAccount is
-// "default:test-sa" subsequent requests to create a ServiceAccount with the
-// same name in "cluster-1" will be blocked until the first request has
-// completed.
-//
-// Note: This mutex is per-replica, currently there's no attempt to co-ordinate
-// across replicas.
-func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *corev1.ServiceAccount, lockPrefix string) (*corev1.Secret, error) {
+func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *corev1.ServiceAccount) (*corev1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
 	logrus.Tracef("EnsureSecretForServiceAccount for %s:%s", sa.Namespace, sa.Name)
 
-	lockKey := fmt.Sprintf("%v%v-%v", lockPrefix, sa.Namespace, sa.Name)
 	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
 	var secretLister secretLister
 	if secretsCache != nil {
@@ -83,9 +65,26 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	}
 
 	if secret == nil {
-		secret, err = createServiceAccountSecret(ctx, sa, secretLister, secretClient, lockKey)
+		secret, err = createServiceAccountSecret(ctx, sa, secretLister, secretClient)
 		if err != nil {
 			return nil, err
+		}
+
+		sa, updated, err := annotateSAWithSecret(ctx, sa, secret, clientSet.CoreV1().ServiceAccounts(sa.Namespace), secretClient)
+		if err != nil {
+			return nil, err
+		}
+
+		if updated {
+			secretRef, err := secretRefFromSA(sa)
+			if err != nil {
+				return nil, err
+			}
+
+			secret, err = clientSet.CoreV1().Secrets(secretRef.Namespace).Get(ctx, secretRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("reloading referenced secret for SA %s: %w", sa.Name, err)
+			}
 		}
 	}
 
@@ -109,7 +108,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
 		if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
-			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s %s ", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start), lockPrefix)
+			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start))
 			return true, nil
 		}
 		return false, nil
@@ -204,14 +203,7 @@ func isSecretForServiceAccount(secret *corev1.Secret, sa *corev1.ServiceAccount)
 	return sa.Name == annotation
 }
 
-func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface, lockKey string) (*corev1.Secret, error) {
-	mutex := getLock(lockKey)
-	mutex.Lock()
-	defer func(key string) {
-		mutex.Unlock()
-		lockMap.Delete(lockKey)
-	}(lockKey)
-
+func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {
 	// We could have been waiting for the Mutex to unlock in a parallel run of
 	// createServiceAccountSecret - check again for the secret existing.
 	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
@@ -229,4 +221,64 @@ func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, 
 	}
 
 	return secret, nil
+}
+
+// returns true if the secret has changed.
+func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret *corev1.Secret, saClient clientv1.ServiceAccountInterface, secretClient clientv1.SecretInterface) (*corev1.ServiceAccount, bool, error) {
+	if sa.Annotations[serviceAccountSecretRefAnnotation] != "" {
+		// TODO: I guess we should check to see if it's the existing SA?
+		return sa, false, nil
+	}
+	if sa.Annotations == nil {
+		sa.Annotations = map[string]string{}
+	}
+	sa.Annotations[serviceAccountSecretRefAnnotation] = keyFromObject(secret).String()
+
+	updated, err := saClient.Update(ctx, sa, metav1.UpdateOptions{})
+	if err == nil {
+		return updated, false, nil
+	}
+
+	if !apierrors.IsConflict(err) {
+		return nil, false, err
+	}
+	// Rollback the optimistically created secret
+	if err := secretClient.Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
+		return nil, false, fmt.Errorf("deleting optimistically locked secret for %s - %s: %w", keyFromObject(secret), keyFromObject(sa), err)
+	}
+	// Load the version that triggered the issue
+	updated, err = saClient.Get(ctx, sa.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, false, fmt.Errorf("getting updated service account %s: %w", keyFromObject(sa), err)
+	}
+
+	return updated, true, nil
+
+}
+
+func keyFromObject(obj namespacedObject) types.NamespacedName {
+	return types.NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}
+}
+
+type namespacedObject interface {
+	GetNamespace() string
+	GetName() string
+}
+
+func secretRefFromSA(sa *corev1.ServiceAccount) (*types.NamespacedName, error) {
+	if sa.Annotations == nil {
+		return nil, nil
+	}
+	if ann := sa.Annotations[serviceAccountSecretRefAnnotation]; ann != "" {
+		elements := strings.Split(ann, string(types.Separator))
+		if len(elements) != 2 {
+			return nil, fmt.Errorf("too many elements parsing ServiceAccount secret reference: %s", ann)
+		}
+		return &types.NamespacedName{Namespace: elements[0], Name: elements[1]}, nil
+	}
+
+	return nil, nil
 }
