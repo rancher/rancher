@@ -57,86 +57,33 @@ type TokenStatus struct {
 	ExpiredAt string `json:"expiredAt"`
 
 	// User derived data
-
 	// The user derived information is complex to determine. As such this is
 	// stored in the backing secret to avoid recomputing it whenever the
 	// token is retrieved.
 
-	// _________ XXX RESEARCH NOTES XXX _________________________ START
-	//
-	// For the norman tokens the User- and GroupPrincipals (UP, GPs) are
-	// provided by the calling context, obviating the need to compute it as
-	// part of the token creation. The auth provider is the UP's provider,
-	// i.e. trivially found.
-	//
-	// See `NewLoginToken` (token/manager.go), and `HandleSamlAssertion`
-	// (saml_client.go) as an example calling context. In that context UP
-	// and GPs are created from the data in the received SAML assertion.
-	// While the UP is stored in the User (*) the GPs are given to the new
-	// token and also stored in a UserAttribute resource.
-	//
-	// The other external auth providers operate in a similar manner. See
-	// `AuthenticateUser` for Principal creation, and `createLoginToken` for
-	// the calling context passing this data to `NewLoginToken`.
-	//
-	// The providers differ in what fields of the Principal structures they
-	// fill in. I.e. the data is provider-dependent.
-	//
-	// (*) Not truly true, only the principalID is stored, nothing else.
-	//
-	// ATTENTION --- Which means that the full UserPrincipal information is
-	// only available in the norman token itself.
-	//
-	// NOTE that the derived tokens get their UP from the base token they
-	// are derived from. See `createDerivedToken` (tokens/manager.go).
-	//
-	// =========== THIS IS A PROBLEM FOR THE EXT TOKENS =================
-	//
-	// While the GPs are retrievable from the `UserAttribute` resource
-	// associated with the User the new token will be for, getting the UP is
-	// difficult.
-	//
-	// While we should be able to get and use the UP data for the user
-	// making the Create request (via its token) that is sensible only if
-	// the user X making the request is the same user X the new token will
-	// be for. The moment we have an admin User X requesting the creation of
-	// a token for some other user Y we have no source for UP data.
-	//
-	// Well, maybe. If we want to reach into hackish territory we could try
-	// and see if user Y already has tokens around for it, of either kind,
-	// and if yes, pull the UP from any of these,
-	//
-	// BEWARE that this further depends on the custom handler having proper
-	// access to the token which auth'd the request. The current imp. API
-	// foundation does not seem to provide this. At the moment we can and do
-	// retrieve the userID from the provided `user.Info` structure.
-	//
-	// SOLUTION ?? Extend the existing norman types and auth/token code to
-	// store the UP in the UserAttribute as well, making it trivially
-	// available.
-	//
-	// [[ Digression: A token created for user X by user X can be considered
-	//    derived. Everything else would be non-derived => Set the flag ]]
-	//
-	// ANOTHER PROBLEM is the `ProviderInfo`. So far I have not managed to
-	// determine where this information is coming from at all. While it is
-	// copied around I found no originating places yet.
-	//
-	// _________ XXX RESEARCH NOTES XXX _________________________ END
-
-	// AuthProvider names the auth provider managing the user
+	// AuthProvider names the auth provider managing the user.
 	AuthProvider string `json:"authProvider"`
-	// UserPrincipal holds the detailed user data
+	// This information is retrieved from the UserAttribute resource referenced by
+	// `Spec.UserID`.
+
+	// UserPrincipal holds the detailed user data.
 	UserPrincipal apiv3.Principal `json:"userPrincipal"`
+	// Most of the fields can be given standard values or are not relevant.
+	// Display name and login name are retrieved from the User resource referenced by `Spec.UserID`.
+	// Provider is the `AuthProvider`.
+	// Meta.name is retrieved from the UserAttribute resource referenced by `Spec.UserID`.
 
 	// GroupPrincipals holds detailed group information
 	// This is not supported here.
 	// The primary location for this information are the UserAttribute resources.
-	// The norman Token maintains GPs only as legacy.
+	// The norman tokens maintain this only as legacy.
 	// The ext tokens here shed this legacy.
 
-	// ProviderInfo provides provider-specific details
-	ProviderInfo map[string]string `json:"providerInfo"`
+	// ProviderInfo provides provider-specific information.
+	// This is not supported here.
+	// The actual primary storage for this is a regular k8s Secret associated with the User.
+	// The norman tokens maintains this only as legacy for the `access_token` of OIDC-based auth providers.
+	// The ext tokens here shed this legacy.
 
 	// Time of last change to the token
 	LastUpdateTime string `json:"lastUpdateTime"`
@@ -179,9 +126,11 @@ func (t *Token) GetUserPrincipal() apiv3.Principal {
 }
 
 func (t *Token) GetGroupPrincipals() []apiv3.Principal {
-	return nil
+	// Not supported. Legacy in Norman tokens.
+	return []apiv3.Principal{}
 }
 
 func (t *Token) GetProviderInfo() map[string]string {
-	return t.Status.ProviderInfo
+	// Not supported. Legacy in Norman tokens.
+	return map[string]string{}
 }

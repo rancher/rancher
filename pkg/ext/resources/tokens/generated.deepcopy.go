@@ -106,13 +106,6 @@ func (in *TokenSpec) DeepCopy() *TokenSpec {
 func (in *TokenStatus) DeepCopyInto(out *TokenStatus) {
 	*out = *in
 	in.UserPrincipal.DeepCopyInto(&out.UserPrincipal)
-	if in.ProviderInfo != nil {
-		in, out := &in.ProviderInfo, &out.ProviderInfo
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	return
 }
 

@@ -378,7 +378,7 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 					},
 					"authProvider": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AuthProvider names the auth provider managing the user",
+							Description: "AuthProvider names the auth provider managing the user.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -386,25 +386,9 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 					},
 					"userPrincipal": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UserPrincipal holds the detailed user data",
+							Description: "UserPrincipal holds the detailed user data.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"),
-						},
-					},
-					"providerInfo": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ProviderInfo provides provider-specific details",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
 						},
 					},
 					"lastUpdateTime": {
@@ -416,7 +400,7 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"expired", "expiredAt", "authProvider", "userPrincipal", "providerInfo", "lastUpdateTime"},
+				Required: []string{"expired", "expiredAt", "authProvider", "userPrincipal", "lastUpdateTime"},
 			},
 		},
 		Dependencies: []string{

@@ -20,9 +20,13 @@ func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 	}
 	wContext.Core.Namespace().Create(ns)
 
-	tokenStore := tokens.NewTokenStore(wContext.Core.Secret(), wContext.Core.Secret().Cache(),
+	tokenStore := tokens.NewTokenStore(
+		wContext.Core.Secret(),
+		wContext.Core.Secret().Cache(),
 		wContext.K8s.AuthorizationV1().SubjectAccessReviews(),
-		wContext.Mgmt.UserAttribute())
+		wContext.Mgmt.UserAttribute(),
+		wContext.Mgmt.User(),
+	)
 	tokenHandler := NewStoreDelegate(tokenStore, tokens.SchemeGroupVersion.WithKind(tokens.TokenAPIResource.Kind))
 	tokenWebService := tokenHandler.WebService(tokens.TokenName, tokens.TokenAPIResource.Namespaced)
 

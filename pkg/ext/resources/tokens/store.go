@@ -31,17 +31,22 @@ type TokenStore struct {
 	secretCache         v1.SecretCache
 	sar                 authzv1.SubjectAccessReviewInterface
 	userAttributeClient v3.UserAttributeController
+	userClient          v3.UserController
 }
 
-func NewTokenStore(secretClient v1.SecretClient,
-	secretCache v1.SecretCache,
-	sar authzv1.SubjectAccessReviewInterface,
-	uaClient v3.UserAttributeController) types.Store[*Token, *TokenList] {
+func NewTokenStore(
+	secretClient v1.SecretClient,
+	secretCache  v1.SecretCache,
+	sar          authzv1.SubjectAccessReviewInterface,
+	uaClient     v3.UserAttributeController,
+	userClient   v3.UserController,
+) types.Store[*Token, *TokenList] {
 	tokenStore := TokenStore{
 		secretClient:        secretClient,
 		secretCache:         secretCache,
 		sar:                 sar,
 		userAttributeClient: uaClient,
+		userClient:          userClient,
 	}
 	return &tokenStore
 }
@@ -70,33 +75,47 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	token.Status.TokenValue = tokenValue
 	token.Status.TokenHash = hashedValue
 
-	// XXX TODO AK // Fill UserPrincipal
-	// XXX TODO AK // Fill ProviderInfo
-
 	// Get derived User information for the token.
 	//
-	// NOTE: The creation process is not given AuthProvider, User- and GroupPrincipals.
+	// NOTE: The creation process is not given `AuthProvider`, `User-` and `GroupPrincipals`.
 	// ..... This information have to be retrieved from somewhere else in the system.
 	// ..... This is in contrast to the Norman tokens who get this information either
 	// ..... as part of the Login process, or by copying the information out of the
 	// ..... base token the new one is derived from. None of that is possible here.
 	//
-	// A User's AuthProvider information is generally captured in their associated UserAttribute
-	// resource. This is what we retrieve and use here now to fill these fields of the token to
-	// be.
+	// A User's `AuthProvider` information is generally captured in their associated
+	// `UserAttribute` resource. This is what we retrieve and use here now to fill these fields
+	// of the token to be.
+	//
+	// `ProviderInfo` is not supported. Norman tokens have it as legacy fallback to hold the
+	// `access_token` data managed by OIDC-based auth providers. The actual primary storage for
+	// this is actually a regular k8s Secret associated with the User.
+	//
+	// `UserPrincipal` is filled in part with standard information, and in part from the
+	// associated `User`s fields.
 
 	attribs, err := t.userAttributeClient.Get(token.Spec.UserID, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user attributes: %w", err)
 	}
 	if attribs != nil {
-		return nil, fmt.Errorf("failed to get user attributes: %w", err)
+		return nil, fmt.Errorf("failed to get user attributes")
 	}
 
 	if len(attribs.ExtraByProvider) != 1 {
 		return nil, fmt.Errorf("bad user attributes: bogus ExtraByProvider, empty or ambigous")
 	}
-	// len == 1 => The single key in the map names the auth provider, and where to look in GPs.
+
+	user, err := t.userClient.Get(token.Spec.UserID, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	}
+	if user != nil {
+		return nil, fmt.Errorf("failed to get user")
+	}
+
+	// (len == 1) => The single key in the UA map names the auth provider
+	// (and where to look in GPs, if we were using GPs)
 	var authProvider string
 	for ap, _ := range attribs.ExtraByProvider {
 		authProvider = ap
@@ -104,6 +123,11 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	}
 
 	token.Status.AuthProvider = authProvider
+	token.Status.UserPrincipal.DisplayName = user.DisplayName
+	token.Status.UserPrincipal.LoginName = user.Username // See also attribs.ExtraByProvider[ap]["username"][0]
+	token.Status.UserPrincipal.ObjectMeta.Name = attribs.ExtraByProvider[authProvider]["principalid"][0]
+	token.Status.UserPrincipal.PrincipalType = "user"
+	token.Status.UserPrincipal.Provider = authProvider
 
 	token.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 	secret, err := secretFromToken(token)
@@ -422,10 +446,6 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 	if err != nil {
 		return nil, err
 	}
-	pi, err := json.Marshal(token.Status.ProviderInfo)
-	if err != nil {
-		return nil, err
-	}
 
 	// inject default on creation
 	ttl := token.Spec.TTL
@@ -466,7 +486,6 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 
 	secret.StringData["auth-provider"] = token.Status.AuthProvider
 	secret.StringData["user-principal"] = string(up)
-	secret.StringData["provider-info"] = string(pi)
 
 	return secret, nil
 }
@@ -492,12 +511,7 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 
 	// status
 	var up apiv3.Principal
-	err = json.Unmarshal(secret.Data["user-principals"], &up)
-	if err != nil {
-		return nil, err
-	}
-	var pi map[string]string
-	err = json.Unmarshal(secret.Data["provider-info"], &pi)
+	err = json.Unmarshal(secret.Data["user-principal"], &up)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +539,6 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			TokenHash:       string(secret.Data["hashedToken"]),
 			AuthProvider:    string(secret.Data["auth-provider"]),
 			UserPrincipal:   up,
-			ProviderInfo:    pi,
 			LastUpdateTime:  string(secret.Data["last-update-time"]),
 		},
 	}
