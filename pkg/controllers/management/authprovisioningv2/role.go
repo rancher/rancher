@@ -335,6 +335,7 @@ func (h *handler) getResourceNames(resourceMatch resourceMatch, cluster *v1.Clus
 		}
 		result = append(result, objMeta.GetName())
 	}
+	sort.Strings(result)
 	return result, nil
 }
 
