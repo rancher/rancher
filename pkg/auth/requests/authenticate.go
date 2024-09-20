@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
-	exttypes "github.com/rancher/rancher/pkg/ext/resources/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
@@ -69,10 +68,9 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 
 	// Rancher Backend direct Ext Token Access via in-built custom handler store instance
 	wContext := mgmtCtx.Wrangler
-	extTokenStore := exttokens.NewTokenStore(
+	extTokenStore := exttokens.NewSystemTokenStore(
 		wContext.Core.Secret(),
 		wContext.Core.Secret().Cache(),
-		wContext.K8s.AuthorizationV1().SubjectAccessReviews(),
 		wContext.Mgmt.UserAttribute(),
 		wContext.Mgmt.User(),
 	)
@@ -101,7 +99,7 @@ type tokenAuthenticator struct {
 	userLister          v3.UserLister
 	clusterRouter       ClusterRouter
 	refreshUser         func(userID string, force bool)
-	extTokenStore       exttypes.Store[*exttokens.Token, *exttokens.TokenList]
+	extTokenStore       *exttokens.SystemTokenStore
 }
 
 const (
@@ -126,7 +124,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, err
 	}
 
-	if !token.IsEnabled() {
+	if !token.GetIsEnabled() {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "user's token is not enabled")
 	}
 	cluster := token.ObjClusterName()
@@ -259,7 +257,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		// Roughly the same process as for legacy tokens, using a different store.
 		// No indexer/cache in play here.
 
-		storedToken, err := a.extTokenStore.GetCore(extTokenName, &metav1.GetOptions{})
+		storedToken, err := a.extTokenStore.Get(extTokenName, &metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil, ErrMustAuthenticate
