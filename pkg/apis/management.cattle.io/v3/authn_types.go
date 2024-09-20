@@ -51,8 +51,12 @@ func (t *Token) GetName() string {
 	return t.ObjectMeta.Name
 }
 
-func (t *Token) IsEnabled() bool {
+func (t *Token) GetIsEnabled() bool {
 	return t.Enabled == nil || *t.Enabled
+}
+
+func (t *Token) GetIsDerived() bool {
+	return t.IsDerived
 }
 
 func (t *Token) GetAuthProvider() string {

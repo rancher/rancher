@@ -4,7 +4,8 @@ import v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 type TokenAccessor interface {
 	GetName() string
-	IsEnabled() bool
+	GetIsEnabled() bool
+	GetIsDerived() bool
 	GetAuthProvider() string
 	GetUserID() string
 	GetUserPrincipal() v3.Principal

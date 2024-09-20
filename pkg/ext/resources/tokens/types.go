@@ -105,8 +105,12 @@ func (t *Token) GetName() string {
 	return t.ObjectMeta.Name
 }
 
-func (t *Token) IsEnabled() bool {
+func (t *Token) GetIsEnabled() bool {
 	return t.Spec.Enabled
+}
+
+func (t *Token) GetIsDerived() bool {
+	return t.Spec.IsDerived
 }
 
 func (t *Token) GetUserID() string {
