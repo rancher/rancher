@@ -39,6 +39,8 @@ func (ra *RestrictedAdminTestSuite) SetupSuite() {
 
 	ra.client = client
 
+	provisioning.DisableUpdateConfig(ra.client)
+
 	log.Info("Getting cluster name from the config file and append cluster details in the struct.")
 	clusterName := client.RancherConfig.ClusterName
 	require.NotEmptyf(ra.T(), clusterName, "Cluster name to install should be set")
