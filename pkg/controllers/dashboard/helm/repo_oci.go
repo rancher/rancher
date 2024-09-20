@@ -105,7 +105,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 
-	err = ensureIndexConfigMap(clusterRepo, newStatus, o.configMapController)
+	err = ensureIndexConfigMap(newStatus, o.configMapController)
 	if err != nil {
 		err = fmt.Errorf("failed to ensure index configmap: %w", err)
 		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
