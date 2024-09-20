@@ -1,14 +1,13 @@
-package snapshot
+package etcdsnapshot
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
-	"github.com/rancher/rancher/tests/v2/actions/etcdsnapshot"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/services"
 	deploy "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
@@ -30,20 +29,22 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
+	InitialIngress  = "ingress-before-restore"
+	InitialWorkload = "wload-before-restore"
+
 	all                          = "all"
 	containerImage               = "nginx"
 	containerName                = "nginx"
 	defaultNamespace             = "default"
 	DeploymentSteveType          = "apps.deployment"
 	isCattleLabeled              = true
-	initialIngress               = "ingress-before-restore"
-	initialWorkload              = "wload-before-restore"
 	ingressSteveType             = "networking.k8s.io.ingress"
 	ingressPath                  = "/index.html"
 	K3S                          = "k3s"
@@ -60,9 +61,80 @@ const (
 	windowsContainerName         = "iis"
 )
 
-func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, etcdRestore *etcdsnapshot.Config, containerImage string) {
-	initialIngressName := namegen.AppendRandomString(initialIngress)
-	initialWorkloadName := namegen.AppendRandomString(initialWorkload)
+func createAndVerifyResources(steveclient *steveV1.Client) (*corev1.PodTemplateSpec, *v1.Deployment, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject, error) {
+
+	var containerTemplate corev1.Container
+	initialIngressName := namegen.AppendRandomString(InitialIngress)
+	initialWorkloadName := namegen.AppendRandomString(InitialWorkload)
+
+	containerTemplate = workloads.NewContainer(containerName, containerImage, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
+
+	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil, map[string]string{})
+	deploymentTemplate := workloads.NewDeploymentTemplate(initialWorkloadName, defaultNamespace, podTemplate, isCattleLabeled, nil)
+
+	service := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceAppendName + initialWorkloadName,
+			Namespace: defaultNamespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{
+				{
+					Name: port,
+					Port: 80,
+				},
+			},
+			Selector: deploymentTemplate.Spec.Template.Labels,
+		},
+	}
+
+	deploymentResp, err := createDeployment(steveclient, initialWorkloadName, deploymentTemplate)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	err = deploy.VerifyDeployment(steveclient, deploymentResp)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	if initialWorkloadName != deploymentResp.ObjectMeta.Name {
+		return nil, nil, nil, nil, nil, errors.New("deployment name doesn't match spec")
+	}
+
+	serviceResp, err := services.CreateService(steveclient, service)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	err = services.VerifyService(steveclient, serviceResp)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	if serviceAppendName+initialWorkloadName != serviceResp.ObjectMeta.Name {
+		return nil, nil, nil, nil, nil, errors.New("service name doesn't match spec")
+	}
+
+	path := extensionsingress.NewIngressPathTemplate(networking.PathTypeExact, ingressPath, serviceAppendName+initialWorkloadName, 80)
+	ingressTemplate := extensionsingress.NewIngressTemplate(initialIngressName, defaultNamespace, "", []networking.HTTPIngressPath{path})
+
+	ingressResp, err := extensionsingress.CreateIngress(steveclient, initialIngressName, ingressTemplate)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	err = ingresses.WaitIngress(steveclient, ingressResp, initialIngressName)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	if initialIngressName != ingressResp.ObjectMeta.Name {
+		return nil, nil, nil, nil, nil, errors.New("ingress name doesn't match spec")
+	}
+
+	return &podTemplate, deploymentTemplate, deploymentResp, serviceResp, ingressResp, nil
+}
+
+func SnapshotRestore(t *testing.T, client *rancher.Client, clusterName string, etcdRestore *Config, containerImage string) {
 
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
@@ -80,57 +152,12 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 		isRKE1 = true
 	}
 
-	var containerTemplate corev1.Container
-
-	containerTemplate = workloads.NewContainer(containerName, containerImage, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
-
-	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil, map[string]string{})
-	deployment := workloads.NewDeploymentTemplate(initialWorkloadName, defaultNamespace, podTemplate, isCattleLabeled, nil)
-
-	service := corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAppendName + initialWorkloadName,
-			Namespace: defaultNamespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name: port,
-					Port: 80,
-				},
-			},
-			Selector: deployment.Spec.Template.Labels,
-		},
-	}
-
-	deploymentResp, err := createDeployment(steveclient, initialWorkloadName, deployment)
+	podTemplate, deploymentTemplate, deploymentResp, serviceResp, ingressResp, err := createAndVerifyResources(steveclient)
 	require.NoError(t, err)
-
-	err = deploy.VerifyDeployment(steveclient, deploymentResp)
-	require.NoError(t, err)
-	require.Equal(t, initialWorkloadName, deploymentResp.ObjectMeta.Name)
-
-	serviceResp, err := services.CreateService(steveclient, service)
-	require.NoError(t, err)
-
-	err = services.VerifyService(steveclient, serviceResp)
-	require.NoError(t, err)
-	require.Equal(t, serviceAppendName+initialWorkloadName, serviceResp.ObjectMeta.Name)
-
-	path := extensionsingress.NewIngressPathTemplate(networking.PathTypeExact, ingressPath, serviceAppendName+initialWorkloadName, 80)
-	ingressTemplate := extensionsingress.NewIngressTemplate(initialIngressName, defaultNamespace, "", []networking.HTTPIngressPath{path})
-
-	ingressResp, err := extensionsingress.CreateIngress(steveclient, initialIngressName, ingressTemplate)
-	require.NoError(t, err)
-
-	err = ingresses.WaitIngress(steveclient, ingressResp, initialIngressName)
-	require.NoError(t, err)
-	require.Equal(t, initialIngressName, ingressResp.ObjectMeta.Name)
 
 	if isRKE1 {
-		cluster, snapshotName, postDeploymentResp, postServiceResp := snapshotRKE1(t, client, podTemplate, deployment, clusterName, clusterID, etcdRestore, isRKE1)
-		restoreRKE1(t, client, snapshotName, etcdRestore, cluster, clusterID)
+		cluster, snapshotName, postDeploymentResp, postServiceResp := SnapshotRKE1(t, client, podTemplate, deploymentTemplate, clusterName, clusterID, etcdRestore, isRKE1)
+		RestoreRKE1(t, client, snapshotName, etcdRestore, cluster, clusterID)
 
 		_, err = steveclient.SteveType(DeploymentSteveType).ByID(postDeploymentResp.ID)
 		require.Error(t, err)
@@ -139,8 +166,8 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 		require.Error(t, err)
 
 	} else {
-		cluster, snapshotName, postDeploymentResp, postServiceResp := snapshotV2Prov(t, client, podTemplate, deployment, clusterName, clusterID, etcdRestore, isRKE1)
-		restoreV2Prov(t, client, snapshotName, etcdRestore, cluster, clusterID)
+		cluster, snapshotName, postDeploymentResp, postServiceResp := SnapshotV2Prov(t, client, podTemplate, deploymentTemplate, clusterName, clusterID, etcdRestore, isRKE1)
+		RestoreV2Prov(t, client, snapshotName, etcdRestore, cluster, clusterID)
 
 		_, err = steveclient.SteveType(DeploymentSteveType).ByID(postDeploymentResp.ID)
 		require.Error(t, err)
@@ -160,8 +187,8 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 	require.NoError(t, err)
 }
 
-func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
-	etcdRestore *etcdsnapshot.Config, isRKE1 bool) (*management.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
+func SnapshotRKE1(t *testing.T, client *rancher.Client, podTemplate *corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
+	etcdRestore *Config, isRKE1 bool) (*management.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
 	existingSnapshots, err := extensionsetcdsnapshot.GetRKE1Snapshots(client, clusterID)
 	require.NoError(t, err)
 
@@ -178,9 +205,9 @@ func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTe
 	podErrors := pods.StatusPods(client, clusterID)
 	assert.Empty(t, podErrors)
 
-	postDeploymentResp, postServiceResp := createPostBackupWorkloads(t, client, clusterID, podTemplate, deployment)
+	postDeploymentResp, postServiceResp := createPostBackupWorkloads(t, client, clusterID, *podTemplate, deployment)
 
-	etcdNodeCount, _ := etcdsnapshot.MatchNodeToAnyEtcdRole(client, clusterID)
+	etcdNodeCount, _ := MatchNodeToAnyEtcdRole(client, clusterID)
 	snapshotToRestore, err := provisioning.VerifySnapshots(client, clusterName, etcdNodeCount+len(existingSnapshots), isRKE1)
 	require.NoError(t, err)
 
@@ -230,7 +257,7 @@ func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTe
 	return cluster, snapshotToRestore, postDeploymentResp, postServiceResp
 }
 
-func restoreRKE1(t *testing.T, client *rancher.Client, snapshotName string, etcdRestore *etcdsnapshot.Config, oldCluster *management.Cluster, clusterID string) {
+func RestoreRKE1(t *testing.T, client *rancher.Client, snapshotName string, etcdRestore *Config, oldCluster *management.Cluster, clusterID string) {
 	// Give the option to restore the same snapshot multiple times. By default, it is set to 1.
 	for i := 0; i < etcdRestore.RecurringRestores; i++ {
 		snapshotRKE1Restore := &management.RestoreFromEtcdBackupInput{
@@ -265,8 +292,8 @@ func restoreRKE1(t *testing.T, client *rancher.Client, snapshotName string, etcd
 	}
 }
 
-func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
-	etcdRestore *etcdsnapshot.Config, isRKE1 bool) (*apisV1.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
+func SnapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate *corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
+	etcdRestore *Config, isRKE1 bool) (*apisV1.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
 	existingSnapshots, err := extensionsetcdsnapshot.GetRKE2K3SSnapshots(client, clusterName)
 	require.NoError(t, err)
 
@@ -283,9 +310,9 @@ func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.Pod
 	podErrors := pods.StatusPods(client, clusterID)
 	assert.Empty(t, podErrors)
 
-	postDeploymentResp, postServiceResp := createPostBackupWorkloads(t, client, clusterID, podTemplate, deployment)
+	postDeploymentResp, postServiceResp := createPostBackupWorkloads(t, client, clusterID, *podTemplate, deployment)
 
-	etcdNodeCount, _ := etcdsnapshot.MatchNodeToAnyEtcdRole(client, clusterID)
+	etcdNodeCount, _ := MatchNodeToAnyEtcdRole(client, clusterID)
 	snapshotToRestore, err := provisioning.VerifySnapshots(client, clusterName, etcdNodeCount+len(existingSnapshots), isRKE1)
 	require.NoError(t, err)
 
@@ -338,7 +365,7 @@ func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.Pod
 	return cluster, snapshotToRestore, postDeploymentResp, postServiceResp
 }
 
-func restoreV2Prov(t *testing.T, client *rancher.Client, snapshotName string, etcdRestore *etcdsnapshot.Config, cluster *apisV1.Cluster, clusterID string) {
+func RestoreV2Prov(t *testing.T, client *rancher.Client, snapshotName string, etcdRestore *Config, cluster *apisV1.Cluster, clusterID string) {
 	clusterObject, _, err := clusters.GetProvisioningClusterByName(client, cluster.Name, namespace)
 	require.NoError(t, err)
 
@@ -419,7 +446,7 @@ func createPostBackupWorkloads(t *testing.T, client *rancher.Client, clusterID s
 }
 
 // This function waits for retentionlimit+1 automatic snapshots to be taken before verifying that the retention limit is respected
-func createSnapshotsUntilRetentionLimit(t *testing.T, client *rancher.Client, clusterName string, retentionLimit int, timeBetweenSnapshots int) {
+func CreateSnapshotsUntilRetentionLimit(t *testing.T, client *rancher.Client, clusterName string, retentionLimit int, timeBetweenSnapshots int) {
 	v1ClusterID, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
 	if v1ClusterID == "" {
 		v3ClusterID, err := clusters.GetClusterIDByName(client, clusterName)
@@ -437,7 +464,7 @@ func createSnapshotsUntilRetentionLimit(t *testing.T, client *rancher.Client, cl
 		logrus.Infof("Waiting %v hours for %v automatic snapshots to be taken", sleepNum, (retentionLimit + 1))
 		time.Sleep(time.Duration(sleepNum)*time.Hour + time.Minute*5)
 
-		err := etcdsnapshot.RKE1RetentionLimitCheck(client, clusterName)
+		err := RKE1RetentionLimitCheck(client, clusterName)
 		require.NoError(t, err)
 
 	} else {
@@ -445,7 +472,7 @@ func createSnapshotsUntilRetentionLimit(t *testing.T, client *rancher.Client, cl
 		logrus.Infof("Waiting %v minutes for %v automatic snapshots to be taken", sleepNum, (retentionLimit + 1))
 		time.Sleep(time.Duration(sleepNum)*time.Minute + time.Minute*5)
 
-		err := etcdsnapshot.RKE2K3SRetentionLimitCheck(client, clusterName)
+		err := RKE2K3SRetentionLimitCheck(client, clusterName)
 		require.NoError(t, err)
 	}
 }

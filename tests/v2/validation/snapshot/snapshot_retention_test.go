@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/etcdsnapshot"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
@@ -101,14 +102,14 @@ func (s *SnapshotRetentionTestSuite) TestAutomaticSnapshotRetention() {
 	for _, tt := range tests {
 		s.Run(tt.testName, func() {
 			config := s.snapshotConfig
-			createSnapshotsUntilRetentionLimit(s.T(), s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
+			etcdsnapshot.CreateSnapshotsUntilRetentionLimit(s.T(), s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
 		})
 	}
 }
 
 func (s *SnapshotRetentionTestSuite) TestAutomaticSnapshotRetentionDynamic() {
 	config := s.snapshotConfig
-	createSnapshotsUntilRetentionLimit(s.T(), s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
+	etcdsnapshot.CreateSnapshotsUntilRetentionLimit(s.T(), s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
 }
 
 // In order for 'go test' to run this suite, we need to create
