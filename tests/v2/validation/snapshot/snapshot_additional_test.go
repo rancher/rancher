@@ -121,7 +121,7 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceNodes() {
 
 		if strings.Contains(tt.name, "S3") {
 			s.Run(tt.name, func() {
-				snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
+				etcdsnapshot.SnapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
 			})
 		} else {
 			s.T().Skip("Skipping test; only S3 enabled clusters are enabled for this test")
@@ -183,7 +183,7 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotRecurringRestores() {
 		}
 
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
+			etcdsnapshot.SnapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
 		})
 	}
 }
