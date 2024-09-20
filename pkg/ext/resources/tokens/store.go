@@ -368,6 +368,24 @@ func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string
 	if _, err := t.checkAdmin("delete", token, userInfo); err != nil {
 		return err
 	}
+
+	err = t.secretClient.Delete(TokenNamespace, name, &metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to delete secret %s: %w", name, err)
+	}
+	return nil
+}
+
+func (t *SystemTokenStore) Delete(name string, opts *metav1.DeleteOptions) error {
+	_, err := t.secretCache.Get(TokenNamespace, name)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("unable to confirm secret existence %s: %w", name, err)
+		}
+		// not found, nothing to do
+		return nil
+	}
+
 	err = t.secretClient.Delete(TokenNamespace, name, &metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to delete secret %s: %w", name, err)

@@ -2,6 +2,7 @@ package providerrefresh
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -27,6 +29,14 @@ type UserAuthRefresher interface {
 }
 
 func NewUserAuthRefresher(ctx context.Context, scaledContext *config.ScaledContext) UserAuthRefresher {
+	wContext := scaledContext.Wrangler
+	extTokenStore := exttokens.NewSystemTokenStore(
+		wContext.Core.Secret(),
+		wContext.Core.Secret().Cache(),
+		wContext.Mgmt.UserAttribute(),
+		wContext.Mgmt.User(),
+	)
+
 	return &refresher{
 		tokenLister:         scaledContext.Management.Tokens("").Controller().Lister(),
 		tokens:              scaledContext.Management.Tokens(""),
@@ -34,6 +44,7 @@ func NewUserAuthRefresher(ctx context.Context, scaledContext *config.ScaledConte
 		tokenMGR:            tokens.NewManager(ctx, scaledContext),
 		userAttributes:      scaledContext.Management.UserAttributes(""),
 		userAttributeLister: scaledContext.Management.UserAttributes("").Controller().Lister(),
+		extTokenStore:       extTokenStore,
 	}
 }
 
@@ -48,6 +59,7 @@ type refresher struct {
 	intervalInSeconds   int64
 	unparsedMaxAge      string
 	maxAge              time.Duration
+	extTokenStore       *exttokens.SystemTokenStore
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
@@ -145,9 +157,9 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 
 func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 	var (
-		derivedTokenList      []*v3.Token
+		derivedTokenList      []accessor.TokenAccessor
 		derivedTokens         map[string][]accessor.TokenAccessor
-		loginTokenList        []*v3.Token
+		loginTokenList        []accessor.TokenAccessor
 		loginTokens           map[string][]accessor.TokenAccessor
 		canLogInAtAll         bool
 		errorConfirmingLogins bool
@@ -163,10 +175,30 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	loginTokens = make(map[string][]accessor.TokenAccessor)
 	derivedTokens = make(map[string][]accessor.TokenAccessor)
 
-	allTokens, err := r.tokenLister.List("", labels.Everything())
+	// List all tokens for the user, norman and ext.
+
+	allNormanTokens, err := r.tokenLister.List("", labels.Everything())
 	if err != nil {
 		return nil, err
 	}
+
+	allExtTokens, err := r.extTokenStore.List(&metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge the separate lists into a unified set
+
+	allTokens := []accessor.TokenAccessor{}
+	for _, token := range allNormanTokens {
+		allTokens = append(allTokens, token)
+	}
+	for _, eToken := range allExtTokens.Items {
+		ex := eToken
+		allTokens = append(allTokens, &ex)
+	}
+
+	// split into derived versus login tokens
 
 	for providerName := range providers.ProviderNames {
 		loginTokens[providerName] = []accessor.TokenAccessor{}
@@ -174,18 +206,21 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	for _, token := range allTokens {
-		if token.UserID != user.Name {
+		if token.GetUserID() != user.Name {
 			continue
 		}
 
-		if token.IsDerived {
-			derivedTokens[token.AuthProvider] = append(derivedTokens[token.AuthProvider], token)
+		ap := token.GetAuthProvider()
+		if token.GetIsDerived() {
+			derivedTokens[ap] = append(derivedTokens[ap], token)
 			derivedTokenList = append(derivedTokenList, token)
 		} else {
-			loginTokens[token.AuthProvider] = append(loginTokens[token.AuthProvider], token)
+			loginTokens[ap] = append(loginTokens[ap], token)
 			loginTokenList = append(loginTokenList, token)
 		}
 	}
+
+	// per provider ...
 
 	for providerName := range providers.ProviderNames {
 		// We have to find out if the user has a userprincipal for the provider.
@@ -293,11 +328,20 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			}
 		}
 
-		// If the user doesn't have access through this provider, we want to remove their login tokens for this provider
+		// If the user doesn't have access through this provider, we want to remove their
+		// login tokens for this provider
 		if !canAccessProvider && !errorConfirmingLogins {
 			for _, token := range loginTokens[providerName] {
-				/// XXX TODO AK deletion is type dependent - mgmt vs ext token
-				err := r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
+				// Deletion is type-dependent
+				var err error
+				switch token.(type) {
+				case *v3.Token:
+					err = r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
+				case *exttokens.Token:
+					err = r.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
+				default:
+					err = fmt.Errorf("Unable to delete token of unknown type %T", token)
+				}
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						continue
@@ -315,9 +359,20 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 	// user has been deactivated, disable their tokens
 	for _, token := range derivedTokenList {
-		token = token.DeepCopy()
-		token.Enabled = pointer.Bool(false)
-		_, err := r.tokenMGR.UpdateToken(token)
+		// Update is type-dependent
+		var err error
+		switch token.(type) {
+		case *v3.Token:
+			normanToken := token.(*v3.Token).DeepCopy()
+			normanToken.Enabled = pointer.Bool(false)
+			_, err = r.tokenMGR.UpdateToken(normanToken)
+		case *exttokens.Token:
+			extToken := token.(*exttokens.Token).DeepCopy()
+			extToken.Spec.Enabled = false
+			r.extTokenStore.Update(extToken, &metav1.UpdateOptions{})
+		default:
+			err = fmt.Errorf("Unable to update token of unknown type %T", token)
+		}
 		if err != nil {
 			return nil, err
 		}
