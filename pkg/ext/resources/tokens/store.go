@@ -27,9 +27,15 @@ const ThirtyDays = 30*24*60*60*100 // 30 days in milliseconds.
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 type TokenStore struct {
+	SystemTokenStore
+	sar                 authzv1.SubjectAccessReviewInterface
+}
+
+// +k8s:openapi-gen=false
+// +k8s:deepcopy-gen=false
+type SystemTokenStore struct {
 	secretClient        v1.SecretClient
 	secretCache         v1.SecretCache
-	sar                 authzv1.SubjectAccessReviewInterface
 	userAttributeClient v3.UserAttributeController
 	userClient          v3.UserController
 }
@@ -42,9 +48,26 @@ func NewTokenStore(
 	userClient   v3.UserController,
 ) types.Store[*Token, *TokenList] {
 	tokenStore := TokenStore{
+		SystemTokenStore: SystemTokenStore{
+			secretClient:        secretClient,
+			secretCache:         secretCache,
+			userAttributeClient: uaClient,
+			userClient:          userClient,
+		},
+		sar: sar,
+	}
+	return &tokenStore
+}
+
+func NewSystemTokenStore(
+	secretClient v1.SecretClient,
+	secretCache  v1.SecretCache,
+	uaClient     v3.UserAttributeController,
+	userClient   v3.UserController,
+) *SystemTokenStore {
+	tokenStore := SystemTokenStore{
 		secretClient:        secretClient,
 		secretCache:         secretCache,
-		sar:                 sar,
 		userAttributeClient: uaClient,
 		userClient:          userClient,
 	}
@@ -158,6 +181,15 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 		return nil, err
 	}
 
+	return t.SystemTokenStore.update (isadmin, token, opts)
+
+}
+
+func (t *SystemTokenStore) Update(token *Token, opts *metav1.UpdateOptions) (*Token, error) {
+	return t.update (true, token, opts)
+}
+
+func (t *SystemTokenStore) update(isadmin bool, token *Token, opts *metav1.UpdateOptions) (*Token, error) {
 	currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get current token %s: %w", token.Name, err)
@@ -208,7 +240,7 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*Token, error) {
 	// have to get token first before we can check permissions on user mismatch
 
-	token, err := t.GetCore (name, opts)
+	token, err := t.SystemTokenStore.Get (name, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +251,7 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 	return token, nil
 }
 
-func (t *TokenStore) GetCore(name string, opts *metav1.GetOptions) (*Token, error) {
+func (t *SystemTokenStore) Get(name string, opts *metav1.GetOptions) (*Token, error) {
 	// Core token retrieval from backing secrets
 	currentSecret, err := t.secretCache.Get(TokenNamespace, name)
 	if err != nil {
@@ -242,6 +274,15 @@ func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if user has full permissions on tokens: %w", err)
 	}
+	return t.SystemTokenStore.list(isadmin, userInfo.GetName(), opts)
+}
+
+func (t *SystemTokenStore) List(opts *metav1.ListOptions) (*TokenList, error) {
+	return t.list(true, "", opts)
+}
+
+func (t *SystemTokenStore) list(isadmin bool, user string, opts *metav1.ListOptions) (*TokenList, error) {
+	// Core token listing from backing secrets
 	secrets, err := t.secretClient.List(TokenNamespace, *opts)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list tokens: %w", err)
@@ -254,7 +295,7 @@ func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.
 			continue
 		}
 		// users can only list their own tokens, unless they have full permissions on this group
-		if !isadmin && token.Spec.UserID != userInfo.GetName() {
+		if !isadmin && token.Spec.UserID != user {
 			continue
 		}
 		tokens = append(tokens, *token)
