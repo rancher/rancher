@@ -27,6 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	imageName = "nginx"
+)
+
 type WorkloadTestSuite struct {
 	suite.Suite
 	client  *rancher.Client
@@ -146,7 +150,7 @@ func (w *WorkloadTestSuite) TestWorkloadCronjob() {
 
 	containerTemplate := workloads.NewContainer(
 		containerName,
-		"nginx",
+		imageName,
 		pullPolicy,
 		[]corev1.VolumeMount{},
 		[]corev1.EnvFromSource{},
@@ -182,7 +186,7 @@ func (w *WorkloadTestSuite) TestWorkloadStatefulset() {
 
 	containerTemplate := workloads.NewContainer(
 		containerName,
-		"nginx",
+		imageName,
 		pullPolicy,
 		[]corev1.VolumeMount{},
 		[]corev1.EnvFromSource{},
@@ -218,7 +222,7 @@ func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
 	upgradeDeployment, err := deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 2, "", "", false, false)
 	require.NoError(w.T(), err)
 
-	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "1", "nginx", 2)
+	w.validateDeploymentUpgrade(namespace.Name, upgradeDeployment, "1", imageName, 2)
 
 	containerName := namegen.AppendRandomString("updatetestcontainer")
 	newContainerTemplate := workloads.NewContainer(containerName,
@@ -235,7 +239,7 @@ func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
 	upgradeDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment)
 	require.NoError(w.T(), err)
 
-	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "2", "redis", 2)
+	w.validateDeploymentUpgrade(namespace.Name, upgradeDeployment, "2", "redis", 2)
 
 	containerName = namegen.AppendRandomString("updatetestcontainertwo")
 	newContainerTemplate = workloads.NewContainer(containerName,
@@ -254,28 +258,86 @@ func (w *WorkloadTestSuite) TestWorkloadUpgrade() {
 	_, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment)
 	require.NoError(w.T(), err)
 
-	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "3", "ubuntu", 2)
+	w.validateDeploymentUpgrade(namespace.Name, upgradeDeployment, "3", "ubuntu", 2)
 
 	logRollback, err := deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 1)
 	require.NoError(w.T(), err)
 	require.NotEmpty(w.T(), logRollback)
 
-	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "4", "nginx", 2)
+	w.validateDeploymentUpgrade(namespace.Name, upgradeDeployment, "4", imageName, 2)
 
 	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 2)
 	require.NoError(w.T(), err)
 	require.NotEmpty(w.T(), logRollback)
 
-	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "5", "redis", 2)
+	w.validateDeploymentUpgrade(namespace.Name, upgradeDeployment, "5", "redis", 2)
 
 	logRollback, err = deployment.RollbackDeployment(w.client, w.cluster.ID, namespace.Name, upgradeDeployment.Name, 3)
 	require.NoError(w.T(), err)
 	require.NotEmpty(w.T(), logRollback)
 
-	validateDeploymentUpgrade(w, namespace.Name, upgradeDeployment, "6", "ubuntu", 2)
+	w.validateDeploymentUpgrade(namespace.Name, upgradeDeployment, "6", "ubuntu", 2)
 }
 
-func validateDeploymentUpgrade(w *WorkloadTestSuite, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedContainerCount int) {
+func (w *WorkloadTestSuite) TestWorkloadPodScaleUp() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	scaleUpDeployment, err := deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	require.NoError(w.T(), err)
+
+	w.validateDeploymentScale(namespace.Name, scaleUpDeployment, imageName, 1)
+
+	replicas := int32(2)
+	scaleUpDeployment.Spec.Replicas = &replicas
+
+	scaleUpDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, scaleUpDeployment)
+	require.NoError(w.T(), err)
+
+	w.validateDeploymentScale(namespace.Name, scaleUpDeployment, imageName, 2)
+
+	replicas = int32(3)
+	scaleUpDeployment.Spec.Replicas = &replicas
+
+	scaleUpDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, scaleUpDeployment)
+	require.NoError(w.T(), err)
+
+	w.validateDeploymentScale(namespace.Name, scaleUpDeployment, imageName, 3)
+}
+
+func (w *WorkloadTestSuite) TestWorkloadPodScaleDown() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	scaleDownDeployment, err := deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 3, "", "", false, false)
+	require.NoError(w.T(), err)
+
+	w.validateDeploymentScale(namespace.Name, scaleDownDeployment, imageName, 3)
+
+	replicas := int32(2)
+	scaleDownDeployment.Spec.Replicas = &replicas
+
+	scaleDownDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, scaleDownDeployment)
+	require.NoError(w.T(), err)
+
+	w.validateDeploymentScale(namespace.Name, scaleDownDeployment, imageName, 2)
+
+	replicas = int32(1)
+	scaleDownDeployment.Spec.Replicas = &replicas
+
+	scaleDownDeployment, err = deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, scaleDownDeployment)
+	require.NoError(w.T(), err)
+
+	w.validateDeploymentScale(namespace.Name, scaleDownDeployment, imageName, 1)
+}
+
+func (w *WorkloadTestSuite) validateDeploymentUpgrade(namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) {
 	err := charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespaceName, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + appv1Deployment.Name,
 	})
@@ -289,7 +351,21 @@ func validateDeploymentUpgrade(w *WorkloadTestSuite, namespaceName string, appv1
 
 	countPods, err := pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespaceName, image)
 	require.NoError(w.T(), err)
-	require.Equal(w.T(), expectedContainerCount, countPods)
+	require.Equal(w.T(), expectedReplicas, countPods)
+}
+
+func (w *WorkloadTestSuite) validateDeploymentScale(namespaceName string, scaleDeployment *appv1.Deployment, image string, expectedReplicas int) {
+	err := charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + scaleDeployment.Name,
+	})
+	require.NoError(w.T(), err)
+
+	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespaceName, scaleDeployment)
+	require.NoError(w.T(), err)
+
+	countPods, err := pods.CountPodContainerRunningByImage(w.client, w.cluster.ID, namespaceName, image)
+	require.NoError(w.T(), err)
+	require.Equal(w.T(), expectedReplicas, countPods)
 }
 
 func TestWorkloadTestSuite(t *testing.T) {
