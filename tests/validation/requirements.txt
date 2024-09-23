@@ -5,7 +5,7 @@ boto3==1.21.46
 cryptography==42.0.4
 flake8==3.5.0
 invoke==1.2.0
-Jinja2==3.1.3
+Jinja2==3.1.4
 kubernetes==12.0.1
 paramiko==3.4.0
 python-digitalocean==1.13.2
