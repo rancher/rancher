@@ -10,6 +10,7 @@ mkdir -p build
 repo_index=${1}
 
 echo "Getting current index from ${repo_index}"
-curl -f -H 'Cache-Control: max-age=0,no-cache' -H 'Host: releases.rancher.com' "https://c.storage.googleapis.com/server-charts/${repo_index}/index.yaml?$(date +%s%N)" -o build/index.yaml
+# Using the s3 URL mitigates cache issues when building multiple charts in parallel
+curl -f "https://s3.amazonaws.com/charts.optimus.rancher.io/server-charts/${repo_index}/index.yaml" -o build/index.yaml
 
 helm_v3 repo index --merge build/index.yaml ./bin/chart/${repo_index}
