@@ -1,6 +1,6 @@
 ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
-ARG REGISTRY=docker.io
+ARG REGISTRY=stgregistry.suse.com
 ARG RANCHER_IMAGE=${REGISTRY}/${RANCHER_REPO}/rancher:${RANCHER_TAG}
 ARG ARCH
 ARG VERSION=dev
@@ -42,6 +42,8 @@ RUN zypper refresh && \
 
 # Main stage using bci-micro as the base image
 FROM final
+ARG ARCH=${ARCH}
+ARG VERSION=${VERSION}
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
@@ -53,9 +55,7 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
 
-ARG ARCH=amd64
 ENV KUBECTL_VERSION v1.27.10
-ARG VERSION=${VERSION}
 
 RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
