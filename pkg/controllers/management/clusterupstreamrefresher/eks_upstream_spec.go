@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	ekscontroller "github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -39,6 +40,12 @@ func BuildEKSUpstreamSpec(secretClient wranglerv1.SecretClient, cluster *mgmtv3.
 		})
 	if err != nil {
 		return nil, err
+	}
+
+	if clusterState.Cluster.Status == ekstypes.ClusterStatusUpdating {
+		// upstream cluster is already updating, must wait until it is finished
+		logrus.Debugf("Waiting for cluster [%s (id: %s)] to finish updating", cluster.Spec.EKSConfig.DisplayName, cluster.Name)
+		return cluster.Spec.EKSConfig, nil
 	}
 
 	ngs, err := eksService.ListNodegroups(ctx,
