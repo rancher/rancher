@@ -5,7 +5,7 @@ package buildconfig
 const (
 	CspAdapterMinVersion    = "104.0.0+up4.0.0"
 	DefaultShellVersion     = "rancher/shell:v0.2.1"
-	FleetVersion            = "104.0.2+up0.10.2"
+	FleetVersion            = "104.0.3+up0.10.3-rc.1"
 	ProvisioningCAPIVersion = "104.0.0+up0.3.0"
 	WebhookVersion          = "104.0.2+up0.5.2"
 )
