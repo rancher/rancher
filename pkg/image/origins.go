@@ -190,6 +190,7 @@ var OriginMap = map[string]string{
 	"mirrored-neuvector-updater":                              "https://github.com/neuvector/neuvector",
 	"mirrored-neuvector-prometheus-exporter":                  "https://github.com/neuvector/prometheus-exporter",
 	"mirrored-neuvector-registry-adapter":                     "https://github.com/neuvector/registry-adapter",
+	"mirrored-neuvector-compliance-config":                    "https://github.com/neuvector/neuvector",
 	"mirrored-nginx-ingress-controller-defaultbackend":        "https://github.com/rancher/ingress-nginx",
 	"mirrored-openpolicyagent-gatekeeper":                     "https://github.com/open-policy-agent/gatekeeper",
 	"mirrored-openpolicyagent-gatekeeper-crds":                "https://github.com/open-policy-agent/gatekeeper",
