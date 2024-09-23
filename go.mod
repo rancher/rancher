@@ -2,9 +2,6 @@ module github.com/rancher/rancher
 
 go 1.21
 
-// use patched wrangler: https://github.com/aruiz14/wrangler/commits/v2.8.5-debug-44760
-replace github.com/rancher/wrangler/v2 => github.com/aruiz14/wrangler/v2 v2.1.1-0.20240829065644-aa4b4936ae51
-
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
