@@ -102,7 +102,7 @@ jobs:
           name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
           path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 4
           overwrite: false
   build-agent:
     needs: [build-server]
@@ -116,6 +116,8 @@ jobs:
         image: registry:2
         ports:
           - 5000:5000
+    env:
+      REGISTRY: "localhost:5000"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -156,8 +158,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Build agent
         id: build
         uses: docker/build-push-action@v5
@@ -168,7 +170,7 @@ jobs:
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-            "REGISTRY=localhost:5000"
+            "REGISTRY=${{ env.REGISTRY }}"
             "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
@@ -182,7 +184,7 @@ jobs:
           name: "rancher-agent-${{ matrix.os }}-${{ matrix.arch }}"
           path: /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 4
           overwrite: false
   integration-tests:
     needs: [build-agent]
