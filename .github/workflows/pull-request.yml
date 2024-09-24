@@ -136,6 +136,7 @@ jobs:
           - 5000:5000
     env:
       REGISTRY: "localhost:5000"
+      ARCH: ${{ matrix.arch }}
     steps:
       - name: Environment variables
         shell: bash
