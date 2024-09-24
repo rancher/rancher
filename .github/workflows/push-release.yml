@@ -25,9 +25,11 @@ jobs:
       id-token: write
     concurrency:
       # if it is a tag run, use a default group to avoid concurrent runs, if it isn't use a unique group to allow concurrent runs
-      group: ${{ contains(github.ref, 'tags/') && 'build-chart-tag' || 'build-chart-${{ github.job }}' }}
+      group: ${{ contains(github.ref, 'tags/') && 'build-chart-tag' || format('build-chart-{0}', github.job) }}
       # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
+    env:
+      CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
