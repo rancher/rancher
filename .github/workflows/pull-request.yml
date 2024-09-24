@@ -53,8 +53,7 @@ jobs:
       matrix:
         os: [linux]
         arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},run-id=${{ github.run_id }}
-    container: registry.suse.com/bci/bci-base:latest
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     env:
       ARCH: ${{ matrix.arch }}
     steps:
@@ -64,11 +63,6 @@ jobs:
           if [[ "$ARCH" == "x64" ]]; then
             echo "ARCH=amd64" >> $GITHUB_ENV
           fi
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y docker awk git jq
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: install yq
@@ -128,8 +122,7 @@ jobs:
       matrix:
         os: [linux]
         arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},run-id=${{ github.run_id }}
-    container: registry.suse.com/bci/bci-base:latest
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     services:
       registry:
         image: registry:2
@@ -145,11 +138,6 @@ jobs:
           if [[ "$ARCH" == "x64" ]]; then
             echo "ARCH=amd64" >> $GITHUB_ENV
           fi
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y docker awk git jq
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: install yq
