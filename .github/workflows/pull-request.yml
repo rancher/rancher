@@ -66,9 +66,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: install yq
-        uses: ./.github/actions/install-yq
-        with:
-          arch: ${{ env.ARCH }}
+        shell: bash
+        run: sudo snap install yq
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -141,9 +140,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: install yq
-        uses: ./.github/actions/install-yq
-        with:
-          arch: ${{ env.ARCH }}
+        shell: bash
+        run: sudo snap install yq
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
