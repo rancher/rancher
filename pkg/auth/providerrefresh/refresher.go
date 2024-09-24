@@ -156,6 +156,11 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 }
 
 func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
+
+	// XXX TODO AK Consider alternate implementation: Instead of mixing norman and ext tokens keep them separate
+	// XXX TODO AK Instead of type dependent switching of case, use separate operations and loops.
+	// XXX TODO AK Avoids reflection.
+
 	var (
 		derivedTokenList      []accessor.TokenAccessor
 		derivedTokens         map[string][]accessor.TokenAccessor
