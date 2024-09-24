@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/robfig/cron"
@@ -20,6 +21,15 @@ var (
 )
 
 func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
+
+	wContext := scaledContext.Wrangler
+	extTokenStore := exttokens.NewSystemTokenStore(
+		wContext.Core.Secret(),
+		wContext.Core.Secret().Cache(),
+		wContext.Mgmt.UserAttribute(),
+		wContext.Mgmt.User(),
+	)
+
 	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
 	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
 	ref = &refresher{
@@ -29,6 +39,7 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 		tokenMGR:            tokens.NewManager(ctx, scaledContext),
 		userAttributes:      mgmtContext.Management.UserAttributes(""),
 		userAttributeLister: mgmtContext.Management.UserAttributes("").Controller().Lister(),
+		extTokenStore:       extTokenStore,
 	}
 
 	UpdateRefreshMaxAge(maxAge)
