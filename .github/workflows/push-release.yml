@@ -24,7 +24,9 @@ jobs:
       contents: read
       id-token: write
     concurrency:
-      group: ${{ contains(github.ref, 'tags/') && "default" || "tag" }}
+      # if it is a tag run, use a default group to avoid concurrent runs, if it isn't use a unique group to allow concurrent runs
+      group: ${{ contains(github.ref, 'tags/') && 'build-chart-tag' || 'build-chart-${{ github.job }}' }}
+      # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
     steps:
       - name: Checkout code
