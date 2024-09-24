@@ -11,12 +11,22 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+  YQ_VERSION: v4.44.3
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
   build-chart:
-    runs-on: ubuntu-latest
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
     steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git jq
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: install yq
+        shell: bash
+        run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.ARCH }}.tar.gz | tar xz && mv yq_linux_${{ env.ARCH }} /usr/bin/yq
       - name: Checkout code
         uses: actions/checkout@v4
       - id: env 
@@ -26,7 +36,6 @@ jobs:
         env: 
           HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
         run: |
-          sudo snap install yq
           curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
           sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
@@ -40,23 +49,29 @@ jobs:
       - name: Package
         run: ./scripts/chart/package
   build-server:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},run-id=${{ github.run_id }}
+    container: registry.suse.com/bci/bci-base:latest
     steps:
+      - name: Environment variables
+        shell: bash
+        run: |
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y docker awk git jq
+      - name: install yq
+        shell: bash
+        run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.ARCH }}.tar.gz | tar xz && mv yq_linux_${{ env.ARCH }} /usr/bin/yq
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
-      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
-      - name: Clean runner
-        run: |
-          # removes dotnet
-          sudo rm -rf /usr/share/dotnet
-          # removes haskell
-          sudo rm -rf /opt/ghc
-          # removes android sdk
-          sudo rm -rf /usr/local/lib/android
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -106,11 +121,12 @@ jobs:
           overwrite: false
   build-agent:
     needs: [build-server]
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},run-id=${{ github.run_id }}
+    container: registry.suse.com/bci/bci-base:latest
     services:
       registry:
         image: registry:2
@@ -119,17 +135,22 @@ jobs:
     env:
       REGISTRY: "localhost:5000"
     steps:
+      - name: Environment variables
+        shell: bash
+        run: |
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y docker awk git jq
+      - name: install yq
+        shell: bash
+        run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.ARCH }}.tar.gz | tar xz && mv yq_linux_${{ env.ARCH }} /usr/bin/yq
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
-      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
-      - name: Clean runner
-        run: |
-          # removes dotnet
-          sudo rm -rf /usr/share/dotnet
-          # removes haskell
-          sudo rm -rf /opt/ghc
-          # removes android sdk
-          sudo rm -rf /usr/local/lib/android
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
