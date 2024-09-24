@@ -11,6 +11,7 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+  YQ_VERSION: v4.44.3
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
