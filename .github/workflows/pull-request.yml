@@ -23,12 +23,12 @@ jobs:
         run: zypper install -y git jq awk
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: install yq
         uses: ./.github/actions/install-yq
         with:
           arch: ${{ env.ARCH }}
-      - name: Checkout code
-        uses: actions/checkout@v4
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -67,14 +67,14 @@ jobs:
       - name: install dependencies
         shell: bash
         run: zypper install -y docker awk git jq
-      - name: install yq
-        uses: ./.github/actions/install-yq
-        with:
-          arch: ${{ env.ARCH }}
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: install yq
+        uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -148,14 +148,14 @@ jobs:
       - name: install dependencies
         shell: bash
         run: zypper install -y docker awk git jq
-      - name: install yq
-        uses: ./.github/actions/install-yq
-        with:
-          arch: ${{ env.ARCH }}
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: install yq
+        uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
