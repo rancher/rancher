@@ -10,7 +10,6 @@ env:
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
-  YQ_VERSION: v4.44.3
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
   unit-tests:
@@ -25,8 +24,9 @@ jobs:
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: install yq
-        shell: bash
-        run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.ARCH }}.tar.gz | tar xz && mv yq_linux_${{ env.ARCH }} /usr/bin/yq
+        uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - name: Checkout code
         uses: actions/checkout@v4
       - id: env 
@@ -68,8 +68,9 @@ jobs:
         shell: bash
         run: zypper install -y docker awk git jq
       - name: install yq
-        shell: bash
-        run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.ARCH }}.tar.gz | tar xz && mv yq_linux_${{ env.ARCH }} /usr/bin/yq
+        uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
@@ -148,8 +149,9 @@ jobs:
         shell: bash
         run: zypper install -y docker awk git jq
       - name: install yq
-        shell: bash
-        run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.ARCH }}.tar.gz | tar xz && mv yq_linux_${{ env.ARCH }} /usr/bin/yq
+        uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
