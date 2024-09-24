@@ -2,12 +2,14 @@ name: Unit Tests
 on: [workflow_dispatch, workflow_call]
 jobs:
   unit-test:
-    runs-on: ubuntu-latest
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/golang:1.22
     timeout-minutes: 60
     steps:
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Run unit tests
         run: go test -cover -tags=test ./pkg/...
 
