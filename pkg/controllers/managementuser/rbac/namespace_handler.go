@@ -588,7 +588,7 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 					err := n.reconcileNamespaceProjectClusterRole(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
 					if err != nil {
 						logrus.Errorf("error cleaning up RBAC for namespace %s: %v", namespaceName, err)
-						return false, err
+						return true, err
 					}
 					logrus.Debugf("successfully cleaned up RBAC for namespace %s", namespaceName)
 					return true, nil
