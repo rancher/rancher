@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: install dependencies
         shell: bash
-        run: zypper install -y git jq
+        run: zypper install -y git jq awk
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: install yq
@@ -101,21 +101,21 @@ jobs:
             "VERSION=${{ env.TAG }}"
             "COMMIT=${{ github.SHA }}"
             "RKE_VERSION=${{ steps.env.outputs.RKE_VERSION }}"
-            "ARCH=${{ matrix.arch }}"
+            "ARCH=${{ env.ARCH }}"
             "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
             "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
             "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
-          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ env.ARCH }}
           context: .
-          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
+          path: /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
           if-no-files-found: error
           retention-days: 4
           overwrite: false
@@ -170,11 +170,11 @@ jobs:
       - name: Download rancher image
         uses: actions/download-artifact@v4
         with:
-          name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
+          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp
       - name: Load image
         run: |
-          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
@@ -188,22 +188,22 @@ jobs:
           push:  ${{ github.event_name != 'pull_request' }}
           build-args: |
             "VERSION=${{ env.TAG }}"
-            "ARCH=${{ matrix.arch }}"
+            "ARCH=${{ env.ARCH }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
             "REGISTRY=${{ env.REGISTRY }}"
             "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ env.ARCH }}
           context: .
-          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
+          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: "rancher-agent-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
+          name: "rancher-agent-${{ matrix.os }}-${{ env.ARCH }}"
+          path: /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
           if-no-files-found: error
           retention-days: 4
           overwrite: false
