@@ -160,14 +160,26 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 }
 
 func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
+	logrus.Infof("ZZZ Update User %p == '%s' == <<%+v>>", user, user.Name, user)
+
 	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 	if err != nil {
 		return nil, err
 	}
+
+	if user.Enabled == nil || !*user.Enabled {
+		logrus.Infof("ZZZ update - todo - Get     All Tokens for User '%s'", user.Name)
+		logrus.Infof("ZZZ update - todo - Disable All Tokens for User '%s'", user.Name)
+		// XXX TODO AK get and disable the user's tokens
+	}
+
 	return user, nil
 }
 
 func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
+
+	logrus.Infof("ZZZ Remove User %p == '%s' == <<%+v>>", user, user.Name, user)
+
 	clusterRoles, err := l.getCRTBByUserName(user.Name)
 	if err != nil {
 		return nil, err
@@ -198,6 +210,7 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 		return nil, err
 	}
 
+	// XXX TODO AK - find the associated ext tokens also
 	tokens, err := l.getTokensByUserName(user.Name)
 	if err != nil {
 		return nil, err
@@ -208,6 +221,7 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 		return nil, err
 	}
 
+	// XXX TODO AK - delete the associated ext tokens also
 	err = l.deleteAllTokens(tokens)
 	if err != nil {
 		return nil, err
@@ -289,6 +303,10 @@ func (l *userLifecycle) getGRBByUserName(username string) ([]*v3.GlobalRoleBindi
 }
 
 func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error) {
+
+	logrus.Infof("ZZZ Get All Tokens for User '%s'", username)
+	// XXX TODO AK - find the associated ext tokens also
+
 	objs, err := l.tokenIndexer.ByIndex(tokenByUserRefKey, username)
 	if err != nil {
 		return nil, fmt.Errorf("error getting indexed tokens: %v", err)
@@ -393,6 +411,10 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 }
 
 func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
+
+	logrus.Infof("ZZZ Delete Tokens <<%+v>>", tokens)
+	// XXX TODO AK - delete the associated ext tokens also
+
 	for _, token := range tokens {
 		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
 		err := l.tokens.DeleteNamespaced(token.Namespace, token.Name, &metav1.DeleteOptions{})

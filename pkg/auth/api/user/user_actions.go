@@ -115,6 +115,7 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 		return err
 	}
 
+	// XXX TODO AK password changed - invalidate session tokens => login tokens => not derived (see refresher.go)
 	return nil
 }
 
