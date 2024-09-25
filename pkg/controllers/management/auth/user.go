@@ -1,5 +1,7 @@
 package auth
 
+// XXX TODO AK -- marker of code modified for ext token support
+
 import (
 	"fmt"
 	"strings"
@@ -9,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
+	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -18,6 +21,7 @@ import (
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
@@ -42,6 +46,7 @@ type userLifecycle struct {
 	userManager     user.Manager
 	clusterLister   v3.ClusterLister
 	clusterManager  *clustermanager.Manager
+	extTokenStore   *exttokens.SystemTokenStore
 }
 
 const (
@@ -53,6 +58,15 @@ const (
 )
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
+
+	wContext := management.Wrangler
+	extTokenStore := exttokens.NewSystemTokenStore(
+		wContext.Core.Secret(),
+		wContext.Core.Secret().Cache(),
+		wContext.Mgmt.UserAttribute(),
+		wContext.Mgmt.User(),
+	)
+
 	lfc := &userLifecycle{
 		prtb:            management.Management.ProjectRoleTemplateBindings(""),
 		crtb:            management.Management.ClusterRoleTemplateBindings(""),
@@ -66,6 +80,7 @@ func newUserLifecycle(management *config.ManagementContext, clusterManager *clus
 		userManager:     management.UserManager,
 		clusterLister:   management.Management.Clusters("").Controller().Lister(),
 		clusterManager:  clusterManager,
+		extTokenStore:   extTokenStore,
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
@@ -210,8 +225,12 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 		return nil, err
 	}
 
-	// XXX TODO AK - find the associated ext tokens also
 	tokens, err := l.getTokensByUserName(user.Name)
+	if err != nil {
+		return nil, err
+	}
+	// XXX TODO AK - find the associated ext tokens also
+	extTokens, err := l.getExtTokensByUserName(user.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -221,8 +240,12 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 		return nil, err
 	}
 
-	// XXX TODO AK - delete the associated ext tokens also
 	err = l.deleteAllTokens(tokens)
+	if err != nil {
+		return nil, err
+	}
+	// XXX TODO AK - delete the associated ext tokens also
+	err = l.deleteAllExtTokens(extTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +328,6 @@ func (l *userLifecycle) getGRBByUserName(username string) ([]*v3.GlobalRoleBindi
 func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error) {
 
 	logrus.Infof("ZZZ Get All Tokens for User '%s'", username)
-	// XXX TODO AK - find the associated ext tokens also
 
 	objs, err := l.tokenIndexer.ByIndex(tokenByUserRefKey, username)
 	if err != nil {
@@ -320,6 +342,27 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 		}
 
 		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+func (l *userLifecycle) getExtTokensByUserName(username string) ([]*exttokens.Token, error) {
+
+	logrus.Infof("ZZZ Get All Ext Tokens for User '%s'", username)
+	// XXX TODO AK - find the associated ext tokens also
+
+	filterForUser := labels.Set(map[string]string{exttokens.UserIDLabel: username})
+	objs, err := l.extTokenStore.List(&metav1.ListOptions{
+		LabelSelector: filterForUser.AsSelector().String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting ext tokens for user %s: %v", username, err)
+	}
+
+	tokens := []*exttokens.Token{}
+	for _, token := range objs.Items {
+		tokens = append(tokens, &token)
 	}
 
 	return tokens, nil
@@ -411,15 +454,29 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 }
 
 func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
-
 	logrus.Infof("ZZZ Delete Tokens <<%+v>>", tokens)
-	// XXX TODO AK - delete the associated ext tokens also
 
 	for _, token := range tokens {
 		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
 		err := l.tokens.DeleteNamespaced(token.Namespace, token.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting token: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (l *userLifecycle) deleteAllExtTokens(tokens []*exttokens.Token) error {
+
+	logrus.Infof("ZZZ Delete Ext Tokens <<%+v>>", tokens)
+	// XXX TODO AK - delete the associated ext tokens
+
+	for _, token := range tokens {
+		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.ObjectMeta.Name, token.GetName)
+		err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("error deleting ext token: %v", err)
 		}
 	}
 
