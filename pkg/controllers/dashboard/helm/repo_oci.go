@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	"github.com/rancher/rancher/pkg/catalogv2/oci/capturewindowclient"
+	"github.com/rancher/rancher/pkg/catalogv2/roundtripper"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/apply"
@@ -176,10 +177,10 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		// If OCIRegistryBackOffDuration is already defined by the registry,
 		// we ignore the exponentialBackOffValues set by the user.
 		var backoff time.Duration
-		ociRegistryBackOffDuration := ociClient.HTTPClient.Transport.(*capturewindowclient.Transport).BackOffDuration
+		ociRegistryBackOffDuration := ociClient.HTTPClient.Transport.(*roundtripper.UserAgent).Next.(*capturewindowclient.Transport).BackOffDuration
 		if ociRegistryBackOffDuration > 0.0 {
 			backoff = time.Duration(ociRegistryBackOffDuration) * time.Second
-			ociClient.HTTPClient.Transport.(*capturewindowclient.Transport).BackOffDuration = 0.0
+			ociClient.HTTPClient.Transport.(*roundtripper.UserAgent).Next.(*capturewindowclient.Transport).BackOffDuration = 0.0
 			newStatus.ShouldNotSkip = true
 		} else {
 			backoff = calculateBackoff(clusterRepo, retryPolicy)
