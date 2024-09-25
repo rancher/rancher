@@ -2,11 +2,10 @@ package k3sbasedupgrade
 
 import (
 	"fmt"
-	"strings"
 	"sync/atomic"
 
-	"github.com/coreos/go-semver/semver"
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
@@ -17,8 +16,8 @@ import (
 )
 
 const (
-	K3sAppNme  = "rancher-k3s-upgrader"
-	Rke2AppNme = "rancher-rke2-upgrader"
+	K3sAppName  = "rancher-k3s-upgrader"
+	Rke2AppName = "rancher-rke2-upgrader"
 )
 
 // globalCounter keeps track of the number of clusters for which the handler is concurrently uninstalling the legacy K3s-based upgrade app.
@@ -29,14 +28,31 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}
-	isK3s := cluster.Status.Driver == mgmtv3.ClusterDriverK3s
-	isRke2 := cluster.Status.Driver == mgmtv3.ClusterDriverRke2
+
+	var (
+		updateVersion string
+		strategy      mgmtv3.ClusterUpgradeStrategy
+	)
+
 	// only applies to imported k3s/rke2 clusters
-	if !isK3s && !isRke2 {
+	if cluster.Status.Driver == mgmtv3.ClusterDriverK3s {
+		if cluster.Spec.K3sConfig == nil {
+			return cluster, nil
+		}
+		updateVersion = cluster.Spec.K3sConfig.Version
+		strategy = cluster.Spec.K3sConfig.ClusterUpgradeStrategy
+	} else if cluster.Status.Driver == mgmtv3.ClusterDriverRke2 {
+		if cluster.Spec.Rke2Config == nil {
+			return cluster, nil
+		}
+		updateVersion = cluster.Spec.Rke2Config.Version
+		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
+	} else {
 		return cluster, nil
 	}
-	// Don't allow nil configs to continue for given cluster type
-	if (isK3s && cluster.Spec.K3sConfig == nil) || (isRke2 && cluster.Spec.Rke2Config == nil) {
+
+	// no version set on imported cluster
+	if updateVersion == "" {
 		return cluster, nil
 	}
 
@@ -51,26 +67,9 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 		}
 	}
 
-	var (
-		updateVersion string
-		strategy      mgmtv3.ClusterUpgradeStrategy
-	)
-	switch {
-	case isK3s:
-		updateVersion = cluster.Spec.K3sConfig.Version
-		strategy = cluster.Spec.K3sConfig.ClusterUpgradeStrategy
-	case isRke2:
-		updateVersion = cluster.Spec.Rke2Config.Version
-		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
-
-	}
-	if updateVersion == "" {
-		return cluster, nil
-	}
-
 	// Check if the cluster is undergoing a Kubernetes version upgrade, and that
 	// all downstream nodes also need the upgrade
-	isNewer, err := IsNewerVersion(cluster.Status.Version.GitVersion, updateVersion)
+	isNewer, err := nodesyncer.IsNewerVersion(cluster.Status.Version.GitVersion, updateVersion)
 	if err != nil {
 		return cluster, err
 	}
@@ -114,7 +113,7 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 	}
 
 	// deploy plans into downstream cluster
-	if err = h.deployPlans(cluster, isK3s, isRke2); err != nil {
+	if err = h.deployPlans(cluster); err != nil {
 		return cluster, err
 	}
 
@@ -140,9 +139,9 @@ func (h *handler) uninstallK3sBasedUpgradeController(cluster *mgmtv3.Cluster) er
 	var appName string
 	switch {
 	case cluster.Status.Driver == mgmtv3.ClusterDriverK3s:
-		appName = K3sAppNme
+		appName = K3sAppName
 	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
-		appName = Rke2AppNme
+		appName = Rke2AppName
 	}
 	app, err := appLister.Get(systemProject.Name, appName)
 	if err != nil {
@@ -161,33 +160,6 @@ func (h *handler) uninstallK3sBasedUpgradeController(cluster *mgmtv3.Cluster) er
 	return nil
 }
 
-// IsNewerVersion returns true if updated versions semver is newer and false if its
-// semver is older. If semver is equal then metadata is alphanumerically compared.
-func IsNewerVersion(prevVersion, updatedVersion string) (bool, error) {
-	parseErrMsg := "failed to parse version: %v"
-	prevVer, err := semver.NewVersion(strings.TrimPrefix(prevVersion, "v"))
-	if err != nil {
-		return false, fmt.Errorf(parseErrMsg, err)
-	}
-
-	updatedVer, err := semver.NewVersion(strings.TrimPrefix(updatedVersion, "v"))
-	if err != nil {
-		return false, fmt.Errorf(parseErrMsg, err)
-	}
-
-	switch updatedVer.Compare(*prevVer) {
-	case -1:
-		return false, nil
-	case 1:
-		return true, nil
-	default:
-		// using metadata to determine precedence is against semver standards
-		// this is ignored because it because k3s uses it to precedence between
-		// two versions based on same k8s version
-		return updatedVer.Metadata > prevVer.Metadata, nil
-	}
-}
-
 // nodeNeedsUpgrade checks all nodes in cluster, returns true if they still need to be upgraded
 func (h *handler) nodesNeedUpgrade(cluster *mgmtv3.Cluster, version string) (bool, error) {
 	v3NodeList, err := h.nodeLister.List(cluster.Name, labels.Everything())
@@ -195,7 +167,7 @@ func (h *handler) nodesNeedUpgrade(cluster *mgmtv3.Cluster, version string) (boo
 		return false, err
 	}
 	for _, node := range v3NodeList {
-		isNewer, err := IsNewerVersion(node.Status.InternalNodeStatus.NodeInfo.KubeletVersion, version)
+		isNewer, err := nodesyncer.IsNewerVersion(node.Status.InternalNodeStatus.NodeInfo.KubeletVersion, version)
 		if err != nil {
 			return false, err
 		}

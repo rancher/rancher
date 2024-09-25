@@ -20,7 +20,7 @@ const MaxDisplayNodes = 10
 
 // deployPlans creates a master and worker plan in the downstream cluster to instrument
 // the system-upgrade-controller in the downstream cluster
-func (h *handler) deployPlans(cluster *mgmtv3.Cluster, isK3s, isRke2 bool) error {
+func (h *handler) deployPlans(cluster *mgmtv3.Cluster) error {
 	var (
 		upgradeImage   string
 		masterPlanName string
@@ -29,13 +29,13 @@ func (h *handler) deployPlans(cluster *mgmtv3.Cluster, isK3s, isRke2 bool) error
 		strategy       mgmtv3.ClusterUpgradeStrategy
 	)
 	switch {
-	case isRke2:
+	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
 		upgradeImage = settings.PrefixPrivateRegistry(rke2upgradeImage)
 		masterPlanName = rke2MasterPlanName
 		workerPlanName = rke2WorkerPlanName
 		Version = cluster.Spec.Rke2Config.Version
 		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
-	case isK3s:
+	case cluster.Status.Driver == mgmtv3.ClusterDriverK3s:
 		upgradeImage = settings.PrefixPrivateRegistry(k3supgradeImage)
 		masterPlanName = k3sMasterPlanName
 		workerPlanName = k3sWorkerPlanName
