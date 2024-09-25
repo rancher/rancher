@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/url"
 	"sort"
 	"strconv"
@@ -21,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
@@ -577,10 +577,8 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 // joinURLFromAddress accepts both an address (IPv4, IPv6, hostname) and returns a fully rendered join URL including `https://` and the supervisor port
 func joinURLFromAddress(address string, port int) string {
 	// ipv6 addresses need to be enclosed in brackets in URLs, and hostnames will fail to be parsed as IPs
-	if net.ParseIP(address) != nil && strings.Count(address, ":") >= 2 {
-		if !strings.HasPrefix(address, "[") && !strings.HasSuffix(address, "]") {
-			address = fmt.Sprintf("[%s]", address)
-		}
+	if utils.IsPlainIPV6(address) {
+		address = fmt.Sprintf("[%s]", address)
 	}
 	return fmt.Sprintf("https://%s:%d", address, port)
 }
