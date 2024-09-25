@@ -6,7 +6,6 @@ import (
 
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
-	"github.com/rancher/rancher/pkg/utils"
 	rketypes "github.com/rancher/rke/types"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
@@ -102,7 +101,7 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface, clusterName str
 	if serviceAccount, err = clientset.CoreV1().ServiceAccounts(cattleNamespace).Get(context.Background(), serviceAccount.Name, metav1.GetOptions{}); err != nil {
 		return "", fmt.Errorf("error getting service account: %w", err)
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount, utils.FormatPrefix(clusterName))
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount)
 	if err != nil {
 		return "", fmt.Errorf("error ensuring secret for service account: %w", err)
 	}
