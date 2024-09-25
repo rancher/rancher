@@ -214,7 +214,7 @@ func (k *KDMTestSuite) TestChangeKDMurl() {
 		for _, pod := range pods.Items {
 			output := k.execCMDForKDMDump(pod, cmd)
 			// if the curl output to from the pod to itslef (over 0.0.0.0) doesn't contain (trace of) version we
-			// recieved over API call which most likely went to the leader Pod, we can assume the KDM file was
+			// received over API call which most likely went to the leader Pod, we can assume the KDM file was
 			// NOT updated on all Pods
 			if !strings.Contains(output, updatedRKE2Version) {
 				k.Fail(fmt.Sprintf("found KDM from a pod:%v not having the latest known version:%v", pod.Name, updatedRKE2Version))
