@@ -18,7 +18,8 @@ jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
   build-publish-chart:
-    runs-on: ubuntu-latest
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
     needs: [push-images]
     permissions:
       contents: read
@@ -29,24 +30,33 @@ jobs:
       # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
     env:
+      ARCH: amd64
       CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
     steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git jq awk aws-cli
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Tag Env Variables
         uses: ./.github/actions/setup-tag-env
+      - name: install yq
+        uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
-      - name: Install dependencies
+      - name: Install Helm dependencies
         env:
           HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
           HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
         run: |
-          sudo snap install yq
           curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
-          sudo mv /tmp/helm /usr/bin/helm_v3 && \
-          sudo chmod +x /usr/bin/helm_v3
+          mv /tmp/helm /usr/bin/helm_v3 && \
+          chmod +x /usr/bin/helm_v3
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
       - name: Build
         run: ./scripts/chart/build chart
@@ -83,23 +93,25 @@ jobs:
         run: |
           AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }} aws cloudfront create-invalidation --distribution-id ${{ env.CHARTS_DISTRIBUTION_ID }} --paths "/*"
   build-server:
-    runs-on: ubuntu-latest
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        arch: [x64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
     steps:
+      - name: Arch environment variable
+        shell: bash
+        run: |
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
       - name: Checkout code
         uses: actions/checkout@v4
-      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
-      - name: Clean runner
-        run: |
-          # removes dotnet
-          sudo rm -rf /usr/share/dotnet
-          # removes haskell
-          sudo rm -rf /opt/ghc
-          # removes android sdk
-          sudo rm -rf /usr/local/lib/android
+      - name: install yq
+        shell: bash
+        run: sudo snap install yq
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - id: env 
@@ -131,31 +143,31 @@ jobs:
             "VERSION=${{ env.TAG }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ steps.env.outputs.RKE_VERSION }}"
-            "ARCH=${{ matrix.arch }}"
+            "ARCH=${{ env.ARCH }}"
             "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
             "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
             "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
-          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ env.ARCH }}
           context: .
-          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
+          path: /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
           if-no-files-found: error
           retention-days: 4
           overwrite: false
   build-agent:
     needs: [build-server]
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     services:
       registry:
         image: registry:2
@@ -163,23 +175,22 @@ jobs:
           - 5000:5000
     env:
       REGISTRY: "127.0.0.1:5000"
+      ARCH: ${{ matrix.arch }}
     steps:
-      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
-      - name: Clean runner
+      - name: Arch environment variable
+        shell: bash
         run: |
-          # removes dotnet
-          sudo rm -rf /usr/share/dotnet
-          # removes haskell
-          sudo rm -rf /opt/ghc
-          # removes android sdk
-          sudo rm -rf /usr/local/lib/android
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Setup Environment Variables
-        run: |
-          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-          source scripts/export-config
-          echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> "$GITHUB_ENV"
+      - name: install yq
+        shell: bash
+        run: sudo snap install yq
+      - id: env 
+        name: Setup Dependencies Env Variables
+        uses: ./.github/actions/setup-build-env
       - name: Setup TAG Variables
         uses: ./.github/actions/setup-tag-env
       - name: Docker meta
@@ -198,11 +209,11 @@ jobs:
       - name: Download rancher image
         uses: actions/download-artifact@v4
         with:
-          name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
+          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp
       - name: Load image
         run: |
-          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
@@ -216,22 +227,22 @@ jobs:
           push: false
           build-args: |
             "VERSION=${{ env.TAG }}"
-            "ARCH=${{ matrix.arch }}"
+            "ARCH=${{ env.ARCH }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
             "REGISTRY=${{ env.REGISTRY }}"
-            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ env.ARCH }}
           context: .
-          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
+          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: "rancher-agent-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
+          name: "rancher-agent-${{ matrix.os }}-${{ env.ARCH }}"
+          path: /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
           if-no-files-found: error
           retention-days: 4
           overwrite: false
@@ -273,22 +284,30 @@ jobs:
           docker push ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }}
         shell: bash
   push-images:
-    runs-on: ubuntu-latest
     needs: [unit-tests, integration-tests]
-    permissions:
-      contents: read
-      id-token: write
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=2cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
     steps:
+      - name: Environment variables
+        shell: bash
+        run: |
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Download rancher image
         uses: actions/download-artifact@v4
         with:
-          pattern: "*-${{ matrix.os }}-${{ matrix.arch }}"
+          pattern: "*-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp
           merge-multiple: true
       - name: Setup Environment Variables
@@ -307,24 +326,24 @@ jobs:
           registry: ${{ env.REGISTRY }}
       - name: Push server image
         run: |
-          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-${{ env.ARCH }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-${{ env.ARCH }}
       - name: Push agent image
         run: |
-          image_agent_id=$(docker load --input /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_agent_id=$(docker load --input /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_agent_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ env.ARCH }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ env.ARCH }}
   merge-server-manifest:
-    runs-on: ubuntu-latest
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     needs: [push-images]
     permissions:
       contents: read
@@ -360,7 +379,7 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY}}/${{ env.IMAGE }}:${{ env.TAG }}
   merge-agent-manifest:
-    runs-on: ubuntu-latest
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     needs: [push-images, build-agent-windows]
     permissions:
       contents: read
@@ -412,22 +431,25 @@ jobs:
           docker buildx imagetools inspect ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
   build-installer:
     needs: [build-publish-chart, merge-server-manifest]
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
     steps:
+      - name: Environment variables
+        shell: bash
+        run: |
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Setup New Environment Variables
-        run: |
-          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -466,13 +488,13 @@ jobs:
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-${{ env.ARCH }}
           context: .
-          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
           file: ./package/Dockerfile.installer
           labels: "${{ steps.meta.outputs.labels }}"
   merge-installer-manifest:
-    runs-on: ubuntu-latest
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     needs: [build-installer]
     permissions:
       contents: read
@@ -513,8 +535,8 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY}}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}
   create-images-files:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
-    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
