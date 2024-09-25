@@ -440,6 +440,7 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 		management.Core.Namespaces(""),
 		management.Management.NodeTemplates("").Controller().Lister(),
 		management.Wrangler.Provisioning.Cluster().Cache(),
+		management.Management.Tokens("").Controller().Lister(),
 	)
 	credSchema.Validator = cred.Validator
 }

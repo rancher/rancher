@@ -9,16 +9,20 @@ import (
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.NodeTemplateLister, provClusterCache provv1.ClusterCache) types.Store {
+const CloudCredentialExpirationAnnotation = "cattle.io/expiration-date"
+
+func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.NodeTemplateLister, provClusterCache provv1.ClusterCache, tokenLister v3.TokenLister) types.Store {
 	transformStore := &transform.Store{
 		Store: store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
@@ -37,6 +41,7 @@ func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.Nod
 		Store:              transformStore,
 		NodeTemplateLister: nodeTemplateLister,
 		ProvClusterCache:   provClusterCache,
+		TokenLister:        tokenLister,
 	}
 
 	return namespacedresource.Wrap(newStore, ns, namespace.GlobalNamespace)
@@ -81,6 +86,91 @@ type Store struct {
 	types.Store
 	NodeTemplateLister v3.NodeTemplateLister
 	ProvClusterCache   provv1.ClusterCache
+	TokenLister        v3.TokenLister
+}
+
+func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if hc, ok := data["harvestercredentialConfig"].(map[string]any); ok && hc != nil {
+		if kubeConfigYaml, ok := hc["kubeconfigContent"].(string); ok && kubeConfigYaml != "" {
+
+			kubeConfig := map[string]any{}
+			if err := yaml.Unmarshal([]byte(kubeConfigYaml), &kubeConfig); err != nil {
+				return nil, err
+			}
+
+			tokenName := ""
+			if userList, ok := kubeConfig["users"].([]any); ok && userList != nil && len(userList) > 0 {
+				for _, u := range userList {
+					if entry, ok := u.(map[string]any); ok && entry != nil {
+						if user, ok := entry["user"].(map[string]any); ok && user != nil {
+							if token, ok := user["token"].(string); ok && token != "" {
+								if strings.HasPrefix(tokenName, "kubeconfig-user-") {
+									tokenName, _, _ = strings.Cut(tokenName, ":")
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if tokenName != "" {
+				token, err := s.TokenLister.Get("", tokenName)
+				if err != nil {
+					return nil, err
+				}
+
+				if token.ExpiresAt != "" {
+					values.PutValue(data, token.ExpiresAt, "annotations", CloudCredentialExpirationAnnotation)
+				}
+			}
+		}
+	}
+
+	return s.Store.Create(apiContext, schema, data)
+}
+
+func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if hc, ok := data["harvestercredentialConfig"].(map[string]any); ok && hc != nil {
+		if kubeConfigYaml, ok := hc["kubeconfigContent"].(string); ok && kubeConfigYaml != "" {
+
+			kubeConfig := map[string]any{}
+			if err := yaml.Unmarshal([]byte(kubeConfigYaml), &kubeConfig); err != nil {
+				return nil, err
+			}
+
+			tokenName := ""
+			if userList, ok := kubeConfig["users"].([]any); ok && userList != nil && len(userList) > 0 {
+				for _, u := range userList {
+					if entry, ok := u.(map[string]any); ok && entry != nil {
+						if user, ok := entry["user"].(map[string]any); ok && user != nil {
+							if token, ok := user["token"].(string); ok && token != "" {
+								if strings.HasPrefix(tokenName, "kubeconfig-user-") {
+									tokenName, _, _ = strings.Cut(tokenName, ":")
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if tokenName != "" {
+				token, err := s.TokenLister.Get("", tokenName)
+				if err != nil {
+					return nil, err
+				}
+
+				if token.ExpiresAt != "" {
+					values.PutValue(data, token.ExpiresAt, "annotations", "cattle.io/expiration-date")
+				}
+			} else {
+				values.RemoveValue(data, "annotations", CloudCredentialExpirationAnnotation)
+			}
+		}
+	}
+
+	return s.Store.Update(apiContext, schema, data, id)
 }
 
 func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {

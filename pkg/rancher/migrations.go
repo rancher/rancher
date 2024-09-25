@@ -7,6 +7,7 @@ import (
 
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -22,6 +23,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
+	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,23 +35,25 @@ import (
 )
 
 const (
-	cattleNamespace                            = "cattle-system"
-	forceUpgradeLogoutConfig                   = "forceupgradelogout"
-	forceLocalSystemAndDefaultProjectCreation  = "forcelocalprojectcreation"
-	forceSystemNamespacesAssignment            = "forcesystemnamespaceassignment"
-	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
-	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
-	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
-	migrateRKEClusterState                     = "migraterkeclusterstate"
-	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
-	rancherVersionKey                          = "rancherVersion"
-	projectsCreatedKey                         = "projectsCreated"
-	namespacesAssignedKey                      = "namespacesAssigned"
-	capiMigratedKey                            = "capiMigrated"
-	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
-	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
-	rkeClustersAnnotatedForMigrationKey        = "rkeClustersAnnotatedForMigration"
-	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
+	cattleNamespace                                 = "cattle-system"
+	forceUpgradeLogoutConfig                        = "forceupgradelogout"
+	forceLocalSystemAndDefaultProjectCreation       = "forcelocalprojectcreation"
+	forceSystemNamespacesAssignment                 = "forcesystemnamespaceassignment"
+	migrateFromMachineToPlanSecret                  = "migratefrommachinetoplanesecret"
+	migrateEncryptionKeyRotationLeaderToStatus      = "migrateencryptionkeyrotationleadertostatus"
+	migrateDynamicSchemaToMachinePools              = "migratedynamicschematomachinepools"
+	migrateRKEClusterState                          = "migraterkeclusterstate"
+	migrateSystemAgentVarDirToDataDirectory         = "migratesystemagentvardirtodatadirectory"
+	migrateHarvesterCloudCredentialExpirationConfig = "migrateharvestercloudcredentialexpiration"
+	rancherVersionKey                               = "rancherVersion"
+	projectsCreatedKey                              = "projectsCreated"
+	namespacesAssignedKey                           = "namespacesAssigned"
+	capiMigratedKey                                 = "capiMigrated"
+	encryptionKeyRotationStatusMigratedKey          = "encryptionKeyRotationStatusMigrated"
+	dynamicSchemaMachinePoolsMigratedKey            = "dynamicSchemaMachinePoolsMigrated"
+	rkeClustersAnnotatedForMigrationKey             = "rkeClustersAnnotatedForMigration"
+	systemAgentVarDirMigratedKey                    = "systemAgentVarDirMigrated"
+	harvesterCloudCredentialExpirationMigratedKey   = "harvesterCloudCredentialExpirationMigrated"
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -80,6 +84,12 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 			return err
 		}
 		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
+			return err
+		}
+	}
+
+	if features.Harvester.Enabled() {
+		if err := migrateHarvesterCloudCredentialExpiration(wranglerContext); err != nil {
 			return err
 		}
 	}
@@ -621,6 +631,68 @@ func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
 	}
 
 	cm.Data[systemAgentVarDirMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateHarvesterCloudCredentialExpiration(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateHarvesterCloudCredentialExpirationConfig)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[harvesterCloudCredentialExpirationMigratedKey] == "true" {
+		return nil
+	}
+
+	secrets, err := w.Core.Secret().List("cattle-global-data", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, secret := range secrets.Items {
+		if content, ok := secret.Data["harvestercredentialConfig-kubeconfigContent"]; ok && content != nil {
+			kubeConfig := map[string]any{}
+			if err = yaml.Unmarshal(content, &kubeConfig); err != nil {
+				return err
+			}
+
+			tokenName := ""
+			if userList, ok := kubeConfig["users"].([]any); ok && userList != nil && len(userList) > 0 {
+				for _, u := range userList {
+					if entry, ok := u.(map[string]any); ok && entry != nil {
+						if user, ok := entry["user"].(map[string]any); ok && user != nil {
+							if token, ok := user["token"].(string); ok && token != "" {
+								if strings.HasPrefix(tokenName, "kubeconfig-user-") {
+									tokenName, _, _ = strings.Cut(tokenName, ":")
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if tokenName == "" {
+				continue
+			}
+
+			token, err := w.Mgmt.Token().Get(tokenName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if token.ExpiresAt != "" {
+				secret = *secret.DeepCopy()
+				secret.Annotations[cred.CloudCredentialExpirationAnnotation] = token.ExpiresAt
+				_, err = w.Core.Secret().Update(&secret)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	cm.Data[harvesterCloudCredentialExpirationMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
