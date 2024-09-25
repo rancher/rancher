@@ -405,7 +405,6 @@ jobs:
   build-installer:
     needs: 
       - merge-server-manifest
-      - build-chart
     runs-on: ubuntu-latest
     strategy:
       matrix:
