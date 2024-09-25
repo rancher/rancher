@@ -1,5 +1,7 @@
 package keycloakoidc
 
+// XXX TODO AK -- marker of code modified for ext token support
+
 import (
 	"context"
 	"encoding/json"

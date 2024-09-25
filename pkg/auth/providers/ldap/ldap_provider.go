@@ -1,5 +1,7 @@
 package ldap
 
+// XXX TODO AK -- marker of code modified for ext token support
+
 import (
 	"context"
 	"crypto/x509"

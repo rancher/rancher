@@ -1,5 +1,7 @@
 package cluster
 
+// XXX TODO AK -- marker of code modified for ext token support
+
 import (
 	"fmt"
 

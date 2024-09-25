@@ -1,5 +1,7 @@
 package v3
 
+// XXX TODO AK -- marker of code modified for ext token support
+
 import (
 	"strings"
 

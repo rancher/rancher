@@ -38,6 +38,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 	if err != nil {
 		return err
 	}
+	// XXX TODO AK -- marker of code modified for ext token support
 	sc.Wrangler = wrangler
 
 	userManager, err := common.NewUserManagerNoBindings(sc)

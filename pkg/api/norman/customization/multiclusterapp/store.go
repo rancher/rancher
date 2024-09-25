@@ -1,5 +1,7 @@
 package multiclusterapp
 
+// XXX TODO AK -- marker of code modified for ext token support
+
 import (
 	"context"
 	"fmt"

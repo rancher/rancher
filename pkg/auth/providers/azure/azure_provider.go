@@ -1,6 +1,8 @@
 // Package azure provides functions and types to register and use Azure AD as the auth provider in Rancher.
 package azure
 
+// XXX TODO AK -- marker of code modified for ext token support
+
 import (
 	"context"
 	"fmt"
