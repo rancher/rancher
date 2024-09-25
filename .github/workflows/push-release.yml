@@ -56,6 +56,14 @@ jobs:
         run: ./scripts/chart/test
       - name: Package
         run: ./scripts/chart/package
+      - name: Upload chart
+        uses: actions/upload-artifact@v4
+        with:
+          name: chart
+          path: ./bin/chart/*
+          if-no-files-found: error
+          retention-days: 4
+          overwrite: true
       - name: Load Secrets from Vault
         if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
         uses: rancher-eio/read-vault-secrets@main
@@ -403,8 +411,7 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
   build-installer:
-    needs: 
-      - merge-server-manifest
+    needs: [build-publish-chart, merge-server-manifest]
     runs-on: ubuntu-latest
     strategy:
       matrix:
