@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/v2/actions/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/quarantine"
 	stevesecrets "github.com/rancher/rancher/tests/v2/actions/secrets"
 	"github.com/rancher/rancher/tests/v2/actions/serviceaccounts"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -2632,6 +2633,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		assert.Nil(s.T(), readObj)
 	})
 }
+
 func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
 	assert.Equal(s.T(), len(expect), len(list))
 	for i, w := range expect {
@@ -2689,6 +2691,6 @@ func TestSteveLocal(t *testing.T) {
 
 func TestSteveDownstream(t *testing.T) {
 	// TODO: Re-enable the test when the bug is fixed
-	t.Skip()
+	quarantine.Test(t, "Re-enable the test when the bug is fixed, r/r#46391")
 	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }
