@@ -50,7 +50,6 @@ import (
 
 const (
 	HTTPClusterRepoName = "test-http-cluster-repo"
-	LatestHTTPRepoURL   = "https://releases.rancher.com/server-charts/latest"
 	StableHTTPRepoURL   = "https://releases.rancher.com/server-charts/stable"
 
 	GitClusterSmallForkName = "test-git-small-fork-cluster-repo"
@@ -121,9 +120,13 @@ type ClusterRepoParams struct {
 
 // TestHTTPRepo tests CREATE, UPDATE, and DELETE operations of HTTP ClusterRepo resources
 func (c *ClusterRepoTestSuite) TestHTTPRepo() {
+	//start http server
+	ts := StartHTTPRepository(c)
+	defer ts.Close()
+
 	c.testClusterRepo(ClusterRepoParams{
 		Name: HTTPClusterRepoName,
-		URL1: LatestHTTPRepoURL,
+		URL1: ts.URL,
 		URL2: StableHTTPRepoURL,
 		Type: HTTP,
 	})
@@ -147,14 +150,43 @@ func (c *ClusterRepoTestSuite) TestGitRepoRetries() {
 	})
 }
 
-func StartRegistry() (*httptest.Server, error) {
+func StartHTTPRepository(c *ClusterRepoTestSuite) *httptest.Server {
+	// Directory where Helm chart and index.yaml are stored
+	repositoryDirectory := "../../../testdata/"
+	_, err := os.Stat(repositoryDirectory)
+	assert.NoError(c.T(), err)
+
+	// Create a new test server
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverVersion, err := c.client.Management.Setting.ByID("server-version")
+		assert.NoError(c.T(), err)
+		if serverVersion.Value == "" {
+			serverVersion.Value = serverVersion.Default
+		}
+
+		assert.Equal(c.T(), r.Header.Get("User-Agent"), fmt.Sprintf("%s/%s %s", "go-rancher", serverVersion.Value, "(HTTP-based Helm Repository)"))
+		http.StripPrefix("/", http.FileServer(http.Dir(repositoryDirectory))).ServeHTTP(w, r)
+	}))
+
+	ip := getOutboundIP()
+	// Bind the server to a specific IP address (your local machine's IP)
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:4050", ip.String()))
+	assert.NoError(c.T(), err)
+	ts.Listener = listener
+	ts.Start()
+
+	return ts
+}
+
+func StartRegistry(c *ClusterRepoTestSuite) (*httptest.Server, error) {
 	// Create a new registry handler
 	handler := registryGoogle.New()
 
 	// Optionally, you can customize the handler here if needed
 	// e.g., add middleware, logging, etc.
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logrus.Infof("Received request: %s %s", r.Method, r.URL)
+		assert.Contains(c.T(), r.Header["User-Agent"][0], "go-rancher")
+		assert.Contains(c.T(), r.Header["User-Agent"][0], "(OCI-based Helm Repository)")
 		handler.ServeHTTP(w, r)
 	})
 
@@ -164,9 +196,7 @@ func StartRegistry() (*httptest.Server, error) {
 	ip := getOutboundIP()
 	// Bind the server to a specific IP address (your local machine's IP)
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:4050", ip.String()))
-	if err != nil {
-		return nil, err
-	}
+	assert.NoError(c.T(), err)
 	ts.Listener = listener
 	ts.Start()
 
@@ -391,7 +421,7 @@ func AddHelmChart(u *url.URL, repoName, path, tag string) error {
 // TestOCIRepo tests CREATE, UPDATE, and DELETE operations of OCI ClusterRepo resources
 func (c *ClusterRepoTestSuite) TestOCIRepo() {
 	//start registry
-	ts, err := StartRegistry()
+	ts, err := StartRegistry(c)
 	assert.NoError(c.T(), err)
 
 	defer ts.Close()
@@ -415,7 +445,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo() {
 // TestOCIRepo2 tests CREATE, UPDATE, and DELETE operations of OCI ClusterRepo additional cases
 func (c *ClusterRepoTestSuite) TestOCIRepo2() {
 	//start registry
-	ts, err := StartRegistry()
+	ts, err := StartRegistry(c)
 	assert.NoError(c.T(), err)
 
 	defer ts.Close()
@@ -617,7 +647,7 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 // TestOCI tests creating an OCI clusterrepo and install a chart
 func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	//start registry
-	ts, err := StartRegistry()
+	ts, err := StartRegistry(c)
 	assert.NoError(c.T(), err)
 
 	u, err := url.Parse(ts.URL)
@@ -718,7 +748,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 // TestOCIEnableRepo tests the enable/disable feature of clusterrepo
 func (c *ClusterRepoTestSuite) TestOCIEnableRepo() {
 	//start registry
-	ts, err := StartRegistry()
+	ts, err := StartRegistry(c)
 	assert.NoError(c.T(), err)
 	defer ts.Close()
 	u, err := url.Parse(ts.URL)
