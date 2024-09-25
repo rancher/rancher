@@ -21,8 +21,11 @@ import (
 	authzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
-const TokenNamespace = "cattle-tokens"
-const ThirtyDays = 30*24*60*60*100 // 30 days in milliseconds.
+const (
+	TokenNamespace = "cattle-tokens"
+	ThirtyDays     = 30*24*60*60*100 // 30 days in milliseconds.
+	UserIDLabel    = "authn.management.cattle.io/token-userId"
+)
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
@@ -514,11 +517,15 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 		token.Spec.TTL = ttl
 	}
 
+	// extend labels for future filtering of tokens by user
+	labels := token.Labels
+	labels[UserIDLabel] = token.Spec.UserID
+
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   TokenNamespace,
 			Name:        token.Name,
-			Labels:      token.Labels,
+			Labels:      labels,
 			Annotations: token.Annotations,
 		},
 		StringData: make(map[string]string),
