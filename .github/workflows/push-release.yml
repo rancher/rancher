@@ -439,6 +439,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
     steps:
       - name: Environment variables
         shell: bash
