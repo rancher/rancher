@@ -17,6 +17,7 @@ import (
 
 const (
 	CreatorIDAnnotation             = "field.cattle.io/creatorId"
+	NoCreatorRBACAnnotation         = "field.cattle.io/noCreatorRBAC"
 	creatorPrincipalNameAnnotation  = "field.cattle.io/creator-principal-name"
 	creatorOwnerBindingAnnotation   = "authz.management.cattle.io/creator-owner-binding"
 	roleTemplatesRequiredAnnotation = "authz.management.cattle.io/creator-role-bindings"

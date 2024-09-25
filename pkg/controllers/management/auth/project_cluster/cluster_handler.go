@@ -194,12 +194,17 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		clusterAnnotations := metaAccessor.GetAnnotations()
 		annotations := map[string]string{}
 
-		if creatorID := clusterAnnotations[CreatorIDAnnotation]; creatorID != "" {
-			annotations[CreatorIDAnnotation] = creatorID
-		}
+		// If we don't want creator owner RBAC, propogate that to the project
+		if noCreatorRBAC := clusterAnnotations[NoCreatorRBACAnnotation]; noCreatorRBAC != "" {
+			annotations[NoCreatorRBACAnnotation] = noCreatorRBAC
+		} else {
+			if creatorID := clusterAnnotations[CreatorIDAnnotation]; creatorID != "" {
+				annotations[CreatorIDAnnotation] = creatorID
+			}
 
-		if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
-			annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
+			if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
+				annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
+			}
 		}
 
 		if name == project.System {
@@ -335,6 +340,10 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 		cluster, ok := obj.(*apisv3.Cluster)
 		if !ok {
 			return obj, fmt.Errorf("expected cluster, got %T", obj)
+		}
+
+		if _, ok := cluster.Annotations[NoCreatorRBACAnnotation]; ok {
+			return obj, nil
 		}
 
 		creatorID := cluster.Annotations[CreatorIDAnnotation]
