@@ -328,6 +328,7 @@ func ensureIndexConfigMap(status *catalog.RepoStatus, configMap corev1controller
 				status.IndexConfigMapName = ""
 				status.IndexConfigMapNamespace = ""
 				status.IndexConfigMapResourceVersion = ""
+				status.ShouldNotSkip = true
 				return nil
 			}
 			logrus.Errorf("Error while fetching index config map %s : %v", status.IndexConfigMapName, err)
@@ -410,10 +411,6 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		return true
 	}
 
-	if newStatus.IndexConfigMapName == "" {
-		return false
-	}
-
 	if newStatus.ObservedGeneration < clusterRepo.Generation {
 		newStatus.NumberOfRetries = 0
 		newStatus.NextRetryAt = metav1.Time{}
@@ -440,6 +437,7 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		controller.EnqueueAfter(clusterRepo.Name, interval)
 		return true
 	}
+
 	return false
 }
 
