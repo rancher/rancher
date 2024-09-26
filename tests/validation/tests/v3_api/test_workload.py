@@ -166,7 +166,7 @@ def test_wl_upgrade():
     validate_workload(p_client, workload, "deployment", ns.name, 2)
     validate_workload_image(p_client, workload, TEST_IMAGE_OS_BASE, ns)
 
-
+#Converted to go test in TestWorkloadPodScaleUp
 def test_wl_pod_scale_up():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -195,7 +195,7 @@ def test_wl_pod_scale_up():
     validate_workload(p_client, workload, "deployment", ns.name, 3)
     validate_pods_are_running_by_id(allpods, workload, ns.name)
 
-
+#Converted to go test in TestWorkloadPodScaleDown
 def test_wl_pod_scale_down():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
