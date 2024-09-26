@@ -10,6 +10,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
+	"github.com/rancher/rancher/pkg/wrangler"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
@@ -60,6 +61,15 @@ func NewTokenStore(
 		sar: sar,
 	}
 	return &tokenStore
+}
+
+func NewSystemTokenStoreFromWrangler(wranglerContext *wrangler.Context) *SystemTokenStore {
+	return NewSystemTokenStore(
+		wranglerContext.Core.Secret(),
+		wranglerContext.Core.Secret().Cache(),
+		wranglerContext.Mgmt.UserAttribute(),
+		wranglerContext.Mgmt.User(),
+	)
 }
 
 func NewSystemTokenStore(

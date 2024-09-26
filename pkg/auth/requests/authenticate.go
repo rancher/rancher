@@ -69,13 +69,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
 	// Rancher Backend direct Ext Token Access via in-built custom handler store instance
-	wContext := mgmtCtx.Wrangler
-	extTokenStore := exttokens.NewSystemTokenStore(
-		wContext.Core.Secret(),
-		wContext.Core.Secret().Cache(),
-		wContext.Mgmt.UserAttribute(),
-		wContext.Mgmt.User(),
-	)
+	extTokenStore := exttokens.NewSystemTokenStoreFromWrangler(mgmtCtx.Wrangler)
 
 	return &tokenAuthenticator{
 		ctx:                 ctx,

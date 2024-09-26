@@ -31,13 +31,7 @@ type UserAuthRefresher interface {
 }
 
 func NewUserAuthRefresher(ctx context.Context, scaledContext *config.ScaledContext) UserAuthRefresher {
-	wContext := scaledContext.Wrangler
-	extTokenStore := exttokens.NewSystemTokenStore(
-		wContext.Core.Secret(),
-		wContext.Core.Secret().Cache(),
-		wContext.Mgmt.UserAttribute(),
-		wContext.Mgmt.User(),
-	)
+	extTokenStore := exttokens.NewSystemTokenStoreFromWrangler(scaledContext.Wrangler)
 
 	return &refresher{
 		tokenLister:         scaledContext.Management.Tokens("").Controller().Lister(),

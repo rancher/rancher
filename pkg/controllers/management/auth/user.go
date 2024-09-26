@@ -59,13 +59,7 @@ const (
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
 
-	wContext := management.Wrangler
-	extTokenStore := exttokens.NewSystemTokenStore(
-		wContext.Core.Secret(),
-		wContext.Core.Secret().Cache(),
-		wContext.Mgmt.UserAttribute(),
-		wContext.Mgmt.User(),
-	)
+	extTokenStore := exttokens.NewSystemTokenStoreFromWrangler(management.Wrangler)
 
 	lfc := &userLifecycle{
 		prtb:            management.Management.ProjectRoleTemplateBindings(""),

@@ -30,13 +30,7 @@ func Setup(ctx context.Context, clusterRouter requests.ClusterRouter, scaledCont
 }
 
 func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
-	wContext := management.Wrangler
-	extTokenStore := exttokens.NewSystemTokenStore(
-		wContext.Core.Secret(),
-		wContext.Core.Secret().Cache(),
-		wContext.Mgmt.UserAttribute(),
-		wContext.Mgmt.User(),
-	)
+	extTokenStore := exttokens.NewSystemTokenStoreFromWrangler(management.Wrangler)
 
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	handler := &user.Handler{
