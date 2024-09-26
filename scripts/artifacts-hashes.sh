@@ -9,5 +9,5 @@ for filename in $dist_folder/*; do
   sum=$(echo $sum_file | awk '{print $1}')
   file_path=$(echo $sum_file | awk '{print $2}')
   file=${file_path#"$dist_folder/"}
-  echo "$sum $file" >> ./dist/sha256sum.txt
+  echo "$sum $file" >> ./bin/sha256sum.txt
 done
