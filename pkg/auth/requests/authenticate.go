@@ -209,11 +209,11 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return err
 	}(); err != nil {
 		// Log the error and move on to avoid failing the request.
-		logrus.Errorf("Error updating lastUsedAt for token %s: %v", token.ObjectMeta.Name, err)
+		logrus.Errorf("Error updating lastUsedAt for token %s: %v", token.Name, err)
 		return authResp, nil
 	}
 
-	logrus.Debugf("Updated lastUsedAt for token %s", token.ObjectMeta.Name)
+	logrus.Debugf("Updated lastUsedAt for token %s", token.Name)
 	return authResp, nil
 }
 
