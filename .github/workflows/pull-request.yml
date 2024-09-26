@@ -12,205 +12,258 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
-  unit-tests:
-    uses: ./.github/workflows/unit-test.yml
-  build-chart:
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
-    steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git jq awk
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: install yq
-        uses: ./.github/actions/install-yq
-        with:
-          arch: ${{ env.ARCH }}
-      - id: env 
-        name: Setup Dependencies Env Variables
-        uses: ./.github/actions/setup-build-env
-      - name: Install dependencies
-        env: 
-          HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
-        run: |
-          curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
-          mv /tmp/helm /usr/bin/helm_v3 && \
-          chmod +x /usr/bin/helm_v3
-          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}; \
-      - name: Build
-        run: ./scripts/chart/build chart
-      - name: Validate
-        run: ./scripts/chart/validate
-      - name: Test
-        run: ./scripts/chart/test
-      - name: Package
-        run: ./scripts/chart/package
-  build-server:
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+  create-images-files:
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
     env:
-      ARCH: ${{ matrix.arch }}
+      REGISTRY: ""
+      GIT_TAG: v2.8.9-alpha2
     steps:
-      - name: Environment variables
-        shell: bash
-        run: |
-          if [[ "$ARCH" == "x64" ]]; then
-            echo "ARCH=amd64" >> $GITHUB_ENV
-          fi
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: install yq
-        shell: bash
-        run: sudo snap install yq
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
+      - uses: actions/setup-go@v5
         with:
-          images: ${{ env.IMAGE }}
-          flavor: |
-            latest=false
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          go-version: '${{ steps.env.outputs.GO_VERSION }}'
+      - name: Download data.json
+        run: |
+          mkdir -p bin
+          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
       - name: Create k3s images file
         uses: ./.github/actions/k3s-images
         with:
           k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
-      - name: Download data.json
-        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./data.json
-      - name: Build and export server
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          push: false
-          build-args: |
-            "VERSION=${{ env.TAG }}"
-            "COMMIT=${{ github.SHA }}"
-            "RKE_VERSION=${{ steps.env.outputs.RKE_VERSION }}"
-            "ARCH=${{ env.ARCH }}"
-            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-            "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
-            "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
-          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ env.ARCH }}
-          context: .
-          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
-          file: ./package/Dockerfile
-          labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
-      - name: Upload image
-        uses: actions/upload-artifact@v4
-        with:
-          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
-          path: /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
-          if-no-files-found: error
-          retention-days: 4
-          overwrite: false
-  build-agent:
-    needs: [build-server]
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
-    env:
-      REGISTRY: "localhost:5000"
-      ARCH: ${{ matrix.arch }}
-    steps:
-      - name: Environment variables
-        shell: bash
+      - name: Create files
         run: |
-          if [[ "$ARCH" == "x64" ]]; then
-            echo "ARCH=amd64" >> $GITHUB_ENV
-          fi
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: install yq
+          mkdir -p $HOME/bin
+          touch $HOME/bin/rancher-rke-k8s-versions.txt
+
+          mkdir -p bin
+          mv ./k3s-airgap-images.tar ./bin
+      - name: Create components and images files
         shell: bash
-        run: sudo snap install yq
-      - id: env 
-        name: Setup Dependencies Env Variables
-        uses: ./.github/actions/setup-build-env
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          flavor: |
-            latest=false
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
-      - name: Download rancher image
-        uses: actions/download-artifact@v4
-        with:
-          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
-          path: /tmp
-      - name: Load image
+        run: ./scripts/create-components-images-files.sh
+      - name: Move files
         run: |
-          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
-          if [ -z "$image_id" ]; then
-            echo "Error: Failed to load image from tarball!"
-            exit 1
-          fi
-          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-      - name: Build agent
-        id: build
-        uses: docker/build-push-action@v5
+          mv $HOME/bin/* ./bin
+      - name: Create sha256sum.txt file
+        run: ./scripts/artifacts-hashes.sh
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
         with:
-          push:  ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            "VERSION=${{ env.TAG }}"
-            "ARCH=${{ env.ARCH }}"
-            "RANCHER_TAG=${{ env.TAG }}"
-            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-            "REGISTRY=${{ env.REGISTRY }}"
-            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ env.ARCH }}
-          context: .
-          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
-          file: ./package/Dockerfile.agent
-          labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
-      - name: Upload image
-        uses: actions/upload-artifact@v4
-        with:
-          name: "rancher-agent-${{ matrix.os }}-${{ env.ARCH }}"
-          path: /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
-          if-no-files-found: error
-          retention-days: 4
-          overwrite: false
-  integration-tests:
-    needs: [build-agent]
-    uses: ./.github/workflows/integration-tests.yml
-    with:
-      parent_run_id: ${{ github.run_id }}
-  build-agent-windows:
-    strategy:
-      matrix:
-        os: [windows]
-        version: [2019, 2022]
-    runs-on: ${{ matrix.os }}-${{ matrix.version }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Build Windows Agent Image
-      run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
+      - name: Upload artifacts to bucket
+        run: |
+          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.txt"
+          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.sh"
+          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.ps1"
+  # unit-tests:
+  #   uses: ./.github/workflows/unit-test.yml
+  # build-chart:
+  #   runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+  #   container: registry.suse.com/bci/bci-base:latest
+  #   steps:
+  #     - name: install dependencies
+  #       shell: bash
+  #       run: zypper install -y git jq awk
+  #     - name: Git safe directory
+  #       run: git config --global --add safe.directory "$PWD"
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: install yq
+  #       uses: ./.github/actions/install-yq
+  #       with:
+  #         arch: ${{ env.ARCH }}
+  #     - id: env 
+  #       name: Setup Dependencies Env Variables
+  #       uses: ./.github/actions/setup-build-env
+  #     - name: Install dependencies
+  #       env: 
+  #         HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
+  #       run: |
+  #         curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
+  #         mv /tmp/helm /usr/bin/helm_v3 && \
+  #         chmod +x /usr/bin/helm_v3
+  #         helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}; \
+  #     - name: Build
+  #       run: ./scripts/chart/build chart
+  #     - name: Validate
+  #       run: ./scripts/chart/validate
+  #     - name: Test
+  #       run: ./scripts/chart/test
+  #     - name: Package
+  #       run: ./scripts/chart/package
+  # build-server:
+  #   strategy:
+  #     matrix:
+  #       os: [linux]
+  #       arch: [x64, arm64]
+  #   runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+  #   env:
+  #     ARCH: ${{ matrix.arch }}
+  #   steps:
+  #     - name: Environment variables
+  #       shell: bash
+  #       run: |
+  #         if [[ "$ARCH" == "x64" ]]; then
+  #           echo "ARCH=amd64" >> $GITHUB_ENV
+  #         fi
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: install yq
+  #       shell: bash
+  #       run: sudo snap install yq
+  #     - id: env 
+  #       name: Setup Dependencies Env Variables
+  #       uses: ./.github/actions/setup-build-env
+  #     - name: Docker meta
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ${{ env.IMAGE }}
+  #         flavor: |
+  #           latest=false
+  #     - name: Set up QEMU
+  #       uses: docker/setup-qemu-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Create k3s images file
+  #       uses: ./.github/actions/k3s-images
+  #       with:
+  #         k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
+  #     - name: Download data.json
+  #       run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+  #     - name: Build and export server
+  #       id: build
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         push: false
+  #         build-args: |
+  #           "VERSION=${{ env.TAG }}"
+  #           "COMMIT=${{ github.SHA }}"
+  #           "RKE_VERSION=${{ steps.env.outputs.RKE_VERSION }}"
+  #           "ARCH=${{ env.ARCH }}"
+  #           "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+  #           "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
+  #           "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
+  #         tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ env.ARCH }}
+  #         context: .
+  #         platforms: "${{ matrix.os }}/${{ env.ARCH }}"
+  #         file: ./package/Dockerfile
+  #         labels: "${{ steps.meta.outputs.labels }}"
+  #         outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
+  #     - name: Upload image
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
+  #         path: /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
+  #         if-no-files-found: error
+  #         retention-days: 4
+  #         overwrite: false
+  # build-agent:
+  #   needs: [build-server]
+  #   strategy:
+  #     matrix:
+  #       os: [linux]
+  #       arch: [x64, arm64]
+  #   runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+  #   services:
+  #     registry:
+  #       image: registry:2
+  #       ports:
+  #         - 5000:5000
+  #   env:
+  #     REGISTRY: "localhost:5000"
+  #     ARCH: ${{ matrix.arch }}
+  #   steps:
+  #     - name: Environment variables
+  #       shell: bash
+  #       run: |
+  #         if [[ "$ARCH" == "x64" ]]; then
+  #           echo "ARCH=amd64" >> $GITHUB_ENV
+  #         fi
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: install yq
+  #       shell: bash
+  #       run: sudo snap install yq
+  #     - id: env 
+  #       name: Setup Dependencies Env Variables
+  #       uses: ./.github/actions/setup-build-env
+  #     - name: Docker meta
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ${{ env.IMAGE }}
+  #         flavor: |
+  #           latest=false
+  #     - name: Set up QEMU
+  #       uses: docker/setup-qemu-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: network=host
+  #     - name: Download rancher image
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
+  #         path: /tmp
+  #     - name: Load image
+  #       run: |
+  #         image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+  #         if [ -z "$image_id" ]; then
+  #           echo "Error: Failed to load image from tarball!"
+  #           exit 1
+  #         fi
+  #         docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+  #         docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+  #     - name: Build agent
+  #       id: build
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         push:  ${{ github.event_name != 'pull_request' }}
+  #         build-args: |
+  #           "VERSION=${{ env.TAG }}"
+  #           "ARCH=${{ env.ARCH }}"
+  #           "RANCHER_TAG=${{ env.TAG }}"
+  #           "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+  #           "REGISTRY=${{ env.REGISTRY }}"
+  #           "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+  #         tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ env.ARCH }}
+  #         context: .
+  #         platforms: "${{ matrix.os }}/${{ env.ARCH }}"
+  #         file: ./package/Dockerfile.agent
+  #         labels: "${{ steps.meta.outputs.labels }}"
+  #         outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
+  #     - name: Upload image
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: "rancher-agent-${{ matrix.os }}-${{ env.ARCH }}"
+  #         path: /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
+  #         if-no-files-found: error
+  #         retention-days: 4
+  #         overwrite: false
+  # integration-tests:
+  #   needs: [build-agent]
+  #   uses: ./.github/workflows/integration-tests.yml
+  #   with:
+  #     parent_run_id: ${{ github.run_id }}
+  # build-agent-windows:
+  #   strategy:
+  #     matrix:
+  #       os: [windows]
+  #       version: [2019, 2022]
+  #   runs-on: ${{ matrix.os }}-${{ matrix.version }}
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #   - name: Build Windows Agent Image
+  #     run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
