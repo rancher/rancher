@@ -5,6 +5,31 @@
       "type": ["string", "null"],
       "enum": ["strict", "system-store", "", null],
       "description": "agentTLSMode must be 'strict' or 'system-store' or null (defaults to system-store)"
+    },
+    "auditLog": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "type": "string",
+          "enum": ["sidecar", "hostPath"],
+          "description": "auditLog.destination must be either 'sidecar' or 'hostPath'"
+        },
+        "level": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3],
+          "description": "auditLog.level must be a number 0-3; 0 to disable, 3 for most verbose"
+        }
+      }
+    },
+    "busyboxImage": {
+      "type": "string",
+      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.repository` & `auditLog.image.tag` instead.",
+      "deprecated": true
+    },
+    "busyboxImagePullPolicy": {
+      "type": "string",
+      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.pullPolicy` instead.",
+      "deprecated": true
     }
   },
   "required": [],
