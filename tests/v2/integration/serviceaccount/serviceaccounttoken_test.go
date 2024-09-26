@@ -72,10 +72,11 @@ func (s *ServiceAccountSuite) TestSingleSecretForServiceAccount() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount)
+			_, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount.DeepCopy())
 			s.Require().NoError(err)
 		}()
 	}
+	wg.Wait()
 
 	pollInterval := 500 * time.Millisecond
 	err = wait.Poll(pollInterval, 5*time.Second, func() (done bool, err error) {
