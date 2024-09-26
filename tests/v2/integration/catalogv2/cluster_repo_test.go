@@ -911,8 +911,8 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	cr.Spec.GitBranch = "invalid-branch"
 	expoValues := v1.ExponentialBackOffValues{
-		MinWait:    2,
-		MaxWait:    4,
+		MinWait:    30,
+		MaxWait:    60,
 		MaxRetries: 2,
 	}
 	cr.Spec.ExponentialBackOffValues = &expoValues
@@ -920,13 +920,12 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	require.NoError(c.T(), err)
 
 	retryNumber := 1
-	err = wait.Poll(200*time.Millisecond, 30*time.Second, func() (done bool, err error) {
+	err = wait.Poll(1*time.Second, 10*time.Minute, func() (done bool, err error) {
 		cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 		assert.NoError(c.T(), err)
 
 		for _, condition := range cr.Status.Conditions {
 			if v1.RepoCondition(condition.Type) == v1.RepoDownloaded {
-				logrus.Infof("Condition: %v, retryNumber %d, number of retries %d", condition, retryNumber, cr.Status.NumberOfRetries)
 				if condition.Status == corev1.ConditionFalse && cr.Status.NumberOfRetries == retryNumber {
 					retryNumber++
 					return false, nil
