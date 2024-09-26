@@ -552,14 +552,24 @@ jobs:
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '${{ steps.env.outputs.GO_VERSION }}'
       - name: Download data.json
         run: |
           mkdir -p bin
           curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
+      - name: Create k3s images file
+        uses: ./.github/actions/k3s-images
+        with:
+          k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
       - name: Create files
         run: |
           mkdir -p $HOME/bin
           touch $HOME/bin/rancher-rke-k8s-versions.txt
+
+          mkdir -p bin
+          mv ./k3s-airgap-images.tar ./bin
       - name: Create components and images files
         shell: bash
         run: ./scripts/create-components-images-files.sh
