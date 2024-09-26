@@ -31,7 +31,7 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		ReleaseData:             capr.GetKDMReleaseData,
 		SystemAgentImage:        settings.SystemAgentInstallerImage.Get,
 		SystemPodLabelSelectors: systeminfo.NewRetriever(clients).GetSystemPodLabelSelectors,
-		PreBootstrapCluster:     prebootstrap.NewRetriever(clients).PreBootstrapClusters,
+		GetBootstrapManifests:   prebootstrap.NewRetriever(clients).GeneratePreBootstrapClusterAgentManifest,
 	})
 	if features.MCM.Enabled() {
 		dynamicschema.Register(ctx, clients)

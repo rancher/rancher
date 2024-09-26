@@ -36,15 +36,6 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 	}
 	result = append(result, clusterAgent)
 
-	preBootstrap, err := p.retrievalFunctions.PreBootstrapCluster(controlPlane)
-	if err != nil {
-		return nil, err
-	}
-	// if we're bootstrapping - just return the cluster-agent manifest
-	if preBootstrap {
-		return result, nil
-	}
-
 	// if we have a nil snapshotMetadata object, it's probably because the annotation didn't exist on the controlplane object. this is not breaking though so don't block.
 	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if snapshotMetadata == nil {

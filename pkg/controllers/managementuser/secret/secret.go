@@ -102,7 +102,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	})
 
 	resourceSyncController := &ResourceSyncController{
-		upstreamSecrets:   mgmt.Core.Secrets("fleet-default"),
+		upstreamSecrets:   mgmt.Core.Secrets(clusterRec.Spec.FleetWorkspaceName),
 		downstreamSecrets: cluster.Core.Secrets(""),
 		clusterName:       clusterRec.Spec.DisplayName,
 	}
@@ -113,7 +113,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface, mgmtCluster *apimgmtv3.Cluster) error {
 	secrets, err := c.upstreamSecrets.List(metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list secrets in fleet-default namespace: %w", err)
+		return fmt.Errorf("failed to list secrets in %v namespace: %w", mgmtCluster.Spec.FleetWorkspaceName, err)
 	}
 
 	logrus.Debugf("[pre-bootstrap][secrets] looking for secrets-to synchronize to cluster %v", c.clusterName)
@@ -127,7 +127,7 @@ func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface
 
 		_, err = c.sync("", &sec)
 		if err != nil {
-			return fmt.Errorf("[pre-bootstrap][secret] failed to synchronize secret %v/%v to cluster %v: %w", sec.Namespace, sec.Name, c.clusterName, err)
+			return fmt.Errorf("failed to synchronize secret %v/%v to cluster %v: %w", sec.Namespace, sec.Name, c.clusterName, err)
 		}
 
 		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", sec.Namespace, sec.Name, c.clusterName)

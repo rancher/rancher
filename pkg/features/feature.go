@@ -132,8 +132,8 @@ var (
 		true,
 		true,
 		true)
-	PreBootstrap = newFeature(
-		"prebootstrap",
+	ProvisioningPreBootstrap = newFeature(
+		"provisioningprebootstrap",
 		"Support running pre-bootstrap workloads on downstream clusters",
 		false,
 		true,

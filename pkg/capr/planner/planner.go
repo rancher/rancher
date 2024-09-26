@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	clusterRegToken = "clusterRegToken"
+	ClusterRegToken = "clusterRegToken"
 
 	EtcdSnapshotConfigMapKey = "provisioning-cluster-spec"
 
@@ -135,11 +135,11 @@ type InfoFunctions struct {
 	ReleaseData             func(context.Context, *rkev1.RKEControlPlane) *model.Release
 	SystemAgentImage        func() string
 	SystemPodLabelSelectors func(plane *rkev1.RKEControlPlane) []string
-	PreBootstrapCluster     func(plane *rkev1.RKEControlPlane) (bool, error)
+	GetBootstrapManifests   func(plane *rkev1.RKEControlPlane) ([]plan.File, error)
 }
 
 func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
-	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(clusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
+	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(ClusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})
 	store := NewStore(clients.Core.Secret(),
@@ -869,7 +869,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		return err
 	}
 
-	preBootstrap, err := p.retrievalFunctions.PreBootstrapCluster(controlPlane)
+	preBootstrapManifests, err := p.retrievalFunctions.GetBootstrapManifests(controlPlane)
 	if err != nil {
 		return err
 	}
@@ -967,7 +967,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, r.entry.Machine) {
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
 			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for kubelet to update")
-		} else if isControlPlane(r.entry) && preBootstrap {
+		} else if isControlPlane(r.entry) && len(preBootstrapManifests) > 0 {
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
 			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for cluster pre-bootstrap to complete")
 		} else if isControlPlane(r.entry) && !controlPlane.Status.AgentConnected {
@@ -1031,57 +1031,56 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		err      error
 	)
 
-	if controlPlane.Spec.UnmanagedConfig {
-		return plan.NodePlan{}, map[string]interface{}{}, "", nil
-	}
+	if !controlPlane.Spec.UnmanagedConfig {
+		nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
+		if err != nil {
+			return nodePlan, map[string]interface{}{}, "", err
+		}
+		var (
+			joinedServer string
+			config       map[string]interface{}
+		)
 
-	nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
-	if err != nil {
-		return nodePlan, map[string]interface{}{}, "", err
-	}
-	var (
-		joinedServer string
-		config       map[string]interface{}
-	)
+		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg, renderS3)
+		if err != nil {
+			return nodePlan, config, joinedServer, err
+		}
 
-	nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg, renderS3)
-	if err != nil {
+		bootstrapManifests, err := p.retrievalFunctions.GetBootstrapManifests(controlPlane)
+		if err != nil {
+			return nodePlan, config, joinedServer, err
+		}
+		if len(bootstrapManifests) > 0 {
+			logrus.Debugf("[planner] adding pre-bootstrap manifests")
+			nodePlan.Files = append(nodePlan.Files, bootstrapManifests...)
+			return nodePlan, config, joinedServer, err
+		}
+
+		nodePlan, err = p.addManifests(nodePlan, controlPlane, entry)
+		if err != nil {
+			return nodePlan, config, joinedServer, err
+		}
+
+		nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry)
+		if err != nil {
+			return nodePlan, config, joinedServer, err
+		}
+
+		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
+
+		idempotentScriptFile := plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
+			Path:    idempotentActionScriptPath(controlPlane),
+			Dynamic: true,
+			Minor:   true,
+		}
+
+		nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
+
 		return nodePlan, config, joinedServer, err
 	}
 
-	nodePlan, err = p.addManifests(nodePlan, controlPlane, entry)
-	if err != nil {
-		return nodePlan, config, joinedServer, err
-	}
-
-	preBootstrap, err := p.retrievalFunctions.PreBootstrapCluster(controlPlane)
-	if err != nil {
-		logrus.Debugf("error getting pre-bootstrap cluster data: %v", err)
-		return nodePlan, config, joinedServer, err
-	}
-
-	if preBootstrap {
-		// exit early as adding remaining manifests before bootstrapping may cause thrashing or operational failures
-		return nodePlan, config, joinedServer, nil
-	}
-
-	nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry)
-	if err != nil {
-		return nodePlan, config, joinedServer, err
-	}
-
-	nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
-
-	idempotentScriptFile := plan.File{
-		Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
-		Path:    idempotentActionScriptPath(controlPlane),
-		Dynamic: true,
-		Minor:   true,
-	}
-
-	nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
-
-	return nodePlan, config, joinedServer, err
+	return plan.NodePlan{}, map[string]interface{}{}, "", nil
 }
 
 func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {

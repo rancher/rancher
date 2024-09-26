@@ -257,11 +257,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
-	if features.PreBootstrap.Enabled() {
-		logrus.Debugf("not starting mini-rancher due to pre-bootstrap...")
-		return nil
-	}
-
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
