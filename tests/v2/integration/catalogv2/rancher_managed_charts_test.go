@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/tests/v2/actions/quarantine"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -127,7 +128,7 @@ func (w *RancherManagedChartsTest) resetSettings() {
 }
 
 func TestRancherManagedChartsSuite(t *testing.T) {
-	t.Skip()
+	quarantine.Test(t)
 	suite.Run(t, new(RancherManagedChartsTest))
 }
 

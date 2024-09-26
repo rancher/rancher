@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	"github.com/rancher/rancher/tests/v2/actions/quarantine"
 	"github.com/rancher/rancher/tests/v2/actions/reports"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -85,6 +86,6 @@ func (h *HostedEKSClusterProvisioningTestSuite) TestProvisioningHostedEKS() {
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestHostedEKSClusterProvisioningTestSuite(t *testing.T) {
-	t.Skip("This test has been deprecated; check https://github.com/rancher/hosted-providers-e2e for updated tests")
+	quarantine.Test(t, "This test has been deprecated; check https://github.com/rancher/hosted-providers-e2e for updated tests")
 	suite.Run(t, new(HostedEKSClusterProvisioningTestSuite))
 }

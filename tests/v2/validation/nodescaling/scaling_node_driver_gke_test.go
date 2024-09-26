@@ -5,6 +5,7 @@ package nodescaling
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/quarantine"
 	"github.com/rancher/rancher/tests/v2/actions/scalinginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/clusters"
@@ -81,6 +82,6 @@ func (s *GKENodeScalingTestSuite) TestScalingGKENodePoolsDynamicInput() {
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestGKENodeScalingTestSuite(t *testing.T) {
-	t.Skip("This test has been deprecated; check https://github.com/rancher/hosted-providers-e2e for updated tests")
+	quarantine.Test(t, "This test has been deprecated; check https://github.com/rancher/hosted-providers-e2e for updated tests")
 	suite.Run(t, new(GKENodeScalingTestSuite))
 }
