@@ -1,5 +1,7 @@
 package api
 
+// XXX TODO AK modified file to carry over
+
 import (
 	"context"
 	"net/http"
@@ -15,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
@@ -27,11 +30,20 @@ func Setup(ctx context.Context, clusterRouter requests.ClusterRouter, scaledCont
 }
 
 func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
+	wContext := management.Wrangler
+	extTokenStore := exttokens.NewSystemTokenStore(
+		wContext.Core.Secret(),
+		wContext.Core.Secret().Cache(),
+		wContext.Mgmt.UserAttribute(),
+		wContext.Mgmt.User(),
+	)
+
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	handler := &user.Handler{
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
 		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
+		ExtTokenStore:            extTokenStore,
 	}
 
 	schema.Formatter = handler.UserFormatter

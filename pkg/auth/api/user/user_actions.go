@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -11,10 +12,12 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokens "github.com/rancher/rancher/pkg/ext/resources/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"golang.org/x/crypto/bcrypt"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -36,6 +39,7 @@ type Handler struct {
 	UserClient               v3.UserInterface
 	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
 	UserAuthRefresher        providerrefresh.UserAuthRefresher
+	ExtTokenStore            *exttokens.SystemTokenStore
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -116,6 +120,23 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 	}
 
 	// XXX TODO AK password changed - invalidate session tokens => login tokens => not derived (see refresher.go)
+
+	// get tokens for user, by user id -- see also `getExtTokensByUserName` @ pkg/controllers/management/auth/user.go
+	filterForUser := labels.Set(map[string]string{exttokens.UserIDLabel: userID})
+	objs, err := h.ExtTokenStore.List(&v1.ListOptions{
+		LabelSelector: filterForUser.AsSelector().String(),
+	})
+	if err != nil {
+		return fmt.Errorf("error getting ext tokens for user %s: %v", userID, err)
+	}
+	// iterate, process non-derived tokens = login/session tokens - invalidate - force ttl to zero.
+	for _, token := range objs.Items {
+		if !token.GetIsDerived() {
+			token.Spec.TTL = 0
+			h.ExtTokenStore.Update(&token, &v1.UpdateOptions{})
+		}
+	}
+
 	return nil
 }
 
