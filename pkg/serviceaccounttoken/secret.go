@@ -22,9 +22,11 @@ const (
 	// ServiceAccountSecretLabel is the label used to search for the secret belonging to a service account.
 	ServiceAccountSecretLabel = "cattle.io/service-account.name"
 
-	serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
+	// ServiceAccountSecretRefAnnotation is applied to the ServiceAccount to
+	// reference the secret that was created.
+	ServiceAccountSecretRefAnnotation = "rancher.io/service-account.secret-ref"
 
-	serviceAccountSecretRefAnnotation = "rancher.io/service-account.secret-ref"
+	serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
 )
 
 // secretLister is an abstraction over any kind of secret lister.
@@ -215,14 +217,14 @@ func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, 
 
 // returns true if the secret has changed.
 func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret *corev1.Secret, saClient clientv1.ServiceAccountInterface, secretClient clientv1.SecretInterface) (*corev1.ServiceAccount, bool, error) {
-	if sa.Annotations[serviceAccountSecretRefAnnotation] != "" {
+	if sa.Annotations[ServiceAccountSecretRefAnnotation] != "" {
 		// TODO: I guess we should check to see if it's the existing SA?
 		return sa, false, nil
 	}
 	if sa.Annotations == nil {
 		sa.Annotations = map[string]string{}
 	}
-	sa.Annotations[serviceAccountSecretRefAnnotation] = keyFromObject(secret).String()
+	sa.Annotations[ServiceAccountSecretRefAnnotation] = secret.Namespace + "/" + secret.Name
 
 	updated, err := saClient.Update(ctx, sa, metav1.UpdateOptions{})
 	if err == nil {
@@ -274,8 +276,8 @@ func secretRefFromSA(sa *corev1.ServiceAccount) (*types.NamespacedName, error) {
 	if sa.Annotations == nil {
 		return nil, nil
 	}
-	if ann := sa.Annotations[serviceAccountSecretRefAnnotation]; ann != "" {
-		elements := strings.Split(ann, string(types.Separator))
+	if ann := sa.Annotations[ServiceAccountSecretRefAnnotation]; ann != "" {
+		elements := strings.Split(ann, "/")
 		if len(elements) != 2 {
 			return nil, fmt.Errorf("too many elements parsing ServiceAccount secret reference: %s", ann)
 		}

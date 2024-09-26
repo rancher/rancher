@@ -5,10 +5,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -53,7 +55,7 @@ func TestOptimisticLocking(t *testing.T) {
 				defer wg.Done()
 				// Sends a DeepCopy because this is theoretically being updated
 				// in different processes.
-				secret, err := EnsureSecretForServiceAccount(context.TODO(), nil, clientSet, sa.DeepCopy())
+				secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.TODO(), nil, clientSet, sa.DeepCopy())
 				assert.NoError(t, err)
 				assert.NotNil(t, secret)
 			}()
@@ -63,13 +65,19 @@ func TestOptimisticLocking(t *testing.T) {
 		secrets, err := k8sClient.Secrets("default").List(context.TODO(), metav1.ListOptions{})
 		assert.NoError(t, err)
 		assert.Len(t, secrets.Items, 1)
+		createdSecret := &secrets.Items[0]
+
+		sa, err = k8sClient.ServiceAccounts("default").Get(context.TODO(), sa.GetName(), metav1.GetOptions{})
+		assert.NoError(t, err)
+
+		assert.Equal(t, sa.Annotations[serviceaccounttoken.ServiceAccountSecretRefAnnotation], keyFromObject(createdSecret).String())
 	})
 }
 
 // this is a fake reconciler for ServiceAccount secrets.
 func fakePopulateSecret(ctx context.Context, t *testing.T, k8sClient typedcorev1.CoreV1Interface, sa *corev1.ServiceAccount) {
 	watcher, err := k8sClient.Secrets("default").Watch(ctx, metav1.ListOptions{
-		LabelSelector: labels.Set(map[string]string{ServiceAccountSecretLabel: sa.GetName()}).String(),
+		LabelSelector: labels.Set(map[string]string{serviceaccounttoken.ServiceAccountSecretLabel: sa.GetName()}).String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -104,5 +112,15 @@ func fakePopulateSecret(ctx context.Context, t *testing.T, k8sClient typedcorev1
 			return
 		}
 
+	}
+}
+
+func keyFromObject(obj interface {
+	GetNamespace() string
+	GetName() string
+}) types.NamespacedName {
+	return types.NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
 	}
 }
