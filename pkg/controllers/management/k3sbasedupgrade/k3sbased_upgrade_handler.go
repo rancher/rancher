@@ -3,15 +3,12 @@ package k3sbasedupgrade
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/coreos/go-semver/semver"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-	app2 "github.com/rancher/rancher/pkg/app"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
+	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,13 +16,22 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+const (
+	K3sAppNme  = "rancher-k3s-upgrader"
+	Rke2AppNme = "rancher-rke2-upgrader"
+)
+
+// globalCounter keeps track of the number of clusters for which the handler is concurrently uninstalling the legacy K3s-based upgrade app.
+// An atomic integer is used for efficiency, as it is lighter than a traditional lock.
+var globalCounter atomic.Int32
+
+func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}
-	isK3s := cluster.Status.Driver == v32.ClusterDriverK3s
-	isRke2 := cluster.Status.Driver == v32.ClusterDriverRke2
-	// only applies to k3s/rke2 clusters
+	isK3s := cluster.Status.Driver == mgmtv3.ClusterDriverK3s
+	isRke2 := cluster.Status.Driver == mgmtv3.ClusterDriverRke2
+	// only applies to imported k3s/rke2 clusters
 	if !isK3s && !isRke2 {
 		return cluster, nil
 	}
@@ -34,9 +40,20 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		return cluster, nil
 	}
 
+	if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
+		if globalCounter.Load() < int32(settings.K3sBasedUpgraderUninstallConcurrency.GetInt()) {
+			globalCounter.Add(1)
+			err := h.uninstallK3sBasedUpgradeController(cluster)
+			globalCounter.Add(-1)
+			if err != nil {
+				return nil, fmt.Errorf("[k3s-based-upgrader] failed to uninstall k3s based upgrade app: %w", err)
+			}
+		}
+	}
+
 	var (
 		updateVersion string
-		strategy      v32.ClusterUpgradeStrategy
+		strategy      mgmtv3.ClusterUpgradeStrategy
 	)
 	switch {
 	case isK3s:
@@ -63,19 +80,22 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 			return cluster, err
 		}
 		if !needsUpgrade {
-			// if upgrade was in progress, make sure to set the state back
-			if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
+			// if upgrade was in progress, make sure to set the state back to true
+			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
+				logrus.Debug("[k3s-based-upgrader] updating the Upgraded condition to true")
+				cluster = cluster.DeepCopy()
+				mgmtv3.ClusterConditionUpgraded.True(cluster)
+				mgmtv3.ClusterConditionUpgraded.Message(cluster, "")
+				if cluster, err = h.clusterClient.Update(cluster); err != nil {
+					return nil, err
+				}
 				logrus.Infof("[k3s-based-upgrader] finished upgrading cluster [%s]", cluster.Name)
-				v32.ClusterConditionUpgraded.True(cluster)
-				v32.ClusterConditionUpgraded.Message(cluster, "")
-				return h.clusterClient.Update(cluster)
 			}
 			return cluster, nil
 		}
-
 	}
 
-	if v32.ClusterConditionUpgraded.IsTrue(cluster) {
+	if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
 		logrus.Infof("[k3s-based-upgrader] upgrading cluster [%s] version from [%s] to [%s]",
 			cluster.Name, cluster.Status.Version.GitVersion, updateVersion)
 		if isNewer {
@@ -93,11 +113,6 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		return cluster, err
 	}
 
-	// create or update k3supgradecontroller if necessary
-	if err = h.deployK3sBasedUpgradeController(cluster.Name, isK3s, isRke2); err != nil {
-		return cluster, err
-	}
-
 	// deploy plans into downstream cluster
 	if err = h.deployPlans(cluster, isK3s, isRke2); err != nil {
 		return cluster, err
@@ -106,40 +121,15 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	return cluster, nil
 }
 
-// deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
-// Updates k3s upgrader controller if one exists and is not the newest available version.
-func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isRke2 bool) error {
-	userCtx, err := h.manager.UserContextNoControllers(clusterName)
+// uninstallK3sBasedUpgradeController uninstalls the k3s-based-upgrader app from the cluster if it exists.
+func (h *handler) uninstallK3sBasedUpgradeController(cluster *mgmtv3.Cluster) error {
+	userCtx, err := h.manager.UserContextNoControllers(cluster.Name)
 	if err != nil {
 		return err
 	}
 
 	projectLister := userCtx.Management.Management.Projects("").Controller().Lister()
-	systemProject, err := project.GetSystemProject(clusterName, projectLister)
-	if err != nil {
-		return err
-	}
-
-	templateID := k3sUpgraderCatalogName
-	template, err := h.templateLister.Get(namespace.GlobalNamespace, templateID)
-	if err != nil {
-		return err
-	}
-
-	latestTemplateVersion, err := h.catalogManager.LatestAvailableTemplateVersion(template, clusterName)
-	if err != nil {
-		return err
-	}
-
-	creator, err := h.systemAccountManager.GetSystemUser(clusterName)
-	if err != nil {
-		return err
-	}
-	systemProjectID := ref.Ref(systemProject)
-	_, systemProjectName := ref.Parse(systemProjectID)
-
-	nsClient := userCtx.Core.Namespaces("")
-	appProjectName, err := app2.EnsureAppProjectName(nsClient, systemProjectName, clusterName, systemUpgradeNS, creator.Name)
+	systemProject, err := project.GetSystemProject(cluster.Name, projectLister)
 	if err != nil {
 		return err
 	}
@@ -147,61 +137,23 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 	appLister := userCtx.Management.Project.Apps("").Controller().Lister()
 	appClient := userCtx.Management.Project.Apps("")
 
-	latestVersionID := latestTemplateVersion.ExternalID
-	var appname string
+	var appName string
 	switch {
-	case isK3s:
-		appname = "rancher-k3s-upgrader"
-	case isRke2:
-		appname = "rancher-rke2-upgrader"
+	case cluster.Status.Driver == mgmtv3.ClusterDriverK3s:
+		appName = K3sAppNme
+	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
+		appName = Rke2AppNme
 	}
-	app, err := appLister.Get(systemProjectName, appname)
+	app, err := appLister.Get(systemProject.Name, appName)
 	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-		logrus.Infof("[k3s-based-upgrader] installing app [%s] in cluster [%s]", appname, clusterName)
-		desiredApp := &v33.App{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      appname,
-				Namespace: systemProjectName,
-				Annotations: map[string]string{
-					"field.cattle.io/creatorId": creator.Name,
-				},
-			},
-			Spec: v33.AppSpec{
-				Description:     "Upgrade controller for k3s based clusters",
-				ExternalID:      latestVersionID,
-				ProjectName:     appProjectName,
-				TargetNamespace: systemUpgradeNS,
-			},
-		}
-
-		// k3s upgrader doesn't exist yet, so it will need to be created
-		if _, err = appClient.Create(desiredApp); err != nil {
-			return err
-		}
-	} else {
-		if !checkDeployed(app) {
-			if !v33.AppConditionForceUpgrade.IsUnknown(app) {
-				v33.AppConditionForceUpgrade.Unknown(app)
-			}
-			logrus.Warnln("force redeploying system-upgrade-controller")
-			if _, err = appClient.Update(app); err != nil {
-				return err
-			}
-		}
-
-		// everything is up-to-date and are set up properly, no need to update.
-		if app.Spec.ExternalID == latestVersionID {
+		if errors.IsNotFound(err) {
 			return nil
 		}
-
-		desiredApp := app.DeepCopy()
-		desiredApp.Spec.ExternalID = latestVersionID
-		logrus.Infof("[k3s-based-upgrader] updating app [%s] in cluster [%s]", appname, clusterName)
-		// new version of k3s upgrade available, or the valuesYaml have changed, update app
-		if _, err = appClient.Update(desiredApp); err != nil {
+		return err
+	}
+	if app != nil && app.DeletionTimestamp == nil {
+		logrus.Infof("[k3s-based-upgrader] uninstalling the app [%s] from the cluster [%s]", app.Name, cluster.Name)
+		if err := appClient.DeleteNamespaced(app.Namespace, app.Name, &metav1.DeleteOptions{}); !errors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -237,7 +189,7 @@ func IsNewerVersion(prevVersion, updatedVersion string) (bool, error) {
 }
 
 // nodeNeedsUpgrade checks all nodes in cluster, returns true if they still need to be upgraded
-func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster, version string) (bool, error) {
+func (h *handler) nodesNeedUpgrade(cluster *mgmtv3.Cluster, version string) (bool, error) {
 	v3NodeList, err := h.nodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return false, err
@@ -254,8 +206,4 @@ func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster, version string) (bool, e
 		}
 	}
 	return false, nil
-}
-
-func checkDeployed(app *v33.App) bool {
-	return v33.AppConditionDeployed.IsTrue(app) || v33.AppConditionInstalled.IsTrue(app)
 }

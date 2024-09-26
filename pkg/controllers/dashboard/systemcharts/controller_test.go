@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +39,16 @@ var (
 	emptyConfig     = &v1.ConfigMap{}
 	originalVersion = settings.RancherWebhookVersion.Get()
 	originalMCM     = features.MCM.Enabled()
+	sucDeployment   = &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "system-upgrade-controller",
+			Namespace: "cattle-system",
+		},
+	}
 )
 
 const testYAML = `---
@@ -49,9 +60,10 @@ priorityClassName: newClass
 `
 
 type testMocks struct {
-	manager       *chartfake.MockManager
-	namespaceCtrl *fake.MockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
-	configCache   *fake.MockCacheInterface[*v1.ConfigMap]
+	manager         *chartfake.MockManager
+	namespaceCtrl   *fake.MockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
+	configCache     *fake.MockCacheInterface[*v1.ConfigMap]
+	deploymentCache *fake.MockCacheInterface[*appsv1.Deployment]
 }
 
 func (t *testMocks) Handler() *handler {
@@ -59,6 +71,7 @@ func (t *testMocks) Handler() *handler {
 		manager:      t.manager,
 		namespaces:   t.namespaceCtrl,
 		chartsConfig: chart.RancherConfigGetter{ConfigCache: t.configCache},
+		deployment:   t.deploymentCache,
 	}
 }
 
@@ -79,9 +92,12 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				settings.RancherWebhookVersion.Set("2.0.0")
 				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"capi":              nil,
@@ -123,6 +139,25 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				expectedSUCValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"system-upgrade-controller",
+					"",
+					"2.0.0",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 			},
 		},
@@ -130,9 +165,12 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with config cache errors",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(4)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(6)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				settings.RancherWebhookVersion.Set("2.0.0")
 				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+
 				expectedValues := map[string]interface{}{
 					"capi": nil,
 					"mcm": map[string]interface{}{
@@ -171,6 +209,24 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				expectedSUCValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"system-upgrade-controller",
+					"",
+					"2.0.0",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 			},
 		},
@@ -178,9 +234,12 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with image override",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(4)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(6)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				settings.RancherWebhookVersion.Set("2.0.1")
 				settings.RancherProvisioningCAPIVersion.Set("2.0.1")
+				settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
+
 				expectedValues := map[string]interface{}{
 					"capi": nil,
 					"mcm": map[string]interface{}{
@@ -226,6 +285,27 @@ func Test_ChartInstallation(t *testing.T) {
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
+				expectedSUCValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher-test.io/rancher/system-upgrade-controller",
+					},
+				}
+
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"system-upgrade-controller",
+					"",
+					"2.0.1",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"rancher-test.io/"+settings.ShellImage.Get(),
+				).Return(nil)
+
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 			},
 			registryOverride: "rancher-test.io",
@@ -234,9 +314,11 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with webhook values",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(4)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(6)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				settings.RancherWebhookVersion.Set("2.0.0")
 				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				features.MCM.Set(true)
 				expectedValues := map[string]interface{}{
 					"priorityClassName": "newClass",
@@ -275,6 +357,24 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				expectedSUCValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"system-upgrade-controller",
+					"",
+					"2.0.0",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 			},
 		},
@@ -284,15 +384,17 @@ func Test_ChartInstallation(t *testing.T) {
 			// reset setting to default values before each test
 			settings.RancherWebhookVersion.Set(originalVersion)
 			settings.RancherProvisioningCAPIVersion.Set(originalVersion)
+			settings.SystemUpgradeControllerChartVersion.Set(originalVersion)
 			features.MCM.Set(originalMCM)
 
 			ctrl := gomock.NewController(t)
 
 			// create mocks for each test
 			mocks := testMocks{
-				manager:       chartfake.NewMockManager(ctrl),
-				namespaceCtrl: fake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl),
-				configCache:   fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
+				manager:         chartfake.NewMockManager(ctrl),
+				namespaceCtrl:   fake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl),
+				configCache:     fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
+				deploymentCache: fake.NewMockCacheInterface[*appsv1.Deployment](ctrl),
 			}
 
 			// allow test to add expected calls to mocks and run any additional setup
