@@ -575,10 +575,7 @@ jobs:
         run: ./scripts/create-components-images-files.sh
       - name: Move files
         run: |
-          mv $HOME/bin/* ./dist
-          mv ./bin/*.txt ./dist
-          mv ./bin/*.sh ./dist
-          mv ./bin/*.ps1 ./dist
+          mv $HOME/bin/* ./bin
       - name: Create sha256sum.txt file
         run: ./scripts/artifacts-hashes.sh
       - name: Load Secrets from Vault
@@ -589,4 +586,6 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
       - name: Upload artifacts to bucket
         run: |
-          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./dist s3://prime-artifacts/rancher/${{ env.TAG }}
+          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.txt"
+          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.sh"
+          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.ps1"

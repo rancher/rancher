@@ -16,7 +16,6 @@ if [ ${ARCH} == arm64 ]; then
 fi
 
 mkdir -p ../dist
-cp ../bin/data.json ../dist/rancher-data.json
 
 cd ../bin
 
