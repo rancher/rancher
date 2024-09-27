@@ -149,17 +149,16 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 }
 
 func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runtime.Object, error) {
+	project, ok := obj.(*apisv3.Project)
+	if !ok {
+		return obj, fmt.Errorf("expected project, got %T", obj)
+	}
+
+	// If we specify no creator owner RBAC, exit
+	if _, ok := project.Annotations[NoCreatorRBACAnnotation]; ok {
+		return obj, nil
+	}
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
-		project, ok := obj.(*apisv3.Project)
-		if !ok {
-			return obj, fmt.Errorf("expected project, got %T", obj)
-		}
-
-		// If we specify no creator owner RBAC, exit
-		if _, ok := project.Annotations[NoCreatorRBACAnnotation]; ok {
-			return obj, nil
-		}
-
 		creatorID := project.Annotations[CreatorIDAnnotation]
 		if creatorID == "" {
 			logrus.Warnf("[%s] project %s has no creatorId annotation. Cannot add creator as owner", ProjectCreateController, project.Name)

@@ -336,16 +336,15 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 }
 
 func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runtime.Object, error) {
+	cluster, ok := obj.(*apisv3.Cluster)
+	if !ok {
+		return obj, fmt.Errorf("expected cluster, got %T", obj)
+	}
+
+	if _, ok := cluster.Annotations[NoCreatorRBACAnnotation]; ok {
+		return obj, nil
+	}
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
-		cluster, ok := obj.(*apisv3.Cluster)
-		if !ok {
-			return obj, fmt.Errorf("expected cluster, got %T", obj)
-		}
-
-		if _, ok := cluster.Annotations[NoCreatorRBACAnnotation]; ok {
-			return obj, nil
-		}
-
 		creatorID := cluster.Annotations[CreatorIDAnnotation]
 		if creatorID == "" {
 			logrus.Warnf("[%s] cluster %s has no creatorId annotation. Cannot add creator as owner", ClusterCreateController, cluster.Name)
