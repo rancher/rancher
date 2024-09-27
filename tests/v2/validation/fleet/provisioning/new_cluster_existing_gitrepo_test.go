@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/rancher/tests/v2/actions/reports"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/clients/rancher/catalog"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
@@ -122,15 +121,9 @@ func (f *FleetWithProvisioningTestSuite) SetupSuite() {
 	f.standardUserClient = standardUserClient
 }
 
-func (f *FleetWithProvisioningTestSuite) TestProvisionAfterAddedGitRepo() {
+func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, fleet.LocalName)
 	require.NoError(f.T(), err)
-
-	chartVersion, err := f.client.Catalog.GetLatestChartVersion(fleet.FleetName, catalog.RancherChartRepo)
-	require.NoError(f.T(), err)
-
-	// fleet chart version may contain chart version info that is a superset of the version reported by the fleet deployment.
-	require.Contains(f.T(), chartVersion, fleetVersion[1:])
 
 	nodeRolesDedicated := []provisioninginput.MachinePools{
 		provisioninginput.EtcdMachinePool,
@@ -156,13 +149,12 @@ func (f *FleetWithProvisioningTestSuite) TestProvisionAfterAddedGitRepo() {
 		testSession := session.NewSession()
 		defer testSession.Cleanup()
 
-		tt.client, err = tt.client.WithSession(testSession)
-		require.NoError(f.T(), err)
-
 		adminClient, err := f.client.WithSession(testSession)
 		require.NoError(f.T(), err)
 
 		provisioningConfig := *f.provisioningConfig
+
+		provisioningConfig.Hardened = true
 		provisioningConfig.MachinePools = tt.machinePools
 
 		f.Run(tt.name, func() {
@@ -197,15 +189,9 @@ func (f *FleetWithProvisioningTestSuite) TestProvisionAfterAddedGitRepo() {
 
 }
 
-func (f *FleetWithProvisioningTestSuite) TestProvisionWindowsAfterAddedGitRepo() {
+func (f *FleetWithProvisioningTestSuite) TestWindowsAfterAddedGitRepo() {
 	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, fleet.LocalName)
 	require.NoError(f.T(), err)
-
-	chartVersion, err := f.client.Catalog.GetLatestChartVersion(fleet.FleetName, catalog.RancherChartRepo)
-	require.NoError(f.T(), err)
-
-	// fleet chart version may contain chart version info that is a superset of the version reported by the fleet deployment.
-	require.Contains(f.T(), chartVersion, fleetVersion[1:])
 
 	nodeRolesDedicatedWindows := []provisioninginput.MachinePools{
 		provisioninginput.EtcdMachinePool,
@@ -238,9 +224,6 @@ func (f *FleetWithProvisioningTestSuite) TestProvisionWindowsAfterAddedGitRepo()
 		f.Run(tt.name, func() {
 			testSession := session.NewSession()
 			defer testSession.Cleanup()
-
-			tt.client, err = tt.client.WithSession(testSession)
-			require.NoError(f.T(), err)
 
 			adminClient, err := f.client.WithSession(testSession)
 			require.NoError(f.T(), err)

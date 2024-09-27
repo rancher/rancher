@@ -5,6 +5,7 @@ package nodescaling
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/scalinginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/rancherversion"
 	"github.com/rancher/shepherd/pkg/config"
@@ -45,15 +46,18 @@ func (s *AutoReplaceSuite) SetupSuite() {
 }
 
 func (s *AutoReplaceSuite) TestEtcdAutoReplaceRKE2K3S() {
-	AutoReplaceFirstNodeWithRole(s.T(), s.client, s.client.RancherConfig.ClusterName, "etcd")
+	err := scalinginput.AutoReplaceFirstNodeWithRole(s.client, s.client.RancherConfig.ClusterName, "etcd")
+	require.NoError(s.T(), err)
 }
 
 func (s *AutoReplaceSuite) TestControlPlaneAutoReplaceRKE2K3S() {
-	AutoReplaceFirstNodeWithRole(s.T(), s.client, s.client.RancherConfig.ClusterName, "control-plane")
+	err := scalinginput.AutoReplaceFirstNodeWithRole(s.client, s.client.RancherConfig.ClusterName, "control-plane")
+	require.NoError(s.T(), err)
 }
 
 func (s *AutoReplaceSuite) TestWorkerAutoReplaceRKE2K3S() {
-	AutoReplaceFirstNodeWithRole(s.T(), s.client, s.client.RancherConfig.ClusterName, "worker")
+	err := scalinginput.AutoReplaceFirstNodeWithRole(s.client, s.client.RancherConfig.ClusterName, "worker")
+	require.NoError(s.T(), err)
 }
 
 func TestAutoReplaceSuite(t *testing.T) {
