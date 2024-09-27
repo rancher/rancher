@@ -9,8 +9,6 @@ source package-env
 
 cd ../package
 
-# Make sure the used data.json is a release artifact
-
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
 fi
