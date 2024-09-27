@@ -115,13 +115,11 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 }
 
 func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
-	condition := isProtectedRBACResource
 	onRemoveHandler := generic.NewRemoveHandler(name, c.Updater(), generic.FromObjectHandlerToHandler(sync))
 	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
-		if !condition(obj) {
-			// ignore
-			return obj, nil
+		if isProtectedRBACResource(obj) {
+			return onRemoveHandler(key, obj)
 		}
-		return onRemoveHandler(key, obj)
+		return obj, nil
 	})
 }
