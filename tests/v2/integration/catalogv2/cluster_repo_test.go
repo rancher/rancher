@@ -170,7 +170,7 @@ func StartHTTPRepository(c *ClusterRepoTestSuite) *httptest.Server {
 
 	ip := getOutboundIP()
 	// Bind the server to a specific IP address (your local machine's IP)
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:4050", ip.String()))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
 	assert.NoError(c.T(), err)
 	ts.Listener = listener
 	ts.Start()
@@ -195,7 +195,7 @@ func StartRegistry(c *ClusterRepoTestSuite) (*httptest.Server, error) {
 
 	ip := getOutboundIP()
 	// Bind the server to a specific IP address (your local machine's IP)
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:4050", ip.String()))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
 	assert.NoError(c.T(), err)
 	ts.Listener = listener
 	ts.Start()
@@ -922,7 +922,9 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	retryNumber := 1
 	err = wait.Poll(1*time.Second, 10*time.Minute, func() (done bool, err error) {
 		cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
-		assert.NoError(c.T(), err)
+		if err != nil {
+			return false, nil
+		}
 
 		for _, condition := range cr.Status.Conditions {
 			if v1.RepoCondition(condition.Type) == v1.RepoDownloaded {
