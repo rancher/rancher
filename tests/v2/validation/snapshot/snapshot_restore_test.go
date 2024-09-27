@@ -102,7 +102,8 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 		}
 
 		s.Run(tt.name, func() {
-			etcdsnapshot.SnapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
+			err := etcdsnapshot.CreateAndValidateSnapshotRestore(s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, containerImage)
+			require.NoError(s.T(), err)
 		})
 	}
 }
@@ -112,7 +113,8 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnlyDynamicInput() {
 		s.T().Skip()
 	}
 
-	etcdsnapshot.SnapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, containerImage)
+	err := etcdsnapshot.CreateAndValidateSnapshotRestore(s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, containerImage)
+	require.NoError(s.T(), err)
 }
 
 // In order for 'go test' to run this suite, we need to create

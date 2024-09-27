@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/fleet"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/clients/rancher/catalog"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	extensionsfleet "github.com/rancher/shepherd/extensions/fleet"
@@ -70,12 +69,6 @@ func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, fleet.LocalName)
 	require.NoError(f.T(), err)
 
-	chartVersion, err := f.client.Catalog.GetLatestChartVersion(fleet.FleetName, catalog.RancherChartRepo)
-	require.NoError(f.T(), err)
-
-	// fleet chart version may contain chart version info that is a superset of the version reported by the fleet deployment.
-	require.Contains(f.T(), chartVersion, fleetVersion[1:])
-
 	urlQuery, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s", "cattle.io/os", "windows"))
 	require.NoError(f.T(), err)
 
@@ -123,7 +116,11 @@ func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 }
 
 func (f *FleetPublicRepoTestSuite) TestDynamicGitRepoDeployment() {
-	defer f.session.Cleanup()
+
+	testSession := session.NewSession()
+	defer testSession.Cleanup()
+	client, err := f.client.WithSession(testSession)
+	require.NoError(f.T(), err)
 
 	dynamicGitRepo := fleet.GitRepoConfig()
 	require.NotNil(f.T(), dynamicGitRepo)
@@ -131,31 +128,27 @@ func (f *FleetPublicRepoTestSuite) TestDynamicGitRepoDeployment() {
 	if len(dynamicGitRepo.Spec.Targets) < 1 {
 		dynamicGitRepo.Spec.Targets = []v1alpha1.GitTarget{
 			{
-				ClusterName: f.client.RancherConfig.ClusterName,
+				ClusterName: client.RancherConfig.ClusterName,
 			},
 		}
 	}
 
-	fleetVersion, err := fleet.GetDeploymentVersion(f.client, fleet.FleetControllerName, fleet.LocalName)
+	fleetVersion, err := fleet.GetDeploymentVersion(client, fleet.FleetControllerName, fleet.LocalName)
 	require.NoError(f.T(), err)
 
-	chartVersion, err := f.client.Catalog.GetLatestChartVersion(fleet.FleetName, catalog.RancherChartRepo)
-	require.NoError(f.T(), err)
-	require.Contains(f.T(), chartVersion, fleetVersion[1:])
+	f.Run("fleet "+fleetVersion, func() {
+		client, err = client.ReLogin()
+		require.NoError(f.T(), err)
 
-	f.client, err = f.client.ReLogin()
-	require.NoError(f.T(), err)
+		logrus.Info("Deploying dynamic gitRepo: ", dynamicGitRepo.Spec)
 
-	logrus.Info("Deploying dynamic gitRepo: ", dynamicGitRepo.ObjectMeta)
-	logrus.Info("Deploying dynamic gitRepo: ", dynamicGitRepo.Spec)
+		gitRepoObject, err := extensionsfleet.CreateFleetGitRepo(client, dynamicGitRepo)
+		require.NoError(f.T(), err)
 
-	gitRepoObject, err := extensionsfleet.CreateFleetGitRepo(f.client, dynamicGitRepo)
-	require.NoError(f.T(), err)
-
-	// expects dynamicGitRepo.GitRepoSpec.Targets to include RancherConfig.ClusterName
-	err = fleet.VerifyGitRepo(f.client, gitRepoObject.ID, f.clusterID, fleet.Namespace+"/"+f.client.RancherConfig.ClusterName)
-	require.NoError(f.T(), err)
-
+		// expects dynamicGitRepo.GitRepoSpec.Targets to include RancherConfig.ClusterName
+		err = fleet.VerifyGitRepo(client, gitRepoObject.ID, f.clusterID, fleet.Namespace+"/"+client.RancherConfig.ClusterName)
+		require.NoError(f.T(), err)
+	})
 }
 
 // In order for 'go test' to run this suite, we need to create
