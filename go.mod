@@ -17,7 +17,7 @@ replace (
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.1.0-rc2 // needed for containers/image/v5
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
 
-	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher109
+	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher109-patch1
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
@@ -124,7 +124,7 @@ require (
 	github.com/rancher/gke-operator v1.1.7
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
-	github.com/rancher/machine v0.15.0-rancher109
+	github.com/rancher/machine v0.15.0-rancher109-patch1
 	github.com/rancher/norman v0.0.0-20240207153035-cb54924f25c7
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
