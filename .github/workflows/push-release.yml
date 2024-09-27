@@ -558,7 +558,8 @@ jobs:
       - name: Download data.json
         run: |
           mkdir -p bin
-          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/rancher-data.json
+          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
+          cp ./bin/data.json ./bin/rancher-data.json
       - name: Create k3s images file
         uses: ./.github/actions/k3s-images
         with:
