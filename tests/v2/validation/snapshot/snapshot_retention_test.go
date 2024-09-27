@@ -102,14 +102,16 @@ func (s *SnapshotRetentionTestSuite) TestAutomaticSnapshotRetention() {
 	for _, tt := range tests {
 		s.Run(tt.testName, func() {
 			config := s.snapshotConfig
-			etcdsnapshot.CreateSnapshotsUntilRetentionLimit(s.T(), s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
+			err := etcdsnapshot.CreateSnapshotsUntilRetentionLimit(s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
+			require.NoError(s.T(), err)
 		})
 	}
 }
 
 func (s *SnapshotRetentionTestSuite) TestAutomaticSnapshotRetentionDynamic() {
 	config := s.snapshotConfig
-	etcdsnapshot.CreateSnapshotsUntilRetentionLimit(s.T(), s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
+	err := etcdsnapshot.CreateSnapshotsUntilRetentionLimit(s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
+	require.NoError(s.T(), err)
 }
 
 // In order for 'go test' to run this suite, we need to create
