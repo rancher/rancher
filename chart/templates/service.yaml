@@ -21,7 +21,7 @@ spec:
     protocol: TCP
     name: http
   - port: 443
-    targetPort: 444
+    targetPort: 443
     protocol: TCP
     name: https-internal
   selector:
