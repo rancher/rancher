@@ -195,7 +195,7 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		annotations := map[string]string{}
 
 		// If we have noCreatorRBAC annotation, propagate the annotation to the project and don't add creatorId annotation
-		if noCreatorRBAC := clusterAnnotations[NoCreatorRBACAnnotation]; noCreatorRBAC != "" {
+		if noCreatorRBAC, ok := clusterAnnotations[NoCreatorRBACAnnotation]; ok {
 			annotations[NoCreatorRBACAnnotation] = noCreatorRBAC
 		} else {
 			if creatorID := clusterAnnotations[CreatorIDAnnotation]; creatorID != "" {
