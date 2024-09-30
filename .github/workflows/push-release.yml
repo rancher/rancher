@@ -552,7 +552,7 @@ jobs:
   docker-image-digests:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: ubuntu-latest
-    needs: [create-images-files]
+    needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
     env:
       DOCKER_REGISTRY: "docker.io"
     steps:
@@ -563,9 +563,9 @@ jobs:
       - name: Create dist folder
         run: mkdir -p dist
       - name: Setup ecm-distro-tools
-        uses: rancher/ecm-distro-tools@v0.38.1
+        uses: rancher/ecm-distro-tools@v0.42.0
         with:
-          version: v0.38.1
+          version: v0.42.0
       - name: Create ECM Config
         run: |
           mkdir -p ~/.ecm-distro-tools
