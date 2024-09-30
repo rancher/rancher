@@ -3,7 +3,9 @@ package rancher
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
@@ -682,8 +684,12 @@ func migrateHarvesterCloudCredentialExpiration(w *wrangler.Context) error {
 			}
 
 			if token.ExpiresAt != "" {
+				t, err := time.Parse(time.RFC3339, token.ExpiresAt)
+				if err != nil {
+					return err
+				}
 				secret = *secret.DeepCopy()
-				secret.Annotations[cred.CloudCredentialExpirationAnnotation] = token.ExpiresAt
+				secret.Annotations[cred.CloudCredentialExpirationAnnotation] = strconv.FormatInt(t.UnixMilli(), 10)
 				_, err = w.Core.Secret().Update(&secret)
 				if err != nil {
 					return err

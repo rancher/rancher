@@ -3,7 +3,9 @@ package cred
 import (
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
@@ -121,7 +123,11 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 				}
 
 				if token.ExpiresAt != "" {
-					values.PutValue(data, token.ExpiresAt, "annotations", CloudCredentialExpirationAnnotation)
+					t, err := time.Parse(time.RFC3339, token.ExpiresAt)
+					if err != nil {
+						return nil, err
+					}
+					values.PutValue(data, strconv.FormatInt(t.UnixMilli(), 10), "annotations", CloudCredentialExpirationAnnotation)
 				}
 			}
 		}
@@ -162,7 +168,11 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 				}
 
 				if token.ExpiresAt != "" {
-					values.PutValue(data, token.ExpiresAt, "annotations", "cattle.io/expiration-date")
+					t, err := time.Parse(time.RFC3339, token.ExpiresAt)
+					if err != nil {
+						return nil, err
+					}
+					values.PutValue(data, strconv.FormatInt(t.UnixMilli(), 10), "annotations", CloudCredentialExpirationAnnotation)
 				}
 			} else {
 				values.RemoveValue(data, "annotations", CloudCredentialExpirationAnnotation)
