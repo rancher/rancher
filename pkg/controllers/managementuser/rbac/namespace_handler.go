@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -87,8 +88,8 @@ func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
-	err := n.reconcileNamespaceProjectClusterRole(obj)
-	return obj, err
+	n.asyncCleanupRBAC(obj.Name)
+	return obj, nil
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
@@ -566,4 +567,41 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		}
 	}
 
+}
+
+// asyncCleanupRBAC will wait for a Terminating namespace to be fully deleted before removing the associated RBAC.
+func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
+	go func() {
+		backoff := wait.Backoff{
+			Duration: 5 * time.Second,
+			Factor:   2.0,
+			Jitter:   0.1,
+			Steps:    10,
+			Cap:      5 * time.Minute,
+		}
+
+		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			_, err := n.m.nsLister.Get("", namespaceName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					// Namespace is fully deleted, clean up RBAC
+					err := n.reconcileNamespaceProjectClusterRole(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
+					if err != nil {
+						logrus.Errorf("error cleaning up RBAC for namespace %s: %v", namespaceName, err)
+						return true, err
+					}
+					logrus.Debugf("successfully cleaned up RBAC for namespace %s", namespaceName)
+					return true, nil
+				}
+				return false, err
+			}
+
+			logrus.Debugf("namespace %s is still present. Will recheck.", namespaceName)
+			return false, nil
+		})
+
+		if err != nil {
+			logrus.Errorf("async cleanup of RBAC for namespace %s failed: %v", namespaceName, err)
+		}
+	}()
 }

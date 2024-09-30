@@ -3,16 +3,21 @@ package rbac
 import (
 	"fmt"
 	"testing"
+	"time"
+
+	coreFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -489,4 +494,104 @@ func (d *DummyIndexer) GetIndexers() cache.Indexers {
 
 func (d *DummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
 	return nil
+}
+
+func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
+	tests := []struct {
+		name                  string
+		indexedRoles          []*rbacv1.ClusterRole
+		nsGetCalls            int
+		nsGetTerminatingCalls int
+	}{
+		{
+			name:                  "namespace already deleted",
+			nsGetCalls:            1,
+			nsGetTerminatingCalls: 0,
+		},
+		{
+			name:                  "namespace still terminating need to wait",
+			nsGetCalls:            2,
+			nsGetTerminatingCalls: 1,
+		},
+	}
+
+	namespaceName := "test-namespace"
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			timesCalled := 0
+			nsTerminatingCount := 0
+
+			namespaceListerMock := &coreFakes.NamespaceListerMock{
+				GetFunc: func(namespace string, name string) (*corev1.Namespace, error) {
+					timesCalled++
+					if nsTerminatingCount < test.nsGetTerminatingCalls {
+						nsTerminatingCount++
+						return &corev1.Namespace{
+							TypeMeta: metav1.TypeMeta{},
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "test-namespace",
+							},
+							Status: corev1.NamespaceStatus{
+								Phase: corev1.NamespaceTerminating,
+							},
+						}, nil
+					}
+					// indicate deleted namespace
+					return nil, apierrors.NewNotFound(schema.GroupResource{}, "")
+				},
+			}
+
+			indexedRoles := []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+			}
+			indexer := DummyIndexer{
+				clusterRoles: map[string][]*rbacv1.ClusterRole{
+					namespaceName: indexedRoles,
+				},
+				err: nil,
+			}
+
+			fakeClusterRoles := &fakes.ClusterRoleInterfaceMock{
+				UpdateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+					return in, nil
+				},
+				DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				},
+			}
+			fakeLister := &fakes.ClusterRoleListerMock{
+				GetFunc: func(namespace string, name string) (*rbacv1.ClusterRole, error) {
+					return &rbacv1.ClusterRole{}, nil
+				},
+			}
+			nsLifecycle := &nsLifecycle{
+				m: &manager{
+					nsLister:     namespaceListerMock,
+					crLister:     fakeLister,
+					crIndexer:    &indexer,
+					clusterRoles: fakeClusterRoles,
+				},
+			}
+
+			nsLifecycle.asyncCleanupRBAC(namespaceName)
+
+			waitForCondition(t, func() bool {
+				return timesCalled == test.nsGetCalls
+			}, 15*time.Second, time.Second)
+		})
+	}
+}
+
+func waitForCondition(t *testing.T, condition func() bool, timeout time.Duration, interval time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(interval)
+	}
+	t.Fatalf("condition not met within %v", timeout)
 }

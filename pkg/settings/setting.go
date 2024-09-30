@@ -133,7 +133,7 @@ var (
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher116")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher118")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -221,7 +221,7 @@ var (
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
 
-	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
+	// RancherProvisioningCAPIVersion is the exact version of the cluster api controller that Rancher will install.
 	RancherProvisioningCAPIVersion = NewSetting("rancher-provisioning-capi-version", "")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.

@@ -1,0 +1,66 @@
+#!/bin/bash
+
+set -e
+
+version="v0.2.0+shell0"
+socket_location="${LOG_SOCKET_LOCATION:-/tmp/log.sock}"
+curl_args=""
+
+function print_help {
+  cat <<EOF
+NAME:
+   loglevel - Dynamically change loglevel
+
+USAGE:
+   loglevel [global options] command [command options] [arguments...]
+
+VERSION:
+   $version
+
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --set value              Set loglevel
+   --socket-location value  (default: "/tmp/log.sock") [\$LOG_SOCKET_LOCATION]
+   --help, -h               show help
+   --version, -v            print the version
+EOF
+}
+
+function print_version {
+  echo "loglevel version $version"
+}
+
+while true; do
+  case "$1" in
+    --set )
+      curl_args="--data level=$2"
+      shift 2
+      ;;
+    --socket-location )
+      socket_location="$2"
+      shift 2
+      ;;
+    --help|help|-h|h )
+      print_help
+      exit 0
+      ;;
+    --version|-v)
+      print_version
+      exit 0
+      ;;
+    -* )
+      echo "Incorrect Usage. flag provided but not defined: $1"
+      echo
+      print_help
+      exit 1
+      ;;
+    * )
+      break
+      ;;
+  esac
+done
+
+set -x
+curl --no-progress-meter --fail-with-body --proxy "" --unix-socket "${socket_location}" http://unix/v1/loglevel $curl_args
