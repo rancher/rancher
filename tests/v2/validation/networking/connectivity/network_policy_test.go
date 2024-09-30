@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/rancher/tests/v2/actions/workloads"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/sshkeys"
@@ -30,6 +31,8 @@ type NetworkPolicyTestSuite struct {
 	client      *rancher.Client
 	project     *management.Project
 	clusterName string
+	namespace   *v1.SteveAPIObject
+	steveClient *v1.Client
 }
 
 const (
@@ -68,38 +71,40 @@ func (n *NetworkPolicyTestSuite) SetupSuite() {
 	require.NoError(n.T(), err)
 	require.Equal(n.T(), createdProject.Name, pingPodProjectName)
 	n.project = createdProject
-}
 
-func (n *NetworkPolicyTestSuite) TestPingPods() {
 	names := newNames()
 
 	namespaceName := names.random["namespaceName"]
 	daemonsetName := names.random["daemonsetName"]
 
 	n.T().Logf("Creating namespace with name [%v]", namespaceName)
-	namespace, err := namespaces.CreateNamespace(n.client, namespaceName, "{}", map[string]string{}, map[string]string{}, n.project)
+	n.namespace, err = namespaces.CreateNamespace(n.client, namespaceName, "{}", map[string]string{}, map[string]string{}, n.project)
 	require.NoError(n.T(), err)
-	assert.Equal(n.T(), namespace.Name, namespaceName)
+	assert.Equal(n.T(), n.namespace.Name, namespaceName)
 
-	steveClient, err := n.client.Steve.ProxyDownstream(n.project.ClusterID)
+	n.steveClient, err = n.client.Steve.ProxyDownstream(n.project.ClusterID)
 	require.NoError(n.T(), err)
 
 	testContainerPodTemplate := newPodTemplateWithTestContainer()
 
 	n.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
-	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, namespace.Name, testContainerPodTemplate, true, nil)
-	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
+	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, n.namespace.Name, testContainerPodTemplate, true, nil)
+	createdDaemonSet, err := n.steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(n.T(), err)
 	assert.Equal(n.T(), createdDaemonSet.Name, daemonsetName)
 
 	n.T().Logf("Waiting for daemonset [%v] to have expected number of available replicas", daemonsetName)
-	err = charts.WatchAndWaitDaemonSets(n.client, n.project.ClusterID, namespace.Name, metav1.ListOptions{})
+	err = charts.WatchAndWaitDaemonSets(n.client, n.project.ClusterID, n.namespace.Name, metav1.ListOptions{})
 	require.NoError(n.T(), err)
+}
 
+func (n *NetworkPolicyTestSuite) TestPingPods() {
+
+	// Get downstream cluster wrangler context
 	wc, err := n.client.WranglerContext.DownStreamClusterWranglerContext(n.project.ClusterID)
 	require.NoError(n.T(), err)
 
-	pods, err := wc.Core.Pod().List(namespace.Name, metav1.ListOptions{})
+	pods, err := wc.Core.Pod().List(n.namespace.Name, metav1.ListOptions{})
 	assert.NoError(n.T(), err)
 	assert.NotEmpty(n.T(), pods)
 
@@ -111,7 +116,7 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 	query, err := url.ParseQuery("labelSelector=node-role.kubernetes.io/" + nodeRole + "=true")
 	assert.NoError(n.T(), err)
 
-	nodeList, err := steveClient.SteveType("node").List(query)
+	nodeList, err := n.steveClient.SteveType("node").List(query)
 	assert.NoError(n.T(), err)
 
 	firstMachine := nodeList.Data[0]
