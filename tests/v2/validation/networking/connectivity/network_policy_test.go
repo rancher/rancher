@@ -38,8 +38,8 @@ type NetworkPolicyTestSuite struct {
 const (
 	nodeRole = "control-plane"
 	// Ping once
-	pingCmd       = "ping -c 1"
-	succesfulPing = "0% packet loss"
+	pingCmd        = "ping -c 1"
+	successfulPing = "0% packet loss"
 )
 
 func (n *NetworkPolicyTestSuite) TearDownSuite() {
@@ -139,7 +139,7 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 	}
 	n.T().Logf("Log of the ping command {%v}", excmdLog)
 
-	assert.Contains(n.T(), excmdLog, succesfulPing, "Unable to ping the pod")
+	assert.Contains(n.T(), excmdLog, successfulPing, "Unable to ping the pod")
 
 }
 
