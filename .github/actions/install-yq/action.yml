@@ -1,0 +1,16 @@
+name: "Install yq"
+description: "Install yq from source"
+inputs:
+  version:
+    description: "yq version"
+    default: v4.44.3
+  arch:
+    description: "host arch"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: install yq
+      shell: bash
+      run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ inputs.version }}/yq_linux_${{ inputs.arch }}.tar.gz | tar xz && mv yq_linux_${{ inputs.arch }} /usr/bin/yq
+
