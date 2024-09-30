@@ -10,6 +10,12 @@ var (
 	RequestKey = struct{}{}
 )
 
+// WriteError write the error message and the http status code in the ResponseWriter
+func WriteError(w http.ResponseWriter, httpStatus int, err error) {
+	w.WriteHeader(httpStatus)
+	w.Write([]byte(err.Error()))
+}
+
 // ReturnHTTPError handles sending out Error response
 // TODO Use the Norman API error framework instead
 func ReturnHTTPError(w http.ResponseWriter, r *http.Request, httpStatus int, errorMessage string) {
