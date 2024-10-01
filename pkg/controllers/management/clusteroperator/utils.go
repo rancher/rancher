@@ -3,6 +3,7 @@ package clusteroperator
 import (
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/util"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -166,13 +167,39 @@ func (e *OperatorController) CheckCrdReady(cluster *mgmtv3.Cluster, clusterType 
 	return cluster, nil
 }
 
-func GenerateSAToken(restConfig *rest.Config, clusterName string) (string, error) {
-	clientSet, err := kubernetes.NewForConfig(restConfig)
+type TransportConfigOption func(*transport.Config)
+
+func WithDialHolder(holder *transport.DialHolder) TransportConfigOption {
+	return func(cfg *transport.Config) {
+		cfg.DialHolder = holder
+	}
+}
+
+func NewClientSetForConfig(config *rest.Config, opts ...TransportConfigOption) (*kubernetes.Clientset, error) {
+	transportConfig, err := config.TransportConfig()
 	if err != nil {
-		return "", fmt.Errorf("error creating clientset for cluster %s: %v", clusterName, err)
+		return nil, err
+	}
+	for _, opt := range opts {
+		opt(transportConfig)
 	}
 
-	return util.GenerateServiceAccountToken(clientSet, clusterName)
+	rt, err := transport.New(transportConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	var httpClient *http.Client
+	if rt != http.DefaultTransport || config.Timeout > 0 {
+		httpClient = &http.Client{
+			Transport: rt,
+			Timeout:   config.Timeout,
+		}
+	} else {
+		httpClient = http.DefaultClient
+	}
+
+	return kubernetes.NewForConfigAndClient(config, httpClient)
 }
 
 func addAdditionalCA(secretsCache wranglerv1.SecretCache, caCert string) (string, error) {
