@@ -571,9 +571,21 @@ jobs:
         run: |
           rm -rf dist && mkdir dist
           mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+      - name: Create App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
       - name: Generate sha256sum file and upload artifacts
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         shell: bash
         run: |
           set -ex
@@ -604,7 +616,7 @@ jobs:
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
       - name: Add release notes
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           NOTES=$(cat ./dist/rancher-components.txt)
           gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
@@ -645,9 +657,21 @@ jobs:
           export WINDOWS_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-windows-images.txt
           release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${WINDOWS_IMAGES_URL}" --output-file "${{ env.WINDOWS_2019_FILE }}"
           cp "${{ env.WINDOWS_2019_FILE }}" "${{ env.WINDOWS_2022_FILE }}"
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+      - name: Create App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
       - name: Upload digests
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.LINUX_AMD64_FILE }} --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.LINUX_ARM64_FILE }} --clobber
