@@ -146,7 +146,7 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
-	if user != nil {
+	if user == nil {
 		return nil, fmt.Errorf("failed to get user")
 	}
 
