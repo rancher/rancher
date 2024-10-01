@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -20,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 const CloudCredentialExpirationAnnotation = "cattle.io/expiration-date"
@@ -92,92 +94,16 @@ type Store struct {
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if hc, ok := data["harvestercredentialConfig"].(map[string]any); ok && hc != nil {
-		if kubeConfigYaml, ok := hc["kubeconfigContent"].(string); ok && kubeConfigYaml != "" {
-
-			kubeConfig := map[string]any{}
-			if err := yaml.Unmarshal([]byte(kubeConfigYaml), &kubeConfig); err != nil {
-				return nil, err
-			}
-
-			tokenName := ""
-			if userList, ok := kubeConfig["users"].([]any); ok && userList != nil && len(userList) > 0 {
-				for _, u := range userList {
-					if entry, ok := u.(map[string]any); ok && entry != nil {
-						if user, ok := entry["user"].(map[string]any); ok && user != nil {
-							if token, ok := user["token"].(string); ok && token != "" {
-								if strings.HasPrefix(tokenName, "kubeconfig-user-") {
-									tokenName, _, _ = strings.Cut(tokenName, ":")
-									break
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if tokenName != "" {
-				token, err := s.TokenLister.Get("", tokenName)
-				if err != nil {
-					return nil, err
-				}
-
-				if token.ExpiresAt != "" {
-					t, err := time.Parse(time.RFC3339, token.ExpiresAt)
-					if err != nil {
-						return nil, err
-					}
-					values.PutValue(data, strconv.FormatInt(t.UnixMilli(), 10), "annotations", CloudCredentialExpirationAnnotation)
-				}
-			}
-		}
+	if err := s.processHarvesterCloudCredentialExpiration(data, false); err != nil {
+		return nil, fmt.Errorf("failed to process harvester cloud credential expiration: %w", err)
 	}
 
 	return s.Store.Create(apiContext, schema, data)
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if hc, ok := data["harvestercredentialConfig"].(map[string]any); ok && hc != nil {
-		if kubeConfigYaml, ok := hc["kubeconfigContent"].(string); ok && kubeConfigYaml != "" {
-
-			kubeConfig := map[string]any{}
-			if err := yaml.Unmarshal([]byte(kubeConfigYaml), &kubeConfig); err != nil {
-				return nil, err
-			}
-
-			tokenName := ""
-			if userList, ok := kubeConfig["users"].([]any); ok && userList != nil && len(userList) > 0 {
-				for _, u := range userList {
-					if entry, ok := u.(map[string]any); ok && entry != nil {
-						if user, ok := entry["user"].(map[string]any); ok && user != nil {
-							if token, ok := user["token"].(string); ok && token != "" {
-								if strings.HasPrefix(tokenName, "kubeconfig-user-") {
-									tokenName, _, _ = strings.Cut(tokenName, ":")
-									break
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if tokenName != "" {
-				token, err := s.TokenLister.Get("", tokenName)
-				if err != nil {
-					return nil, err
-				}
-
-				if token.ExpiresAt != "" {
-					t, err := time.Parse(time.RFC3339, token.ExpiresAt)
-					if err != nil {
-						return nil, err
-					}
-					values.PutValue(data, strconv.FormatInt(t.UnixMilli(), 10), "annotations", CloudCredentialExpirationAnnotation)
-				}
-			} else {
-				values.RemoveValue(data, "annotations", CloudCredentialExpirationAnnotation)
-			}
-		}
+	if err := s.processHarvesterCloudCredentialExpiration(data, true); err != nil {
+		return nil, fmt.Errorf("failed to process harvester cloud credential expiration: %w", err)
 	}
 
 	return s.Store.Update(apiContext, schema, data, id)
@@ -206,4 +132,81 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		}
 	}
 	return s.Store.Delete(apiContext, schema, id)
+}
+
+func (s *Store) processHarvesterCloudCredentialExpiration(data map[string]any, remove bool) error {
+	if hc, ok := data["harvestercredentialConfig"].(map[string]any); ok && hc != nil {
+		if kubeconfigYaml, ok := hc["kubeconfigContent"].(string); ok && kubeconfigYaml != "" {
+
+			expiration, err := GetHarvesterCloudCredentialExpirationFromKubeconfig(kubeconfigYaml, func(tokenName string) (*apimgmtv3.Token, error) {
+				return s.TokenLister.Get("", tokenName)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get harvester cloud credential expiration from kubeconfig: %w", err)
+			}
+
+			if expiration != "" {
+				values.PutValue(data, expiration, "annotations", CloudCredentialExpirationAnnotation)
+			} else if remove {
+				values.RemoveValue(data, "annotations", CloudCredentialExpirationAnnotation)
+			}
+		}
+	}
+	return nil
+}
+
+func GetHarvesterCloudCredentialExpirationFromKubeconfig(kubeconfigYaml string, getToken func(string) (*apimgmtv3.Token, error)) (string, error) {
+	tokenName, err := getHarvesterCredentialTokenNameFromKubeconfig(kubeconfigYaml)
+	if err != nil {
+		return "", fmt.Errorf("failed to get harvester credential config token name: %w", err)
+	}
+
+	if tokenName != "" {
+		token, err := getToken(tokenName)
+		if err != nil {
+			return "", fmt.Errorf("failed to get harvester credential config token: %w", err)
+		}
+
+		if ms, err := getMillisecondsUntilTokenExpiration(token); err != nil {
+			return "", fmt.Errorf("failed to get harvester credential config token expiration: %w", err)
+		} else if ms != nil {
+			return strconv.FormatInt(*ms, 10), nil
+		}
+	}
+
+	return "", nil
+}
+
+func getHarvesterCredentialTokenNameFromKubeconfig(kubeconfigYaml string) (string, error) {
+	kubeConfig := map[string]any{}
+	if err := yaml.Unmarshal([]byte(kubeconfigYaml), &kubeConfig); err != nil {
+		return "", err
+	}
+
+	if userList, ok := kubeConfig["users"].([]any); ok && userList != nil && len(userList) > 0 {
+		for _, u := range userList {
+			if entry, ok := u.(map[string]any); ok && entry != nil {
+				if user, ok := entry["user"].(map[string]any); ok && user != nil {
+					if token, ok := user["token"].(string); ok && token != "" {
+						if strings.HasPrefix(token, "kubeconfig-user-") {
+							token, _, _ = strings.Cut(token, ":")
+							return token, nil
+						}
+					}
+				}
+			}
+		}
+	}
+	return "", nil
+}
+
+func getMillisecondsUntilTokenExpiration(token *apimgmtv3.Token) (*int64, error) {
+	if token.ExpiresAt != "" {
+		t, err := time.Parse(time.RFC3339, token.ExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse token expiration time: %w", err)
+		}
+		return ptr.To(t.UnixMilli()), nil
+	}
+	return nil, nil
 }

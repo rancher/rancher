@@ -3,9 +3,7 @@ package rancher
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
@@ -25,7 +23,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
-	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -652,44 +649,18 @@ func migrateHarvesterCloudCredentialExpiration(w *wrangler.Context) error {
 	}
 
 	for _, secret := range secrets.Items {
-		if content, ok := secret.Data["harvestercredentialConfig-kubeconfigContent"]; ok && content != nil {
-			kubeConfig := map[string]any{}
-			if err = yaml.Unmarshal(content, &kubeConfig); err != nil {
-				return err
-			}
+		if kubeconfigYaml, ok := secret.Data["harvestercredentialConfig-kubeconfigContent"]; ok && kubeconfigYaml != nil {
 
-			tokenName := ""
-			if userList, ok := kubeConfig["users"].([]any); ok && userList != nil && len(userList) > 0 {
-				for _, u := range userList {
-					if entry, ok := u.(map[string]any); ok && entry != nil {
-						if user, ok := entry["user"].(map[string]any); ok && user != nil {
-							if token, ok := user["token"].(string); ok && token != "" {
-								if strings.HasPrefix(tokenName, "kubeconfig-user-") {
-									tokenName, _, _ = strings.Cut(tokenName, ":")
-									break
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if tokenName == "" {
-				continue
-			}
-
-			token, err := w.Mgmt.Token().Get(tokenName, metav1.GetOptions{})
+			expiration, err := cred.GetHarvesterCloudCredentialExpirationFromKubeconfig(string(kubeconfigYaml), func(tokenName string) (*v32.Token, error) {
+				return w.Mgmt.Token().Get(tokenName, metav1.GetOptions{})
+			})
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get harvester cloud credential expiration from kubeconfig: %w", err)
 			}
 
-			if token.ExpiresAt != "" {
-				t, err := time.Parse(time.RFC3339, token.ExpiresAt)
-				if err != nil {
-					return err
-				}
+			if expiration != "" {
 				secret = *secret.DeepCopy()
-				secret.Annotations[cred.CloudCredentialExpirationAnnotation] = strconv.FormatInt(t.UnixMilli(), 10)
+				secret.Annotations[cred.CloudCredentialExpirationAnnotation] = expiration
 				_, err = w.Core.Secret().Update(&secret)
 				if err != nil {
 					return err
