@@ -108,9 +108,6 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 		return nil, fmt.Errorf("unable to hash token value: %w", err)
 	}
 
-	token.Status.TokenValue = tokenValue
-	token.Status.TokenHash = hashedValue
-
 	// Get derived User information for the token.
 	//
 	// NOTE: The creation process is not given `AuthProvider`, `User-` and `GroupPrincipals`.
@@ -158,6 +155,7 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 		break
 	}
 
+	token.Status.TokenHash = hashedValue
 	token.Status.AuthProvider = authProvider
 	token.Status.UserPrincipal.DisplayName = user.DisplayName
 	token.Status.UserPrincipal.LoginName = user.Username // See also attribs.ExtraByProvider[ap]["username"][0]
@@ -185,6 +183,7 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 
 	// users don't care about the hashed value
 	newToken.Status.TokenHash = ""
+	newToken.Status.TokenValue = tokenValue
 	return newToken, nil
 }
 
@@ -490,8 +489,11 @@ func setExpired(token *Token) error {
 		return err
 	}
 
+	// note: The marshalling puts quotes around the string. strip them
+	// before handing this to the token and yaml adding another layer
+	// of quotes around such a string
+	token.Status.ExpiredAt = string(eAt[1:len(eAt)-1])
 	token.Status.Expired = isExpired
-	token.Status.ExpiredAt = string(eAt)
 	return nil
 }
 
@@ -615,7 +617,7 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			IsDerived:   derived,
 		},
 		Status: TokenStatus{
-			TokenHash:       string(secret.Data["hashedToken"]),
+			TokenHash:       string(secret.Data["hash"]),
 			AuthProvider:    string(secret.Data["auth-provider"]),
 			UserPrincipal:   up,
 			LastUpdateTime:  string(secret.Data["last-update-time"]),
