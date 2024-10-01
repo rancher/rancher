@@ -24,7 +24,7 @@ import (
 
 const (
 	TokenNamespace = "cattle-tokens"
-	ThirtyDays     = 30*24*60*60*100 // 30 days in milliseconds.
+	ThirtyDays     = 30*24*60*60*1000 // 30 days in milliseconds.
 	UserIDLabel    = "authn.management.cattle.io/token-userId"
 )
 
