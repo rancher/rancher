@@ -22,16 +22,16 @@ k3d:
 		.
 
 create-cluster: k3d
-	@bin/k3d cluster create --image rancher/k3s:$(K3D_K3S_VERSION)-k3s1 $(K3D_CLUSTER)
+	@k3d cluster create --image rancher/k3s:$(K3D_K3S_VERSION)-k3s1 $(K3D_CLUSTER)
 
 delete-cluster: k3d
-	@bin/k3d cluster delete $(K3D_CLUSTER)
+	@k3d cluster delete $(K3D_CLUSTER)
 
 build:
 	 CGO_ENABLED=0 go build -o ext ../cmd/ext/
 
-image:
-	@$(BUILD) \
+image: build
+	$(BUILD) \
 		--target=apiserver-poc \
 		--output=type=image,name=$(REGISTRY_IMAGE):$(IMAGE_TAG) \
 		.
@@ -39,16 +39,14 @@ image:
 push:
 	docker push $(REGISTRY_IMAGE):$(IMAGE_TAG)
 
-import:
-	@bin/k3d image import --cluster $(K3D_CLUSTER) $(REGISTRY_IMAGE):$(IMAGE_TAG)
+import: image
+	k3d image import --verbose --cluster $(K3D_CLUSTER) $(REGISTRY_IMAGE):$(IMAGE_TAG)
 
-deploy:
-	@$(MAKE) image import
+deploy: image import
 	@kubectl apply -f deployment.yaml
 	@kubectl -n cattle-system delete pods -l app=api-extension
 
-deploy-external:
-	@$(MAKE) image push
+deploy-external: image push
 	@kubectl apply -f deployment.yaml
 	@kubectl -n cattle-system delete pods -l app=api-extension
 
