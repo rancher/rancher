@@ -226,7 +226,7 @@ def test_wl_pod_scale_down():
     validate_workload(p_client, workload, "deployment", ns.name)
     validate_pods_are_running_by_id(allpods, workload, ns.name)
 
-
+#Converted to go test in TestWorkloadPauseOrchestration
 def test_wl_pause_orchestration():
     p_client = namespace["p_client"]
     ns = namespace["ns"]

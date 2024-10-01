@@ -2,10 +2,6 @@ package deployment
 
 import (
 	"context"
-	"errors"
-
-	"fmt"
-	"strconv"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 
@@ -13,7 +9,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/unstructured"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
@@ -23,12 +18,7 @@ import (
 )
 
 const (
-	imageName           = "nginx"
-	historyHeader       = "REVISION  CHANGE-CAUSE"
-	historyHeaderLength = 2
-	revisionsIndex      = 1
-	revisionNumberIndex = 0
-	revisionAnnotation  = "deployment.kubernetes.io/revision"
+	imageName = "nginx"
 )
 
 // CreateDeploymentWithConfigmap is a helper to create a deployment with or without a secret/configmap
@@ -112,46 +102,4 @@ func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, d
 	})
 
 	return updatedDeployment, err
-}
-
-// RolbackDeployment is a helper to rollback deployments
-func RollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, revision int) (string, error) {
-	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deploymentName)
-	revisionCmd := fmt.Sprintf("--to-revision=%s", strconv.Itoa(revision))
-	execCmd := []string{"kubectl", "rollout", "undo", "-n", namespaceName, deploymentCmd, revisionCmd}
-	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
-	return logCmd, err
-}
-
-// ValidateRolloutHistoryDeployment is a helper to validate rollout history deployment
-func ValidateRolloutHistoryDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, expectedRevision string) error {
-	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
-	if err != nil {
-		return err
-	}
-
-	deploymentResource := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(namespaceName)
-
-	unstructuredResp, err := deploymentResource.Get(context.TODO(), deploymentName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	latestDeployment := &appv1.Deployment{}
-	err = scheme.Scheme.Convert(unstructuredResp, latestDeployment, unstructuredResp.GroupVersionKind())
-	if err != nil {
-		return err
-	}
-
-	if latestDeployment.ObjectMeta.Annotations == nil {
-		return errors.New("revision empty")
-	}
-
-	revision := latestDeployment.ObjectMeta.Annotations[revisionAnnotation]
-
-	if revision == expectedRevision {
-		return nil
-	}
-
-	return errors.New("revision not found")
 }
