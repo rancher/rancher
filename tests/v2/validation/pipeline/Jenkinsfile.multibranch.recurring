@@ -6,9 +6,9 @@ node {
     def jobName = "${JOB_NAME}"
     def config = env.CONFIG
     def filename = "config.yaml"
-    def hostnameSuffix = ["v2.7-head":"v27", "v2.8-head":"v28", "v2.9-head":"v29"]
-    def releaseBranchTagMap = ["v2.7-head":"release/v2.7", "v2.8-head":"release/v2.8", "v2.9-head":"release/v2.9"]
-    def tagChartMap = ["v2.7-head":"2.7.12", "v2.8-head":"2.8.3", "v2.9-head":"2.8.3"]
+    def hostnameSuffix = ["v2.7-head":"v27", "v2.8-head":"v28", "v2.9-head":"v29", "main":"main"]
+    def releaseBranchTagMap = ["v2.7-head":"release/v2.7", "v2.8-head":"release/v2.8", "v2.9-head":"release/v2.9", "head":"main"]
+    def tagChartMap = ["v2.7-head":"2.7.12", "v2.8-head":"2.8.8", "v2.9-head":"2.9.2", "head":"2.9.2"]
     def rancherChartRepo = "prime"
     def configPath = ""
 
