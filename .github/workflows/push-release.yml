@@ -13,6 +13,7 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   REGISTRY: "docker.io"
+  GH_CLI_VERSION: 2.57.0
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -637,6 +638,13 @@ jobs:
           zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
           zypper ref
           zypper install -y aws-cli wget jq gh
+      - name: install gh
+        shell: bash
+        run: |
+          mkdir -p /tmp/gh
+          curl -fsL https://github.com/cli/cli/releases/download/v${{ env.GH_CLI_VERSION }}/gh_${{ env.GH_CLI_VERSION }}_linux_amd64.tar.gz | tar xvzf - --strip-components=1 -C /tmp/gh
+          mv /tmp/gh/bin/gh /usr/bin/gh
+          chmod +x /usr/bin/gh
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - name: Setup ecm-distro-tools
