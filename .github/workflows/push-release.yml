@@ -633,7 +633,7 @@ jobs:
         uses: actions/checkout@v4
       - name: install dependencies
         shell: bash
-        run: zypper install -y aws-cli wget jq
+        run: zypper install -y aws-cli wget jq gh
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - name: Setup ecm-distro-tools

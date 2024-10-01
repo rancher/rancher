@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: install dependencies
         shell: bash
-        run: zypper install -y git jq awk
+        run: zypper install -y git jq awk gh
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
