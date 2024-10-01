@@ -20,7 +20,10 @@ jobs:
     steps:
       - name: install dependencies
         shell: bash
-        run: zypper install -y git jq awk gh
+        run: |
+          zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+          zypper ref
+          zypper install -y git jq awk gh
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
