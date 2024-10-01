@@ -133,7 +133,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.10.0
 	github.com/rancher/gke-operator v1.9.3-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20240705194423-b2a060d103c1
+	github.com/rancher/lasso v0.0.0-20240923125127-ae858d002589
 	github.com/rancher/machine v0.15.0-rancher118
 	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -174,11 +174,11 @@ require (
 	k8s.io/kube-aggregator v0.30.1
 	k8s.io/kubectl v0.30.1
 	k8s.io/kubernetes v1.30.1
-	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
+	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.7.3
-	sigs.k8s.io/controller-runtime v0.18.4
+	sigs.k8s.io/controller-runtime v0.18.5
 	sigs.k8s.io/yaml v1.4.0
 )
 
