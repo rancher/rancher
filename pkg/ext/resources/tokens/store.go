@@ -134,7 +134,7 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user attributes: %w", err)
 	}
-	if attribs != nil {
+	if attribs == nil {
 		return nil, fmt.Errorf("failed to get user attributes")
 	}
 
