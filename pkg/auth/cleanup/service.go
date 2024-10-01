@@ -21,7 +21,6 @@ var errAuthConfigNil = errors.New("cannot get auth provider if its config is nil
 type Service struct {
 	secretsInterface corev1.SecretInterface
 
-	userCache  controllers.UserCache
 	userClient controllers.UserClient
 
 	clusterRoleTemplateBindingsCache  controllers.ClusterRoleTemplateBindingCache
@@ -39,7 +38,6 @@ func NewCleanupService(secretsInterface corev1.SecretInterface, c controllers.In
 	return &Service{
 		secretsInterface: secretsInterface,
 
-		userCache:  c.User().Cache(),
 		userClient: c.User(),
 
 		clusterRoleTemplateBindingsCache:  c.ClusterRoleTemplateBinding().Cache(),
@@ -156,12 +154,12 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 	if config == nil {
 		return errAuthConfigNil
 	}
-	users, err := s.userCache.List(labels.Everything())
+	users, err := s.userClient.List(v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list users: %w", err)
 	}
 
-	for _, u := range users {
+	for _, u := range users.Items {
 		providerName := getProviderNameFromPrincipalNames(u.PrincipalIDs...)
 		if providerName == config.Name {
 			// A fully external user (who was never local) has no password.
@@ -171,7 +169,7 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 					return err
 				}
 			} else {
-				if err := s.resetLocalUser(u); err != nil {
+				if err := s.resetLocalUser(&u); err != nil {
 					return fmt.Errorf("failed to reset local user: %w", err)
 				}
 			}
