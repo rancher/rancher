@@ -634,10 +634,7 @@ jobs:
         uses: actions/checkout@v4
       - name: install dependencies
         shell: bash
-        run: |
-          zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
-          zypper ref
-          zypper install -y aws-cli wget jq gh
+        run: zypper install -y aws-cli wget jq gh
       - name: install gh
         shell: bash
         run: |
