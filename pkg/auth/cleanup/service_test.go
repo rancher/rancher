@@ -73,6 +73,12 @@ func TestRunCleanup(t *testing.T) {
 			PrincipalIDs: []string{"azuread_group://rick", "local://rick"},
 			Password:     "secret",
 		},
+		"boss": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "boss",
+				Labels: map[string]string{"authz.management.cattle.io/bootstrapping": "admin-user"}},
+			PrincipalIDs: []string{"local://boss", "azuread_user://authprincipal"},
+		},
 	}
 
 	var tokenStore = map[string]*v3.Token{
@@ -245,19 +251,6 @@ func newMockCleanupService(t *testing.T,
 		return nil
 	}).AnyTimes()
 
-	// Setup User mock cache
-	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-	userCache.EXPECT().List(gomock.Any()).DoAndReturn(func(_ labels.Selector) ([]*v3.User, error) {
-		var lst []*v3.User
-		for _, v := range userStore {
-			lst = append(lst, v)
-		}
-		return lst, nil
-	}).AnyTimes()
-	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
-		return userStore[name], nil
-	}).AnyTimes()
-
 	// Setup User mock client
 	userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 	userClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, _ *metav1.DeleteOptions) error {
@@ -267,7 +260,20 @@ func newMockCleanupService(t *testing.T,
 	userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
 		userStore[user.Name] = user
 		return user, nil
-	})
+	}).AnyTimes()
+	userClient.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*v3.UserList, error) {
+		var lst v3.UserList
+		for _, v := range userStore {
+			selector, err := labels.Parse(opts.LabelSelector)
+			if err != nil {
+				return nil, err
+			}
+			if selector.Matches(labels.Set(v.Labels)) {
+				lst.Items = append(lst.Items, *v)
+			}
+		}
+		return &lst, nil
+	}).AnyTimes()
 
 	return Service{
 		secretsInterface:                  getSecretInterfaceMock(secretStore),
@@ -279,7 +285,6 @@ func newMockCleanupService(t *testing.T,
 		clusterRoleTemplateBindingsClient: crtbClient,
 		tokensCache:                       tokenCache,
 		tokensClient:                      tokenClient,
-		userCache:                         userCache,
 		userClient:                        userClient,
 	}
 }
