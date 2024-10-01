@@ -20,10 +20,16 @@ jobs:
     steps:
       - name: install dependencies
         shell: bash
+        run: zypper install -y git jq awk
+      - name: install gh
+        shell: bash
+        env:
+          GH_CLI_VERSION: 2.57.0
         run: |
-          zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
-          zypper ref
-          zypper install -y git jq awk gh
+          mkdir -p /tmp/gh
+          curl -fsL https://github.com/cli/cli/releases/download/v${{ env.GH_CLI_VERSION }}/gh_${{ env.GH_CLI_VERSION }}_linux_amd64.tar.gz | tar xvzf - --strip-components=1 -C /tmp/gh
+          mv /tmp/gh/bin/gh /usr/bin/gh
+          chmod +x /usr/bin/gh
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
