@@ -468,7 +468,7 @@ func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
 	defer cancel()
 	sar, err := t.sar.Create(ctx, sar, metav1.CreateOptions{})
 	if err != nil {
-		return false, fmt.Errorf("uanble to create SAR: %w", err)
+		return false, fmt.Errorf("unable to create SAR: %w", err)
 	}
 	return sar.Status.Allowed, nil
 }
