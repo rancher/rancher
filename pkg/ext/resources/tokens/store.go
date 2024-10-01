@@ -529,6 +529,9 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 
 	// extend labels for future filtering of tokens by user
 	labels := token.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
 	labels[UserIDLabel] = token.Spec.UserID
 
 	secret := &corev1.Secret{
