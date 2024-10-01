@@ -63,6 +63,7 @@ func (f *Factory) ClusterDialer(clusterName string, retryOnError bool) (dialer.D
 }
 
 func (f *Factory) ClusterDialHolder(clusterName string, retryOnError bool) (*transport.DialHolder, error) {
+	// Get cached dialHolder, if available
 	f.dialHoldersLock.RLock()
 	cached, ok := f.dialHolders[clusterName]
 	f.dialHoldersLock.RUnlock()
@@ -70,15 +71,24 @@ func (f *Factory) ClusterDialHolder(clusterName string, retryOnError bool) (*tra
 		return cached, nil
 	}
 
+	// Lock for writing
+	f.dialHoldersLock.Lock()
+	defer f.dialHoldersLock.Unlock()
+
+	// Check for possible writes while waiting
+	if cached, ok := f.dialHolders[clusterName]; ok {
+		return cached, nil
+	}
+
+	// Create new dialHolder
 	clusterDialer, err := f.ClusterDialer(clusterName, retryOnError)
 	if err != nil {
 		return nil, err
 	}
 	dialHolder := &transport.DialHolder{Dial: clusterDialer}
 
-	f.dialHoldersLock.Lock()
+	// Save in the cache
 	f.dialHolders[clusterName] = dialHolder
-	f.dialHoldersLock.Unlock()
 
 	return dialHolder, nil
 }
