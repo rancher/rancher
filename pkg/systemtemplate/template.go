@@ -217,7 +217,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - windows
@@ -318,7 +318,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - linux
@@ -415,7 +415,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - windows
@@ -424,7 +424,7 @@ spec:
                   values:
                     - "true"
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - windows
@@ -433,7 +433,7 @@ spec:
                   values:
                     - "true"
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - windows
