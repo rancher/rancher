@@ -214,8 +214,8 @@ type Config struct {
 	CNIs                           []string                                 `json:"cni,omitempty" yaml:"cni,omitempty"`
 	PSACT                          string                                   `json:"psact,omitempty" yaml:"psact,omitempty"`
 	PNI                            bool                                     `json:"pni,omitempty" yaml:"pni,omitempty"`
-	AgentEnvVars                   *[]rkev1.EnvVar                          `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
-	AgentEnvVarsRKE1               *[]management.EnvVar                     `json:"agentEnvVarsRKE1,omitempty" yaml:"agentEnvVarsRKE1,omitempty"`
+	AgentEnvVars                   []rkev1.EnvVar                           `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
+	AgentEnvVarsRKE1               []management.EnvVar                      `json:"agentEnvVarsRKE1,omitempty" yaml:"agentEnvVarsRKE1,omitempty"`
 	ClusterAgent                   *management.AgentDeploymentCustomization `json:"clusterAgent,omitempty" yaml:"clusterAgent,omitempty"`
 	FleetAgent                     *management.AgentDeploymentCustomization `json:"fleetAgent,omitempty" yaml:"fleetAgent,omitempty"`
 	ETCD                           *rkev1.ETCD                              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
