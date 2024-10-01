@@ -411,6 +411,7 @@ jobs:
 
           docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
 
+          # docker buildx imagetools create pushes to the registry by default, which is not the same behavior as docker manifest create
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
             --append ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
             --append ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 
