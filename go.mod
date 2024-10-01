@@ -176,7 +176,7 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/imdario/mergo v0.3.15
 	github.com/rancher/cis-operator v1.0.11
-	github.com/rancher/shepherd v0.0.0-20240912175837-499d22f27ced
+	github.com/rancher/shepherd v0.0.0-20240927150412-cc8e26d7c6b3
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 

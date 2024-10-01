@@ -624,7 +624,9 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 			return nil, err
 		}
 
-		command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, roles)
+		// environment variables must be escaped inside original registration command
+		temp := strings.Replace(token.InsecureNodeCommand, "\"", "\\\"", -1)
+		command := fmt.Sprintf("%s %s", temp, roles)
 		logrus.Infof("registration command is %s", command)
 		err = corral.UpdateCorralConfig("registration_command", command)
 		if err != nil {
@@ -703,7 +705,9 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 			return nil, err
 		}
 
-		command := fmt.Sprintf("%s %s", token.NodeCommand, roles)
+		// environment variables must be escaped inside original registration command
+		temp := strings.Replace(token.NodeCommand, "\"", "\\\"", -1)
+		command := fmt.Sprintf("%s %s", temp, roles)
 		logrus.Infof("registration command is %s", command)
 		err = corral.UpdateCorralConfig("registration_command", command)
 		if err != nil {
