@@ -145,12 +145,12 @@ var (
 	setPermissionsWindowsScriptFile = plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(
 			fmt.Sprintf(setPermissionsWindowsScript,
-				"c:\\var\\lib\\rancher\\rke2",    // RKE2 data dir
-				"c:\\var\\lib\\rancher\\agent",   // System agent dir
-				"c:\\var\\lib\\rancher\\capr"))), // Provisioning dir
+				"c:\\var\\lib\\rancher\\rke2",
+				"c:\\var\\lib\\rancher\\agent",
+				"c:\\var\\lib\\rancher\\capr"))),
 
 		Path: fmt.Sprintf(setPermissionsWindowsScriptPath,
-			"c:\\var\\lib\\rancher\\capr"), // provisioning dir
+			"c:\\var\\lib\\rancher\\capr"),
 		Dynamic: true,
 		Minor:   true,
 	}

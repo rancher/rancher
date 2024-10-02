@@ -1091,8 +1091,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 
 	if windows(entry) {
 		// We need to wait for the controlPlane to be ready before sending this plan
-		// to ensure that the initial installation has fully completed and all files have been
-		// written to disk. If all required files already have the proper ACLs, this plan will noop.
+		// to ensure that the initial installation has fully completed
 		if controlPlane.Status.Ready {
 			nodePlan.Files = append(nodePlan.Files, setPermissionsWindowsScriptFile)
 			nodePlan.Instructions = append(nodePlan.Instructions, setPermissionsWindowsScriptInstruction)
