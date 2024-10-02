@@ -9,6 +9,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/capr"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
@@ -104,8 +105,9 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	}
 
 	// RKE2: wait to update the connected condition until it is pre-bootstrapped
-	if cluster.Annotations["provisioning.cattle.io/administrated"] == "true" &&
-		!v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
+	if capr.PreBootstrap(cluster) &&
+		cluster.Annotations["provisioning.cattle.io/administrated"] == "true" &&
+		cluster.Name != "local" {
 		// overriding it to be disconnected until bootstrapping is done
 		logrus.Debugf("[pre-bootstrap][%v] Waiting for cluster to be pre-bootstrapped - not marking agent connected", cluster.Name)
 		return c.updateClusterConnectedCondition(cluster, false)

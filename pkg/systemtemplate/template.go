@@ -193,6 +193,9 @@ spec:
             value: "true"
           - name: CATTLE_CLUSTER_REGISTRY
             value: "{{.ClusterRegistry}}"
+          {{- if .IsPreBootstrap }}
+          # since we're on the host network, talk to the apiserver over localhost
+          {{- end }}
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}
@@ -204,6 +207,10 @@ spec:
       {{- if .PrivateRegistryConfig}}
       imagePullSecrets:
       - name: cattle-private-registry
+      {{- end }}
+      {{- if .IsPreBootstrap }}
+      # use hostNetwork since the CNI (and coreDNS) is not up yet
+      hostNetwork: true
       {{- end }}
       volumes:
       - name: cattle-credentials

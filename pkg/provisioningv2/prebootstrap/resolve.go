@@ -6,12 +6,10 @@ import (
 	"path"
 	"sort"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
-	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -73,17 +71,11 @@ func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1
 }
 
 func (r *Retriever) preBootstrapCluster(cp *rkev1.RKEControlPlane) (bool, error) {
-	// if the upstream rancher _does not_ have pre-bootstrapping enabled just always return false.
-	if !features.ProvisioningPreBootstrap.Enabled() {
-		logrus.Debug("[pre-bootstrap] feature-flag disabled, skipping pre-bootstrap flow")
-		return false, nil
-	}
-
 	mgmtCluster, err := r.mgmtClusterCache.Get(cp.Spec.ManagementClusterName)
 	if err != nil {
 		logrus.Warnf("[pre-bootstrap] failed to get management cluster [%v] for rke control plane [%v]: %v", cp.Spec.ManagementClusterName, cp.Name, err)
 		return false, fmt.Errorf("failed to get mgmt Cluster %v: %w", cp.Spec.ManagementClusterName, err)
 	}
 
-	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster), nil
+	return capr.PreBootstrap(mgmtCluster), nil
 }
