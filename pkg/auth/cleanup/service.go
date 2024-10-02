@@ -160,6 +160,7 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 	}
 
 	for _, u := range users.Items {
+		u := u
 		providerName := getProviderNameFromPrincipalNames(u.PrincipalIDs...)
 		if providerName == config.Name {
 			// A fully external user (who was never local) has no password.
