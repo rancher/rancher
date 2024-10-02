@@ -2,6 +2,7 @@ package managementuser
 
 import (
 	"context"
+	"fmt"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
@@ -30,7 +31,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-	secret.Register(ctx, cluster)
+	secret.Register(ctx, mgmt, cluster, clusterRec)
 	resourcequota.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
@@ -84,4 +85,19 @@ func registerImpersonationCaches(cluster *config.UserContext) {
 	cluster.Core.Secrets("").Controller()
 	cluster.Core.ServiceAccounts("").Controller()
 	cluster.Core.Namespaces("").Controller()
+}
+
+// PreBootstrap is a list of functions that _need_ to be run before the rest of the controllers start
+// the functions should return an error if they fail, and the start of the controllers will be blocked until all of them succeed
+func PreBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+	if cluster.ClusterName == "local" {
+		return nil
+	}
+
+	err := secret.Bootstrap(ctx, mgmt, cluster, clusterRec)
+	if err != nil {
+		return fmt.Errorf("failed to bootstrap secrets: %w", err)
+	}
+
+	return nil
 }
