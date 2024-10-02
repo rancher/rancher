@@ -132,13 +132,13 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.10.0
 	github.com/rancher/gke-operator v1.9.0
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20240828170735-d79536cac289
+	github.com/rancher/lasso v0.0.0-20240923125127-ae858d002589
 	github.com/rancher/machine v0.15.0-rancher118
 	github.com/rancher/norman v0.0.0-20240822182819-60ccfabc4ac5
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.6.0
-	github.com/rancher/steve v0.0.0-20240906202532-e930ae3691b2
+	github.com/rancher/steve v0.0.0-20240913181958-99e479ba0f08
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.0.1-rc.1
@@ -177,7 +177,7 @@ require (
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.7.3
-	sigs.k8s.io/controller-runtime v0.18.4
+	sigs.k8s.io/controller-runtime v0.18.5
 	sigs.k8s.io/yaml v1.4.0
 )
 
