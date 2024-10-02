@@ -118,16 +118,23 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 
 // TODO(wrangler/v4): revert to use OnRemove when it supports options (https://github.com/rancher/wrangler/pull/472).
 func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
-	// This is calculated by the handler https://github.com/rancher/wrangler/blob/2044a7b2bb07a187dff7a936d6f6a8740d29ad9e/pkg/generic/remove.go
-	finalizerKey := "wrangler.cattle.io/" + name
+	condition := scopedRBACOnRemoveCondition(name)
 	onRemoveHandler := generic.NewRemoveHandler(name, c.Updater(), generic.FromObjectHandlerToHandler(sync))
 	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
-		// Objects which already have the finalizer should also be handled even if they don't match the condition in order to be cleanly deleted
-		if hasFinalizer(obj, finalizerKey) || isProtectedRBACResource(obj) {
+		if condition(obj) {
 			return onRemoveHandler(key, obj)
 		}
 		return obj, nil
 	})
+}
+
+func scopedRBACOnRemoveCondition(name string) func(obj runtime.Object) bool {
+	// This is calculated by the handler https://github.com/rancher/wrangler/blob/2044a7b2bb07a187dff7a936d6f6a8740d29ad9e/pkg/generic/remove.go
+	finalizerKey := "wrangler.cattle.io/" + name
+	return func(obj runtime.Object) bool {
+		// Objects which already have the finalizer should also be handled even if they don't match the condition in order to be cleanly deleted
+		return hasFinalizer(obj, finalizerKey) || isProtectedRBACResource(obj)
+	}
 }
 
 func hasFinalizer(obj runtime.Object, finalizer string) bool {
