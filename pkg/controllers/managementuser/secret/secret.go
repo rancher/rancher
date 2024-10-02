@@ -1,6 +1,7 @@
 package secret
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -119,18 +120,25 @@ func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface
 	logrus.Debugf("[pre-bootstrap][secrets] looking for secrets-to synchronize to cluster %v", c.clusterName)
 
 	for _, sec := range secrets.Items {
-		if !c.bootstrapSyncable(&sec) {
+		s := &sec
+
+		if !c.bootstrapSyncable(s) {
 			continue
 		}
 
-		logrus.Debugf("[pre-bootstrap-sync][secrets] syncing secret %v/%v to cluster %v", sec.Namespace, sec.Name, c.clusterName)
+		logrus.Debugf("[pre-bootstrap-sync][secrets] syncing secret %v/%v to cluster %v", s.Namespace, s.Name, c.clusterName)
 
-		_, err = c.sync("", &sec)
+		s, err = c.injectClusterIdIfNecessary(s, mgmtCluster.Name)
 		if err != nil {
-			return fmt.Errorf("failed to synchronize secret %v/%v to cluster %v: %w", sec.Namespace, sec.Name, c.clusterName, err)
+			return fmt.Errorf("failed to inject clusterId into secret %v/%v for cluster %v: %w", s.Namespace, s.Name, c.clusterName, err)
 		}
 
-		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", sec.Namespace, sec.Name, c.clusterName)
+		_, err = c.sync("", s)
+		if err != nil {
+			return fmt.Errorf("failed to synchronize secret %v/%v to cluster %v: %w", s.Namespace, s.Name, c.clusterName, err)
+		}
+
+		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", s.Namespace, s.Name, c.clusterName)
 	}
 
 	apimgmtv3.ClusterConditionPreBootstrapped.True(mgmtCluster)
@@ -164,6 +172,22 @@ func (c *ResourceSyncController) syncable(obj *corev1.Secret) bool {
 func (c *ResourceSyncController) bootstrapSyncable(obj *corev1.Secret) bool {
 	// only difference between sync and bootstrapSync is requiring the boostrap sync annotation to be set to "true"
 	return c.syncable(obj) && obj.Annotations[syncPreBootstrapAnnotation] == "true"
+}
+
+func (c *ResourceSyncController) injectClusterIdIfNecessary(sec *corev1.Secret, clusterId string) (*corev1.Secret, error) {
+	updates := false
+	for key, value := range sec.Data {
+		if bytes.Contains(value, []byte("{{clusterId}}")) {
+			sec.Data[key] = bytes.ReplaceAll(value, []byte("{{clusterId}}"), []byte(clusterId))
+			updates = true
+		}
+	}
+
+	if updates {
+		return c.upstreamSecrets.Update(sec)
+	}
+
+	return sec, nil
 }
 
 func (c *ResourceSyncController) sync(key string, obj *corev1.Secret) (runtime.Object, error) {

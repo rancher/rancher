@@ -177,6 +177,9 @@ func main() {
 		logrus.Fatal(err)
 	}
 
+	logrus.Infof("=====================")
+	logrus.Infof("CATTLE AGENT IMAGE: %v", os.Getenv("CATTLE_AGENT_IMAGE"))
+	logrus.Infof("=====================")
 	app.Run(os.Args)
 }
 
