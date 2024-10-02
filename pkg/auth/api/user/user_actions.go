@@ -119,7 +119,7 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 		return err
 	}
 
-	// XXX TODO AK password changed - invalidate session tokens => login tokens => not derived (see refresher.go)
+	// XXX NOTE AK password changed - invalidate session tokens => login tokens => not derived (see refresher.go)
 
 	// get tokens for user, by user id -- see also `getExtTokensByUserName` @ pkg/controllers/management/auth/user.go
 	filterForUser := labels.Set(map[string]string{exttokens.UserIDLabel: userID})
@@ -129,10 +129,11 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 	if err != nil {
 		return fmt.Errorf("error getting ext tokens for user %s: %v", userID, err)
 	}
-	// iterate, process non-derived tokens = login/session tokens - invalidate - force ttl to zero.
+	// iterate, process non-derived tokens = login/session tokens - invalidate - force ttl to 1 millisecond - expires
+	// cannot use ttl == 0, this triggeres the default ttl of 30 days.
 	for _, token := range objs.Items {
 		if !token.GetIsDerived() {
-			token.Spec.TTL = 0
+			token.Spec.TTL = 1
 			h.ExtTokenStore.Update(&token, &v1.UpdateOptions{})
 		}
 	}
