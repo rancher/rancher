@@ -32,6 +32,7 @@ import (
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -271,6 +272,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if features.MCM.Enabled() {
 		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
 		nodedriver.Register(ctx, r.Wrangler)
+		kontainerdrivermetadata.Register(ctx, r.Wrangler)
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}

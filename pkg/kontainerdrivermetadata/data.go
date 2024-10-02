@@ -230,7 +230,7 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 				APIVersion: APIVersion,
 			},
 		}
-		if _, err := md.SystemImages.Create(sysImage); err != nil && !errors.IsAlreadyExists(err) {
+		if _, err := md.SystemImagesController.Create(sysImage); err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
 		return nil
@@ -251,7 +251,7 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 			sysImageCopy.Labels[k] = v
 		}
 	}
-	if _, err := md.SystemImages.Update(sysImageCopy); err != nil {
+	if _, err := md.SystemImagesController.Update(sysImageCopy); err != nil {
 		return err
 	}
 	return nil
@@ -279,7 +279,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		if exists {
 			svcOption.Labels = existLabel
 		}
-		if _, err := md.ServiceOptions.Create(svcOption); err != nil && !errors.IsAlreadyExists(err) {
+		if _, err := md.ServiceOptionsController.Create(svcOption); err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
 		return nil
@@ -300,7 +300,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		svcOptionCopy.Labels = updateLabel(svcOptionCopy.Labels, exists)
 	}
 	if svcOptionCopy != nil {
-		if _, err := md.ServiceOptions.Update(svcOptionCopy); err != nil {
+		if _, err := md.ServiceOptionsController.Update(svcOptionCopy); err != nil {
 			return err
 		}
 	}
@@ -425,15 +425,15 @@ func getRKEVendorOptions(options map[string]rketypes.KubernetesServicesOptions) 
 }
 
 func (md *MetadataController) getRKEAddon(name string) (*v3.RkeAddon, error) {
-	return md.AddonsLister.Get(namespace.GlobalNamespace, name)
+	return md.Addons.Get(namespace.GlobalNamespace, name, metav1.GetOptions{})
 }
 
 func (md *MetadataController) getRKEServiceOption(k8sVersion string, osType OSType) (*v3.RkeK8sServiceOption, error) {
-	return md.ServiceOptionsLister.Get(namespace.GlobalNamespace, getVersionNameWithOsType(k8sVersion, osType))
+	return md.ServiceOptionsController.Get(namespace.GlobalNamespace, getVersionNameWithOsType(k8sVersion, osType), metav1.GetOptions{})
 }
 
 func (md *MetadataController) getRKESystemImage(k8sVersion string) (*v3.RkeK8sSystemImage, error) {
-	return md.SystemImagesLister.Get(namespace.GlobalNamespace, k8sVersion)
+	return md.SystemImagesController.Get(namespace.GlobalNamespace, k8sVersion, metav1.GetOptions{})
 }
 
 func getVersionNameWithOsType(str string, osType OSType) string {
@@ -501,7 +501,7 @@ func (md *MetadataController) getUserSettings() (map[string]string, bool, error)
 		return ""
 	}
 	for key := range userUpdateSettingMap {
-		setting, err := md.SettingLister.Get("", key)
+		setting, err := md.Settings.Get(key, metav1.GetOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return nil, false, fmt.Errorf("driverMetadata: error getting setting %s: %v", key, err)
