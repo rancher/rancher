@@ -14,6 +14,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/capr"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -178,7 +179,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.ProvisioningV2.Name():           false,
 		features.EmbeddedClusterAPI.Name():       false,
 		features.UISQLCache.Name():               features.UISQLCache.Enabled(),
-		features.ProvisioningPreBootstrap.Name(): !apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(cluster),
+		features.ProvisioningPreBootstrap.Name(): capr.PreBootstrap(cluster),
 	}
 }
 
@@ -187,8 +188,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(),
-		cluster.Spec.WindowsPreferedCluster,
-		!apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(cluster),
+		cluster.Spec.WindowsPreferedCluster, capr.PreBootstrap(cluster),
 		cluster, GetDesiredFeatures(cluster), taints, secretLister)
 	return buf.Bytes(), err
 }

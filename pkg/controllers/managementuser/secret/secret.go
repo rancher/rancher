@@ -1,6 +1,7 @@
 package secret
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -62,6 +63,7 @@ type ResourceSyncController struct {
 	upstreamSecrets   v1.SecretInterface
 	downstreamSecrets v1.SecretInterface
 	clusterName       string
+	clusterId         string
 }
 
 func Bootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) error {
@@ -69,6 +71,7 @@ func Bootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.
 		upstreamSecrets:   mgmt.Core.Secrets(clusterRec.Spec.FleetWorkspaceName),
 		downstreamSecrets: cluster.Core.Secrets(""),
 		clusterName:       clusterRec.Spec.DisplayName,
+		clusterId:         clusterRec.Name,
 	}
 
 	return c.bootstrap(mgmt.Management.Clusters(""), clusterRec)
@@ -119,18 +122,20 @@ func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface
 	logrus.Debugf("[pre-bootstrap][secrets] looking for secrets-to synchronize to cluster %v", c.clusterName)
 
 	for _, sec := range secrets.Items {
-		if !c.bootstrapSyncable(&sec) {
+		s := &sec
+
+		if !c.bootstrapSyncable(s) {
 			continue
 		}
 
-		logrus.Debugf("[pre-bootstrap-sync][secrets] syncing secret %v/%v to cluster %v", sec.Namespace, sec.Name, c.clusterName)
+		logrus.Debugf("[pre-bootstrap-sync][secrets] syncing secret %v/%v to cluster %v", s.Namespace, s.Name, c.clusterName)
 
-		_, err = c.sync("", &sec)
+		_, err = c.sync("", s)
 		if err != nil {
-			return fmt.Errorf("failed to synchronize secret %v/%v to cluster %v: %w", sec.Namespace, sec.Name, c.clusterName, err)
+			return fmt.Errorf("failed to synchronize secret %v/%v to cluster %v: %w", s.Namespace, s.Name, c.clusterName, err)
 		}
 
-		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", sec.Namespace, sec.Name, c.clusterName)
+		logrus.Debugf("[pre-boostrap-sync][secret] successfully synced secret %v/%v to downstream cluster %v", s.Namespace, s.Name, c.clusterName)
 	}
 
 	apimgmtv3.ClusterConditionPreBootstrapped.True(mgmtCluster)
@@ -166,6 +171,26 @@ func (c *ResourceSyncController) bootstrapSyncable(obj *corev1.Secret) bool {
 	return c.syncable(obj) && obj.Annotations[syncPreBootstrapAnnotation] == "true"
 }
 
+func (c *ResourceSyncController) injectClusterIdIntoSecretData(sec *corev1.Secret) *corev1.Secret {
+	for key, value := range sec.Data {
+		if bytes.Contains(value, []byte("{{clusterId}}")) {
+			sec.Data[key] = bytes.ReplaceAll(value, []byte("{{clusterId}}"), []byte(c.clusterId))
+		}
+	}
+
+	return sec
+}
+
+func (c *ResourceSyncController) removeClusterIdFromSecretData(sec *corev1.Secret) *corev1.Secret {
+	for key, value := range sec.Data {
+		if bytes.Contains(value, []byte(c.clusterId)) {
+			sec.Data[key] = bytes.ReplaceAll(value, []byte(c.clusterId), []byte("{{clusterId}}"))
+		}
+	}
+
+	return sec
+}
+
 func (c *ResourceSyncController) sync(key string, obj *corev1.Secret) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
@@ -195,19 +220,23 @@ func (c *ResourceSyncController) sync(key string, obj *corev1.Secret) (runtime.O
 	if targetSecret == nil || errors.IsNotFound(err) {
 		logrus.Debugf("[resource-sync][secret] creating secret %v/%v in cluster %v", ns, name, c.clusterName)
 
-		_, err = c.downstreamSecrets.Create(
-			&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-				Data:       obj.Data,
-			},
-		)
+		newSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+			Data:       obj.Data,
+		}
+
+		newSecret = c.injectClusterIdIntoSecretData(newSecret)
+
+		_, err = c.downstreamSecrets.Create(newSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create secret %v/%v in cluster %v: %w", ns, name, c.clusterName, err)
 		}
-	} else if !reflect.DeepEqual(targetSecret.Data, obj.Data) {
+	} else if !reflect.DeepEqual(c.removeClusterIdFromSecretData(targetSecret).Data, obj.Data) {
 		logrus.Debugf("[resource-sync][secret] updating secret %v/%v in cluster %v", ns, name, c.clusterName)
 
 		targetSecret.Data = obj.Data
+		targetSecret = c.injectClusterIdIntoSecretData(targetSecret)
+
 		_, err = c.downstreamSecrets.Update(targetSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update secret %v/%v in cluster %v: %w", ns, name, c.clusterName, err)

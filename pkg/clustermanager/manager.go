@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
@@ -222,7 +223,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	// pre-bootstrap the cluster if it's not already bootstrapped
 	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
-	if !apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(rec.clusterRec) {
+	if capr.PreBootstrap(rec.clusterRec) {
 		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
 		if err != nil {
 			transaction.Rollback()
