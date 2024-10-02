@@ -342,7 +342,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 	}
 
 	if _, ok := cluster.Annotations[NoCreatorRBACAnnotation]; ok {
-		logrus.Debugf("[%s] annotation %s found. Skipping adding creator as owner", ClusterCreateController, NoCreatorRBACAnnotation)
+		logrus.Infof("[%s] annotation %s found. Skipping adding creator as owner", ClusterCreateController, NoCreatorRBACAnnotation)
 		return obj, nil
 	}
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {

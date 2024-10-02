@@ -156,7 +156,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 	// If we specify no creator owner RBAC, exit
 	if _, ok := project.Annotations[NoCreatorRBACAnnotation]; ok {
-		logrus.Debugf("[%s] annotation %s found. Skipping adding creator as owner", ProjectCreateController, NoCreatorRBACAnnotation)
+		logrus.Infof("[%s] annotation %s found. Skipping adding creator as owner", ProjectCreateController, NoCreatorRBACAnnotation)
 		return obj, nil
 	}
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
