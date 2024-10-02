@@ -13,6 +13,7 @@ import (
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
+	"github.com/rancher/lasso/pkg/metrics"
 	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
@@ -183,6 +184,7 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
+	ctx = metrics.WithContextID(ctx, "wranglercontext")
 	if err := w.ControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
 		transaction.Rollback()
 		return err
