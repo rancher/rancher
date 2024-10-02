@@ -111,7 +111,11 @@ rules:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  {{- if .IsPreBootstrap }}
+  name: cattle-cluster-agent-bootstrap
+  {{- else }}
   name: cattle-cluster-agent
+  {{- end }}
   namespace: cattle-system
   annotations:
     management.cattle.io/scale-available: "2"
@@ -130,7 +134,24 @@ spec:
       {{- end }}
       serviceAccountName: cattle
       tolerations:
-      {{- if .Tolerations }}
+      {{- if .IsPreBootstrap }}
+      # tolerations wrt running on the pre-bootstrapped node
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/controlplane
+        value: "true"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+      - effect: NoExecute
+        key: "node-role.kubernetes.io/etcd"
+        operator: "Exists"
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: "Exists"
+      {{- else if .Tolerations }}
       # Tolerations added based on found taints on controlplane nodes
 {{ .Tolerations | indent 6 }}
       {{- else }}

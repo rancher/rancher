@@ -316,7 +316,7 @@ func Start429Registry(t assert.TestingT, rateLimitedHeader bool) (*httptest.Serv
 
 	ip := getOutboundIP()
 	// Bind the server to a specific IP address (your local machine's IP)
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:8080", ip.String()))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
 	if err != nil {
 		log.Printf("Failed to bind to local IP: %v", err)
 		return nil, err

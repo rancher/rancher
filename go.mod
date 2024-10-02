@@ -62,7 +62,7 @@ replace (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240719121207-baeda6b89fe3
-	github.com/rancher/shepherd v0.0.0-20240912175816-661a2b75cab3
+	github.com/rancher/shepherd v0.0.0-20240927124745-2cec0756a561
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -132,7 +132,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.10.0
 	github.com/rancher/gke-operator v1.9.0
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20240828170735-d79536cac289
+	github.com/rancher/lasso v0.0.0-20240923125127-ae858d002589
 	github.com/rancher/machine v0.15.0-rancher118
 	github.com/rancher/norman v0.0.0-20240822182819-60ccfabc4ac5
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -177,7 +177,7 @@ require (
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.7.3
-	sigs.k8s.io/controller-runtime v0.18.4
+	sigs.k8s.io/controller-runtime v0.18.5
 	sigs.k8s.io/yaml v1.4.0
 )
 

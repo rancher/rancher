@@ -91,21 +91,21 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
 	// Authenticated routes
-	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
+	impersonatingAuth := requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager))
 	saAuth := auth.ToMiddleware(requests.NewServiceAccountAuth(scaledContext, clustermanager.ToRESTConfig))
 	accessControlHandler := rbac.NewAccessControlHandler()
 
 	saauthed := mux.NewRouter()
 	saauthed.UseEncodedPath()
 	saauthed.PathPrefix("/k8s/clusters/{clusterID}").Handler(k8sProxy)
-	saauthed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth)))
+	saauthed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth.ImpersonationMiddleware)))
 	saauthed.Use(mux.MiddlewareFunc(accessControlHandler))
 	saauthed.Use(requests.NewAuthenticatedFilter)
 
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
 
-	authed.Use(mux.MiddlewareFunc(impersonatingAuth))
+	authed.Use(impersonatingAuth.ImpersonationMiddleware)
 	authed.Use(mux.MiddlewareFunc(accessControlHandler))
 	authed.Use(requests.NewAuthenticatedFilter)
 
@@ -125,7 +125,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	metricsAuthed := mux.NewRouter()
 	metricsAuthed.UseEncodedPath()
 	tokenReviewAuth := auth.ToMiddleware(requests.NewTokenReviewAuth(scaledContext.K8sClient.AuthenticationV1()))
-	metricsAuthed.Use(mux.MiddlewareFunc(tokenReviewAuth.Chain(impersonatingAuth)))
+	metricsAuthed.Use(mux.MiddlewareFunc(tokenReviewAuth.Chain(impersonatingAuth.ImpersonationMiddleware)))
 	metricsAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
 	metricsAuthed.Use(requests.NewAuthenticatedFilter)
 	metricsAuthed.Use(metrics.NewMetricsHandler(scaledContext.K8sClient))

@@ -9,6 +9,7 @@ import (
 
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
+	project "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/rbac"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -162,6 +163,8 @@ func (pcrl *ProjectsContainerResourceLimitTestSuite) TestCpuAndMemoryLimitEqualT
 	require.Equal(pcrl.T(), memoryReservation, projectSpec.RequestsMemory, "Memory reservation mismatch")
 
 	log.Info("Verify that the namespace has the label and annotation referencing the project.")
+	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pcrl.cluster.ID, createdProject.Name, createdNamespace.Name)
+	require.NoError(pcrl.T(), err)
 	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pcrl.cluster.ID, createdNamespace.Name)
 	require.NoError(pcrl.T(), err)
 	err = checkNamespaceLabelsAndAnnotations(pcrl.cluster.ID, createdProject.Name, updatedNamespace)
@@ -207,6 +210,8 @@ func (pcrl *ProjectsContainerResourceLimitTestSuite) TestCpuAndMemoryLimitGreate
 	require.Equal(pcrl.T(), memoryReservation, projectSpec.RequestsMemory, "Memory reservation mismatch")
 
 	log.Info("Verify that the namespace has the label and annotation referencing the project.")
+	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pcrl.cluster.ID, createdProject.Name, createdNamespace.Name)
+	require.NoError(pcrl.T(), err)
 	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pcrl.cluster.ID, createdNamespace.Name)
 	require.NoError(pcrl.T(), err)
 	err = checkNamespaceLabelsAndAnnotations(pcrl.cluster.ID, createdProject.Name, updatedNamespace)
@@ -338,6 +343,152 @@ func (pcrl *ProjectsContainerResourceLimitTestSuite) TestUpdateProjectWithMemory
 	require.Error(pcrl.T(), err)
 	pattern := fmt.Sprintf(`admission webhook "rancher.cattle.io.projects.management.cattle.io" denied the request: project.spec.containerDefaultResourceLimit: Invalid value: v3.ContainerResourceLimit{RequestsCPU:"%s", RequestsMemory:"%s", LimitsCPU:"%s", LimitsMemory:"%s"}: requested memory %s is greater than limit %s`, cpuReservation, memoryReservation, cpuLimit, memoryLimit, memoryReservation, memoryLimit)
 	require.Regexp(pcrl.T(), regexp.MustCompile(pattern), err.Error())
+}
+
+func (pcrl *ProjectsContainerResourceLimitTestSuite) TestLimitDeletionPropagationToExistingNamespaces() {
+	subSession := pcrl.session.NewSession()
+	defer subSession.Cleanup()
+
+	standardUserClient, _ := pcrl.setupUserForProject()
+
+	log.Info("Create a project (with container default resource limit) and a namespace in the project.")
+	cpuLimit := "100m"
+	cpuReservation := "50m"
+	memoryLimit := "64Mi"
+	memoryReservation := "32Mi"
+
+	createdProject, createdNamespace, err := createProjectAndNamespaceWithLimits(standardUserClient, pcrl.cluster.ID, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the container default resource limit in the Project spec is accurate.")
+	projectSpec := createdProject.Spec.ContainerDefaultResourceLimit
+	require.Equal(pcrl.T(), cpuLimit, projectSpec.LimitsCPU, "CPU limit mismatch")
+	require.Equal(pcrl.T(), cpuReservation, projectSpec.RequestsCPU, "CPU reservation mismatch")
+	require.Equal(pcrl.T(), memoryLimit, projectSpec.LimitsMemory, "Memory limit mismatch")
+	require.Equal(pcrl.T(), memoryReservation, projectSpec.RequestsMemory, "Memory reservation mismatch")
+
+	log.Info("Verify that the namespace has the label and annotation referencing the project.")
+	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pcrl.cluster.ID, createdProject.Name, createdNamespace.Name)
+	require.NoError(pcrl.T(), err)
+	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pcrl.cluster.ID, createdNamespace.Name)
+	require.NoError(pcrl.T(), err)
+	err = checkNamespaceLabelsAndAnnotations(pcrl.cluster.ID, createdProject.Name, updatedNamespace)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the limit range object is created for the namespace and the resource limit in the limit range is accurate.")
+	err = checkLimitRange(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Remove the container default limits set in the Project.")
+	cpuLimit = ""
+	cpuReservation = ""
+	memoryLimit = ""
+	memoryReservation = ""
+	updatedProject, err := updateProjectContainerResourceLimit(standardUserClient, createdProject, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err, "Failed to update container resource limit.")
+
+	log.Info("Verify that the container default resource limits in the Project spec has been updated.")
+	projectSpec = updatedProject.Spec.ContainerDefaultResourceLimit
+	require.Equal(pcrl.T(), cpuLimit, projectSpec.LimitsCPU, "CPU limit mismatch")
+	require.Equal(pcrl.T(), cpuReservation, projectSpec.RequestsCPU, "CPU reservation mismatch")
+	require.Equal(pcrl.T(), memoryLimit, projectSpec.LimitsMemory, "Memory limit mismatch")
+	require.Equal(pcrl.T(), memoryReservation, projectSpec.RequestsMemory, "Memory reservation mismatch")
+
+	log.Info("Verify that the limit range in the existing namespace is deleted.")
+	ctx, err := standardUserClient.WranglerContext.DownStreamClusterWranglerContext(pcrl.cluster.ID)
+	limitRanges, err := ctx.Core.LimitRange().List(updatedNamespace.Name, metav1.ListOptions{})
+	require.NoError(pcrl.T(), err)
+	require.Equal(pcrl.T(), 0, len(limitRanges.Items))
+
+	log.Info("Create a deployment in the namespace with one replica and verify that a pod is created.")
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false)
+	require.NoError(pcrl.T(), err, "Failed to create deployment in the namespace")
+	err = charts.WatchAndWaitDeployments(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + createdDeployment.Name,
+	})
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
+	err = checkContainerResources(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
+}
+
+func (pcrl *ProjectsContainerResourceLimitTestSuite) TestOverrideDefaultLimitInNamespace() {
+	subSession := pcrl.session.NewSession()
+	defer subSession.Cleanup()
+
+	standardUserClient, standardUserContext := pcrl.setupUserForProject()
+
+	log.Info("Create a project (with container default resource limit) and a namespace in the project.")
+	cpuLimit := "100m"
+	cpuReservation := "50m"
+	memoryLimit := "64Mi"
+	memoryReservation := "32Mi"
+
+	createdProject, createdNamespace, err := createProjectAndNamespaceWithLimits(standardUserClient, pcrl.cluster.ID, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the container default resource limit in the Project spec is accurate.")
+	projectSpec := createdProject.Spec.ContainerDefaultResourceLimit
+	require.Equal(pcrl.T(), cpuLimit, projectSpec.LimitsCPU, "CPU limit mismatch")
+	require.Equal(pcrl.T(), cpuReservation, projectSpec.RequestsCPU, "CPU reservation mismatch")
+	require.Equal(pcrl.T(), memoryLimit, projectSpec.LimitsMemory, "Memory limit mismatch")
+	require.Equal(pcrl.T(), memoryReservation, projectSpec.RequestsMemory, "Memory reservation mismatch")
+
+	log.Info("Verify that the namespace has the label and annotation referencing the project.")
+	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pcrl.cluster.ID, createdProject.Name, createdNamespace.Name)
+	require.NoError(pcrl.T(), err)
+	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pcrl.cluster.ID, createdNamespace.Name)
+	require.NoError(pcrl.T(), err)
+	err = checkNamespaceLabelsAndAnnotations(pcrl.cluster.ID, createdProject.Name, updatedNamespace)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the limit range object is created for the namespace and the resource limit in the limit range is accurate.")
+	err = checkLimitRange(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Create a deployment in the namespace with one replica and verify that a pod is created.")
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false)
+	require.NoError(pcrl.T(), err, "Failed to create deployment in the namespace")
+	err = charts.WatchAndWaitDeployments(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + createdDeployment.Name,
+	})
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
+	err = checkContainerResources(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Override the CPU, memory limit and request in the namespace.")
+	cpuLimit = "150m"
+	cpuReservation = "100m"
+	memoryLimit = "128Mi"
+	memoryReservation = "64Mi"
+	if _, exists := updatedNamespace.Annotations[containerDefaultLimitAnnotation]; !exists {
+		updatedNamespace.Annotations[containerDefaultLimitAnnotation] = fmt.Sprintf(`{"limitsCpu":"%s","limitsMemory":"%s","requestsCpu":"%s","requestsMemory":"%s"}`, cpuLimit, memoryLimit, cpuReservation, memoryReservation)
+	}
+
+	currentNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name)
+	require.NoError(pcrl.T(), err)
+	updatedNamespace.ResourceVersion = currentNamespace.ResourceVersion
+	namespace, err := standardUserContext.Core.Namespace().Update(updatedNamespace)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the resource limit in the limit range is accurate.")
+	err = checkLimitRange(standardUserClient, pcrl.cluster.ID, namespace.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Create a deployment in the namespace with one replica and verify that a pod is created.")
+	createdDeployment, err = deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false)
+	require.NoError(pcrl.T(), err, "Failed to create deployment in the namespace")
+	err = charts.WatchAndWaitDeployments(standardUserClient, pcrl.cluster.ID, namespace.Name, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + createdDeployment.Name,
+	})
+	require.NoError(pcrl.T(), err)
+
+	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
+	err = checkContainerResources(standardUserClient, pcrl.cluster.ID, namespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pcrl.T(), err)
 }
 
 func TestProjectsContainerResourceLimitTestSuite(t *testing.T) {

@@ -103,6 +103,14 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 		return nil
 	}
 
+	// RKE2: wait to update the connected condition until it is pre-bootstrapped
+	if cluster.Annotations["provisioning.cattle.io/administrated"] == "true" &&
+		!v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
+		// overriding it to be disconnected until bootstrapping is done
+		logrus.Debugf("[pre-bootstrap][%v] Waiting for cluster to be pre-bootstrapped - not marking agent connected", cluster.Name)
+		return c.updateClusterConnectedCondition(cluster, false)
+	}
+
 	return c.updateClusterConnectedCondition(cluster, hasSession)
 }
 

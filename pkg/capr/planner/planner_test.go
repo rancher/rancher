@@ -148,6 +148,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 			entry := createTestPlanEntry(tt.args.os)
 			planner.retrievalFunctions.SystemAgentImage = func() string { return "system-agent" }
 			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
+			planner.retrievalFunctions.GetBootstrapManifests = func(cp *rkev1.RKEControlPlane) ([]plan.File, error) { return nil, nil }
 			// act
 			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
 
@@ -518,6 +519,7 @@ func Test_getInstallerImage(t *testing.T) {
 			var planner Planner
 			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			planner.retrievalFunctions.SystemAgentImage = func() string { return "rancher/system-agent-installer-" }
+			planner.retrievalFunctions.GetBootstrapManifests = func(cp *rkev1.RKEControlPlane) ([]plan.File, error) { return nil, nil }
 
 			assert.Equal(t, tt.expected, planner.getInstallerImage(tt.controlPlane))
 		})
