@@ -1,0 +1,54 @@
+
+NewSystemTokenStore	core constructor // no admin checks
+NewTokenStore		     		 // admin checks -> SAR mocking
+
+Basic mocking of secret client/cache, userattr, user client
+
+cache: update, get, delete
+note: creation from wrangler may properly share the cache among several token stores
+alt:  move creation of system token store up the call chain, make it part of wrangler context?
+
+Create - token store only, not system store - todo expose that for future system-internal token creation
+
+Update
+	(TokenStore: fail to check admin
+		fail to check user full permissions)
+
+	fail on retrieval of backing secret
+	fail on conversion of secret to token
+		fail to parse enabled			/bool
+		fail to parse is-derived		/bool
+		fail to parse tll			/int
+		fail to unmarshal user principal	/json
+		fail to set expired
+			fail to to marshal time
+
+	fail on change of user id
+	fail on change of cluster name
+	fail on change of `IsDerived`, i.e. flag `is this a login token`
+	
+	fail on change of TTL extension for non-admin	// can we test `update`, note lower-case
+
+	fail on conversion of token to secret
+		fail to marshal user principal	/json
+
+	fail on update of backing secret
+	fail on reading back token (2nd conversion of secret to token)
+
+Get
+	fail on retrieval of backing secret
+	fail on conversion of secret to token	(Details s.a.)
+
+	(TokenStore: fail to check admin)
+
+List
+	(TokenStore: fail to check user full permissions)
+
+	fail on failure to list secrets
+	note: secret to token conversion errors are ignored
+
+
+Delete
+	fail on retrieval of backing secret
+	fail on conversion of secret to token	(Details s.a.)
+	fail on failure to delete secret

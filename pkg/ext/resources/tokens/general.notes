@@ -1,0 +1,32 @@
+
+TODO :: dynamic creation of field `current` -- compare request token to Get/List result
+
+TODO :: check userInfo content if that contains the token
+     :: DONE -- answer is NO -- talking with Tom
+
+ALT  :: No such field, dash board computes it for itself
+
+PROPOSED   Change `isDerived` to `isLogin`. Inverted meaning.
+
+	   Default for creation from kubectl is `isLogin==false`,
+	   i.e. derived token for use as API key somewhere (CI, othe automation).
+
+	   In discussion.
+
+TESTING	   - unit tests - store
+
+pkg/controllers/management/auth/user.go:182:	// XXX NOTE AK get and disable the user's tokens
+pkg/controllers/management/auth/user.go:226:	// XXX NOTE AK - find the associated ext tokens also
+pkg/controllers/management/auth/user.go:241:	// XXX NOTE AK - delete the associated ext tokens also
+pkg/controllers/management/auth/user.go:347:	// XXX NOTE AK - find the associated ext tokens also
+pkg/controllers/management/auth/user.go:467:	// XXX NOTE AK - delete the associated ext tokens
+
+TEST	// XXX NOTE AK - user removal - remove ext tokens
+TEST	// XXX NOTE AK - user disable - delete/disable ext tokens /delete login /disable derived
+TEST 	// XXX NOTE AK password changed - invalidate session tokens => login tokens => not derived (see refresher.go)
+
+test -- authenticate code - fail expired tokens ?!
+
+     token authentication
+     - rejects expired ext tokens	// not seen for norman tokens
+     - rejects disabled tokens		// check after ext expiry check
