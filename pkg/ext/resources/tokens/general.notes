@@ -1,4 +1,22 @@
 
+cattle-token namespace
+
+       - note it as system namespace
+       - document that nobody should be givw permissions to that namespace
+       - should be good enough in term of `lock-down`
+
+Manager Permissions
+
+	"*" is definitely different from listing all the allowed verbs, in terms of
+	permission checks.
+
+	using it is an anti-pattern however
+
+	better use a custom verb for the permission, f.e. `managed-token`
+
+	there is a precedence, Jonathon has done this for global roles, in the webhook,
+	see `bind` and `escalate` verbs.
+
 TODO :: dynamic creation of field `current` -- compare request token to Get/List result
 
 TODO :: check userInfo content if that contains the token
