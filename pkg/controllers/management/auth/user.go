@@ -1,6 +1,6 @@
 package auth
 
-// XXX TODO AK -- marker of code modified for ext token support
+// XXX NOTE AK -- marker of code modified for ext token support
 
 import (
 	"fmt"
@@ -177,15 +177,46 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	}
 
 	if user.Enabled == nil || !*user.Enabled {
-		logrus.Infof("ZZZ update - todo - Get     All Tokens for User '%s'", user.Name)
-		logrus.Infof("ZZZ update - todo - Disable All Tokens for User '%s'", user.Name)
-		// XXX TODO AK get and disable the user's tokens
+		// XXX NOTE AK this was not done for norman tokens - should we do it for ext ?
+		// XXX NOTE AK this was not done for norman tokens - should we add it for norman ?
+		// XXX NOTE AK actually! refresher.go deletes/disables (norman) tokens when user is
+		// XXX NOTE AK disabled --> do we need this here ?
+		// XXX NOTE AK -- well, it would be a more immediate response to the user change
+		//
+		// XXX NOTE AK get and delete/disable the user's ext tokens
+
+		extTokens, err := l.getExtTokensByUserName(user.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, token := range extTokens {
+			if token.GetIsDerived() {
+				// Non-login token. Only disable it
+				logrus.Infof("[%v] Disabling ext token %v for user %v",
+					userController, token.GetName(), token.GetUserID())
+				token.Enabled = false
+				err := l.extTokenStore.Update(token, &metav1.UpdateOptions{})
+				if err != nil {
+					return fmt.Errorf("error updating ext token: %v", err)
+				}
+			} else {
+				// Login token. Delete it.
+				logrus.Infof("[%v] Deleting token %v for user %v",
+					userController, token.GetName(), token.GetUserID())
+				err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
+				if err != nil {
+					return fmt.Errorf("error deleting ext token: %v", err)
+				}
+			}
+		}
 	}
 
 	return user, nil
 }
 
 func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
+	// XXX NOTE AK - user removal - remove ext tokens
 
 	logrus.Infof("ZZZ Remove User %p == '%s' == <<%+v>>", user, user.Name, user)
 
@@ -223,7 +254,7 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	// XXX TODO AK - find the associated ext tokens also
+	// XXX NOTE AK - find the associated ext tokens also
 	extTokens, err := l.getExtTokensByUserName(user.Name)
 	if err != nil {
 		return nil, err
@@ -238,7 +269,7 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	// XXX TODO AK - delete the associated ext tokens also
+	// XXX NOTE AK - delete the associated ext tokens also
 	err = l.deleteAllExtTokens(extTokens)
 	if err != nil {
 		return nil, err
@@ -342,9 +373,8 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 }
 
 func (l *userLifecycle) getExtTokensByUserName(username string) ([]*exttokens.Token, error) {
-
+	// XXX NOTE AK - find the associated ext tokens also
 	logrus.Infof("ZZZ Get All Ext Tokens for User '%s'", username)
-	// XXX TODO AK - find the associated ext tokens also
 
 	filterForUser := labels.Set(map[string]string{exttokens.UserIDLabel: username})
 	objs, err := l.extTokenStore.List(&metav1.ListOptions{
@@ -462,12 +492,12 @@ func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 }
 
 func (l *userLifecycle) deleteAllExtTokens(tokens []*exttokens.Token) error {
-
 	logrus.Infof("ZZZ Delete Ext Tokens <<%+v>>", tokens)
-	// XXX TODO AK - delete the associated ext tokens
+	// XXX NOTE AK - delete the associated ext tokens
 
 	for _, token := range tokens {
-		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.ObjectMeta.Name, token.GetName)
+		logrus.Infof("[%v] Deleting token %v for user %v",
+			userController, token.GetName(), token.GetUserID())
 		err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting ext token: %v", err)
