@@ -633,6 +633,12 @@ func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
+// migrateHarvesterCloudCredentialExpiration will add an expiration timestamp to all harvester cloud credential secrets
+// that are based on the v3 Token API. For each credential, the kubeconfig is extracted, the token is derived from the
+// kubeconfig, and the cred.CloudCredentialExpirationAnnotation is inserted with a value of the token's `ExpiresAt`
+// field converted to milliseconds since Unix Epoch. If the credential is not a harvester credential, this
+// function does nothing. This migration is only performed once, after which the expiration annotation is managed by
+// norman for all v3 API CRUD.
 func migrateHarvesterCloudCredentialExpiration(w *wrangler.Context) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateHarvesterCloudCredentialExpirationConfig)
 	if err != nil || cm == nil {
