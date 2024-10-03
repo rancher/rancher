@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	testRunName = os.Getenv(qasedefaults.TestRunNameEnvVar)
+	testRunName = "Anu test run"
 	qaseToken   = os.Getenv(qasedefaults.QaseTokenEnvVar)
 )
 
@@ -35,6 +35,8 @@ func main() {
 	cfg := qase.NewConfiguration()
 	cfg.AddDefaultHeader("Token", qaseToken)
 	client := qase.NewAPIClient(cfg)
+
+	logrus.Info("starting qase test run script.")
 
 	if *startRun {
 		// create test run
