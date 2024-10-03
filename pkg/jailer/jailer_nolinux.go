@@ -4,13 +4,13 @@
 package jailer
 
 import (
+	"fmt"
 	"os/exec"
 	"runtime"
-
-	"github.com/sirupsen/logrus"
 )
 
-func JailCommand(cmd *exec.Cmd, jailPath string) (*exec.Cmd, error) {
-	logrus.Warnf("not jailing command %v, unsupported on %s", cmd.Args, runtime.GOOS)
-	return cmd, nil
+// JailCommand does nothing in this implementation because the actual jailing of commands
+// only occurs on Linux systems.
+func JailCommand(cmd *exec.Cmd, _ string) (*exec.Cmd, error) {
+	return nil, fmt.Errorf("not jailing command %v, unsupported on %s", cmd.Args, runtime.GOOS)
 }
