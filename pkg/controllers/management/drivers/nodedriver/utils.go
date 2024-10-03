@@ -3,15 +3,19 @@ package nodedriver
 import (
 	"fmt"
 	"net/rpc"
+	"os"
+	"os/user"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/machine/libmachine/drivers/plugin/localbinary"
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	cli "github.com/rancher/machine/libmachine/mcnflag"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers"
+	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/sirupsen/logrus"
 )
 
@@ -84,8 +88,48 @@ func getCreateFlagsForDriver(driver string) ([]cli.Flag, error) {
 		return flags, nil
 	}
 
-	logrus.Debug("Starting binary ", driver)
-	p, err := localbinary.NewPlugin(driver)
+	logrus.Debugf("Starting binary %s", driver)
+	finalDriverName := driver
+
+	if os.Getenv("CATTLE_DEV_MODE") == "" {
+		core := false
+		for _, coreDriver := range localbinary.CoreDrivers {
+			if coreDriver == driver {
+				core = true
+				break
+			}
+		}
+		if !core {
+			fullName := fmt.Sprintf("%s%s", drivers.DockerMachineDriverPrefix, driver)
+			finalDriverName = path.Join("/opt/drivers/management-state/bin", fullName)
+
+			u, err := user.Lookup(jailer.JailUser)
+			if err != nil {
+				return nil, fmt.Errorf("error getting jailed user: %w", err)
+			}
+			g, err := user.LookupGroup(jailer.JailGroup)
+			if err != nil {
+				return nil, fmt.Errorf("error getting jailed group: %w", err)
+			}
+
+			defer func() {
+				if err := os.Unsetenv(localbinary.PluginUID); err != nil {
+					logrus.Warnf("Error unsetting env var: %v", err)
+				}
+				if err := os.Unsetenv(localbinary.PluginGID); err != nil {
+					logrus.Warnf("Error unsetting env var: %v", err)
+				}
+			}()
+
+			if err := os.Setenv(localbinary.PluginUID, u.Uid); err != nil {
+				return nil, fmt.Errorf("error setting env var: %w", err)
+			}
+			if err := os.Setenv(localbinary.PluginGID, g.Gid); err != nil {
+				return nil, fmt.Errorf("error setting env var: %w", err)
+			}
+		}
+	}
+	p, err := localbinary.NewPlugin(finalDriverName)
 	if err != nil {
 		return nil, err
 	}

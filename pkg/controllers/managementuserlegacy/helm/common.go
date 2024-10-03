@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -29,10 +28,10 @@ const (
 func writeTempDir(rootDir string, files map[string]string) error {
 	for name, content := range files {
 		fp := filepath.Join(rootDir, name)
-		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(fp), 0o755); err != nil {
 			return err
 		}
-		if err := ioutil.WriteFile(fp, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(fp, []byte(content), 0o644); err != nil {
 			return err
 		}
 	}
@@ -190,7 +189,7 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, *common.HelmPath, er
 
 func createTempDir(obj *v3.App) (*common.HelmPath, error) {
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
-		dir, err := ioutil.TempDir("", "helm-")
+		dir, err := os.MkdirTemp("", "helm-")
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +209,6 @@ func createTempDir(obj *v3.App) (*common.HelmPath, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	paths := &common.HelmPath{
 		FullPath:         filepath.Join(jailer.BaseJailPath, jailDir),
 		InJailPath:       "/",

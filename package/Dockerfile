@@ -45,8 +45,12 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/nsenter --version
 
 RUN useradd rancher && \
+    groupadd jail-accessors && \
+    usermod -aG jail-accessors rancher && \
     mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
-    chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
+    chgrp jail-accessors /var/lib/rancher /var/lib/cattle /usr/local/bin && \
+    chmod 750            /var/lib/rancher /var/lib/cattle /usr/local/bin && \
+    chmod g+s            /var/lib/rancher /var/lib/cattle /usr/local/bin
 
 RUN mkdir /root/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
@@ -129,6 +133,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     git clone -b master --depth 1 https://github.com/rancher/helm3-charts /var/lib/rancher-data/local-catalogs/helm3-library
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
+    chown root:root /usr/bin/rancher-machine && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
     curl -LO https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-amd64.zip && \
     unzip docker-machine-driver-linode_linux-amd64.zip -d /opt/drivers/management-state/bin && \
@@ -170,6 +175,7 @@ RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
 # set up helm 3
 RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
+    chown root:root /usr/bin/helm_v3 /usr/bin/kustomize && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.

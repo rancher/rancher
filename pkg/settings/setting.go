@@ -288,6 +288,10 @@ var (
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
 	// EULAAgreed is used only by the UI, but needs to be known to Rancher so that it's not removed.
 	EULAAgreed = NewSetting("eula-agreed", "")
+
+	// UnprivilegedJailUser controls whether jailed commands execute under a separate (unprivileged/non-root) user
+	// account. Setting it to false is only recommended for testing and development environments.
+	UnprivilegedJailUser = NewSetting("unprivileged-jail-user", "true")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
