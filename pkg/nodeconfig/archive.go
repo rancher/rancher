@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,9 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"crypto/tls"
-	"crypto/x509"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -175,12 +174,23 @@ func extractConfig(baseDir, extractedConfig string) error {
 			if err != nil {
 				return fmt.Errorf("error reinitializing config (Mkdirall). Config Dir: %v. Dir: %v. Error: %v", baseDir, info.Name(), err)
 			}
+
+			// Make sure to preserve the directory UID and GID.
+			if err = os.Chown(filePath, header.Uid, header.Gid); err != nil {
+				return fmt.Errorf("error changing ownership of directory %s: %w", filePath, err)
+			}
+
 			continue
 		}
 
 		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 		if err != nil {
 			return fmt.Errorf("error reinitializing config (OpenFile). Config Dir: %v. File: %v. Error: %v", baseDir, info.Name(), err)
+		}
+
+		// Make sure to preserve the file UID and GID.
+		if err = os.Chown(filePath, header.Uid, header.Gid); err != nil {
+			return fmt.Errorf("error changing ownership of file %s: %w", filePath, err)
 		}
 
 		_, err = io.Copy(file, tarReader)

@@ -146,7 +146,7 @@ func SplitExternalID(externalID string) (string, string, string, string, string,
 		templateVersionNamespace = split[0]
 		catalog = split[1]
 	}
-	//pre-upgrade setups will have global catalogs, where externalId field on templateversions won't have namespace.
+	// pre-upgrade setups will have global catalogs, where externalId field on templateversions won't have namespace.
 	// since these are global catalogs, we can default to global namespace
 	if templateVersionNamespace == "" {
 		templateVersionNamespace = namespace.GlobalNamespace
@@ -290,7 +290,7 @@ func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[strin
 	if app.Spec.ValuesYaml != "" {
 		custom := "custom-values.yaml"
 		valuesYaml := filepath.Join(tempDir.FullPath, custom)
-		if err := ioutil.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
+		if err := os.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0o755); err != nil {
 			return values, err
 		}
 		values = append(values, "--values", filepath.Join(tempDir.InJailPath, custom))

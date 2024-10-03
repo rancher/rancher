@@ -272,6 +272,10 @@ var (
 	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
+
+	// UnprivilegedJailUser controls whether jailed commands execute under a separate (unprivileged/non-root) user
+	// account. Setting it to false is only recommended for testing and development environments.
+	UnprivilegedJailUser = NewSetting("unprivileged-jail-user", "true")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
