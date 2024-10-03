@@ -21,6 +21,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -797,8 +798,8 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	require.NoError(c.T(), err)
 
 	retryNumber := 1
-	err = wait.Poll(200*time.Millisecond, 30*time.Second, func() (done bool, err error) {
-		cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(context.TODO(), 200*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		cr, err = c.catalogClient.ClusterRepos().Get(ctx, params.Name, metav1.GetOptions{})
 		assert.NoError(c.T(), err)
 
 		for _, condition := range cr.Status.Conditions {
