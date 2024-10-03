@@ -2,6 +2,7 @@ name: Provisioning tests
 on:
   pull_request:
     branches:
+      - main
       - release/v*
 jobs:
   provisioning_tests:
