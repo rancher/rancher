@@ -335,6 +335,10 @@ var (
 	_ = NewSetting("auth-password-requirements-description", "")
 	_ = NewSetting("api-host", "")
 	_ = NewSetting("telemetry-uid", "")
+
+	// UnprivilegedJailUser controls whether jailed commands execute under a separate (unprivileged/non-root) user
+	// account. Setting it to false is only recommended for testing and development environments.
+	UnprivilegedJailUser = NewSetting("unprivileged-jail-user", "true")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
