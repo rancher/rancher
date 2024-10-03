@@ -27,8 +27,11 @@ node {
     def patchedConfigsDir = "patched-cattle-configs"
 
     def testResultsOut = "results.xml"
+    def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
+    def qaseRun = "testrun"
+    def testRunConfig = "testrunconfig.yaml"
 
     // rancher
     def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
@@ -118,7 +121,8 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
-                          string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
+                          string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: 'RANCHER_LINODE_ACCESSKEY')]) {
         withEnv(paramsMap) {
           stage('Checkout') {
             deleteDir()
@@ -172,7 +176,18 @@ node {
               stage("Build Environment") {
                 try {
                   sh "docker run -v ${validationVolume}:/root --name ${buildTestContainer} -t --env-file ${envFile} " +
-                  "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh\""
+                  "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh;${workPath}pipeline/scripts/build_qase_auto_testrun.sh\""
+
+                  sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"                  
+                  sh "./${qaseRun} --startRun=true"
+
+                  if ("${env.QASE_TEST_RUN_ID}" == "null" || "${env.QASE_TEST_RUN_ID}" == "") {
+                      echo "Getting the qase testID"
+                      env.QASE_TEST_RUN_ID = sh (  
+                        script: "./yq '.id'  ./${testRunConfig}",
+                        returnStdout: true
+                        ).trim() 
+                    }
                 } catch(err) {
                    sh "docker stop ${buildTestContainer}"
                    sh "docker rm -v ${buildTestContainer}"
@@ -227,12 +242,16 @@ node {
                        returnStdout: true
                      ).trim()
 
+
                      jobs["$it-provisioning"] = { 
                        stage("Parallel Provisioning: $it"){
                          def containerName = "${job_name}${env.BUILD_NUMBER}_$it-provisioning"
                          try {
+                             echo "Starting provisioning tests." 
                             sh "docker run --volumes-from ${buildTestContainer} --name ${containerName} -t -e CATTLE_TEST_CONFIG=\"${absoluteConfigPath}\" " +
-                          "${imageName} sh -c \"gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsOut} -- -tags=validation ${testCase} -timeout=\"60m\" -v\""
+                          "${imageName} sh -c \"gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsJSON} -- -tags=validation ${testCase} -timeout=\"60m\" -v\""
+
+
 
                           dir("./${patchedConfigsDir}") {
                             sh "docker cp ${containerName}:${rootPath}${configsDir}/$it ."
@@ -280,7 +299,6 @@ node {
               stage('Run preupgrade checks') {
                 try {
                   jobs = [:]
-
                   configFiles.each {
                     try {
                       def configPath = "./${configsDir}/$it"
@@ -295,6 +313,8 @@ node {
                         script: "./yq '.testCases.upgradeTestCase'  ${configPath}",
                         returnStdout: true
                       ).trim()
+             
+                      sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"  
 
                       def goValidationParams = [
                         string(name: 'TIMEOUT', value: "30m"),
@@ -304,6 +324,7 @@ node {
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
                         string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
+                        string(name: 'QASE_TEST_RUN_ID', value: "${env.QASE_TEST_RUN_ID}"),
                         string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
                       ]
 
@@ -317,7 +338,9 @@ node {
                 } catch(err) {
                   echo "Pre upgrade tests had failures: " + err
                 }
+              sh "./${qaseRun} --startRun=false"
               }
+
               stage('Upgrade local cluster version') {
                 try {
                       def configPath = "./${configsDir}/${localConfigFileName}"
@@ -333,6 +356,10 @@ node {
                         returnStdout: true
                       ).trim()
 
+                      echo "Getting the test run ID in upgrade local cluster"
+                      
+                      sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"
+
                       def goValidationParams = [
                         string(name: 'TIMEOUT', value: "2h"),
                         text(name: 'CONFIG', value: configYaml),
@@ -341,6 +368,7 @@ node {
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
                         string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}" ),
+                        string(name: 'QASE_TEST_RUN_ID', value: "${env.QASE_TEST_RUN_ID}"),
                         string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
                       ]
 
@@ -348,6 +376,7 @@ node {
                 } catch(err) {
                   echo "Kubernetes upgrade tests had failures: " + err
                 }
+              sh "./${qaseRun} --startRun=false"
               }
               stage('Run postupgrade checks') {
                 try {
@@ -368,6 +397,10 @@ node {
                         returnStdout: true
                       ).trim()
 
+                      echo "Getting the test run ID in post upgrade checks"
+
+                      sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"
+
                       def goValidationParams = [
                         string(name: 'TIMEOUT', value: "30m"),
                         text(name: 'CONFIG', value: configYaml),
@@ -376,6 +409,7 @@ node {
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
                         string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
+                        string(name: 'QASE_TEST_RUN_ID', value: "${env.QASE_TEST_RUN_ID}"),
                         string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
                       ]
 
@@ -383,6 +417,7 @@ node {
                     } catch(err) {
                       echo "Post upgrade $it had failures: " + err
                     }
+                  sh "./${qaseRun} --startRun=false"
                   }
 
                   parallel jobs
