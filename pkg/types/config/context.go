@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/lasso/pkg/metrics"
 	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/store/proxy"
@@ -171,6 +172,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 
 func (c *ScaledContext) Start(ctx context.Context) error {
 	logrus.Info("Starting API controllers")
+	ctx = metrics.WithContextID(ctx, "scaledcontext")
 	return c.ControllerFactory.Start(ctx, 50)
 }
 
@@ -472,6 +474,7 @@ func (w *UserContext) Start(ctx context.Context) error {
 	if err := w.Management.ControllerFactory.Start(w.runContext, 50); err != nil {
 		return err
 	}
+	ctx = metrics.WithContextID(ctx, fmt.Sprintf("usercontext_%s", w.ClusterName))
 	return w.ControllerFactory.Start(ctx, 5)
 }
 
@@ -515,5 +518,6 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 
 func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
+	ctx = metrics.WithContextID(ctx, fmt.Sprintf("useronlycontext_%s", w.ClusterName))
 	return w.ControllerFactory.Start(ctx, 5)
 }
