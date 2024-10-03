@@ -817,11 +817,7 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	})
 	require.NoError(c.T(), err)
 
-	cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
-	assert.NoError(c.T(), err)
-
 	downloadTime := cr.Status.DownloadTime
-
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), cr.Name, metav1.GetOptions{})
 		if err != nil {
