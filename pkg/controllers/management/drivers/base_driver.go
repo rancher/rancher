@@ -180,7 +180,7 @@ func isElf(input string) bool {
 	if _, err := f.Read(elf); err != nil {
 		return false
 	}
-	//support unix binary and mac-os binary mach-o
+	// support unix binary and mac-os binary mach-o
 	return bytes.Compare(elf, []byte{0x7f, 0x45, 0x4c, 0x46}) == 0 || bytes.Compare(elf, []byte{0xcf, 0xfa, 0xed, 0xfe}) == 0
 }
 
@@ -228,7 +228,9 @@ func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 		}
 
 		if strings.HasPrefix(path.Base(p), d.BinaryPrefix) {
-			file = p
+			if isElf(p) {
+				file = p
+			}
 		}
 
 		return nil
@@ -241,6 +243,15 @@ func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 	if driverName == "" {
 		driverName = path.Base(file)
 	}
+
+	info, err := os.Lstat(file)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("driver %s is not a regular file", driverName)
+	}
+
 	f, err := os.Open(file)
 	if err != nil {
 		return "", err
@@ -251,7 +262,6 @@ func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 		return "", err
 	}
 
-	driverName = strings.ToLower(driverName)
 	dest, err := os.Create(cacheFile + "-" + driverName)
 	if err != nil {
 		return "", err
