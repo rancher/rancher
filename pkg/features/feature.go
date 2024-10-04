@@ -132,12 +132,6 @@ var (
 		true,
 		true,
 		true)
-	ProvisioningPreBootstrap = newFeature(
-		"provisioningprebootstrap",
-		"Support running pre-bootstrap workloads on downstream clusters",
-		false,
-		true,
-		true)
 )
 
 type Feature struct {
