@@ -143,8 +143,9 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 // expiration in milliseconds from the associated token, and set the CloudCredentialExpirationAnnotation on the
 // secret, removing on update if not present. Cloud credentials are transformed by norman, and thus the secret key of
 // `harvestercredentialConfig-kubeconfigContent` is unrolled into a top level map with `kubeconfigContent` as a nested
-// element within that map (see: decodeNonPasswordFields). If the credential is not a harvester credential, this
-// function does nothing.
+// element within that map (see: decodeNonPasswordFields). If remove is false, the existing annotation (if present) is
+// not removed. If remove is true, the existing annotation will only be removed if the associated token does not have a
+// valid expiration. If the credential is not a harvester credential, this function does nothing.
 func (s *Store) processHarvesterCloudCredentialExpiration(data map[string]any, remove bool) error {
 	if hc, ok := data["harvestercredentialConfig"].(map[string]any); ok && hc != nil {
 		if kubeconfigYaml, ok := hc["kubeconfigContent"].(string); ok && kubeconfigYaml != "" {
