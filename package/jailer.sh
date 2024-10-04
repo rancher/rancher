@@ -94,7 +94,7 @@ cp -l /bin/rm /opt/jail/$NAME/bin/
 cp -l /usr/bin/mkisofs /opt/jail/$NAME/usr/bin
 
 cd /dev
-# tar copy /dev excluding mqueue and shm
-tar cf - --exclude=mqueue --exclude=shm --exclude=pts . | (cd /opt/jail/${NAME}/dev; tar xfp -)
+# tar copy a minimum set of devices from /dev
+tar cf - zero urandom tty stdout stdin stderr random null fd core full | (cd /opt/jail/${NAME}/dev; tar xfp -)
 
 touch /opt/jail/$NAME/done
