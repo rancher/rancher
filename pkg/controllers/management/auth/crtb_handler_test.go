@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -66,6 +65,9 @@ func TestReconcileBindings(t *testing.T) {
 	t.Cleanup(func() {
 		timeNow = oldTimeNow
 	})
+	mockStatus := &status.Status{
+		TimeNow: timeNow,
+	}
 	tests := []struct {
 		name       string
 		crtb       *v3.ClusterRoleTemplateBinding
@@ -431,6 +433,7 @@ func TestReconcileBindings(t *testing.T) {
 			crtbLifecycle.clusterLister = state.clusterListerMock
 			crtbLifecycle.projectLister = state.projectListerMock
 			crtbLifecycle.mgr = state.managerMock
+			crtbLifecycle.s = mockStatus
 
 			err := crtbLifecycle.reconcileBindings(test.crtb)
 
@@ -441,222 +444,6 @@ func TestReconcileBindings(t *testing.T) {
 			}
 
 			assert.Equal(t, test.wantStatus, test.crtb.Status)
-		})
-	}
-}
-
-func TestAddLocalCondition(t *testing.T) {
-	mockTime := time.Unix(0, 0)
-	oldTimeNow := timeNow
-	timeNow = func() time.Time {
-		return mockTime
-	}
-	t.Cleanup(func() {
-		timeNow = oldTimeNow
-	})
-	mockErr := errors.New("mock error")
-	tests := map[string]struct {
-		binding    *v3.ClusterRoleTemplateBinding
-		condition  v1.Condition
-		reason     string
-		err        error
-		wantStatus v3.ClusterRoleTemplateBindingStatus
-	}{
-		"add new condition": {
-			binding:   &v3.ClusterRoleTemplateBinding{},
-			condition: v1.Condition{Type: subjectExists},
-			reason:    subjectExists,
-			err:       nil,
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   subjectExists,
-						Status: v1.ConditionTrue,
-						Reason: subjectExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-				},
-			},
-		},
-		"add new condition when there are already other existing conditions": {
-			binding: &v3.ClusterRoleTemplateBinding{
-				Status: v3.ClusterRoleTemplateBindingStatus{
-					LocalConditions: []v1.Condition{
-						{
-							Type:   subjectExists,
-							Status: v1.ConditionTrue,
-							Reason: subjectExists,
-							LastTransitionTime: v1.Time{
-								Time: mockTime,
-							},
-						},
-					},
-				},
-			},
-			condition: v1.Condition{Type: bindingExists},
-			reason:    bindingExists,
-			err:       nil,
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   subjectExists,
-						Status: v1.ConditionTrue,
-						Reason: subjectExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-					{
-						Type:   bindingExists,
-						Status: v1.ConditionTrue,
-						Reason: bindingExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-				},
-			},
-		},
-		"add new condition with error": {
-			binding:   &v3.ClusterRoleTemplateBinding{},
-			condition: v1.Condition{Type: subjectExists},
-			reason:    failedToGetCluster,
-			err:       mockErr,
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    subjectExists,
-						Status:  v1.ConditionFalse,
-						Message: mockErr.Error(),
-						Reason:  failedToGetCluster,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-				},
-			},
-		},
-		"modify existing condition": {
-			binding: &v3.ClusterRoleTemplateBinding{
-				Status: v3.ClusterRoleTemplateBindingStatus{
-					LocalConditions: []v1.Condition{
-						{
-							Type:   subjectExists,
-							Status: v1.ConditionTrue,
-							Reason: subjectExists,
-							LastTransitionTime: v1.Time{
-								Time: mockTime,
-							},
-						},
-					},
-				},
-			},
-			condition: v1.Condition{Type: subjectExists},
-			reason:    subjectExists,
-			err:       mockErr,
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    subjectExists,
-						Status:  v1.ConditionFalse,
-						Reason:  subjectExists,
-						Message: mockErr.Error(),
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-				},
-			},
-		},
-		"modify existing error condition": {
-			binding: &v3.ClusterRoleTemplateBinding{
-				Status: v3.ClusterRoleTemplateBindingStatus{
-					LocalConditions: []v1.Condition{
-						{
-							Type:   subjectExists,
-							Status: v1.ConditionTrue,
-							Reason: subjectExists,
-							LastTransitionTime: v1.Time{
-								Time: mockTime,
-							},
-						},
-						{
-							Type:    bindingExists,
-							Status:  v1.ConditionFalse,
-							Message: mockErr.Error(),
-							Reason:  failedToGetCluster,
-							LastTransitionTime: v1.Time{
-								Time: mockTime,
-							},
-						},
-					},
-				},
-			},
-			condition: v1.Condition{Type: bindingExists},
-			reason:    bindingExists,
-			err:       nil,
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   subjectExists,
-						Status: v1.ConditionTrue,
-						Reason: subjectExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-					{
-						Type:   bindingExists,
-						Status: v1.ConditionTrue,
-						Reason: bindingExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-				},
-			},
-		},
-		"add existing condition": {
-			binding: &v3.ClusterRoleTemplateBinding{
-				Status: v3.ClusterRoleTemplateBindingStatus{
-					LocalConditions: []v1.Condition{
-						{
-							Type:   subjectExists,
-							Status: v1.ConditionTrue,
-							Reason: subjectExists,
-							LastTransitionTime: v1.Time{
-								Time: mockTime,
-							},
-						},
-					},
-				},
-			},
-			condition: v1.Condition{Type: subjectExists},
-			reason:    subjectExists,
-			err:       nil,
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   subjectExists,
-						Status: v1.ConditionTrue,
-						Reason: subjectExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for name, test := range tests {
-		test := test
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			addLocalCondition(test.binding, test.condition, test.reason, test.err)
-			assert.Equal(t, test.wantStatus, test.binding.Status)
 		})
 	}
 }

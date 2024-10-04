@@ -404,12 +404,12 @@ type ClusterRoleTemplateBinding struct {
 
 // ClusterRoleTemplateBindingStatus represents the most recently observed status of the ClusterRoleTemplateBinding
 type ClusterRoleTemplateBindingStatus struct {
-	// ObservedGeneration is the most recent generation (metadata.generation in CRTB)
+	// ObservedGenerationLocal is the most recent generation (metadata.generation in CRTB)
 	// observed by the local controller operating on this status. Populated by the system.
 	// +optional
 	ObservedGenerationLocal int64 `json:"observedGenerationLocal,omitempty"`
 
-	// ObservedGeneration is the most recent generation (metadata.generation in CRTB)
+	// ObservedGenerationRemote is the most recent generation (metadata.generation in CRTB)
 	// observed by the remote controller operating on this status. Populated by the system.
 	// +optional
 	ObservedGenerationRemote int64 `json:"observedGenerationRemote,omitempty"`
