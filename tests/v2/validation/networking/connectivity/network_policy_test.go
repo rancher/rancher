@@ -98,7 +98,7 @@ func (n *NetworkPolicyTestSuite) SetupSuite() {
 	require.NoError(n.T(), err)
 }
 
-func (n *NetworkPolicyTestSuite) TestPingPods() {
+func (n *NetworkPolicyTestSuite) TestPingPodsFromCPNode() {
 
 	// Get downstream cluster wrangler context
 	wc, err := n.client.WranglerContext.DownStreamClusterWranglerContext(n.project.ClusterID)
@@ -108,9 +108,6 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 	assert.NoError(n.T(), err)
 	assert.NotEmpty(n.T(), pods)
 
-	pod2Ip := pods.Items[1].Status.PodIP
-	pingExecCmd := pingCmd + " " + pod2Ip
-	nodeRole := nodeRole
 	_, stevecluster, err := clusters.GetProvisioningClusterByName(n.client, n.clusterName, provisioninginput.Namespace)
 
 	query, err := url.ParseQuery("labelSelector=node-role.kubernetes.io/" + nodeRole + "=true")
@@ -118,29 +115,29 @@ func (n *NetworkPolicyTestSuite) TestPingPods() {
 
 	nodeList, err := n.steveClient.SteveType("node").List(query)
 	assert.NoError(n.T(), err)
+	assert.NotEmpty(n.T(), nodeList, err)
 
 	firstMachine := nodeList.Data[0]
 
 	sshUser, err := sshkeys.GetSSHUser(n.client, stevecluster)
 	assert.NoError(n.T(), err)
-
-	if sshUser == "" {
-		assert.NoError(n.T(), errors.New("sshUser does not exist"))
-	}
+	assert.NotEmpty(n.T(), sshUser, errors.New("sshUser does not exist"))
 
 	sshNode, err := sshkeys.GetSSHNodeFromMachine(n.client, sshUser, &firstMachine)
 	assert.NoError(n.T(), err)
 
 	n.T().Logf("Running ping on [%v]", firstMachine.Name)
 
-	excmdLog, err := sshNode.ExecuteCommand(pingExecCmd)
-	if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-		assert.NoError(n.T(), err)
+	for i := 1; i < len(pods.Items); i++ {
+		podIP := pods.Items[i].Status.PodIP
+		pingExecCmd := pingCmd + " " + podIP
+		excmdLog, err := sshNode.ExecuteCommand(pingExecCmd)
+		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+			assert.NoError(n.T(), err)
+		}
+		n.T().Logf("Log of the ping command {%v}", excmdLog)
+		assert.Contains(n.T(), excmdLog, successfulPing, "Unable to ping the pod")
 	}
-	n.T().Logf("Log of the ping command {%v}", excmdLog)
-
-	assert.Contains(n.T(), excmdLog, successfulPing, "Unable to ping the pod")
-
 }
 
 func TestNetworkPolicyTestSuite(t *testing.T) {
