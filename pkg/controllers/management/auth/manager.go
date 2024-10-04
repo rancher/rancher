@@ -92,7 +92,7 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 		rbClient:      management.RBAC.RoleBindings(""),
 		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crbClient:     management.RBAC.ClusterRoleBindings(""),
-		crtbClient:    management.Management.ClusterRoleTemplateBindings(""),
+		crtbClient:    management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 	}
 	return prtb, crtb
 }
