@@ -2,6 +2,7 @@ package clusterauthtoken
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -27,18 +28,16 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 	if !clusterAuthToken.Enabled ||
 		isExpired(clusterAuthToken) ||
 		clusterAuthToken.LastUsedAt == nil {
-		return clusterAuthToken, nil
+		return clusterAuthToken, nil // Nothing to do.
 	}
 
 	tokenName := clusterAuthToken.Name
-
 	token, err := h.tokenCache.Get(tokenName)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			logrus.Errorf("[%s] Error getting token %s: %v", clusterAuthTokenController, tokenName, err)
+		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
+			return clusterAuthToken, nil // ClusterAuthToken was orphaned.
 		}
-
-		return clusterAuthToken, nil
+		return nil, fmt.Errorf("error getting token %s: %w", tokenName, err)
 	}
 
 	if token.LastUsedAt != nil && token.LastUsedAt.After(clusterAuthToken.LastUsedAt.Time) {
@@ -46,7 +45,7 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 	}
 
 	if tokens.IsExpired(*token) {
-		return clusterAuthToken, nil
+		return clusterAuthToken, nil // Should not update expired token.
 	}
 
 	if err := func() error {
@@ -66,9 +65,7 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 		_, err = h.tokenClient.Patch(token.Name, types.JSONPatchType, patch)
 		return err
 	}(); err != nil {
-		// Log the error and move on to avoid failing the request.
-		logrus.Errorf("[%s] Error updating lastUsedAt for token %s: %v", clusterAuthTokenController, tokenName, err)
-		return clusterAuthToken, nil
+		return nil, fmt.Errorf("error updating lastUsedAt for token %s: %v", tokenName, err)
 	}
 
 	logrus.Debugf("[%s] Updated lastUsedAt for token %s", clusterAuthTokenController, tokenName)

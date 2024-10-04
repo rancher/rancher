@@ -22,50 +22,54 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 	t.Run("clusterAuthToken is nil", func(t *testing.T) {
 		handler := &clusterAuthTokenHandler{}
 
-		_, err := handler.sync("", nil)
-		require.Nil(t, err)
+		obj, err := handler.sync("", nil)
+		require.NoError(t, err)
+		require.Nil(t, obj)
 	})
 
 	t.Run("clusterAuthToken is being deleted", func(t *testing.T) {
 		handler := &clusterAuthTokenHandler{}
 
 		deletedAt := metav1.NewTime(time.Now())
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{
 				DeletionTimestamp: &deletedAt,
 			},
 			Enabled: true,
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
+		require.Nil(t, obj)
 	})
 
 	t.Run("lastUsedAt is not set", func(t *testing.T) {
 		handler := &clusterAuthTokenHandler{}
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			Enabled: true,
 		})
-		require.Nil(t, err)
-
+		require.NoError(t, err)
+		require.NotNil(t, obj)
 	})
 
 	t.Run("clusterAuthToken is disabled", func(t *testing.T) {
 		handler := &clusterAuthTokenHandler{}
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			Enabled: false,
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
 	})
 
 	t.Run("clusterAuthToken is expired", func(t *testing.T) {
 		handler := &clusterAuthTokenHandler{}
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			Enabled:   true,
 			ExpiresAt: time.Now().Add(-time.Second).Format(time.RFC3339),
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
 	})
 
 	t.Run("token not found", func(t *testing.T) {
@@ -78,14 +82,15 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 
 		lastUsedAt := metav1.NewTime(time.Now())
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
 			Enabled:    true,
 			LastUsedAt: &lastUsedAt,
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
 	})
 
 	t.Run("error getting token", func(t *testing.T) {
@@ -98,14 +103,46 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 
 		lastUsedAt := metav1.NewTime(time.Now())
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
 			Enabled:    true,
 			LastUsedAt: &lastUsedAt,
 		})
-		require.Nil(t, err)
+		require.Error(t, err)
+		require.Nil(t, obj)
+	})
+
+	t.Run("token is expired", func(t *testing.T) {
+		now := time.Now()
+		tokenLastUsedAt := metav1.NewTime(now.Add(-time.Minute))
+		tokenCreatedAt := metav1.NewTime(now.Add(-time.Hour))
+		clusterAuthTokenLastUsedAt := metav1.NewTime(now)
+
+		tokenCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
+		tokenCache.EXPECT().Get(tokenName).Return(&apiv3.Token{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              tokenName,
+				CreationTimestamp: tokenCreatedAt,
+			},
+			LastUsedAt: &tokenLastUsedAt,
+			TTLMillis:  now.Sub(tokenCreatedAt.Time).Milliseconds() - 1,
+		}, nil).Times(1)
+
+		handler := &clusterAuthTokenHandler{
+			tokenCache: tokenCache,
+		}
+
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: tokenName,
+			},
+			Enabled:    true,
+			LastUsedAt: &clusterAuthTokenLastUsedAt,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, obj)
 	})
 
 	t.Run("token was used more recently than clusterAuthToken", func(t *testing.T) {
@@ -125,14 +162,15 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			tokenCache: tokenCache,
 		}
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
 			Enabled:    true,
 			LastUsedAt: &clusterAuthTokenLastUsedAt,
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
 	})
 
 	t.Run("token updated successfully", func(t *testing.T) {
@@ -156,17 +194,18 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			tokenClient: tokenClient,
 		}
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
 			Enabled:    true,
 			LastUsedAt: &clusterAuthTokenLastUsedAt,
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
 	})
 
-	t.Run("error updating token doesn't fail sync", func(t *testing.T) {
+	t.Run("error updating token", func(t *testing.T) {
 		now := time.Now()
 		tokenLastUsedAt := metav1.NewTime(now.Add(-time.Second))
 		clusterAuthTokenLastUsedAt := metav1.NewTime(now)
@@ -187,13 +226,14 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			tokenClient: tokenClient,
 		}
 
-		_, err := handler.sync("", &clusterv3.ClusterAuthToken{
+		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
 			Enabled:    true,
 			LastUsedAt: &clusterAuthTokenLastUsedAt,
 		})
-		require.Nil(t, err)
+		require.Error(t, err)
+		require.Nil(t, obj)
 	})
 }
