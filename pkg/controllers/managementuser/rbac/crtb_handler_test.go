@@ -3,8 +3,16 @@ package rbac
 import (
 	"fmt"
 	"testing"
+	"time"
 
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/status"
+	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -34,20 +42,53 @@ type crtbTestState struct {
 }
 
 func TestSyncCRTB(t *testing.T) {
+	mockTime := time.Unix(0, 0)
+	oldTimeNow := timeNow
+	timeNow = func() time.Time {
+		return mockTime
+	}
+	t.Cleanup(func() {
+		timeNow = oldTimeNow
+	})
 	t.Parallel()
 	tests := []struct {
 		name       string
 		stateSetup func(crtbTestState)
 		crtb       *v3.ClusterRoleTemplateBinding
 		wantError  bool
+		wantStatus v3.ClusterRoleTemplateBindingStatus
 	}{
 		{
 			name: "crtb with no role template",
 			crtb: noRoleTemplateCRTB.DeepCopy(),
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: roleTemplateDoesNotExist,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "crtb with no subject",
 			crtb: noSubjectCRTB.DeepCopy(),
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: userOrGroupDoesNotExist,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "error getting roletemplate",
@@ -58,6 +99,19 @@ func TestSyncCRTB(t *testing.T) {
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:    clusterRolesExists,
+						Status:  v1.ConditionFalse,
+						Message: "couldn't get role template rt-name: " + e.Error(),
+						Reason:  failedToGetRoleTemplate,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "error gathering roles",
@@ -69,6 +123,19 @@ func TestSyncCRTB(t *testing.T) {
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:    clusterRolesExists,
+						Status:  v1.ConditionFalse,
+						Message: e.Error(),
+						Reason:  failedToGatherRoles,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "error ensuring roles",
@@ -81,6 +148,19 @@ func TestSyncCRTB(t *testing.T) {
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:    clusterRolesExists,
+						Status:  v1.ConditionFalse,
+						Message: e.Error(),
+						Reason:  failedToCreateRoles,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "error ensuring cluster bindings",
@@ -94,6 +174,27 @@ func TestSyncCRTB(t *testing.T) {
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRolesExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+					{
+						Type:    clusterRoleBindingsExists,
+						Status:  v1.ConditionFalse,
+						Message: e.Error(),
+						Reason:  failedToCreateBindings,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "error ensuring service account impersonator",
@@ -108,6 +209,35 @@ func TestSyncCRTB(t *testing.T) {
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRolesExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+					{
+						Type:   clusterRoleBindingsExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRoleBindingsExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+					{
+						Type:    serviceAccountImpersonatorExists,
+						Status:  v1.ConditionFalse,
+						Message: e.Error(),
+						Reason:  failedToCreateServiceAccountImpersonator,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "success",
@@ -121,6 +251,34 @@ func TestSyncCRTB(t *testing.T) {
 				cts.managerMock.EXPECT().ensureServiceAccountImpersonator(gomock.Any()).Return(nil)
 			},
 			crtb: defaultCRTB.DeepCopy(),
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRolesExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+					{
+						Type:   clusterRoleBindingsExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRoleBindingsExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+					{
+						Type:   serviceAccountImpersonatorExists,
+						Status: v1.ConditionTrue,
+						Reason: serviceAccountImpersonatorExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -143,6 +301,343 @@ func TestSyncCRTB(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+
+			assert.Equal(t, test.wantStatus, test.crtb.Status)
+		})
+	}
+}
+
+func TestAddRemoteCondition(t *testing.T) {
+	mockTime := time.Unix(0, 0)
+	oldTimeNow := timeNow
+	timeNow = func() time.Time {
+		return mockTime
+	}
+	t.Cleanup(func() {
+		timeNow = oldTimeNow
+	})
+	mockErr := errors.New("mock error")
+	tests := map[string]struct {
+		binding    *v3.ClusterRoleTemplateBinding
+		condition  v1.Condition
+		reason     string
+		err        error
+		wantStatus v3.ClusterRoleTemplateBindingStatus
+	}{
+		"add new condition": {
+			binding:   &v3.ClusterRoleTemplateBinding{},
+			condition: v1.Condition{Type: clusterRolesExists},
+			reason:    clusterRolesExists,
+			err:       nil,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRolesExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
+		},
+		"add new condition when there are already other existing conditions": {
+			binding: &v3.ClusterRoleTemplateBinding{
+				Status: v3.ClusterRoleTemplateBindingStatus{
+					RemoteConditions: []v1.Condition{
+						{
+							Type:   clusterRolesExists,
+							Status: v1.ConditionTrue,
+							Reason: clusterRolesExists,
+							LastTransitionTime: v1.Time{
+								Time: mockTime,
+							},
+						},
+					},
+				},
+			},
+			condition: v1.Condition{Type: clusterRoleBindingsExists},
+			reason:    clusterRoleBindingsExists,
+			err:       nil,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRolesExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+					{
+						Type:   clusterRoleBindingsExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRoleBindingsExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
+		},
+		"add new condition with error": {
+			binding:   &v3.ClusterRoleTemplateBinding{},
+			condition: v1.Condition{Type: clusterRolesExists},
+			reason:    failedToCreateRoles,
+			err:       mockErr,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:    clusterRolesExists,
+						Status:  v1.ConditionFalse,
+						Message: mockErr.Error(),
+						Reason:  failedToCreateRoles,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
+		},
+		"modify existing condition": {
+			binding: &v3.ClusterRoleTemplateBinding{
+				Status: v3.ClusterRoleTemplateBindingStatus{
+					RemoteConditions: []v1.Condition{
+						{
+							Type:   clusterRolesExists,
+							Status: v1.ConditionTrue,
+							Reason: clusterRolesExists,
+							LastTransitionTime: v1.Time{
+								Time: mockTime,
+							},
+						},
+					},
+				},
+			},
+			condition: v1.Condition{Type: clusterRolesExists},
+			reason:    clusterRolesExists,
+			err:       mockErr,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:    clusterRolesExists,
+						Status:  v1.ConditionFalse,
+						Reason:  clusterRolesExists,
+						Message: mockErr.Error(),
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
+		},
+		"modify existing error condition": {
+			binding: &v3.ClusterRoleTemplateBinding{
+				Status: v3.ClusterRoleTemplateBindingStatus{
+					RemoteConditions: []v1.Condition{
+						{
+							Type:   clusterRolesExists,
+							Status: v1.ConditionTrue,
+							Reason: clusterRolesExists,
+							LastTransitionTime: v1.Time{
+								Time: mockTime,
+							},
+						},
+						{
+							Type:    clusterRoleBindingsExists,
+							Status:  v1.ConditionFalse,
+							Message: mockErr.Error(),
+							Reason:  failedToCreateRoles,
+							LastTransitionTime: v1.Time{
+								Time: mockTime,
+							},
+						},
+					},
+				},
+			},
+			condition: v1.Condition{Type: clusterRoleBindingsExists},
+			reason:    clusterRoleBindingsExists,
+			err:       nil,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRolesExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+					{
+						Type:   clusterRoleBindingsExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRoleBindingsExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
+		},
+		"add existing condition": {
+			binding: &v3.ClusterRoleTemplateBinding{
+				Status: v3.ClusterRoleTemplateBindingStatus{
+					RemoteConditions: []v1.Condition{
+						{
+							Type:   clusterRolesExists,
+							Status: v1.ConditionTrue,
+							Reason: clusterRolesExists,
+							LastTransitionTime: v1.Time{
+								Time: mockTime,
+							},
+						},
+					},
+				},
+			},
+			condition: v1.Condition{Type: clusterRolesExists},
+			reason:    clusterRolesExists,
+			err:       nil,
+			wantStatus: v3.ClusterRoleTemplateBindingStatus{
+				RemoteConditions: []v1.Condition{
+					{
+						Type:   clusterRolesExists,
+						Status: v1.ConditionTrue,
+						Reason: clusterRolesExists,
+						LastTransitionTime: v1.Time{
+							Time: mockTime,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			addRemoteCondition(test.binding, test.condition, test.reason, test.err)
+			assert.Equal(t, test.wantStatus, test.binding.Status)
+		})
+	}
+}
+
+func TestUpdateStatus(t *testing.T) {
+	mockTime := time.Unix(0, 0)
+	oldTimeNow := timeNow
+	timeNow = func() time.Time {
+		return mockTime
+	}
+	t.Cleanup(func() {
+		timeNow = oldTimeNow
+	})
+	ctrl := gomock.NewController(t)
+
+	crtbClusterRolesExists := &v3.ClusterRoleTemplateBinding{
+		Status: v3.ClusterRoleTemplateBindingStatus{
+			RemoteConditions: []v1.Condition{
+				{
+					Type:   clusterRolesExists,
+					Status: v1.ConditionTrue,
+					Reason: clusterRolesExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+			},
+			LastUpdateTime: mockTime.String(),
+		},
+	}
+	crtbSubjectError := &v3.ClusterRoleTemplateBinding{
+		Status: v3.ClusterRoleTemplateBindingStatus{
+			RemoteConditions: []v1.Condition{
+				{
+					Type:   clusterRolesExists,
+					Status: v1.ConditionFalse,
+					Reason: failedToCreateRoles,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+			},
+			LastUpdateTime: mockTime.String(),
+		},
+	}
+	crtbEmptyStatus := &v3.ClusterRoleTemplateBinding{
+		Status: v3.ClusterRoleTemplateBindingStatus{
+			LastUpdateTime: mockTime.String(),
+		},
+	}
+	crtbEmptyStatusLocalComplete := &v3.ClusterRoleTemplateBinding{
+		Status: v3.ClusterRoleTemplateBindingStatus{
+			LastUpdateTime: mockTime.String(),
+			SummaryLocal:   status.SummaryCompleted,
+		},
+	}
+	tests := map[string]struct {
+		crtb       *v3.ClusterRoleTemplateBinding
+		crtbClient func(*v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController
+		wantErr    error
+	}{
+		"status updated": {
+			crtb: crtbClusterRolesExists,
+			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
+				crtbSubjectExist := crtbClusterRolesExists.DeepCopy()
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name, v1.GetOptions{}).Return(crtbEmptyStatus, nil)
+				crtbSubjectExist.Status.SummaryRemote = status.SummaryCompleted
+				mock.EXPECT().UpdateStatus(crtbSubjectExist)
+
+				return mock
+			},
+		},
+		"status not updated when remote conditions are the same": {
+			crtb: crtbClusterRolesExists,
+			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name, v1.GetOptions{}).Return(crtbClusterRolesExists.DeepCopy(), nil)
+
+				return mock
+			},
+		},
+		"set summary to complete when local is complete": {
+			crtb: crtbClusterRolesExists,
+			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
+				crtbSubjectExist := crtbClusterRolesExists.DeepCopy()
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name, v1.GetOptions{}).Return(crtbEmptyStatusLocalComplete, nil)
+				crtbSubjectExist.Status.SummaryLocal = status.SummaryCompleted
+				crtbSubjectExist.Status.SummaryRemote = status.SummaryCompleted
+				crtbSubjectExist.Status.Summary = status.SummaryCompleted
+				mock.EXPECT().UpdateStatus(crtbSubjectExist)
+
+				return mock
+			},
+		},
+		"set summary to error when there is an error condition": {
+			crtb: crtbSubjectError,
+			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
+				crtbSubjectExist := crtbClusterRolesExists.DeepCopy()
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name, v1.GetOptions{}).Return(crtbSubjectExist, nil)
+				crtbSubjectExist.Status.SummaryRemote = status.SummaryError
+				crtbSubjectExist.Status.Summary = status.SummaryError
+				mock.EXPECT().UpdateStatus(crtbSubjectExist)
+
+				return mock
+			},
+		},
+	}
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c := crtbLifecycle{
+				crtbClient: test.crtbClient(test.crtb),
+			}
+			err := c.updateStatus(test.crtb)
+			assert.Equal(t, test.wantErr, err)
 		})
 	}
 }
