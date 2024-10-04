@@ -180,7 +180,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	if features.Auth.Enabled() {
-		authServer, err = auth.NewServer(ctx, restConfig)
+		authServer, err = auth.NewServer(ctx, restConfig, wranglerContext)
 		if err != nil {
 			return nil, err
 		}
