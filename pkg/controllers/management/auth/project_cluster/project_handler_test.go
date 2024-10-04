@@ -98,3 +98,18 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	assert.Equal(t, "", prtbs[0].UserName)
 	assert.Equal(t, userPrincipalName, prtbs[0].UserPrincipalName)
 }
+
+func TestReconcileProjectCreatorRTBNoCreatorRBAC(t *testing.T) {
+	// When NoCreatorRBACAnnotation is set, nothing in the lifecycle will be called
+	lifecycle := &projectLifecycle{}
+	project := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Annotations: map[string]string{
+				NoCreatorRBACAnnotation: "true",
+			},
+		},
+	}
+	obj, err := lifecycle.reconcileProjectCreatorRTB(project)
+	assert.NoError(t, err)
+	assert.NotNil(t, obj)
+}
