@@ -49,6 +49,7 @@ func newCRTBLifecycle(m *manager, management *config.ManagementContext) *crtbLif
 		crbLister:  m.workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crbClient:  m.workload.RBAC.ClusterRoleBindings(""),
 		crtbClient: management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		s:          status.NewStatus(),
 	}
 }
 
@@ -58,6 +59,7 @@ type crtbLifecycle struct {
 	crbLister  typesrbacv1.ClusterRoleBindingLister
 	crbClient  typesrbacv1.ClusterRoleBindingInterface
 	crtbClient controllersv3.ClusterRoleTemplateBindingController
+	s          *status.Status
 }
 
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
@@ -85,48 +87,48 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 
 	if binding.RoleTemplateName == "" {
 		logrus.Warnf("ClusterRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
-		addRemoteCondition(binding, condition, roleTemplateDoesNotExist, nil)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, roleTemplateDoesNotExist, nil)
 		return nil
 	}
 
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
-		addRemoteCondition(binding, condition, userOrGroupDoesNotExist, nil)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, userOrGroupDoesNotExist, nil)
 		return nil
 	}
 
 	rt, err := c.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		addRemoteCondition(binding, condition, failedToGetRoleTemplate, fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err))
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToGetRoleTemplate, fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err))
 		return err
 	}
 
 	roles := map[string]*v3.RoleTemplate{}
 	if err := c.m.gatherRoles(rt, roles, 0); err != nil {
-		addRemoteCondition(binding, condition, failedToGatherRoles, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToGatherRoles, err)
 		return err
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
-		addRemoteCondition(binding, condition, failedToCreateRoles, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateRoles, err)
 		return err
 	}
-	addRemoteCondition(binding, condition, clusterRolesExists, nil)
+	c.s.AddCondition(&binding.Status.RemoteConditions, condition, clusterRolesExists, nil)
 
 	condition = metav1.Condition{Type: clusterRoleBindingsExists}
 	if err := c.m.ensureClusterBindings(roles, binding); err != nil {
-		addRemoteCondition(binding, condition, failedToCreateBindings, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateBindings, err)
 		return err
 	}
-	addRemoteCondition(binding, condition, clusterRoleBindingsExists, nil)
+	c.s.AddCondition(&binding.Status.RemoteConditions, condition, clusterRoleBindingsExists, nil)
 
 	condition = metav1.Condition{Type: serviceAccountImpersonatorExists}
 	if binding.UserName != "" {
 		if err := c.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
-			addRemoteCondition(binding, condition, failedToCreateServiceAccountImpersonator, err)
+			c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateServiceAccountImpersonator, err)
 			return err
 		}
 	}
-	addRemoteCondition(binding, condition, serviceAccountImpersonatorExists, nil)
+	c.s.AddCondition(&binding.Status.RemoteConditions, condition, serviceAccountImpersonatorExists, nil)
 
 	return nil
 }
@@ -137,21 +139,21 @@ func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding)
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	rbs, err := c.crbLister.List("", set.AsSelector())
 	if err != nil {
-		addRemoteCondition(binding, condition, failedToListCRBs, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToListCRBs, err)
 		return fmt.Errorf("couldn't list clusterrolebindings with selector %s: %w", set.AsSelector(), err)
 	}
 
 	for _, rb := range rbs {
 		if err := c.crbClient.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
-				addRemoteCondition(binding, condition, failedToDeleteClusterRoleBinding, err)
+				c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToDeleteClusterRoleBinding, err)
 				return fmt.Errorf("error deleting clusterrolebinding %v: %w", rb.Name, err)
 			}
 		}
 	}
 
 	if err := c.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
-		addRemoteCondition(binding, condition, failedToDeleteServiceAccountImpersonator, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToDeleteServiceAccountImpersonator, err)
 		return fmt.Errorf("error deleting service account impersonator: %w", err)
 	}
 
@@ -166,7 +168,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 	condition := metav1.Condition{Type: crtbLabelsUpdated}
 
 	if binding.Labels[rtbCrbRbLabelsUpdated] == "true" {
-		addRemoteCondition(binding, condition, crtbLabelsUpdated, nil)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, crtbLabelsUpdated, nil)
 		return nil
 	}
 
@@ -174,18 +176,18 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 	set := labels.Set(map[string]string{rtbOwnerLabelLegacy: string(binding.UID)})
 	reqUpdatedLabel, err := labels.NewRequirement(rtbLabelUpdated, selection.DoesNotExist, []string{})
 	if err != nil {
-		addRemoteCondition(binding, condition, failedToCreateLabelRequirement, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateLabelRequirement, err)
 		return err
 	}
 	reqNsAndNameLabel, err := labels.NewRequirement(rtbOwnerLabel, selection.DoesNotExist, []string{})
 	if err != nil {
-		addRemoteCondition(binding, condition, failedToCreateLabelRequirement, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateLabelRequirement, err)
 		return err
 	}
 	set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel)
 	userCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel).String()})
 	if err != nil {
-		addRemoteCondition(binding, condition, failedToListCRBs, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToListCRBs, err)
 		return err
 	}
 	bindingValue := pkgrbac.GetRTBLabel(binding.ObjectMeta)
@@ -206,7 +208,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 		returnErr = errors.Join(returnErr, retryErr)
 	}
 	if returnErr != nil {
-		addRemoteCondition(binding, condition, failedToUpdateCRBs, returnErr)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToUpdateCRBs, returnErr)
 		return returnErr
 	}
 
@@ -224,11 +226,11 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 	})
 
 	if retryErr != nil {
-		addRemoteCondition(binding, condition, failedToUpdateCRBs, returnErr)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToUpdateCRBs, returnErr)
 		return returnErr
 	}
 
-	addRemoteCondition(binding, condition, crtbLabelsUpdated, nil)
+	c.s.AddCondition(&binding.Status.RemoteConditions, condition, crtbLabelsUpdated, nil)
 
 	return nil
 }
@@ -268,29 +270,4 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding) error 
 		}
 		return nil
 	})
-}
-
-func addRemoteCondition(binding *v3.ClusterRoleTemplateBinding, condition metav1.Condition, reason string, err error) {
-	if err != nil {
-		condition.Status = metav1.ConditionFalse
-		condition.Message = err.Error()
-	} else {
-		condition.Status = metav1.ConditionTrue
-	}
-	condition.Reason = reason
-	condition.LastTransitionTime = metav1.Time{Time: timeNow()}
-
-	found := false
-	for i := range binding.Status.RemoteConditions {
-		remoteCondition := &binding.Status.RemoteConditions[i]
-		if condition.Type == remoteCondition.Type {
-			remoteCondition.Status = condition.Status
-			remoteCondition.Reason = condition.Reason
-			remoteCondition.Message = condition.Message
-			found = true
-		}
-	}
-	if !found {
-		binding.Status.RemoteConditions = append(binding.Status.RemoteConditions, condition)
-	}
 }
