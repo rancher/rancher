@@ -484,6 +484,7 @@ type SamlConfig struct {
 	UIDField           string `json:"uidField"           norman:"required"`
 	RancherAPIHost     string `json:"rancherApiHost"     norman:"required"`
 	EntityID           string `json:"entityID"`
+	GroupsFromLDAPOnly bool   `json:"groupsFromLDAPOnly" norman:"default=false"`
 }
 
 type SamlConfigTestInput struct {
