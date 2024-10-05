@@ -4,7 +4,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/wrangler"
@@ -57,10 +56,6 @@ func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, r
 		return nil, err
 	}
 
-	err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
-
 	return createdDeployment, err
 }
 
@@ -89,9 +84,26 @@ func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, d
 		return nil, err
 	}
 
-	err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + updatedDeployment.Name,
-	})
-
 	return updatedDeployment, err
+}
+
+// DeleteDeployment is a helper to delete a deployment
+func DeleteDeployment(client *rancher.Client, clusterID string, deployment *appv1.Deployment) error {
+	steveClient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
+	deploymentID := deployment.Namespace + "/" + deployment.Name
+	deploymentResp, err := steveClient.SteveType(DeploymentSteveType).ByID(deploymentID)
+	if err != nil {
+		return err
+	}
+
+	err = steveClient.SteveType(DeploymentSteveType).Delete(deploymentResp)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
