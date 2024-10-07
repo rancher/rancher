@@ -1,0 +1,133 @@
+package workloads
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strconv"
+	"testing"
+
+	"github.com/rancher/rancher/pkg/api/scheme"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
+	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/kubectl"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	appv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	revisionAnnotation = "deployment.kubernetes.io/revision"
+)
+
+func validateDeploymentUpgrade(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) {
+	log.Info("Waiting deployment comes up active")
+	err := charts.WatchAndWaitDeployments(client, clusterName, namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + appv1Deployment.Name,
+	})
+	require.NoError(t, err)
+
+	log.Info("Waiting for all pods to be running")
+	err = pods.WatchAndWaitPodContainerRunning(client, clusterName, namespaceName, appv1Deployment)
+	require.NoError(t, err)
+
+	log.Infof("Verifying rollout history by revision %s", expectedRevision)
+	err = verifyDeploymentAgainstRolloutHistory(client, clusterName, namespaceName, appv1Deployment.Name, expectedRevision)
+	require.NoError(t, err)
+
+	log.Infof("Counting all pods running by image %s", image)
+	countPods, err := pods.CountPodContainerRunningByImage(client, clusterName, namespaceName, image)
+	require.NoError(t, err)
+	require.Equal(t, expectedReplicas, countPods)
+}
+
+func validateDeploymentScale(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, scaleDeployment *appv1.Deployment, image string, expectedReplicas int) {
+	log.Info("Waiting deployment comes up active")
+	err := charts.WatchAndWaitDeployments(client, clusterName, namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + scaleDeployment.Name,
+	})
+	require.NoError(t, err)
+
+	log.Info("Waiting for all pods to be running")
+	err = pods.WatchAndWaitPodContainerRunning(client, clusterName, namespaceName, scaleDeployment)
+	require.NoError(t, err)
+
+	log.Infof("Counting all pods running by image %s", image)
+	countPods, err := pods.CountPodContainerRunningByImage(client, clusterName, namespaceName, image)
+	require.NoError(t, err)
+	require.Equal(t, expectedReplicas, countPods)
+}
+
+func rollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, revision int) (string, error) {
+	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deploymentName)
+	revisionCmd := fmt.Sprintf("--to-revision=%s", strconv.Itoa(revision))
+	execCmd := []string{"kubectl", "rollout", "undo", "-n", namespaceName, deploymentCmd, revisionCmd}
+	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
+	return logCmd, err
+}
+
+func verifyDeploymentAgainstRolloutHistory(client *rancher.Client, clusterID, namespaceName string, deploymentName string, expectedRevision string) error {
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return err
+	}
+
+	deploymentResource := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(namespaceName)
+
+	unstructuredResp, err := deploymentResource.Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	latestDeployment := &appv1.Deployment{}
+	err = scheme.Scheme.Convert(unstructuredResp, latestDeployment, unstructuredResp.GroupVersionKind())
+	if err != nil {
+		return err
+	}
+
+	if latestDeployment.ObjectMeta.Annotations == nil {
+		return errors.New("revision empty")
+	}
+
+	revision := latestDeployment.ObjectMeta.Annotations[revisionAnnotation]
+
+	if revision == expectedRevision {
+		return nil
+	}
+
+	return errors.New("revision not found")
+}
+
+func verifyOrchestrationStatus(client *rancher.Client, clusterID, namespaceName string, deploymentName string, isPaused bool) error {
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return err
+	}
+
+	deploymentResource := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(namespaceName)
+
+	unstructuredResp, err := deploymentResource.Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	latestDeployment := &appv1.Deployment{}
+	err = scheme.Scheme.Convert(unstructuredResp, latestDeployment, unstructuredResp.GroupVersionKind())
+	if err != nil {
+		return err
+	}
+
+	if latestDeployment.Spec.Paused == isPaused {
+		return nil
+	}
+
+	if isPaused {
+		return errors.New("the orchestration is paused")
+	}
+
+	return errors.New("the orchestration is active")
+
+}
