@@ -88,14 +88,14 @@ func Test_Fleet_Cluster(t *testing.T) {
 		cluster, err = clients.Fleet.Cluster().Get("fleet-local", "local", metav1.GetOptions{})
 		return err == nil && cluster != nil && cluster.Status.Summary.Ready > 0
 	}, waitFor, tick)
-	require.Equal(cluster.Spec.AgentAffinity, &builtinAffinity)
+	require.Equal(&builtinAffinity, cluster.Spec.AgentAffinity)
 	require.Nil(cluster.Spec.AgentResources)
 	require.Empty(cluster.Spec.AgentTolerations)
 
 	// fleet-agent deployment has affinity
 	agent, err := clients.Apps.StatefulSet().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
 	require.NoError(err)
-	require.Equal(agent.Spec.Template.Spec.Affinity, &builtinAffinity)
+	require.Equal(&builtinAffinity, agent.Spec.Template.Spec.Affinity)
 	for _, container := range agent.Spec.Template.Spec.InitContainers {
 		require.Empty(container.Resources)
 	}
@@ -122,27 +122,27 @@ func Test_Fleet_Cluster(t *testing.T) {
 	require.Eventually(func() bool {
 		cluster, err = clients.Fleet.Cluster().Get("fleet-local", "local", metav1.GetOptions{})
 		if err == nil && cluster != nil && cluster.Status.Summary.Ready > 0 {
-			assert.Equal(t, cluster.Spec.AgentAffinity, &linuxAffinity)
+			assert.Equal(t, &linuxAffinity, cluster.Spec.AgentAffinity)
 		}
 		return false
 	}, waitFor, tick)
 
-	require.Equal(cluster.Spec.AgentAffinity, &linuxAffinity)
-	require.Equal(cluster.Spec.AgentResources, resourceReq)
+	require.Equal(&linuxAffinity, cluster.Spec.AgentAffinity)
+	require.Equal(resourceReq, cluster.Spec.AgentResources)
 	require.Contains(cluster.Spec.AgentTolerations, tolerations[0])
 
 	// changes are present in deployment
 	agent, err = clients.Apps.StatefulSet().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
 	require.NoError(err)
-	require.Equal(agent.Spec.Template.Spec.Affinity, &linuxAffinity)
+	require.Equal(&linuxAffinity, agent.Spec.Template.Spec.Affinity)
 	for _, container := range agent.Spec.Template.Spec.InitContainers {
-		require.Equal(container.Resources.Limits, resourceReq.Limits)
-		require.Equal(container.Resources.Requests, resourceReq.Requests)
+		require.Equal(resourceReq.Limits, container.Resources.Limits)
+		require.Equal(resourceReq.Requests, container.Resources.Requests)
 	}
 	require.GreaterOrEqual(len(agent.Spec.Template.Spec.Containers), 1)
 	for _, container := range agent.Spec.Template.Spec.Containers {
-		require.Equal(container.Resources.Limits, resourceReq.Limits)
-		require.Equal(container.Resources.Requests, resourceReq.Requests)
+		require.Equal(resourceReq.Limits, container.Resources.Limits)
+		require.Equal(resourceReq.Requests, container.Resources.Requests)
 	}
-	require.Contains(agent.Spec.Template.Spec.Tolerations, tolerations[0])
+	require.Contains(tolerations[0], agent.Spec.Template.Spec.Tolerations)
 }
