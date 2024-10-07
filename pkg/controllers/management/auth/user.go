@@ -198,7 +198,7 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 				token.Enabled = false
 				err := l.extTokenStore.Update(token, &metav1.UpdateOptions{})
 				if err != nil {
-					return fmt.Errorf("error updating ext token: %v", err)
+					return nil, fmt.Errorf("error updating ext token: %v", err)
 				}
 			} else {
 				// Login token. Delete it.
@@ -206,7 +206,7 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 					userController, token.GetName(), token.GetUserID())
 				err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
 				if err != nil {
-					return fmt.Errorf("error deleting ext token: %v", err)
+					return nil, fmt.Errorf("error deleting ext token: %v", err)
 				}
 			}
 		}
