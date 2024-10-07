@@ -65,6 +65,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Use Catalog Templates", "catalogs-use").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
 	rb.addRole("Manage Users", "users-manage").
+		// XXX NOTE AK token support - custom permissions for user admins
+		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("manage-token").
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").
@@ -119,6 +121,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
 
 	rb.addRole("User Base", "user-base").
+		// XXX NOTE AK token support - standard permissions for regular users
+		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("get", "list", "watch", "create", "delete", "update").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
