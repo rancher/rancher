@@ -12,7 +12,7 @@ Manager Permissions
 
 	using it is an anti-pattern however
 
-	better use a custom verb for the permission, f.e. `managed-token`
+	better use a custom verb for the permission, f.e. `manage-token`
 
 	there is a precedence, Jonathon has done this for global roles, in the webhook,
 	see `bind` and `escalate` verbs.

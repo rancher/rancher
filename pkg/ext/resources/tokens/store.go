@@ -457,7 +457,7 @@ func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
 			Groups: user.GetGroups(),
 			UID:    user.GetUID(),
 			ResourceAttributes: &authv1.ResourceAttributes{
-				Verb:     "*",
+				Verb:     "manage-token",
 				Resource: "tokens",
 				Group:    "ext.cattle.io",
 			},
