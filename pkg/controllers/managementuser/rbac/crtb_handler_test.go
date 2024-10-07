@@ -155,7 +155,7 @@ func TestSyncCRTB(t *testing.T) {
 					{
 						Type:    clusterRolesExists,
 						Status:  v1.ConditionFalse,
-						Message: e.Error(),
+						Message: "couldn't ensure roles: " + e.Error(),
 						Reason:  failedToCreateRoles,
 						LastTransitionTime: v1.Time{
 							Time: mockTime,
@@ -189,7 +189,7 @@ func TestSyncCRTB(t *testing.T) {
 					{
 						Type:    clusterRoleBindingsExists,
 						Status:  v1.ConditionFalse,
-						Message: e.Error(),
+						Message: "couldn't ensure cluster bindings : " + e.Error(),
 						Reason:  failedToCreateBindings,
 						LastTransitionTime: v1.Time{
 							Time: mockTime,
@@ -232,7 +232,7 @@ func TestSyncCRTB(t *testing.T) {
 					{
 						Type:    serviceAccountImpersonatorExists,
 						Status:  v1.ConditionFalse,
-						Message: e.Error(),
+						Message: "couldn't ensure service account impersonator: " + e.Error(),
 						Reason:  failedToCreateServiceAccountImpersonator,
 						LastTransitionTime: v1.Time{
 							Time: mockTime,
