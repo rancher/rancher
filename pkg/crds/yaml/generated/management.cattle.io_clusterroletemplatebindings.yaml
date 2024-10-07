@@ -140,13 +140,13 @@ spec:
                 type: array
               observedGenerationLocal:
                 description: |-
-                  ObservedGeneration is the most recent generation (metadata.generation in CRTB)
+                  ObservedGenerationLocal is the most recent generation (metadata.generation in CRTB)
                   observed by the local controller operating on this status. Populated by the system.
                 format: int64
                 type: integer
               observedGenerationRemote:
                 description: |-
-                  ObservedGeneration is the most recent generation (metadata.generation in CRTB)
+                  ObservedGenerationRemote is the most recent generation (metadata.generation in CRTB)
                   observed by the remote controller operating on this status. Populated by the system.
                 format: int64
                 type: integer

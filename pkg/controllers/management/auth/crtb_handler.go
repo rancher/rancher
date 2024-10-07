@@ -312,7 +312,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToUpdateClusterRoleBindings, err)
+			c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToUpdateClusterRoleBindings, retryErr)
 		}
 		returnErr = errors.Join(returnErr, retryErr)
 	}

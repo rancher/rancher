@@ -98,7 +98,8 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 
 	rt, err := c.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToGetRoleTemplate, fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err))
+		err = fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
+		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToGetRoleTemplate, err)
 		return err
 	}
 
@@ -109,6 +110,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
+		err = fmt.Errorf("couldn't ensure roles: %w", err)
 		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateRoles, err)
 		return err
 	}
@@ -116,6 +118,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 
 	condition = metav1.Condition{Type: clusterRoleBindingsExists}
 	if err := c.m.ensureClusterBindings(roles, binding); err != nil {
+		err = fmt.Errorf("couldn't ensure cluster bindings %v: %w", binding.Name, err)
 		c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateBindings, err)
 		return err
 	}
@@ -124,6 +127,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	condition = metav1.Condition{Type: serviceAccountImpersonatorExists}
 	if binding.UserName != "" {
 		if err := c.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
+			err = fmt.Errorf("couldn't ensure service account impersonator: %w", err)
 			c.s.AddCondition(&binding.Status.RemoteConditions, condition, failedToCreateServiceAccountImpersonator, err)
 			return err
 		}
