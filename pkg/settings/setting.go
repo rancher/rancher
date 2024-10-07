@@ -102,8 +102,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.9/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.18/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.10-rc.1/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.19-rc.1/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -288,6 +288,10 @@ var (
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
 	// EULAAgreed is used only by the UI, but needs to be known to Rancher so that it's not removed.
 	EULAAgreed = NewSetting("eula-agreed", "")
+
+	// UnprivilegedJailUser controls whether jailed commands execute under a separate (unprivileged/non-root) user
+	// account. Setting it to false is only recommended for testing and development environments.
+	UnprivilegedJailUser = NewSetting("unprivileged-jail-user", "true")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

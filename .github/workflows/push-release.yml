@@ -559,6 +559,7 @@ jobs:
         run: |
           mkdir -p bin
           curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
+          cp ./bin/data.json ./bin/rancher-data.json
       - name: Create k3s images file
         uses: ./.github/actions/k3s-images
         with:
@@ -585,7 +586,28 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
       - name: Upload artifacts to bucket
+        shell: bash
         run: |
-          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.txt"
-          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.sh"
-          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./bin s3://prime-artifacts/rancher/${{ env.TAG }} --exclude "*" --include "*.ps1"
+          set -ex
+
+          artifacts=(
+            "rancher-components.txt"
+            "rancher-data.json"
+            "rancher-images-origins.txt"
+            "rancher-images-sources.txt"
+            "rancher-images.txt"
+            "rancher-load-images.ps1"
+            "rancher-load-images.sh"
+            "rancher-mirror-to-rancher-org.ps1"
+            "rancher-mirror-to-rancher-org.sh"
+            "rancher-rke-k8s-versions.txt"
+            "rancher-save-images.ps1"
+            "rancher-save-images.sh"
+            "rancher-windows-images-sources.txt"
+            "rancher-windows-images.txt"
+            "sha256sum.txt"
+          )
+          for artifact in "${artifacts[@]}"; do
+            AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp "./bin/$artifact" "s3://prime-artifacts/rancher/${{ env.TAG }}/$artifact"
+          done
+
