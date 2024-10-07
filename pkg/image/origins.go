@@ -174,6 +174,7 @@ var OriginMap = map[string]string{
 	"mirrored-longhornio-csi-resizer":                         "https://github.com/longhorn/external-resizer",
 	"mirrored-longhornio-csi-snapshotter":                     "https://github.com/longhorn/external-snapshotter",
 	"mirrored-longhornio-livenessprobe":                       "https://github.com/longhorn/longhorn",
+	"mirrored-longhornio-longhorn-cli":                        "https://github.com/longhorn/cli",
 	"mirrored-longhornio-longhorn-engine":                     "https://github.com/longhorn/longhorn-engine",
 	"mirrored-longhornio-longhorn-instance-manager":           "https://github.com/longhorn/longhorn-instance-manager",
 	"mirrored-longhornio-longhorn-manager":                    "https://github.com/longhorn/longhorn-manager",
