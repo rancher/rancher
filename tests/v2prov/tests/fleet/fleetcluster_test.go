@@ -93,11 +93,16 @@ func Test_Fleet_Cluster(t *testing.T) {
 	require.Empty(cluster.Spec.AgentTolerations)
 
 	// fleet-agent deployment has affinity
-	agent, err := clients.Apps.Deployment().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
+	agent, err := clients.Apps.StatefulSet().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
 	require.NoError(err)
 	require.Equal(agent.Spec.Template.Spec.Affinity, &builtinAffinity)
-	require.Len(agent.Spec.Template.Spec.Containers, 1)
-	require.Empty(agent.Spec.Template.Spec.Containers[0].Resources)
+	for _, container := range agent.Spec.Template.Spec.InitContainers {
+		require.Empty(container.Resources)
+	}
+	require.GreaterOrEqual(len(agent.Spec.Template.Spec.Containers), 1)
+	for _, container := range agent.Spec.Template.Spec.Containers {
+		require.Empty(container.Resources)
+	}
 	require.NotEmpty(agent.Spec.Template.Spec.Tolerations) // Fleet has built-in tolerations
 
 	// change settings on management cluster, results should show up in fleet-agent deployment
@@ -127,11 +132,17 @@ func Test_Fleet_Cluster(t *testing.T) {
 	require.Contains(cluster.Spec.AgentTolerations, tolerations[0])
 
 	// changes are present in deployment
-	agent, err = clients.Apps.Deployment().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
+	agent, err = clients.Apps.StatefulSet().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
 	require.NoError(err)
 	require.Equal(agent.Spec.Template.Spec.Affinity, &linuxAffinity)
-	require.Len(agent.Spec.Template.Spec.Containers, 1)
-	require.Equal(agent.Spec.Template.Spec.Containers[0].Resources.Limits, resourceReq.Limits)
-	require.Equal(agent.Spec.Template.Spec.Containers[0].Resources.Requests, resourceReq.Requests)
+	for _, container := range agent.Spec.Template.Spec.InitContainers {
+		require.Equal(container.Resources.Limits, resourceReq.Limits)
+		require.Equal(container.Resources.Requests, resourceReq.Requests)
+	}
+	require.GreaterOrEqual(len(agent.Spec.Template.Spec.Containers), 1)
+	for _, container := range agent.Spec.Template.Spec.Containers {
+		require.Equal(container.Resources.Limits, resourceReq.Limits)
+		require.Equal(container.Resources.Requests, resourceReq.Requests)
+	}
 	require.Contains(agent.Spec.Template.Spec.Tolerations, tolerations[0])
 }
