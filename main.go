@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -40,13 +39,7 @@ func main() {
 		if dir, err := os.Getwd(); err == nil {
 			dmPath := filepath.Join(dir, "management-state", "bin")
 			os.MkdirAll(dmPath, 0700)
-			newPath := fmt.Sprintf("%s%s%s", dmPath, string(os.PathListSeparator), os.Getenv("PATH"))
-
-			os.Setenv("PATH", newPath)
 		}
-	} else {
-		newPath := fmt.Sprintf("%s%s%s", "/opt/drivers/management-state/bin", string(os.PathListSeparator), os.Getenv("PATH"))
-		os.Setenv("PATH", newPath)
 	}
 
 	var config rancher.Options

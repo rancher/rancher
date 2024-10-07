@@ -1,13 +1,17 @@
 package drivers
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
@@ -17,6 +21,8 @@ type DynamicDriver struct {
 }
 
 var DockerMachineDriverPrefix = "docker-machine-driver-"
+
+const ExecutionTimeout = time.Second * 5
 
 func NewDynamicDriver(builtin bool, name, url, hash string) *DynamicDriver {
 	d := &DynamicDriver{
@@ -82,25 +88,55 @@ func (d *BaseDriver) copyTo(dest string) error {
 // Executable is will return nil if the driver can be executed
 func (d *BaseDriver) Executable() error {
 	if d.DriverName == "" {
-		return fmt.Errorf("Empty driver name")
+		return fmt.Errorf("empty driver name")
 	}
 
 	if d.Builtin {
 		return nil
 	}
-
+	logrus.Debugf("Checking if driver %s is executable", d.DriverName)
 	binaryPath := d.binName()
-	_, err := os.Stat(binaryPath)
+	info, err := os.Lstat(binaryPath)
 	if err != nil {
-		return fmt.Errorf("Driver %s not found", binaryPath)
+		return fmt.Errorf("driver %s not found", binaryPath)
 	}
-	cmd := exec.Command(binaryPath)
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("driver %s is not a regular file", binaryPath)
+	}
+
+	// prepare a jail
+	jailName := fmt.Sprintf("exec-jail-%s", d.DriverName)
+	jailPath := path.Join(jailer.BaseJailPath, jailName)
+	err = jailer.CreateJail(jailName)
+	if err != nil {
+		return fmt.Errorf("couldn't create exec-jail: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), ExecutionTimeout)
+	defer cancel()
+
+	binaryPathInJail := path.Join("/var/lib/rancher/management-state/bin", d.DriverName)
+	cmd, err := jailer.JailCommand(exec.CommandContext(ctx, binaryPathInJail), jailPath)
+	if err != nil {
+		return fmt.Errorf("error jailing command: %w", err)
+	}
+
 	err = cmd.Start()
 	if err != nil {
-		return errors.Wrapf(err, "Driver binary %s couldn't execute", binaryPath)
+		return errors.Wrapf(err, "driver binary %s couldn't execute", binaryPathInJail)
 	}
 
 	// We don't care about the exit code, just want to make sure we can execute the binary
 	_ = cmd.Wait()
+
+	// Remove the jail to ensure it is rebuilt each time,
+	// as the hard link still points to the old driver after downloading a new version
+	info, err = os.Lstat(jailPath)
+	if err == nil && info.IsDir() {
+		if err := os.RemoveAll(jailPath); err != nil {
+			return fmt.Errorf("couldn't remove exec-jail: %w", err)
+		}
+	}
+
 	return nil
 }

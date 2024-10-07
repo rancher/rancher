@@ -2,8 +2,10 @@ package jailer
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path"
 	"strconv"
 	"strings"
@@ -16,6 +18,15 @@ import (
 )
 
 const BaseJailPath = "/opt/jail"
+
+// JailUser is the non-root user's username used for executing commands within the Linux jail.
+// This user should already exist, having been created during the image build process
+// (refer to "useradd rancher" in the package/Dockerfile).
+const JailUser = "rancher"
+
+// JailGroup is the name of the user group that should have access to all files and directories
+// within the jail directory.
+const JailGroup = "jail-accessors"
 
 var lock = sync.Mutex{}
 
@@ -82,4 +93,53 @@ func getWhitelistedEnvVars(envvars []string) []string {
 		envvars = append(envvars, name+"="+value)
 	})
 	return envvars
+}
+
+// SetJailOwnership will ensure that the file/dir at `path` is owned by jailed user and group.
+func SetJailOwnership(path string) error {
+	uid, err := getUserID(JailUser)
+	if err != nil {
+		return fmt.Errorf("error finding UID for user %s: %w", JailUser, err)
+	}
+
+	gid, err := getGroupID(JailGroup)
+	if err != nil {
+		return fmt.Errorf("error finding GID for group %s: %w", JailGroup, err)
+	}
+
+	if err = os.Chown(path, uid, gid); err != nil {
+		return fmt.Errorf("error changing ownership of %s: %w", path, err)
+	}
+
+	return nil
+}
+
+// getUserID returns the user ID of the given username.
+func getUserID(userName string) (int, error) {
+	u, err := user.Lookup(userName)
+	if err != nil {
+		return 0, fmt.Errorf("error getting user %s: %w", userName, err)
+	}
+
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing user ID: %w", err)
+	}
+
+	return uid, nil
+}
+
+// getGroupID returns the group ID of the given group name.
+func getGroupID(groupName string) (int, error) {
+	group, err := user.LookupGroup(groupName)
+	if err != nil {
+		return 0, fmt.Errorf("error getting gid for group %s: %w", groupName, err)
+	}
+
+	gid, err := strconv.Atoi(group.Gid)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing group ID %s: %w", group.Gid, err)
+	}
+
+	return gid, nil
 }

@@ -312,25 +312,25 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node)
 	// Since we know this will take a long time persist so user sees status
 	obj, err := m.nodeClient.Update(obj)
 	if err != nil {
-		return obj, err
+		return obj, fmt.Errorf("error from nodeclient.Update: %w", err)
 	}
 
 	err = aliasToPath(obj.Status.NodeTemplateSpec.Driver, configRawMap, obj.Namespace)
 	if err != nil {
-		return obj, err
+		return obj, fmt.Errorf("error from aliasToPath: %w", err)
 	}
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
 	cmd, err := buildCommand(nodeDir, obj, createCommandsArgs)
 	if err != nil {
-		return obj, err
+		return obj, fmt.Errorf("error from buildCreateCommand: %w", err)
 	}
 
 	logrus.Infof("[node-controller] Provisioning node %s", obj.Spec.RequestedHostname)
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
 	if err != nil {
-		return obj, err
+		return obj, fmt.Errorf("error from startReturnOutput: %w", err)
 	}
 	defer stdoutReader.Close()
 	defer stderrReader.Close()
@@ -564,6 +564,7 @@ func (m *Lifecycle) Updated(obj *apimgmtv3.Node) (runtime.Object, error) {
 		if err == nil {
 			m.setWaiting(obj)
 		}
+
 		return obj, err
 	})
 	return newObj.(*apimgmtv3.Node), err
