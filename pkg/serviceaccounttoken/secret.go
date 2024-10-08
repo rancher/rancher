@@ -218,7 +218,6 @@ func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, 
 // returns true if the secret has changed.
 func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret *corev1.Secret, saClient clientv1.ServiceAccountInterface, secretClient clientv1.SecretInterface) (*corev1.ServiceAccount, bool, error) {
 	if sa.Annotations[ServiceAccountSecretRefAnnotation] != "" {
-		// TODO: I guess we should check to see if it's the existing SA?
 		return sa, false, nil
 	}
 	if sa.Annotations == nil {
