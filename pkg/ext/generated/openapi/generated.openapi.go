@@ -326,7 +326,7 @@ func schema_pkg_ext_resources_tokens_TokenSpec(ref common.ReferenceCallback) com
 					},
 					"isDerived": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates a token which was derived from some other token",
+							Description: "Indicates a token which was derived from some other token. Login/Sessions tokens are \"not derived\".",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",

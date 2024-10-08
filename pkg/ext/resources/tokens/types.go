@@ -34,7 +34,7 @@ type TokenSpec struct {
 	// Enabled indicates an active token
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
-	// Indicates a token which was derived from some other token
+	// Indicates a token which was derived from some other token.
 	// Login/Sessions tokens are "not derived".
 	IsDerived bool `json:"isDerived"`
 }

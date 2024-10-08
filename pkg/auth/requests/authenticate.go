@@ -248,7 +248,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	// 1. look for token in the indexer. use that if found.
 	// 2. in all other cases (not found, or error), retrieve directly via kube client
 
-	if extTokenName, found := strings.CutPrefix(tokenName, "ext-"); found {
+	if extTokenName, found := strings.CutPrefix(tokenName, "ext/"); found {
 		// Process ext token
 		// Roughly the same process as for legacy tokens, using a different store.
 		// No indexer/cache in play here.
