@@ -17,9 +17,9 @@ jobs:
       matrix:
         include:
         - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "k3s"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
         - V2PROV_TEST_DIST: "rke2"
