@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	apiV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rbac "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/v2/actions/namespaces"
 	"github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -19,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	coreV1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // VerifyGlobalRoleBindingsForUser validates that a global role bindings is created for a user when the user is created
@@ -27,6 +29,27 @@ func VerifyGlobalRoleBindingsForUser(t *testing.T, user *management.User, adminC
 	grbs, err := adminClient.Steve.SteveType("management.cattle.io.globalrolebinding").List(query)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(grbs.Data))
+}
+
+// VerifyRoleBindingsForUser validates that the corresponding role bindings are created for the user
+func VerifyRoleBindingsForUser(t *testing.T, user *management.User, adminClient *rancher.Client, clusterID string, role Role) {
+	rblist, err := rbac.ListRoleBindings(adminClient, LocalCluster, clusterID, metav1.ListOptions{})
+	require.NoError(t, err)
+	userID := user.Resource.ID
+	userRoleBindings := []string{}
+
+	for _, rb := range rblist.Items {
+		if rb.Subjects[0].Kind == UserKind && rb.Subjects[0].Name == userID {
+			userRoleBindings = append(userRoleBindings, rb.Name)
+		}
+	}
+
+	switch role {
+	case ClusterOwner, ClusterMember:
+		assert.Equal(t, 1, len(userRoleBindings))
+	case ProjectOwner, ProjectMember, RestrictedAdmin:
+		assert.Equal(t, 2, len(userRoleBindings))
+	}
 }
 
 // VerifyUserCanListCluster validates a user with the required global permissions are able to/not able to list the clusters in rancher server
