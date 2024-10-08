@@ -128,7 +128,7 @@ func (n *NetworkPolicyTestSuite) TestPingPodsFromCPNode() {
 
 	n.T().Logf("Running ping on [%v]", firstMachine.Name)
 
-	for i := 1; i < len(pods.Items); i++ {
+	for i := 0; i < len(pods.Items); i++ {
 		podIP := pods.Items[i].Status.PodIP
 		pingExecCmd := pingCmd + " " + podIP
 		excmdLog, err := sshNode.ExecuteCommand(pingExecCmd)
