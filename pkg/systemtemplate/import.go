@@ -14,6 +14,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/capr"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -41,6 +42,7 @@ type context struct {
 	Namespace             string
 	URLPlain              string
 	IsWindowsCluster      bool
+	IsPreBootstrap        bool
 	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
@@ -73,7 +75,7 @@ func toFeatureString(features map[string]bool) string {
 	return buf.String()
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
+func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool, isPreBootstrap bool,
 	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := md5.Sum([]byte(url + token + namespace))
@@ -155,6 +157,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
 		IsWindowsCluster:      isWindowsCluster,
+		IsPreBootstrap:        isPreBootstrap,
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
@@ -169,13 +172,14 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 
 func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	return map[string]bool{
-		features.MCM.Name():                false,
-		features.MCMAgent.Name():           true,
-		features.Fleet.Name():              false,
-		features.RKE2.Name():               false,
-		features.ProvisioningV2.Name():     false,
-		features.EmbeddedClusterAPI.Name(): false,
-		features.UISQLCache.Name():         features.UISQLCache.Enabled(),
+		features.MCM.Name():                      false,
+		features.MCMAgent.Name():                 true,
+		features.Fleet.Name():                    false,
+		features.RKE2.Name():                     false,
+		features.ProvisioningV2.Name():           false,
+		features.EmbeddedClusterAPI.Name():       false,
+		features.UISQLCache.Name():               features.UISQLCache.Enabled(),
+		features.ProvisioningPreBootstrap.Name(): capr.PreBootstrap(cluster),
 	}
 }
 
@@ -183,7 +187,8 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
-		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
+		cluster.Name, token, settings.ServerURL.Get(),
+		cluster.Spec.WindowsPreferedCluster, capr.PreBootstrap(cluster),
 		cluster, GetDesiredFeatures(cluster), taints, secretLister)
 	return buf.Bytes(), err
 }
