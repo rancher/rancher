@@ -195,8 +195,8 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 				// Non-login token. Only disable it
 				logrus.Infof("[%v] Disabling ext token %v for user %v",
 					userController, token.GetName(), token.GetUserID())
-				token.Enabled = false
-				err := l.extTokenStore.Update(token, &metav1.UpdateOptions{})
+				token.Spec.Enabled = false
+				_, err := l.extTokenStore.Update(token, &metav1.UpdateOptions{})
 				if err != nil {
 					return nil, fmt.Errorf("error updating ext token: %v", err)
 				}
