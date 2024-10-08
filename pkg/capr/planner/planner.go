@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	clusterRegToken = "clusterRegToken"
+	ClusterRegToken = "clusterRegToken"
 
 	EtcdSnapshotConfigMapKey = "provisioning-cluster-spec"
 
@@ -135,10 +135,11 @@ type InfoFunctions struct {
 	ReleaseData             func(context.Context, *rkev1.RKEControlPlane) *model.Release
 	SystemAgentImage        func() string
 	SystemPodLabelSelectors func(plane *rkev1.RKEControlPlane) []string
+	GetBootstrapManifests   func(plane *rkev1.RKEControlPlane) ([]plan.File, error)
 }
 
 func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
-	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(clusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
+	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(ClusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})
 	store := NewStore(clients.Core.Secret(),
@@ -920,6 +921,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		return err
 	}
 
+	preBootstrapManifests, err := p.retrievalFunctions.GetBootstrapManifests(controlPlane)
+	if err != nil {
+		return err
+	}
+
 	for _, r := range reconcilables {
 		logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - processing machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name)
 		// we exclude here and not in collect to ensure that include matched at least one node
@@ -1013,6 +1019,9 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, r.entry.Machine) {
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
 			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for kubelet to update")
+		} else if isControlPlane(r.entry) && len(preBootstrapManifests) > 0 {
+			outOfSync = append(outOfSync, r.entry.Machine.Name)
+			messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "waiting for cluster pre-bootstrap to complete")
 		} else if isControlPlane(r.entry) && !controlPlane.Status.AgentConnected {
 			// If the control plane nodes are currently being provisioned/updated, then it should be ensured that cluster-agent is connected.
 			// Without the agent connected, the controllers running in Rancher, including CAPI, can't communicate with the downstream cluster.
@@ -1073,6 +1082,7 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		nodePlan plan.NodePlan
 		err      error
 	)
+
 	if !controlPlane.Spec.UnmanagedConfig {
 		nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
 		if err != nil {
@@ -1082,8 +1092,19 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 			joinedServer string
 			config       map[string]interface{}
 		)
+
 		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg, renderS3)
 		if err != nil {
+			return nodePlan, config, joinedServer, err
+		}
+
+		bootstrapManifests, err := p.retrievalFunctions.GetBootstrapManifests(controlPlane)
+		if err != nil {
+			return nodePlan, config, joinedServer, err
+		}
+		if len(bootstrapManifests) > 0 {
+			logrus.Debugf("[planner] adding pre-bootstrap manifests")
+			nodePlan.Files = append(nodePlan.Files, bootstrapManifests...)
 			return nodePlan, config, joinedServer, err
 		}
 
@@ -1103,6 +1124,7 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 
 		return nodePlan, config, joinedServer, err
 	}
+
 	return plan.NodePlan{}, map[string]interface{}{}, "", nil
 }
 
