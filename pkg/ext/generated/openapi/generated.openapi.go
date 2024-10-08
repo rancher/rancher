@@ -370,7 +370,7 @@ func schema_pkg_ext_resources_tokens_TokenStatus(ref common.ReferenceCallback) c
 					},
 					"expiredAt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpiredAt is creation time + time-to-live",
+							Description: "ExpiresAt is creation time + time-to-live, i.e. when the token expires. This is the empty string if the token does not expire at all.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",

@@ -54,8 +54,9 @@ type TokenStatus struct {
 
 	// Expired flag, derived from creation time and time-to-live
 	Expired bool `json:"expired"`
-	// ExpiredAt is creation time + time-to-live
-	ExpiredAt string `json:"expiredAt"`
+	// ExpiresAt is creation time + time-to-live, i.e. when the token expires. This is the empty
+	// string if the token does not expire at all.
+	ExpiresAt string `json:"expiredAt"`
 
 	// User derived data
 	// The user derived information is complex to determine. As such this is

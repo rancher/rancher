@@ -477,7 +477,7 @@ func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
 func setExpired(token *Token) error {
 	if token.Spec.TTL < 0 {
 		token.Status.Expired = false
-		token.Status.ExpiredAt = ""
+		token.Status.ExpiresAt = ""
 		return nil
 	}
 
@@ -492,7 +492,7 @@ func setExpired(token *Token) error {
 	// note: The marshalling puts quotes around the string. strip them
 	// before handing this to the token and yaml adding another layer
 	// of quotes around such a string
-	token.Status.ExpiredAt = string(eAt[1:len(eAt)-1])
+	token.Status.ExpiresAt = string(eAt[1:len(eAt)-1])
 	token.Status.Expired = isExpired
 	return nil
 }
