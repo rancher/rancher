@@ -28,6 +28,7 @@ const (
 	LdapConfigFieldOwnerReferences                 = "ownerReferences"
 	LdapConfigFieldPort                            = "port"
 	LdapConfigFieldRemoved                         = "removed"
+	LdapConfigFieldSearchUsingServiceAccount       = "searchUsingServiceAccount"
 	LdapConfigFieldServers                         = "servers"
 	LdapConfigFieldServiceAccountDistinguishedName = "serviceAccountDistinguishedName"
 	LdapConfigFieldServiceAccountPassword          = "serviceAccountPassword"
@@ -71,6 +72,7 @@ type LdapConfig struct {
 	OwnerReferences                 []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Port                            int64             `json:"port,omitempty" yaml:"port,omitempty"`
 	Removed                         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SearchUsingServiceAccount       bool              `json:"searchUsingServiceAccount,omitempty" yaml:"searchUsingServiceAccount,omitempty"`
 	Servers                         []string          `json:"servers,omitempty" yaml:"servers,omitempty"`
 	ServiceAccountDistinguishedName string            `json:"serviceAccountDistinguishedName,omitempty" yaml:"serviceAccountDistinguishedName,omitempty"`
 	ServiceAccountPassword          string            `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
