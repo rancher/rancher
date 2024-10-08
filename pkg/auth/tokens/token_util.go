@@ -15,6 +15,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func getAuthProviderName(principalID string) string {
@@ -57,6 +58,16 @@ func IsExpired(token v3.Token) bool {
 
 	ttlDuration := time.Duration(token.TTLMillis) * time.Millisecond
 	return durationElapsed.Seconds() >= ttlDuration.Seconds()
+}
+
+// IsIdleExpired checks if the idle session timeout was reached since last update.
+func IsIdleExpired(token v3.Token, lastTimeActivity metav1.Time) bool {
+	// useractivity has not been initialized yet
+	if token.LastIdleTimeout.IsZero() {
+		return false
+	}
+
+	return token.LastIdleTimeout.Compare(lastTimeActivity.Time) <= 0
 }
 
 func GetTokenAuthFromRequest(req *http.Request) string {
@@ -153,6 +164,13 @@ func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error)
 	}
 	if IsExpired(*storedToken) {
 		return http.StatusGone, errors.New("must authenticate")
+	}
+
+	currentTime := metav1.Now()
+	if IsIdleExpired(*storedToken, currentTime) {
+		// reset token.LastIdleTimeout before de-authenticating the user
+		//storedToken.LastIdleTimeout = metav1.NewTime(time.Time{})
+		return http.StatusGone, errors.New("must authenticate, idle session timeout expired")
 	}
 	return http.StatusOK, nil
 }
