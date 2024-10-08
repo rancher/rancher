@@ -10,4 +10,5 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	management := workload.Management.WithAgent("rbac-role-templates")
 
 	management.Management.RoleTemplates("").AddLifecycle(ctx, "cluster-roletemplate-handler", newRoleTemplateLifecycle(workload))
+	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, "cluster-crtb-handler", newCRTBLifecycle(workload))
 }
