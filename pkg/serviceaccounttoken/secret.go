@@ -39,7 +39,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
-	logrus.Tracef("EnsureSecretForServiceAccount for %s", keyFromObject(sa))
+	logrus.Tracef("EnsureSecretForServiceAccount for %s", logKeyFromObject(sa))
 
 	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
 	var secretLister secretLister
@@ -63,7 +63,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 
 	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
 	if err != nil {
-		return nil, fmt.Errorf("error looking up secret for service account %s: %w", keyFromObject(sa), err)
+		return nil, fmt.Errorf("error looking up secret for service account %s: %w", logKeyFromObject(sa), err)
 	}
 
 	if secret == nil {
@@ -85,7 +85,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 
 			secret, err = clientSet.CoreV1().Secrets(secretRef.Namespace).Get(ctx, secretRef.Name, metav1.GetOptions{})
 			if err != nil {
-				return nil, fmt.Errorf("reloading referenced secret for SA %s: %w", keyFromObject(sa), err)
+				return nil, fmt.Errorf("reloading referenced secret for SA %s: %w", logKeyFromObject(sa), err)
 			}
 		}
 	}
@@ -94,7 +94,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 		return secret, nil
 	}
 
-	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret %s for service account %s to be populated with token", keyFromObject(secret), keyFromObject(sa))
+	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret %s for service account %s to be populated with token", logKeyFromObject(secret), logKeyFromObject(sa))
 	backoff := wait.Backoff{
 		Duration: 2 * time.Millisecond,
 		Cap:      100 * time.Millisecond,
@@ -107,10 +107,10 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 		// use the secret client, rather than the secret getter, to circumvent the cache
 		secret, err = secretClient.Get(ctx, secret.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, fmt.Errorf("error ensuring secret for service account %s: %w", keyFromObject(sa), err)
+			return false, fmt.Errorf("error ensuring secret for service account %s: %w", logKeyFromObject(sa), err)
 		}
 		if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
-			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account %s in %s", keyFromObject(sa), time.Now().Sub(start))
+			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account %s in %s", logKeyFromObject(sa), time.Now().Sub(start))
 			return true, nil
 		}
 		return false, nil
@@ -183,12 +183,12 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 			continue
 		}
 
-		logrus.Warnf("EnsureSecretForServiceAccount: secret %s is invalid for service account [%s], deleting", keyFromObject(s), keyFromObject(sa))
+		logrus.Warnf("EnsureSecretForServiceAccount: secret %s is invalid for service account [%s], deleting", logKeyFromObject(s), logKeyFromObject(sa))
 		err = secretClient.Delete(ctx, s.Name, metav1.DeleteOptions{})
 		if err != nil {
 			// we don't want to return the delete failure since the success/failure of the cleanup shouldn't affect
 			// the ability of the caller to use any identified, valid secret
-			logrus.Errorf("unable to delete secret %s: %v", keyFromObject(sa), err)
+			logrus.Errorf("unable to delete secret %s: %v", logKeyFromObject(sa), err)
 		}
 	}
 
@@ -209,7 +209,7 @@ func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, 
 	sc := SecretTemplate(sa)
 	secret, err := secretClient.Create(ctx, sc, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error ensuring secret for service account %s: %w", keyFromObject(sa), err)
+		return nil, fmt.Errorf("error ensuring secret for service account %s: %w", logKeyFromObject(sa), err)
 	}
 
 	return secret, nil
@@ -231,27 +231,29 @@ func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 		return updated, false, nil
 	}
 	if !apierrors.IsConflict(err) {
-		logrus.Debugf("Successfully annotated ServiceAccount for %s", keyFromObject(sa))
+		logrus.Debugf("Successfully annotated ServiceAccount for %s", logKeyFromObject(sa))
 		return nil, false, err
 	}
 
 	// Rollback the optimistically created secret
-	logrus.Debugf("Rolling back ServiceAccount secret for %s", keyFromObject(secret))
+	logrus.Debugf("Rolling back ServiceAccount secret for %s", logKeyFromObject(secret))
 	if err := secretClient.Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
-		return nil, false, fmt.Errorf("deleting optimistically locked secret for %s - %s: %w", keyFromObject(secret), keyFromObject(sa), err)
+		return nil, false, fmt.Errorf("deleting optimistically locked secret for %s - %s: %w", logKeyFromObject(secret), logKeyFromObject(sa), err)
 	}
 	// Load the version that triggered the issue
-	logrus.Debugf("Reloading ServiceAccount %s", keyFromObject(sa))
+	logrus.Debugf("Reloading ServiceAccount %s", logKeyFromObject(sa))
 	updated, err = saClient.Get(ctx, sa.Name, metav1.GetOptions{})
 	if err != nil {
-		return nil, false, fmt.Errorf("getting updated service account %s: %w", keyFromObject(sa), err)
+		return nil, false, fmt.Errorf("getting updated service account %s: %w", logKeyFromObject(sa), err)
 	}
 
 	return updated, true, nil
 
 }
 
-func keyFromObject(obj namespacedObject) namespacedName {
+// This should be replaced with a types.NamespacedName which stringifies to
+// <namespace>/<name> but that would change the log output format.
+func logKeyFromObject(obj namespacedObject) namespacedName {
 	return namespacedName{
 		Name:      obj.GetName(),
 		Namespace: obj.GetNamespace(),

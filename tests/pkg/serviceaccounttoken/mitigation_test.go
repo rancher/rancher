@@ -17,6 +17,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
+// This tests that creation of secrets for SAs doesn't result in lots of secrets
+// being created.
+//
+// This uses envtest (which uses the kube-apiserver and etcd) to test the
+// functionality.
+//
+// Additional tests should be run within the envtest context. You need to be
+// careful around removing resources.
+//
+// This spawns a goroutine that fakes the Kubernetes controller that updates
+// Service Account secrets with a fake token.
 func TestOptimisticLocking(t *testing.T) {
 	testEnv := &envtest.Environment{}
 	restCfg, err := testEnv.Start()
@@ -71,6 +82,7 @@ func TestOptimisticLocking(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, sa.Annotations[serviceaccounttoken.ServiceAccountSecretRefAnnotation], keyFromObject(createdSecret).String())
+		assert.Equal(t, string(createdSecret.Data["token"]), "this-is-not-a-real-key")
 	})
 }
 
