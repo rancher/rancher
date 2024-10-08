@@ -36,15 +36,16 @@ const (
 	ClusterActionSaveAsTemplate        = "saveAsTemplate"
 
 	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
-	ClusterConditionReady          condition.Cond = "Ready"
-	ClusterConditionPending        condition.Cond = "Pending"
-	ClusterConditionCertsGenerated condition.Cond = "CertsGenerated"
-	ClusterConditionEtcd           condition.Cond = "etcd"
-	ClusterConditionProvisioned    condition.Cond = "Provisioned"
-	ClusterConditionUpdated        condition.Cond = "Updated"
-	ClusterConditionUpgraded       condition.Cond = "Upgraded"
-	ClusterConditionWaiting        condition.Cond = "Waiting"
-	ClusterConditionRemoved        condition.Cond = "Removed"
+	ClusterConditionReady           condition.Cond = "Ready"
+	ClusterConditionPending         condition.Cond = "Pending"
+	ClusterConditionCertsGenerated  condition.Cond = "CertsGenerated"
+	ClusterConditionEtcd            condition.Cond = "etcd"
+	ClusterConditionPreBootstrapped condition.Cond = "PreBootstrapped"
+	ClusterConditionProvisioned     condition.Cond = "Provisioned"
+	ClusterConditionUpdated         condition.Cond = "Updated"
+	ClusterConditionUpgraded        condition.Cond = "Upgraded"
+	ClusterConditionWaiting         condition.Cond = "Waiting"
+	ClusterConditionRemoved         condition.Cond = "Removed"
 	// ClusterConditionNoDiskPressure true when all cluster nodes have sufficient disk
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
