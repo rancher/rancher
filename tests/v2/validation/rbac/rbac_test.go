@@ -74,6 +74,9 @@ func (rb *RBTestSuite) sequentialTestRBAC(role rbac.Role, member string, user *m
 	rb.Run("Validating Global Role Binding is created for "+role.String(), func() {
 		rbac.VerifyGlobalRoleBindingsForUser(rb.T(), user, rb.client)
 	})
+	rb.Run("Validating corresponding role bindings for users", func() {
+		rbac.VerifyRoleBindingsForUser(rb.T(), user, rb.client, rb.cluster.ID, role)
+	})
 	rb.Run("Validating if "+role.String()+" can list any downstream clusters", func() {
 		rbac.VerifyUserCanListCluster(rb.T(), rb.client, standardClient, rb.cluster.ID, role)
 	})

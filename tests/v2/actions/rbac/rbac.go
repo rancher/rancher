@@ -33,6 +33,8 @@ const (
 	ActiveStatus                   = "active"
 	ForbiddenError                 = "403 Forbidden"
 	DefaultNamespace               = "fleet-default"
+	LocalCluster                   = "local"
+	UserKind                       = "User"
 )
 
 func (r Role) String() string {
