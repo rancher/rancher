@@ -230,8 +230,8 @@ spec:
                   created in the local cluster. One of "Complete" or "Error".
                 type: string
               summaryRemote:
-                description: Summary represents the summary of the resources created
-                  in the downstream cluster. One of "Complete" or "Error".
+                description: SummaryRemote represents the summary of the resources
+                  created in the downstream cluster. One of "Complete" or "Error".
                 type: string
             type: object
           userName:
