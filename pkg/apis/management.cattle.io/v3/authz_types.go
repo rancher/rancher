@@ -426,7 +426,7 @@ type ClusterRoleTemplateBindingStatus struct {
 	// +optional
 	SummaryLocal string `json:"summaryLocal,omitempty"`
 
-	// Summary represents the summary of the resources created in the downstream cluster. One of "Complete" or "Error".
+	// SummaryRemote represents the summary of the resources created in the downstream cluster. One of "Complete" or "Error".
 	// +optional
 	SummaryRemote string `json:"summaryRemote,omitempty"`
 
