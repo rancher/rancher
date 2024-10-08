@@ -22,10 +22,10 @@ k3d:
 		.
 
 create-cluster: k3d
-	@bin/k3d cluster create --image rancher/k3s:$(K3D_K3S_VERSION)-k3s1 $(K3D_CLUSTER)
+	@k3d cluster create --image rancher/k3s:$(K3D_K3S_VERSION)-k3s1 $(K3D_CLUSTER)
 
 delete-cluster: k3d
-	@bin/k3d cluster delete $(K3D_CLUSTER)
+	@k3d cluster delete $(K3D_CLUSTER)
 
 build:
 	 CGO_ENABLED=0 go build -o ext ../cmd/ext/
@@ -40,7 +40,7 @@ push:
 	docker push $(REGISTRY_IMAGE):$(IMAGE_TAG)
 
 import:
-	@bin/k3d image import --cluster $(K3D_CLUSTER) $(REGISTRY_IMAGE):$(IMAGE_TAG)
+	@k3d image import --cluster $(K3D_CLUSTER) $(REGISTRY_IMAGE):$(IMAGE_TAG)
 
 deploy:
 	@$(MAKE) image import
@@ -60,9 +60,11 @@ exec:
 
 deepcopy-gen:
 	@$(DEEPCOPY_GEN) --go-header-file ../scripts/boilerplate.go.txt ../pkg/ext/resources/tokens/
+	@$(DEEPCOPY_GEN) --go-header-file ../scripts/boilerplate.go.txt ../pkg/ext/resources/useractivity/
 
 openapi-gen:
-	@$(OPENAPI_GEN) --output-pkg github.com/rancher/rancher/pkg/ext/generated/openapi --output-dir ../pkg/ext/generated/openapi --go-header-file ../scripts/boilerplate.go.txt  ../pkg/ext/resources/tokens/ k8s.io/apimachinery/pkg/apis/meta/v1
+	@$(OPENAPI_GEN) --output-pkg github.com/rancher/rancher/pkg/ext/generated/openapi/tokens --output-dir ../pkg/ext/generated/openapi/tokens/ --go-header-file ../scripts/boilerplate.go.txt  ../pkg/ext/resources/tokens/ k8s.io/apimachinery/pkg/apis/meta/v1
+	@$(OPENAPI_GEN) --output-pkg github.com/rancher/rancher/pkg/ext/generated/openapi/useractivity --output-dir ../pkg/ext/generated/openapi/useractivity/ --go-header-file ../scripts/boilerplate.go.txt  ../pkg/ext/resources/useractivity/ k8s.io/apimachinery/pkg/apis/meta/v1
 
 gen:
 	@$(MAKE) deepcopy-gen

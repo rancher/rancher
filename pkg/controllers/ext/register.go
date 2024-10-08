@@ -281,7 +281,7 @@ func (h *handler) ensureAPIExtensionEnabled() error {
 						{
 							Name:            "api-extension",
 							Image:           settings.ImperativeAPIImage.Get(),
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullNever,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: tunnelPort,

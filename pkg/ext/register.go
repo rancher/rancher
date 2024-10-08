@@ -2,8 +2,10 @@ package ext
 
 import (
 	"github.com/gorilla/mux"
-	"github.com/rancher/rancher/pkg/ext/generated/openapi"
+	openapitokens "github.com/rancher/rancher/pkg/ext/generated/openapi/tokens"
+	openapiuseractivity "github.com/rancher/rancher/pkg/ext/generated/openapi/useractivity"
 	"github.com/rancher/rancher/pkg/ext/resources/tokens"
+	"github.com/rancher/rancher/pkg/ext/resources/useractivity"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +26,12 @@ func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 	tokenHandler := NewStoreDelegate(tokenStore, tokens.SchemeGroupVersion.WithKind(tokens.TokenAPIResource.Kind))
 	tokenWebService := tokenHandler.WebService(tokens.RancherTokenName, tokens.TokenAPIResource.Namespaced)
 
+	userActivityStore := useractivity.NewUserActivityStore()
+	userActivityHandler := NewStoreDelegate(userActivityStore, useractivity.SchemeGroupVersion.WithKind(useractivity.UserActivityAPIResource.Kind))
+	userActivityWebService := userActivityHandler.WebService(useractivity.UserActivityName, useractivity.UserActivityAPIResource.Namespaced)
+
 	apiServer.AddAPIResource(tokens.SchemeGroupVersion, tokens.TokenAPIResource, tokenHandler.Delegate, tokenWebService)
+	apiServer.AddAPIResource(useractivity.SchemeGroupVersion, useractivity.UserActivityAPIResource, userActivityHandler.Delegate, userActivityWebService)
 	apiServer.RegisterRoutes(router)
 }
 
@@ -32,7 +39,8 @@ func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 func getDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	result := make(map[string]common.OpenAPIDefinition)
 	for _, getDefs := range []func(common.ReferenceCallback) map[string]common.OpenAPIDefinition{
-		openapi.GetOpenAPIDefinitions,
+		openapitokens.GetOpenAPIDefinitions,
+		openapiuseractivity.GetOpenAPIDefinitions,
 	} {
 		defs := getDefs(ref)
 		for key, val := range defs {
