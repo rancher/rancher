@@ -3,15 +3,17 @@ package authprovisioningv2
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/rancher/kubernetes-provider-detector/providers"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
+	"k8s.io/apimachinery/pkg/labels"
+
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 // OnCluster creates the roles required for users to be able to see/manage the
@@ -119,6 +121,16 @@ func (h *handler) enqueueCRTBsForRKEClusters(cluster *v1.Cluster) error {
 		}
 		for _, crtb := range crtbs {
 			h.clusterRoleTemplateBindingController.Enqueue(crtb.Namespace, crtb.Name)
+		}
+		prtbs, err := h.projectRoleTemplateBindings.List("", labels.Everything())
+		if err != nil {
+			return err
+		}
+		for _, prtb := range prtbs {
+			clusterName := strings.Split(prtb.ProjectName, ":")[0]
+			if clusterName == cluster.Name {
+				h.projectRoleTemplateBindingController.Enqueue(prtb.Namespace, prtb.Name)
+			}
 		}
 	}
 

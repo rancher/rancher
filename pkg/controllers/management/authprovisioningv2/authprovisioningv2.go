@@ -42,6 +42,7 @@ type handler struct {
 	clusterRoleTemplateBindings          mgmtcontrollers.ClusterRoleTemplateBindingCache
 	clusterRoleTemplateBindingController mgmtcontrollers.ClusterRoleTemplateBindingController
 	projectRoleTemplateBindingController mgmtcontrollers.ProjectRoleTemplateBindingController
+	projectRoleTemplateBindings          mgmtcontrollers.ProjectRoleTemplateBindingCache
 	roleTemplatesCache                   mgmtcontrollers.RoleTemplateCache
 	clusters                             provisioningcontrollers.ClusterCache
 	mgmtClusters                         mgmtcontrollers.ClusterCache
@@ -74,6 +75,7 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 		clusterRoleTemplateBindings:          clients.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		clusterRoleTemplateBindingController: clients.Mgmt.ClusterRoleTemplateBinding(),
 		projectRoleTemplateBindingController: clients.Mgmt.ProjectRoleTemplateBinding(),
+		projectRoleTemplateBindings:          clients.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		roleTemplatesCache:                   clients.Mgmt.RoleTemplate().Cache(),
 		clusters:                             clients.Provisioning.Cluster().Cache(),
 		mgmtClusters:                         clients.Mgmt.Cluster().Cache(),

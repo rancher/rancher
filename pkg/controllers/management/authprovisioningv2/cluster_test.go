@@ -34,12 +34,45 @@ func TestOnCluster(t *testing.T) {
 			},
 		},
 	}
+	prtbInCluster := &v3.ProjectRoleTemplateBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "prtb1",
+			Namespace: "ns1",
+		},
+		ProjectName: "cluster:project",
+	}
+	prtbs := []*v3.ProjectRoleTemplateBinding{
+		prtbInCluster,
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "prtb2",
+				Namespace: "ns1",
+			},
+			ProjectName: "invalid",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "prtb3",
+				Namespace: "ns1",
+			},
+			ProjectName: "clusterB:project",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "prtb4",
+				Namespace: "ns1",
+			},
+			ProjectName: "",
+		},
+	}
 	err := errors.NewBadRequest("error")
 
 	tests := map[string]struct {
 		cluster       *v1.Cluster
 		crtbCacheMock func(string) mgmtcontrollers.ClusterRoleTemplateBindingCache
 		crtbMock      func() mgmtcontrollers.ClusterRoleTemplateBindingController
+		prtbCacheMock func(string) mgmtcontrollers.ProjectRoleTemplateBindingCache
+		prtbMock      func() mgmtcontrollers.ProjectRoleTemplateBindingController
 		expectedErr   error
 	}{
 		"no rke doesn't enqueue CRTBs": {
@@ -56,9 +89,73 @@ func TestOnCluster(t *testing.T) {
 			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
 				return fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 			},
+			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
+				return fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+			},
+			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
+				return fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+			},
 			expectedErr: nil,
 		},
-		"rke enqueue CRTBs": {
+		"rke enqueue CRTBs and PRTBs": {
+			cluster: &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+					Labels: map[string]string{
+						kubernetesprovider.ProviderKey: providers.RKE,
+					},
+				},
+			},
+			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+				mock.EXPECT().List(clusterName, labels.Everything()).Return(crtbs, nil)
+				return mock
+			},
+			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				for _, crtb := range crtbs {
+					mock.EXPECT().Enqueue(crtb.Namespace, crtb.Name)
+				}
+				return mock
+			},
+			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+				mock.EXPECT().List("", labels.Everything()).Return(prtbs, nil)
+				return mock
+			},
+			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
+				mock := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+				mock.EXPECT().Enqueue(prtbInCluster.Namespace, prtbInCluster.Name)
+				return mock
+			},
+
+			expectedErr: nil,
+		},
+		"rke enqueue CRTBs error": {
+			cluster: &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubernetesprovider.ProviderKey: providers.RKE,
+					},
+				},
+			},
+			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+				mock.EXPECT().List(clusterName, labels.Everything()).Return(nil, err)
+				return mock
+			},
+			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
+				return fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+			},
+			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
+				return fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+			},
+			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
+				return fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+			},
+			expectedErr: err,
+		},
+		"rke enqueue PRTBs error": {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -78,23 +175,13 @@ func TestOnCluster(t *testing.T) {
 				}
 				return mock
 			},
-			expectedErr: nil,
-		},
-		"rke enqueue CRTBs error": {
-			cluster: &v1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						kubernetesprovider.ProviderKey: providers.RKE,
-					},
-				},
-			},
-			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().List(clusterName, labels.Everything()).Return(nil, err)
+			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+				mock.EXPECT().List("", labels.Everything()).Return(nil, err)
 				return mock
 			},
-			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
-				return fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
+				return fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
 			},
 			expectedErr: err,
 		},
@@ -111,6 +198,8 @@ func TestOnCluster(t *testing.T) {
 			h := handler{
 				clusterRoleTemplateBindings:          test.crtbCacheMock(test.cluster.Name),
 				clusterRoleTemplateBindingController: test.crtbMock(),
+				projectRoleTemplateBindings:          test.prtbCacheMock(test.cluster.Name),
+				projectRoleTemplateBindingController: test.prtbMock(),
 				roleCache:                            roleCacheMock,
 				roleController:                       roleControllerMock,
 			}
