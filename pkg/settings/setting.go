@@ -152,6 +152,12 @@ var (
 	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
+	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
+	// By default, the value for auth-user-session-idle-ttl-minutes should be set
+	// at the same value of auth-user-session-ttl-minutes (for backward compatibility reasons),
+	// and must never be greater than this value.
+	AuthUserSessionIdleTTLMinutes = NewSetting("auth-user-session-idle-ttl-minutes", "960") // 16 hours
+
 	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
 	// debug purposes.
 	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
@@ -382,6 +388,7 @@ func init() {
 	// setup auth setting
 	authsettings.AuthUserInfoResyncCron = AuthUserInfoResyncCron
 	authsettings.AuthUserSessionTTLMinutes = AuthUserSessionTTLMinutes
+	authsettings.AuthUserSessionIdleTTLMinutes = AuthUserSessionIdleTTLMinutes
 	authsettings.AuthUserInfoMaxAgeSeconds = AuthUserInfoMaxAgeSeconds
 	authsettings.FirstLogin = FirstLogin
 
