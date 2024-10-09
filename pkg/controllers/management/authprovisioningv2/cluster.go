@@ -68,7 +68,7 @@ func (h *handler) createClusterViewRole(cluster *v1.Cluster) error {
 
 		// This is needed for creating RoleBindings when moving rke clusters to a different workspace.
 		// This is only needed for rke because Role and RoleBindings are moved to the new workspace. In other k8s distros they stay in the fleet-default ns.
-		if err = h.enqueueCRTBsForRKEClusters(cluster); err != nil {
+		if err = h.enqueueRoleTemplateBindingsForRKEClusters(cluster); err != nil {
 			return err
 		}
 		return nil
@@ -113,7 +113,7 @@ func (h *handler) cleanClusterAdminRoleBindings(cluster *v1.Cluster) error {
 	return nil
 }
 
-func (h *handler) enqueueCRTBsForRKEClusters(cluster *v1.Cluster) error {
+func (h *handler) enqueueRoleTemplateBindingsForRKEClusters(cluster *v1.Cluster) error {
 	if cluster.Labels[kubernetesprovider.ProviderKey] == providers.RKE {
 		crtbs, err := h.clusterRoleTemplateBindings.List(cluster.Name, labels.Everything())
 		if err != nil {
