@@ -34,9 +34,8 @@ type TokenSpec struct {
 	// Enabled indicates an active token
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
-	// Indicates a token which was derived from some other token.
-	// Login/Sessions tokens are "not derived".
-	IsDerived bool `json:"isDerived"`
+	// Indicates a login/session token. Non-session tokens are derived from some other token.
+	IsLogin bool `json:"isLogin"`
 }
 
 // TokenStatus contains the data derived from the specification or otherwise generated.
@@ -112,7 +111,7 @@ func (t *Token) GetIsEnabled() bool {
 }
 
 func (t *Token) GetIsDerived() bool {
-	return t.Spec.IsDerived
+	return !t.Spec.IsLogin
 }
 
 func (t *Token) GetUserID() string {

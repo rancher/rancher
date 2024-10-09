@@ -217,8 +217,8 @@ func (t *SystemTokenStore) update(isadmin bool, token *Token, opts *metav1.Updat
 	if token.Spec.ClusterName != currentToken.Spec.ClusterName {
 		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit cluster name", token.Name)
 	}
-	if token.Spec.IsDerived != currentToken.Spec.IsDerived {
-		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit flag is-derived", token.Name)
+	if token.Spec.IsLogin != currentToken.Spec.IsLogin {
+		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit flag isLogin", token.Name)
 	}
 	if !isadmin && (token.Spec.TTL > currentToken.Spec.TTL) {
 		return nil, fmt.Errorf ("unable to change token %s: non-admin forbidden to extend time-to-live", token.Name)
@@ -553,7 +553,7 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 	secret.StringData["ttl"] = fmt.Sprintf("%d", ttl)
 	secret.StringData["enabled"] = fmt.Sprintf("%t", token.Spec.Enabled)
 	secret.StringData["description"] = token.Spec.Description
-	secret.StringData["is-derived"] = fmt.Sprintf("%t", token.Spec.IsDerived)
+	secret.StringData["is-login"] = fmt.Sprintf("%t", token.Spec.IsLogin)
 
 	// status
 	secret.StringData["hash"] = token.Status.TokenHash
@@ -577,7 +577,7 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	derived, err :=	strconv.ParseBool(string(secret.Data["is-derived"]))
+	isLogin, err :=	strconv.ParseBool(string(secret.Data["is-login"]))
 	if err != nil {
 		return nil, err
 	}
@@ -614,7 +614,7 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			ClusterName: string(secret.Data["clusterName"]),
 			TTL:         ttl,
 			Enabled:     enabled,
-			IsDerived:   derived,
+			IsLogin:     isLogin,
 		},
 		Status: TokenStatus{
 			TokenHash:       string(secret.Data["hash"]),
