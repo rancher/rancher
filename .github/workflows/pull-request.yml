@@ -1,6 +1,12 @@
 name: Build Pull Request
 on:
-  - pull_request 
+  pull_request:
+    paths-ignore:
+      # omit tests from triggering CI except when CI tests are changed
+      - 'tests/v2/validation/**'
+      - 'tests/v2/codecoverage/**'
+      - 'tests/validation/**'
+
 env:
   ARCH: amd64
   TAG: v2.10-${{ github.sha }}-head
