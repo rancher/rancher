@@ -27,8 +27,11 @@ node {
     def patchedConfigsDir = "patched-cattle-configs"
 
     def testResultsOut = "results.xml"
+    def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
+    def qaseRun = "./testrun" // 
+    def testRunConfig = "testrunconfig.yaml" // Config file for Qase
 
     // rancher
     def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
@@ -118,7 +121,8 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
-                          string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
+                          string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: 'RANCHER_LINODE_ACCESSKEY')]) {
         withEnv(paramsMap) {
           stage('Checkout') {
             deleteDir()
@@ -172,7 +176,29 @@ node {
               stage("Build Environment") {
                 try {
                   sh "docker run -v ${validationVolume}:/root --name ${buildTestContainer} -t --env-file ${envFile} " +
-                  "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh\""
+                  "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh;${workPath}pipeline/scripts/build_qase_auto_testrun.sh\""
+
+                  echo "Checking the current working directory and its contents"
+                  sh "pwd"
+                  sh "ls"
+
+                  // copy updated config file from the build test container
+                  sh "docker cp ${buildTestContainer}:${workPath}${filename} ./"
+                  sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"
+                  sh "./${qaseRun} --startRun=true"
+
+                    def testRunID = sh (  
+                      script: "./yq '.id'  ./${testRunConfig}",
+                      returnStdout: true
+                    ).trim()
+                    
+                    if (!testRunID) {
+                          error "Failed to create Qase test run or retrieve test run ID"
+                      } else {
+                          echo "Qase test run ID: ${testRunID}"
+                      }
+                    
+
                 } catch(err) {
                    sh "docker stop ${buildTestContainer}"
                    sh "docker rm -v ${buildTestContainer}"
@@ -227,12 +253,16 @@ node {
                        returnStdout: true
                      ).trim()
 
+
                      jobs["$it-provisioning"] = { 
                        stage("Parallel Provisioning: $it"){
                          def containerName = "${job_name}${env.BUILD_NUMBER}_$it-provisioning"
                          try {
+                             echo "Starting provisioning tests. Getting qase run iD: " 
                             sh "docker run --volumes-from ${buildTestContainer} --name ${containerName} -t -e CATTLE_TEST_CONFIG=\"${absoluteConfigPath}\" " +
-                          "${imageName} sh -c \"gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsOut} -- -tags=validation ${testCase} -timeout=\"60m\" -v\""
+                          "${imageName} sh -c \"gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsJSON} -- -tags=validation ${testCase} -timeout=\"60m\" -v\""
+
+
 
                           dir("./${patchedConfigsDir}") {
                             sh "docker cp ${containerName}:${rootPath}${configsDir}/$it ."
@@ -281,6 +311,7 @@ node {
                 try {
                   jobs = [:]
 
+
                   configFiles.each {
                     try {
                       def configPath = "./${configsDir}/$it"
@@ -302,6 +333,7 @@ node {
                         string(name: 'REPO', value: "${rancherRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+                        string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
                         string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
                         string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
@@ -317,79 +349,81 @@ node {
                 } catch(err) {
                   echo "Pre upgrade tests had failures: " + err
                 }
+              sh "./${qaseRun} --startRun=false"
               }
-              stage('Upgrade local cluster version') {
-                try {
-                      def configPath = "./${configsDir}/${localConfigFileName}"
-                      def configYaml = readFile(file: "./${patchedConfigsDir}/${localConfigFileName}")
 
-                      def testCase = sh (
-                        script: "./yq '.testCases.upgradeKubernetesTestCase'  ${configPath}",
-                        returnStdout: true
-                      ).trim()
+              // stage('Upgrade local cluster version') {
+              //   try {
+              //         def configPath = "./${configsDir}/${localConfigFileName}"
+              //         def configYaml = readFile(file: "./${patchedConfigsDir}/${localConfigFileName}")
 
-                      def testPackage = sh (
-                        script: "./yq '.testCases.upgradeTestCase'  ${configPath}",
-                        returnStdout: true
-                      ).trim()
+              //         def testCase = sh (
+              //           script: "./yq '.testCases.upgradeKubernetesTestCase'  ${configPath}",
+              //           returnStdout: true
+              //         ).trim()
 
-                      def goValidationParams = [
-                        string(name: 'TIMEOUT', value: "2h"),
-                        text(name: 'CONFIG', value: configYaml),
-                        string(name: 'REPO', value: "${rancherRepo}"),
-                        string(name: 'BRANCH', value: "${branch}"),
-                        string(name: 'TEST_PACKAGE', value: "${testPackage}"),
-                        string(name: 'TAGS', value: "${defaultTag}"),
-                        string(name: 'GOTEST_TESTCASE', value: "${testCase}" ),
-                        string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
-                      ]
+              //         def testPackage = sh (
+              //           script: "./yq '.testCases.upgradeTestCase'  ${configPath}",
+              //           returnStdout: true
+              //         ).trim()
 
-                      build job: 'go-automation-freeform-job', parameters: goValidationParams
-                } catch(err) {
-                  echo "Kubernetes upgrade tests had failures: " + err
-                }
-              }
-              stage('Run postupgrade checks') {
-                try {
-                  jobs = [:]
+              //         def goValidationParams = [
+              //           string(name: 'TIMEOUT', value: "2h"),
+              //           text(name: 'CONFIG', value: configYaml),
+              //           string(name: 'REPO', value: "${rancherRepo}"),
+              //           string(name: 'BRANCH', value: "${branch}"),
+              //           string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+              //           string(name: 'TAGS', value: "${defaultTag}"),
+              //           string(name: 'GOTEST_TESTCASE', value: "${testCase}" ),
+              //           string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
+              //         ]
 
-                  configFiles.each {
-                    try {
-                      def configPath = "./${configsDir}/$it"
-                      def configYaml = readFile(file: "./${patchedConfigsDir}/$it")
+              //         build job: 'go-automation-freeform-job', parameters: goValidationParams
+              //   } catch(err) {
+              //     echo "Kubernetes upgrade tests had failures: " + err
+              //   }
+              // }
+              // stage('Run postupgrade checks') {
+              //   try {
+              //     jobs = [:]
 
-                      def testCase = sh (
-                        script: "./yq '.testCases.postUpgradeTestCase'  ${configPath}",
-                        returnStdout: true
-                      ).trim()
+              //     configFiles.each {
+              //       try {
+              //         def configPath = "./${configsDir}/$it"
+              //         def configYaml = readFile(file: "./${patchedConfigsDir}/$it")
 
-                      def testPackage = sh (
-                        script: "./yq '.testCases.upgradeTestCase'  ${configPath}",
-                        returnStdout: true
-                      ).trim()
+              //         def testCase = sh (
+              //           script: "./yq '.testCases.postUpgradeTestCase'  ${configPath}",
+              //           returnStdout: true
+              //         ).trim()
 
-                      def goValidationParams = [
-                        string(name: 'TIMEOUT', value: "30m"),
-                        text(name: 'CONFIG', value: configYaml),
-                        string(name: 'REPO', value: "${rancherRepo}"),
-                        string(name: 'BRANCH', value: "${branch}"),
-                        string(name: 'TEST_PACKAGE', value: "${testPackage}"),
-                        string(name: 'TAGS', value: "${defaultTag}"),
-                        string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
-                        string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
-                      ]
+              //         def testPackage = sh (
+              //           script: "./yq '.testCases.upgradeTestCase'  ${configPath}",
+              //           returnStdout: true
+              //         ).trim()
 
-                      jobs["$it-postupgrade"] = { build job: 'go-automation-freeform-job', parameters: goValidationParams }
-                    } catch(err) {
-                      echo "Post upgrade $it had failures: " + err
-                    }
-                  }
+              //         def goValidationParams = [
+              //           string(name: 'TIMEOUT', value: "30m"),
+              //           text(name: 'CONFIG', value: configYaml),
+              //           string(name: 'REPO', value: "${rancherRepo}"),
+              //           string(name: 'BRANCH', value: "${branch}"),
+              //           string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+              //           string(name: 'TAGS', value: "${defaultTag}"),
+              //           string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
+              //           string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
+              //         ]
 
-                  parallel jobs
-                } catch(err){
-                  echo "Post upgrade tests had failures: " + err
-                }
-              }
+              //         jobs["$it-postupgrade"] = { build job: 'go-automation-freeform-job', parameters: goValidationParams }
+              //       } catch(err) {
+              //         echo "Post upgrade $it had failures: " + err
+              //       }
+              //     }
+
+              //     parallel jobs
+              //   } catch(err){
+              //     echo "Post upgrade tests had failures: " + err
+              //   }
+              // }
               stage('Delete Rancher and resources') {
                 if (cleanup.toBoolean()) {
                   try{

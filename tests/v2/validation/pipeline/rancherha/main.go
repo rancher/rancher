@@ -18,6 +18,7 @@ const rke1 = "rke1"
 
 func main() {
 	corralRancherHA := new(corralha.CorralRancherHA)
+	logrus.Info("debugging for corral rancher ha", corralRancherHA)
 	config.LoadConfig(corralha.CorralRancherHAConfigConfigurationFileKey, corralRancherHA)
 
 	corralSession := session.NewSession()
