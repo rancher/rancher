@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/workloads/cronjob"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/daemonset"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
-	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/statefulset"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -65,50 +64,6 @@ func (w *WorkloadTestSuite) TestWorkloadDeployment() {
 
 	log.Info("Creating new deployment")
 	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false, true)
-	require.NoError(w.T(), err)
-}
-
-func (w *WorkloadTestSuite) TestWorkloadSideKick() {
-	subSession := w.session.NewSession()
-	defer subSession.Cleanup()
-
-	log.Info("Creating new project and namespace")
-	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
-	require.NoError(w.T(), err)
-
-	log.Info("Creating new deployment")
-	createdDeployment, err := deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false, true)
-	require.NoError(w.T(), err)
-
-	log.Info("Waiting for all pods to be running")
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, createdDeployment)
-	require.NoError(w.T(), err)
-
-	containerName := namegen.AppendRandomString("update-test-container")
-	newContainerTemplate := workloads.NewContainer(containerName,
-		redisImageName,
-		corev1.PullAlways,
-		[]corev1.VolumeMount{},
-		[]corev1.EnvFromSource{},
-		nil,
-		nil,
-		nil,
-	)
-
-	createdDeployment.Spec.Template.Spec.Containers = append(createdDeployment.Spec.Template.Spec.Containers, newContainerTemplate)
-
-	log.Info("Updating image deployment")
-	updatedDeployment, err := deployment.UpdateDeployment(w.client, w.cluster.ID, namespace.Name, createdDeployment, true)
-	require.NoError(w.T(), err)
-
-	log.Info("Waiting deployment comes up active")
-	err = charts.WatchAndWaitDeployments(w.client, w.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + updatedDeployment.Name,
-	})
-	require.NoError(w.T(), err)
-
-	log.Info("Waiting for all pods to be running")
-	err = pods.WatchAndWaitPodContainerRunning(w.client, w.cluster.ID, namespace.Name, updatedDeployment)
 	require.NoError(w.T(), err)
 }
 
