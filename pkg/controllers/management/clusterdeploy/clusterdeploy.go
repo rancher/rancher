@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/rancher/pkg/capr"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -445,7 +447,8 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 	}
 
 	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url, cluster.Spec.WindowsPreferedCluster,
+	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url,
+		cluster.Spec.WindowsPreferedCluster, capr.PreBootstrap(cluster),
 		cluster, features, taints, cd.secretLister)
 
 	return buf.Bytes(), err
