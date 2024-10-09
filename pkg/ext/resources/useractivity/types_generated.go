@@ -11,7 +11,7 @@ var (
 	UserActivityName = "useractivities"
 )
 
-var SchemeGroupVersion = schema.GroupVersion{Group: "ext.cattle.io", Version: "v1alpha1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: "ext.cattle.io", Version: "v1"}
 var UserActivityAPIResource = metav1.APIResource{
 	Name:         "useractivities",
 	SingularName: "useractivity",

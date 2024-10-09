@@ -18,12 +18,12 @@ type UserActivity struct {
 }
 
 type UserActivitySpec struct {
-	TokenId      string `json:"tokenId"`
-	LastActivity string `json:"lastActivity"`
+	TokenId string `json:"tokenId"`
 }
 
 type UserActivityStatus struct {
 	CurrentTimeout string `json:"currentTimeout"`
+	LastActivity   string `json:"lastActivity"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

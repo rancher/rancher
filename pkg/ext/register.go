@@ -26,7 +26,7 @@ func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 	tokenHandler := NewStoreDelegate(tokenStore, tokens.SchemeGroupVersion.WithKind(tokens.TokenAPIResource.Kind))
 	tokenWebService := tokenHandler.WebService(tokens.RancherTokenName, tokens.TokenAPIResource.Namespaced)
 
-	userActivityStore := useractivity.NewUserActivityStore()
+	userActivityStore := useractivity.NewUserActivityStore(wContext.Mgmt.Token())
 	userActivityHandler := NewStoreDelegate(userActivityStore, useractivity.SchemeGroupVersion.WithKind(useractivity.UserActivityAPIResource.Kind))
 	userActivityWebService := userActivityHandler.WebService(useractivity.UserActivityName, useractivity.UserActivityAPIResource.Namespaced)
 

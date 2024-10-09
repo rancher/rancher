@@ -194,15 +194,8 @@ func schema_pkg_ext_resources_useractivity_UserActivitySpec(ref common.Reference
 							Format:  "",
 						},
 					},
-					"lastActivity": {
-						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
-						},
-					},
 				},
-				Required: []string{"tokenId", "lastActivity"},
+				Required: []string{"tokenId"},
 			},
 		},
 	}
@@ -221,8 +214,15 @@ func schema_pkg_ext_resources_useractivity_UserActivityStatus(ref common.Referen
 							Format:  "",
 						},
 					},
+					"lastActivity": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
 				},
-				Required: []string{"currentTimeout"},
+				Required: []string{"currentTimeout", "lastActivity"},
 			},
 		},
 	}
