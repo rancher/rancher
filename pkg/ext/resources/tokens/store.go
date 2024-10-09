@@ -88,7 +88,7 @@ func NewSystemTokenStore(
 }
 
 func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Token, opts *metav1.CreateOptions) (*Token, error) {
-	if _, err := t.checkAdmin("create", token, userInfo); err != nil {
+	if _, err := t.checkForManageToken("create", token, userInfo); err != nil {
 		return nil, err
 	}
 	// reject user-provided token value, or hash
@@ -188,7 +188,7 @@ func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *Toke
 }
 
 func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Token, opts *metav1.UpdateOptions) (*Token, error) {
-	isadmin, err := t.checkAdmin("update", token, userInfo)
+	isadmin, err := t.checkForManageToken("update", token, userInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 	if err != nil {
 		return nil, err
 	}
-	if _, err := t.checkAdmin("get", token, userInfo); err != nil {
+	if _, err := t.checkForManageToken("get", token, userInfo); err != nil {
 		return nil, err
 	}
 
@@ -281,8 +281,8 @@ func (t *SystemTokenStore) Get(name string, opts *metav1.GetOptions) (*Token, er
 }
 
 func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (*TokenList, error) {
-	// cannot use checkAdmin here. we have lots of tokens to check, with the same admin value.
-	isadmin, err := t.userHasFullPermissions(userInfo)
+	// cannot use checkForManageToken here. we have lots of tokens to check, with the same admin value.
+	isadmin, err := t.userHasManageTokenPermissions(userInfo)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if user has full permissions on tokens: %w", err)
 	}
@@ -323,8 +323,8 @@ func (t *SystemTokenStore) list(isadmin bool, user string, opts *metav1.ListOpti
 
 // TODO: Close channel
 func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (<-chan types.WatchEvent[*Token], error) {
-	// cannot use checkAdmin here. we have lots of tokens to check, with the same admin value.
-	isadmin, err := t.userHasFullPermissions(userInfo)
+	// cannot use checkForManageToken here. we have lots of tokens to check, with the same admin value.
+	isadmin, err := t.userHasManageTokenPermissions(userInfo)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if user has full permissions on tokens: %w", err)
 	}
@@ -377,7 +377,7 @@ func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string
 	// ignore errors here, only in the conversion of the non-string fields.
 	// user id needed for the admin check will be ok.
 	token, _ := tokenFromSecret(secret)
-	if _, err := t.checkAdmin("delete", token, userInfo); err != nil {
+	if _, err := t.checkForManageToken("delete", token, userInfo); err != nil {
 		return err
 	}
 
@@ -450,7 +450,7 @@ func (t *TokenStore) ConvertToTable(list *TokenList, opts *metav1.TableOptions) 
 	return table
 }
 
-func (t *TokenStore) userHasFullPermissions(user user.Info) (bool, error) {
+func (t *TokenStore) userHasManageTokenPermissions(user user.Info) (bool, error) {
 	sar := &authv1.SubjectAccessReview{
 		Spec: authv1.SubjectAccessReviewSpec{
 			User:   user.GetName(),
@@ -497,11 +497,11 @@ func setExpired(token *Token) error {
 	return nil
 }
 
-func(t *TokenStore) checkAdmin(verb string, token *Token, userInfo user.Info) (bool, error) {
+func(t *TokenStore) checkForManageToken(verb string, token *Token, userInfo user.Info) (bool, error) {
 	if token.Spec.UserID == userInfo.GetName() {
 		return false, nil
 	}
-	isadmin, err := t.userHasFullPermissions(userInfo)
+	isadmin, err := t.userHasManageTokenPermissions(userInfo)
 	if err != nil {
 		return false, fmt.Errorf("unable to check if user has full permissions on tokens: %w", err)
 	}
