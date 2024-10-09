@@ -104,14 +104,14 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	harvesterDriverVersion := "v0.6.9"
+	harvesterDriverVersion := "v0.7.0"
 	harvesterDriverURL := fmt.Sprintf("https://github.com/harvester/docker-machine-driver-harvester/releases/download/%s/docker-machine-driver-harvester-%s.tar.gz", harvesterDriverVersion, runtime.GOARCH)
-	harvesterDriverCheckSum := "76e1aeb778709e7350ce51f5252e87943ddcc914ad65ac487baa505c93b8e9f7"
+	harvesterDriverCheckSum := "7d5817d521407b33aa163b50c9c33fe562bb56fffd08c862894781c7720d9ecb"
 	if runtime.GOARCH == "arm64" {
 		//overwrite arm driver version here
-		harvesterDriverCheckSum = "63727eb1832b2dec67ca512a9f534b9bf80da4938627b00bd29cbb66af5f0794"
+		harvesterDriverCheckSum = "14aca2912dcc7949393b709fcba3e5b994e5103d3177607138ccb9986fb450bd"
 	}
-	if err := addMachineDriver(HarvesterDriver, harvesterDriverURL, "", harvesterDriverCheckSum, []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
+	if err := addMachineDriver(HarvesterDriver, harvesterDriverURL, "", harvesterDriverCheckSum, []string{"github.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
