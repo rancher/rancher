@@ -30,7 +30,7 @@ var promotedRulesForProjects = map[string]string{
 
 const (
 	clusterRoleOwnerAnnotation = "authz.cluster.cattle.io/clusterrole-owner"
-	aggregationLabel           = "management.cattle.io/aggregates-to"
+	aggregationLabel           = "management.cattle.io/aggregates"
 	projectContext             = "project"
 	aggregatorSuffix           = "aggregator"
 	promotedSuffix             = "promoted"
