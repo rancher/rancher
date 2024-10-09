@@ -20,6 +20,9 @@ import (
 
 const (
 	revisionAnnotation = "deployment.kubernetes.io/revision"
+	nginxImageName     = "nginx"
+	ubuntuImageName    = "ubuntu"
+	redisImageName     = "redis"
 )
 
 func validateDeploymentUpgrade(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) {
