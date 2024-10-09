@@ -1521,8 +1521,8 @@ github.com/rancher/remotedialer v0.4.0 h1:T9yC5bFMsZFVQ6rK0dNrRg6rRb6Zr/4vsig8S0
 github.com/rancher/remotedialer v0.4.0/go.mod h1:Ys004RpJuTLSm+k4aYUCoFiOOad37ubYev3TkOFg/5w=
 github.com/rancher/rke v1.6.3-rc.1 h1:q1A+UBpYSLMD6rTExQ+nfmZABDEOiqpsb1+oBIJiqNM=
 github.com/rancher/rke v1.6.3-rc.1/go.mod h1:n9ys1XDbjh3BN7GYl9Vbu+zm4CWVSBvpRkBGiJ9JvIw=
-github.com/rancher/shepherd v0.0.0-20240927124838-08bcfb63d35f h1:pvdPG+eNLkczV9Vy0IfyNrCEfY0m/ZSdZlMQBnFKSgw=
-github.com/rancher/shepherd v0.0.0-20240927124838-08bcfb63d35f/go.mod h1:zekxs8n6YwnsX1i58abObrkWDfdA9O3hV8wQATuS+8o=
+github.com/rancher/shepherd v0.0.0-20241004183905-ebfd445527d6 h1:YqkYtiOpaLRATUT7r0NZDwjb0tONcN9ubj1X2t31uZc=
+github.com/rancher/shepherd v0.0.0-20241004183905-ebfd445527d6/go.mod h1:zekxs8n6YwnsX1i58abObrkWDfdA9O3hV8wQATuS+8o=
 github.com/rancher/steve v0.0.0-20241002125954-dd27bd0c8d30 h1:ojHehGARtAqSqknH3DO+rfQqWFewQpDyzMYsmAwxbDs=
 github.com/rancher/steve v0.0.0-20241002125954-dd27bd0c8d30/go.mod h1:z7qYaI/LOpoBtm25c5YddiDyQLaD/QzRNtj0Qt1v/5Y=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde h1:x5VZI/0TUx1MeZirh6e0OMAInhCmq6yRvD6897458Ng=
