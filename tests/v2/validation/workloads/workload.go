@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
@@ -17,10 +19,15 @@ import (
 	"github.com/stretchr/testify/require"
 	appv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
 	revisionAnnotation = "deployment.kubernetes.io/revision"
+	nginxImageName     = "nginx"
+	ubuntuImageName    = "ubuntu"
+	redisImageName     = "redis"
+	podSteveType       = "pod"
 )
 
 func validateDeploymentUpgrade(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) {
@@ -62,10 +69,57 @@ func validateDeploymentScale(t *testing.T, client *rancher.Client, clusterName s
 }
 
 func rollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, revision int) (string, error) {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return "", err
+	}
+
+	namespaceClient := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName)
+	podsResp, err := namespaceClient.List(nil)
+	if err != nil {
+		return "", err
+	}
+
+	//Collect the pod IDs that are expected to be deleted after the rollback
+	expectBeDeletedIds := []string{}
+	for _, podResp := range podsResp.Data {
+		expectBeDeletedIds = append(expectBeDeletedIds, podResp.ID)
+	}
+
+	//Execute the roolback
 	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deploymentName)
 	revisionCmd := fmt.Sprintf("--to-revision=%s", strconv.Itoa(revision))
 	execCmd := []string{"kubectl", "rollout", "undo", "-n", namespaceName, deploymentCmd, revisionCmd}
 	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
+	if err != nil {
+		return "", err
+	}
+
+	backoff := kwait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    10,
+	}
+
+	//Waiting for all expectedToBeDeletedIds to be deleted
+	err = kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		for _, id := range expectBeDeletedIds {
+			//If the expected delete ID doesn't exist, it should be ignored
+			podResp, err := namespaceClient.ByID(id)
+			if err != nil && strings.Contains(err.Error(), "404 Not Found") {
+				continue
+			}
+			if err != nil {
+				return false, err
+			}
+			if podResp != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+
 	return logCmd, err
 }
 
@@ -94,11 +148,11 @@ func verifyDeploymentAgainstRolloutHistory(client *rancher.Client, clusterID, na
 
 	revision := latestDeployment.ObjectMeta.Annotations[revisionAnnotation]
 
-	if revision == expectedRevision {
-		return nil
+	if revision != expectedRevision {
+		return errors.New("revision not found")
 	}
 
-	return errors.New("revision not found")
+	return nil
 }
 
 func verifyOrchestrationStatus(client *rancher.Client, clusterID, namespaceName string, deploymentName string, isPaused bool) error {
@@ -120,14 +174,13 @@ func verifyOrchestrationStatus(client *rancher.Client, clusterID, namespaceName 
 		return err
 	}
 
-	if latestDeployment.Spec.Paused == isPaused {
-		return nil
+	if isPaused && !latestDeployment.Spec.Paused {
+		return errors.New("the orchestration is active")
 	}
 
-	if isPaused {
+	if !isPaused && latestDeployment.Spec.Paused {
 		return errors.New("the orchestration is paused")
 	}
 
-	return errors.New("the orchestration is active")
-
+	return nil
 }
