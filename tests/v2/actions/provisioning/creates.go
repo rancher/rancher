@@ -561,23 +561,29 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 // CreateProvisioningAirgapCustomCluster provisions a non-rke1 cluster using corral to gather its nodes, then runs verify checks
 func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.Packages) (*v1.SteveAPIObject, error) {
 	setLogrusFormatter()
-	rolesPerNode := map[int32]string{}
+	quantityPerPool := []int32{}
+	rolesPerPool := []string{}
 	for _, pool := range clustersConfig.MachinePools {
 		var finalRoleCommand string
 		if pool.MachinePoolConfig.ControlPlane {
 			finalRoleCommand += " --controlplane"
 		}
+
 		if pool.MachinePoolConfig.Etcd {
 			finalRoleCommand += " --etcd"
 		}
+
 		if pool.MachinePoolConfig.Worker {
 			finalRoleCommand += " --worker"
 		}
+
 		if pool.MachinePoolConfig.Windows {
 			finalRoleCommand += " --windows"
 		}
 
-		rolesPerNode[pool.MachinePoolConfig.Quantity] = finalRoleCommand
+		quantityPerPool = append(quantityPerPool, pool.MachinePoolConfig.Quantity)
+		rolesPerPool = append(rolesPerPool, finalRoleCommand)
+
 	}
 
 	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
@@ -618,32 +624,25 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 	}
 
 	logrus.Infof("Register Custom Cluster Through Corral")
-	for quantity, roles := range rolesPerNode {
-		err = corral.UpdateCorralConfig("node_count", fmt.Sprint(quantity))
-		if err != nil {
-			return nil, err
-		}
+	corralsArgs := []corral.Args{}
+
+	for poolIndex, poolRole := range rolesPerPool {
+
+		regCmd := fmt.Sprintf("%s %s", token.InsecureNodeCommand, poolRole)
 
 		// environment variables must be escaped inside original registration command
-		temp := strings.Replace(token.InsecureNodeCommand, "\"", "\\\"", -1)
-		command := fmt.Sprintf("%s %s", temp, roles)
-		logrus.Infof("registration command is %s", command)
-		err = corral.UpdateCorralConfig("registration_command", command)
-		if err != nil {
-			return nil, err
-		}
+		regCmd = strings.Replace(regCmd, "\"", "\\\"", -1)
 
-		corralName := namegen.AppendRandomString(rke2k3sNodeCorralName)
-		_, err = corral.CreateCorral(
-			client.Session,
-			corralName,
-			corralPackages.CorralPackageImages[corralPackageAirgapCustomClusterName],
-			corralPackages.HasDebug,
-			corralPackages.HasCleanup,
-		)
-		if err != nil {
-			return nil, err
-		}
+		corralsArgs = append(corralsArgs, corral.Args{
+			Name:        namegen.AppendRandomString(rke2k3sNodeCorralName),
+			PackageName: corralPackages.CorralPackageImages[corralPackageAirgapCustomClusterName],
+			Updates:     map[string]string{"registration_command": regCmd, "node_count": fmt.Sprint(quantityPerPool[poolIndex])},
+		})
+	}
+
+	_, err = corral.CreateMultipleCorrals(client.Session, corralsArgs, corralPackages.HasDebug, corralPackages.HasCleanup)
+	if err != nil {
+		return nil, err
 	}
 
 	createdCluster, err := client.Steve.SteveType(stevetypes.Provisioning).ByID(namespace + "/" + clusterName)
@@ -654,7 +653,8 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.Packages) (*management.Cluster, error) {
 	setLogrusFormatter()
 	clusterName := namegen.AppendRandomString(rke1AirgapCustomCluster)
-	rolesPerNode := map[int64]string{}
+	quantityPerPool := []int32{}
+	rolesPerPool := []string{}
 	for _, pool := range clustersConfig.NodePools {
 		var finalRoleCommand string
 		if pool.NodeRoles.ControlPlane {
@@ -667,7 +667,8 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 			finalRoleCommand += " --worker"
 		}
 
-		rolesPerNode[pool.NodeRoles.Quantity] = finalRoleCommand
+		quantityPerPool = append(quantityPerPool, int32(pool.NodeRoles.Quantity))
+		rolesPerPool = append(rolesPerPool, finalRoleCommand)
 	}
 
 	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
@@ -698,35 +699,25 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 		return nil, err
 	}
 
+	corralsArgs := []corral.Args{}
+
 	logrus.Infof("Register Custom Cluster Through Corral")
-	for quantity, roles := range rolesPerNode {
-		err = corral.UpdateCorralConfig("node_count", fmt.Sprint(quantity))
-		if err != nil {
-			return nil, err
-		}
-
+	for poolIndex, poolRole := range rolesPerPool {
 		// environment variables must be escaped inside original registration command
-		temp := strings.Replace(token.NodeCommand, "\"", "\\\"", -1)
-		command := fmt.Sprintf("%s %s", temp, roles)
-		logrus.Infof("registration command is %s", command)
-		err = corral.UpdateCorralConfig("registration_command", command)
-		if err != nil {
-			return nil, err
-		}
+		escapedCommand := strings.Replace(token.NodeCommand, "\"", "\\\"", -1)
 
-		corralName := namegen.AppendRandomString(rke1NodeCorralName)
-
-		_, err = corral.CreateCorral(
-			client.Session,
-			corralName,
-			corralPackages.CorralPackageImages[corralPackageAirgapCustomClusterName],
-			corralPackages.HasDebug,
-			corralPackages.HasCleanup,
-		)
-		if err != nil {
-			return nil, err
-		}
+		corralsArgs = append(corralsArgs, corral.Args{
+			Name:        namegen.AppendRandomString(rke1NodeCorralName),
+			PackageName: corralPackages.CorralPackageImages[corralPackageAirgapCustomClusterName],
+			Updates:     map[string]string{"registration_command": fmt.Sprintf("%s %s", escapedCommand, poolRole), "node_count": fmt.Sprint(quantityPerPool[poolIndex])},
+		})
 	}
+
+	_, err = corral.CreateMultipleCorrals(client.Session, corralsArgs, corralPackages.HasDebug, corralPackages.HasCleanup)
+	if err != nil {
+		return nil, err
+	}
+
 	createdCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
 	return createdCluster, err
 }
