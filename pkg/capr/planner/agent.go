@@ -14,7 +14,7 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, nil
 	}
 
-	tokens, err := p.clusterRegistrationTokenCache.GetByIndex(clusterRegToken, controlPlane.Spec.ManagementClusterName)
+	tokens, err := p.clusterRegistrationTokenCache.GetByIndex(ClusterRegToken, controlPlane.Spec.ManagementClusterName)
 	if err != nil {
 		return nil, err
 	}

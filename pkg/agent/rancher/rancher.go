@@ -70,6 +70,11 @@ type handler struct {
 }
 
 func (h *handler) startRancher() {
+	if features.ProvisioningPreBootstrap.Enabled() {
+		logrus.Debugf("not starting embedded rancher due to pre-bootstrap...")
+		return
+	}
+
 	clientConfig := kubeconfig.GetNonInteractiveClientConfig("")
 	server, err := rancher.New(h.ctx, clientConfig, &rancher.Options{
 		HTTPListenPort:  80,
