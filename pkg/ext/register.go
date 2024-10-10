@@ -15,18 +15,25 @@ import (
 func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 	apiServer := NewAPIServer(getDefinitions)
 
-	ns := &corev1.Namespace{
+	nsTokens := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tokens.TokenNamespace,
 		},
 	}
-	wContext.Core.Namespace().Create(ns)
+	wContext.Core.Namespace().Create(nsTokens)
+
+	nsUserActivity := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: useractivity.UserActivityNamespace,
+		},
+	}
+	wContext.Core.Namespace().Create(nsUserActivity)
 
 	tokenStore := tokens.NewTokenStore(wContext.Core.Secret(), wContext.Core.Secret().Cache(), wContext.K8s.AuthorizationV1().SubjectAccessReviews())
 	tokenHandler := NewStoreDelegate(tokenStore, tokens.SchemeGroupVersion.WithKind(tokens.TokenAPIResource.Kind))
 	tokenWebService := tokenHandler.WebService(tokens.RancherTokenName, tokens.TokenAPIResource.Namespaced)
 
-	userActivityStore := useractivity.NewUserActivityStore(wContext.Mgmt.Token())
+	userActivityStore := useractivity.NewUserActivityStore(wContext.Mgmt.Token(), wContext.Core.ConfigMap())
 	userActivityHandler := NewStoreDelegate(userActivityStore, useractivity.SchemeGroupVersion.WithKind(useractivity.UserActivityAPIResource.Kind))
 	userActivityWebService := userActivityHandler.WebService(useractivity.UserActivityName, useractivity.UserActivityAPIResource.Namespaced)
 
