@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/sirupsen/logrus"
 )
@@ -61,7 +61,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 				continue
 			}
 
-			versionGTMin, err := k3sbasedupgrade.IsNewerVersion(minVersion, rancherVersion)
+			versionGTMin, err := nodesyncer.IsNewerVersion(minVersion, rancherVersion)
 			if err != nil {
 				continue
 			}
@@ -70,7 +70,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 				continue
 			}
 
-			versionLTMax, err := k3sbasedupgrade.IsNewerVersion(rancherVersion, maxVersion)
+			versionLTMax, err := nodesyncer.IsNewerVersion(rancherVersion, maxVersion)
 			if err != nil {
 				continue
 			}
