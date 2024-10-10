@@ -124,8 +124,8 @@ func TestCleanupRuns(t *testing.T) {
 func TestAuthConfigReset(t *testing.T) {
 	t.Parallel()
 
-	allFields := []string{"accessMode", "allowedPrincipalIds", "apiVersion", "kind", "metadata", "type", "status"}
-	postResetFields := []string{"apiVersion", "kind", "metadata", "type", "status"}
+	allFields := []string{"accessMode", "allowedPrincipalIds", "apiVersion", "kind", "metadata", "type", "status", "logoutAllSupported"}
+	postResetFields := []string{"apiVersion", "kind", "metadata", "type", "status", "logoutAllSupported"}
 
 	tests := []struct {
 		annotationValue string
@@ -153,6 +153,7 @@ func TestAuthConfigReset(t *testing.T) {
 				Enabled:             false,
 				AccessMode:          "unrestricted",
 				AllowedPrincipalIDs: []string{"user1", "user2"},
+				LogoutAllSupported:  true,
 			}
 
 			mockUsers := newMockUserLister()
