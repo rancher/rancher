@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -92,7 +93,9 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 		rbClient:      management.RBAC.RoleBindings(""),
 		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crbClient:     management.RBAC.ClusterRoleBindings(""),
-		crtbClient:    management.Management.ClusterRoleTemplateBindings(""),
+		crtbClient:    management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		crtbCache:     management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		s:             status.NewStatus(),
 	}
 	return prtb, crtb
 }
