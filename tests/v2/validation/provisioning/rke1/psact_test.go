@@ -105,10 +105,16 @@ func (r *RKE1PSACTTestSuite) TestRKE1PSACTNodeDriverCluster() {
 	}
 
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.NodePools = tt.nodePools
 		provisioningConfig.PSACT = string(tt.psact)
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig,
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, &provisioningConfig,
 			permutations.RKE1ProvisionCluster, nil, nil)
 	}
 }
