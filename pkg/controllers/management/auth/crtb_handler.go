@@ -97,6 +97,7 @@ type crtbLifecycle struct {
 	crbLister     typesrbacv1.ClusterRoleBindingLister
 	crbClient     typesrbacv1.ClusterRoleBindingInterface
 	crtbClient    controllersv3.ClusterRoleTemplateBindingController
+	crtbCache     controllersv3.ClusterRoleTemplateBindingCache
 	s             *status.Status
 }
 
@@ -371,7 +372,7 @@ var timeNow = func() time.Time {
 
 func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crtbFromCluster, err := c.crtbClient.Get(crtb.Namespace, crtb.Name, metav1.GetOptions{})
+		crtbFromCluster, err := c.crtbCache.Get(crtb.Namespace, crtb.Name)
 		if err != nil {
 			return err
 		}
