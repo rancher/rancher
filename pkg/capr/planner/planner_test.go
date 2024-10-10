@@ -124,7 +124,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:RESTART_STAMP", "$env:INSTALL_RKE2_EXEC"},
+				envs:            []string{"RESTART_STAMP", "INSTALL_RKE2_EXEC"},
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			planner.retrievalFunctions.GetBootstrapManifests = func(cp *rkev1.RKEControlPlane) ([]plan.File, error) { return nil, nil }
 			// act
-			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
+			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry, false)
 
 			// assert
 			a.Nil(err)

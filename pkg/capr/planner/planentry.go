@@ -136,6 +136,14 @@ func isOnlyWorker(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && isWorker(entry)
 }
 
+func isOnlyWindowsWorker(entry *planEntry) bool {
+	return isOnlyWorker(entry) && windows(entry)
+}
+
+func isOnlyLinuxWorker(entry *planEntry) bool {
+	return isOnlyWorker(entry) && !windows(entry)
+}
+
 func windows(entry *planEntry) bool {
 	if entry == nil || entry.Metadata == nil {
 		return false

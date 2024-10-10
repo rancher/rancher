@@ -47,12 +47,13 @@ type Secret struct {
 }
 
 type OneTimeInstruction struct {
-	Name       string   `json:"name,omitempty"`
-	Image      string   `json:"image,omitempty"`
-	Env        []string `json:"env,omitempty"`
-	Args       []string `json:"args,omitempty"`
-	Command    string   `json:"command,omitempty"`
-	SaveOutput bool     `json:"saveOutput,omitempty"`
+	Name                              string   `json:"name,omitempty"`
+	Image                             string   `json:"image,omitempty"`
+	Env                               []string `json:"env,omitempty"`
+	Args                              []string `json:"args,omitempty"`
+	Command                           string   `json:"command,omitempty"`
+	SaveOutput                        bool     `json:"saveOutput,omitempty"`
+	ResetFailureCountOnServiceRestart bool     `json:"resetFailuresOnServiceRestart,omitempty"`
 }
 
 type PeriodicInstruction struct {
