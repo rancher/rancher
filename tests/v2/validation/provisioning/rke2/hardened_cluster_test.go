@@ -94,6 +94,12 @@ func (c *HardenedRKE2ClusterProvisioningTestSuite) TestProvisioningRKE2HardenedC
 		{"RKE2 CIS 1.8 Profile Permissive " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "rke2-cis-1.8-profile-permissive"},
 	}
 	for _, tt := range tests {
+		subSession := c.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := c.client.WithSession(subSession)
+		require.NoError(c.T(), err)
+
 		c.Run(tt.name, func() {
 			provisioningConfig := *c.provisioningConfig
 			provisioningConfig.MachinePools = tt.machinePools
@@ -105,20 +111,20 @@ func (c *HardenedRKE2ClusterProvisioningTestSuite) TestProvisioningRKE2HardenedC
 			testConfig := clusters.ConvertConfigToClusterConfig(&provisioningConfig)
 			testConfig.KubernetesVersion = c.provisioningConfig.RKE2KubernetesVersions[0]
 
-			clusterObject, err := provisioning.CreateProvisioningCustomCluster(tt.client, &externalNodeProvider, testConfig)
+			clusterObject, err := provisioning.CreateProvisioningCustomCluster(client, &externalNodeProvider, testConfig)
 			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
-			provisioning.VerifyCluster(c.T(), tt.client, testConfig, clusterObject)
+			provisioning.VerifyCluster(c.T(), client, testConfig, clusterObject)
 
-			cluster, err := extensionscluster.NewClusterMeta(tt.client, clusterObject.Name)
+			cluster, err := extensionscluster.NewClusterMeta(client, clusterObject.Name)
 			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
-			latestCISBenchmarkVersion, err := tt.client.Catalog.GetLatestChartVersion(charts.CISBenchmarkName, catalog.RancherChartRepo)
+			latestCISBenchmarkVersion, err := client.Catalog.GetLatestChartVersion(charts.CISBenchmarkName, catalog.RancherChartRepo)
 			require.NoError(c.T(), err)
 
-			project, err := projects.GetProjectByName(tt.client, cluster.ID, cis.System)
+			project, err := projects.GetProjectByName(client, cluster.ID, cis.System)
 			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
@@ -131,8 +137,8 @@ func (c *HardenedRKE2ClusterProvisioningTestSuite) TestProvisioningRKE2HardenedC
 				ProjectID: c.project.ID,
 			}
 
-			cis.SetupCISBenchmarkChart(tt.client, c.project.ClusterID, c.chartInstallOptions, charts.CISBenchmarkNamespace)
-			cis.RunCISScan(tt.client, c.project.ClusterID, tt.scanProfileName)
+			cis.SetupCISBenchmarkChart(client, c.project.ClusterID, c.chartInstallOptions, charts.CISBenchmarkNamespace)
+			cis.RunCISScan(client, c.project.ClusterID, tt.scanProfileName)
 		})
 	}
 }

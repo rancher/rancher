@@ -91,6 +91,12 @@ func (r *RKE2CloudProviderTestSuite) TestAWSCloudProviderCluster() {
 	}
 
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
 		if !tt.runFlag {
 			r.T().Logf("SKIPPED")
 			continue
@@ -99,7 +105,8 @@ func (r *RKE2CloudProviderTestSuite) TestAWSCloudProviderCluster() {
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.CloudProvider = "aws"
 		provisioningConfig.MachinePools = tt.machinePools
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
+
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }
 
@@ -123,6 +130,12 @@ func (r *RKE2CloudProviderTestSuite) TestVsphereCloudProviderCluster() {
 	}
 
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
 		if !tt.runFlag {
 			r.T().Logf("SKIPPED")
 			continue
@@ -131,7 +144,8 @@ func (r *RKE2CloudProviderTestSuite) TestVsphereCloudProviderCluster() {
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.CloudProvider = "rancher-vsphere"
 		provisioningConfig.MachinePools = tt.machinePools
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
+
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }
 

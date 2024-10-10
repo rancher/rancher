@@ -6,6 +6,8 @@ Please see below for more details for your config. Please note that the config c
 
 ## Table of Contents
 1. [Getting Started](#Getting-Started)
+2. [Release Testing](#Release-Testing)
+3. [Local Qase Reporting](#Local-Qase-Reporting)
 
 ## Getting Started
 In your config file, set the following:
@@ -32,3 +34,71 @@ automated check to validate [this issue](https://github.com/rancher/rancher/issu
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/deleting --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestDeleteInitMachineTestSuite/TestDeleteInitMachine"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+## Release Testing
+The release testing includes all of the tests that are ran during release testing time. Each test will first provision a cluster and then run the specific test. See an example config below:
+
+```yaml
+rancher:
+  host: ""
+  adminToken: ""
+  cleanup: false
+  insecure: true
+provisioningInput:
+  rke1KubernetesVersion: [""]
+  rke2KubernetesVersion: [""]
+  k3sKubernetesVersion: [""]
+  cni: ["calico"]
+  providers: ["linode"]
+linodeCredentials:
+   token: ""
+linodeConfig:
+  authorizedUsers: ""
+  createPrivateIp: true
+  dockerPort: "2376"
+  image: "linode/ubuntu22.04"
+  instanceType: "g6-dedicated-8"
+  label: ""
+  region: "us-west"
+  rootPass: ""
+  sshPort: "22"
+  sshUser: "root"
+  stackscript: ""
+  stackscriptData: ""
+  swapSize: "512"
+  tags: ""
+  token: ""
+  type: "linodeConfig"
+  uaPrefix: "Rancher"
+linodeMachineConfigs:
+  region: "us-west"
+  linodeMachineConfig:
+  - roles: ["etcd", "controlplane", "worker"]
+    authorizedUsers: ""
+    createPrivateIp: true
+    dockerPort: "2376"
+    image: "linode/ubuntu22.04"
+    instanceType: "g6-standard-8"
+    region: "us-west"
+    rootPass: ""
+    sshPort: "22"
+    sshUser: ""
+    stackscript: ""
+    stackscriptData: ""
+    swapSize: "512"
+    tags: ""
+    uaPrefix: "Rancher"
+```
+
+To run, use the following command:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/deleting --junitfile results.xml -- -timeout=300m -tags=validation -v -run "TestDeleteReleaseTestingTestSuite$"`
+
+## Local Qase Reporting
+If you are planning to report to Qase locally, then you will need to have the following done:
+1. The `rancher` block in your config file must have `localQaseReporting: true`.
+2. The working shell session must have the following two environmental variables set:
+     - `QASE_AUTOMATION_TOKEN=""`
+     - `QASE_TEST_RUN_ID=""`
+3. Append `./reporter` to the end of the `gotestsum` command. See an example below::
+     - `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/deleting --junitfile results.xml --jsonfile results.json -- -timeout=300m -v -run "TestDeleteReleaseTestingTestSuite$";/path/to/rancher/rancher/reporter`

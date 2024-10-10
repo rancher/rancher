@@ -126,14 +126,22 @@ func (r *RKE1CloudProviderTestSuite) TestVsphereCloudProviderRKE1Cluster() {
 	}
 
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
 		if !tt.runFlag {
 			r.T().Logf("SKIPPED")
 			continue
 		}
+
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.CloudProvider = "rancher-vsphere"
 		provisioningConfig.NodePools = tt.nodePools
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
+
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, &provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
 	}
 }
 

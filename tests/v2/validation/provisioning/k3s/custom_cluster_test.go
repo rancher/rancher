@@ -88,6 +88,12 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, c.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
+		subSession := c.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(c.T(), err)
+
 		if !tt.runFlag {
 			c.T().Logf("SKIPPED")
 			continue
@@ -95,7 +101,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 
 		provisioningConfig := *c.provisioningConfig
 		provisioningConfig.MachinePools = tt.machinePools
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.K3SCustomCluster, nil, nil)
+		permutations.RunTestPermutations(&c.Suite, tt.name, client, &provisioningConfig, permutations.K3SCustomCluster, nil, nil)
 	}
 }
 
@@ -123,7 +129,13 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 		{provisioninginput.StandardClientName.String(), c.standardUserClient},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.K3SCustomCluster, nil, nil)
+		subSession := c.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(c.T(), err)
+
+		permutations.RunTestPermutations(&c.Suite, tt.name, client, c.provisioningConfig, permutations.K3SCustomCluster, nil, nil)
 	}
 }
 

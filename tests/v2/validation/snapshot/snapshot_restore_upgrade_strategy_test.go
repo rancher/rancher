@@ -59,7 +59,7 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStra
 		etcdSnapshot *etcdsnapshot.Config
 		client       *rancher.Client
 	}{
-		{"Restore cluster config, Kubernetes version and etcd", snapshotRestoreAll, s.client},
+		{"Restore upgrade strategy - cluster config, Kubernetes version and etcd", snapshotRestoreAll, s.client},
 	}
 
 	for _, tt := range tests {

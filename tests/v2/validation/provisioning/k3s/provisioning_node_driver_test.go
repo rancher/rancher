@@ -89,13 +89,19 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 	}
 
 	for _, tt := range tests {
+		testSession := session.NewSession()
+		defer testSession.Cleanup()
+
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(k.T(), err)
+
 		if !tt.runFlag {
 			k.T().Logf("SKIPPED")
 			continue
 		}
 		provisioningConfig := *k.provisioningConfig
 		provisioningConfig.MachinePools = tt.machinePools
-		permutations.RunTestPermutations(&k.Suite, tt.name, tt.client, &provisioningConfig, permutations.K3SProvisionCluster, nil, nil)
+		permutations.RunTestPermutations(&k.Suite, tt.name, client, &provisioningConfig, permutations.K3SProvisionCluster, nil, nil)
 	}
 }
 
@@ -113,7 +119,13 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 	}
 
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&k.Suite, tt.name, tt.client, k.provisioningConfig, permutations.K3SProvisionCluster, nil, nil)
+		testSession := session.NewSession()
+		defer testSession.Cleanup()
+
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(k.T(), err)
+
+		permutations.RunTestPermutations(&k.Suite, tt.name, client, k.provisioningConfig, permutations.K3SProvisionCluster, nil, nil)
 	}
 }
 
