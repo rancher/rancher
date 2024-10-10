@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+	windowsContainerImage = "mcr.microsoft.com/windows/servercore/iis"
+)
+
 type SnapshotRestoreWindowsTestSuite struct {
 	suite.Suite
 	session        *session.Session
@@ -60,7 +64,8 @@ func (s *SnapshotRestoreWindowsTestSuite) TestSnapshotRestoreWindows() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, windowsContainerImage)
+			err := etcdsnapshot.CreateAndValidateSnapshotRestore(s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, windowsContainerImage)
+			require.NoError(s.T(), err)
 		})
 	}
 }
@@ -70,7 +75,8 @@ func (s *SnapshotRestoreWindowsTestSuite) TestSnapshotRestoreWindowsDynamicInput
 		s.T().Skip()
 	}
 
-	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, windowsContainerImage)
+	err := etcdsnapshot.CreateAndValidateSnapshotRestore(s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, windowsContainerImage)
+	require.NoError(s.T(), err)
 }
 
 // In order for 'go test' to run this suite, we need to create

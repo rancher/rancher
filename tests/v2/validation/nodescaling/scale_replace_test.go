@@ -8,6 +8,7 @@ import (
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/machinepools"
+	"github.com/rancher/rancher/tests/v2/actions/scalinginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
@@ -77,7 +78,8 @@ func (s *NodeReplacingTestSuite) TestReplacingNodes() {
 		}
 
 		s.Run(tt.name, func() {
-			ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.nodeRoles.Etcd, tt.nodeRoles.ControlPlane, tt.nodeRoles.Worker)
+			err := scalinginput.ReplaceNodes(s.client, s.client.RancherConfig.ClusterName, tt.nodeRoles.Etcd, tt.nodeRoles.ControlPlane, tt.nodeRoles.Worker)
+			require.NoError(s.T(), err)
 		})
 	}
 }

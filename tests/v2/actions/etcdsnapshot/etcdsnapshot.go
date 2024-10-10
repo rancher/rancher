@@ -3,6 +3,7 @@ package etcdsnapshot
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/rancher/norman/types"
@@ -60,14 +61,18 @@ func RKE1RetentionLimitCheck(client *rancher.Client, clusterName string) error {
 		isS3 = true
 	}
 
-	existingSnapshots, err := etcdsnapshot.GetRKE1Snapshots(client, clusterName)
+	snapshotManagementObjList, err := client.Management.EtcdBackup.ListAll(&types.ListOpts{
+		Filters: map[string]interface{}{
+			"clusterId": clusterID,
+		},
+	})
 	if err != nil {
 		return err
 	}
 
 	automaticSnapshots := []management.EtcdBackup{}
 
-	for _, snapshot := range existingSnapshots {
+	for _, snapshot := range snapshotManagementObjList.Data {
 		if !snapshot.Manual {
 			automaticSnapshots = append(automaticSnapshots, snapshot)
 		}
@@ -124,14 +129,19 @@ func RKE2K3SRetentionLimitCheck(client *rancher.Client, clusterName string) erro
 		isS3 = true
 	}
 
-	existingSnapshots, err := etcdsnapshot.GetRKE2K3SSnapshots(client, clusterName)
+	query, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s", etcdsnapshot.SnapshotClusterNameLabel, clusterName))
+	if err != nil {
+		return err
+	}
+
+	snapshotSteveObjList, err := client.Steve.SteveType(etcdsnapshot.SnapshotSteveResourceType).List(query)
 	if err != nil {
 		return err
 	}
 
 	automaticSnapshots := []rancherv1.SteveAPIObject{}
 
-	for _, snapshot := range existingSnapshots {
+	for _, snapshot := range snapshotSteveObjList.Data {
 		if strings.Contains(snapshot.Annotations["etcdsnapshot.rke.io/snapshot-file-name"], "etcd-snapshot") {
 			automaticSnapshots = append(automaticSnapshots, snapshot)
 		}

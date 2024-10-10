@@ -6,12 +6,12 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+
 	psadeploy "github.com/rancher/rancher/tests/v2/actions/psact"
 	"github.com/rancher/rancher/tests/v2/actions/registries"
 	"github.com/rancher/rancher/tests/v2/actions/reports"
@@ -21,8 +21,6 @@ import (
 	shepherdclusters "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
 	"github.com/rancher/shepherd/extensions/defaults"
-	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
-	"github.com/rancher/shepherd/extensions/etcdsnapshot"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
 	"github.com/rancher/shepherd/extensions/sshkeys"
@@ -35,7 +33,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -417,72 +414,6 @@ func VerifyUpgrade(t *testing.T, updatedCluster *bundledclusters.BundledCluster,
 		require.NoError(t, err)
 		assert.Equalf(t, upgradedVersion, clusterSpec.KubernetesVersion, "[%v]: %v", updatedCluster.Meta.Name, logMessageKubernetesVersion)
 	}
-}
-
-// VerifySnapshots waits for a cluster's snapshots to be ready and validates that the correct number of snapshots have been taken
-func VerifySnapshots(client *rancher.Client, clusterName string, expectedSnapshotLength int, isRKE1 bool) (string, error) {
-	client, err := client.ReLogin()
-	if err != nil {
-		return "", err
-	}
-
-	var snapshotToBeRestored string
-	var snapshotNameList []string
-	s3Prefix := onDemandPrefix + clusterName
-	err = kwait.PollUntilContextTimeout(context.TODO(), 5*time.Second, defaults.FiveMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
-		if isRKE1 {
-			snapshotObjectList, err := etcdsnapshot.GetRKE1Snapshots(client, clusterName)
-			if err != nil {
-				return false, err
-			}
-
-			for _, snapshot := range snapshotObjectList {
-				snapshotNameList = append(snapshotNameList, snapshot.ID)
-			}
-		} else {
-			snapshotObjectList, err := etcdsnapshot.GetRKE2K3SSnapshots(client, clusterName)
-			if err != nil {
-				return false, err
-			}
-
-			for _, snapshot := range snapshotObjectList {
-				snapshotNameList = append(snapshotNameList, snapshot.Name)
-			}
-		}
-
-		if len(snapshotNameList) == 0 {
-			return false, fmt.Errorf("no snapshots found")
-		}
-
-		if strings.Contains(fmt.Sprintf("%v", snapshotNameList), s3Prefix) {
-			snapshotSteveObjList, err := client.Steve.SteveType(stevetypes.EtcdSnapshot).List(nil)
-			if err != nil {
-				return false, err
-			}
-
-			for _, snapshot := range snapshotSteveObjList.Data {
-				if snapshot.Annotations[etcdSnapshotAnnotation] == s3 {
-					snapshotToBeRestored = snapshot.Name
-
-					return true, nil
-				} else if snapshot.Annotations[etcdSnapshotAnnotation] == local {
-					snapshotToBeRestored = snapshotNameList[len(snapshotNameList)-1]
-
-					return true, nil
-				}
-			}
-
-			return false, nil
-		}
-
-		if len(snapshotNameList) == expectedSnapshotLength || len(snapshotNameList) > expectedSnapshotLength {
-			snapshotToBeRestored = snapshotNameList[0]
-			return true, nil
-		}
-
-		return false, nil
-	})
-	return snapshotToBeRestored, err
 }
 
 // VerifySSHTests validates the ssh tests listed in the config on each node of the cluster
