@@ -126,17 +126,22 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 		{"5 nodes - 1 role per node + 2 Windows workers " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedTwoWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
+		subSession := c.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := c.client.WithSession(subSession)
+		require.NoError(c.T(), err)
+
 		if !tt.runFlag {
 			c.T().Logf("SKIPPED")
 			continue
 		}
 
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
 		if (c.isWindows == tt.isWindows) || (c.isWindows && !tt.isWindows) {
 			provisioningConfig := *c.provisioningConfig
 			provisioningConfig.MachinePools = tt.machinePools
-			permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
+
+			permutations.RunTestPermutations(&c.Suite, tt.name, client, &provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
 		} else {
 			c.T().Skip("Skipping Windows tests")
 		}
@@ -156,12 +161,13 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 		{provisioninginput.StandardClientName.String(), c.standardUserClient},
 	}
 	for _, tt := range tests {
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
-		_, err := tt.client.WithSession(testSession)
+		subSession := c.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := c.client.WithSession(subSession)
 		require.NoError(c.T(), err)
 
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
+		permutations.RunTestPermutations(&c.Suite, tt.name, client, c.provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
 	}
 }
 

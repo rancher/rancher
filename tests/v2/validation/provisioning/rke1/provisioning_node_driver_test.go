@@ -87,13 +87,21 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
 		if !tt.runFlag {
 			r.T().Logf("SKIPPED")
 			continue
 		}
+
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.NodePools = tt.nodePools
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
+
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, &provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
 	}
 }
 
@@ -111,7 +119,13 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 		{provisioninginput.StandardClientName.String(), r.standardUserClient},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, r.provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
 	}
 }
 

@@ -134,7 +134,7 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 
 			provisioning.VerifyRKE1Cluster(u.T(), client, testConfig, upgradedRKE1Cluster)
 		} else {
-			upgradedCluster, err := upgradeRKE2K3SCluster(u.T(), client, cluster, testConfig)
+			upgradedCluster, err := upgradeRKE2K3SCluster(u.T(), client, cluster.Name, testConfig)
 			require.NoError(u.T(), err)
 
 			provisioning.VerifyCluster(u.T(), client, testConfig, upgradedCluster)
@@ -146,15 +146,18 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 
 // upgradeRKE1Cluster is a function to upgrade a downstream RKE1 cluster.
 func upgradeRKE1Cluster(t *testing.T, client *rancher.Client, cluster upgradeinput.Cluster, clustersConfig *clusters.ClusterConfig) (*management.Cluster, error) {
-	clusterObj, err := extensionscluster.GetClusterIDByName(client, cluster.Name)
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	require.NoError(t, err)
 
-	clusterResp, err := client.Management.Cluster.ByID(clusterObj)
+	clusterObj, err := extensionscluster.GetClusterIDByName(adminClient, cluster.Name)
 	require.NoError(t, err)
 
-	updatedCluster := clusters.UpdateRKE1ClusterConfig(clusterResp.Name, client, clustersConfig)
+	clusterResp, err := adminClient.Management.Cluster.ByID(clusterObj)
+	require.NoError(t, err)
 
-	updatedClusterResp, err := extensionscluster.UpdateRKE1Cluster(client, clusterResp, updatedCluster)
+	updatedCluster := clusters.UpdateRKE1ClusterConfig(clusterResp.Name, adminClient, clustersConfig)
+
+	updatedClusterResp, err := extensionscluster.UpdateRKE1Cluster(adminClient, clusterResp, updatedCluster)
 	require.NoError(t, err)
 
 	upgradedCluster, err := client.Management.Cluster.ByID(updatedClusterResp.ID)
@@ -167,11 +170,14 @@ func upgradeRKE1Cluster(t *testing.T, client *rancher.Client, cluster upgradeinp
 }
 
 // upgradeRKE2K3SCluster is a function to upgrade a downstream RKE2 or K3S cluster.
-func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgradeinput.Cluster, clustersConfig *clusters.ClusterConfig) (*v1.SteveAPIObject, error) {
-	clusterObj, err := extensionscluster.GetV1ProvisioningClusterByName(client, cluster.Name)
+func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, clusterName string, clustersConfig *clusters.ClusterConfig) (*v1.SteveAPIObject, error) {
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	require.NoError(t, err)
 
-	clusterResp, err := client.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(clusterObj)
+	clusterObj, err := extensionscluster.GetV1ProvisioningClusterByName(adminClient, clusterName)
+	require.NoError(t, err)
+
+	clusterResp, err := adminClient.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(clusterObj)
 	require.NoError(t, err)
 
 	updatedCluster := clusters.UpdateK3SRKE2ClusterConfig(clusterResp, clustersConfig)
@@ -180,7 +186,7 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 	err = v1.ConvertToK8sType(updatedCluster, &updatedClusterObj)
 	require.NoError(t, err)
 
-	updatedClusterResp, err := extensionscluster.UpdateK3SRKE2Cluster(client, updatedCluster, updatedClusterObj)
+	updatedClusterResp, err := extensionscluster.UpdateK3SRKE2Cluster(adminClient, updatedCluster, updatedClusterObj)
 	require.NoError(t, err)
 
 	updatedClusterSpec := &provv1.ClusterSpec{}
