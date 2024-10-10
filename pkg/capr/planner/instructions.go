@@ -8,6 +8,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -16,7 +17,7 @@ const (
 )
 
 // generateInstallInstruction generates the instruction necessary to install the desired tool.
-func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry, env []string) plan.OneTimeInstruction {
+func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry, env []string, resetFailureCountOnSystemAgentRestart bool) plan.OneTimeInstruction {
 	var instruction plan.OneTimeInstruction
 	image := p.getInstallerImage(controlPlane)
 	cattleOS := entry.Metadata.Labels[capr.CattleOSLabel]
@@ -26,14 +27,22 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 		}
 		switch cattleOS {
 		case capr.WindowsMachineOS:
-			env = append(env, fmt.Sprintf("$env:%s=\"%s\"", arg.Name, arg.Value))
+			env = append(env, capr.FormatWindowsEnvVar(corev1.EnvVar{
+				Name:  arg.Name,
+				Value: arg.Value,
+			}, true))
 		default:
 			env = append(env, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
 		}
 	}
 	switch cattleOS {
 	case capr.WindowsMachineOS:
+		// TODO: Properly format the data dir when adding full support for Windows nodes
 		env = append(env, fmt.Sprintf("$env:%s_DATA_DIR=\"c:%s\"", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)), capr.GetDistroDataDir(controlPlane)))
+		env = append(env, capr.FormatWindowsEnvVar(corev1.EnvVar{
+			Name:  "INSTALL_RKE2_VERSION",
+			Value: strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-"),
+		}, true))
 	default:
 		env = append(env, fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)), capr.GetDistroDataDir(controlPlane)))
 	}
@@ -41,26 +50,31 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 	switch cattleOS {
 	case capr.WindowsMachineOS:
 		instruction = plan.OneTimeInstruction{
-			Name:    "install",
-			Image:   image,
-			Command: "powershell.exe",
-			Args:    []string{"-File", "run.ps1"},
-			Env:     env,
+			Name:                              "install",
+			Image:                             image,
+			Command:                           "powershell.exe",
+			Args:                              []string{"-File", "run.ps1"},
+			ResetFailureCountOnServiceRestart: resetFailureCountOnSystemAgentRestart,
+			Env:                               env,
 		}
 	default:
 		instruction = plan.OneTimeInstruction{
-			Name:    "install",
-			Image:   image,
-			Command: "sh",
-			Args:    []string{"-c", "run.sh"},
-			Env:     env,
+			Name:                              "install",
+			Image:                             image,
+			Command:                           "sh",
+			Args:                              []string{"-c", "run.sh"},
+			ResetFailureCountOnServiceRestart: resetFailureCountOnSystemAgentRestart,
+			Env:                               env,
 		}
 	}
 
 	if isOnlyWorker(entry) {
 		switch cattleOS {
 		case capr.WindowsMachineOS:
-			instruction.Env = append(instruction.Env, fmt.Sprintf("$env:INSTALL_%s_EXEC=\"agent\"", capr.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+			instruction.Env = append(instruction.Env, capr.FormatWindowsEnvVar(corev1.EnvVar{
+				Name:  fmt.Sprintf("INSTALL_%s_EXEC", capr.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)),
+				Value: "agent",
+			}, true))
 		default:
 			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", capr.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
 		}
@@ -72,17 +86,20 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 // addInstallInstructionWithRestartStamp will generate an instruction and append it to the node plan that executes the `run.sh` or `run.ps1`
 // from the installer image based on the control plane configuration. It will generate a restart stamp based on the
 // passed in configuration to determine whether it needs to start/restart the service being managed.
-func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
+func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, resetFailureCountOnSystemAgentRestart bool) (plan.NodePlan, error) {
 	var restartStampEnv string
 	stamp := restartStamp(nodePlan, controlPlane, p.getInstallerImage(controlPlane))
 	switch entry.Metadata.Labels[capr.CattleOSLabel] {
 	case capr.WindowsMachineOS:
-		restartStampEnv = "$env:RESTART_STAMP=\"" + stamp + "\""
+		restartStampEnv = capr.FormatWindowsEnvVar(corev1.EnvVar{
+			Name:  "WINS_RESTART_STAMP",
+			Value: stamp,
+		}, true)
 	default:
 		restartStampEnv = "RESTART_STAMP=" + stamp
 	}
 	instEnv := []string{restartStampEnv}
-	nodePlan.Instructions = append(nodePlan.Instructions, p.generateInstallInstruction(controlPlane, entry, instEnv))
+	nodePlan.Instructions = append(nodePlan.Instructions, p.generateInstallInstruction(controlPlane, entry, instEnv, resetFailureCountOnSystemAgentRestart))
 	return nodePlan, nil
 }
 
@@ -93,12 +110,15 @@ func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RK
 	var skipStartEnv string
 	switch entry.Metadata.Labels[capr.CattleOSLabel] {
 	case capr.WindowsMachineOS:
-		skipStartEnv = fmt.Sprintf("$env:INSTALL_%s_SKIP_START=\"true\"", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)))
+		skipStartEnv = capr.FormatWindowsEnvVar(corev1.EnvVar{
+			Name:  fmt.Sprintf("INSTALL_%s_SKIP_START", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion))),
+			Value: "true",
+		}, true)
 	default:
 		skipStartEnv = fmt.Sprintf("INSTALL_%s_SKIP_START=true", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)))
 	}
 	instEnv := []string{skipStartEnv}
-	return p.generateInstallInstruction(controlPlane, entry, instEnv)
+	return p.generateInstallInstruction(controlPlane, entry, instEnv, false)
 }
 
 func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {

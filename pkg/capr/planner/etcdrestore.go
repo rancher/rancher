@@ -230,7 +230,7 @@ func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.R
 	}
 	initNode := initNodes[0]
 
-	initNodePlan, _, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
+	initNodePlan, _, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "", false)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.R
 
 	controlPlaneEntry := controlPlaneEntries[0]
 
-	firstControlPlanePlan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, controlPlaneEntry, joinServer)
+	firstControlPlanePlan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, controlPlaneEntry, joinServer, false)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func (p *Planner) runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane *rkev1.
 	}
 	initNode := initNodes[0]
 
-	initNodePlan, _, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
+	initNodePlan, _, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "", false)
 	if err != nil {
 		return err
 	}

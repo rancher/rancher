@@ -76,7 +76,7 @@ func Test_CurrentVersionResolvesGH5551(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			shouldCreatePlan := currentVersionResolvesGH5551(tc.currentVersion)
+			shouldCreatePlan := CurrentVersionResolvesGH5551(tc.currentVersion)
 			if shouldCreatePlan != tc.expectedResult {
 				t.Logf("expected %t when providing rke2 version %s but got %t", tc.expectedResult, tc.currentVersion, shouldCreatePlan)
 				t.Fail()

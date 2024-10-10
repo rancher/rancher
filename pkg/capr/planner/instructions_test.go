@@ -50,7 +50,7 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
 				envs:            []string{},
-				expectedEnvsLen: 2,
+				expectedEnvsLen: 3,
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -77,8 +77,8 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:HTTP_PROXY", "$env:HTTPS_PROXY", "$env:INSTALL_RKE2_EXEC"},
-				expectedEnvsLen: 4,
+				envs:            []string{"HTTP_PROXY", "HTTPS_PROXY", "INSTALL_RKE2_EXEC"},
+				expectedEnvsLen: 5,
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -97,7 +97,7 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 			planner.retrievalFunctions.SystemAgentImage = func() string { return tt.args.image }
 			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			// act
-			p := planner.generateInstallInstruction(controlPlane, entry, []string{})
+			p := planner.generateInstallInstruction(controlPlane, entry, []string{}, false)
 
 			// assert
 			a.NotNil(p)
@@ -149,7 +149,7 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:RESTART_STAMP"},
+				envs:            []string{"RESTART_STAMP"},
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -166,7 +166,7 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 			entry := createTestPlanEntry(tt.args.os)
 
 			// act
-			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
+			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry, false)
 
 			// assert
 			a.Nil(err)
@@ -224,7 +224,7 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:INSTALL_RKE2_SKIP_START=\"true\""},
+				envs:            []string{"INSTALL_RKE2_SKIP_START=true"},
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
