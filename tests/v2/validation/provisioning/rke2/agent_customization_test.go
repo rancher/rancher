@@ -128,6 +128,7 @@ func (r *RKE2AgentCustomizationTestSuite) TestProvisioningRKE2ClusterAgentCustom
 
 		client, err := tt.client.WithSession(subSession)
 		require.NoError(r.T(), err)
+
 		r.provisioningConfig.MachinePools = tt.machinePools
 
 		if tt.agent == "fleet-agent" {
@@ -178,6 +179,7 @@ func (r *RKE2AgentCustomizationTestSuite) TestFailureProvisioningRKE2ClusterAgen
 
 		client, err := tt.client.WithSession(subSession)
 		require.NoError(r.T(), err)
+
 		r.provisioningConfig.MachinePools = tt.machinePools
 
 		if tt.agent == "fleet-agent" {

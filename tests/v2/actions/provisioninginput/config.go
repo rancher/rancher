@@ -84,6 +84,42 @@ var WorkerMachinePool = MachinePools{
 	},
 }
 
+var EtcdMultipleMachines = MachinePools{
+	MachinePoolConfig: machinepools.MachinePoolConfig{
+		NodeRoles: machinepools.NodeRoles{
+			Etcd:     true,
+			Quantity: 3,
+		},
+	},
+}
+
+var ControlPlaneMultipleMachines = MachinePools{
+	MachinePoolConfig: machinepools.MachinePoolConfig{
+		NodeRoles: machinepools.NodeRoles{
+			ControlPlane: true,
+			Quantity:     2,
+		},
+	},
+}
+
+var WorkerMultipleMachines = MachinePools{
+	MachinePoolConfig: machinepools.MachinePoolConfig{
+		NodeRoles: machinepools.NodeRoles{
+			Worker:   true,
+			Quantity: 3,
+		},
+	},
+}
+
+var WindowsMultipleMachines = MachinePools{
+	MachinePoolConfig: machinepools.MachinePoolConfig{
+		NodeRoles: machinepools.NodeRoles{
+			Windows:  true,
+			Quantity: 2,
+		},
+	},
+}
+
 var WindowsMachinePool = MachinePools{
 	MachinePoolConfig: machinepools.MachinePoolConfig{
 		NodeRoles: machinepools.NodeRoles{
@@ -128,6 +164,27 @@ var WorkerNodePool = NodePools{
 	NodeRoles: nodepools.NodeRoles{
 		Worker:   true,
 		Quantity: 1,
+	},
+}
+
+var EtcdMultipleNodes = NodePools{
+	NodeRoles: nodepools.NodeRoles{
+		Etcd:     true,
+		Quantity: 3,
+	},
+}
+
+var ControlPlaneMultipleNodes = NodePools{
+	NodeRoles: nodepools.NodeRoles{
+		ControlPlane: true,
+		Quantity:     2,
+	},
+}
+
+var WorkerMultipleNodes = NodePools{
+	NodeRoles: nodepools.NodeRoles{
+		Worker:   true,
+		Quantity: 3,
 	},
 }
 

@@ -6,6 +6,8 @@ Please see below for more details for your config. Please note that the config c
 
 ## Table of Contents
 1. [Getting Started](#Getting-Started)
+2. [Release Testing](#Release-Testing)
+3. [Local Qase Reporting](#Local-Qase-Reporting)
 
 ## Getting Started
 In your config file, set the following:
@@ -54,3 +56,71 @@ Note: This test will only work with Windows nodes existing in the cluster. Run t
 
 ### Sanpshot additional tests
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotAdditionalTestsTestSuite$"`
+
+## Release Testing
+The release testing includes all of the tests that are ran during release testing time. Each test will first provision a cluster and then run the specific test. See an example config below:
+
+```yaml
+rancher:
+  host: ""
+  adminToken: ""
+  cleanup: false
+  clusterName: ""
+  insecure: true
+provisioningInput:
+  rke1KubernetesVersion: [""]
+  rke2KubernetesVersion: [""]
+  k3sKubernetesVersion: [""]
+  cni: ["calico"]
+  providers: ["linode"]
+linodeCredentials:
+   token: ""
+linodeConfig:
+  authorizedUsers: ""
+  createPrivateIp: true
+  dockerPort: "2376"
+  image: "linode/ubuntu22.04"
+  instanceType: "g6-dedicated-8"
+  label: ""
+  region: "us-west"
+  rootPass: ""
+  sshPort: "22"
+  sshUser: "root"
+  stackscript: ""
+  stackscriptData: ""
+  swapSize: "512"
+  tags: ""
+  token: ""
+  type: "linodeConfig"
+  uaPrefix: "Rancher"
+linodeMachineConfigs:
+  linodeMachineConfig:
+  - roles: ["etcd", "controlplane", "worker"]
+    authorizedUsers: ""
+    createPrivateIp: true
+    dockerPort: "2376"
+    image: "linode/ubuntu22.04"
+    instanceType: "g6-standard-8"
+    region: "us-west"
+    rootPass: ""
+    sshPort: "22"
+    sshUser: ""
+    stackscript: ""
+    stackscriptData: ""
+    swapSize: "512"
+    tags: ""
+    uaPrefix: "Rancher"
+```
+
+To run, use the following command:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=240m -tags=validation -v -run "TestSnapshotRestoreReleaseTestingTestSuite$"`
+
+## Local Qase Reporting
+If you are planning to report to Qase locally, then you will need to have the following done:
+1. The `rancher` block in your config file must have `localQaseReporting: true`.
+2. The working shell session must have the following two environmental variables set:
+     - `QASE_AUTOMATION_TOKEN=""`
+     - `QASE_TEST_RUN_ID=""`
+3. Append `./reporter` to the end of the `gotestsum` command. See an example below::
+     - `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml --jsonfile results.json -- -timeout=300m -v -run "TestSnapshotRestoreReleaseTestingTestSuite$";/path/to/rancher/rancher/reporter`

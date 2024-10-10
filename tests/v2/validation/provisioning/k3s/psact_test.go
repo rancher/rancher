@@ -105,10 +105,16 @@ func (k *K3SPSACTTestSuite) TestK3SPSACTNodeDriverCluster() {
 	}
 
 	for _, tt := range tests {
+		testSession := session.NewSession()
+		defer testSession.Cleanup()
+
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(k.T(), err)
+
 		provisioningConfig := *k.provisioningConfig
 		provisioningConfig.MachinePools = tt.machinePools
 		provisioningConfig.PSACT = string(tt.psact)
-		permutations.RunTestPermutations(&k.Suite, tt.name, tt.client, &provisioningConfig,
+		permutations.RunTestPermutations(&k.Suite, tt.name, client, &provisioningConfig,
 			permutations.K3SProvisionCluster, nil, nil)
 	}
 }

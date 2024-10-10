@@ -55,20 +55,14 @@ func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePools() {
 		Quantity: 1,
 	}
 
-	nodeRolesTwoWorkers := nodepools.NodeRoles{
-		Worker:   true,
-		Quantity: 2,
-	}
-
 	tests := []struct {
 		name      string
 		nodeRoles nodepools.NodeRoles
 		client    *rancher.Client
 	}{
-		{"Scaling control plane by 1", nodeRolesControlPlane, s.client},
-		{"Scaling etcd node by 1", nodeRolesEtcd, s.client},
-		{"Scaling worker by 1", nodeRolesWorker, s.client},
-		{"Scaling worker node machine by 2", nodeRolesTwoWorkers, s.client},
+		{"Scaling RKE1 control plane by 1", nodeRolesControlPlane, s.client},
+		{"Scaling RKE1 etcd node by 1", nodeRolesEtcd, s.client},
+		{"Scaling RKE1 worker by 1", nodeRolesWorker, s.client},
 	}
 
 	for _, tt := range tests {

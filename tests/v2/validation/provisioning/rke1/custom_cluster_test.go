@@ -90,6 +90,12 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, c.standardUserClient, c.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
+		subSession := c.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(c.T(), err)
+
 		if !tt.runFlag {
 			c.T().Logf("SKIPPED")
 			continue
@@ -98,7 +104,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 		provisioningConfig := *c.provisioningConfig
 		provisioningConfig.NodePools = tt.nodePools
 		provisioningConfig.NodePools[0].SpecifyCustomPublicIP = true
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
+
+		permutations.RunTestPermutations(&c.Suite, tt.name, client, &provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
 
@@ -117,7 +124,13 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDy
 		{provisioninginput.StandardClientName.String(), c.standardUserClient},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
+		subSession := c.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(c.T(), err)
+
+		permutations.RunTestPermutations(&c.Suite, tt.name, client, c.provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
 
