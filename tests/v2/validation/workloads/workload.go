@@ -21,6 +21,9 @@ import (
 
 const (
 	revisionAnnotation = "deployment.kubernetes.io/revision"
+	nginxImageName     = "nginx"
+	ubuntuImageName    = "ubuntu"
+	redisImageName     = "redis"
 )
 
 func validateDeploymentUpgrade(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) {
@@ -31,17 +34,12 @@ func validateDeploymentUpgrade(t *testing.T, client *rancher.Client, clusterName
 	require.NoError(t, err)
 
 	log.Info("Waiting for all pods to be running")
-	err = pods.WatchAndWaitPodContainerRunning(client, clusterName, namespaceName, appv1Deployment)
+	err = pods.WatchAndWaitPodContainerRunning(client, clusterName, namespaceName, appv1Deployment, image, expectedReplicas)
 	require.NoError(t, err)
 
 	log.Infof("Verifying rollout history by revision %s", expectedRevision)
 	err = verifyDeploymentAgainstRolloutHistory(client, clusterName, namespaceName, appv1Deployment.Name, expectedRevision)
 	require.NoError(t, err)
-
-	log.Infof("Counting all pods running by image %s", image)
-	countPods, err := pods.CountPodContainerRunningByImage(client, clusterName, namespaceName, image)
-	require.NoError(t, err)
-	require.Equal(t, expectedReplicas, countPods)
 }
 
 func validateDeploymentScale(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, scaleDeployment *appv1.Deployment, image string, expectedReplicas int) {
@@ -52,13 +50,8 @@ func validateDeploymentScale(t *testing.T, client *rancher.Client, clusterName s
 	require.NoError(t, err)
 
 	log.Info("Waiting for all pods to be running")
-	err = pods.WatchAndWaitPodContainerRunning(client, clusterName, namespaceName, scaleDeployment)
+	err = pods.WatchAndWaitPodContainerRunning(client, clusterName, namespaceName, scaleDeployment, image, expectedReplicas)
 	require.NoError(t, err)
-
-	log.Infof("Counting all pods running by image %s", image)
-	countPods, err := pods.CountPodContainerRunningByImage(client, clusterName, namespaceName, image)
-	require.NoError(t, err)
-	require.Equal(t, expectedReplicas, countPods)
 }
 
 func rollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, revision int) (string, error) {

@@ -128,14 +128,7 @@ func CheckPodLogsForErrors(client *rancher.Client, clusterID string, podName str
 }
 
 // WatchAndWaitPodContainerRunning is a helper to watch and wait all pod containers running
-func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespaceName string, deploymentTemplate *appv1.Deployment) error {
-	steveclient, err := client.Steve.ProxyDownstream(clusterID)
-	if err != nil {
-		return err
-	}
-
-	namespacedClient := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName)
-
+func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespaceName string, deploymentTemplate *appv1.Deployment, image string, replicas int) error {
 	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
 	if err != nil {
 		return err
@@ -150,34 +143,15 @@ func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespac
 	if err != nil {
 		return err
 	}
-
 	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
-		podsResp, err := namespacedClient.List(nil)
+		count, err := CountPodContainerRunningByImage(client, clusterID, namespaceName, image)
 		if err != nil {
 			return false, err
 		}
 
-		allContainerRunning := true
-		for _, podResp := range podsResp.Data {
-			podStatus := &corev1.PodStatus{}
-			err = v1.ConvertToK8sType(podResp.Status, podStatus)
-			if err != nil {
-				return false, err
-			}
-
-			for _, containerStatus := range podStatus.ContainerStatuses {
-				if containerStatus.State.Running == nil {
-					allContainerRunning = false
-				}
-			}
-		}
-		return allContainerRunning, nil
+		return count == replicas, nil
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // CountPodContainerRunningByImage is a helper to count all pod containers running by image
@@ -200,7 +174,7 @@ func CountPodContainerRunningByImage(client *rancher.Client, clusterID, namespac
 			return 0, err
 		}
 		for _, containerStatus := range podStatus.ContainerStatuses {
-			if containerStatus.State.Running != nil && strings.Contains(containerStatus.Image, image) {
+			if containerStatus.State.Running != nil && containerStatus.State.Terminated == nil && strings.Contains(containerStatus.Image, image) {
 				count++
 			}
 		}
