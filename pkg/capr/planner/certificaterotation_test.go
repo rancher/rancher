@@ -247,7 +247,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 	}
 
 	genericSetup := func(mp *mockPlanner) {
-		mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(clusterRegToken, "somecluster").Return([]*v3.ClusterRegistrationToken{{Status: v3.ClusterRegistrationTokenStatus{Token: "lol"}}}, nil)
+		mp.clusterRegistrationTokenCache.EXPECT().GetByIndex(ClusterRegToken, "somecluster").Return([]*v3.ClusterRegistrationToken{{Status: v3.ClusterRegistrationTokenStatus{Token: "lol"}}}, nil)
 		mp.managementClusters.EXPECT().Get("somecluster").Return(&v3.Cluster{}, nil)
 	}
 
@@ -410,8 +410,9 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			mockPlanner := newMockPlanner(t, InfoFunctions{
-				SystemAgentImage: func() string { return "system-agent" },
-				ImageResolver:    image.ResolveWithControlPlane,
+				SystemAgentImage:      func() string { return "system-agent" },
+				ImageResolver:         image.ResolveWithControlPlane,
+				GetBootstrapManifests: func(plane *rkev1.RKEControlPlane) ([]plan.File, error) { return nil, nil },
 			})
 			if tt.setup != nil {
 				tt.setup(mockPlanner)

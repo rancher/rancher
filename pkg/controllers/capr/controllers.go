@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/provisioningv2/prebootstrap"
 	"github.com/rancher/rancher/pkg/provisioningv2/systeminfo"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -30,6 +31,7 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		ReleaseData:             capr.GetKDMReleaseData,
 		SystemAgentImage:        settings.SystemAgentInstallerImage.Get,
 		SystemPodLabelSelectors: systeminfo.NewRetriever(clients).GetSystemPodLabelSelectors,
+		GetBootstrapManifests:   prebootstrap.NewRetriever(clients).GeneratePreBootstrapClusterAgentManifest,
 	})
 	if features.MCM.Enabled() {
 		dynamicschema.Register(ctx, clients)
