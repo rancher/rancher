@@ -24,6 +24,9 @@ const (
 
 	// ProvisioningCAPIChartName name of the chart for rancher-provisioning-capi.
 	ProvisioningCAPIChartName = "rancher-provisioning-capi"
+
+	// SystemUpgradeControllerChartName name of the chart system-upgrade-controller
+	SystemUpgradeControllerChartName = "system-upgrade-controller"
 )
 
 var errKeyNotFound = errors.New("key not found")
@@ -59,7 +62,7 @@ type RancherConfigGetter struct {
 	ConfigCache corev1.ConfigMapCache
 }
 
-// GetPriorityClassName attempts to retrieve the priority class for rancher pods and feature charts as set via helm values.
+// GetGlobalValue attempts to retrieve value of the specified key from the configmap that stores rancher configuration information.
 func (r *RancherConfigGetter) GetGlobalValue(key string) (string, error) {
 	return r.getKey(key, settings.ConfigMapName.Get())
 }
