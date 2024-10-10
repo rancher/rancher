@@ -24,7 +24,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const CloudCredentialExpirationAnnotation = "cattle.io/expiration-timestamp"
+const CloudCredentialExpirationAnnotation = "rancher.io/expiration-timestamp"
 
 func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.NodeTemplateLister, provClusterCache provv1.ClusterCache, tokenLister v3.TokenLister) types.Store {
 	transformStore := &transform.Store{
