@@ -18,6 +18,9 @@ spec:
     - jsonPath: .status.summary
       name: STATUS
       type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
     name: v3
     schema:
       openAPIV3Schema:
