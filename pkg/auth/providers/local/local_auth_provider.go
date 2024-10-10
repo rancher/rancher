@@ -30,6 +30,8 @@ const (
 	searchIndexDefaultLen = 6
 )
 
+var invalidHash, _ = bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
+
 type Provider struct {
 	userLister   v3.UserLister
 	groupLister  v3.GroupLister
@@ -37,7 +39,6 @@ type Provider struct {
 	gmIndexer    cache.Indexer
 	groupIndexer cache.Indexer
 	tokenMGR     *tokens.Manager
-	invalidHash  []byte
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -53,8 +54,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 	gIndexers := map[string]cache.IndexFunc{groupSearchIndex: groupSearchIndexer}
 	gInformer.AddIndexers(gIndexers)
 
-	invalidHash, _ := bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
-
 	l := &Provider{
 		userIndexer:  informer.GetIndexer(),
 		gmIndexer:    gmInformer.GetIndexer(),
@@ -62,7 +61,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 		groupIndexer: gInformer.GetIndexer(),
 		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
 		tokenMGR:     tokenMGR,
-		invalidHash:  invalidHash,
 	}
 	return l
 }
@@ -122,7 +120,7 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	if err != nil {
 		// If the user don't exist the password is evaluated
 		// to avoid user enumeration via timing attack (time based side-channel).
-		bcrypt.CompareHashAndPassword(l.invalidHash, []byte(pwd))
+		bcrypt.CompareHashAndPassword(invalidHash, []byte(pwd))
 		logrus.Debugf("Get User [%s] failed during Authentication: %v", username, err)
 		return v3.Principal{}, nil, "", authFailedError
 	}
