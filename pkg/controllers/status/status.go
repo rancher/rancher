@@ -38,6 +38,7 @@ func (s *Status) AddCondition(conditions *[]metav1.Condition, condition metav1.C
 			c.Status = condition.Status
 			c.Reason = condition.Reason
 			c.Message = condition.Message
+			c.LastTransitionTime = metav1.Time{Time: s.TimeNow()}
 			found = true
 		}
 	}

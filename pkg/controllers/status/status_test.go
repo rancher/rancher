@@ -98,7 +98,7 @@ func TestAddCondition(t *testing.T) {
 					Status: v1.ConditionTrue,
 					Reason: clusterRolesExists,
 					LastTransitionTime: v1.Time{
-						Time: mockTime,
+						Time: time.Now(),
 					},
 				},
 			},
@@ -133,7 +133,7 @@ func TestAddCondition(t *testing.T) {
 					Message: mockErr.Error(),
 					Reason:  failedToCreateRoles,
 					LastTransitionTime: v1.Time{
-						Time: mockTime,
+						Time: time.Now(),
 					},
 				},
 			},
