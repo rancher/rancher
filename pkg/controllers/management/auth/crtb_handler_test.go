@@ -474,6 +474,29 @@ func TestUpdateStatus(t *testing.T) {
 			LastUpdateTime: mockTime.String(),
 		},
 	}
+	crtbSubjectAndBindingExist := &v3.ClusterRoleTemplateBinding{
+		Status: v3.ClusterRoleTemplateBindingStatus{
+			LocalConditions: []v1.Condition{
+				{
+					Type:   subjectExists,
+					Status: v1.ConditionTrue,
+					Reason: subjectExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+				{
+					Type:   bindingExists,
+					Status: v1.ConditionTrue,
+					Reason: bindingExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+			},
+			LastUpdateTime: mockTime.String(),
+		},
+	}
 	crtbSubjectError := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
 			LocalConditions: []v1.Condition{
@@ -507,7 +530,7 @@ func TestUpdateStatus(t *testing.T) {
 		wantErr    error
 	}{
 		"status updated": {
-			crtb: crtbSubjectExist,
+			crtb: crtbSubjectExist.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
@@ -531,13 +554,13 @@ func TestUpdateStatus(t *testing.T) {
 			},
 			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
 				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbEmptyStatus, nil)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbEmptyStatus.DeepCopy(), nil)
 
 				return mock
 			},
 		},
 		"status not updated when local conditions are the same": {
-			crtb: crtbSubjectExist,
+			crtb: crtbSubjectExist.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				return fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 			},
@@ -549,7 +572,7 @@ func TestUpdateStatus(t *testing.T) {
 			},
 		},
 		"set summary to complete when remote is complete": {
-			crtb: crtbSubjectExist,
+			crtb: crtbSubjectExist.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
@@ -575,13 +598,13 @@ func TestUpdateStatus(t *testing.T) {
 			},
 			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
 				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbEmptyStatusRemoteComplete, nil)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbEmptyStatusRemoteComplete.DeepCopy(), nil)
 
 				return mock
 			},
 		},
 		"set summary to error when there is an error condition": {
-			crtb: crtbSubjectError,
+			crtb: crtbSubjectError.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
@@ -606,7 +629,37 @@ func TestUpdateStatus(t *testing.T) {
 			},
 			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
 				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbSubjectExist, nil)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbSubjectExist.DeepCopy(), nil)
+
+				return mock
+			},
+		},
+		"status updated when a condition is removed": {
+			crtb: crtbSubjectExist.DeepCopy(),
+			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
+					Status: v3.ClusterRoleTemplateBindingStatus{
+						LocalConditions: []v1.Condition{
+							{
+								Type:   subjectExists,
+								Status: v1.ConditionTrue,
+								Reason: subjectExists,
+								LastTransitionTime: v1.Time{
+									Time: mockTime,
+								},
+							},
+						},
+						LastUpdateTime: mockTime.String(),
+						SummaryLocal:   status.SummaryCompleted,
+					},
+				})
+
+				return mock
+			},
+			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbSubjectAndBindingExist.DeepCopy(), nil)
 
 				return mock
 			},
