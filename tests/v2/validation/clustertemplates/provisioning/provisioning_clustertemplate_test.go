@@ -15,7 +15,6 @@ import (
 	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/settings"
-	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 
@@ -51,7 +50,6 @@ var (
 type ClusterTemplateProvisioningTestSuite struct {
 	suite.Suite
 	client             *rancher.Client
-	standardClient     *rancher.Client
 	session            *session.Session
 	provisioningConfig *provisioninginput.Config
 }
@@ -82,11 +80,6 @@ func (ct *ClusterTemplateProvisioningTestSuite) SetupSuite() {
 	if ct.provisioningConfig.CNIs == nil {
 		ct.provisioningConfig.CNIs = []string{clustertemplates.CniCalico}
 	}
-
-	user, err := users.CreateUserWithRole(ct.client, users.UserConfig(), "user")
-	require.NoError(ct.T(), err)
-	ct.standardClient, err := ct.client.AsUser(user)
-	require.NoError(ct.T(), err)
 }
 
 func (ct *ClusterTemplateProvisioningTestSuite) TestProvisioningRKE1ClusterWithClusterTemplate() {
