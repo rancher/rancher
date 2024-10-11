@@ -3,7 +3,6 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -109,6 +108,7 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	obj.Status.LocalConditions = []metav1.Condition{}
 	obj, err := c.reconcileSubject(obj)
 	return obj, errors.Join(err,
 		c.reconcileLabels(obj),
@@ -376,7 +376,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding) error 
 		if err != nil {
 			return err
 		}
-		if reflect.DeepEqual(crtbFromCluster.Status.LocalConditions, crtb.Status.LocalConditions) {
+		if status.CompareConditions(crtbFromCluster.Status.LocalConditions, crtb.Status.LocalConditions) {
 			return nil
 		}
 

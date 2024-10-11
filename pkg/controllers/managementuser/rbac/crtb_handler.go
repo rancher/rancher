@@ -3,7 +3,6 @@ package rbac
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/status"
@@ -70,6 +69,7 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	obj.Status.RemoteConditions = []metav1.Condition{}
 	return obj, errors.Join(c.reconcileCRTBUserClusterLabels(obj),
 		c.syncCRTB(obj),
 		c.updateStatus(obj))
@@ -251,7 +251,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding) error 
 		if err != nil {
 			return err
 		}
-		if reflect.DeepEqual(crtbFromCluster.Status.RemoteConditions, crtb.Status.RemoteConditions) {
+		if status.CompareConditions(crtbFromCluster.Status.RemoteConditions, crtb.Status.RemoteConditions) {
 			return nil
 		}
 
