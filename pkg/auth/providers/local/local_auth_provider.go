@@ -306,7 +306,7 @@ func (l *Provider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.Gr
 		return localUsers, localGroups, err
 	}
 	for _, user := range allUsers {
-		if !(strings.HasPrefix(user.ObjectMeta.Name, searchKey) || strings.HasPrefix(user.Username, searchKey) || strings.HasPrefix(user.DisplayName, searchKey)) {
+		if !userMatchesSearchKey(user, searchKey) {
 			continue
 		}
 		localUsers = append(localUsers, user)
@@ -431,6 +431,19 @@ func indexField(field string, maxindex int) []string {
 	for i := 2; i <= maxindex; i++ {
 		fieldIndexes = append(fieldIndexes, field[0:i])
 	}
+
+	splitToLower := func(s string) []string {
+		var lowers []string
+		for _, v := range strings.Split(s, " ") {
+			lowers = append(lowers, strings.ToLower(v))
+		}
+
+		return lowers
+	}
+
+	fieldIndexes = append(fieldIndexes, strings.Split(field, " ")...)
+	fieldIndexes = append(fieldIndexes, splitToLower(field)...)
+
 	return fieldIndexes
 }
 
@@ -474,4 +487,12 @@ func (l *Provider) IsDisabledProvider() (bool, error) {
 // CleanupResources deletes resources associated with the local auth provider.
 func (l *Provider) CleanupResources(*v3.AuthConfig) error {
 	return nil
+}
+
+func userMatchesSearchKey(user *v3.User, searchKey string) bool {
+	lowerSearchKey := strings.ToLower(searchKey)
+
+	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
+		strings.Contains(strings.ToLower(user.Username), lowerSearchKey) ||
+		strings.Contains(strings.ToLower(user.DisplayName), lowerSearchKey))
 }
