@@ -108,6 +108,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		upstreamSecrets:   mgmt.Core.Secrets(clusterRec.Spec.FleetWorkspaceName),
 		downstreamSecrets: cluster.Core.Secrets(""),
 		clusterName:       clusterRec.Spec.DisplayName,
+		clusterId:         clusterRec.Name,
 	}
 
 	resourceSyncController.upstreamSecrets.AddHandler(ctx, "secret-resource-synced", resourceSyncController.sync)
