@@ -1,11 +1,13 @@
 package status
 
 import (
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -196,6 +198,117 @@ func TestAddCondition(t *testing.T) {
 			conditions := test.conditions
 			s.AddCondition(&conditions, test.condition, test.reason, test.err)
 			assert.Equal(t, test.wantConditions, conditions)
+		})
+	}
+}
+
+func TestCompareConditions(t *testing.T) {
+	tests := map[string]struct {
+		s1, s2 []metav1.Condition
+		want   bool
+	}{
+		"equals": {
+			s1: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Now()},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			s2: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Unix(0, 0)},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			want: true,
+		},
+		"different type": {
+			s1: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Now()},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			s2: []metav1.Condition{
+				{
+					Type:               clusterRoleBindingsExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Unix(0, 0)},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			want: false,
+		},
+		"different status": {
+			s1: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Now()},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			s2: []metav1.Condition{
+				{
+					Type:               clusterRoleBindingsExists,
+					Status:             SummaryError,
+					LastTransitionTime: metav1.Time{Time: time.Unix(0, 0)},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			want: false,
+		},
+		"different len": {
+			s1: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Now()},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Now()},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			s2: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryError,
+					LastTransitionTime: metav1.Time{Time: time.Unix(0, 0)},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			want: false,
+		},
+		"empty slices": {
+			s1:   []metav1.Condition{},
+			s2:   []metav1.Condition{},
+			want: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, test.want, CompareConditions(test.s1, test.s2))
 		})
 	}
 }
