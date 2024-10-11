@@ -40,8 +40,8 @@ type TokenStore struct {
 type SystemTokenStore struct {
 	secretClient        v1.SecretClient
 	secretCache         v1.SecretCache
-	userAttributeClient v3.UserAttributeController
-	userClient          v3.UserController
+	userAttributeClient v3.UserAttributeClient
+	userClient          v3.UserClient
 }
 
 func NewTokenStore(
