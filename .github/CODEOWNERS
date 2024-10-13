@@ -1,0 +1,6 @@
+# Hostbusters/Provisioning
+pkg/capr @rancher/rancher-team-2-hostbusters-dev
+pkg/controllers/capr @rancher/rancher-team-2-hostbusters-dev
+pkg/controllers/provisioningv2 @rancher/rancher-team-2-hostbusters-dev
+pkg/provisioningv2 @rancher/rancher-team-2-hostbusters-dev
+pkg/serviceaccounttoken @rancher/rancher-team-2-hostbusters-dev @rancher/collie
