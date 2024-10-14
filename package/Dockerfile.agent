@@ -38,7 +38,7 @@ ENV LOGLEVEL_VERSION v0.1.6
 
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
 
-ARG VERSION=dev
+ARG VERSION=${VERSION}
 LABEL io.cattle.agent true
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=''
