@@ -57,6 +57,7 @@ const (
 	DeploymentFieldShareProcessNamespace         = "shareProcessNamespace"
 	DeploymentFieldState                         = "state"
 	DeploymentFieldSubdomain                     = "subdomain"
+	DeploymentFieldSupplementalGroupsPolicy      = "supplementalGroupsPolicy"
 	DeploymentFieldSysctls                       = "sysctls"
 	DeploymentFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	DeploymentFieldTopologySpreadConstraints     = "topologySpreadConstraints"
@@ -124,6 +125,7 @@ type Deployment struct {
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	SupplementalGroupsPolicy      string                         `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraint     `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`

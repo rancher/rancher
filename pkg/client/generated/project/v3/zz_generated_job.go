@@ -62,6 +62,7 @@ const (
 	JobFieldState                         = "state"
 	JobFieldSubdomain                     = "subdomain"
 	JobFieldSuccessPolicy                 = "successPolicy"
+	JobFieldSupplementalGroupsPolicy      = "supplementalGroupsPolicy"
 	JobFieldSuspend                       = "suspend"
 	JobFieldSysctls                       = "sysctls"
 	JobFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
@@ -136,6 +137,7 @@ type Job struct {
 	State                         string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
 	SuccessPolicy                 *SuccessPolicy                 `json:"successPolicy,omitempty" yaml:"successPolicy,omitempty"`
+	SupplementalGroupsPolicy      string                         `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Suspend                       *bool                          `json:"suspend,omitempty" yaml:"suspend,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
