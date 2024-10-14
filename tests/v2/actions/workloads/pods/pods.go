@@ -1,25 +1,20 @@
 package pods
 
 import (
-	"context"
 	"errors"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
-	"github.com/rancher/shepherd/pkg/wait"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
@@ -136,28 +131,19 @@ func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespac
 
 	namespacedClient := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName)
 
-	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
-	if err != nil {
-		return err
+	backoff := kwait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    10,
 	}
 
-	deploymentResource := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(namespaceName)
-
-	watchAppInterface, err := deploymentResource.Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + deploymentTemplate.Name,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	if err != nil {
-		return err
-	}
-
-	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+	err = kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		podsResp, err := namespacedClient.List(nil)
 		if err != nil {
 			return false, err
 		}
 
-		allContainerRunning := true
 		for _, podResp := range podsResp.Data {
 			podStatus := &corev1.PodStatus{}
 			err = v1.ConvertToK8sType(podResp.Status, podStatus)
@@ -167,11 +153,11 @@ func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespac
 
 			for _, containerStatus := range podStatus.ContainerStatuses {
 				if containerStatus.State.Running == nil {
-					allContainerRunning = false
+					return false, nil
 				}
 			}
 		}
-		return allContainerRunning, nil
+		return true, nil
 	})
 	if err != nil {
 		return err
