@@ -213,10 +213,11 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 	var localGroups []*v3.Group
 	var err error
 
+	queryKey := strings.ToLower(searchKey)
 	if len(searchKey) > searchIndexDefaultLen {
-		localUsers, localGroups, err = l.listAllUsersAndGroups(searchKey)
+		localUsers, localGroups, err = l.listAllUsersAndGroups(queryKey)
 	} else {
-		localUsers, localGroups, err = l.listUsersAndGroupsByIndex(searchKey)
+		localUsers, localGroups, err = l.listUsersAndGroupsByIndex(queryKey)
 	}
 
 	if err != nil {
@@ -441,7 +442,6 @@ func indexField(field string, maxindex int) []string {
 		return lowers
 	}
 
-	fieldIndexes = append(fieldIndexes, strings.Split(field, " ")...)
 	fieldIndexes = append(fieldIndexes, splitToLower(field)...)
 
 	return fieldIndexes
@@ -490,9 +490,7 @@ func (l *Provider) CleanupResources(*v3.AuthConfig) error {
 }
 
 func userMatchesSearchKey(user *v3.User, searchKey string) bool {
-	lowerSearchKey := strings.ToLower(searchKey)
-
 	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
-		strings.Contains(strings.ToLower(user.Username), lowerSearchKey) ||
-		strings.Contains(strings.ToLower(user.DisplayName), lowerSearchKey))
+		strings.Contains(strings.ToLower(user.Username), searchKey) ||
+		strings.Contains(strings.ToLower(user.DisplayName), searchKey))
 }
