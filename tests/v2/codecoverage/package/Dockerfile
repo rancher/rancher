@@ -161,7 +161,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/helm_v3
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.30.2-k3s2 \
+COPY --from=rancher/k3s:v1.31.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
