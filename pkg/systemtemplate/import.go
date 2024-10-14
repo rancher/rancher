@@ -171,15 +171,22 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 }
 
 func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
+	enableMSUC := false
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+		// the case of imported rke2/k3s cluster
+		enableMSUC = true
+	}
+
 	return map[string]bool{
-		features.MCM.Name():                      false,
-		features.MCMAgent.Name():                 true,
-		features.Fleet.Name():                    false,
-		features.RKE2.Name():                     false,
-		features.ProvisioningV2.Name():           false,
-		features.EmbeddedClusterAPI.Name():       false,
-		features.UISQLCache.Name():               features.UISQLCache.Enabled(),
-		features.ProvisioningPreBootstrap.Name(): capr.PreBootstrap(cluster),
+		features.MCM.Name():                            false,
+		features.MCMAgent.Name():                       true,
+		features.Fleet.Name():                          false,
+		features.RKE2.Name():                           false,
+		features.ProvisioningV2.Name():                 false,
+		features.EmbeddedClusterAPI.Name():             false,
+		features.UISQLCache.Name():                     features.UISQLCache.Enabled(),
+		features.ProvisioningPreBootstrap.Name():       capr.PreBootstrap(cluster),
+		features.ManagedSystemUpgradeController.Name(): features.ManagedSystemUpgradeController.Enabled() && enableMSUC,
 	}
 }
 

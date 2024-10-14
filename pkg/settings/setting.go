@@ -231,9 +231,13 @@ var (
 	// debug purposes.
 	RKE2ChartDefaultURL = NewSetting("rke2-chart-default-url", "https://git.rancher.io/")
 
-	// SystemDefaultRegistry is the default contrainer registry used for images.
+	// SystemDefaultRegistry is the default container registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
 	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
+
+	// K3sBasedUpgraderUninstallConcurrency defines the maximum number of clusters
+	// for which the K3s-based-upgrade handler can simultaneously uninstall the legacy K3s-based upgrade app.
+	K3sBasedUpgraderUninstallConcurrency = NewSetting("k3s-based-upgrader-uninstall-concurrency", "5")
 
 	// UIBanners holds configuration to display a custom fixed banner in the header, footer, or both
 	UIBanners = NewSetting("ui-banners", "{}")
