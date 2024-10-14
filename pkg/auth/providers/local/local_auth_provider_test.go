@@ -3,6 +3,7 @@ package local
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -100,6 +101,10 @@ func TestProvider_SearchPrincipals_short_names(t *testing.T) {
 			for _, p := range principals {
 				names = append(names, p.Name)
 			}
+
+			sort.Strings(names)
+			sort.Strings(tt.want)
+
 			if !slices.Equal(names, tt.want) {
 				t.Errorf("SearchPrincipals() got %#v, want %#v", names, tt.want)
 			}
