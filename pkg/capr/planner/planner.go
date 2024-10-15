@@ -226,7 +226,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 	releaseData := p.retrievalFunctions.ReleaseData(p.ctx, cp)
 	if releaseData == nil {
-		return status, errWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
+		return status, errWaitingf("%s/%s: KDM release data is empty for %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
 	}
 
 	capiCluster, err := capr.GetOwnerCAPICluster(cp, p.capiClusters)
