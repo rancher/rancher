@@ -1,19 +1,18 @@
 package local
 
 import (
-	"fmt"
-	"slices"
 	"sort"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
 func TestProvider_SearchPrincipals_short_names(t *testing.T) {
-	// if the query string is less than searchIndexDefaultLen
+	// If the query string is less than searchIndexDefaultLen
 	// we query the indexer.
 	// Longer queries use the userLister and match
 	provider := Provider{
@@ -47,13 +46,12 @@ func TestProvider_SearchPrincipals_short_names(t *testing.T) {
 				DisplayName: "John Smith",
 			},
 		),
-		groupIndexer: newTestGroupIndexer(), // only needed to prevent nil-pointer.
+		groupIndexer: newTestGroupIndexer(), // Only needed to prevent nil-pointer.
 	}
 
 	shortNameTests := []struct {
 		searchKey string
-
-		want []string
+		want      []string
 	}{
 		{
 			searchKey: "tes",
@@ -63,7 +61,18 @@ func TestProvider_SearchPrincipals_short_names(t *testing.T) {
 			searchKey: "Tes",
 			want:      []string{"local://u-12345"},
 		},
-
+		{
+			searchKey: "Test U",
+			want:      []string{"local://u-12345"},
+		},
+		{
+			searchKey: "test U",
+			want:      []string{"local://u-12345"},
+		},
+		{
+			searchKey: "test u",
+			want:      []string{"local://u-12345"},
+		},
 		{
 			searchKey: "oth",
 			want:      []string{"local://u-23456"},
@@ -91,11 +100,9 @@ func TestProvider_SearchPrincipals_short_names(t *testing.T) {
 	}
 
 	for _, tt := range shortNameTests {
-		t.Run(fmt.Sprintf("searchKey = %s", tt.searchKey), func(t *testing.T) {
+		t.Run("searchKey "+tt.searchKey, func(t *testing.T) {
 			principals, err := provider.SearchPrincipals(tt.searchKey, "user", v3.Token{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			var names []string
 			for _, p := range principals {
@@ -105,9 +112,7 @@ func TestProvider_SearchPrincipals_short_names(t *testing.T) {
 			sort.Strings(names)
 			sort.Strings(tt.want)
 
-			if !slices.Equal(names, tt.want) {
-				t.Errorf("SearchPrincipals() got %#v, want %#v", names, tt.want)
-			}
+			require.Equal(t, names, tt.want)
 		})
 	}
 }
@@ -130,18 +135,35 @@ func TestProvider_SearchPrincipals_long_search(t *testing.T) {
 		groupIndexer: newTestGroupIndexer(),
 	}
 
-	principals, err := provider.SearchPrincipals("test user", "user", v3.Token{})
-	if err != nil {
-		t.Fatal(err)
+	longNameTests := []struct {
+		searchKey string
+		want      []string
+	}{
+		{
+			searchKey: "test user",
+			want:      []string{"local://u-12345"},
+		},
+		{
+			searchKey: "testuser",
+			want:      []string{"local://u-12345"},
+		},
 	}
 
-	var names []string
-	for _, p := range principals {
-		names = append(names, p.Name)
-	}
-	want := []string{"local://u-12345"}
-	if !slices.Equal(names, want) {
-		t.Errorf("SearchPrincipals() got %#v, want %#v", names, want)
+	for _, tt := range longNameTests {
+		t.Run("searchKey "+tt.searchKey, func(t *testing.T) {
+			principals, err := provider.SearchPrincipals(tt.searchKey, "user", v3.Token{})
+			require.NoError(t, err)
+
+			var names []string
+			for _, p := range principals {
+				names = append(names, p.Name)
+			}
+
+			sort.Strings(names)
+			sort.Strings(tt.want)
+
+			require.Equal(t, names, tt.want)
+		})
 	}
 }
 

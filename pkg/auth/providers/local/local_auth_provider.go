@@ -18,6 +18,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -398,13 +399,13 @@ func userSearchIndexer(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, nil
 	}
-	var fieldIndexes []string
+	fieldIndexes := sets.New[string]()
 
-	fieldIndexes = append(fieldIndexes, indexField(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
 
-	return fieldIndexes, nil
+	return fieldIndexes.UnsortedList(), nil
 }
 
 func groupSearchIndexer(obj interface{}) ([]string, error) {
@@ -427,22 +428,22 @@ func minOf(length int, defaultLen int) int {
 	return defaultLen
 }
 
-func indexField(field string, maxindex int) []string {
+func indexField(field string, maxIndex int) []string {
 	var fieldIndexes []string
-	for i := 2; i <= maxindex; i++ {
-		fieldIndexes = append(fieldIndexes, field[0:i])
+	for i := 2; i <= maxIndex; i++ {
+		fieldIndexes = append(fieldIndexes, strings.ToLower(field[0:i]))
 	}
 
-	splitToLower := func(s string) []string {
+	splitToLower := func(s string, limit int) []string {
 		var lowers []string
-		for _, v := range strings.Split(s, " ") {
-			lowers = append(lowers, strings.ToLower(v))
+		for _, v := range strings.Fields(s) {
+			lowers = append(lowers, strings.ToLower(v)[:minOf(limit, len(v))])
 		}
 
 		return lowers
 	}
 
-	fieldIndexes = append(fieldIndexes, splitToLower(field)...)
+	fieldIndexes = append(fieldIndexes, splitToLower(field, maxIndex)...)
 
 	return fieldIndexes
 }
@@ -491,6 +492,10 @@ func (l *Provider) CleanupResources(*v3.AuthConfig) error {
 
 func userMatchesSearchKey(user *v3.User, searchKey string) bool {
 	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
-		strings.Contains(strings.ToLower(user.Username), searchKey) ||
-		strings.Contains(strings.ToLower(user.DisplayName), searchKey))
+		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizeWhitespace(searchKey)) ||
+		strings.Contains(strings.ToLower(normalizeWhitespace(user.DisplayName)), normalizeWhitespace(searchKey)))
+}
+
+func normalizeWhitespace(s string) string {
+	return strings.Join(strings.Fields(s), "")
 }
