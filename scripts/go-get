@@ -18,4 +18,3 @@ done
 go get -d "${MODULE}@${VERSION}"
 go mod tidy
 go mod verify
-go generate ./...
