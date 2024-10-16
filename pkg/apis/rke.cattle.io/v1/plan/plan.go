@@ -74,9 +74,10 @@ type File struct {
 
 // NodePlan is the struct used to deliver instructions/files/probes to the system-agent, and retrieve feedback
 type NodePlan struct {
-	Files                []File                `json:"files,omitempty"`
-	Instructions         []OneTimeInstruction  `json:"instructions,omitempty"`
-	PeriodicInstructions []PeriodicInstruction `json:"periodicInstructions,omitempty"`
-	Error                string                `json:"error,omitempty"`
-	Probes               map[string]Probe      `json:"probes,omitempty"`
+	Files                                 []File                `json:"files,omitempty"`
+	Instructions                          []OneTimeInstruction  `json:"instructions,omitempty"`
+	PeriodicInstructions                  []PeriodicInstruction `json:"periodicInstructions,omitempty"`
+	Error                                 string                `json:"error,omitempty"`
+	Probes                                map[string]Probe      `json:"probes,omitempty"`
+	ResetFailureCountOnSystemAgentRestart bool                  `json:"resetFailureCountOnStartup,omitempty"`
 }

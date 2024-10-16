@@ -73,6 +73,9 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	failedChecksum := string(secret.Data["failed-checksum"])
 	plan := secret.Data["plan"]
 
+	failureCount := string(secret.Data["failure-count"])
+	maxFailures := string(secret.Data["max-failures"])
+
 	secretChanged := false
 	secret = secret.DeepCopy()
 
@@ -103,7 +106,12 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 
 	if failedChecksum == planner.PlanHash(plan) {
 		logrus.Debugf("[plansecret] %s/%s: rv: %s: Detected failed plan application, reconciling machine PlanApplied condition to error", secret.Namespace, secret.Name, secret.ResourceVersion)
-		err = h.reconcileMachinePlanAppliedCondition(secret, fmt.Errorf("error applying plan -- check rancher-system-agent.service logs on node for more information"))
+		// plans which temporarily fail will continue to set the failedChecksum as expected, however this should not be considered a
+		// true failure unless we have required that the plan not fail at any point, or we have reached the maximum of attempts configured.
+		// After a successful application, the checksum is cleared by the system-agent.
+		if maxFailures == "-1" || failureCount == maxFailures {
+			err = h.reconcileMachinePlanAppliedCondition(secret, fmt.Errorf("error applying plan -- check rancher-system-agent.service logs on node for more information"))
+		}
 		return secret, err
 	}
 

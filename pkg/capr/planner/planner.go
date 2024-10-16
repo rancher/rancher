@@ -20,6 +20,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -361,8 +362,8 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 
 	// select all etcd and then filter to just initNodes so that unavailable count is correct
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
-		"1", "",
-		controlPlaneDrainOptions)
+		"1", "", controlPlaneDrainOptions, -1, 1,
+		false)
 	capr.Bootstrapped.True(&status)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
@@ -382,8 +383,8 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 
 	// Process all nodes that have the etcd role and are NOT an init node or deleting. Only process 1 node at a time.
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
-		"1", joinServer,
-		controlPlaneDrainOptions)
+		"1", joinServer, controlPlaneDrainOptions,
+		-1, 1, false)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -391,8 +392,8 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 
 	// Process all nodes that have the controlplane role and are NOT an init node or deleting.
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
-		controlPlaneConcurrency, joinServer,
-		controlPlaneDrainOptions)
+		controlPlaneConcurrency, joinServer, controlPlaneDrainOptions, -1, 1,
+		false)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -409,10 +410,35 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 		return status, errWaiting("marking control plane as initialized and ready")
 	}
 
-	// Process all nodes that are ONLY worker nodes.
-	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
-		workerConcurrency, "",
-		workerDrainOptions)
+	// Process all nodes that are ONLY linux worker nodes.
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyLinuxWorker, isInitNodeOrDeleting,
+		workerConcurrency, "", workerDrainOptions, -1, 1,
+		false)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return status, err
+	}
+
+	// Process all nodes that are ONLY windows worker nodes.
+	resetFailureCountOnRestart := false
+	windowsMaxFailures := -1
+	windowsMaxFailureThreshold := 1
+	// This conditional can be removed once the minimum version of rke2
+	// supported by Rancher is v1.31.0, and '5' can then always be passed
+	// to 'reconcile' when processing Windows node plans.
+	if managesystemagent.CurrentVersionResolvesGH5551(cp.Spec.KubernetesVersion) {
+		// In some circumstances plans may temporarily fail to complete on Windows nodes
+		// due to factors out of Ranchers control. This is particularly prevalent for the Windows
+		// installation plan, but could occur for other Windows specific plans too.
+		// In these cases, Rancher should re-run the plan again to circumvent any transient errors.
+		windowsMaxFailures = 5
+		windowsMaxFailureThreshold = 5
+		resetFailureCountOnRestart = true
+	}
+
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWindowsWorker, isInitNodeOrDeleting,
+		workerConcurrency, "", workerDrainOptions, windowsMaxFailures,
+		windowsMaxFailureThreshold, resetFailureCountOnRestart)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -829,8 +855,9 @@ type reconcilable struct {
 	minorChange bool
 }
 
-func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
-	tierName string, include, exclude roleFilter, maxUnavailable string, forcedJoinURL string, drainOptions rkev1.DrainOptions) error {
+func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool, tierName string,
+	include, exclude roleFilter, maxUnavailable, forcedJoinURL string, drainOptions rkev1.DrainOptions,
+	maxFailures, failureThreshold int, resetFailureCountOnSystemAgentRestart bool) error {
 	var (
 		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
 		messages                                                      = map[string][]string{}
@@ -855,6 +882,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		if err != nil {
 			return err
 		}
+		plan.ResetFailureCountOnSystemAgentRestart = resetFailureCountOnSystemAgentRestart
 		reconcilables = append(reconcilables, &reconcilable{
 			entry:       entry,
 			desiredPlan: plan,
@@ -901,14 +929,14 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - setting initial plan for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name)
 			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - initial plan for machine %s/%s new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name, r.desiredPlan)
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
-			if err := p.store.UpdatePlan(r.entry, r.desiredPlan, r.joinedURL, -1, 1); err != nil {
+			if err := p.store.UpdatePlan(r.entry, r.desiredPlan, r.joinedURL, maxFailures, failureThreshold); err != nil {
 				return err
 			}
 		} else if r.minorChange {
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - minor plan change detected for machine %s/%s, updating plan immediately", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name)
 			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - minor plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name, r.entry.Plan.Plan, r.desiredPlan)
 			outOfSync = append(outOfSync, r.entry.Machine.Name)
-			if err := p.store.UpdatePlan(r.entry, r.desiredPlan, r.joinedURL, -1, 1); err != nil {
+			if err := p.store.UpdatePlan(r.entry, r.desiredPlan, r.joinedURL, maxFailures, failureThreshold); err != nil {
 				return err
 			}
 		} else if r.change {
@@ -932,7 +960,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
 					logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name)
 					logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, r.entry.Machine.Namespace, r.entry.Machine.Name, r.entry.Plan.Plan, r.desiredPlan)
-					if err = p.store.UpdatePlan(r.entry, r.desiredPlan, r.joinedURL, -1, 1); err != nil {
+					if err = p.store.UpdatePlan(r.entry, r.desiredPlan, r.joinedURL, maxFailures, failureThreshold); err != nil {
 						return err
 					} else if r.entry.Metadata.Annotations[capr.DrainDoneAnnotation] != "" {
 						messages[r.entry.Machine.Name] = append(messages[r.entry.Machine.Name], "drain completed")

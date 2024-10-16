@@ -1,6 +1,7 @@
 package capr
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"testing"
 
@@ -310,6 +311,97 @@ func TestCompressInterface(t *testing.T) {
 			err = DecompressInterface(result, target)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.value, target)
+		})
+	}
+}
+
+func TestFormatWindowsEnvVar(t *testing.T) {
+	tests := []struct {
+		Name           string
+		EnvVar         corev1.EnvVar
+		IsPlanVar      bool
+		ExpectedString string
+	}{
+		{
+			Name: "Basic String",
+			EnvVar: corev1.EnvVar{
+				Name:  "BASIC_STRING",
+				Value: "ABC123",
+			},
+			IsPlanVar:      false,
+			ExpectedString: "$env:BASIC_STRING=\"ABC123\"",
+		},
+		{
+			Name: "Basic Bool",
+			EnvVar: corev1.EnvVar{
+				Name:  "BASIC_BOOL",
+				Value: "true",
+			},
+			IsPlanVar:      false,
+			ExpectedString: "$env:BASIC_BOOL=$true",
+		},
+		{
+			Name: "Basic Plan String",
+			EnvVar: corev1.EnvVar{
+				Name:  "PLAN_STRING",
+				Value: "VALUE",
+			},
+			IsPlanVar:      true,
+			ExpectedString: "PLAN_STRING=VALUE",
+		},
+		{
+			Name: "Basic Plan Bool",
+			EnvVar: corev1.EnvVar{
+				Name:  "PLAN_BOOL",
+				Value: "true",
+			},
+			IsPlanVar:      true,
+			ExpectedString: "PLAN_BOOL=true",
+		},
+		{
+			Name: "Plan Name Mistakenly Includes $env:",
+			EnvVar: corev1.EnvVar{
+				Name:  "$env:PLAN_BOOL",
+				Value: "true",
+			},
+			IsPlanVar:      true,
+			ExpectedString: "PLAN_BOOL=true",
+		},
+		{
+			Name: "Plan Bool Mistakenly Includes $",
+			EnvVar: corev1.EnvVar{
+				Name:  "PLAN_BOOL",
+				Value: "$true",
+			},
+			IsPlanVar:      true,
+			ExpectedString: "PLAN_BOOL=true",
+		},
+		{
+			Name: "Non-Plan String Value Includes $",
+			EnvVar: corev1.EnvVar{
+				Name:  "PLAN_BOOL",
+				Value: "\"$true\"",
+			},
+			IsPlanVar:      false,
+			ExpectedString: "$env:PLAN_BOOL=\"$true\"",
+		},
+		{
+			Name: "Plan String Value Includes $",
+			EnvVar: corev1.EnvVar{
+				Name:  "PLAN_BOOL",
+				Value: "\"$true\"",
+			},
+			IsPlanVar:      true,
+			ExpectedString: "PLAN_BOOL=$true",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			out := FormatWindowsEnvVar(tc.EnvVar, tc.IsPlanVar)
+			if out != tc.ExpectedString {
+				t.Fatalf("Expected %s, got %s", tc.ExpectedString, out)
+			}
 		})
 	}
 }

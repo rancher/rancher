@@ -674,3 +674,42 @@ func PreBootstrap(mgmtCluster *v3.Cluster) bool {
 
 	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
 }
+
+// FormatWindowsEnvVar accepts a corev1.EnvVar and returns a string to be used in either
+// a Powershell script or the Rancher planner, indicated by the isPlanVariable parameter.
+// This function automatically configures the '$env:' prefix for a given environment variable,
+// automatically prefixes boolean values with '$', and surrounds string variables with double quotes as
+// needed. If the provided variable name incorrectly uses either '$env:' or '$' for the given isPlanVariable
+// value, it will be removed.
+func FormatWindowsEnvVar(envVar corev1.EnvVar, isPlanVariable bool) string {
+	lowerValue := strings.ToLower(envVar.Value)
+	isBool := lowerValue == "$true" || lowerValue == "$false" ||
+		lowerValue == "true" || lowerValue == "false"
+
+	// remove any user provided prefixes and quotations
+	envVar.Name = strings.TrimPrefix(envVar.Name, "$env:")
+	envVar.Value = strings.Trim(envVar.Value, "\"")
+
+	if !isBool {
+		format := ""
+		// Non-boolean variables are always treated as strings,
+		// even numbers
+		format = "$env:%s=\"%s\""
+		if isPlanVariable {
+			format = "%s=%s"
+		}
+
+		return fmt.Sprintf(format, envVar.Name, envVar.Value)
+	}
+
+	if !isPlanVariable {
+		if !strings.HasPrefix(envVar.Value, "$") {
+			envVar.Value = "$" + envVar.Value
+		}
+		return fmt.Sprintf("$env:%s=%s", envVar.Name, envVar.Value)
+	}
+
+	envVar.Value = strings.Trim(envVar.Value, "$")
+
+	return fmt.Sprintf("%s=%s", envVar.Name, envVar.Value)
+}
