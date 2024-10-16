@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/roletemplates"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -129,6 +130,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
 	relatedresource.WatchClusterScoped(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
 		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
+
+	roletemplates.Register(ctx, management)
 }
 
 type managerInterface interface {
