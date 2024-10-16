@@ -1,6 +1,7 @@
 package schemas
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -119,6 +120,14 @@ func checkPreferredVersion(client *rancher.Client, schemasCollection *v1.SteveCo
 	return failedSchemaPreferredVersionCheck, nil
 }
 
+func getInsecureHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+}
+
 func getJSONResponse(client *rancher.Client, clusterID, endpointType, existingID string) (map[string]interface{}, error) {
 	rancherURL := client.RancherConfig.Host
 	token := client.RancherConfig.AdminToken
@@ -142,7 +151,8 @@ func getJSONResponse(client *rancher.Client, clusterID, endpointType, existingID
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := getInsecureHTTPClient()
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
