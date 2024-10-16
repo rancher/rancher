@@ -7,14 +7,11 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// TODO: handle external rules
 
 var promotedRulesForProjects = map[string]string{
 	"navlinks":          "ui.cattle.io",
@@ -52,25 +49,24 @@ type roleTemplateHandler struct {
 //  2. an Aggregating ClusterRole that aggregates all inherited RoleTemplates' promoted Cluster Roles named "RoleTemplateName-promoted-aggregator"
 func (rtl *roleTemplateHandler) OnChange(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 
-	getFunc := func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-		return rtl.crClient.Get(cr.Name, metav1.GetOptions{})
-	}
+	// The rules for the role template includes external rules
+	rules := append(rt.Rules, rt.ExternalRules...)
 
 	// 1. Cluster role with rules
-	cr := rtl.buildClusterRole(clusterRoleNameFor(rt), rt.Name, rt.Rules)
-	if err := createOrUpdateResource(cr, rtl.crClient, getFunc, areClusterRolesSame); err != nil {
+	cr := rtl.buildClusterRole(clusterRoleNameFor(rt.Name), rt.Name, rules)
+	if err := createOrUpdateResource(cr, rtl.crClient, areClusterRolesSame); err != nil {
 		return nil, err
 	}
 
 	// 2. Aggregating cluster role
-	cr = rtl.buildAggregatingClusterRole(clusterRoleNameFor(rt), rt.Name, rt.RoleTemplateNames)
-	if err := createOrUpdateResource(cr, rtl.crClient, getFunc, areAggregatingClusterRolesSame); err != nil {
+	cr = rtl.buildAggregatingClusterRole(clusterRoleNameFor(rt.Name), rt.Name, rt.RoleTemplateNames)
+	if err := createOrUpdateResource(cr, rtl.crClient, areAggregatingClusterRolesSame); err != nil {
 		return nil, err
 	}
 
 	// Projects can have 2 extra cluster roles for global resources
 	if rt.Context == projectContext {
-		promotedRules := getPromotedRules(rt.Rules)
+		promotedRules := getPromotedRules(rules)
 
 		// If there are no promoted rules and no inherited RoleTemplates, no need for additional cluster roles
 		if len(promotedRules) == 0 && len(rt.RoleTemplateNames) == 0 {
@@ -79,8 +75,8 @@ func (rtl *roleTemplateHandler) OnChange(key string, rt *v3.RoleTemplate) (*v3.R
 
 		if len(promotedRules) != 0 {
 			// 3. Project global resources cluster role
-			cr = rtl.buildClusterRole(promotedClusterRoleNameFor(rt), rt.Name, promotedRules)
-			if err := createOrUpdateResource(cr, rtl.crClient, getFunc, areClusterRolesSame); err != nil {
+			cr = rtl.buildClusterRole(promotedClusterRoleNameFor(rt.Name), rt.Name, promotedRules)
+			if err := createOrUpdateResource(cr, rtl.crClient, areClusterRolesSame); err != nil {
 				return nil, err
 			}
 		}
@@ -89,8 +85,8 @@ func (rtl *roleTemplateHandler) OnChange(key string, rt *v3.RoleTemplate) (*v3.R
 		// It's possible for this role to have no rules if there are no promoted rules in any of the inherited RoleTemplates or in the above ClusterRole (3)
 		// but without fetching all those RoleTemplates and looking through their rules, it's not possible to prevent this ahead of time as the Rules in
 		// an aggregating cluster role only get populated at run time
-		cr = rtl.buildAggregatingClusterRole(promotedClusterRoleNameFor(rt), rt.Name, rt.RoleTemplateNames)
-		if err := createOrUpdateResource(cr, rtl.crClient, getFunc, areAggregatingClusterRolesSame); err != nil {
+		cr = rtl.buildAggregatingClusterRole(promotedClusterRoleNameFor(rt.Name), rt.Name, rt.RoleTemplateNames)
+		if err := createOrUpdateResource(cr, rtl.crClient, areAggregatingClusterRolesSame); err != nil {
 			return nil, err
 		}
 	}
@@ -149,25 +145,25 @@ func areAggregatingClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bo
 func (rtl *roleTemplateHandler) OnRemove(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	var returnedErrors error
 
-	crName := clusterRoleNameFor(rt)
+	crName := clusterRoleNameFor(rt.Name)
 	err := rtl.crClient.Delete(crName, &metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		returnedErrors = errors.Join(returnedErrors, err)
 	}
 
-	err = rtl.crClient.Delete(addAggregatorSuffix(crName), &metav1.DeleteOptions{})
+	err = rtl.crClient.Delete(aggregatedClusterRoleNameFor(crName), &metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		returnedErrors = errors.Join(returnedErrors, err)
 	}
 
 	if rt.Context == projectContext {
-		crName = promotedClusterRoleNameFor(rt)
+		crName = promotedClusterRoleNameFor(rt.Name)
 		err = rtl.crClient.Delete(crName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			returnedErrors = errors.Join(returnedErrors, err)
 		}
 
-		err = rtl.crClient.Delete(addAggregatorSuffix(crName), &metav1.DeleteOptions{})
+		err = rtl.crClient.Delete(aggregatedClusterRoleNameFor(crName), &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			returnedErrors = errors.Join(returnedErrors, err)
 		}
@@ -205,7 +201,7 @@ func (rtl *roleTemplateHandler) buildAggregatingClusterRole(name, ownerName stri
 		roleTemplateLabels = append(roleTemplateLabels, labelSelector)
 	}
 
-	crName := addAggregatorSuffix(name)
+	crName := aggregatedClusterRoleNameFor(name)
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,
@@ -222,7 +218,7 @@ func (rtl *roleTemplateHandler) buildAggregatingClusterRole(name, ownerName stri
 	}
 }
 
-// TODO: handle external rules (ask Raul)
+// getPromotedRules filters a list of PolicRules for promoted rules for projects and returns them as a list
 func getPromotedRules(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
 	var promotedRules []rbacv1.PolicyRule
 	for _, r := range rules {
@@ -239,14 +235,4 @@ func getPromotedRules(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
 		}
 	}
 	return promotedRules
-}
-
-// clusterRoleNameFor returns the cluster role name for a given RoleTemplate
-func clusterRoleNameFor(rt *v3.RoleTemplate) string {
-	return rt.Name
-}
-
-// promotedClusterRoleNameFor returns the cluster role name of a promoted cluster role for a given RoleTemplate
-func promotedClusterRoleNameFor(rt *v3.RoleTemplate) string {
-	return name.SafeConcatName(rt.Name + promotedSuffix)
 }
