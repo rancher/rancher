@@ -30,7 +30,7 @@ func GetBootstrapPassword(ctx context.Context, secrets corev1.SecretInterface) (
 	}
 
 	// if the bootstrap password is set return it
-	if s.StringData[bootstrapPasswordSecretKey] != "" {
+	if len(s.Data[bootstrapPasswordSecretKey]) > 0 {
 		return s.StringData[bootstrapPasswordSecretKey], generated, nil
 	}
 
