@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -276,6 +277,60 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServer() {
 	_, err = unauthV3Client.Paths()
 	require.Error(s.T(), err)
 	require.True(s.T(), apierrors.IsForbidden(err))
+
+}
+
+func (s *LocalSteveAPITestSuite) TestExtensionAPIServerAuthorization() {
+	restConfig := newExtensionAPIRestConfig(s.client.RancherConfig, s.clusterID, s.client.RancherConfig.AdminToken)
+	client, err := rest.HTTPClientFor(restConfig)
+	require.NoError(s.T(), err)
+
+	tests := []struct {
+		path               string
+		expectedStatusCode int
+	}{
+		{
+			path:               "/openapi/v2",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			path:               "/openapi/v3",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			path:               "/openapi/v3/version",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			path:               "/metrics",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/healthz",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/readyz",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/livez",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/version",
+			expectedStatusCode: http.StatusForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		name := strings.ReplaceAll(test.path, "/", "_")
+		s.T().Run(name, func(t *testing.T) {
+			resp, err := client.Get(fmt.Sprintf("%s/%s", restConfig.Host, test.path))
+			require.NoError(t, err)
+			require.Equal(t, test.expectedStatusCode, resp.StatusCode)
+		})
+	}
 }
 
 type DownstreamSteveAPITestSuite struct {

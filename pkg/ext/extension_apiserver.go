@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
@@ -66,6 +67,22 @@ func NewExtensionAPIServer(wranglerContext *wrangler.Context) (steveserver.Exten
 		Authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 			if a.IsResourceRequest() {
 				return aslAuthorizer.Authorize(ctx, a)
+			}
+
+			// An API server has a lot more routes exposed but for now
+			// we just want to expose these. Note /api is needed for client-go's
+			// discovery even though not strictly necessary
+			maybeAllowed := false
+			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3"}
+			for _, path := range allowedPathsPrefix {
+				if strings.HasPrefix(a.GetPath(), path) {
+					maybeAllowed = true
+					break
+				}
+			}
+
+			if !maybeAllowed {
+				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2 and /openapi/v3 supported", nil
 			}
 
 			// Until https://github.com/rancher/rancher/issues/47483 is fixed
