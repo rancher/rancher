@@ -54,6 +54,7 @@ const (
 	PodFieldState                         = "state"
 	PodFieldStatus                        = "status"
 	PodFieldSubdomain                     = "subdomain"
+	PodFieldSupplementalGroupsPolicy      = "supplementalGroupsPolicy"
 	PodFieldSysctls                       = "sysctls"
 	PodFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	PodFieldTopologySpreadConstraints     = "topologySpreadConstraints"
@@ -117,6 +118,7 @@ type Pod struct {
 	State                         string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Status                        *PodStatus                     `json:"status,omitempty" yaml:"status,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	SupplementalGroupsPolicy      string                         `json:"supplementalGroupsPolicy,omitempty" yaml:"supplementalGroupsPolicy,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraint     `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`

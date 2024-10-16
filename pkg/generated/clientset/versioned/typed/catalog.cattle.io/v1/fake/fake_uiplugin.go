@@ -41,22 +41,24 @@ var uipluginsKind = v1.SchemeGroupVersion.WithKind("UIPlugin")
 
 // Get takes name of the uIPlugin, and returns the corresponding uIPlugin object, and an error if there is any.
 func (c *FakeUIPlugins) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.UIPlugin, err error) {
+	emptyResult := &v1.UIPlugin{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(uipluginsResource, c.ns, name), &v1.UIPlugin{})
+		Invokes(testing.NewGetActionWithOptions(uipluginsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UIPlugin), err
 }
 
 // List takes label and field selectors, and returns the list of UIPlugins that match those selectors.
 func (c *FakeUIPlugins) List(ctx context.Context, opts metav1.ListOptions) (result *v1.UIPluginList, err error) {
+	emptyResult := &v1.UIPluginList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(uipluginsResource, uipluginsKind, c.ns, opts), &v1.UIPluginList{})
+		Invokes(testing.NewListActionWithOptions(uipluginsResource, uipluginsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,40 +77,43 @@ func (c *FakeUIPlugins) List(ctx context.Context, opts metav1.ListOptions) (resu
 // Watch returns a watch.Interface that watches the requested uIPlugins.
 func (c *FakeUIPlugins) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(uipluginsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(uipluginsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a uIPlugin and creates it.  Returns the server's representation of the uIPlugin, and an error, if there is any.
 func (c *FakeUIPlugins) Create(ctx context.Context, uIPlugin *v1.UIPlugin, opts metav1.CreateOptions) (result *v1.UIPlugin, err error) {
+	emptyResult := &v1.UIPlugin{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(uipluginsResource, c.ns, uIPlugin), &v1.UIPlugin{})
+		Invokes(testing.NewCreateActionWithOptions(uipluginsResource, c.ns, uIPlugin, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UIPlugin), err
 }
 
 // Update takes the representation of a uIPlugin and updates it. Returns the server's representation of the uIPlugin, and an error, if there is any.
 func (c *FakeUIPlugins) Update(ctx context.Context, uIPlugin *v1.UIPlugin, opts metav1.UpdateOptions) (result *v1.UIPlugin, err error) {
+	emptyResult := &v1.UIPlugin{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(uipluginsResource, c.ns, uIPlugin), &v1.UIPlugin{})
+		Invokes(testing.NewUpdateActionWithOptions(uipluginsResource, c.ns, uIPlugin, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UIPlugin), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeUIPlugins) UpdateStatus(ctx context.Context, uIPlugin *v1.UIPlugin, opts metav1.UpdateOptions) (*v1.UIPlugin, error) {
+func (c *FakeUIPlugins) UpdateStatus(ctx context.Context, uIPlugin *v1.UIPlugin, opts metav1.UpdateOptions) (result *v1.UIPlugin, err error) {
+	emptyResult := &v1.UIPlugin{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(uipluginsResource, "status", c.ns, uIPlugin), &v1.UIPlugin{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(uipluginsResource, "status", c.ns, uIPlugin, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UIPlugin), err
 }
@@ -123,7 +128,7 @@ func (c *FakeUIPlugins) Delete(ctx context.Context, name string, opts metav1.Del
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeUIPlugins) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(uipluginsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(uipluginsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.UIPluginList{})
 	return err
@@ -131,11 +136,12 @@ func (c *FakeUIPlugins) DeleteCollection(ctx context.Context, opts metav1.Delete
 
 // Patch applies the patch and returns the patched uIPlugin.
 func (c *FakeUIPlugins) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.UIPlugin, err error) {
+	emptyResult := &v1.UIPlugin{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(uipluginsResource, c.ns, name, pt, data, subresources...), &v1.UIPlugin{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(uipluginsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UIPlugin), err
 }
