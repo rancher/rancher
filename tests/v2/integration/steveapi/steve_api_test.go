@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -38,6 +39,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -239,12 +242,123 @@ type LocalSteveAPITestSuite struct {
 	steveAPITestSuite
 }
 
+func (s *LocalSteveAPITestSuite) TestExtensionAPIServer() {
+	restConfig := newExtensionAPIRestConfig(s.client.RancherConfig, s.clusterID, s.client.RancherConfig.AdminToken)
+	discClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	require.NoError(s.T(), err)
+
+	groups, err := discClient.ServerGroups()
+	require.NoError(s.T(), err)
+	require.GreaterOrEqual(s.T(), len(groups.Groups), 0)
+
+	v2Document, err := discClient.OpenAPISchema()
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), v2Document)
+
+	v3Client := discClient.OpenAPIV3()
+	paths, err := v3Client.Paths()
+	require.NoError(s.T(), err)
+	require.GreaterOrEqual(s.T(), len(paths), 0)
+
+	// No auth
+	unauthRestConfig := newExtensionAPIRestConfig(s.client.RancherConfig, s.clusterID, "")
+	unauthDiscClient, err := discovery.NewDiscoveryClientForConfig(unauthRestConfig)
+	require.NoError(s.T(), err)
+
+	_, err = unauthDiscClient.ServerGroups()
+	require.Error(s.T(), err)
+	require.True(s.T(), apierrors.IsForbidden(err))
+
+	_, err = unauthDiscClient.OpenAPISchema()
+	require.Error(s.T(), err)
+	require.True(s.T(), apierrors.IsForbidden(err))
+
+	unauthV3Client := unauthDiscClient.OpenAPIV3()
+	_, err = unauthV3Client.Paths()
+	require.Error(s.T(), err)
+	require.True(s.T(), apierrors.IsForbidden(err))
+
+}
+
+func (s *LocalSteveAPITestSuite) TestExtensionAPIServerAuthorization() {
+	restConfig := newExtensionAPIRestConfig(s.client.RancherConfig, s.clusterID, s.client.RancherConfig.AdminToken)
+	client, err := rest.HTTPClientFor(restConfig)
+	require.NoError(s.T(), err)
+
+	tests := []struct {
+		path               string
+		expectedStatusCode int
+	}{
+		{
+			path:               "/openapi/v2",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			path:               "/openapi/v3",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			path:               "/openapi/v3/version",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			path:               "/metrics",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/healthz",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/readyz",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/livez",
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			path:               "/version",
+			expectedStatusCode: http.StatusForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		name := strings.ReplaceAll(test.path, "/", "_")
+		s.T().Run(name, func(t *testing.T) {
+			resp, err := client.Get(fmt.Sprintf("%s/%s", restConfig.Host, test.path))
+			require.NoError(t, err)
+			require.Equal(t, test.expectedStatusCode, resp.StatusCode)
+		})
+	}
+}
+
 type DownstreamSteveAPITestSuite struct {
 	steveAPITestSuite
 }
 
 func (s *steveAPITestSuite) TearDownSuite() {
 	s.session.Cleanup()
+}
+
+// Tests that everything in /ext returns 404 since the Downstream cluster shouldn't be served
+func (s *DownstreamSteveAPITestSuite) TestExtensionAPIServer() {
+	restConfig := newExtensionAPIRestConfig(s.client.RancherConfig, s.clusterID, s.client.RancherConfig.AdminToken)
+	discClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	require.NoError(s.T(), err)
+
+	_, err = discClient.ServerGroups()
+	require.Error(s.T(), err)
+	require.True(s.T(), apierrors.IsNotFound(err))
+
+	_, err = discClient.OpenAPISchema()
+	require.Error(s.T(), err)
+	require.True(s.T(), apierrors.IsNotFound(err))
+
+	v3Client := discClient.OpenAPIV3()
+	_, err = v3Client.Paths()
+	require.Error(s.T(), err)
+	require.True(s.T(), apierrors.IsNotFound(err))
 }
 
 func (s *LocalSteveAPITestSuite) SetupSuite() {
@@ -2691,4 +2805,19 @@ func TestSteveDownstream(t *testing.T) {
 	// TODO: Re-enable the test when the bug is fixed
 	t.Skip()
 	suite.Run(t, new(DownstreamSteveAPITestSuite))
+}
+
+func newExtensionAPIRestConfig(rancherConfig *rancher.Config, clusterID string, bearerToken string) *rest.Config {
+	host := fmt.Sprintf("https://%s/ext", rancherConfig.Host)
+	if clusterID != "" {
+		host = fmt.Sprintf("https://%s/k8s/clusters/%s/ext", rancherConfig.Host, clusterID)
+	}
+	return &rest.Config{
+		Host:        host,
+		BearerToken: bearerToken,
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: *rancherConfig.Insecure,
+			CAFile:   rancherConfig.CAFile,
+		},
+	}
 }

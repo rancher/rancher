@@ -30,6 +30,7 @@ import (
 	"github.com/rancher/rancher/pkg/crds"
 	dashboardcrds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
+	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
@@ -196,14 +197,20 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	extensionAPIServer, err := ext.NewExtensionAPIServer(wranglerContext)
+	if err != nil {
+		return nil, fmt.Errorf("extension api server: %w", err)
+	}
+
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
-		ServerVersion:   settings.ServerVersion.Get(),
-		Controllers:     steveControllers,
-		AccessSetLookup: wranglerContext.ASL,
-		AuthMiddleware:  steveauth.ExistingContext,
-		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
-		ClusterRegistry: opts.ClusterRegistry,
-		SQLCache:        features.UISQLCache.Enabled(),
+		ServerVersion:      settings.ServerVersion.Get(),
+		Controllers:        steveControllers,
+		AccessSetLookup:    wranglerContext.ASL,
+		AuthMiddleware:     steveauth.ExistingContext,
+		Next:               ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
+		ClusterRegistry:    opts.ClusterRegistry,
+		SQLCache:           features.UISQLCache.Enabled(),
+		ExtensionAPIServer: extensionAPIServer,
 	})
 	if err != nil {
 		return nil, err
