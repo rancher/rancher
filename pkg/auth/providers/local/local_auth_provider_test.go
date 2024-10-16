@@ -11,10 +11,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func TestProvider_SearchPrincipals_short_names(t *testing.T) {
+func TestProviderSearchPrincipalShortNames(t *testing.T) {
 	// If the query string is less than searchIndexDefaultLen
 	// we query the indexer.
-	// Longer queries use the userLister and match
+	// Longer queries use the userLister and match.
 	provider := Provider{
 		userIndexer: newTestUserIndexer(
 			&v3.User{
@@ -117,7 +117,7 @@ func TestProvider_SearchPrincipals_short_names(t *testing.T) {
 	}
 }
 
-func TestProvider_SearchPrincipals_long_search(t *testing.T) {
+func TestProviderSearchPrincipalsLongSearch(t *testing.T) {
 	provider := Provider{
 		userLister: fakeUserLister{
 			users: []*v3.User{
