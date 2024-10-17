@@ -167,26 +167,6 @@ func correctOwnerRefs(ownerReferences *[]metav1.OwnerReference) bool {
 			ownerRef.APIVersion = RancherManagementAPIVersion
 			ownerRef.Kind = v3.ClusterTemplateRevisionGroupVersionKind.Kind
 			needsUpdate = true
-		case "globaldnses":
-			/* Global DNS entries had a Role & RoleBinding created for them with this ownerRef format:
-			  - apiVersion: management.cattle.io
-			    kind: globaldnses
-			    name: gd-s82dh
-			    uid: 3ecf8b69-525b-4a11-85a9-e34cae71f761
-			The APIVersion and Kind both fields are incorrect*/
-			ownerRef.APIVersion = RancherManagementAPIVersion
-			ownerRef.Kind = v3.GlobalDnsGroupVersionKind.Kind
-			needsUpdate = true
-		case "globaldnsproviders":
-			/* Global DNS providers had a Role & RoleBinding created for them with this ownerRef format:
-			  - apiVersion: management.cattle.io
-			    kind: globaldnsproviders
-			    name: rajashree-test
-			    uid: 1e1775da-1eb2-4d9b-99d6-9020f7357ee2
-			The APIVersion and Kind both fields are incorrect*/
-			ownerRef.APIVersion = RancherManagementAPIVersion
-			ownerRef.Kind = v3.GlobalDnsProviderGroupVersionKind.Kind
-			needsUpdate = true
 		case "multiclusterapps":
 			/* Multi Cluster Apps had a Role & RoleBinding created for them with this ownerRef format:
 			  - apiVersion: management.cattle.io

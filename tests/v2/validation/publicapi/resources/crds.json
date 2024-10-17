@@ -20,8 +20,6 @@
         "etcdbackups.management.cattle.io",
         "features.management.cattle.io",
         "fleetworkspaces.management.cattle.io",
-        "globaldnses.management.cattle.io",
-        "globaldnsproviders.management.cattle.io",
         "globalrolebindings.management.cattle.io",
         "globalroles.management.cattle.io",
         "groupmembers.management.cattle.io",
