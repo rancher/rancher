@@ -66,6 +66,8 @@ type OperationClient interface {
 	// Uninstall gets the uninstallation commands using the given namespace, name and options and gets the user information using the isApp flag as true.
 	// Returns a catalog.Operation that represents the helm operation to be created
 	Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error)
+	// AddCpTaintsToTolerations gets the list of control plane nodes and adds their taints to the given tolerations.
+	AddCpTaintsToTolerations(tolerations []v1.Toleration) ([]v1.Toleration, error)
 }
 
 type ContentClient interface {
@@ -313,18 +315,33 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return nil
 	}
 
+	if desiredValue == nil {
+		desiredValue = map[string]interface{}{}
+	}
+	// if tolerations are already present we don't change them
+	if _, ok := desiredValue["tolerations"]; !ok {
+		var tolerations []v1.Toleration
+		tolerations, err = m.operation.AddCpTaintsToTolerations(tolerations)
+		if err != nil {
+			logrus.Warnf("failed to add tolerations for control plane taints: %v", err)
+		} else {
+			desiredValue["tolerations"] = tolerations
+		}
+	}
+
 	timeout := settings.SystemManagedChartsOperationTimeout.Get()
 	t, err := time.ParseDuration(timeout)
 	if err != nil {
 		t = 5 * time.Minute
 	}
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
-		Timeout:       &metav1.Duration{Duration: t},
-		Wait:          true,
-		Install:       true,
-		MaxHistory:    5,
-		Namespace:     namespace,
-		TakeOwnership: takeOwnership,
+		Timeout:                &metav1.Duration{Duration: t},
+		Wait:                   true,
+		Install:                true,
+		MaxHistory:             5,
+		Namespace:              namespace,
+		TakeOwnership:          takeOwnership,
+		AutomaticCPTolerations: true,
 		Charts: []types.ChartUpgrade{
 			{
 				ChartName:   name,
