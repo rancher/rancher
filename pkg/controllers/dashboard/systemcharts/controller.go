@@ -237,7 +237,7 @@ func (h *handler) onDeployment(_ string, d *k8sappsv1.Deployment) (*k8sappsv1.De
 			appName, ok := d.Labels[legacyAppLabel]
 			if ok {
 				logrus.Debugf("[systemcharts] found deployment %s/%s with label %s=%s", d.Namespace, d.Name, legacyAppLabel, appName)
-				if appName == k3sbasedupgrade.K3sAppNme || appName == k3sbasedupgrade.Rke2AppNme {
+				if appName == k3sbasedupgrade.K3sAppName || appName == k3sbasedupgrade.Rke2AppName {
 					logrus.Debugf("[systemcharts] enqueue %s", repoName)
 					h.clusterRepo.Enqueue(repoName)
 				}
