@@ -3,6 +3,7 @@ package k3sbasedupgrade
 import (
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -10,13 +11,15 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 )
 
-const k3sMasterPlanName = "k3s-master-plan"
-const k3sWorkerPlanName = "k3s-worker-plan"
-const systemUpgradeServiceAccount = "system-upgrade-controller"
-const k3supgradeImage = "rancher/k3s-upgrade"
-const rke2upgradeImage = "rancher/rke2-upgrade"
-const rke2MasterPlanName = "rke2-master-plan"
-const rke2WorkerPlanName = "rke2-worker-plan"
+const (
+	k3sMasterPlanName           = "k3s-master-plan"
+	k3sWorkerPlanName           = "k3s-worker-plan"
+	systemUpgradeServiceAccount = "system-upgrade-controller"
+	k3supgradeImage             = "rancher/k3s-upgrade"
+	rke2upgradeImage            = "rancher/rke2-upgrade"
+	rke2MasterPlanName          = "rke2-master-plan"
+	rke2WorkerPlanName          = "rke2-worker-plan"
+)
 
 var genericPlan = planv1.Plan{
 	TypeMeta: metav1.TypeMeta{
@@ -36,130 +39,123 @@ var genericPlan = planv1.Plan{
 	Status: planv1.PlanStatus{},
 }
 
-func generateMasterPlan(version string, concurrency int, drain bool, upgradeImage, masterPlanName string) planv1.Plan {
+func generateMasterPlan(version string, concurrency int, drain bool, image, masterPlanName string) planv1.Plan {
 	masterPlan := genericPlan
-	masterPlan.Spec.Upgrade.Image = upgradeImage
-	masterPlan.Name = masterPlanName
-	masterPlan.Spec.Version = version
-	masterPlan.Spec.Concurrency = int64(concurrency)
-
-	if drain {
-		masterPlan.Spec.Drain = &planv1.DrainSpec{
-			Force: true,
-		}
-	}
-
-	// only select master nodes
-	masterPlan.Spec.NodeSelector = &metav1.LabelSelector{
+	return generatePlan(masterPlan, masterPlanName, version, image, concurrency, drain, &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{{
-
 			Key:      describe.LabelNodeRolePrefix + "master",
 			Operator: metav1.LabelSelectorOpIn,
 			Values:   []string{"true"},
-		}},
-	}
-
-	masterPlan.Spec.Tolerations = []corev1.Toleration{{
-		Operator: corev1.TolerationOpExists,
-	}}
-
-	return masterPlan
+		},
+			{
+				Key:      nodesyncer.UpgradeEnabledLabel,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+		},
+	})
 }
 
-func generateWorkerPlan(version string, concurrency int, drain bool, upgradeImage, workerPlanName, masterPlanName string) planv1.Plan {
+func generateWorkerPlan(version string, concurrency int, drain bool, image, workerPlanName, masterPlanName string) planv1.Plan {
 	workerPlan := genericPlan
-	workerPlan.Spec.Upgrade.Image = upgradeImage
-	workerPlan.Name = workerPlanName
-	workerPlan.Spec.Version = version
-	workerPlan.Spec.Concurrency = int64(concurrency)
-
-	if drain {
-		workerPlan.Spec.Drain = &planv1.DrainSpec{
-			Force: true,
-		}
-	}
-
-	// worker plans wait for master plans to complete
 	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
-		Image: upgradeImage + ":" + parseVersion(version),
+		Image: image + ":" + parseVersion(version),
 		Args:  []string{"prepare", masterPlanName},
 	}
-	// select all nodes that are not master
-	workerPlan.Spec.NodeSelector = &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      describe.LabelNodeRolePrefix + "master",
-			Operator: metav1.LabelSelectorOpDoesNotExist,
-		}},
-	}
-
-	workerPlan.Spec.Tolerations = []corev1.Toleration{{
-		Operator: corev1.TolerationOpExists,
-	}}
-
-	return workerPlan
+	return generatePlan(workerPlan, workerPlanName, version, image, concurrency, drain, &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      describe.LabelNodeRolePrefix + "master",
+				Operator: metav1.LabelSelectorOpDoesNotExist,
+			},
+			{
+				Key:      nodesyncer.UpgradeEnabledLabel,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+		},
+	})
 }
 
 func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int, drain bool, masterPlanName string) planv1.Plan {
-	masterPlan.Name = masterPlanName
-	masterPlan.Spec.Version = version
-	masterPlan.Spec.Concurrency = int64(concurrency)
-
-	if drain {
-		masterPlan.Spec.Drain = &planv1.DrainSpec{
-			Force: true,
-		}
-	}
-
-	// only select master nodes
-	masterPlan.Spec.NodeSelector = &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-
-			Key:      describe.LabelNodeRolePrefix + "master",
-			Operator: metav1.LabelSelectorOpIn,
-			Values:   []string{"true"},
-		}},
-	}
-
-	masterPlan.Spec.Tolerations = []corev1.Toleration{{
-		Operator: corev1.TolerationOpExists,
-	}}
-
-	masterPlan.Spec.ServiceAccountName = genericPlan.Spec.ServiceAccountName
-
-	return masterPlan
+	return configurePlan(masterPlan, version, concurrency, drain, masterPlanName, &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      describe.LabelNodeRolePrefix + "master",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+			{
+				Key:      nodesyncer.UpgradeEnabledLabel,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+		},
+	})
 }
 
-func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int, drain bool, upgradeImage, workerPlanName, masterPlanName string) planv1.Plan {
-	workerPlan.Name = workerPlanName
-	workerPlan.Spec.Version = version
-	workerPlan.Spec.Concurrency = int64(concurrency)
+func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int, drain bool, image, workerPlanName, masterPlanName string) planv1.Plan {
+	// worker plans wait for master plans to complete
+	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
+		Image: image + ":" + parseVersion(version),
+		Args:  []string{"prepare", masterPlanName},
+	}
+	return configurePlan(workerPlan, version, concurrency, drain, workerPlanName, &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      describe.LabelNodeRolePrefix + "master",
+				Operator: metav1.LabelSelectorOpDoesNotExist,
+			},
+			{
+				Key:      nodesyncer.UpgradeEnabledLabel,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"true"},
+			},
+		},
+	})
+}
+
+func generatePlan(plan planv1.Plan, name, version, image string, concurrency int, drain bool, selector *metav1.LabelSelector) planv1.Plan {
+	plan.Spec.Upgrade.Image = image
+	plan.Name = name
+	plan.Spec.Version = version
+	plan.Spec.Concurrency = int64(concurrency)
 
 	if drain {
-		workerPlan.Spec.Drain = &planv1.DrainSpec{
+		plan.Spec.Drain = &planv1.DrainSpec{
 			Force: true,
 		}
 	}
 
-	// worker plans wait for master plans to complete
-	workerPlan.Spec.Prepare = &planv1.ContainerSpec{
-		Image: upgradeImage + ":" + parseVersion(version),
-		Args:  []string{"prepare", masterPlanName},
-	}
+	plan.Spec.NodeSelector = selector
 
-	workerPlan.Spec.NodeSelector = &metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      describe.LabelNodeRolePrefix + "master",
-			Operator: metav1.LabelSelectorOpDoesNotExist,
-		}},
-	}
-
-	workerPlan.Spec.Tolerations = []corev1.Toleration{{
+	plan.Spec.Tolerations = []corev1.Toleration{{
 		Operator: corev1.TolerationOpExists,
 	}}
 
-	workerPlan.Spec.ServiceAccountName = genericPlan.Spec.ServiceAccountName
+	return plan
+}
 
-	return workerPlan
+func configurePlan(plan planv1.Plan, version string, concurrency int, drain bool, name string, selector *metav1.LabelSelector) planv1.Plan {
+	plan.Name = name
+	plan.Spec.Version = version
+	plan.Spec.Concurrency = int64(concurrency)
+
+	if drain {
+		plan.Spec.Drain = &planv1.DrainSpec{
+			Force: true,
+		}
+	}
+
+	plan.Spec.NodeSelector = selector
+
+	plan.Spec.Tolerations = []corev1.Toleration{{
+		Operator: corev1.TolerationOpExists,
+	}}
+
+	plan.Spec.ServiceAccountName = genericPlan.Spec.ServiceAccountName
+
+	return plan
 }
 
 // a valid k3s version needs to be converted to valid docker tag (v1.17.3+k3s1 => v1.17.3-k3s1)
