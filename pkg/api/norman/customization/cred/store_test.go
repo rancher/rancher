@@ -12,11 +12,12 @@ func TestGetHarvesterCloudCredentialExpirationFromKubeconfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		kubeconfig string
-		tokenFunc  func(string) (*apimgmtv3.Token, error)
-		expected   string
-		expectErr  bool
+		name        string
+		kubeconfig  string
+		tokenFunc   func(string) (*apimgmtv3.Token, error)
+		expected    string
+		expectErr   bool
+		validateErr func(err error) bool
 	}{
 		{
 			name:       "empty kubeconfig",
@@ -45,6 +46,9 @@ func TestGetHarvesterCloudCredentialExpirationFromKubeconfig(t *testing.T) {
 				return nil, apierrors.NewNotFound(apimgmtv3.Resource("token"), "kubeconfig-user-test")
 			},
 			expectErr: true,
+			validateErr: func(err error) bool {
+				return apierrors.IsNotFound(err)
+			},
 		},
 		{
 			name: "bad timestamp on token",
@@ -90,6 +94,9 @@ func TestGetHarvesterCloudCredentialExpirationFromKubeconfig(t *testing.T) {
 			tokenName, err := GetHarvesterCloudCredentialExpirationFromKubeconfig(tt.kubeconfig, tt.tokenFunc)
 			if tt.expectErr {
 				assert.Error(t, err)
+				if tt.validateErr != nil {
+					assert.True(t, tt.validateErr(err))
+				}
 			} else {
 				assert.NoError(t, err)
 			}
