@@ -691,10 +691,9 @@ func FormatWindowsEnvVar(envVar corev1.EnvVar, isPlanVariable bool) string {
 	envVar.Value = strings.Trim(envVar.Value, "\"")
 
 	if !isBool {
-		format := ""
 		// Non-boolean variables are always treated as strings,
 		// even numbers
-		format = "$env:%s=\"%s\""
+		format := "$env:%s=\"%s\""
 		if isPlanVariable {
 			format = "%s=%s"
 		}
