@@ -295,7 +295,7 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 	}
 	plans = append(plans, plan)
 
-	if currentVersionResolvesGH5551(cluster.Spec.KubernetesVersion) {
+	if CurrentVersionResolvesGH5551(cluster.Spec.KubernetesVersion) {
 		windowsPlan := winsUpgradePlan(cluster, env, secretName)
 		if cluster.Spec.RedeploySystemAgentGeneration != 0 {
 			windowsPlan.Spec.Secrets = append(windowsPlan.Spec.Secrets, upgradev1.SecretSpec{
@@ -427,11 +427,11 @@ func toStringPointer(x string) *string {
 	return &x
 }
 
-// currentVersionResolvesGH5551 determines if the given rke2 version
+// CurrentVersionResolvesGH5551 determines if the given rke2 version
 // has fixed the RKE2 bug outlined in GH-5551. Windows SUC plans cannot be delivered
 // to clusters running versions containing this bug. This function can be removed
 // when v1.31.x is the lowest supported version offered by Rancher.
-func currentVersionResolvesGH5551(version string) bool {
+func CurrentVersionResolvesGH5551(version string) bool {
 
 	// remove leading v and trailing distro identifier
 	v := strings.TrimPrefix(version, "v")
