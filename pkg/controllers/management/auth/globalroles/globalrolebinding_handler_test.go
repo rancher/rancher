@@ -77,6 +77,7 @@ type grbTestStateChanges struct {
 	t                *testing.T
 	createdCRTBs     []*v3.ClusterRoleTemplateBinding
 	createdCRBs      []*rbacv1.ClusterRoleBinding
+	updatedCRBs      []*rbacv1.ClusterRoleBinding
 	deletedCRTBNames []string
 	createdRBs       map[string]*rbacv1.RoleBinding
 	deletedRBsNames  map[string]struct{}
@@ -223,6 +224,86 @@ func TestCreateUpdate(t *testing.T) {
 			},
 			inputBinding: grb.DeepCopy(),
 			wantBinding:  addAnnotation(&grb),
+			wantError:    false,
+		},
+		{
+			name: "success on both cluster and global permissions - ClusterRole already exists and need to be updated with new Subject",
+			stateSetup: func(state grbTestState) {
+				// mocks for both cluster and global permissions
+				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+					if name == gr.Name && namespace == "" {
+						return &gr, nil
+					}
+					return nil, fmt.Errorf("not found")
+				}
+				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+					return nil, nil
+				}
+
+				// mocks for just cluster permissions
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+					return crtb, nil
+				}
+				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+					return nil
+				}
+				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
+					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
+				}
+
+				// mocks for just global permissions
+				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return &rbacv1.ClusterRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "cattle-globalrolebinding-test-grb",
+						},
+					}, nil
+				}
+				state.crbClientMock.UpdateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					state.stateChanges.updatedCRBs = append(state.stateChanges.updatedCRBs, crb)
+					return crb, nil
+				}
+
+				// mocks for fleet workspace permissions
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+					state.stateChanges.fwhCalled = true
+					return nil
+				}
+			},
+			stateAssertions: func(stateChanges grbTestStateChanges) {
+				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
+				require.Len(stateChanges.t, stateChanges.updatedCRBs, 1)
+				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+				// cluster assertions
+				crtb := stateChanges.createdCRTBs[0]
+				require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
+				require.Equal(stateChanges.t, "not-local", crtb.Namespace)
+				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+				require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
+				require.Equal(stateChanges.t, userName, crtb.UserName)
+				require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
+				require.Len(stateChanges.t, crtb.OwnerReferences, 1)
+				require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
+
+				// global assertions
+				crb := stateChanges.updatedCRBs[0]
+				bindingName := "cattle-globalrolebinding-" + grb.Name
+				roleName := "cattle-globalrole-" + gr.Name
+				require.Equal(stateChanges.t, bindingName, crb.Name)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+
+				// fleet workspace assertions
+				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+			},
+			inputBinding: grb.DeepCopy(),
+			wantBinding:  &grb,
 			wantError:    false,
 		},
 		{
