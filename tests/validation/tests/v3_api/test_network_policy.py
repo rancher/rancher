@@ -8,6 +8,7 @@ random_password = random_test_name("pass")
 PROJECT_ISOLATION = os.environ.get('RANCHER_PROJECT_ISOLATION', "disabled")
 
 
+# This test is deprecated and is replaced by tests/v2/validation/networking/connectivity/network_policy_test.go
 def test_connectivity_between_pods():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
