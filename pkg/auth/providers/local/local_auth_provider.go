@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -16,6 +17,9 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -431,7 +435,8 @@ func minOf(length int, defaultLen int) int {
 func indexField(field string, maxIndex int) []string {
 	var fieldIndexes []string
 	for i := 2; i <= maxIndex; i++ {
-		fieldIndexes = append(fieldIndexes, strings.ToLower(field[0:i]))
+		fieldIndexes = append(fieldIndexes, strings.ToLower(
+			string([]rune(simplifyString(field))[0:i])))
 	}
 
 	splitToLower := func(s string, limit int) []string {
@@ -493,9 +498,21 @@ func (l *Provider) CleanupResources(*v3.AuthConfig) error {
 func userMatchesSearchKey(user *v3.User, searchKey string) bool {
 	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
 		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizeWhitespace(searchKey)) ||
-		strings.Contains(strings.ToLower(normalizeWhitespace(user.DisplayName)), normalizeWhitespace(searchKey)))
+		strings.Contains(strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName))), normalizeWhitespace(searchKey)))
 }
 
 func normalizeWhitespace(s string) string {
 	return strings.Join(strings.Fields(s), "")
+}
+
+// simplifyString transforms unicode characters in the string by replacing
+// the
+// The set of characters that is replaced (unicode.Mn) is here
+//
+//	https://www.compart.com/en/unicode/category/Mn
+func simplifyString(s string) string {
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	result, _, _ := transform.String(t, s)
+
+	return result
 }

@@ -45,6 +45,13 @@ func TestProviderSearchPrincipalShortNames(t *testing.T) {
 				Username:    "johns",
 				DisplayName: "John Smith",
 			},
+			&v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "u-56789",
+				},
+				Username:    "edubois",
+				DisplayName: "Émile Dubois",
+			},
 		),
 		groupIndexer: newTestGroupIndexer(), // Only needed to prevent nil-pointer.
 	}
@@ -97,6 +104,18 @@ func TestProviderSearchPrincipalShortNames(t *testing.T) {
 			searchKey: "john",
 			want:      []string{"local://u-45678"},
 		},
+		{
+			searchKey: "émile",
+			want:      []string{"local://u-56789"},
+		},
+		{
+			searchKey: "Emile",
+			want:      []string{"local://u-56789"},
+		},
+		{
+			searchKey: "emile",
+			want:      []string{"local://u-56789"},
+		},
 	}
 
 	for _, tt := range shortNameTests {
@@ -118,6 +137,7 @@ func TestProviderSearchPrincipalShortNames(t *testing.T) {
 }
 
 func TestProviderSearchPrincipalsLongSearch(t *testing.T) {
+	// For longer search strings we query and match on all users!
 	provider := Provider{
 		userLister: fakeUserLister{
 			users: []*v3.User{
@@ -127,6 +147,13 @@ func TestProviderSearchPrincipalsLongSearch(t *testing.T) {
 					},
 					Username:    "test",
 					DisplayName: "Test User",
+				},
+				&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "u-56789",
+					},
+					Username:    "edubois",
+					DisplayName: "Émile Dubois",
 				},
 			},
 		},
@@ -146,6 +173,10 @@ func TestProviderSearchPrincipalsLongSearch(t *testing.T) {
 		{
 			searchKey: "testuser",
 			want:      []string{"local://u-12345"},
+		},
+		{
+			searchKey: "Emile Dubois",
+			want:      []string{"local://u-56789"},
 		},
 	}
 
