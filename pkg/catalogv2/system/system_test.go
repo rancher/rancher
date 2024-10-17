@@ -404,6 +404,7 @@ func TestInstall(t *testing.T) {
 		values               map[string]interface{}
 		takeOwnership        bool
 		installImageOverride string
+		cpTolerations        []v1.Toleration
 	}
 	type testMocks struct {
 		indexOutput               *repo.IndexFile
@@ -569,29 +570,97 @@ func TestInstall(t *testing.T) {
 			},
 			expected: nil,
 		},
+		{
+			name: "Should add cp tolerations to values",
+			input: testInput{
+				name:          "test-chart",
+				exactVersion:  "102.0.0+up1.0.0",
+				cpTolerations: []v1.Toleration{{Key: "foo", Value: "bar"}},
+			},
+			mocks: testMocks{
+				indexOutput: &repo.IndexFile{
+					Entries: map[string]repo.ChartVersions{
+						"test-chart": []*repo.ChartVersion{
+							{Metadata: &chart.Metadata{Version: "102.0.0+up1.0.0"}},
+							{Metadata: &chart.Metadata{Version: "102.1.0+up1.0.0"}},
+						},
+					},
+				},
+				upgradeOutput: &catalog.Operation{
+					Status: catalog.OperationStatus{
+						PodName:      "install-operation",
+						PodNamespace: "cattle-system",
+					},
+				},
+				podGetOutput: &v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:  "helm",
+						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+					},
+				}}},
+			},
+			expected: nil,
+		},
+		{
+			name: "Should not add cp tolerations to values if tolerations array is present in the provided values",
+			input: testInput{
+				name:         "test-chart",
+				exactVersion: "102.0.0+up1.0.0",
+				values: map[string]interface{}{
+					"tolerations": []v1.Toleration{{Key: "foo2", Value: "bar2"}},
+				},
+			},
+			mocks: testMocks{
+				indexOutput: &repo.IndexFile{
+					Entries: map[string]repo.ChartVersions{
+						"test-chart": []*repo.ChartVersion{
+							{Metadata: &chart.Metadata{Version: "102.0.0+up1.0.0"}},
+							{Metadata: &chart.Metadata{Version: "102.1.0+up1.0.0"}},
+						},
+					},
+				},
+				upgradeOutput: &catalog.Operation{
+					Status: catalog.OperationStatus{
+						PodName:      "install-operation",
+						PodNamespace: "cattle-system",
+					},
+				},
+				podGetOutput: &v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:  "helm",
+						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+					},
+				}}},
+			},
+			expected: nil,
+		},
 	}
 
 	for _, test := range testCases {
 		if test.skip {
 			continue
 		}
-		var versionMatcher interface{}
-		if test.input.exactVersion != "" {
-			versionMatcher = mock.MatchedBy(func(r io.Reader) bool {
-				upgradeArgs := &types2.ChartUpgradeAction{}
-				_ = json.NewDecoder(r).Decode(upgradeArgs)
-				return upgradeArgs.Charts[0].Version == test.input.exactVersion
-			})
-		} else {
-			versionMatcher = mock.Anything
-		}
+		UpgradeActionMatcher := mock.MatchedBy(func(r io.Reader) bool {
+			upgradeArgs := &types2.ChartUpgradeAction{}
+			_ = json.NewDecoder(r).Decode(upgradeArgs)
+			if test.input.exactVersion != "" {
+				asserts.Equal(true, upgradeArgs.Charts[0].Version == test.input.exactVersion, test.name)
+			}
+			if test.input.values["tolerations"] != nil {
+				tolExpected := test.input.values["tolerations"].([]v1.Toleration)
+				tol := upgradeArgs.Charts[0].Values["tolerations"].([]interface{})[0].(map[string]interface{})
+				asserts.Equal(true, (tol["value"] == tolExpected[0].Value) && (tol["key"] == tolExpected[0].Key), test.name)
+			}
+			return true
+		})
 		contentMock, opsMock, podsMock, settingsMock, helmMock, clusterRepoMock :=
 			&mocks.ContentClient{}, &mocks.OperationClient{}, &mocks.PodClient{}, &mocks.SettingController{}, &mocks.HelmClient{}, &mocks.ClusterRepoController{}
 
 		contentMock.On("Index", "", "rancher-charts", "", true).Return(test.mocks.indexOutput, test.mocks.indexError)
 		helmMock.On("ListReleases", test.input.namespace, test.input.name, action.ListDeployed).Return(test.mocks.isInstalledReleasesOutput, test.mocks.isInstalledReleasesError)
 		helmMock.On("ListReleases", test.input.namespace, test.input.name, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback).Return(test.mocks.hasStatusOutput, test.mocks.hasStatusError)
-		opsMock.On("Upgrade", context.TODO(), installUser, "", "rancher-charts", versionMatcher, test.input.installImageOverride).Return(test.mocks.upgradeOutput, test.mocks.upgradeError)
+		opsMock.On("Upgrade", context.TODO(), installUser, "", "rancher-charts", UpgradeActionMatcher, test.input.installImageOverride).Return(test.mocks.upgradeOutput, test.mocks.upgradeError)
+		opsMock.On("AddCpTaintsToTolerations", []v1.Toleration(nil)).Return(test.input.cpTolerations, nil)
 		if test.mocks.podGetOutput != nil || test.mocks.podGetError != nil {
 			podsMock.On("Get", test.mocks.upgradeOutput.Status.PodNamespace, test.mocks.upgradeOutput.Status.PodName, metav1.GetOptions{}).Return(test.mocks.podGetOutput, test.mocks.podGetError)
 		}

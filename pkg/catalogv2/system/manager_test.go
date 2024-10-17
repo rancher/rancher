@@ -455,13 +455,13 @@ func TestInstallCharts(t *testing.T) {
 				if foundRelease != nil {
 					foundReleases = []*release.Release{foundRelease}
 				}
-
 				// Call from installCharts and isInstalled
 				mockHelmClient.EXPECT().ListReleases(dc.namespace, dc.name, action.ListDeployed).
 					Return(foundReleases, nil).
 					MaxTimes(2)
 
 				if test.expectInstalls[dc.name] {
+					mockOperationClient.EXPECT().AddCpTaintsToTolerations([]v1.Toleration(nil)).Return([]v1.Toleration{{Value: "bar", Key: "foo"}}, nil)
 					// Call from install -> hasStatus
 					mockHelmClient.EXPECT().ListReleases(
 						dc.namespace,
