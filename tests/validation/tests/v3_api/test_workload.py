@@ -253,6 +253,7 @@ def test_wl_pause_orchestration():
 
 
 # Windows could not support host port for now.
+#Converted to go test in TestHostPort
 @skip_test_windows_os
 @skip_host_node_port
 def test_wl_with_hostPort():
@@ -276,7 +277,7 @@ def test_wl_with_hostPort():
     workload = wait_for_wl_to_active(p_client, workload)
     validate_hostPort(p_client, workload, source_port, namespace["cluster"])
 
-
+#Converted to go test in TestNodePort
 @skip_host_node_port
 def test_wl_with_nodePort():
     p_client = namespace["p_client"]
@@ -300,7 +301,7 @@ def test_wl_with_nodePort():
     workload = wait_for_wl_to_active(p_client, workload)
     validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
-
+#Converted to go test in TestClusterIP
 def test_wl_with_clusterIp():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -339,7 +340,7 @@ def test_wl_with_clusterIp():
     test_pods = wait_for_pods_in_workload(p_client, workload_for_test, 2)
     validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
 
-
+#Converted to go test in TestLoadBalance
 @if_check_lb
 def test_wl_with_lb():
     p_client = namespace["p_client"]
