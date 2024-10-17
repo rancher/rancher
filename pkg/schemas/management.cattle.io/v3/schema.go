@@ -44,7 +44,6 @@ var (
 		Init(projectCatalogTypes).
 		Init(clusterCatalogTypes).
 		Init(multiClusterAppTypes).
-		Init(globalDNSTypes).
 		Init(kontainerTypes).
 		Init(etcdBackupTypes).
 		Init(credTypes).
@@ -766,30 +765,6 @@ func multiClusterAppTypes(schemas *types.Schemas) *types.Schemas {
 					Input: "updateMultiClusterAppTargetsInput",
 				},
 			}
-		})
-}
-
-func globalDNSTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		TypeName("globalDns", v3.GlobalDns{}).
-		TypeName("globalDnsProvider", v3.GlobalDnsProvider{}).
-		TypeName("globalDnsSpec", v3.GlobalDNSSpec{}).
-		TypeName("globalDnsStatus", v3.GlobalDNSStatus{}).
-		TypeName("globalDnsProviderSpec", v3.GlobalDNSProviderSpec{}).
-		MustImport(&Version, v3.UpdateGlobalDNSTargetsInput{}).
-		AddMapperForType(&Version, v3.GlobalDns{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.GlobalDnsProvider{}, m.Drop{Field: "namespaceId"}).
-		MustImportAndCustomize(&Version, v3.GlobalDns{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"addProjects": {
-					Input: "updateGlobalDNSTargetsInput",
-				},
-				"removeProjects": {
-					Input: "updateGlobalDNSTargetsInput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.GlobalDnsProvider{}, func(schema *types.Schema) {
 		})
 }
 

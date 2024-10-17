@@ -472,7 +472,7 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplaterevisions").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "clustertemplaterevisions").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch").

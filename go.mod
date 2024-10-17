@@ -9,7 +9,6 @@ replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.27+incompatible // rancher-machine requires a replace is set
-
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 
@@ -64,7 +63,6 @@ replace (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240821150307-952f563826f5
-	github.com/rancher/shepherd v0.0.0-20241011174838-687a861827fb
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -140,6 +138,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.0-rc.1
+	github.com/rancher/shepherd v0.0.0-20241022163200-008e42430c0c
 	github.com/rancher/steve v0.0.0-20241018180629-06c2eb50d11d
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
