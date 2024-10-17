@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/kubectl"
@@ -33,7 +34,8 @@ const (
 func validateDeploymentUpgrade(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) {
 	log.Info("Waiting deployment comes up active")
 	err := charts.WatchAndWaitDeployments(client, clusterName, namespaceName, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + appv1Deployment.Name,
+		FieldSelector:  "metadata.name=" + appv1Deployment.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	require.NoError(t, err)
 
