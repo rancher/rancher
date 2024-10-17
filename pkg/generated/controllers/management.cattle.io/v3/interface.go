@@ -57,8 +57,6 @@ type Interface interface {
 	FreeIpaProvider() FreeIpaProviderController
 	GenericOIDCProvider() GenericOIDCProviderController
 	GithubProvider() GithubProviderController
-	GlobalDns() GlobalDnsController
-	GlobalDnsProvider() GlobalDnsProviderController
 	GlobalRole() GlobalRoleController
 	GlobalRoleBinding() GlobalRoleBindingController
 	GoogleOAuthProvider() GoogleOAuthProviderController
@@ -211,14 +209,6 @@ func (v *version) GenericOIDCProvider() GenericOIDCProviderController {
 
 func (v *version) GithubProvider() GithubProviderController {
 	return generic.NewNonNamespacedController[*v3.GithubProvider, *v3.GithubProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GithubProvider"}, "githubproviders", v.controllerFactory)
-}
-
-func (v *version) GlobalDns() GlobalDnsController {
-	return generic.NewController[*v3.GlobalDns, *v3.GlobalDnsList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalDns"}, "globaldnses", true, v.controllerFactory)
-}
-
-func (v *version) GlobalDnsProvider() GlobalDnsProviderController {
-	return generic.NewController[*v3.GlobalDnsProvider, *v3.GlobalDnsProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalDnsProvider"}, "globaldnsproviders", true, v.controllerFactory)
 }
 
 func (v *version) GlobalRole() GlobalRoleController {

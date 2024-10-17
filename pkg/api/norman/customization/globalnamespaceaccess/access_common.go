@@ -23,6 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+const (
+	GlobalDnsFieldMembers = "members"
+)
+
 type MemberAccess struct {
 	Users              v3.UserInterface
 	RoleTemplateLister v3.RoleTemplateLister
@@ -372,7 +376,7 @@ func hasLocalTargets(targetProjects []string) (bool, error) {
 func CheckAccessToUpdateMembers(members []v32.Member, data map[string]interface{}, ownerAccess bool) error {
 	var requestUpdatesMembers bool
 	// Check if members are being updated, if yes, make sure only member with owner permission is making this update request
-	newMembers := convert.ToMapSlice(data[client.GlobalDnsFieldMembers])
+	newMembers := convert.ToMapSlice(data[GlobalDnsFieldMembers])
 	originalMembers := members
 	if len(newMembers) != len(originalMembers) && !ownerAccess {
 		return fmt.Errorf("only members with owner access can update members")
