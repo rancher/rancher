@@ -2,6 +2,7 @@ package rancher
 
 import (
 	"context"
+	"errors"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -88,7 +89,16 @@ func (h *handler) startRancher() {
 	}
 	go func() {
 		err = server.ListenAndServe(h.ctx)
-		logrus.Fatalf("Embedded rancher failed to start: %v", err)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				// context cancellation would happen when cancel() corresponding to h.ctx gets called;
+				// since h.ctx is a signal context registered for SIGINT and SIGTERM, cancel() would be called upon
+				// receiving one of these signals
+				logrus.Infof("Embedded rancher exited due to context cancellation: %v", err)
+			} else {
+				logrus.Fatalf("Embedded rancher failed to start or exited abnormally: %v", err)
+			}
+		}
 	}()
 }
 
