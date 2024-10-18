@@ -23,6 +23,43 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// using a subset of condition, because we don't need to check LastTransitionTime or Message
+// see globalrole_handler_test.go for definition
+// type reducedCondition struct
+
+// A subset of the GRB status, because we do not have/want to check timings.
+type reducedStatus struct {
+	Summary    string
+	Conditions []reducedCondition
+}
+
+// A subset of the GRB, because we do not have/want to check timings.
+type reducedGRB struct {
+	// type meta
+	Kind string
+	APIVersion string
+	// object meta
+	Name               string
+	Namespace          string
+	UID                types.UID
+	Generation         int64
+	Labels             map[string]string
+	Annotations        map[string]string
+	UserName           string
+	GroupPrincipalName string
+	GlobalRoleName     string
+	Status             reducedStatus
+}
+
+// local implementation of the globalRoleBindingController interface for mocking
+type globalRoleBindingControllerMock struct {
+	err error
+}
+
+func (m *globalRoleBindingControllerMock) UpdateStatus(b *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+	return b, m.err
+}
+
 var (
 	inheritedTestGr = v3.GlobalRole{
 		ObjectMeta: metav1.ObjectMeta{
@@ -116,6 +153,7 @@ func TestCreateUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-grb",
 			UID:  "1234",
+			Generation: generation,
 		},
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
@@ -139,12 +177,18 @@ func TestCreateUpdate(t *testing.T) {
 		return newGRB
 	}
 
+	addStatus := func(grb reducedGRB, n string, rcs []reducedCondition) reducedGRB {
+		grb.Status.Summary = n
+		grb.Status.Conditions = rcs
+		return grb
+	}
+
 	tests := []struct {
 		name            string
 		stateSetup      func(grbTestState)
 		stateAssertions func(grbTestStateChanges)
 		inputBinding    *v3.GlobalRoleBinding
-		wantBinding     *v3.GlobalRoleBinding
+		wantBinding     reducedGRB
 		wantError       bool
 	}{
 		{
@@ -222,7 +266,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addAnnotation(&grb),
+			wantBinding:  addStatus(reducedGRBOf(addAnnotation(&grb)), SummaryCompleted, []reducedCondition{
+				{ reason:"ClusterPermissionsOk", status:"True"},
+				{ reason:"GlobalRoleBindingOk", status:"True"},
+				{ reason:"NamespacedRoleBindingsOk", status:"True"},
+			        { reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    false,
 		},
 		{
@@ -289,7 +338,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addAnnotation(&grb),
+			wantBinding:  addStatus(reducedGRBOf(addAnnotation(&grb)), SummaryInProgress, []reducedCondition{
+				{ reason:"FailedToListClusters", status:"False"},
+				{ reason:"GlobalRoleBindingOk", status:"True"},
+				{ reason:"NamespacedRoleBindingsOk", status:"True"},
+			        { reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    true,
 		},
 		{
@@ -367,7 +421,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  &grb,
+			wantBinding:  addStatus (reducedGRBOf(&grb), SummaryInProgress, []reducedCondition{
+				{ reason:"ClusterPermissionsOk", status:"True"},
+				{ reason:"FailedToAddCRB", status:"False"},
+				{ reason:"NamespacedRoleBindingsOk", status:"True"},
+			        { reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    true,
 		},
 		{
@@ -425,7 +484,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  &grb,
+			wantBinding:  addStatus(reducedGRBOf(&grb), SummaryInProgress, []reducedCondition{
+				{ reason:"FailedToGetGlobalRole", status:"False"},
+				{ reason:"FailedToAddCRB", status:"False"},
+				{ reason:"FailedToGetGlobalRole", status:"False"},
+				{ reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    true,
 		},
 		{
@@ -503,18 +567,28 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addAnnotation(&grb),
+			wantBinding:  addStatus(reducedGRBOf(addAnnotation(&grb)),SummaryInProgress, []reducedCondition{
+				{ reason: "ClusterPermissionsOk", status: "True" },
+				{ reason: "GlobalRoleBindingOk", status: "True" },
+				{ reason: "NamespacedRoleBindingsOk", status: "True" },
+				{ reason: "FailedToReconcileFleetWorkspacePermissions", status: "False" },
+			}),
 			wantError:    true,
 		},
 	}
 
 	for _, test := range tests {
 		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			grbLifecycle := globalRoleBindingLifecycle{}
-			testFuncs := []func(*v3.GlobalRoleBinding) (runtime.Object, error){grbLifecycle.Create, grbLifecycle.Updated}
-			for _, testFunc := range testFuncs {
+		grbLifecycle := globalRoleBindingLifecycle{}
+		testFuncs := []struct {
+			name string
+			fun  func(*v3.GlobalRoleBinding) (runtime.Object, error)
+		} {
+			{"create", grbLifecycle.Create},
+			{"update", grbLifecycle.Updated},
+		}
+		for _, testFunc := range testFuncs {
+			t.Run(testFunc.name + " " + test.name, func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
 				grListerMock := fakes.GlobalRoleListerMock{}
@@ -542,10 +616,14 @@ func TestCreateUpdate(t *testing.T) {
 					fwhMock:           &fphMock,
 					stateChanges:      &stateChanges,
 				}
+				grbClientMock := &globalRoleBindingControllerMock{
+					err: nil,
+				}
 				if test.stateSetup != nil {
 					test.stateSetup(state)
 				}
 				grbLifecycle.grLister = &grListerMock
+				grbLifecycle.grbClient = grbClientMock
 				grbLifecycle.crbLister = &crbListerMock
 				grbLifecycle.crtbCache = crtbCacheMock
 				grbLifecycle.clusterLister = &clusterListerMock
@@ -553,8 +631,12 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.crbClient = &crbClientMock
 				grbLifecycle.roleBindingLister = &rbListerMock
 				grbLifecycle.fleetPermissionsHandler = &fphMock
-				res, resErr := testFunc(test.inputBinding)
-				require.Equal(t, test.wantBinding, res)
+
+				// run test on local of input. prevent modifications from .fun to leak into other tests.
+				input := test.inputBinding.DeepCopy()
+
+				res, resErr := testFunc.fun(input)
+				require.Equal(t, test.wantBinding, reducedGRBOf(res.(*v3.GlobalRoleBinding)))
 				if test.wantError {
 					require.Error(t, resErr)
 				} else {
@@ -563,8 +645,8 @@ func TestCreateUpdate(t *testing.T) {
 				if test.stateAssertions != nil {
 					test.stateAssertions(*state.stateChanges)
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
@@ -658,6 +740,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 		inputObject     *v3.GlobalRoleBinding
 		stateAssertions func(stateChanges grbTestStateChanges)
 		wantError       bool
+		condition       reducedCondition
 	}{
 		{
 			name: "no inherited roles",
@@ -690,6 +773,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: false,
+			condition: reducedCondition{reason:"ClusterPermissionsOk", status:"True"},
 		},
 		{
 			name: "missing inherited roles",
@@ -722,6 +806,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: false,
+			condition: reducedCondition{reason:"ClusterPermissionsOk", status:"True"},
 		},
 		{
 			name: "inherited cluster roles",
@@ -768,6 +853,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: false,
+			condition: reducedCondition{reason:"ClusterPermissionsOk", status:"True"},
 		},
 		{
 			name: "inherited cluster roles, purge innacurate roles",
@@ -1008,6 +1094,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: false,
+			condition: reducedCondition{reason:"ClusterPermissionsOk", status:"True"},
 		},
 		{
 			name: "cluster lister error",
@@ -1038,6 +1125,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: true,
+			condition: reducedCondition{reason:"FailedToListClusters", status:"False"},
 		},
 		{
 			name: "crtb creation error",
@@ -1092,6 +1180,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: true,
+			condition: reducedCondition{reason:"FailedToReconcileCRTBs", status:"True"},
 		},
 		{
 			name: "indexer error",
@@ -1140,6 +1229,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: true,
+			condition: reducedCondition{reason:"FailedToReconcileCRTBs", status:"True"},
 		},
 		{
 			name: "crtb delete error",
@@ -1216,6 +1306,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: true,
+			condition: reducedCondition{reason:"FailedToReconcileCRTBs", status:"True"},
 		},
 		{
 			name: "no global role",
@@ -1246,6 +1337,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				UserName:       "test-user",
 			},
 			wantError: true,
+			condition: reducedCondition{reason:"FailedToGetGlobalRole", status:"False"},
 		},
 	}
 	for _, test := range tests {
@@ -1277,12 +1369,18 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				clusterLister: &clusterListerMock,
 				crtbClient:    &crtbClientMock,
 			}
+
 			resErr := grbLifecycle.reconcileClusterPermissions(test.inputObject)
+
 			if test.wantError {
 				require.Error(t, resErr)
 			} else {
 				require.NoError(t, resErr)
 			}
+
+			require.Len(t, test.inputObject.Status.Conditions, 1)
+			require.Equal(t, test.condition, rcOf(test.inputObject.Status.Conditions[0]))
+
 			if test.stateAssertions != nil {
 				test.stateAssertions(*state.stateChanges)
 			}
@@ -1311,9 +1409,13 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		stateAssertions   func(grbTestStateChanges)
 		globalRoleBinding *v3.GlobalRoleBinding
 		wantError         bool
+		condition         []reducedCondition
 	}{
 		{
 			name: "global role not found",
+			condition: []reducedCondition{
+				{reason:"FailedToGetGlobalRole", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return nil, fmt.Errorf("error")
@@ -1324,6 +1426,10 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "getting namespace fails",
+			condition: []reducedCondition{
+				{reason:"FailedToGetGRBNamespace", status:"False"},
+				{reason:"FailedToGetGRBNamespace", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1339,6 +1445,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "namespace is nil",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1354,6 +1463,10 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "getting roleBinding fails",
+			condition: []reducedCondition{
+				{reason:"FailedToGetRB", status:"False"},
+				{reason:"FailedToGetRB", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1372,6 +1485,10 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "creating roleBinding fails",
+			condition: []reducedCondition{
+				{reason:"FailedToCreateRB", status:"False"},
+				{reason:"FailedToCreateRB", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1396,6 +1513,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "roleBindings get created",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1451,6 +1571,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "roleBindings don't get created in a terminating namespace",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1483,6 +1606,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "one NS not found, still creates other RB",
+			condition: []reducedCondition{
+				{reason:"FailedToGetGRBNamespace", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1517,6 +1643,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "delete roleBinding from terminating namespace",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1573,6 +1702,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "update roleBindings with bad roleRef name",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1630,6 +1762,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "update roleBindings with bad grbOwner label",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1688,6 +1823,10 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "update roleBindings fails",
+			condition: []reducedCondition{
+				{reason:"FailedToDeleteRB", status:"False"},
+				{reason:"FailedToDeleteRB", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1715,6 +1854,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "purge RBs that falsely claim to be owned by GRB",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1761,6 +1903,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "do not purge RBs that correctly claim to belong to GRB",
+			condition: []reducedCondition{
+				{reason:"NamespacedRoleBindingsOk", status:"True"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1815,6 +1960,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "delete purged RBs fails",
+			condition: []reducedCondition{
+				{reason:"FailedToPurgeInvalidNamespacedRBs", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1861,6 +2009,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 		},
 		{
 			name: "list RBs fails",
+			condition: []reducedCondition{
+				{reason:"FailedToListRoleBindings", status:"False"},
+			},
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(_, _ string) (*v3.GlobalRole, error) {
 					return namespacedRulesGR.DeepCopy(), nil
@@ -1921,12 +2072,20 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 			grbLifecycle.roleLister = &rLister
 			grbLifecycle.roleBindingLister = &rbLister
 			grbLifecycle.roleBindings = &rbClient
+
 			err := grbLifecycle.reconcileNamespacedRoleBindings(test.globalRoleBinding)
+
 			if test.wantError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
+
+			require.Len(t, test.globalRoleBinding.Status.Conditions, len(test.condition))
+			for index, cond := range test.condition {
+				require.Equal(t, cond, rcOf(test.globalRoleBinding.Status.Conditions[index]))
+			}
+
 			if test.stateAssertions != nil {
 				test.stateAssertions(*state.stateChanges)
 			}
@@ -1940,4 +2099,368 @@ type fleetPermissionsHandlerMock struct {
 
 func (f *fleetPermissionsHandlerMock) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
 	return f.reconcileFleetWorkspacePermissionsFunc(globalRoleBinding)
+}
+
+func TestSetGRBAsInProgress(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		grb          *v3.GlobalRoleBinding
+		updateReturn error
+		wantError    bool
+	}{
+		{
+			name: "update grb status to InProgress",
+			grb:  &v3.GlobalRoleBinding{
+				Status: v3.GlobalRoleBindingStatus{
+					Summary: SummaryCompleted,
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "update grb with empty status to InProgress",
+			grb:  &v3.GlobalRoleBinding{
+				Status: v3.GlobalRoleBindingStatus{},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update grb with nil status to InProgress",
+			grb:          &v3.GlobalRoleBinding{},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update grb fails",
+			grb:          &v3.GlobalRoleBinding{},
+			updateReturn: fmt.Errorf("error"),
+			wantError:    true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			grbLifecycle := globalRoleBindingLifecycle{}
+			grbClientMock := &globalRoleBindingControllerMock{
+				err: test.updateReturn,
+			}
+			grbLifecycle.grbClient = grbClientMock
+
+			err := grbLifecycle.setGRBAsInProgress(test.grb)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Empty(t, test.grb.Status.Conditions)
+			require.Equal(t, SummaryInProgress, test.grb.Status.Summary)
+		})
+	}
+}
+
+func TestSetGRBAsCompleted(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		grb           *v3.GlobalRoleBinding
+		summary      string
+		updateReturn error
+		wantError    bool
+	}{
+		{
+			name: "grb with a met condition is Completed",
+			grb:  &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+				Status: v3.GlobalRoleBindingStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test1",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			summary:      SummaryCompleted,
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "grb with multiple met conditions is Completed",
+			grb:  &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+				Status: v3.GlobalRoleBindingStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test1",
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   "test2",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			summary:      SummaryCompleted,
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "grb with no conditions is Completed",
+			grb:  &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+				Status: v3.GlobalRoleBindingStatus{
+					Conditions: []metav1.Condition{},
+				},
+			},
+			summary:      SummaryCompleted,
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "grb with nil status is Completed",
+			grb:  &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+			},
+			summary:      SummaryCompleted,
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "grb with one unmet and one met condition is Error",
+			grb:  &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+				Status: v3.GlobalRoleBindingStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test1",
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   "test2",
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			},
+			summary:      SummaryError,
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "grb with multiple unmet conditions is Error",
+			grb:  &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+				Status: v3.GlobalRoleBindingStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test1",
+							Status: metav1.ConditionFalse,
+						},
+						{
+							Type:   "test2",
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			},
+			summary:      SummaryError,
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "grb with unknown conditions is Error",
+			grb:  &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+				Status: v3.GlobalRoleBindingStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test1",
+							Status: metav1.ConditionUnknown,
+						},
+						{
+							Type:   "test2",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			summary:      SummaryError,
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "update grb fails",
+			grb: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: generation,
+				},
+			},
+			updateReturn: fmt.Errorf("error"),
+			wantError:    true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			grbLifecycle := globalRoleBindingLifecycle{}
+			grbClientMock := &globalRoleBindingControllerMock{
+				err: test.updateReturn,
+			}
+			grbLifecycle.grbClient = grbClientMock
+
+			err := grbLifecycle.setGRBAsCompleted(test.grb)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			if test.summary != "" {
+				require.Equal(t, test.summary, test.grb.Status.Summary)
+			}
+			require.Equal(t, generation, test.grb.Status.ObservedGeneration)
+		})
+	}
+}
+
+func TestSetGRBAsTerminating(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		grb          *v3.GlobalRoleBinding
+		updateReturn error
+		wantError    bool
+	}{
+		{
+			name: "update grb status to Terminating",
+			grb:  &v3.GlobalRoleBinding{
+				Status: v3.GlobalRoleBindingStatus{
+					Summary: SummaryCompleted,
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "update grb with empty status to Terminating",
+			grb:  &v3.GlobalRoleBinding{
+				Status: v3.GlobalRoleBindingStatus{},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update grb with nil status to Terminating",
+			grb:          &v3.GlobalRoleBinding{},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update grb fails",
+			grb:          &v3.GlobalRoleBinding{},
+			updateReturn: fmt.Errorf("error"),
+			wantError:    true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			grbLifecycle := globalRoleBindingLifecycle{}
+			grbClientMock := &globalRoleBindingControllerMock{
+				err: test.updateReturn,
+			}
+			grbLifecycle.grbClient = grbClientMock
+
+			err := grbLifecycle.setGRBAsTerminating(test.grb)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Empty(t, test.grb.Status.Conditions)
+			require.Equal(t, SummaryTerminating, test.grb.Status.Summary)
+		})
+	}
+}
+
+// rcOf is an internal helper to convert full kube conditions into the reduced
+// form used by the tests. This drops the message and lastTransitionTime.
+func rcOf(c metav1.Condition) reducedCondition {
+	return reducedCondition{
+		reason: c.Reason,
+		status: c.Status,
+	}
+}
+
+func rcOfMap(mcs []metav1.Condition) []reducedCondition {
+	var cs []reducedCondition
+	for _, c := range mcs {
+		cs = append (cs, rcOf (c))
+	}
+	return cs
+}
+
+func reducedGRBStatusOf(status v3.GlobalRoleBindingStatus) reducedStatus {
+	return reducedStatus{
+		Summary: status.Summary,
+		Conditions: rcOfMap (status.Conditions),
+	}
+}
+
+func reducedGRBOf(grb *v3.GlobalRoleBinding) reducedGRB {
+	return reducedGRB{
+		Kind:               grb.Kind,
+		APIVersion:         grb.APIVersion,
+		Name:		    grb.Name,
+		Namespace:	    grb.Namespace,
+		UID:		    grb.UID,
+		Generation:	    grb.Generation,
+		Labels:		    grb.Labels,
+		Annotations: 	    grb.Annotations,
+		UserName:           grb.UserName,
+		GroupPrincipalName: grb.GroupPrincipalName,
+		GlobalRoleName:     grb.GlobalRoleName,
+		Status:             reducedGRBStatusOf (grb.Status),
+	}
 }
