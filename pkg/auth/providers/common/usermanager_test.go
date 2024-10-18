@@ -143,3 +143,94 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckAccess(t *testing.T) {
+	testCases := []struct {
+		name                string
+		accessMode          string
+		allowedPrincipalIDs []string
+		userPrincipalID     string
+		groups              []v3.Principal
+		user                *v3.User
+		userErr             error
+		expectedResult      bool
+		expectedError       error
+	}{
+		{
+			name:                "Unrestricted access, should allow",
+			accessMode:          "unrestricted",
+			allowedPrincipalIDs: []string{},
+			userPrincipalID:     "local://user",
+			expectedResult:      true,
+			expectedError:       nil,
+		},
+		{
+			name:                "Required access, principal allowed",
+			accessMode:          "required",
+			allowedPrincipalIDs: []string{"local://user", "github://user1"},
+			userPrincipalID:     "local://user",
+			user: &v3.User{
+				PrincipalIDs: []string{"local://user", "github://user1"},
+			},
+			expectedResult: true,
+			expectedError:  nil,
+		},
+		{
+			name:                "Restricted access, no matching principal",
+			accessMode:          "restricted",
+			allowedPrincipalIDs: []string{"github://user2"},
+			userPrincipalID:     "local://user",
+			user: &v3.User{
+				PrincipalIDs: []string{"local://user"},
+			},
+			groups: []v3.Principal{
+				{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "github://group1",
+					},
+				},
+			},
+			expectedResult: false,
+			expectedError:  nil,
+		},
+		{
+			name:                "Unsupported accessMode",
+			accessMode:          "unknown",
+			allowedPrincipalIDs: []string{"local://user"},
+			userPrincipalID:     "local://user",
+			expectedResult:      false,
+			expectedError:       errors.New("Unsupported accessMode: unknown"),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			mockUserIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			indexers := map[string]cache.IndexFunc{
+				userByPrincipalIndex: userByPrincipal,
+			}
+			mockUserIndexer.AddIndexers(indexers)
+
+			userControllerMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			um := &userManager{
+				users:       userControllerMock,
+				userIndexer: mockUserIndexer,
+			}
+
+			userControllerMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options v1.GetOptions) (*v3.User, error) {
+				return test.user, test.userErr
+			}).AnyTimes()
+
+			result, err := um.CheckAccess(test.accessMode, test.allowedPrincipalIDs, test.userPrincipalID, test.groups)
+
+			if test.expectedError != nil {
+				assert.EqualError(t, err, test.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectedResult, result)
+			}
+		})
+	}
+}
