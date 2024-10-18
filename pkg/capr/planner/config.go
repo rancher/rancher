@@ -395,7 +395,7 @@ func addTaints(config map[string]interface{}, entry *planEntry, cp *rkev1.RKECon
 		taintString []string
 	)
 
-	taints, err := getTaints(entry, cp)
+	taints, err := capr.GetTaints(entry.Metadata.Annotations[capr.TaintsAnnotation], capr.GetRuntime(cp.Spec.KubernetesVersion), isControlPlane(entry), isEtcd(entry), isWorker(entry))
 	if err != nil {
 		return err
 	}
