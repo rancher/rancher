@@ -3,6 +3,7 @@ package serviceaccounttoken
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -154,18 +155,31 @@ func serviceAccountSecretPrefix(sa *corev1.ServiceAccount) string {
 }
 
 // ServiceAccountSecret returns the secret for the given Service Account.
-// If there are more than one, it returns the first. Can return a nil secret
-// and a nil error if no secret is found
+// Can return a nil secret and a nil error if no secret is found
 func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("cannot get secret for nil service account")
 	}
 
+	annotations := maps.Clone(sa.Annotations)
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	secretAnn := annotations[ServiceAccountSecretRefAnnotation]
+	if secretAnn == "" {
+		return findSecretForSA(ctx, sa, secretLister, secretClient)
+	}
+
+	return secretFromSA(ctx, sa, secretClient)
+}
+
+func findSecretForSA(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {
 	secrets, err := secretLister(sa.Namespace, labels.SelectorFromSet(map[string]string{
 		ServiceAccountSecretLabel: sa.Name,
 	}))
 	if err != nil {
-		return nil, fmt.Errorf("could not get secrets for service account: %w", err)
+		return nil, fmt.Errorf("could not get secrets for service account %s: %w", sa.Name, err)
 	}
 
 	if len(secrets) < 1 {
@@ -183,16 +197,30 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 			continue
 		}
 
-		logrus.Warnf("EnsureSecretForServiceAccount: secret %s is invalid for service account [%s], deleting", logKeyFromObject(s), logKeyFromObject(sa))
+		logrus.Warnf("EnsureSecretForServiceAccount: secret [%s:%s] is invalid for service account [%s], deleting", s.Namespace, s.Name, sa.Name)
 		err = secretClient.Delete(ctx, s.Name, metav1.DeleteOptions{})
 		if err != nil {
 			// we don't want to return the delete failure since the success/failure of the cleanup shouldn't affect
 			// the ability of the caller to use any identified, valid secret
-			logrus.Errorf("unable to delete secret %s: %v", logKeyFromObject(sa), err)
+			logrus.Errorf("unable to delete secret [%s:%s]: %v", s.Namespace, s.Name, err)
 		}
 	}
 
 	return result, nil
+}
+
+func secretFromSA(ctx context.Context, sa *corev1.ServiceAccount, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {
+	secretRef, err := secretRefFromSA(sa)
+	if err != nil {
+		return nil, err
+	}
+
+	secret, err := secretClient.Get(ctx, secretRef.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get secrets for service account: %w", err)
+	}
+
+	return secret, nil
 }
 
 func isSecretForServiceAccount(secret *corev1.Secret, sa *corev1.ServiceAccount) bool {
@@ -217,20 +245,24 @@ func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, 
 
 // returns true if the secret has changed.
 func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret *corev1.Secret, saClient clientv1.ServiceAccountInterface, secretClient clientv1.SecretInterface) (*corev1.ServiceAccount, bool, error) {
-	if sa.Annotations[ServiceAccountSecretRefAnnotation] != "" {
-		return sa, false, nil
-	}
 	if sa.Annotations == nil {
 		sa.Annotations = map[string]string{}
 	}
-	sa.Annotations[ServiceAccountSecretRefAnnotation] = secret.Namespace + "/" + secret.Name
+	secretAnnotation := secret.Namespace + "/" + secret.Name
+
+	// If the SA is already annotated with the secret already
+	if ann := sa.Annotations[ServiceAccountSecretRefAnnotation]; ann == secretAnnotation {
+		return sa, false, nil
+	}
+
+	sa.Annotations[ServiceAccountSecretRefAnnotation] = secretAnnotation
 
 	updated, err := saClient.Update(ctx, sa, metav1.UpdateOptions{})
 	if err == nil {
 		return updated, false, nil
 	}
 	if !apierrors.IsConflict(err) {
-		logrus.Debugf("Successfully annotated ServiceAccount for %s", logKeyFromObject(sa))
+		logrus.Debugf("Failed to update ServiceAccount for %s: %s", logKeyFromObject(sa), err)
 		return nil, false, err
 	}
 
