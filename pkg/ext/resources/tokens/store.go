@@ -39,7 +39,6 @@ type TokenStore struct {
 // +k8s:deepcopy-gen=false
 type SystemTokenStore struct {
 	secretClient        v1.SecretClient
-	secretCache         v1.SecretCache
 	userAttributeClient v3.UserAttributeClient
 	userClient          v3.UserClient
 }
@@ -49,7 +48,6 @@ func NewTokenStoreFromWrangler(wranglerContext *wrangler.Context) types.Store[*T
 
 	return NewTokenStore(
 		wranglerContext.Core.Secret(),
-		wranglerContext.Core.Secret().Cache(),
 		wranglerContext.K8s.AuthorizationV1().SubjectAccessReviews(),
 		wranglerContext.Mgmt.UserAttribute(),
 		wranglerContext.Mgmt.User(),
@@ -58,7 +56,6 @@ func NewTokenStoreFromWrangler(wranglerContext *wrangler.Context) types.Store[*T
 
 func NewTokenStore(
 	secretClient v1.SecretClient,
-	secretCache  v1.SecretCache,
 	sar          authzv1.SubjectAccessReviewInterface,
 	uaClient     v3.UserAttributeController,
 	userClient   v3.UserController,
@@ -66,7 +63,6 @@ func NewTokenStore(
 	tokenStore := TokenStore{
 		SystemTokenStore: SystemTokenStore{
 			secretClient:        secretClient,
-			secretCache:         secretCache,
 			userAttributeClient: uaClient,
 			userClient:          userClient,
 		},
@@ -78,7 +74,6 @@ func NewTokenStore(
 func NewSystemTokenStoreFromWrangler(wranglerContext *wrangler.Context) *SystemTokenStore {
 	return NewSystemTokenStore(
 		wranglerContext.Core.Secret(),
-		wranglerContext.Core.Secret().Cache(),
 		wranglerContext.Mgmt.UserAttribute(),
 		wranglerContext.Mgmt.User(),
 	)
@@ -86,13 +81,11 @@ func NewSystemTokenStoreFromWrangler(wranglerContext *wrangler.Context) *SystemT
 
 func NewSystemTokenStore(
 	secretClient v1.SecretClient,
-	secretCache  v1.SecretCache,
 	uaClient     v3.UserAttributeController,
 	userClient   v3.UserController,
 ) *SystemTokenStore {
 	tokenStore := SystemTokenStore{
 		secretClient:        secretClient,
-		secretCache:         secretCache,
 		userAttributeClient: uaClient,
 		userClient:          userClient,
 	}
@@ -214,7 +207,7 @@ func (t *SystemTokenStore) Update(token *Token, opts *metav1.UpdateOptions) (*To
 }
 
 func (t *SystemTokenStore) update(isadmin bool, token *Token, opts *metav1.UpdateOptions) (*Token, error) {
-	currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
+	currentSecret, err := t.secretClient.Get(TokenNamespace, token.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to get current token %s: %w", token.Name, err)
 	}
@@ -277,7 +270,7 @@ func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, o
 
 func (t *SystemTokenStore) Get(name string, opts *metav1.GetOptions) (*Token, error) {
 	// Core token retrieval from backing secrets
-	currentSecret, err := t.secretCache.Get(TokenNamespace, name)
+	currentSecret, err := t.secretClient.Get(TokenNamespace, name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, err
@@ -381,7 +374,7 @@ func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1
 
 func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string, opts *metav1.DeleteOptions) error {
 	// have to pull the token information first before we can check permissions
-	secret, err := t.secretCache.Get(TokenNamespace, name)
+	secret, err := t.secretClient.Get(TokenNamespace, name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to confirm secret existence %s: %w", name, err)
 	}
@@ -401,7 +394,7 @@ func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string
 }
 
 func (t *SystemTokenStore) Delete(name string, opts *metav1.DeleteOptions) error {
-	_, err := t.secretCache.Get(TokenNamespace, name)
+	_, err := t.secretClient.Get(TokenNamespace, name, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("unable to confirm secret existence %s: %w", name, err)
