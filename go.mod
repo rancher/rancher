@@ -140,7 +140,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.0-rc.1
-	github.com/rancher/steve v0.0.0-20241015140027-8fc2dd4f7460
+	github.com/rancher/steve v0.0.0-20241018171542-f6c6ca839c22
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.0.1-rc.3
