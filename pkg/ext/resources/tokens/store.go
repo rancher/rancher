@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 	"strconv"
+	"time"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
-	"github.com/rancher/rancher/pkg/wrangler"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	authv1 "k8s.io/api/authorization/v1"
@@ -24,7 +24,7 @@ import (
 
 const (
 	TokenNamespace = "cattle-tokens"
-	ThirtyDays     = 30*24*60*60*1000 // 30 days in milliseconds.
+	ThirtyDays     = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds.
 	UserIDLabel    = "authn.management.cattle.io/token-userId"
 )
 
@@ -32,7 +32,7 @@ const (
 // +k8s:deepcopy-gen=false
 type TokenStore struct {
 	SystemTokenStore
-	sar                 authzv1.SubjectAccessReviewInterface
+	sar authzv1.SubjectAccessReviewInterface
 }
 
 // +k8s:openapi-gen=false
@@ -56,9 +56,9 @@ func NewTokenStoreFromWrangler(wranglerContext *wrangler.Context) types.Store[*T
 
 func NewTokenStore(
 	secretClient v1.SecretClient,
-	sar          authzv1.SubjectAccessReviewInterface,
-	uaClient     v3.UserAttributeController,
-	userClient   v3.UserController,
+	sar authzv1.SubjectAccessReviewInterface,
+	uaClient v3.UserAttributeController,
+	userClient v3.UserController,
 ) types.Store[*Token, *TokenList] {
 	tokenStore := TokenStore{
 		SystemTokenStore: SystemTokenStore{
@@ -81,8 +81,8 @@ func NewSystemTokenStoreFromWrangler(wranglerContext *wrangler.Context) *SystemT
 
 func NewSystemTokenStore(
 	secretClient v1.SecretClient,
-	uaClient     v3.UserAttributeController,
-	userClient   v3.UserController,
+	uaClient v3.UserAttributeController,
+	userClient v3.UserController,
 ) *SystemTokenStore {
 	tokenStore := SystemTokenStore{
 		secretClient:        secretClient,
@@ -198,12 +198,12 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Toke
 		return nil, err
 	}
 
-	return t.SystemTokenStore.update (isadmin, token, opts)
+	return t.SystemTokenStore.update(isadmin, token, opts)
 
 }
 
 func (t *SystemTokenStore) Update(token *Token, opts *metav1.UpdateOptions) (*Token, error) {
-	return t.update (true, token, opts)
+	return t.update(true, token, opts)
 }
 
 func (t *SystemTokenStore) update(isadmin bool, token *Token, opts *metav1.UpdateOptions) (*Token, error) {
@@ -217,16 +217,16 @@ func (t *SystemTokenStore) update(isadmin bool, token *Token, opts *metav1.Updat
 	}
 
 	if token.Spec.UserID != currentToken.Spec.UserID {
-		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit user id", token.Name)
+		return nil, fmt.Errorf("unable to change token %s: forbidden to edit user id", token.Name)
 	}
 	if token.Spec.ClusterName != currentToken.Spec.ClusterName {
-		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit cluster name", token.Name)
+		return nil, fmt.Errorf("unable to change token %s: forbidden to edit cluster name", token.Name)
 	}
 	if token.Spec.IsLogin != currentToken.Spec.IsLogin {
-		return nil, fmt.Errorf ("unable to change token %s: forbidden to edit flag isLogin", token.Name)
+		return nil, fmt.Errorf("unable to change token %s: forbidden to edit flag isLogin", token.Name)
 	}
 	if !isadmin && (token.Spec.TTL > currentToken.Spec.TTL) {
-		return nil, fmt.Errorf ("unable to change token %s: non-admin forbidden to extend time-to-live", token.Name)
+		return nil, fmt.Errorf("unable to change token %s: non-admin forbidden to extend time-to-live", token.Name)
 	}
 
 	// Keep status, never store the token value, refresh time
@@ -257,7 +257,7 @@ func (t *SystemTokenStore) update(isadmin bool, token *Token, opts *metav1.Updat
 func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*Token, error) {
 	// have to get token first before we can check permissions on user mismatch
 
-	token, err := t.SystemTokenStore.Get (name, opts)
+	token, err := t.SystemTokenStore.Get(name, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +486,7 @@ func setExpired(token *Token) error {
 		return nil
 	}
 
-	expiresAt := token.ObjectMeta.CreationTimestamp.Add (time.Duration(token.Spec.TTL)*time.Millisecond)
+	expiresAt := token.ObjectMeta.CreationTimestamp.Add(time.Duration(token.Spec.TTL) * time.Millisecond)
 	isExpired := time.Now().After(expiresAt)
 
 	eAt, err := metav1.NewTime(expiresAt).MarshalJSON()
@@ -497,12 +497,12 @@ func setExpired(token *Token) error {
 	// note: The marshalling puts quotes around the string. strip them
 	// before handing this to the token and yaml adding another layer
 	// of quotes around such a string
-	token.Status.ExpiresAt = string(eAt[1:len(eAt)-1])
+	token.Status.ExpiresAt = string(eAt[1 : len(eAt)-1])
 	token.Status.Expired = isExpired
 	return nil
 }
 
-func(t *TokenStore) checkForManageToken(verb string, token *Token, userInfo user.Info) (bool, error) {
+func (t *TokenStore) checkForManageToken(verb string, token *Token, userInfo user.Info) (bool, error) {
 	if token.Spec.UserID == userInfo.GetName() {
 		return false, nil
 	}
@@ -578,11 +578,11 @@ func secretFromToken(token *Token) (*corev1.Secret, error) {
 
 func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 	// spec
-	enabled, err :=	strconv.ParseBool(string(secret.Data["enabled"]))
+	enabled, err := strconv.ParseBool(string(secret.Data["enabled"]))
 	if err != nil {
 		return nil, err
 	}
-	isLogin, err :=	strconv.ParseBool(string(secret.Data["is-login"]))
+	isLogin, err := strconv.ParseBool(string(secret.Data["is-login"]))
 	if err != nil {
 		return nil, err
 	}
@@ -622,10 +622,10 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			IsLogin:     isLogin,
 		},
 		Status: TokenStatus{
-			TokenHash:       string(secret.Data["hash"]),
-			AuthProvider:    string(secret.Data["auth-provider"]),
-			UserPrincipal:   up,
-			LastUpdateTime:  string(secret.Data["last-update-time"]),
+			TokenHash:      string(secret.Data["hash"]),
+			AuthProvider:   string(secret.Data["auth-provider"]),
+			UserPrincipal:  up,
+			LastUpdateTime: string(secret.Data["last-update-time"]),
 		},
 	}
 
