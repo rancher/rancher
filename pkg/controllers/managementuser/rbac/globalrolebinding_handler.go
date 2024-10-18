@@ -1,7 +1,9 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/rancher/norman/types/slice"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -20,6 +22,16 @@ import (
 const (
 	grbByUserAndRoleIndex = "authz.cluster.cattle.io/grb-by-user-and-role"
 	grbHandlerName        = "grb-cluster-sync"
+)
+
+// Condition reason types
+const (
+	// CRBExists is a success indicator
+	CRBExists = "CRBExists"
+	// FailedToGetCRB indicates that the controller failed to retrieve an existing associated CRB
+	FailedToGetCRB = "FailedToGetCRB"
+	// FailedToCreateCRB indicates that the controller failed to create a missing associated CRB
+	FailedToCreateCRB = "FailedToCreateCRB"
 )
 
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
@@ -60,6 +72,7 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 		clusterName:         workload.ClusterName,
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		grbClient:           workload.Management.WithAgent("rbac-handler-base").Wrangler.Mgmt.GlobalRoleBinding(),
 		// The following clients/controllers all point at the management cluster
 		grLister: workload.Management.Management.GlobalRoles("").Controller().Lister(),
 	}
@@ -74,36 +87,66 @@ type grbHandler struct {
 	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
 	crbLister           rbacv1.ClusterRoleBindingLister
 	grLister            v3.GlobalRoleLister
+	grbClient           globalRoleBindingController
+}
+
+// Local interface abstracting the mgmtconv3.GlobalRoleBindingController down to
+// necessities. The testsuite then provides a local mock implementation for itself.
+type globalRoleBindingController interface {
+	UpdateStatus(*apisv3.GlobalRoleBinding) (*apisv3.GlobalRoleBinding, error)
 }
 
 func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Object, error) {
+	if obj != nil {
+		logrus.Debugf("GRB key %v `%v` deleted? %v", key, obj.GlobalRoleName, obj.DeletionTimestamp)
+	} else {
+		logrus.Debugf("GRB key %v, deleted?", key)
+	}
+
+	// ignore deleted resources (and those pending final removal)
 	if obj == nil || obj.DeletionTimestamp != nil {
+		if obj != nil {
+			// Mark as in deletion
+			return obj, c.setGRBAsTerminating(obj)
+		}
 		return obj, nil
 	}
+
+	// ignore non-admin roles
 	isAdmin, err := c.isAdminRole(obj.GlobalRoleName)
 	if err != nil {
 		return nil, err
 	}
 	if !isAdmin {
+		logrus.Debugf("GRB %v ignored, not an admin role", obj.GlobalRoleName)
 		return obj, nil
 	}
 
-	logrus.Debugf("%v is an admin role", obj.GlobalRoleName)
+	logrus.Debugf("GRB %v is an admin role", obj.GlobalRoleName)
 
-	return obj, c.ensureClusterAdminBinding(obj)
+	// status for create|update of admin roles
+	return obj, errors.Join(
+		c.setGRBAsInProgress(obj),
+		c.ensureClusterAdminBinding(obj),
+		c.setGRBAsCompleted(obj),
+	)
 }
 
 // ensureClusterAdminBinding creates a ClusterRoleBinding for GRB subject to
 // the Kubernetes "cluster-admin" ClusterRole in the downstream cluster.
 func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding) error {
+	condition := metav1.Condition{Type: CRBExists}
+
 	bindingName := rbac.GrbCRBName(obj)
 	_, err := c.crbLister.Get("", bindingName)
 	if err != nil && !apierrors.IsNotFound(err) {
+		addGRBCondition(obj, condition, FailedToGetCRB, bindingName, err)
 		return fmt.Errorf("failed to get ClusterRoleBinding '%s' from the cache: %w", bindingName, err)
 	}
 
 	if err == nil {
 		// binding exists, nothing to do
+		addGRBCondition(obj, condition, CRBExists, bindingName, nil)
 		return nil
 	}
 
@@ -118,8 +161,11 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding) er
 		},
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
+		addGRBCondition(obj, condition, FailedToCreateCRB, bindingName, err)
 		return fmt.Errorf("failed to create ClusterRoleBinding '%s' for admin in downstream '%s': %w", bindingName, c.clusterName, err)
 	}
+
+	addGRBCondition(obj, condition, CRBExists, bindingName, nil)
 	return nil
 }
 
@@ -162,4 +208,58 @@ func grbByUserAndRole(obj interface{}) ([]string, error) {
 	}
 
 	return []string{rbac.GetGRBTargetKey(grb) + "-" + grb.GlobalRoleName}, nil
+}
+
+func (c *grbHandler) setGRBAsInProgress(binding *v3.GlobalRoleBinding) error {
+	binding.Status.Conditions = []metav1.Condition{}
+	binding.Status.Summary = SummaryInProgress
+	binding.Status.LastUpdateTime = time.Now().String()
+	updatedGRB, err := c.grbClient.UpdateStatus(binding)
+	if err != nil {
+		return err
+	}
+	// For future updates, we want the latest version of our GRB
+	*binding = *updatedGRB
+	return nil
+}
+
+func (c *grbHandler) setGRBAsCompleted(binding *v3.GlobalRoleBinding) error {
+	binding.Status.Summary = SummaryCompleted
+	for _, c := range binding.Status.Conditions {
+		if c.Status != metav1.ConditionTrue {
+			binding.Status.Summary = SummaryError
+			break
+		}
+	}
+	binding.Status.LastUpdateTime = time.Now().String()
+	binding.Status.ObservedGeneration = binding.ObjectMeta.Generation
+	updatedGRB, err := c.grbClient.UpdateStatus(binding)
+	if err != nil {
+		return err
+	}
+	// For future updates, we want the latest version of our GRB
+	*binding = *updatedGRB
+	return nil
+}
+
+func (c *grbHandler) setGRBAsTerminating(binding *v3.GlobalRoleBinding) error {
+	binding.Status.Conditions = []metav1.Condition{}
+	binding.Status.Summary = SummaryTerminating
+	binding.Status.LastUpdateTime = time.Now().String()
+	_, err := c.grbClient.UpdateStatus(binding)
+	return err
+}
+
+func addGRBCondition(binding *v3.GlobalRoleBinding, condition metav1.Condition,
+	reason, name string, err error) {
+	if err != nil {
+		condition.Status = metav1.ConditionFalse
+		condition.Message = fmt.Sprintf("%s not created: %v", name, err)
+	} else {
+		condition.Status = metav1.ConditionTrue
+		condition.Message = fmt.Sprintf("%s created", name)
+	}
+	condition.Reason = reason
+	condition.LastTransitionTime = metav1.Time{Time: time.Now()}
+	binding.Status.Conditions = append(binding.Status.Conditions, condition)
 }
