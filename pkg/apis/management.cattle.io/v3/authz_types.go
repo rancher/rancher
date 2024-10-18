@@ -359,6 +359,9 @@ func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.summary"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ClusterRoleTemplateBinding is the object representing membership of a subject in a cluster with permissions
 // specified by a given role template.
@@ -394,6 +397,47 @@ type ClusterRoleTemplateBinding struct {
 	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the cluster. Immutable.
 	// +kubebuilder:validation:Required
 	RoleTemplateName string `json:"roleTemplateName" norman:"required,noupdate,type=reference[roleTemplate]"`
+
+	// Status is the most recently observed status of the ClusterRoleTemplateBinding. BEWARE. This is read from and written to by __two__ controllers.
+	// +optional
+	Status ClusterRoleTemplateBindingStatus `json:"status,omitempty"`
+}
+
+// ClusterRoleTemplateBindingStatus represents the most recently observed status of the ClusterRoleTemplateBinding
+type ClusterRoleTemplateBindingStatus struct {
+	// ObservedGenerationLocal is the most recent generation (metadata.generation in CRTB)
+	// observed by the local controller operating on this status. Populated by the system.
+	// +optional
+	ObservedGenerationLocal int64 `json:"observedGenerationLocal,omitempty"`
+
+	// ObservedGenerationRemote is the most recent generation (metadata.generation in CRTB)
+	// observed by the remote controller operating on this status. Populated by the system.
+	// +optional
+	ObservedGenerationRemote int64 `json:"observedGenerationRemote,omitempty"`
+
+	// LastUpdateTime is a k8s timestamp of the last time the status was updated by any of the two controllers operating on it.
+	// +optional
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	// Summary represents the summary of all resources. One of "Complete" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+
+	// SummaryLocal represents the summary of the resources created in the local cluster. One of "Complete" or "Error".
+	// +optional
+	SummaryLocal string `json:"summaryLocal,omitempty"`
+
+	// SummaryRemote represents the summary of the resources created in the downstream cluster. One of "Complete" or "Error".
+	// +optional
+	SummaryRemote string `json:"summaryRemote,omitempty"`
+
+	// LocalConditions is a slice of Condition, indicating the status of backing RBAC objects created in the local cluster.
+	// +optional
+	LocalConditions []metav1.Condition `json:"localConditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// RemoteConditions is a slice of Condition, indicating the status of backing RBAC objects created in the downstream cluster.
+	// +optional
+	RemoteConditions []metav1.Condition `json:"remoteConditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 func (c *ClusterRoleTemplateBinding) ObjClusterName() string {
