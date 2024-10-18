@@ -1,0 +1,175 @@
+//go:build (validation || infra.any || cluster.any || sanity) && !stress && !extended
+
+package observability
+
+import (
+	"context"
+	"strings"
+
+	//"net/url"
+	"testing"
+
+	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
+	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
+	"github.com/rancher/rancher/tests/v2/actions/observability"
+	"github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/shepherd/clients/rancher"
+	extencharts "github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type StackStateTestSuite struct {
+	suite.Suite
+	client                        *rancher.Client
+	session                       *session.Session
+	cluster                       *clusters.ClusterMeta
+	projectID                     string
+	stackstateAgentInstallOptions *charts.InstallOptions
+	stackstateConfigs             observability.StackStateConfigs
+}
+
+func (ss *StackStateTestSuite) TearDownSuite() {
+	ss.session.Cleanup()
+}
+
+func (ss *StackStateTestSuite) SetupSuite() {
+	testSession := session.NewSession()
+	ss.session = testSession
+
+	client, err := rancher.NewClient("", testSession)
+	require.NoError(ss.T(), err)
+
+	ss.client = client
+
+	log.Info("Getting cluster name from the config file and append cluster details in rb")
+	clusterName := client.RancherConfig.ClusterName
+	require.NotEmptyf(ss.T(), clusterName, "Cluster name to install should be set")
+	cluster, err := clusters.NewClusterMeta(ss.client, clusterName)
+	require.NoError(ss.T(), err)
+	ss.cluster = cluster
+
+	log.Info("Creating a project and namespace for the chart to be installed in.")
+
+	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
+	projectTemplate.Name = charts.StackstateNamespace
+	project, err := client.Steve.SteveType(project).Create(projectTemplate)
+	require.NoError(ss.T(), err)
+	ss.projectID = project.ID
+
+	_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
+	require.NoError(ss.T(), err)
+
+	log.Info("Verifying if the ui plugin repository for ui extensions exists.")
+	_, err = ss.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
+
+	if k8sErrors.IsNotFound(err) {
+		err = addExtensionsRepo(ss.client)
+		require.NoError(ss.T(), err)
+	} else {
+		require.NoError(ss.T(), err)
+	}
+
+	var stackstateConfigs observability.StackStateConfigs
+	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
+	ss.stackstateConfigs = stackstateConfigs
+
+	log.Info("Crete a node driver with stackstate extensions ui to whitelist stackstate URL")
+	err = installNodeDriver(ss.client, []string{ss.stackstateConfigs.Url})
+	require.NoError(ss.T(), err)
+
+	ss.T().Log("Checking if the stack state CRD is installed.")
+	crdsExists, err := ss.client.Steve.SteveType(apiExtenisonsCRD).ByID(observabilitySteveType)
+	if crdsExists == nil && strings.Contains(err.Error(), "Not Found") {
+		err = installStackstateCRD(ss.client)
+		require.NoError(ss.T(), err)
+	} else {
+		require.NoError(ss.T(), err)
+	}
+
+	client, err = client.ReLogin()
+	require.NoError(ss.T(), err)
+
+	ss.T().Log("Checking if the stack state extension is already installed.")
+	initialStackstateExtension, err := extencharts.GetChartStatus(client, localCluster, charts.StackstateExtensionNamespace, charts.StackstateExtensionsName)
+	require.NoError(ss.T(), err)
+
+	if !initialStackstateExtension.IsAlreadyInstalled {
+		latestUIPluginVersion, err := ss.client.Catalog.GetLatestChartVersion(charts.StackstateExtensionsName, charts.UIPluginName)
+		require.NoError(ss.T(), err)
+
+		ss.T().Log("Installing stackstate ui extensions")
+		extensionOptions := &charts.ExtensionOptions{
+			ChartName:   charts.StackstateExtensionsName,
+			ReleaseName: charts.StackstateExtensionsName,
+			Version:     latestUIPluginVersion,
+		}
+
+		err = charts.InstallStackstateExtension(client, extensionOptions)
+		require.NoError(ss.T(), err)
+
+		log.Info("Adding stack state extension configuration.")
+
+		steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
+		require.NoError(ss.T(), err)
+
+		crdConfig := newStackstateConfiguration(charts.StackstateNamespace, ss.stackstateConfigs)
+		crd, err := steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
+		require.NoError(ss.T(), err)
+
+		_, err = steveAdminClient.SteveType(charts.StackstateCRD).ByID(crd.ID)
+		require.NoError(ss.T(), err)
+	}
+
+	latestSSVersion, err := ss.client.Catalog.GetLatestChartVersion(charts.StackstateK8sAgent, rancherPartnerCharts)
+	ss.stackstateAgentInstallOptions = &charts.InstallOptions{
+		Cluster:   cluster,
+		Version:   latestSSVersion,
+		ProjectID: project.ID,
+	}
+}
+
+func (ss *StackStateTestSuite) TestStackState() {
+	subSession := ss.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := ss.client.WithSession(subSession)
+	require.NoError(ss.T(), err)
+
+	var stackstateConfigs observability.StackStateConfigs
+	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
+
+	initialStackstateAgent, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
+	require.NoError(ss.T(), err)
+
+	if !initialStackstateAgent.IsAlreadyInstalled {
+		log.Info("Installing stack state agent on the provided cluster")
+
+		systemProject, err := projects.GetProjectByName(client, ss.cluster.ID, systemProject)
+		require.NoError(ss.T(), err)
+		systemProjectID := strings.Split(systemProject.ID, ":")[1]
+
+		err = charts.InstallStackstateAgentChart(ss.client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url, systemProjectID)
+		require.NoError(ss.T(), err)
+		log.Info("Stack state chart installed successfully")
+
+		ss.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")
+		err = extencharts.WatchAndWaitDeployments(client, ss.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
+		require.NoError(ss.T(), err)
+
+		ss.T().Log("Verifying the daemonsets of stackstate agent chart to have expected number of available replicas nodes")
+		err = extencharts.WatchAndWaitDaemonSets(client, ss.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
+		require.NoError(ss.T(), err)
+	}
+}
+
+func TestStackStateTestSuite(t *testing.T) {
+	suite.Run(t, new(StackStateTestSuite))
+}
