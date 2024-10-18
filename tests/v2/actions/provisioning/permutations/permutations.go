@@ -33,7 +33,6 @@ import (
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/namegenerator"
-	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -84,16 +83,12 @@ var (
 )
 
 // RunTestPermutations runs through all relevant perumutations in a given config file, including node providers, k8s versions, and CNIs
-func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.Client, provisioningConfig *provisioninginput.Config, clusterType string, hostnameTruncation []machinepools.HostnameTruncation, corralPackages *corral.Packages) {
-	var name string
+func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.Client, provisioningConfig *provisioninginput.Config, clusterType string, hostnameTruncation []machinepools.HostnameTruncation, corralPackages *corral.Packages) (*steveV1.SteveAPIObject, *management.Cluster) {
 	var providers []string
 	var testClusterConfig *clusters.ClusterConfig
+	var clusterObject *steveV1.SteveAPIObject
+	var rke1ClusterObject *management.Cluster
 	var err error
-
-	testSession := session.NewSession()
-	defer testSession.Cleanup()
-	client, err = client.WithSession(testSession)
-	require.NoError(s.T(), err)
 
 	if strings.Contains(clusterType, "Custom") {
 		providers = provisioningConfig.NodeProviders
@@ -112,13 +107,14 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 
 				testClusterConfig = clusters.ConvertConfigToClusterConfig(provisioningConfig)
 				testClusterConfig.CNI = cni
-				name = testNamePrefix + " Node Provider: " + nodeProviderName + " Kubernetes version: " + kubeVersion + " cni: " + cni
 
-				clusterObject := &steveV1.SteveAPIObject{}
-				rke1ClusterObject := &management.Cluster{}
+				if strings.Contains(testNamePrefix, "Admin") || strings.Contains(testNamePrefix, "Standard") {
+					testNamePrefix = testNamePrefix + " Node Provider: " + nodeProviderName + " Kubernetes version: " + kubeVersion + " cni: " + cni
+				}
+
 				nodeTemplate := &nodetemplates.NodeTemplate{}
 
-				s.Run(name, func() {
+				s.Run(testNamePrefix, func() {
 					if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
 						byteYaml, err := os.ReadFile(outOfTreeAWSFilePath)
 						require.NoError(s.T(), err)
@@ -210,6 +206,8 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 			}
 		}
 	}
+
+	return clusterObject, rke1ClusterObject
 }
 
 // RunPostClusterCloudProviderChecks does additinal checks on the cluster if there's a cloud provider set
