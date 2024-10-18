@@ -45,8 +45,8 @@ export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
 # export CATTLE_AGENT_IMAGE="rancher/rancher-agent:${AGENT_TAG}"
-# using :head for now while figuring out why loading from the docker cache isn't working
-export CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.8-head"
+# using v2.8-4ac9c55885285bd8ce3c7b7e31fc2deb056e1a25-head for now while figuring out why loading from the docker cache isn't working
+export CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.8-4ac9c55885285bd8ce3c7b7e31fc2deb056e1a25-head"
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
