@@ -11,6 +11,7 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/auth/providers/activedirectory/guid"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -311,4 +312,37 @@ func NewDefaultSearchRequest(baseDN, filter string, scope int, attributes []stri
 		attributes,               // Attributes
 		nil,                      // Controls
 	)
+}
+
+func GatherAliases(lConn ldapv3.Client, objectClass, userObjectClass, main string, searchAttributes []string) ([]string, error) {
+	parts := strings.Split(main, "://")
+	userDN := parts[1]
+
+	searchRequest := NewWholeSubtreeSearchRequest(
+		userDN,
+		fmt.Sprintf("(%v=%v)", objectClass, userObjectClass),
+		searchAttributes,
+	)
+
+	result, err := lConn.Search(searchRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result.Entries) == 0 {
+		return nil, errors.Errorf("no entry found for id %v", main)
+	}
+
+	aliases := []string{}
+
+	objectGUID := result.Entries[0].GetRawAttributeValue("objectGUID")
+	if len(objectGUID) > 0 {
+		parsedUUID, err := guid.New(objectGUID)
+		if err != nil {
+			return nil, fmt.Errorf("error creating guid %w", err)
+		}
+		aliases = append(aliases, fmt.Sprintf("%s://objectGUID=%s", parts[0], parsedUUID.UUID()))
+	}
+
+	return aliases, nil
 }
