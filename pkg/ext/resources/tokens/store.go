@@ -44,6 +44,18 @@ type SystemTokenStore struct {
 	userClient          v3.UserClient
 }
 
+func NewTokenStoreFromWrangler(wranglerContext *wrangler.Context) types.Store[*Token, *TokenList] {
+	logrus.Info("ZZZ NewTokenStoreFromWrangler")
+
+	return NewTokenStore(
+		wranglerContext.Core.Secret(),
+		wranglerContext.Core.Secret().Cache(),
+		wranglerContext.K8s.AuthorizationV1().SubjectAccessReviews(),
+		wranglerContext.Mgmt.UserAttribute(),
+		wranglerContext.Mgmt.User(),
+	)
+}
+
 func NewTokenStore(
 	secretClient v1.SecretClient,
 	secretCache  v1.SecretCache,
