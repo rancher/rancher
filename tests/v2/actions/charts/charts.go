@@ -23,10 +23,11 @@ type InstallOptions struct {
 }
 
 type ExtensionOptions struct {
-	ChartName string
-	Version string
+	ChartName   string
+	Version     string
 	ReleaseName string
 }
+
 // payloadOpts is a private struct that contains the options for the chart payloads.
 // It is used to avoid passing the same options to different functions while using the chart helpers.
 type payloadOpts struct {
