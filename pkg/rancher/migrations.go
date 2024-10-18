@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -660,7 +661,10 @@ func migrateHarvesterCloudCredentialExpiration(w *wrangler.Context) error {
 			expiration, err := cred.GetHarvesterCloudCredentialExpirationFromKubeconfig(string(kubeconfigYaml), func(tokenName string) (*v32.Token, error) {
 				return w.Mgmt.Token().Get(tokenName, metav1.GetOptions{})
 			})
-			if err != nil {
+			if apierrors.IsNotFound(err) {
+				logrus.Debugf("Cloud credential [%s] using nonexistent token", secret.Name)
+				continue
+			} else if err != nil {
 				return fmt.Errorf("failed to get harvester cloud credential expiration from kubeconfig: %w", err)
 			}
 
