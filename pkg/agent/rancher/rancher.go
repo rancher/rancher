@@ -88,11 +88,16 @@ func (h *handler) startRancher() {
 		logrus.Fatalf("Embedded rancher failed to initialize: %v", err)
 	}
 	go func() {
-		if err := server.ListenAndServe(h.ctx); errors.Is(err, context.Canceled) {
-			// usually (not always) context cancellation would happen when cancel() corresponding to h.ctx gets called
-			logrus.Infof("Embedded rancher exited due to context cancellation: %v", err)
-		} else {
-			logrus.Fatalf("Embedded rancher failed to start or exited abnormally: %v", err)
+		err = server.ListenAndServe(h.ctx)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				// context cancellation would happen when cancel() corresponding to h.ctx gets called;
+				// since h.ctx is a signal context registered for SIGINT and SIGTERM, cancel() would be called upon
+				// receiving one of these signals
+				logrus.Infof("Embedded rancher exited due to context cancellation: %v", err)
+			} else {
+				logrus.Fatalf("Embedded rancher failed to start or exited abnormally: %v", err)
+			}
 		}
 	}()
 }
