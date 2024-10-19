@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -24,7 +25,7 @@ func TestRegexp(t *testing.T) {
 	assert.False(t, mgmtNameRegexp.MatchString("ac-12345b"))
 }
 
-func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
+func TestGenerateProvisioningClusterFromLegacyCluster(t *testing.T) {
 	tests := []struct {
 		name    string
 		cluster *v3.Cluster
@@ -80,11 +81,21 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 	}
 }
 
-func TestController_createNewCluster(t *testing.T) {
+func defaultClusterSpec() v3.ClusterSpec {
+	return v3.ClusterSpec{
+		ClusterSpecBase: v3.ClusterSpecBase{
+			// default agent image
+			DesiredAgentImage: settings.AgentImage.Get(),
+		},
+	}
+}
+
+func TestCreateNewCluster(t *testing.T) {
 	tests := []struct {
-		name        string
-		cluster     *v1.Cluster
-		clusterSpec v3.ClusterSpec
+		name                string
+		cluster             *v1.Cluster
+		mgmtClusterSpec     v3.ClusterSpec
+		expectedClusterSpec v3.ClusterSpec
 	}{
 		{
 			name: "test-default",
@@ -92,7 +103,8 @@ func TestController_createNewCluster(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec:       v1.ClusterSpec{},
 			},
-			clusterSpec: v3.ClusterSpec{},
+			mgmtClusterSpec:     v3.ClusterSpec{},
+			expectedClusterSpec: defaultClusterSpec(),
 		},
 		{
 			name: "test-cluster-agent-customization",
@@ -103,8 +115,53 @@ func TestController_createNewCluster(t *testing.T) {
 					FleetAgentDeploymentCustomization:   getTestFleetAgentCustomizationV1(),
 				},
 			},
-			clusterSpec: v3.ClusterSpec{
-				ClusterSpecBase: v3.ClusterSpecBase{},
+			expectedClusterSpec: func() v3.ClusterSpec {
+				spec := defaultClusterSpec()
+				spec.ClusterSpecBase.ClusterAgentDeploymentCustomization = getTestClusterAgentCustomizationV3()
+				spec.ClusterSpecBase.FleetAgentDeploymentCustomization = getTestFleetAgentCustomizationV3()
+				return spec
+			}(),
+		},
+		{
+			name: "test-cluster-desired-image",
+			cluster: &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec:       v1.ClusterSpec{},
+			},
+			mgmtClusterSpec: v3.ClusterSpec{
+				ClusterSpecBase: v3.ClusterSpecBase{
+					DesiredAgentImage: "rancher/rancher-agent:test",
+					DesiredAuthImage:  "rancher/kube-api-auth:test",
+				},
+			},
+			expectedClusterSpec: v3.ClusterSpec{
+				ClusterSpecBase: v3.ClusterSpecBase{
+					DesiredAgentImage: "rancher/rancher-agent:test",
+					// desired auth image is not set if local auth endpoint is disabled
+					DesiredAuthImage: "",
+				},
+			},
+		},
+		{
+			name: "test-cluster-desired-auth-image",
+			cluster: &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec:       v1.ClusterSpec{},
+			},
+			mgmtClusterSpec: v3.ClusterSpec{
+				ClusterSpecBase: v3.ClusterSpecBase{
+					DesiredAuthImage:         "rancher/kube-api-auth:test",
+					LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{Enabled: true},
+				},
+			},
+			expectedClusterSpec: v3.ClusterSpec{
+				ClusterSpecBase: v3.ClusterSpecBase{
+					DesiredAuthImage: "rancher/kube-api-auth:test",
+					// default agent image
+					DesiredAgentImage: settings.AgentImage.Get(),
+					// prov cluster is source of truth for local cluster auth endpoint
+					LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{},
+				},
 			},
 		},
 	}
@@ -112,28 +169,20 @@ func TestController_createNewCluster(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](mockCtrl)
 	clusterCache.EXPECT().Get(gomock.AssignableToTypeOf("")).Return(&v3.Cluster{}, nil).AnyTimes()
+	h := handler{
+		mgmtClusterCache: clusterCache,
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := handler{
-				mgmtClusterCache: clusterCache,
-			}
-
-			obj, _, err := h.createNewCluster(tt.cluster, tt.cluster.Status, tt.clusterSpec)
-
+			obj, _, err := h.createNewCluster(tt.cluster, tt.cluster.Status, tt.mgmtClusterSpec)
 			assert.Nil(t, err)
 			assert.NotNil(t, obj, "Expected non-nil v3 cluster obj")
+
 			jsonData, _ := json.Marshal(obj[0])
 			var legacyCluster v3.Cluster
 			json.Unmarshal(jsonData, &legacyCluster)
 
-			switch tt.name {
-			case "test-default":
-				assert.Nil(t, legacyCluster.Spec.ClusterAgentDeploymentCustomization)
-				assert.Nil(t, legacyCluster.Spec.FleetAgentDeploymentCustomization)
-			case "test-cluster-agent-customization":
-				assert.Equal(t, getTestClusterAgentCustomizationV3(), legacyCluster.Spec.ClusterAgentDeploymentCustomization)
-				assert.Equal(t, getTestFleetAgentCustomizationV3(), legacyCluster.Spec.FleetAgentDeploymentCustomization)
-			}
+			assert.Equal(t, tt.expectedClusterSpec, legacyCluster.Spec)
 		})
 	}
 }

@@ -78,23 +78,23 @@ func getPrivateRepoURL(machineGlobalConfig rkev1.GenericMap, machineSelectorConf
 	return settings.SystemDefaultRegistry.Get()
 }
 
-func GetDesiredAgentImage(cp *rkev1.RKEControlPlane, mgmtCluster *v3.Cluster) string {
-	desiredAgent := mgmtCluster.Spec.DesiredAgentImage
-	if mgmtCluster.Spec.AgentImageOverride != "" {
-		desiredAgent = mgmtCluster.Spec.AgentImageOverride
+func GetDesiredAgentImage(cluster *v1.Cluster, mgmtClusterSpec *v3.ClusterSpec) string {
+	desiredAgent := mgmtClusterSpec.DesiredAgentImage
+	if mgmtClusterSpec.AgentImageOverride != "" {
+		desiredAgent = mgmtClusterSpec.AgentImageOverride
 	}
 	if desiredAgent == "" || desiredAgent == "fixed" {
-		desiredAgent = ResolveWithControlPlane(settings.AgentImage.Get(), cp)
+		desiredAgent = ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	}
 	return desiredAgent
 }
 
-func GetDesiredAuthImage(cp *rkev1.RKEControlPlane, mgmtCluster *v3.Cluster) string {
+func GetDesiredAuthImage(cluster *v1.Cluster, mgmtClusterSpec *v3.ClusterSpec) string {
 	var desiredAuth string
-	if mgmtCluster.Spec.LocalClusterAuthEndpoint.Enabled {
-		desiredAuth = mgmtCluster.Spec.DesiredAuthImage
+	if mgmtClusterSpec.LocalClusterAuthEndpoint.Enabled {
+		desiredAuth = mgmtClusterSpec.DesiredAuthImage
 		if desiredAuth == "" || desiredAuth == "fixed" {
-			desiredAuth = ResolveWithControlPlane(settings.AuthImage.Get(), cp)
+			desiredAuth = ResolveWithCluster(settings.AuthImage.Get(), cluster)
 		}
 	}
 	return desiredAuth
