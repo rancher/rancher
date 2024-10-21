@@ -343,6 +343,87 @@ func (ss *StackStateTestSuite) TestDynamicUpgradeStackstateAgentChart() {
 	})
 }
 
+func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
+	subSession := ss.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := ss.client.WithSession(subSession)
+	require.NoError(ss.T(), err)
+
+	versionsList, err := client.Catalog.GetListChartVersions(charts.StackstateK8sAgent, rancherPartnerCharts)
+	require.NoError(ss.T(), err)
+
+	if len(versionsList) < 2 {
+		ss.T().Skip("Skipping the upgrade case, only one version of stackstate agent chart is available")
+	}
+	require.GreaterOrEqualf(ss.T(), len(versionsList), 2, "There should be at least 2 versions of the stackstate agent chart")
+
+	versionLatest := versionsList[0]
+	ss.T().Log(versionLatest)
+	versionBeforeLatest := versionsList[1]
+	ss.T().Log(versionBeforeLatest)
+	ss.stackstateAgentInstallOptions.Version = versionBeforeLatest
+
+	ss.T().Log("Checking if the stackstate agent chart is installed with one of the previous versions")
+	initialStackstateAgent, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
+	require.NoError(ss.T(), err)
+
+	if initialStackstateAgent.IsAlreadyInstalled && initialStackstateAgent.ChartDetails.Spec.Chart.Metadata.Version == versionLatest {
+		ss.T().Skip("Skipping the upgrade case, stackstate agent chart is already installed with the latest version")
+	}
+
+	var stackstateConfigs observability.StackStateConfigs
+	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
+
+	if !initialStackstateAgent.IsAlreadyInstalled {
+		systemProject, err := projects.GetProjectByName(client, ss.cluster.ID, systemProject)
+		require.NoError(ss.T(), err)
+		systemProjectID := strings.Split(systemProject.ID, ":")[1]
+
+		ss.T().Log("Installing stackstate agent chart with the version before the latest version")
+		err = charts.InstallStackstateAgentChart(client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url, systemProjectID)
+		require.NoError(ss.T(), err)
+
+		ss.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")
+		err = extencharts.WatchAndWaitDeployments(client, ss.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
+		require.NoError(ss.T(), err)
+
+		ss.T().Log("Verifying the daemonsets of stackstate agent chart to have expected number of available replicas nodes")
+		err = extencharts.WatchAndWaitDaemonSets(client, ss.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
+		require.NoError(ss.T(), err)
+	}
+
+	stackstateAgentChartPreUpgrade, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
+
+	require.NoError(ss.T(), err)
+
+	// Validate current version of stackstate agent is one of the versions before latest
+	chartVersionPreUpgrade := stackstateAgentChartPreUpgrade.ChartDetails.Spec.Chart.Metadata.Version
+	require.Contains(ss.T(), versionsList[1:], chartVersionPreUpgrade)
+
+	ss.stackstateAgentInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.StackstateK8sAgent, rancherPartnerCharts)
+	require.NoError(ss.T(), err)
+
+	ss.T().Log("Upgrading stackstate agent chart to the latest version")
+	err = charts.UpgradeStackstateAgentChart(client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url)
+	require.NoError(ss.T(), err)
+
+	ss.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")
+	err = extencharts.WatchAndWaitDeployments(client, ss.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
+	require.NoError(ss.T(), err)
+
+	ss.T().Log("Verifying the daemonsets of stackstate agent chart to have expected number of available replicas nodes")
+	err = extencharts.WatchAndWaitDaemonSets(client, ss.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
+	require.NoError(ss.T(), err)
+
+	stackstateAgentChartPostUpgrade, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
+	require.NoError(ss.T(), err)
+
+	ss.T().Log("Comparing installed and desired stackstate agent versions")
+	chartVersionPostUpgrade := stackstateAgentChartPostUpgrade.ChartDetails.Spec.Chart.Metadata.Version
+	require.Equal(ss.T(), ss.stackstateAgentInstallOptions.Version, chartVersionPostUpgrade)
+}
+
 func TestStackStateTestSuite(t *testing.T) {
 	suite.Run(t, new(StackStateTestSuite))
 }
