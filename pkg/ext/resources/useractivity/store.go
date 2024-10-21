@@ -9,7 +9,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -41,29 +40,14 @@ func (uas *UserActivityStore) Create(ctx context.Context, userInfo user.Info, us
 	if token.Labels[tokenUserId] == userInfo.GetName() {
 		// once validated the request, we can define the lastActivity time.
 		lastActivity := time.Now()
-		useractivity.Status.LastActivity = lastActivity.String()
 		// TODO: replace '10' with the value of auth-user-session-ttl-minutes
-		useractivity.Status.CurrentTimeout = lastActivity.Local().Add(time.Minute * time.Duration(10)).String()
+		newIdleTimeout := lastActivity.Local().Add(time.Minute * time.Duration(10))
 
-		// check if resource already exists.
-		_, err := uas.configMapClient.Get(UserActivityNamespace, useractivity.Spec.TokenId, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			// in case the configmap doens't exists, we create it.
-			cm := configMapFromUserActivity(useractivity)
-			_, err := uas.configMapClient.Create(cm)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create configmap for useractivity: %w", err)
-			}
-		} else if err != nil {
-			return nil, fmt.Errorf("unable to get configmap for useractivity: %w", err)
-		} else {
-			// in case the configmap already exists, this must be updated.
-			cm := configMapFromUserActivity(useractivity)
-			_, err := uas.configMapClient.Update(cm)
-			if err != nil {
-				return nil, fmt.Errorf("unable to update configmap for useractivity: %w", err)
-			}
-		}
+		token.CurrentIdleTimeout = newIdleTimeout
+		uas.tokenController.Update(token)
+
+		useractivity.Status.LastActivity = lastActivity.String()
+		useractivity.Status.CurrentTimeout = newIdleTimeout.String()
 
 		return useractivity, nil
 	}
