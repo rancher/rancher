@@ -107,8 +107,8 @@ func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	return v3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
 }
 
-// PerformSamlLogout guards against a regular logout when the system has SLO, i.e. LogoutAll forced.
-func PerformSamlLogout(apiContext *types.APIContext, token *v3.Token) error {
+// Logout guards against a regular logout when the system has SLO, i.e. LogoutAll forced.
+func (s *Provider) Logout(apiContext *types.APIContext, token *v3.Token) error {
 	providerName := token.AuthProvider
 
 	logrus.Debugf("SAML [logout]: triggered by provider %s", providerName)
@@ -127,7 +127,7 @@ func PerformSamlLogout(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }
 
-func PerformSamlLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (s *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	providerName := token.AuthProvider
 
 	logrus.Debugf("SAML [logout-all]: triggered by provider %s", providerName)

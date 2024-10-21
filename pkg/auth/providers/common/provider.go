@@ -29,4 +29,8 @@ type AuthProvider interface {
 	CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error)
 	GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string
 	IsDisabledProvider() (bool, error)
+
+	// API methods to perform per-provider custom actions for logout/all.
+	LogoutAll(apiContext *types.APIContext, token *v3.Token) error
+	Logout(apiContext *types.APIContext, token *v3.Token) error
 }
