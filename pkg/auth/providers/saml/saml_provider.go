@@ -161,7 +161,19 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) erro
 		return fmt.Errorf("SAML [logout-all]: UserAttributes for rancher user %q not found", userName)
 	}
 
-	userAtProvider := userAttributes.ExtraByProvider[providerName]["username"][0]
+	// Incremental extraction of the user at provider info
+	extras, ok := userAttributes.ExtraByProvider[providerName]
+	if !ok {
+		return fmt.Errorf("SAML [logout-all]: UserAttributes has no data for provider %q", providerName)
+	}
+	users, ok := extras["username"]
+	if !ok {
+		return fmt.Errorf("SAML [logout-all]: UserAttributes %q provider data has no user name information", providerName)
+	}
+	if len(users) == 0 {
+		return fmt.Errorf("SAML [logout-all]: UserAttributes %q provider user information is empty", providerName)
+	}
+	userAtProvider := users[0]
 	finalRedirectURL := samlLogout.FinalRedirectURL
 
 	w := apiContext.Response
