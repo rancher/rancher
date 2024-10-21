@@ -1,6 +1,9 @@
 package tokens
 
 import (
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/golang/mock/gomock" // <-- fake | "go.uber.org/mock/gomock"
@@ -14,6 +17,17 @@ import (
 )
 
 func Test_SystemTokenStore_Get(t *testing.T) {
+
+	someerror := fmt.Errorf("bogus")
+	userIdMissingError := fmt.Errorf("userId missing")
+	hashMissingError := fmt.Errorf("token hash missing")
+	authProviderMissingError := fmt.Errorf("auth provider missing")
+	lastUpdateMissingError := fmt.Errorf("last update time missing")
+	_, parseBoolError := strconv.ParseBool("")
+	_, parseIntError := strconv.ParseInt("", 10, 64)
+	var up v3.Principal
+	jsonSyntaxError := json.Unmarshal([]byte(""), &up)
+
 	tests := []struct {
 		name    string                                          // test name
 		store   func(ctrl *gomock.Controller) *SystemTokenStore // create store to test, with mock clients
@@ -23,7 +37,7 @@ func Test_SystemTokenStore_Get(t *testing.T) {
 		tok     *Token                                          // expected op result, token
 	}{
 		{
-			name: "no backing secret",
+			name: "backing secret not found",
 			store: func(ctrl *gomock.Controller) *SystemTokenStore {
 				// mock clients ...
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
@@ -43,6 +57,315 @@ func Test_SystemTokenStore_Get(t *testing.T) {
 			opts:    nil,
 			err:     apierrors.NewNotFound(schema.GroupResource{}, ""),
 			tok:     nil,
+		},
+		{
+			name: "some other error",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(nil, someerror).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to get token secret %s: %w", "bogus", someerror),
+			tok:     nil,
+		},
+		{
+			name: "empty secret",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", parseBoolError),
+			tok:     nil,
+		},
+		{
+			name: "part-filled secret (enabled)",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						Data: map[string][]byte{
+							"enabled": []byte("false"),
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", parseBoolError),
+			tok:     nil,
+		},
+		{
+			name: "part-filled secret (enabled, is-login)",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						Data: map[string][]byte{
+							"enabled":  []byte("false"),
+							"is-login": []byte("true"),
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", parseIntError),
+			tok:     nil,
+		},
+		{
+			name: "part-filled secret (enabled, is-login, ttl)",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						Data: map[string][]byte{
+							"enabled":  []byte("false"),
+							"is-login": []byte("true"),
+							"ttl":      []byte("4000"),
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", userIdMissingError),
+			tok:     nil,
+		},
+		{
+			name: "part-filled secret (enabled, is-login, ttl, user id)",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						Data: map[string][]byte{
+							"enabled":  []byte("false"),
+							"is-login": []byte("true"),
+							"ttl":      []byte("4000"),
+							"userID":   []byte("lkajdlksjlkds"),
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", hashMissingError),
+			tok:     nil,
+		},
+		{
+			name: "part-filled secret (enabled, is-login, ttl, user id, hash)",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						Data: map[string][]byte{
+							"enabled":  []byte("false"),
+							"is-login": []byte("true"),
+							"ttl":      []byte("4000"),
+							"userID":   []byte("lkajdlksjlkds"),
+							"hash":     []byte("kla9jkdmj"),
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", authProviderMissingError),
+			tok:     nil,
+		},
+		{
+			name: "part-filled secret (enabled, is-login, ttl, user id, hash, auth provider)",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						Data: map[string][]byte{
+							"enabled":       []byte("false"),
+							"is-login":      []byte("true"),
+							"ttl":           []byte("4000"),
+							"userID":        []byte("lkajdlksjlkds"),
+							"hash":          []byte("kla9jkdmj"),
+							"auth-provider": []byte("somebody"),
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", lastUpdateMissingError),
+			tok:     nil,
+		},
+		{
+			name: "part-filled secret (enabled, is-login, ttl, user id, hash, auth provider, last update)",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						Data: map[string][]byte{
+							"enabled":          []byte("false"),
+							"is-login":         []byte("true"),
+							"ttl":              []byte("4000"),
+							"userID":           []byte("lkajdlksjlkds"),
+							"hash":             []byte("kla9jkdmj"),
+							"auth-provider":    []byte("somebody"),
+							"last-update-time": []byte("13:00:05"),
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     fmt.Errorf("unable to extract token %s: %w", "bogus", jsonSyntaxError),
+			tok:     nil,
+		},
+		{
+			name: "filled secret",
+			store: func(ctrl *gomock.Controller) *SystemTokenStore {
+				// mock clients ...
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+				// configure mocks for expected calls and responses
+				secrets.EXPECT().
+					Get("cattle-tokens", "bogus", gomock.Any()).
+					Return(&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "bogus",
+						},
+						Data: map[string][]byte{
+							"enabled":          []byte("false"),
+							"is-login":         []byte("true"),
+							"ttl":              []byte("4000"),
+							"userID":           []byte("lkajdlksjlkds"),
+							"hash":             []byte("kla9jkdmj"),
+							"auth-provider":    []byte("somebody"),
+							"last-update-time": []byte("13:00:05"),
+							"user-principal":   []byte("{}"),
+							// Should actually add tests for the structure of the user principal
+							// and check the same in the store code.
+						},
+					}, nil).
+					AnyTimes()
+
+				// assemble store talking to mocks
+				return NewSystemTokenStore(secrets, uattrs, users)
+			},
+			tokname: "bogus",
+			opts:    nil,
+			err:     nil,
+			tok: &Token{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Token",
+					APIVersion: "ext.cattle.io/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bogus",
+				},
+				Spec: TokenSpec{
+					UserID:      "lkajdlksjlkds",
+					Description: "",
+					ClusterName: "",
+					TTL:         4000,
+					Enabled:     false,
+					IsLogin:     true,
+				},
+				Status: TokenStatus{
+					TokenValue:     "",
+					TokenHash:      "kla9jkdmj",
+					Expired:        true,
+					ExpiresAt:      "0001-01-01T00:00:04Z",
+					AuthProvider:   "somebody",
+					LastUpdateTime: "13:00:05",
+				},
+			},
 		},
 	}
 

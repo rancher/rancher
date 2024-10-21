@@ -595,6 +595,26 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 		ttl = ThirtyDays
 	}
 
+	userId := string(secret.Data["userID"])
+	if userId == "" {
+		return nil, fmt.Errorf("userId missing")
+	}
+
+	tokenHash := string(secret.Data["hash"])
+	if tokenHash == "" {
+		return nil, fmt.Errorf("token hash missing")
+	}
+
+	authProvider := string(secret.Data["auth-provider"])
+	if authProvider == "" {
+		return nil, fmt.Errorf("auth provider missing")
+	}
+
+	lastUpdateTime := string(secret.Data["last-update-time"])
+	if lastUpdateTime == "" {
+		return nil, fmt.Errorf("last update time missing")
+	}
+
 	// status
 	var up apiv3.Principal
 	err = json.Unmarshal(secret.Data["user-principal"], &up)
@@ -614,7 +634,7 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			Annotations:       secret.Annotations,
 		},
 		Spec: TokenSpec{
-			UserID:      string(secret.Data["userID"]),
+			UserID:      userId,
 			Description: string(secret.Data["description"]),
 			ClusterName: string(secret.Data["clusterName"]),
 			TTL:         ttl,
@@ -622,10 +642,10 @@ func tokenFromSecret(secret *corev1.Secret) (*Token, error) {
 			IsLogin:     isLogin,
 		},
 		Status: TokenStatus{
-			TokenHash:      string(secret.Data["hash"]),
-			AuthProvider:   string(secret.Data["auth-provider"]),
+			TokenHash:      tokenHash,
+			AuthProvider:   authProvider,
 			UserPrincipal:  up,
-			LastUpdateTime: string(secret.Data["last-update-time"]),
+			LastUpdateTime: lastUpdateTime,
 		},
 	}
 
