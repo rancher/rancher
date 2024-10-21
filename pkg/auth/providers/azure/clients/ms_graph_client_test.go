@@ -132,8 +132,8 @@ func TestMSGraphClient_ListGroupMemberships(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{
-		"15f6a947-9d67-4e7f-b1d0-f5f52145fed3",
-		"748274fd-3ec7-40d1-b08b-775c1a8ec1af",
+		"15f6a947-9d67-4e7f-b1d0-f5f52145fed3", "5e0d1316-aa15-4c94-83e1-7db91acc7795",
+		"6b2c23ed-626d-4ce4-a889-7c2043ace20e", "748274fd-3ec7-40d1-b08b-775c1a8ec1af",
 		"bf881716-8d6d-456f-b234-2b143dfd5cf0"}, groups)
 }
 
