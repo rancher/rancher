@@ -55,6 +55,14 @@ func (p *fakeProvider) IsDisabledProvider() (bool, error) {
 	return p.disabled, nil
 }
 
+func (p *fakeProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
+func (p *fakeProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
 func (p *fakeProvider) GetName() string {
 	return p.name
 }
