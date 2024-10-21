@@ -300,13 +300,112 @@ func newStackstateAgentChartInstallAction(p *payloadOpts, apiKey, url, systemPro
 		},
 	}
 
-	// have to send correct projectID for example p-c4fgk
-	// chart version here is incorrect
 	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, rancherPartnerCharts, systemProjectID, p.DefaultRegistry, stackstateValues)
 
 	chartInstalls := []types.ChartInstall{*chartInstall}
-
 	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
 
 	return chartInstallAction
+}
+
+// UpgradeStackstateAgentChart is a helper function that upgrades the stackstate agent chart.
+func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, apiKey, url string) error {
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	stackstateAgentChartUpgradeActionPayload := &payloadOpts{
+		InstallOptions: *installOptions,
+		Name:           StackstateK8sAgent,
+		Namespace:      StackstateNamespace,
+		Host:           serverSetting.Value,
+	}
+
+	chartUpgradeAction := newStackstateAgentChartUpgradeAction(stackstateAgentChartUpgradeActionPayload, apiKey, url)
+
+	catalogClient, err := client.GetClusterCatalogClient(installOptions.Cluster.ID)
+	if err != nil {
+		return err
+	}
+
+	err = catalogClient.UpgradeChart(chartUpgradeAction, RancherPartnerChartRepo)
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+	adminCatalogClient, err := adminClient.GetClusterCatalogClient(installOptions.Cluster.ID)
+	if err != nil {
+		return err
+	}
+
+	// wait for chart to be in status pending upgrade
+	watchAppInterface, err := adminCatalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + StackstateK8sAgent,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusPendingUpgrade) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// wait for chart to be full deployed
+	watchAppInterface, err = adminCatalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + StackstateK8sAgent,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusDeployed) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// newStackstateAgentChartUpgradeAction is a private helper function that returns chart upgrade action.
+func newStackstateAgentChartUpgradeAction(p *payloadOpts, apiKey, url string) *types.ChartUpgradeAction {
+
+	stackstateValues := map[string]interface{}{
+		"stackstate": map[string]interface{}{
+			"cluster": map[string]interface{}{
+				"name": p.Cluster.Name,
+			},
+			"apiKey": apiKey,
+			"url":    url,
+		},
+	}
+
+	chartUpgrade := newChartUpgrade(p.Name, p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, p.DefaultRegistry, stackstateValues)
+	chartUpgrades := []types.ChartUpgrade{*chartUpgrade}
+	chartUpgradeAction := newChartUpgradeAction(p.Namespace, chartUpgrades)
+
+	return chartUpgradeAction
 }
