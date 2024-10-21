@@ -43,7 +43,6 @@ func NewStackstateCRDConfiguration(namespace string, stackstateCRDConfig StackSt
 	return crdConfig
 }
 
-
 // InstallNodeDriver is a helper that utilizes the rancher client and add the stackstate domains to whitelist them.
 func InstallNodeDriver(client *rancher.Client, whitelistDomains []string) error {
 
@@ -51,6 +50,8 @@ func InstallNodeDriver(client *rancher.Client, whitelistDomains []string) error 
 		Name:             StackstateName,
 		Active:           true,
 		WhitelistDomains: whitelistDomains,
+		URL:              "local://",
+		State:            "inactive",
 	}
 
 	stackstateNodeDriver, err := client.Management.NodeDriver.Create(nodedriver)
