@@ -6,8 +6,10 @@ import (
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +23,7 @@ const (
 	creatorPrincipalNameAnnotation  = "field.cattle.io/creator-principal-name"
 	creatorOwnerBindingAnnotation   = "authz.management.cattle.io/creator-owner-binding"
 	roleTemplatesRequiredAnnotation = "authz.management.cattle.io/creator-role-bindings"
+	clusterNameLabel                = "cluster.cattle.io/name"
 )
 
 var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
@@ -74,4 +77,58 @@ func reconcileResourceToNamespace(obj runtime.Object, controller string, nsListe
 
 		return obj, nil
 	})
+}
+
+// createMembershipRoles creates 2 cluster roles: an owner role and a member role. To be used to create project/cluster membership roles.
+func createMembershipRoles(obj runtime.Object, resourceType string, crClient crbacv1.ClusterRoleController) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("error accessing object %v: %w", obj, err)
+	}
+	typeInfo, err := meta.TypeAccessor(obj)
+	if err != nil {
+		return fmt.Errorf("error accessing object type %v: %w", obj, err)
+	}
+
+	rules := []rbacv1.PolicyRule{
+		{
+			APIGroups:     []string{"management.cattle.io"},
+			Resources:     []string{resourceType},
+			ResourceNames: []string{accessor.GetName()},
+			Verbs:         []string{"get"},
+		},
+	}
+
+	objectMeta := metav1.ObjectMeta{
+		Name: accessor.GetName() + "-member",
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: typeInfo.GetAPIVersion(),
+				Kind:       typeInfo.GetKind(),
+				Name:       accessor.GetName(),
+				UID:        accessor.GetUID(),
+			},
+		},
+	}
+
+	if resourceType == "cluster" {
+		objectMeta.Annotations = map[string]string{clusterNameLabel: accessor.GetName()}
+	}
+
+	memberRole := &rbacv1.ClusterRole{
+		ObjectMeta: objectMeta,
+		Rules:      rules,
+	}
+	if _, err := crClient.Create(memberRole); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	ownerRole := memberRole
+	ownerRole.Name = accessor.GetName() + "-owner"
+	ownerRole.Rules[0].Verbs = []string{"*"}
+	if _, err := crClient.Create(ownerRole); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
 }
