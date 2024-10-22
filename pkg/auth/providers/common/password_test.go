@@ -103,7 +103,3 @@ func TestSavePasswordSecret(t *testing.T) {
 	assert.Equal(t, wantSecret.Namespace+":"+wantSecret.Name, name)
 	assert.Equal(t, wantSecret, createdSecret)
 }
-
-type secretFake struct {
-	Created []*corev1.Secret
-}
