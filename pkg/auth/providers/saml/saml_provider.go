@@ -156,10 +156,6 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) erro
 	if err != nil {
 		return err
 	}
-	if userAttributes == nil {
-		logrus.Debugf("SAML [logout-all]: UserAttributes for rancher user %q not found", userName)
-		return fmt.Errorf("SAML [logout-all]: UserAttributes for rancher user %q not found", userName)
-	}
 
 	// Incremental extraction of the user at provider info
 	usernames, ok := userAttributes.ExtraByProvider[providerName]["username"]
