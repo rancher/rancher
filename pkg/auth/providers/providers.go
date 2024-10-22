@@ -166,6 +166,10 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 }
 
 func ProviderLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	if token.AuthProvider == "" {
+		return nil
+	}
+
 	ap, err := GetProvider(token.AuthProvider)
 	if err != nil {
 		return err
@@ -174,6 +178,10 @@ func ProviderLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 }
 
 func ProviderLogout(apiContext *types.APIContext, token *v3.Token) error {
+	if token.AuthProvider == "" {
+		return nil
+	}
+
 	ap, err := GetProvider(token.AuthProvider)
 	if err != nil {
 		return err
