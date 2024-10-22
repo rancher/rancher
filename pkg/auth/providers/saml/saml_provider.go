@@ -162,18 +162,11 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) erro
 	}
 
 	// Incremental extraction of the user at provider info
-	extras, ok := userAttributes.ExtraByProvider[providerName]
-	if !ok {
-		return fmt.Errorf("SAML [logout-all]: UserAttributes has no data for provider %q", providerName)
+	usernames, ok := userAttributes.ExtraByProvider[providerName]["username"]
+	if len(usernames) == 0 {
+		return fmt.Errorf("SAML [logout-all]: UserAttribute extras contains no username for provider %q", providerName)
 	}
-	users, ok := extras["username"]
-	if !ok {
-		return fmt.Errorf("SAML [logout-all]: UserAttributes %q provider data has no user name information", providerName)
-	}
-	if len(users) == 0 {
-		return fmt.Errorf("SAML [logout-all]: UserAttributes %q provider user information is empty", providerName)
-	}
-	userAtProvider := users[0]
+	userAtProvider := usernames[0]
 	finalRedirectURL := samlLogout.FinalRedirectURL
 
 	w := apiContext.Response
