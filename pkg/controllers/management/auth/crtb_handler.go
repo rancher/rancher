@@ -101,19 +101,20 @@ type crtbLifecycle struct {
 }
 
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	obj, err := c.reconcileSubject(obj)
+	var localConditions []metav1.Condition
+	obj, err := c.reconcileSubject(obj, &localConditions)
 	return obj, errors.Join(err,
-		c.reconcileBindings(obj),
-		c.updateStatus(obj))
+		c.reconcileBindings(obj, &localConditions),
+		c.updateStatus(obj, localConditions))
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	obj.Status.LocalConditions = []metav1.Condition{}
-	obj, err := c.reconcileSubject(obj)
+	var localConditions []metav1.Condition
+	obj, err := c.reconcileSubject(obj, &localConditions)
 	return obj, errors.Join(err,
-		c.reconcileLabels(obj),
-		c.reconcileBindings(obj),
-		c.updateStatus(obj))
+		c.reconcileLabels(obj, &localConditions),
+		c.reconcileBindings(obj, &localConditions),
+		c.updateStatus(obj, localConditions))
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
@@ -121,25 +122,25 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
 		c.s.AddCondition(&obj.Status.LocalConditions, condition, failedToDeleteClusterMembershipBinding, err)
-		return nil, errors.Join(err, c.updateStatus(obj))
+		return nil, errors.Join(err, c.updateStatus(obj, obj.Status.LocalConditions))
 	}
 	if err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj); err != nil {
 		c.s.AddCondition(&obj.Status.LocalConditions, condition, failedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace, err)
-		return nil, errors.Join(err, c.updateStatus(obj))
+		return nil, errors.Join(err, c.updateStatus(obj, obj.Status.LocalConditions))
 	}
 
 	if err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj); err != nil {
 		c.s.AddCondition(&obj.Status.LocalConditions, condition, failedToDeleteAuthV2Permissions, err)
-		return nil, errors.Join(err, c.updateStatus(obj))
+		return nil, errors.Join(err, c.updateStatus(obj, obj.Status.LocalConditions))
 	}
 
 	return nil, nil
 }
 
-func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, localConditions *[]metav1.Condition) (*v3.ClusterRoleTemplateBinding, error) {
 	condition := metav1.Condition{Type: subjectExists}
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, subjectExists, nil)
+		c.s.AddCondition(localConditions, condition, subjectExists, nil)
 		return binding, nil
 	}
 
@@ -147,19 +148,19 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
 		user, err := c.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
 		if err != nil {
-			c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToCreateUser, err)
+			c.s.AddCondition(localConditions, condition, failedToCreateUser, err)
 			return binding, err
 		}
 
 		binding.UserName = user.Name
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, subjectExists, nil)
+		c.s.AddCondition(localConditions, condition, subjectExists, nil)
 		return binding, nil
 	}
 
 	if binding.UserPrincipalName == "" && binding.UserName != "" {
 		u, err := c.userLister.Get("", binding.UserName)
 		if err != nil {
-			c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToGetUser, err)
+			c.s.AddCondition(localConditions, condition, failedToGetUser, err)
 			return binding, err
 		}
 		for _, p := range u.PrincipalIDs {
@@ -168,11 +169,11 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 				break
 			}
 		}
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, subjectExists, nil)
+		c.s.AddCondition(localConditions, condition, subjectExists, nil)
 		return binding, nil
 	}
 
-	c.s.AddCondition(&binding.Status.LocalConditions, condition, crtbHasNoSubject, fmt.Errorf("CRTB has no subject"))
+	c.s.AddCondition(localConditions, condition, crtbHasNoSubject, fmt.Errorf("CRTB has no subject"))
 
 	return nil, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
 }
@@ -182,28 +183,28 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 // - ensure the subject can see the cluster in the mgmt API
 // - if the subject was granted owner permissions for the clsuter, ensure they can create/update/delete the cluster
 // - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules in the cluster's mgmt plane namespace
-func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding, localConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: bindingExists}
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, bindingExists, nil)
+		c.s.AddCondition(localConditions, condition, bindingExists, nil)
 		return nil
 	}
 
 	clusterName := binding.ClusterName
 	cluster, err := c.clusterLister.Get("", clusterName)
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToGetCluster, err)
+		c.s.AddCondition(localConditions, condition, failedToGetCluster, err)
 		return err
 	}
 	if cluster == nil {
 		err = fmt.Errorf("cannot create binding because cluster %v was not found", clusterName)
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, clusterNotFound, err)
+		c.s.AddCondition(localConditions, condition, clusterNotFound, err)
 		return err
 	}
 	// if roletemplate is not builtin, check if it's inherited/cloned
 	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext, 0)
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToCheckReferencedRole, err)
+		c.s.AddCondition(localConditions, condition, failedToCheckReferencedRole, err)
 		return err
 	}
 	var clusterRoleName string
@@ -215,23 +216,23 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToBuildSubject, err)
+		c.s.AddCondition(localConditions, condition, failedToBuildSubject, err)
 		return err
 	}
 	if err := c.mgr.ensureClusterMembershipBinding(clusterRoleName, pkgrbac.GetRTBLabel(binding.ObjectMeta), cluster, isOwnerRole, subject); err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToEnsureClusterMembershipBinding, err)
+		c.s.AddCondition(localConditions, condition, failedToEnsureClusterMembershipBinding, err)
 		return err
 	}
 
 	err = c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagementPlaneResources, subject, binding)
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToGrantManagementPlanePrivileges, err)
+		c.s.AddCondition(localConditions, condition, failedToGrantManagementPlanePrivileges, err)
 		return err
 	}
 
 	projects, err := c.projectLister.List(binding.Namespace, labels.Everything())
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToListProjects, err)
+		c.s.AddCondition(localConditions, condition, failedToListProjects, err)
 		return err
 	}
 	for _, p := range projects {
@@ -240,11 +241,11 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 			continue
 		}
 		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagementPlaneResources, subject, binding); err != nil {
-			c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToGrantManagementClusterScopedPrivilegesInProjectNamespace, err)
+			c.s.AddCondition(localConditions, condition, failedToGrantManagementClusterScopedPrivilegesInProjectNamespace, err)
 			return err
 		}
 	}
-	c.s.AddCondition(&binding.Status.LocalConditions, condition, bindingExists, nil)
+	c.s.AddCondition(localConditions, condition, bindingExists, nil)
 
 	return nil
 }
@@ -271,7 +272,7 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	return nil
 }
 
-func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, localConditions *[]metav1.Condition) error {
 	/* Prior to 2.5, for every CRTB, following CRBs and RBs are created in the management clusters
 		1. CRTB.UID is the label key for a CRB, CRTB.UID=memberhsip-binding-owner
 	    2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in the cluster that the user has access to)
@@ -280,21 +281,21 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 	condition := metav1.Condition{Type: labelsReconciled}
 
 	if binding.Labels[RtbCrbRbLabelsUpdated] == "true" {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, labelsReconciled, nil)
+		c.s.AddCondition(localConditions, condition, labelsReconciled, nil)
 		return nil
 	}
 
 	var returnErr error
 	requirements, err := getLabelRequirements(binding.ObjectMeta)
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToGetRequirements, err)
+		c.s.AddCondition(localConditions, condition, failedToGetRequirements, err)
 		return err
 	}
 
 	set := labels.Set(map[string]string{string(binding.UID): MembershipBindingOwnerLegacy})
 	crbs, err := c.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToGetClusterRoleBindings, err)
+		c.s.AddCondition(localConditions, condition, failedToGetClusterRoleBindings, err)
 		return err
 	}
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
@@ -313,7 +314,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToUpdateClusterRoleBindings, retryErr)
+			c.s.AddCondition(localConditions, condition, failedToUpdateClusterRoleBindings, retryErr)
 		}
 		returnErr = errors.Join(returnErr, retryErr)
 	}
@@ -321,7 +322,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 	set = map[string]string{string(binding.UID): CrtbInProjectBindingOwner}
 	rbs, err := c.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToListRB, err)
+		c.s.AddCondition(localConditions, condition, failedToListRB, err)
 		return err
 	}
 
@@ -340,7 +341,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToUpdateClusterRoleBindings, retryErr)
+			c.s.AddCondition(localConditions, condition, failedToUpdateClusterRoleBindings, retryErr)
 		}
 		returnErr = errors.Join(returnErr, retryErr)
 	}
@@ -361,7 +362,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 		return err
 	})
 	if retryErr != nil {
-		c.s.AddCondition(&binding.Status.LocalConditions, condition, failedToUpdateClusterRoleTemplateBindings, retryErr)
+		c.s.AddCondition(localConditions, condition, failedToUpdateClusterRoleTemplateBindings, retryErr)
 	}
 	return retryErr
 }
@@ -370,13 +371,13 @@ var timeNow = func() time.Time {
 	return time.Now()
 }
 
-func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, localConditions []metav1.Condition) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		crtbFromCluster, err := c.crtbCache.Get(crtb.Namespace, crtb.Name)
 		if err != nil {
 			return err
 		}
-		if status.CompareConditions(crtbFromCluster.Status.LocalConditions, crtb.Status.LocalConditions) {
+		if status.CompareConditions(crtbFromCluster.Status.LocalConditions, localConditions) {
 			return nil
 		}
 
@@ -384,7 +385,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding) error 
 		if crtbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
 			crtbFromCluster.Status.Summary = status.SummaryCompleted
 		}
-		for _, c := range crtb.Status.LocalConditions {
+		for _, c := range localConditions {
 			if c.Status != metav1.ConditionTrue {
 				crtbFromCluster.Status.Summary = status.SummaryError
 				crtbFromCluster.Status.SummaryLocal = status.SummaryError
@@ -394,7 +395,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding) error 
 
 		crtbFromCluster.Status.LastUpdateTime = timeNow().String()
 		crtbFromCluster.Status.ObservedGenerationLocal = crtb.ObjectMeta.Generation
-		crtbFromCluster.Status.LocalConditions = crtb.Status.LocalConditions
+		crtbFromCluster.Status.LocalConditions = localConditions
 		crtbFromCluster, err = c.crtbClient.UpdateStatus(crtbFromCluster)
 		if err != nil {
 			return err
