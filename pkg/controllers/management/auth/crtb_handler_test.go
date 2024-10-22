@@ -69,24 +69,22 @@ func TestReconcileBindings(t *testing.T) {
 		TimeNow: timeNow,
 	}
 	tests := []struct {
-		name       string
-		crtb       *v3.ClusterRoleTemplateBinding
-		stateSetup func(crtbTestState)
-		wantError  bool
-		wantStatus v3.ClusterRoleTemplateBindingStatus
+		name           string
+		crtb           *v3.ClusterRoleTemplateBinding
+		stateSetup     func(crtbTestState)
+		wantError      bool
+		wantConditions []v1.Condition
 	}{
 		{
 			name: "reconcile crtb with no subject",
 			crtb: noUserCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   bindingExists,
-						Status: v1.ConditionTrue,
-						Reason: bindingExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:   bindingExists,
+					Status: v1.ConditionTrue,
+					Reason: bindingExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -100,16 +98,14 @@ func TestReconcileBindings(t *testing.T) {
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    bindingExists,
-						Status:  v1.ConditionFalse,
-						Reason:  failedToGetCluster,
-						Message: e.Error(),
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:    bindingExists,
+					Status:  v1.ConditionFalse,
+					Reason:  failedToGetCluster,
+					Message: e.Error(),
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -123,16 +119,14 @@ func TestReconcileBindings(t *testing.T) {
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    bindingExists,
-						Status:  v1.ConditionFalse,
-						Reason:  clusterNotFound,
-						Message: "cannot create binding because cluster clusterName was not found",
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:    bindingExists,
+					Status:  v1.ConditionFalse,
+					Reason:  clusterNotFound,
+					Message: "cannot create binding because cluster clusterName was not found",
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -150,16 +144,14 @@ func TestReconcileBindings(t *testing.T) {
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    bindingExists,
-						Status:  v1.ConditionFalse,
-						Reason:  failedToCheckReferencedRole,
-						Message: e.Error(),
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:    bindingExists,
+					Status:  v1.ConditionFalse,
+					Reason:  failedToCheckReferencedRole,
+					Message: e.Error(),
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -181,16 +173,14 @@ func TestReconcileBindings(t *testing.T) {
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    bindingExists,
-						Status:  v1.ConditionFalse,
-						Reason:  failedToEnsureClusterMembershipBinding,
-						Message: e.Error(),
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:    bindingExists,
+					Status:  v1.ConditionFalse,
+					Reason:  failedToEnsureClusterMembershipBinding,
+					Message: e.Error(),
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -214,16 +204,14 @@ func TestReconcileBindings(t *testing.T) {
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    bindingExists,
-						Status:  v1.ConditionFalse,
-						Reason:  failedToGrantManagementPlanePrivileges,
-						Message: e.Error(),
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:    bindingExists,
+					Status:  v1.ConditionFalse,
+					Reason:  failedToGrantManagementPlanePrivileges,
+					Message: e.Error(),
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -250,16 +238,14 @@ func TestReconcileBindings(t *testing.T) {
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    bindingExists,
-						Status:  v1.ConditionFalse,
-						Reason:  failedToListProjects,
-						Message: e.Error(),
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:    bindingExists,
+					Status:  v1.ConditionFalse,
+					Reason:  failedToListProjects,
+					Message: e.Error(),
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -291,16 +277,14 @@ func TestReconcileBindings(t *testing.T) {
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:    bindingExists,
-						Status:  v1.ConditionFalse,
-						Reason:  failedToGrantManagementClusterScopedPrivilegesInProjectNamespace,
-						Message: e.Error(),
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:    bindingExists,
+					Status:  v1.ConditionFalse,
+					Reason:  failedToGrantManagementClusterScopedPrivilegesInProjectNamespace,
+					Message: e.Error(),
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -330,15 +314,13 @@ func TestReconcileBindings(t *testing.T) {
 				}
 			},
 			crtb: defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   bindingExists,
-						Status: v1.ConditionTrue,
-						Reason: bindingExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:   bindingExists,
+					Status: v1.ConditionTrue,
+					Reason: bindingExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -368,15 +350,13 @@ func TestReconcileBindings(t *testing.T) {
 				}
 			},
 			crtb: defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   bindingExists,
-						Status: v1.ConditionTrue,
-						Reason: bindingExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:   bindingExists,
+					Status: v1.ConditionTrue,
+					Reason: bindingExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -407,15 +387,13 @@ func TestReconcileBindings(t *testing.T) {
 				}
 			},
 			crtb: defaultCRTB.DeepCopy(),
-			wantStatus: v3.ClusterRoleTemplateBindingStatus{
-				LocalConditions: []v1.Condition{
-					{
-						Type:   bindingExists,
-						Status: v1.ConditionTrue,
-						Reason: bindingExists,
-						LastTransitionTime: v1.Time{
-							Time: mockTime,
-						},
+			wantConditions: []v1.Condition{
+				{
+					Type:   bindingExists,
+					Status: v1.ConditionTrue,
+					Reason: bindingExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
 					},
 				},
 			},
@@ -434,8 +412,9 @@ func TestReconcileBindings(t *testing.T) {
 			crtbLifecycle.projectLister = state.projectListerMock
 			crtbLifecycle.mgr = state.managerMock
 			crtbLifecycle.s = mockStatus
+			conditions := []v1.Condition{}
 
-			err := crtbLifecycle.reconcileBindings(test.crtb)
+			err := crtbLifecycle.reconcileBindings(test.crtb, &conditions)
 
 			if test.wantError {
 				require.Error(t, err)
@@ -443,7 +422,7 @@ func TestReconcileBindings(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			assert.Equal(t, test.wantStatus, test.crtb.Status)
+			assert.Equal(t, test.wantConditions, conditions)
 		})
 	}
 }
@@ -524,13 +503,13 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 	tests := map[string]struct {
-		crtb       *v3.ClusterRoleTemplateBinding
-		crtbClient func(*v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController
-		crtbCache  func(*v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache
-		wantErr    error
+		crtb            *v3.ClusterRoleTemplateBinding
+		crtbClient      func(*v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController
+		localConditions []v1.Condition
+		wantErr         error
 	}{
 		"status updated": {
-			crtb: crtbSubjectExist.DeepCopy(),
+			crtb: crtbEmptyStatus.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
@@ -552,27 +531,17 @@ func TestUpdateStatus(t *testing.T) {
 
 				return mock
 			},
-			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbEmptyStatus.DeepCopy(), nil)
-
-				return mock
-			},
+			localConditions: crtbSubjectExist.Status.LocalConditions,
 		},
 		"status not updated when local conditions are the same": {
 			crtb: crtbSubjectExist.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				return fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 			},
-			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbSubjectExist.DeepCopy(), nil)
-
-				return mock
-			},
+			localConditions: crtbSubjectExist.Status.LocalConditions,
 		},
 		"set summary to complete when remote is complete": {
-			crtb: crtbSubjectExist.DeepCopy(),
+			crtb: crtbEmptyStatusRemoteComplete.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
@@ -596,15 +565,10 @@ func TestUpdateStatus(t *testing.T) {
 
 				return mock
 			},
-			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbEmptyStatusRemoteComplete.DeepCopy(), nil)
-
-				return mock
-			},
+			localConditions: crtbSubjectExist.Status.LocalConditions,
 		},
 		"set summary to error when there is an error condition": {
-			crtb: crtbSubjectError.DeepCopy(),
+			crtb: crtbSubjectExist.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
@@ -627,15 +591,10 @@ func TestUpdateStatus(t *testing.T) {
 
 				return mock
 			},
-			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbSubjectExist.DeepCopy(), nil)
-
-				return mock
-			},
+			localConditions: crtbSubjectError.Status.LocalConditions,
 		},
 		"status updated when a condition is removed": {
-			crtb: crtbSubjectExist.DeepCopy(),
+			crtb: crtbSubjectAndBindingExist.DeepCopy(),
 			crtbClient: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingController {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
@@ -657,12 +616,7 @@ func TestUpdateStatus(t *testing.T) {
 
 				return mock
 			},
-			crtbCache: func(crtb *v3.ClusterRoleTemplateBinding) controllersv3.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().Get(crtb.Namespace, crtb.Name).Return(crtbSubjectAndBindingExist.DeepCopy(), nil)
-
-				return mock
-			},
+			localConditions: crtbSubjectExist.Status.LocalConditions,
 		},
 	}
 
@@ -670,11 +624,13 @@ func TestUpdateStatus(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			crtbCache := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+			crtbCache.EXPECT().Get(test.crtb.Namespace, test.crtb.Name).Return(test.crtb, nil)
 			c := crtbLifecycle{
 				crtbClient: test.crtbClient(test.crtb),
-				crtbCache:  test.crtbCache(test.crtb),
+				crtbCache:  crtbCache,
 			}
-			err := c.updateStatus(test.crtb)
+			err := c.updateStatus(test.crtb, test.localConditions)
 			assert.Equal(t, test.wantErr, err)
 		})
 	}
