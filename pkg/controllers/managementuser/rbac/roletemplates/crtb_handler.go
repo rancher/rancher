@@ -28,17 +28,20 @@ func newCRTBHandler(uc *config.UserContext) *crtbHandler {
 	return &crtbHandler{
 		impersonationHandler: &impersonationHandler{
 			userContext: uc,
-			crClient:    uc.Management.Wrangler.RBAC.ClusterRole(),
-			// TODO I don't think these crtb and prtb clients get the local cluster which is where prtbs/crtbs live
-			crtbClient: uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
-			prtbClient: uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
+			crClient:    uc.RBACw.ClusterRole(),
+			crtbClient:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+			prtbClient:  uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 		},
-		crbClient: uc.Management.Wrangler.RBAC.ClusterRoleBinding(),
+		crbClient: uc.RBACw.ClusterRoleBinding(),
 	}
 }
 
 // OnChange ensures that the correct ClusterRoleBinding exists for the ClusterRoleTemplateBinding
 func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	if crtb == nil || crtb.DeletionTimestamp != nil {
+		return nil, nil
+	}
+
 	crb, err := buildClusterRoleBinding(crtb)
 	if err != nil {
 		return nil, err
@@ -111,7 +114,7 @@ func buildClusterRoleBinding(crtb *v3.ClusterRoleTemplateBinding) (*v1.ClusterRo
 	ownerLabel := createCRTBOwnerLabel(crtb.Name)
 	roleRef := v1.RoleRef{
 		Kind: "ClusterRole",
-		Name: aggregatedClusterRoleNameFor(crtb.RoleTemplateName),
+		Name: rbac.AggregatedClusterRoleNameFor(crtb.RoleTemplateName),
 	}
 
 	subject, err := rbac.BuildSubjectFromRTB(crtb)
