@@ -29,6 +29,10 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
+		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token":              schema_pkg_apis_extcattleio_v1_Token(ref),
+		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenList":          schema_pkg_apis_extcattleio_v1_TokenList(ref),
+		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec":          schema_pkg_apis_extcattleio_v1_TokenSpec(ref),
+		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus":        schema_pkg_apis_extcattleio_v1_TokenStatus(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity":       schema_pkg_apis_extcattleio_v1_UserActivity(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityList":   schema_pkg_apis_extcattleio_v1_UserActivityList(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus": schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref),
@@ -85,6 +89,263 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
 		"k8s.io/apimachinery/pkg/runtime.Unknown":                                 schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
 		"k8s.io/apimachinery/pkg/version.Info":                                    schema_k8sio_apimachinery_pkg_version_Info(ref),
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Token is the main extension Token structure",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec is the spec of RancherToken",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec", "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_TokenList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenList is a list of Token resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"metadata", "items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenSpec contains the user-specifiable parts of the Token",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"userID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UserID is the user id",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Human readable description.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"clusterName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ClusterName is the cluster that the token is scoped to. When empty, the default, the token can be used for all clusters.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"ttl": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TTL is the time-to-live of the token, in milliseconds. The default of 0 is treated as 30 days.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Enabled indicates an active token. The `null` state maps to `true`, making that the default.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"userID"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenStatus contains the data derived from the specification or otherwise generated.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"tokenValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TokenValue is the access key. Shown only on token creation. Not saved.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"tokenHash": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TokenHash is the hash of the value. Only thing saved.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"current": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Current is a boolean flag. It is set to true for a token returned by a get, list, or watch request, when the token is the token which authenticated that request. All other tokens returned by the request, if any, will have this flag set to false.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"expired": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Expired is a boolean flag, derived from creation time and time-to-live. True indicates that the token has exceeded its time to live, as counted from creation.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"expiresAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExpiresAt is creation time + time-to-live, i.e. the time when the token expires.  This is set to the empty string if the token does not expire at all.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"authProvider": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AuthProvider names the auth provider managing the user. This information is retrieved from the UserAttribute resource referenced by `Spec.UserID`.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"DisplayName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisplayName is the display name of the User referenced by `Spec.UserID`. Stored as it is one of the pieces required to to internally assemble a v3.Principal structure for the token.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"LoginName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LoginName is the name of the User referenced by `Spec.UserID`. Stored as it is one of the pieces required to to internally assemble a v3.Principal structure for the token.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"PrincipalID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PrincipalID is retrieved from the UserAttribute resource referenced by `Spec.UserID`. It is the first principal id found for the auth provider. Stored as it is one of the pieces required to internally assemble a v3.Principal structure for the token.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastUpdateTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastUpdateTime provides the time of last change to the token",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastUsedAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastUsedAt provides the last time the token was used in a request, at second granularity.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+				},
+				Required: []string{"current", "expired", "expiresAt", "authProvider", "DisplayName", "LoginName", "PrincipalID", "lastUpdateTime"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
