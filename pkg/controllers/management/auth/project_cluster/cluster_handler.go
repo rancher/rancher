@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -58,6 +59,7 @@ type clusterLifecycle struct {
 	rbLister           rbacv1.RoleBindingLister
 	roleBindings       rbacv1.RoleBindingInterface
 	roleTemplateLister v3.RoleTemplateLister
+	crClient           crbacv1.ClusterRoleController
 }
 
 // NewClusterLifecycle creates and returns a clusterLifecycle from a given ManagementContext
@@ -73,6 +75,7 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 		rbLister:           management.RBAC.RoleBindings("").Controller().Lister(),
 		roleBindings:       management.RBAC.RoleBindings(""),
 		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
+		crClient:           management.Wrangler.RBAC.ClusterRole(),
 	}
 }
 
@@ -110,6 +113,10 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if err := createMembershipRoles(obj, "cluster", l.crClient); err != nil {
+		return nil, err
 	}
 
 	obj, err = l.reconcileClusterCreatorRTB(obj)

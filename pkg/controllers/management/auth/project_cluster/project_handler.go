@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
+	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,7 @@ type projectLifecycle struct {
 	rbLister             rbacv1.RoleBindingLister
 	roleBindings         rbacv1.RoleBindingInterface
 	systemAccountManager *systemaccount.Manager
+	crClient             crbacv1.ClusterRoleController
 }
 
 // NewProjectLifecycle creates and returns a projectLifecycle from a given ManagementContext
@@ -55,6 +57,7 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
 		roleBindings:         management.RBAC.RoleBindings(""),
 		systemAccountManager: systemaccount.NewManager(management),
+		crClient:             management.Wrangler.RBAC.ClusterRole(),
 	}
 }
 
@@ -79,6 +82,10 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.nsClient)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := createMembershipRoles(obj, "cluster", l.crClient); err != nil {
 		return nil, err
 	}
 

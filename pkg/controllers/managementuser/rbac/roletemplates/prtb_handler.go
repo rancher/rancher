@@ -34,21 +34,24 @@ func newPRTBHandler(uc *config.UserContext) *prtbHandler {
 	return &prtbHandler{
 		impersonationHandler: impersonationHandler{
 			userContext: uc,
-			crClient:    uc.Management.Wrangler.RBAC.ClusterRole(),
-			// TODO I don't think these crtb and prtb clients get the local cluster which is where prtbs/crtbs live
-			crtbClient: uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
-			prtbClient: uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
+			crClient:    uc.RBACw.ClusterRole(),
+			crtbClient:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+			prtbClient:  uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 		},
-		crClient: uc.Management.Wrangler.RBAC.ClusterRole(),
+		crClient: uc.RBACw.ClusterRole(),
 		rtClient: uc.Management.Wrangler.Mgmt.RoleTemplate(),
-		nsClient: uc.Management.Wrangler.Core.Namespace(),
-		rbClient: uc.Management.Wrangler.RBAC.RoleBinding(),
+		nsClient: uc.Corew.Namespace(),
+		rbClient: uc.RBACw.RoleBinding(),
 	}
 }
 
 // OnChange ensures a Role Binding exists in every project namespace to the RoleTemplate ClusterRole.
 // If there are promoted rules, it creates a second Role Binding in each namaspace to the promoted ClusterRole
 func (p *prtbHandler) OnChange(key string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+	if prtb == nil || prtb.DeletionTimestamp != nil {
+		return nil, nil
+	}
+
 	hasPromotedRule, err := p.doesRoleTemplateHavePromotedRules(prtb)
 	if err != nil {
 		return nil, err
@@ -162,7 +165,7 @@ func (p *prtbHandler) doesRoleTemplateHavePromotedRules(prtb *v3.ProjectRoleTemp
 		return false, err
 	}
 
-	_, err = p.crClient.Get(promotedClusterRoleNameFor(rt.Name), metav1.GetOptions{})
+	_, err = p.crClient.Get(rbac.PromotedClusterRoleNameFor(rt.Name), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, err
 	}
@@ -175,7 +178,7 @@ func buildRoleBindings(prtb *v3.ProjectRoleTemplateBinding, ns string, createPro
 	ownerLabel := createPRTBOwnerLabel(prtb.Name)
 	roleRef := v1.RoleRef{
 		Kind: "Role",
-		Name: aggregatedClusterRoleNameFor(prtb.RoleTemplateName),
+		Name: rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName),
 	}
 
 	subject, err := rbac.BuildSubjectFromRTB(prtb)
@@ -195,7 +198,7 @@ func buildRoleBindings(prtb *v3.ProjectRoleTemplateBinding, ns string, createPro
 
 	var promotedRB *v1.RoleBinding
 	if createPromotedRoleBinding {
-		roleRef.Name = aggregatedClusterRoleNameFor(promotedClusterRoleNameFor(prtb.RoleTemplateName))
+		roleRef.Name = rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(prtb.RoleTemplateName))
 		promotedRB = &v1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "rb-",
