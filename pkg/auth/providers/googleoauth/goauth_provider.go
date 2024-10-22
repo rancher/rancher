@@ -233,8 +233,6 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token v3.Token) (
 	}
 }
 
-// No operation - no custom logout logic for this provider
-
 func (g *googleOauthProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }

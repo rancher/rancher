@@ -67,8 +67,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	return provider
 }
 
-// No operation - no custom logout logic for this provider
-
 func (g *ghProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }

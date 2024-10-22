@@ -70,8 +70,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
-// No operation - no custom logout logic for this provider
-
 func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }
