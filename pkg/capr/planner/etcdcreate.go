@@ -67,7 +67,7 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 	// Generate and deliver desired plan for the bootstrap/init node first.
 	if err := p.reconcile(controlPlane, tokensSecret, clusterPlan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "", controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions,
-		-1, 1, false); err != nil {
+		-1, 1, false, true); err != nil {
 		return err
 	}
 
