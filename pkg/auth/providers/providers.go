@@ -55,8 +55,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	userMGR := mgmt.UserManager
 	tokenMGR := tokens.NewManager(ctx, mgmt)
 
-	// dnyamic setup of callback - static causes import loop
-	// DEBT: refactor to make the callback not necessary
+	// TODO: refactor to eliminate the need for these callbacks, which exist to avoid the import cycle.
 	tokens.OnLogoutAll(ProviderLogoutAll)
 	tokens.OnLogout(ProviderLogout)
 
