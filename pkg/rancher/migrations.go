@@ -3,7 +3,9 @@ package rancher
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
@@ -663,7 +665,9 @@ func migrateHarvesterCloudCredentialExpiration(w *wrangler.Context) error {
 			})
 			if apierrors.IsNotFound(err) {
 				logrus.Debugf("Cloud credential [%s] using nonexistent token", secret.Name)
-				continue
+				// if the secret is not found, we use the unix 0 timestamp. This is done a bit odd since
+				// time.Unix returns an int64 and we don't want to produce overflow
+				expiration = strconv.FormatInt(time.Unix(0, 0).UnixMilli(), 10)
 			} else if err != nil {
 				return fmt.Errorf("failed to get harvester cloud credential expiration from kubeconfig: %w", err)
 			}
