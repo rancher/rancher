@@ -157,7 +157,6 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) erro
 		return err
 	}
 
-	// Incremental extraction of the user at provider info
 	usernames, ok := userAttributes.ExtraByProvider[providerName]["username"]
 	if len(usernames) == 0 {
 		return fmt.Errorf("SAML [logout-all]: UserAttribute extras contains no username for provider %q", providerName)
