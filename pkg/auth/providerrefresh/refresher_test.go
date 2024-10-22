@@ -523,6 +523,14 @@ func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
+func (p *mockLocalProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
+func (p *mockLocalProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
 func (p *mockLocalProvider) GetName() string {
 	panic("not implemented")
 }
@@ -573,6 +581,14 @@ type mockShibbolethProvider struct {
 
 func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
 	return p.enabled, p.enabledErr
+}
+
+func (p *mockShibbolethProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
+func (p *mockShibbolethProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
 }
 
 func (p *mockShibbolethProvider) GetName() string {

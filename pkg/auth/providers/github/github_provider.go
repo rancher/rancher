@@ -67,6 +67,14 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	return provider
 }
 
+func (g *ghProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	return nil
+}
+
+func (g *ghProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	return nil
+}
+
 func (g *ghProvider) GetName() string {
 	return Name
 }

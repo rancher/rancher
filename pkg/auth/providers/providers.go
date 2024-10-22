@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -54,8 +55,9 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	userMGR := mgmt.UserManager
 	tokenMGR := tokens.NewManager(ctx, mgmt)
 
-	tokens.OnLogoutAll(saml.PerformSamlLogoutAll)
-	tokens.OnLogout(saml.PerformSamlLogout)
+	// TODO: refactor to eliminate the need for these callbacks, which exist to avoid the import cycle.
+	tokens.OnLogoutAll(ProviderLogoutAll)
+	tokens.OnLogout(ProviderLogout)
 
 	var p common.AuthProvider
 
@@ -160,6 +162,30 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	Providers[genericoidc.Name] = p
 	providersByType[client.GenericOIDCConfigType] = p
 	providersByType[publicclient.GenericOIDCProviderType] = p
+}
+
+func ProviderLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	if token.AuthProvider == "" {
+		return nil
+	}
+
+	ap, err := GetProvider(token.AuthProvider)
+	if err != nil {
+		return err
+	}
+	return ap.LogoutAll(apiContext, token)
+}
+
+func ProviderLogout(apiContext *types.APIContext, token *v3.Token) error {
+	if token.AuthProvider == "" {
+		return nil
+	}
+
+	ap, err := GetProvider(token.AuthProvider)
+	if err != nil {
+		return err
+	}
+	return ap.Logout(apiContext, token)
 }
 
 func IsValidUserExtraAttribute(key string) bool {
