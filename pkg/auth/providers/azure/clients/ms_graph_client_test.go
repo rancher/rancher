@@ -24,8 +24,7 @@ import (
 // TEST_AZURE_APPLICATION_SECRET
 
 func TestMSGraphClient_GetUser(t *testing.T) {
-	secrets := newTestSecretsClient()
-	client := newTestClientWithSecretsClient(t, secrets)
+	client := newTestClient(t)
 
 	user, err := client.GetUser("testuser6@ranchertest.onmicrosoft.com")
 	if err != nil {
@@ -43,7 +42,6 @@ func TestMSGraphClient_GetUser(t *testing.T) {
 	}
 	assert.Equal(t, want, user)
 
-	client = newTestClientWithSecretsClient(t, secrets)
 	_, err = client.GetUser("testuser6@ranchertest.onmicrosoft.com")
 	if err != nil {
 		t.Fatal(err)
@@ -197,8 +195,10 @@ func newTestClientWithSecretsClient(t *testing.T, secrets normancorev1.SecretInt
 }
 
 func newTestSecretsClient() normancorev1.SecretInterface {
-	secrets := map[types.NamespacedName]*corev1.Secret{}
+	return newTestSecretsClientWithMap(map[types.NamespacedName]*corev1.Secret{})
+}
 
+func newTestSecretsClientWithMap(secrets map[types.NamespacedName]*corev1.Secret) normancorev1.SecretInterface {
 	sm := &fakes.SecretInterfaceMock{
 		GetNamespacedFunc: func(namespace, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
