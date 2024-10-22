@@ -12,17 +12,12 @@ Manager Permissions
 
 	using it is an anti-pattern however
 
-	better use a custom verb for the permission, f.e. `manage-token`
+DONE	better use a custom verb for the permission, f.e. `manage-token`
 
 	there is a precedence, Jonathon has done this for global roles, in the webhook,
 	see `bind` and `escalate` verbs.
 
-TODO :: dynamic creation of field `current` -- compare request token to Get/List result
-
-TODO :: check userInfo content if that contains the token
-     :: DONE -- answer is NO -- talking with Tom
-
-ALT  :: No such field, dash board computes it for itself
+DONE:	The field `current` does not have to be supported, per the discussion on the RFC.
 
 PROPOSED   Change `isDerived` to `isLogin`. Inverted meaning.
 
@@ -32,6 +27,9 @@ PROPOSED   Change `isDerived` to `isLogin`. Inverted meaning.
 	   In discussion.
 
 TESTING	   - unit tests - store
+
+pkg/data/management/role_data.go
+
 
 pkg/controllers/management/auth/user.go:182:	// XXX NOTE AK get and disable the user's tokens
 pkg/controllers/management/auth/user.go:226:	// XXX NOTE AK - find the associated ext tokens also
