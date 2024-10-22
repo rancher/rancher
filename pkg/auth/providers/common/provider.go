@@ -30,7 +30,11 @@ type AuthProvider interface {
 	GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string
 	IsDisabledProvider() (bool, error)
 
-	// API methods to perform per-provider custom actions for logout/all.
+	// LogoutAll implements the "logout-all" action for the provider, if supported. If
+	// "logout-all" is not supported do nothing and return nil.
 	LogoutAll(apiContext *types.APIContext, token *v3.Token) error
+
+	// Logout implements a guard against invoking the "logout" action when "logout-all" is
+	// forced. If "logout-all" is not supported by the provider do nothing and return nil.
 	Logout(apiContext *types.APIContext, token *v3.Token) error
 }
