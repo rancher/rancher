@@ -9,7 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -19,7 +19,7 @@ var errAuthConfigNil = errors.New("cannot get auth provider if its config is nil
 
 // Service performs cleanup of resources associated with an auth provider.
 type Service struct {
-	secretsInterface corev1.SecretInterface
+	secretsInterface wcorev1.SecretController
 
 	userClient controllers.UserClient
 
@@ -37,7 +37,7 @@ type Service struct {
 }
 
 // NewCleanupService creates and returns a new auth provider cleanup service.
-func NewCleanupService(secretsInterface corev1.SecretInterface, c controllers.Interface) *Service {
+func NewCleanupService(secretsInterface wcorev1.SecretController, c controllers.Interface) *Service {
 	return &Service{
 		secretsInterface: secretsInterface,
 
