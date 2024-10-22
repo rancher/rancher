@@ -54,6 +54,7 @@ type clusterLifecycle struct {
 	rbLister           rbacv1.RoleBindingCache
 	roleBindings       rbacv1.RoleBindingController
 	roleTemplateLister v3.RoleTemplateCache
+	crClient           rbacv1.ClusterRoleController
 }
 
 // NewClusterLifecycle creates and returns a clusterLifecycle from a given ManagementContext
@@ -69,6 +70,7 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 		rbLister:           management.Wrangler.RBAC.RoleBinding().Cache(),
 		roleBindings:       management.Wrangler.RBAC.RoleBinding(),
 		roleTemplateLister: management.Wrangler.Mgmt.RoleTemplate().Cache(),
+		crClient:           management.Wrangler.RBAC.ClusterRole(),
 	}
 }
 
@@ -107,6 +109,10 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if err := createMembershipRoles(obj, "cluster", l.crClient); err != nil {
+		return nil, err
 	}
 
 	obj, err = l.reconcileClusterCreatorRTB(obj)
