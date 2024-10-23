@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -16,8 +17,12 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -30,6 +35,8 @@ const (
 	searchIndexDefaultLen = 6
 )
 
+var invalidHash, _ = bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
+
 type Provider struct {
 	userLister   v3.UserLister
 	groupLister  v3.GroupLister
@@ -37,7 +44,6 @@ type Provider struct {
 	gmIndexer    cache.Indexer
 	groupIndexer cache.Indexer
 	tokenMGR     *tokens.Manager
-	invalidHash  []byte
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -53,8 +59,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 	gIndexers := map[string]cache.IndexFunc{groupSearchIndex: groupSearchIndexer}
 	gInformer.AddIndexers(gIndexers)
 
-	invalidHash, _ := bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
-
 	l := &Provider{
 		userIndexer:  informer.GetIndexer(),
 		gmIndexer:    gmInformer.GetIndexer(),
@@ -62,7 +66,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 		groupIndexer: gInformer.GetIndexer(),
 		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
 		tokenMGR:     tokenMGR,
-		invalidHash:  invalidHash,
 	}
 	return l
 }
@@ -122,7 +125,7 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	if err != nil {
 		// If the user don't exist the password is evaluated
 		// to avoid user enumeration via timing attack (time based side-channel).
-		bcrypt.CompareHashAndPassword(l.invalidHash, []byte(pwd))
+		bcrypt.CompareHashAndPassword(invalidHash, []byte(pwd))
 		logrus.Debugf("Get User [%s] failed during Authentication: %v", username, err)
 		return v3.Principal{}, nil, "", authFailedError
 	}
@@ -215,10 +218,11 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 	var localGroups []*v3.Group
 	var err error
 
+	queryKey := strings.ToLower(searchKey)
 	if len(searchKey) > searchIndexDefaultLen {
-		localUsers, localGroups, err = l.listAllUsersAndGroups(searchKey)
+		localUsers, localGroups, err = l.listAllUsersAndGroups(queryKey)
 	} else {
-		localUsers, localGroups, err = l.listUsersAndGroupsByIndex(searchKey)
+		localUsers, localGroups, err = l.listUsersAndGroupsByIndex(queryKey)
 	}
 
 	if err != nil {
@@ -308,7 +312,7 @@ func (l *Provider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.Gr
 		return localUsers, localGroups, err
 	}
 	for _, user := range allUsers {
-		if !(strings.HasPrefix(user.ObjectMeta.Name, searchKey) || strings.HasPrefix(user.Username, searchKey) || strings.HasPrefix(user.DisplayName, searchKey)) {
+		if !userMatchesSearchKey(user, searchKey) {
 			continue
 		}
 		localUsers = append(localUsers, user)
@@ -399,13 +403,26 @@ func userSearchIndexer(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, nil
 	}
-	var fieldIndexes []string
+	fieldIndexes := sets.New[string]()
 
-	fieldIndexes = append(fieldIndexes, indexField(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
 
-	return fieldIndexes, nil
+	splitToLower := func(s string, limit int) []string {
+		var lowers []string
+		for _, v := range strings.Fields(s) {
+			lowers = append(lowers, strings.ToLower(v)[:minOf(limit, len(v))])
+		}
+
+		return lowers
+	}
+
+	fieldIndexes.Insert(splitToLower(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(splitToLower(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(splitToLower(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
+
+	return fieldIndexes.UnsortedList(), nil
 }
 
 func groupSearchIndexer(obj interface{}) ([]string, error) {
@@ -428,11 +445,13 @@ func minOf(length int, defaultLen int) int {
 	return defaultLen
 }
 
-func indexField(field string, maxindex int) []string {
+func indexField(field string, maxIndex int) []string {
 	var fieldIndexes []string
-	for i := 2; i <= maxindex; i++ {
-		fieldIndexes = append(fieldIndexes, field[0:i])
+	for i := 2; i <= maxIndex; i++ {
+		fieldIndexes = append(fieldIndexes, strings.ToLower(
+			string([]rune(simplifyString(field))[0:i])))
 	}
+
 	return fieldIndexes
 }
 
@@ -476,4 +495,34 @@ func (l *Provider) IsDisabledProvider() (bool, error) {
 // CleanupResources deletes resources associated with the local auth provider.
 func (l *Provider) CleanupResources(*v3.AuthConfig) error {
 	return nil
+}
+
+func userMatchesSearchKey(user *v3.User, searchKey string) bool {
+	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
+		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizeWhitespace(searchKey)) ||
+		strings.Contains(strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName))), normalizeWhitespace(searchKey)))
+}
+
+func normalizeWhitespace(s string) string {
+	return strings.Join(strings.Fields(s), "")
+}
+
+// simplifyString transforms unicode characters in the string by replacing
+// the characters.
+//
+// The set of characters that is replaced (unicode.Mn) is here
+//
+//	https://www.compart.com/en/unicode/category/Mn
+func simplifyString(s string) string {
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	result, _, err := transform.String(t, s)
+
+	// This shouldn't really happen, as the rune transformer is very forgiving
+	// and bad things get changed to �
+	if err != nil {
+		logrus.Errorf("failed to simplify string %q: %s", s, err)
+		return s
+	}
+
+	return result
 }
