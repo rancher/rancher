@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/wrangler"
@@ -21,7 +22,7 @@ const (
 )
 
 // CreateDeployment is a helper to create a deployment with or without a secret/configmap
-func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes bool) (*appv1.Deployment, error) {
+func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes, watchDeployment bool) (*appv1.Deployment, error) {
 	deploymentName := namegen.AppendRandomString("testdeployment")
 	containerName := namegen.AppendRandomString("testcontainer")
 	pullPolicy := corev1.PullAlways
@@ -56,11 +57,17 @@ func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, r
 		return nil, err
 	}
 
+	if watchDeployment {
+		err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
+			FieldSelector: "metadata.name=" + createdDeployment.Name,
+		})
+	}
+
 	return createdDeployment, err
 }
 
 // UpdateDeployment is a helper to update deployments
-func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment) (*appv1.Deployment, error) {
+func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment, watchDeployment bool) (*appv1.Deployment, error) {
 	var wranglerContext *wrangler.Context
 	var err error
 
@@ -82,6 +89,12 @@ func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, d
 	updatedDeployment, err := wranglerContext.Apps.Deployment().Update(deployment)
 	if err != nil {
 		return nil, err
+	}
+
+	if watchDeployment {
+		err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
+			FieldSelector: "metadata.name=" + updatedDeployment.Name,
+		})
 	}
 
 	return updatedDeployment, err

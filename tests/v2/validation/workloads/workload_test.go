@@ -63,7 +63,7 @@ func (w *WorkloadTestSuite) TestWorkloadDeployment() {
 	require.NoError(w.T(), err)
 
 	log.Info("Creating new deployment")
-	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false, true)
 	require.NoError(w.T(), err)
 }
 

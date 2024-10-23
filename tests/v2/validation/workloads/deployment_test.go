@@ -61,7 +61,7 @@ func (d *DeploymentTestSuite) TestDeploymentSideKick() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	createdDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false)
+	createdDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false, true)
 	require.NoError(d.T(), err)
 
 	log.Info("Waiting for all pods to be running")
@@ -82,7 +82,7 @@ func (d *DeploymentTestSuite) TestDeploymentSideKick() {
 	createdDeployment.Spec.Template.Spec.Containers = append(createdDeployment.Spec.Template.Spec.Containers, newContainerTemplate)
 
 	log.Info("Updating image deployment")
-	updatedDeployment, err := deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, createdDeployment)
+	updatedDeployment, err := deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, createdDeployment, true)
 	require.NoError(d.T(), err)
 
 	log.Info("Waiting deployment comes up active")
@@ -105,7 +105,7 @@ func (d *DeploymentTestSuite) TestDeploymentUpgrade() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	upgradeDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false)
+	upgradeDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentUpgrade(d.T(), d.client, d.cluster.ID, namespace.Name, upgradeDeployment, "1", nginxImageName, 2)
@@ -123,7 +123,7 @@ func (d *DeploymentTestSuite) TestDeploymentUpgrade() {
 	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
 
 	log.Info("Updating deployment")
-	upgradeDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, upgradeDeployment)
+	upgradeDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, upgradeDeployment, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentUpgrade(d.T(), d.client, d.cluster.ID, namespace.Name, upgradeDeployment, "2", redisImageName, 2)
@@ -143,7 +143,7 @@ func (d *DeploymentTestSuite) TestDeploymentUpgrade() {
 	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
 
 	log.Info("Updating deployment")
-	_, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, upgradeDeployment)
+	_, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, upgradeDeployment, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentUpgrade(d.T(), d.client, d.cluster.ID, namespace.Name, upgradeDeployment, "3", ubuntuImageName, 2)
@@ -179,7 +179,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleUp() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	scaleUpDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false)
+	scaleUpDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleUpDeployment, nginxImageName, 1)
@@ -188,7 +188,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleUp() {
 	scaleUpDeployment.Spec.Replicas = &replicas
 
 	log.Info("Updating deployment replicas")
-	scaleUpDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleUpDeployment)
+	scaleUpDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleUpDeployment, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleUpDeployment, nginxImageName, 2)
@@ -197,7 +197,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleUp() {
 	scaleUpDeployment.Spec.Replicas = &replicas
 
 	log.Info("Updating deployment replicas")
-	scaleUpDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleUpDeployment)
+	scaleUpDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleUpDeployment, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleUpDeployment, nginxImageName, 3)
@@ -212,7 +212,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleDown() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	scaleDownDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 3, "", "", false, false)
+	scaleDownDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 3, "", "", false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleDownDeployment, nginxImageName, 3)
@@ -221,7 +221,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleDown() {
 	scaleDownDeployment.Spec.Replicas = &replicas
 
 	log.Info("Updating deployment replicas")
-	scaleDownDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleDownDeployment)
+	scaleDownDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleDownDeployment, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleDownDeployment, nginxImageName, 2)
@@ -230,7 +230,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleDown() {
 	scaleDownDeployment.Spec.Replicas = &replicas
 
 	log.Info("Updating deployment replicas")
-	scaleDownDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleDownDeployment)
+	scaleDownDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, scaleDownDeployment, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleDownDeployment, nginxImageName, 1)
@@ -245,14 +245,14 @@ func (d *DeploymentTestSuite) TestDeploymentPauseOrchestration() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	pauseDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false)
+	pauseDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, pauseDeployment, nginxImageName, 2)
 
 	log.Info("Pausing orchestration")
 	pauseDeployment.Spec.Paused = true
-	pauseDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, pauseDeployment)
+	pauseDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, pauseDeployment, true)
 	require.NoError(d.T(), err)
 
 	log.Info("Verifying orchestration is paused")
@@ -274,7 +274,7 @@ func (d *DeploymentTestSuite) TestDeploymentPauseOrchestration() {
 	pauseDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
 
 	log.Info("Updating deployment image and replica")
-	pauseDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, pauseDeployment)
+	pauseDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, pauseDeployment, true)
 	require.NoError(d.T(), err)
 
 	log.Info("Waiting for all pods to be running")
@@ -289,7 +289,7 @@ func (d *DeploymentTestSuite) TestDeploymentPauseOrchestration() {
 
 	log.Info("Activing orchestration")
 	pauseDeployment.Spec.Paused = false
-	pauseDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, pauseDeployment)
+	pauseDeployment, err = deployment.UpdateDeployment(d.client, d.cluster.ID, namespace.Name, pauseDeployment, true)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, pauseDeployment, redisImageName, int(replicas))
 
