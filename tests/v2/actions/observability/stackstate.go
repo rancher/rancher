@@ -25,7 +25,7 @@ const (
 	ApiExtenisonsCRD       = "apiextensions.k8s.io.customresourcedefinition"
 )
 
-// NewStackstateConfiguration is a constructor that takes in the configuration and creates an unstructured type to install the CRD
+// NewStackstateCRDConfiguration is a constructor that takes in the configuration and creates an unstructured type to install the CRD
 func NewStackstateCRDConfiguration(namespace, name string, stackstateCRDConfig StackStateConfigs) *unstructured.Unstructured {
 
 	crdConfig := &unstructured.Unstructured{
