@@ -14,6 +14,20 @@ type AuthProvider struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Type string `json:"type"`
+
+	// Flag. True when the auth provider supports a `Logout All` operation.
+	// Currently only the SAML providers do, with their `Single Log Out` flow.
+	LogoutAllSupported bool `json:"logoutAllSupported,omitempty"`
+
+	// Flag. True when the auth provider is configured to accept a `Logout All`
+	// operation. Can be set if and only if the provider supports `Logout All`
+	// (see AuthConfig.LogoutAllSupported).
+	LogoutAllEnabled bool `json:"logoutAllEnabled,omitempty"`
+
+	// Flag. Can be set if and only if `LogoutAllEnabled` (above) is set.
+	// When set `Logout All` is the only kind of logout accepted. A regular
+	// logout request will be rejected.
+	LogoutAllForced bool `json:"logoutAllForced,omitempty"`
 }
 
 func (a *AuthProvider) GetType() string {
