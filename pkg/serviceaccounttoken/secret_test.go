@@ -199,13 +199,22 @@ func TestServiceAccountSecret(t *testing.T) {
 		clientset  *fake.Clientset
 		fakeLister *fakeSecretLister
 	}
-	baseSA := corev1.ServiceAccount{
+	baseSA := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "base-sa",
+			Name:      "test-sa",
 			Namespace: "test-ns",
 		},
 	}
-	validSecret := corev1.Secret{
+	annotatedSA := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "annotated-sa",
+			Namespace: "test-ns",
+			Annotations: map[string]string{
+				ServiceAccountSecretRefAnnotation: "test-ns/annotated-sa-secret",
+			},
+		},
+	}
+	validSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "base-sa-secret",
 			Namespace: "test-ns",
@@ -218,9 +227,9 @@ func TestServiceAccountSecret(t *testing.T) {
 		},
 		Type: corev1.SecretTypeServiceAccountToken,
 	}
-	invalidSecretType := corev1.Secret{
+	invalidSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "invalid-secret-type",
+			Name:      "base-sa-secret",
 			Namespace: "test-ns",
 			Labels: map[string]string{
 				ServiceAccountSecretLabel: baseSA.Name,
@@ -231,18 +240,19 @@ func TestServiceAccountSecret(t *testing.T) {
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
-	invalidSecretAnnotation := corev1.Secret{
+
+	referencedSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "invalid-secret-annotation",
+			Name:      "annotated-sa-secret",
 			Namespace: "test-ns",
 			Labels: map[string]string{
-				ServiceAccountSecretLabel: baseSA.Name,
+				ServiceAccountSecretLabel: annotatedSA.Name,
 			},
 			Annotations: map[string]string{
-				serviceAccountSecretAnnotation: "some-other-sa",
+				serviceAccountSecretAnnotation: annotatedSA.Name,
 			},
 		},
-		Type: corev1.SecretTypeOpaque,
+		Type: corev1.SecretTypeServiceAccountToken,
 	}
 	tests := []struct {
 		name       string
@@ -257,60 +267,47 @@ func TestServiceAccountSecret(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:       "test no secrets",
-			inputSA:    &baseSA,
-			wantError:  false,
-			wantSecret: nil,
+			name:    "test SA annotated with secret - secret exists",
+			inputSA: annotatedSA,
+			stateSetup: func(ts testState) {
+				ts.clientset.Tracker().Add(referencedSecret)
+			},
+			wantSecret: referencedSecret,
 		},
 		{
-			name:    "test valid secrets, first returned",
-			inputSA: &baseSA,
+			name:    "test SA annotated with secret - secret does not exist",
+			inputSA: annotatedSA,
 			stateSetup: func(ts testState) {
-				validSecondSecret := validSecret.DeepCopy()
-				validSecondSecret.Name = "base-sa-secret-2"
-				ts.fakeLister.secrets = []*corev1.Secret{&validSecret, validSecondSecret}
+				ts.clientset.Tracker().Add(referencedSecret)
 			},
-			wantError:  false,
-			wantSecret: &validSecret,
+			wantSecret: referencedSecret,
 		},
 		{
-			name:    "test invalid secrets, none returned",
-			inputSA: &baseSA,
+			name:    "test SA NOT annotated with secret but valid secret available",
+			inputSA: baseSA,
 			stateSetup: func(ts testState) {
-				ts.fakeLister.secrets = []*corev1.Secret{&invalidSecretType, &invalidSecretAnnotation}
-				ts.clientset.Tracker().Add(&invalidSecretType)
-				ts.clientset.Tracker().Add(&invalidSecretAnnotation)
+				ts.fakeLister.secrets = []*corev1.Secret{validSecret}
+				ts.clientset.Tracker().Add(validSecret)
 			},
-			wantError:  false,
-			wantSecret: nil,
+			wantSecret: validSecret,
 		},
 		{
-			name:    "test invalid secrets delete failure, valid still returned",
-			inputSA: &baseSA,
-			stateSetup: func(ts testState) {
-				ts.fakeLister.secrets = []*corev1.Secret{&invalidSecretType, &invalidSecretAnnotation, &validSecret}
-				ts.clientset.Tracker().Add(&invalidSecretType)
-				// don't add the invalid annotation secret to the state, this will cause a not-found error on delete
-			},
-			wantError:  false,
-			wantSecret: &validSecret,
+			name:    "test SA NOT annotated with secret and no secrets",
+			inputSA: baseSA,
 		},
 		{
-			name:    "test valid + invalid secrets, only valid returned",
-			inputSA: &baseSA,
+			name:    "test SA not annotated with secret and no valid secrets",
+			inputSA: baseSA,
 			stateSetup: func(ts testState) {
-				ts.fakeLister.secrets = []*corev1.Secret{&invalidSecretType, &invalidSecretAnnotation, &validSecret}
-				ts.clientset.Tracker().Add(&invalidSecretType)
-				ts.clientset.Tracker().Add(&invalidSecretAnnotation)
+				ts.fakeLister.secrets = []*corev1.Secret{invalidSecret}
+				ts.clientset.Tracker().Add(invalidSecret)
 			},
-			wantError:  false,
-			wantSecret: &validSecret,
 		},
 		{
 			name:    "test secret lister error",
-			inputSA: &baseSA,
+			inputSA: baseSA,
 			stateSetup: func(ts testState) {
-				ts.fakeLister.secrets = []*corev1.Secret{&invalidSecretType, &invalidSecretAnnotation, &validSecret}
+				ts.fakeLister.secrets = []*corev1.Secret{invalidSecret}
 				ts.fakeLister.err = fmt.Errorf("server unavailable")
 			},
 			wantError: true,
@@ -318,11 +315,9 @@ func TestServiceAccountSecret(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			k8sClient := fake.NewSimpleClientset()
-			fakeLister := fakeSecretLister{}
 			state := testState{
-				clientset:  k8sClient,
-				fakeLister: &fakeLister,
+				clientset:  fake.NewSimpleClientset(),
+				fakeLister: &fakeSecretLister{},
 			}
 			if test.stateSetup != nil {
 				test.stateSetup(state)
