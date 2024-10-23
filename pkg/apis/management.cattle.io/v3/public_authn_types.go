@@ -13,7 +13,10 @@ type AuthProvider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Type string `json:"type"`
+	Type               string `json:"type"`
+	LogoutAllSupported bool   `json:"logoutAllSupported"`
+	LogoutAllEnabled   bool   `json:"logoutAllEnabled"`
+	LogoutAllForced    bool   `json:"logoutAllForced"`
 }
 
 func (a *AuthProvider) GetType() string {
