@@ -112,7 +112,7 @@ func newChartUpgrade(chartName, releaseName, version, clusterID, clusterName, ur
 	return &chartUpgrade
 }
 
-// newExtensionsInstallAction is a private constructor that creates a chart install with given chart values that can be used for chart install action.
+// newExtensionsInstall is a private constructor that creates a chart install with given chart values that can be used for chart install action.
 func newExtensionsInstall(name, version string, chartValues map[string]interface{}) *types.ChartInstall {
 	chartInstall := types.ChartInstall{
 		ChartName:   name,
@@ -126,12 +126,4 @@ func newExtensionsInstall(name, version string, chartValues map[string]interface
 	}
 
 	return &chartInstall
-}
-
-// newExtensionsInstallAction is a private constructor that creates a payload for extensions install action chartInstalls and extensions namespace.
-func newExtensionsInstallAction(namespace string, chartInstalls []types.ChartInstall) *types.ChartInstallAction {
-	return &types.ChartInstallAction{
-		Namespace: namespace,
-		Charts:    chartInstalls,
-	}
 }

@@ -30,7 +30,7 @@ var (
 	timeoutSeconds = int64(60 * 2)
 )
 
-// InstallStackstateExtension is a helper function that installs the stackstate extension chart.
+// InstallStackstateExtension is a helper function that installs the stackstate extension chart in the local cluster of rancher.
 func InstallStackstateExtension(client *rancher.Client, installExtensionOptions *ExtensionOptions) error {
 
 	extensionInstallAction := newStackstateExtensionsInstallAction(installExtensionOptions)
@@ -42,7 +42,6 @@ func InstallStackstateExtension(client *rancher.Client, installExtensionOptions 
 
 	// register uninstall stackstate extension as a cleanup function
 	client.Session.RegisterCleanupFunc(func() error {
-		// UninstallAction for when uninstalling the stackstate agent chart
 		defaultChartUninstallAction := newChartUninstallAction()
 
 		err := catalogClient.UninstallChart(StackstateExtensionsName, StackstateExtensionNamespace, defaultChartUninstallAction)
@@ -126,7 +125,6 @@ func InstallStackstateExtension(client *rancher.Client, installExtensionOptions 
 		return err
 	}
 
-	// wait for chart to be full deployed
 	watchAppInterface, err := catalogClient.Apps(StackstateExtensionNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + StackstateExtensionsName,
 		TimeoutSeconds: &timeoutSeconds,
@@ -144,9 +142,11 @@ func InstallStackstateExtension(client *rancher.Client, installExtensionOptions 
 		}
 		return false, nil
 	})
+
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -156,7 +156,10 @@ func newStackstateExtensionsInstallAction(p *ExtensionOptions) *types.ChartInsta
 	chartInstall := newExtensionsInstall(p.ChartName, p.Version, nil)
 	chartInstalls := []types.ChartInstall{*chartInstall}
 
-	chartInstallAction := newExtensionsInstallAction(StackstateExtensionNamespace, chartInstalls)
+	chartInstallAction := &types.ChartInstallAction{
+		Namespace: StackstateExtensionNamespace,
+		Charts:    chartInstalls,
+	}
 
 	return chartInstallAction
 }
@@ -181,9 +184,9 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 	if err != nil {
 		return err
 	}
+
 	// register uninstall stackstate agent as a cleanup function
 	client.Session.RegisterCleanupFunc(func() error {
-		// UninstallAction for when uninstalling the stackstate agent chart
 		defaultChartUninstallAction := newChartUninstallAction()
 
 		err := catalogClient.UninstallChart(StackstateK8sAgent, StackstateNamespace, defaultChartUninstallAction)
@@ -213,12 +216,6 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 		if err != nil {
 			return err
 		}
-
-		err = catalogClient.UninstallChart(StackstateK8sAgent, StackstateNamespace, defaultChartUninstallAction)
-		if err != nil {
-			return err
-		}
-		log.Info("Uninstalled stackstate chart successfully.")
 
 		steveclient, err := client.Steve.ProxyDownstream(installOptions.Cluster.ID)
 		if err != nil {
@@ -368,7 +365,6 @@ func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *Install
 		return err
 	}
 
-	// wait for chart to be full deployed
 	watchAppInterface, err = adminCatalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + StackstateK8sAgent,
 		TimeoutSeconds: &timeoutSeconds,
