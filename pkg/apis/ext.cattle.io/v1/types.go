@@ -2,7 +2,17 @@
 package v1
 
 import (
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// copied from package "pkg/auth/providers/common" (provider.go).
+	// BEWARE the local copies are necessary because import of the package
+	// triggers CI failure around modules and dependencies, crewjam/saml in
+	// particular.
+	UserAttributePrincipalID = "principalid"
+	UserAttributeUserName    = "username"
 )
 
 // +genclient
@@ -119,4 +129,61 @@ type TokenStatus struct {
 
 	// LastUsedAt provides the last time the token was used in a request, at second granularity.
 	LastUsedAt *metav1.Time `json:"lastUsedAt,omitempty"`
+}
+
+// Implement the TokenAccessor interface
+
+func (t *Token) GetName() string {
+	return t.ObjectMeta.Name
+}
+
+func (t *Token) GetIsEnabled() bool {
+	return t.Spec.Enabled == nil || *t.Spec.Enabled
+}
+
+func (t *Token) GetIsDerived() bool {
+	// session is the kind of login tokens, the only kind of non-derived tokens.
+	return t.Spec.Kind != "session"
+}
+
+func (t *Token) GetUserID() string {
+	return t.Spec.UserID
+}
+
+func (t *Token) ObjClusterName() string {
+	return t.Spec.ClusterName
+}
+
+func (t *Token) GetAuthProvider() string {
+	return t.Status.AuthProvider
+}
+
+func (t *Token) GetUserPrincipal() apiv3.Principal {
+	return apiv3.Principal{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: t.Status.PrincipalID,
+		},
+		DisplayName:   t.Status.DisplayName,
+		LoginName:     t.Status.LoginName,
+		Provider:      t.Status.AuthProvider,
+		PrincipalType: "user",
+		ExtraInfo: map[string]string{
+			UserAttributePrincipalID: t.Status.PrincipalID,
+			UserAttributeUserName:    t.Status.LoginName,
+		},
+	}
+}
+
+func (t *Token) GetGroupPrincipals() []apiv3.Principal {
+	// Not supported. Legacy in Norman tokens.
+	return []apiv3.Principal{}
+}
+
+func (t *Token) GetProviderInfo() map[string]string {
+	// Not supported. Legacy in Norman tokens.
+	return map[string]string{}
+}
+
+func (t *Token) GetLastUsedAt() *metav1.Time {
+	return t.Status.LastUsedAt
 }
