@@ -6,7 +6,9 @@ import (
 
 	"testing"
 
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/fleet"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	"github.com/rancher/rancher/tests/v2/actions/observability"
@@ -14,9 +16,12 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extencharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
+	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/users"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
@@ -86,7 +91,7 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	_, err = rb.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
 
 	if k8sErrors.IsNotFound(err) {
-		err = observability.AddExtensionsRepo(rb.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
+		err = observability.CreateExtensionsRepo(rb.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
 	}
 	require.NoError(rb.T(), err)
 
@@ -194,6 +199,16 @@ func (rb *StackStateRBACTestSuite) TestClusterOwnerInstallStackstate() {
 	rb.T().Log("Verifying the daemonsets of stackstate agent chart to have expected number of available replicas nodes")
 	err = extencharts.WatchAndWaitDaemonSets(client, rb.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
 	require.NoError(rb.T(), err)
+
+	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(rb.client, rb.client.RancherConfig.ClusterName, fleet.Namespace)
+	if clusterObject != nil {
+		status := &provv1.ClusterStatus{}
+		err := steveV1.ConvertToK8sType(clusterObject.Status, status)
+		require.NoError(rb.T(), err)
+
+		podErrors := pods.StatusPods(client, status.ClusterName)
+		require.Empty(rb.T(), podErrors)
+	}
 }
 
 func (rb *StackStateRBACTestSuite) TestMembersCannotInstallStackstate() {

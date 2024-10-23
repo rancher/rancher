@@ -157,8 +157,8 @@ func InstallStackstateCRD(client *rancher.Client) error {
 
 }
 
-// AddExtensionsRepo is a helper that utilizes the rancher client and add the ui extensions repo to the list if repositories in the local cluster.
-func AddExtensionsRepo(client *rancher.Client, rancherUiPluginsName, uiExtensionGitRepoURL, uiExtensionsRepoBranch string) error {
+// CreateExtensionsRepo is a helper that utilizes the rancher client and add the ui extensions repo to the list if repositories in the local cluster.
+func CreateExtensionsRepo(client *rancher.Client, rancherUiPluginsName, uiExtensionGitRepoURL, uiExtensionsRepoBranch string) error {
 	log.Info("Adding ui extensions repo to rancher chart repositories in the local cluster.")
 
 	clusterRepoObj := v1.ClusterRepo{
