@@ -16,8 +16,9 @@ func TransformToAuthProvider(authConfig map[string]interface{}) map[string]inter
 		result["type"] = strings.Replace(t, "Config", "Provider", -1)
 	}
 
-	if supported, _ := authConfig["logoutAllSupported"].(bool); supported {
-		result["logoutAllSupported"] = supported
+	for _, key := range []string{"logoutAllSupported", "logoutAllEnabled", "logoutAllForced"} {
+		value, _ := authConfig[key].(bool)
+		result[key] = value
 	}
 
 	return result

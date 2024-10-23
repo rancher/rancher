@@ -87,15 +87,7 @@ func (s *Provider) CustomizeSchema(schema *types.Schema) {
 }
 
 func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
-
-	enabled, _ := authConfig["logoutAllEnabled"].(bool)
-	forced, _ := authConfig["logoutAllForced"].(bool)
-
 	p := common.TransformToAuthProvider(authConfig)
-
-	p["logoutAllEnabled"] = enabled
-	p["logoutAllForced"] = forced
-
 	switch s.name {
 	case PingName:
 		p[publicclient.PingProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
