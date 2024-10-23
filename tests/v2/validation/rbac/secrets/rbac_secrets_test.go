@@ -86,7 +86,7 @@ func (rbs *RbacSecretTestSuite) TestCreateSecretAsEnvVar() {
 			case rbac.ClusterOwner.String(), rbac.ProjectOwner.String(), rbac.ProjectMember.String():
 				assert.NoError(rbs.T(), err, "failed to create secret")
 				log.Infof("As a %v, create a deployment using the secret as an environment variable.", tt.role.String())
-				_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, createdSecret.Name, "", true, false)
+				_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, createdSecret.Name, "", true, false, true)
 				assert.NoError(rbs.T(), err, "failed to create deployment with secret")
 			case rbac.ClusterMember.String(), rbac.ReadOnly.String():
 				assert.Error(rbs.T(), err)
@@ -131,7 +131,7 @@ func (rbs *RbacSecretTestSuite) TestCreateSecretAsVolume() {
 			case rbac.ClusterOwner.String(), rbac.ProjectOwner.String(), rbac.ProjectMember.String():
 				assert.NoError(rbs.T(), err, "failed to create secret")
 				log.Infof("As a %v, create a deployment using the secret as an environment variable.", tt.role.String())
-				_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, createdSecret.Name, "", false, true)
+				_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, createdSecret.Name, "", false, true, true)
 				assert.NoError(rbs.T(), err, "failed to create deployment with secret")
 			case rbac.ClusterMember.String(), rbac.ReadOnly.String():
 				assert.Error(rbs.T(), err)
@@ -241,7 +241,7 @@ func (rbs *RbacSecretTestSuite) TestUpdateSecret() {
 				assert.Equal(rbs.T(), updatedSecret.Data["foo"], []byte("bar"))
 
 				log.Infof("As a %v, create a deployment using the updated secret.", tt.role.String())
-				_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, updatedSecret.Name, "", true, false)
+				_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, updatedSecret.Name, "", true, false, true)
 				assert.NoError(rbs.T(), err, "failed to create deployment with secret")
 			case rbac.ClusterMember.String(), rbac.ReadOnly.String():
 				assert.Error(rbs.T(), err)
@@ -328,7 +328,7 @@ func (rbs *RbacSecretTestSuite) TestCrudSecretAsClusterMember() {
 	require.NoError(rbs.T(), err, "failed to create secret")
 
 	log.Infof("As a %v, create a deployment using the secret as an environment variable.", role)
-	_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, createdSecret.Name, "", true, false)
+	_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, createdSecret.Name, "", true, false, true)
 	require.NoError(rbs.T(), err, "failed to create deployment with secret")
 
 	log.Infof("As a %v, list the secret.", role)
@@ -351,7 +351,7 @@ func (rbs *RbacSecretTestSuite) TestCrudSecretAsClusterMember() {
 	assert.Equal(rbs.T(), updatedSecret.Data["foo"], []byte("bar"))
 
 	log.Infof("As a %v, create a deployment using the secret as an environment variable.", role)
-	_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, updatedSecret.Name, "", true, false)
+	_, err = deployment.CreateDeployment(standardUserClient, rbs.cluster.ID, namespace.Name, 1, updatedSecret.Name, "", true, false, true)
 	require.NoError(rbs.T(), err, "failed to create deployment with secret")
 
 	log.Infof("As a %v, delete the secret.", role)

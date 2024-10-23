@@ -22,7 +22,7 @@ const (
 )
 
 // CreateDeployment is a helper to create a deployment with or without a secret/configmap
-func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes bool) (*appv1.Deployment, error) {
+func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes, watchDeployment bool) (*appv1.Deployment, error) {
 	deploymentName := namegen.AppendRandomString("testdeployment")
 	containerName := namegen.AppendRandomString("testcontainer")
 	pullPolicy := corev1.PullAlways
@@ -57,15 +57,17 @@ func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, r
 		return nil, err
 	}
 
-	err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
+	if watchDeployment {
+		err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
+			FieldSelector: "metadata.name=" + createdDeployment.Name,
+		})
+	}
 
 	return createdDeployment, err
 }
 
 // UpdateDeployment is a helper to update deployments
-func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment) (*appv1.Deployment, error) {
+func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment, watchDeployment bool) (*appv1.Deployment, error) {
 	var wranglerContext *wrangler.Context
 	var err error
 
@@ -89,9 +91,11 @@ func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, d
 		return nil, err
 	}
 
-	err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + updatedDeployment.Name,
-	})
+	if watchDeployment {
+		err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
+			FieldSelector: "metadata.name=" + updatedDeployment.Name,
+		})
+	}
 
 	return updatedDeployment, err
 }
