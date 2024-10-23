@@ -409,6 +409,19 @@ func userSearchIndexer(obj interface{}) ([]string, error) {
 	fieldIndexes.Insert(indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
 	fieldIndexes.Insert(indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
 
+	splitToLower := func(s string, limit int) []string {
+		var lowers []string
+		for _, v := range strings.Fields(s) {
+			lowers = append(lowers, strings.ToLower(v)[:minOf(limit, len(v))])
+		}
+
+		return lowers
+	}
+
+	fieldIndexes.Insert(splitToLower(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(splitToLower(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(splitToLower(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
+
 	return fieldIndexes.UnsortedList(), nil
 }
 
@@ -438,17 +451,6 @@ func indexField(field string, maxIndex int) []string {
 		fieldIndexes = append(fieldIndexes, strings.ToLower(
 			string([]rune(simplifyString(field))[0:i])))
 	}
-
-	splitToLower := func(s string, limit int) []string {
-		var lowers []string
-		for _, v := range strings.Fields(s) {
-			lowers = append(lowers, strings.ToLower(v)[:minOf(limit, len(v))])
-		}
-
-		return lowers
-	}
-
-	fieldIndexes = append(fieldIndexes, splitToLower(field, maxIndex)...)
 
 	return fieldIndexes
 }
@@ -506,13 +508,21 @@ func normalizeWhitespace(s string) string {
 }
 
 // simplifyString transforms unicode characters in the string by replacing
-// the
+// the characters.
+//
 // The set of characters that is replaced (unicode.Mn) is here
 //
 //	https://www.compart.com/en/unicode/category/Mn
 func simplifyString(s string) string {
 	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-	result, _, _ := transform.String(t, s)
+	result, _, err := transform.String(t, s)
+
+	// This shouldn't really happen, as the rune transformer is very forgiving
+	// and bad things get changed to �
+	if err != nil {
+		logrus.Errorf("failed to simplify string %q: %s", s, err)
+		return s
+	}
 
 	return result
 }
