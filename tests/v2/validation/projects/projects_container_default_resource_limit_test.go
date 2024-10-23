@@ -12,7 +12,6 @@ import (
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/session"
@@ -120,12 +119,8 @@ func (pcrl *ProjectsContainerResourceLimitTestSuite) TestLimitDeletionPropagatio
 	require.Equal(pcrl.T(), 0, len(limitRanges.Items))
 
 	log.Info("Create a deployment in the namespace with one replica and verify that a pod is created.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false, true)
 	require.NoError(pcrl.T(), err, "Failed to create deployment in the namespace")
-	err = charts.WatchAndWaitDeployments(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
-	require.NoError(pcrl.T(), err)
 
 	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
 	err = checkContainerResources(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
@@ -165,12 +160,8 @@ func (pcrl *ProjectsContainerResourceLimitTestSuite) TestOverrideDefaultLimitInN
 	require.NoError(pcrl.T(), err)
 
 	log.Info("Create a deployment in the namespace with one replica and verify that a pod is created.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false, true)
 	require.NoError(pcrl.T(), err, "Failed to create deployment in the namespace")
-	err = charts.WatchAndWaitDeployments(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
-	require.NoError(pcrl.T(), err)
 
 	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
 	err = checkContainerResources(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
@@ -196,12 +187,8 @@ func (pcrl *ProjectsContainerResourceLimitTestSuite) TestOverrideDefaultLimitInN
 	require.NoError(pcrl.T(), err)
 
 	log.Info("Create a deployment in the namespace with one replica and verify that a pod is created.")
-	createdDeployment, err = deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false)
+	createdDeployment, err = deployment.CreateDeployment(standardUserClient, pcrl.cluster.ID, updatedNamespace.Name, 1, "", "", false, false, true)
 	require.NoError(pcrl.T(), err, "Failed to create deployment in the namespace")
-	err = charts.WatchAndWaitDeployments(standardUserClient, pcrl.cluster.ID, namespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
-	require.NoError(pcrl.T(), err)
 
 	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
 	err = checkContainerResources(standardUserClient, pcrl.cluster.ID, namespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
