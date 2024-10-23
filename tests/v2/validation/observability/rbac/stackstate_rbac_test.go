@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
+	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	"github.com/rancher/rancher/tests/v2/actions/observability"
 	"github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/rbac"
@@ -44,7 +45,7 @@ type StackStateRBACTestSuite struct {
 	client                        *rancher.Client
 	session                       *session.Session
 	cluster                       *management.Cluster
-	project                       *management.Project
+	projectID                     string
 	stackstateAgentInstallOptions *charts.InstallOptions
 	stackstateConfigs             observability.StackStateConfigs
 }
@@ -72,24 +73,22 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 
 	log.Info("Creating a project and namespace for the chart to be installed in.")
 
-	stackstateProject, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
+	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
+	projectTemplate.Name = charts.StackstateNamespace
+	project, err := client.Steve.SteveType(project).Create(projectTemplate)
 	require.NoError(rb.T(), err)
+	rb.projectID = project.ID
 
+	_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
 	require.NoError(rb.T(), err)
-	rb.project = stackstateProject
-
-	_, err = namespaces.CreateNamespace(client, cluster.ID, rb.project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
-	require.NoError(rb.T(), err, "Unable to create stackstate namespace.")
 
 	log.Info("Verifying if the ui plugin repository for ui extensions exists.")
 	_, err = rb.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
 
 	if k8sErrors.IsNotFound(err) {
 		err = observability.AddExtensionsRepo(rb.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
-		require.NoError(rb.T(), err)
-	} else {
-		require.NoError(rb.T(), err)
 	}
+	require.NoError(rb.T(), err)
 
 	var stackstateConfigs observability.StackStateConfigs
 	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
@@ -99,19 +98,15 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	_, err = client.Management.NodeDriver.ByID(observability.StackstateName)
 	if strings.Contains(err.Error(), "Not Found") {
 		err = observability.InstallNodeDriver(rb.client, []string{rb.stackstateConfigs.Url})
-		require.NoError(rb.T(), err, "Unable to install node driver for stackstate.")
-	} else {
-		require.NoError(rb.T(), err)
 	}
+	require.NoError(rb.T(), err)
 
 	rb.T().Log("Checking if the stack state CRD is installed.")
 	crdsExists, err := rb.client.Steve.SteveType(observability.ApiExtenisonsCRD).ByID(observability.ObservabilitySteveType)
 	if crdsExists == nil && strings.Contains(err.Error(), "Not Found") {
 		err = observability.InstallStackstateCRD(rb.client)
-		require.NoError(rb.T(), err, "Unable to install stackstate CRD.")
-	} else {
-		require.NoError(rb.T(), err)
 	}
+	require.NoError(rb.T(), err)
 
 	client, err = client.ReLogin()
 	require.NoError(rb.T(), err)
@@ -133,26 +128,27 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 
 		err = charts.InstallStackstateExtension(client, extensionOptions)
 		require.NoError(rb.T(), err)
-
-		log.Info("Adding stack state extension configuration.")
-
-		steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
-		require.NoError(rb.T(), err)
-
-		crdConfig := observability.NewStackstateCRDConfiguration(charts.StackstateNamespace, rb.stackstateConfigs)
-		crd, err := steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
-		require.NoError(rb.T(), err, "Unable to install stackstate CRD configuration.")
-
-		_, err = steveAdminClient.SteveType(charts.StackstateCRD).ByID(crd.ID)
-		require.NoError(rb.T(), err)
 	}
+
+	log.Info("Adding stackstate extension configuration.")
+
+	steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
+	require.NoError(rb.T(), err)
+
+	crdConfig := observability.NewStackstateCRDConfiguration(charts.StackstateNamespace, observability.StackstateName, rb.stackstateConfigs)
+	crd, err := steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
+	require.NoError(rb.T(), err, "Unable to install stackstate CRD configuration.")
+
+	config, err := steveAdminClient.SteveType(charts.StackstateCRD).ByID(crd.ID)
+	require.NoError(rb.T(), err)
+	require.Equal(rb.T(), observability.StackstateName, config.ObjectMeta.Name, "Stackstate configuration name differs.")
 
 	latestSSVersion, err := rb.client.Catalog.GetLatestChartVersion(charts.StackstateK8sAgent, rancherPartnerCharts)
 	require.NoError(rb.T(), err)
 	rb.stackstateAgentInstallOptions = &charts.InstallOptions{
 		Cluster:   cluster,
 		Version:   latestSSVersion,
-		ProjectID: rb.project.ID,
+		ProjectID: rb.projectID,
 	}
 }
 
@@ -184,6 +180,7 @@ func (rb *StackStateRBACTestSuite) TestClusterOwnerInstallStackstate() {
 
 	systemProject, err := projects.GetProjectByName(client, rb.cluster.ID, systemProject)
 	require.NoError(rb.T(), err)
+	require.NotNil(rb.T(), systemProject.ID, "System project is nil.")
 	systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
 	err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs.ClusterApiKey, rb.stackstateConfigs.Url, systemProjectID)
@@ -234,7 +231,9 @@ func (rb *StackStateRBACTestSuite) TestMembersCannotInstallStackstate() {
 		require.NoError(rb.T(), err)
 
 		if strings.Contains(tt.role.String(), "project") {
-			err := users.AddProjectMember(rb.client, rb.project, user, tt.role.String(), nil)
+			stackstateProject, err := client.Management.Project.ByID(rb.projectID)
+			require.NoError(rb.T(), err)
+			err = users.AddProjectMember(rb.client, stackstateProject, user, tt.role.String(), nil)
 			require.NoError(rb.T(), err)
 		} else {
 			err := users.AddClusterRoleToUser(rb.client, rb.cluster, user, tt.role.String(), nil)
@@ -243,12 +242,13 @@ func (rb *StackStateRBACTestSuite) TestMembersCannotInstallStackstate() {
 
 		systemProject, err := projects.GetProjectByName(client, rb.cluster.ID, systemProject)
 		require.NoError(rb.T(), err)
+		require.NotNil(rb.T(), systemProject.ID, "System project is nil.")
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
 		err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs.ClusterApiKey, rb.stackstateConfigs.Url, systemProjectID)
 		require.Error(rb.T(), err)
-		k8sErrors.IsForbidden(rb.T(), err.Error())
-		log.Info("Unable to install Stackstate agent chart.")
+		k8sErrors.IsForbidden(err)
+		log.Info("Unable to install Stackstate agent chart as " + tt.name)
 	}
 }
 
