@@ -6,7 +6,6 @@ import (
 	"context"
 	"strings"
 
-	//"net/url"
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/actions/charts"
@@ -85,12 +84,9 @@ func (ss *StackStateTestSuite) SetupSuite() {
 	_, err = ss.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
 
 	if k8sErrors.IsNotFound(err) {
-
 		err = observability.AddExtensionsRepo(ss.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
-		require.NoError(ss.T(), err)
-	} else {
-		require.NoError(ss.T(), err)
 	}
+	require.NoError(ss.T(), err)
 
 	var stackstateConfigs observability.StackStateConfigs
 	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
@@ -104,10 +100,8 @@ func (ss *StackStateTestSuite) SetupSuite() {
 	crdsExists, err := ss.client.Steve.SteveType(observability.ApiExtenisonsCRD).ByID(observability.ObservabilitySteveType)
 	if crdsExists == nil && strings.Contains(err.Error(), "Not Found") {
 		err = observability.InstallStackstateCRD(ss.client)
-		require.NoError(ss.T(), err)
-	} else {
-		require.NoError(ss.T(), err)
 	}
+	require.NoError(ss.T(), err)
 
 	client, err = client.ReLogin()
 	require.NoError(ss.T(), err)
@@ -129,19 +123,18 @@ func (ss *StackStateTestSuite) SetupSuite() {
 
 		err = charts.InstallStackstateExtension(client, extensionOptions)
 		require.NoError(ss.T(), err)
-
-		log.Info("Adding stack state extension configuration.")
-
-		steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
-		require.NoError(ss.T(), err)
-
-		crdConfig := observability.NewStackstateCRDConfiguration(charts.StackstateNamespace, ss.stackstateConfigs)
-		crd, err := steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
-		require.NoError(ss.T(), err)
-
-		_, err = steveAdminClient.SteveType(charts.StackstateCRD).ByID(crd.ID)
-		require.NoError(ss.T(), err)
 	}
+	log.Info("Adding stack state extension configuration.")
+
+	steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
+	require.NoError(ss.T(), err)
+
+	crdConfig := observability.NewStackstateCRDConfiguration(charts.StackstateNamespace, observability.StackstateName, ss.stackstateConfigs)
+	crd, err := steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
+	require.NoError(ss.T(), err)
+
+	_, err = steveAdminClient.SteveType(charts.StackstateCRD).ByID(crd.ID)
+	require.NoError(ss.T(), err)
 
 	latestSSVersion, err := ss.client.Catalog.GetLatestChartVersion(charts.StackstateK8sAgent, rancherPartnerCharts)
 	ss.stackstateAgentInstallOptions = &charts.InstallOptions{
@@ -247,7 +240,7 @@ func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
 	require.NoError(ss.T(), err)
 
 	ss.T().Log("Upgrading stackstate agent chart to the latest version")
-	err = charts.UpgradeStackstateAgentChart(client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url)
+	err = charts.UpgradeStackstateAgentChart(client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url, systemProject)
 	require.NoError(ss.T(), err)
 
 	ss.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")

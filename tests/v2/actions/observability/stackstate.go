@@ -26,12 +26,12 @@ const (
 )
 
 // NewStackstateConfiguration is a constructor that takes in the configuration and creates an unstructured type to install the CRD
-func NewStackstateCRDConfiguration(namespace string, stackstateCRDConfig StackStateConfigs) *unstructured.Unstructured {
+func NewStackstateCRDConfiguration(namespace, name string, stackstateCRDConfig StackStateConfigs) *unstructured.Unstructured {
 
 	crdConfig := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
-				"name":      StackstateName,
+				"name":      name,
 				"namespace": namespace,
 			},
 			"spec": map[string]interface{}{
@@ -48,7 +48,7 @@ func InstallNodeDriver(client *rancher.Client, whitelistDomains []string) error 
 
 	nodedriver := &management.NodeDriver{
 		Name:             StackstateName,
-		Active:           true,
+		Active:           false,
 		WhitelistDomains: whitelistDomains,
 		URL:              "local://",
 		State:            "inactive",
@@ -59,13 +59,13 @@ func InstallNodeDriver(client *rancher.Client, whitelistDomains []string) error 
 		return err
 	}
 
-	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.TwoMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		resp, err := client.Management.NodeDriver.ByID(stackstateNodeDriver.ID)
 		if err != nil {
 			return false, err
 		}
 
-		if resp.State == "downloading" {
+		if resp.State == "inactive" {
 			return true, nil
 		}
 		return false, nil
@@ -89,6 +89,20 @@ func InstallStackstateCRD(client *rancher.Client) error {
 					Schema: &apiextv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
 							Type: "object",
+							Properties: map[string]apiextv1.JSONSchemaProps{
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextv1.JSONSchemaProps{
+										"url": {Type: "string"},
+										"serviceToken": {
+											Type: "string",
+										},
+										"apiToken": {
+											Type: "string",
+										},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -102,6 +116,7 @@ func InstallStackstateCRD(client *rancher.Client) error {
 			Scope: "Namespaced",
 		},
 	}
+
 	crd, err := client.Steve.SteveType(ApiExtenisonsCRD).Create(stackstateCRDConfig)
 	if err != nil {
 		return err
@@ -113,7 +128,7 @@ func InstallStackstateCRD(client *rancher.Client) error {
 			return err
 		}
 
-		err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+		err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.TwoMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 			_, err = client.Steve.SteveType(ApiExtenisonsCRD).ByID(crd.ID)
 			if err != nil {
 				return false, nil
@@ -126,7 +141,7 @@ func InstallStackstateCRD(client *rancher.Client) error {
 		return nil
 	})
 
-	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.TwoMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		resp, err := client.Steve.SteveType(ApiExtenisonsCRD).ByID(ObservabilitySteveType)
 		if err != nil {
 			return false, err
