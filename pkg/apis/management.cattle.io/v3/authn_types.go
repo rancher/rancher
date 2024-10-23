@@ -47,8 +47,46 @@ type Token struct {
 	Enabled         *bool             `json:"enabled,omitempty" norman:"default=true"`
 }
 
+// Implement the TokenAccessor interface
+
+func (t *Token) GetName() string {
+	return t.ObjectMeta.Name
+}
+
+func (t *Token) GetIsEnabled() bool {
+	return t.Enabled == nil || *t.Enabled
+}
+
+func (t *Token) GetIsDerived() bool {
+	return t.IsDerived
+}
+
+func (t *Token) GetAuthProvider() string {
+	return t.AuthProvider
+}
+
+func (t *Token) GetUserID() string {
+	return t.UserID
+}
+
+func (t *Token) GetUserPrincipal() Principal {
+	return t.UserPrincipal
+}
+
 func (t *Token) ObjClusterName() string {
 	return t.ClusterName
+}
+
+func (t *Token) GetGroupPrincipals() []Principal {
+	return t.GroupPrincipals
+}
+
+func (t *Token) GetProviderInfo() map[string]string {
+	return t.ProviderInfo
+}
+
+func (t *Token) GetLastUsedAt() *metav1.Time {
+	return t.LastUsedAt
 }
 
 // +genclient
