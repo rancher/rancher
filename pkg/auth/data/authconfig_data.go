@@ -1,6 +1,8 @@
 package data
 
 import (
+	"encoding/json"
+
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
@@ -17,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func AuthConfigs(management *config.ManagementContext) error {
@@ -94,7 +97,9 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 	}
 	annotations[auth.CleanupAnnotation] = auth.CleanupRancherLocked
 
-	_, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
+	// technote: An ObjectClient is used for the creation to ensure that all fields of all the
+	// possible AuthConfig variants make it into the store unharmed.
+	createdOrKnown, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
@@ -103,8 +108,42 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 		Enabled:            enabled,
 		LogoutAllSupported: sloSupported,
 	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
+	if err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+
+		// The AC already exists. The result of the Create (in `createdOrKnown`) is just the
+		// object given to it as argument. It is NOT the object found in the store. It is
+		// still needed as argument for Patch().
+		//
+		// Given that a Patch operation is (a) quick, and (b) does not throw an error when
+		// given a no-op, pulling the existing object and checking if the flag has the
+		// proper value or not is not really an optimization. Setting the flag is therefore
+		// done unconditionally. This ensures both existence and proper value without fuss.
+		//
+		// Note that the `add` operation works even when the flag field exists. It behaves
+		// like a `replace`. This may just be because the flag is a scalar field, neither
+		// object, nor array.
+
+		patch, err := json.Marshal([]struct {
+			Op    string `json:"op"`
+			Path  string `json:"path"`
+			Value any    `json:"value"`
+		}{{
+			Op:    "add",
+			Path:  "/logoutAllSupported",
+			Value: sloSupported,
+		}})
+		if err != nil {
+			return err
+		}
+
+		_, err = management.Management.AuthConfigs("").ObjectClient().
+			Patch(name, createdOrKnown, types.JSONPatchType, patch)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
