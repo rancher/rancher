@@ -301,7 +301,7 @@ func (c AzureMSGraphClient) getOIDFromLogin(config *v32.AzureADConfig, credentia
 	}
 
 	// Acquire the OID exchanging the Code to verify the user
-	oidFromCode, err := oidFromAuthCode(credential.Code, config)
+	oidFromCode, err := oidFromAuthCode(credential.Code, config, c.GraphEndpointURL)
 	if err != nil {
 		return "", fmt.Errorf("getting OID from AuthCode: %w", err)
 	}
@@ -380,7 +380,7 @@ func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
 }
 
 // oidFromAuthCode exchanges the AuthCode for a IDToken, returning the user OID
-func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
+func oidFromAuthCode(token string, config *v32.AzureADConfig, endpointURL string) (string, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
@@ -397,9 +397,8 @@ func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	scope := fmt.Sprintf("%s/%s", config.GraphEndpoint, ".default")
 
-	authResult, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), token, config.RancherURL, []string{scope})
+	authResult, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), token, config.RancherURL, []string{endpointURL})
 	if err != nil {
 		return "", err
 	}
