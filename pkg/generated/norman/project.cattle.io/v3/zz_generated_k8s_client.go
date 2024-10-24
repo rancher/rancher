@@ -22,8 +22,6 @@ type Interface interface {
 	NamespacedBasicAuthsGetter
 	NamespacedSSHAuthsGetter
 	WorkloadsGetter
-	AppsGetter
-	AppRevisionsGetter
 }
 
 type Client struct {
@@ -208,34 +206,6 @@ func (c *Client) Workloads(namespace string) WorkloadInterface {
 	sharedClient := c.clientFactory.ForResourceKind(WorkloadGroupVersionResource, WorkloadGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &WorkloadResource, WorkloadGroupVersionKind, workloadFactory{})
 	return &workloadClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type AppsGetter interface {
-	Apps(namespace string) AppInterface
-}
-
-func (c *Client) Apps(namespace string) AppInterface {
-	sharedClient := c.clientFactory.ForResourceKind(AppGroupVersionResource, AppGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AppResource, AppGroupVersionKind, appFactory{})
-	return &appClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type AppRevisionsGetter interface {
-	AppRevisions(namespace string) AppRevisionInterface
-}
-
-func (c *Client) AppRevisions(namespace string) AppRevisionInterface {
-	sharedClient := c.clientFactory.ForResourceKind(AppRevisionGroupVersionResource, AppRevisionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AppRevisionResource, AppRevisionGroupVersionKind, appRevisionFactory{})
-	return &appRevisionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

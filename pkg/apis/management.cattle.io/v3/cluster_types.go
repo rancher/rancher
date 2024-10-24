@@ -150,6 +150,17 @@ type ClusterSpec struct {
 	FleetWorkspaceName                  string                      `json:"fleetWorkspaceName,omitempty"`
 }
 
+type Answer struct {
+	ProjectName     string            `json:"projectName,omitempty" norman:"type=reference[project]"`
+	ClusterName     string            `json:"clusterName,omitempty" norman:"type=reference[cluster]"`
+	Values          map[string]string `json:"values,omitempty"`
+	ValuesSetString map[string]string `json:"valuesSetString,omitempty"`
+}
+
+func (a *Answer) ObjClusterName() string {
+	return a.ClusterName
+}
+
 type ImportedConfig struct {
 	KubeConfig string `json:"kubeConfig" norman:"type=password"`
 }

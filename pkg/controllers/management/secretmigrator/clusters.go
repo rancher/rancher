@@ -20,7 +20,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
@@ -788,75 +787,6 @@ func (h *handler) migrateClusterSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.
 		logrus.Tracef("[secretmigrator] cleaning questions and answers from cluster %s", clusterCopy.Name)
 		cleanQuestions(clusterCopy)
 
-		// cluster catalogs
-		clusterCatalogs, err := h.clusterCatalogLister.List(clusterCopy.Name, labels.NewSelector())
-		if err != nil {
-			logrus.Errorf("[secretmigrator] failed to get cluster catalogs for cluster %s, will retry: %v", clusterCopy.Name, err)
-			return cluster, err
-		}
-		for _, c := range clusterCatalogs {
-			if c.GetSecret() == "" && c.Spec.Password != "" {
-				logrus.Tracef("[secretmigrator] migrating secrets for cluster catalog %s in cluster %s", c.Name, clusterCopy.Name)
-				secret, err := h.migrator.CreateOrUpdateCatalogSecret(c.GetSecret(), c.Spec.Password, cluster)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for cluster catalog %s in cluster %s, will retry: %v", c.Name, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if secret != nil {
-					logrus.Tracef("[secretmigrator] secret found for cluster catalog %s in cluster %s", c.Name, clusterCopy.Name)
-					c.Spec.CatalogSecrets.CredentialSecret = secret.Name
-					c.Spec.Password = ""
-					_, err = h.clusterCatalogs.Update(c)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for cluster catalog %s in cluster %s, will retry: %v", c.Name, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-		}
-
-		projects, err := h.projectLister.List(clusterCopy.Name, labels.NewSelector())
-		if err != nil {
-			logrus.Errorf("[secretmigrator] failed to get projects for cluster %s, will retry: %v", clusterCopy.Name, err)
-			return cluster, err
-		}
-
-		// project catalogs
-		for _, p := range projects {
-			projectCatalogs, err := h.projectCatalogLister.List(p.Name, labels.NewSelector())
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to get project catalogs for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
-			}
-			for _, c := range projectCatalogs {
-				if c.GetSecret() == "" && c.Spec.Password != "" {
-					logrus.Tracef("[secretmigrator] migrating secrets for project catalog %s in cluster %s", c.Name, clusterCopy.Name)
-					secret, err := h.migrator.CreateOrUpdateCatalogSecret(c.GetSecret(), c.Spec.Password, clusterCopy)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for project catalog %s in cluster %s, will retry: %v", c.Name, clusterCopy.Name, err)
-						return cluster, err
-					}
-					if secret != nil {
-						logrus.Tracef("[secretmigrator] secret found for project catalog %s in cluster %s", c.Name, clusterCopy.Name)
-						c.Spec.CatalogSecrets.CredentialSecret = secret.Name
-						c.Spec.Password = ""
-						_, err = h.projectCatalogs.Update(c)
-						if err != nil {
-							logrus.Errorf("[secretmigrator] failed to migrate secrets for project catalog %s in cluster %s, will retry: %v", c.Name, clusterCopy.Name, err)
-							deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-							if deleteErr != nil {
-								logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-							}
-							return cluster, err
-						}
-					}
-				}
-			}
-		}
 		return clusterCopy, err
 	})
 

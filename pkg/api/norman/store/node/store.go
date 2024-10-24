@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	"github.com/rancher/rancher/pkg/api/norman/store/workload"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -29,7 +28,6 @@ func SetupStore(schema *types.Schema) {
 			Store: schema.Store,
 		},
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
-			workload.SetPublicEndpointsFields(data)
 			setState(data)
 			return data, nil
 		},

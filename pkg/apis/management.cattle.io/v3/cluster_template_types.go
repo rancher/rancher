@@ -53,6 +53,14 @@ type ClusterTemplateSpec struct {
 	Members []Member `json:"members,omitempty"`
 }
 
+type Member struct {
+	UserName           string `json:"userName,omitempty" norman:"type=reference[user]"`
+	UserPrincipalName  string `json:"userPrincipalName,omitempty" norman:"type=reference[principal]"`
+	DisplayName        string `json:"displayName,omitempty"`
+	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"type=reference[principal]"`
+	AccessType         string `json:"accessType,omitempty" norman:"type=enum,options=owner|member|read-only"`
+}
+
 // +genclient
 // +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

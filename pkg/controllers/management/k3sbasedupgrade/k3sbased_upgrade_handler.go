@@ -1,17 +1,12 @@
 package k3sbasedupgrade
 
 import (
-	"fmt"
 	"sync/atomic"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
-	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/rancher/pkg/settings"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -54,17 +49,6 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 	// no version set on imported cluster
 	if updateVersion == "" {
 		return cluster, nil
-	}
-
-	if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
-		if globalCounter.Load() < int32(settings.K3sBasedUpgraderUninstallConcurrency.GetInt()) {
-			globalCounter.Add(1)
-			err := h.uninstallK3sBasedUpgradeController(cluster)
-			globalCounter.Add(-1)
-			if err != nil {
-				return nil, fmt.Errorf("[k3s-based-upgrader] failed to uninstall k3s based upgrade app: %w", err)
-			}
-		}
 	}
 
 	// Check if the cluster is undergoing a Kubernetes version upgrade, and that
@@ -118,46 +102,6 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 	}
 
 	return cluster, nil
-}
-
-// uninstallK3sBasedUpgradeController uninstalls the k3s-based-upgrader app from the cluster if it exists.
-func (h *handler) uninstallK3sBasedUpgradeController(cluster *mgmtv3.Cluster) error {
-	userCtx, err := h.manager.UserContextNoControllers(cluster.Name)
-	if err != nil {
-		return err
-	}
-
-	projectLister := userCtx.Management.Management.Projects("").Controller().Lister()
-	systemProject, err := project.GetSystemProject(cluster.Name, projectLister)
-	if err != nil {
-		return err
-	}
-
-	appLister := userCtx.Management.Project.Apps("").Controller().Lister()
-	appClient := userCtx.Management.Project.Apps("")
-
-	var appName string
-	switch {
-	case cluster.Status.Driver == mgmtv3.ClusterDriverK3s:
-		appName = K3sAppName
-	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
-		appName = Rke2AppName
-	}
-	app, err := appLister.Get(systemProject.Name, appName)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-	if app != nil && app.DeletionTimestamp == nil {
-		logrus.Infof("[k3s-based-upgrader] uninstalling the app [%s] from the cluster [%s]", app.Name, cluster.Name)
-		if err := appClient.DeleteNamespaced(app.Namespace, app.Name, &metav1.DeleteOptions{}); !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // nodeNeedsUpgrade checks all nodes in cluster, returns true if they still need to be upgraded

@@ -167,26 +167,6 @@ func correctOwnerRefs(ownerReferences *[]metav1.OwnerReference) bool {
 			ownerRef.APIVersion = RancherManagementAPIVersion
 			ownerRef.Kind = v3.ClusterTemplateRevisionGroupVersionKind.Kind
 			needsUpdate = true
-		case "multiclusterapps":
-			/* Multi Cluster Apps had a Role & RoleBinding created for them with this ownerRef format:
-			  - apiVersion: management.cattle.io
-			    kind: multiclusterapps
-			    name: wp
-			    uid: fe24c360-d35d-48f6-8295-9a66fdefac79
-			The APIVersion and Kind both fields are incorrect*/
-			ownerRef.APIVersion = RancherManagementAPIVersion
-			ownerRef.Kind = v3.MultiClusterAppGroupVersionKind.Kind
-			needsUpdate = true
-		case "multiclusterapprevisions":
-			/* Multi Cluster Revisions had a Role & RoleBinding created for them with this ownerRef format:
-			  - apiVersion: management.cattle.io
-			    kind: multiclusterapprevisions
-			    name: mcapprevision-mbh68
-			    uid: f0c30e41-dbe0-4057-8fac-760b0d8f54e1
-			The APIVersion and Kind both fields are incorrect*/
-			ownerRef.APIVersion = RancherManagementAPIVersion
-			ownerRef.Kind = v3.MultiClusterAppRevisionGroupVersionKind.Kind
-			needsUpdate = true
 		}
 		(*ownerReferences)[ind] = ownerRef
 	}

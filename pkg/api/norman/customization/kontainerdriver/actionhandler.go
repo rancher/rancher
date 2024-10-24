@@ -10,13 +10,11 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/channelserver"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
@@ -39,7 +37,6 @@ type ActionHandler struct {
 type ListHandler struct {
 	SysImageLister  v3.RkeK8sSystemImageLister
 	SysImages       v3.RkeK8sSystemImageInterface
-	CatalogLister   v3.CatalogLister
 	ConfigMapLister v1.ConfigMapLister
 }
 
@@ -143,14 +140,6 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		rkeSysImages[k8sVersion] = *rkeSysImgCopy
 	}
 
-	var catalogImageList *v1.ConfigMap
-	catalogImageList, err = lh.ConfigMapLister.Get(namespace.System, utils.GetCatalogImageCacheName(utils.SystemLibraryName))
-	if err != nil {
-		return httperror.WrapAPIError(err, httperror.ServerError, "failed to get image list for system catalog")
-	}
-
-	_, targetSysCatalogImages := image.ParseCatalogImageListConfigMap(catalogImageList)
-
 	var targetRkeSysImages []string
 	exportConfig := image.ExportConfig{OsType: image.Linux}
 	switch apiContext.ID {
@@ -171,7 +160,6 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	agentImage := settings.AgentImage.Get()
 	targetImages = append(targetImages, img.Mirror(agentImage))
 	targetImages = append(targetImages, targetRkeSysImages...)
-	targetImages = append(targetImages, targetSysCatalogImages...)
 
 	b := []byte(strings.Join(targetImages, "\n"))
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(b)))

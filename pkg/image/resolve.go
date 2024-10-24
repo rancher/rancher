@@ -75,12 +75,6 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 		return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
 	}
 
-	// fetch images from system charts
-	systemCharts := SystemCharts{exportConfig}
-	if err := systemCharts.FetchImages(imagesSet); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to fetch images from system charts")
-	}
-
 	// fetch images from system images
 	system := System{exportConfig}
 	if err := system.FetchImages(rkeSystemImages, imagesSet); err != nil {

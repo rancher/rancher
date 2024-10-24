@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/norman/restwatch"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
@@ -74,7 +73,6 @@ type ScaledContext struct {
 	SystemTokens      systemtokens.Interface
 	UserManager       user.Manager
 	PeerManager       peermanager.PeerManager
-	CatalogManager    manager.CatalogManager
 
 	Management managementv3.Interface
 	Project    projectv3.Interface
@@ -98,7 +96,6 @@ func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
 	mgmt.Dialer = c.Dialer
 	mgmt.UserManager = c.UserManager
 	mgmt.SystemTokens = c.SystemTokens
-	mgmt.CatalogManager = c.CatalogManager
 	mgmt.Wrangler = c.Wrangler
 	c.managementContext = mgmt
 	return mgmt, nil
@@ -189,7 +186,6 @@ type ManagementContext struct {
 	Dialer            dialer.Factory
 	UserManager       user.Manager
 	SystemTokens      systemtokens.Interface
-	CatalogManager    manager.CatalogManager
 
 	Management managementv3.Interface
 	Project    projectv3.Interface

@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	v3cluster "github.com/rancher/rancher/pkg/controllers/management/cluster"
 
-	"github.com/rancher/rancher/pkg/controllers/managementapi/catalog"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/samlconfig"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/usercontrollers"
@@ -25,7 +24,6 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 		return err
 	}
 
-	catalog.Register(ctx, scaledContext)
 	dynamicschema.Register(ctx, scaledContext, server.Schemas)
 	whitelistproxyNodeDriver.Register(ctx, scaledContext)
 	whitelistproxyKontainerDriver.Register(ctx, scaledContext)

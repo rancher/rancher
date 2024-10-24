@@ -167,3 +167,8 @@ type WorkloadMetric struct {
 	Path   string `json:"path,omitempty"`
 	Schema string `json:"schema,omitempty" norman:"type=enum,options=HTTP|HTTPS"`
 }
+
+type RollbackRevision struct {
+	RevisionName string `json:"revisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
+	ForceUpgrade bool   `json:"forceUpgrade,omitempty"`
+}
