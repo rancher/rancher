@@ -93,7 +93,7 @@ letsEncrypt:
     # options: traefik, nginx
     class: ""
 # If you are using certs signed by a private CA set to 'true' and set the 'tls-ca'
-# in the 'rancher-system' namespace. See the README.md for details
+# in the 'cattle-system' namespace. See the README.md for details
 privateCA: false
 
 # http[s] proxy server passed into rancher server.
