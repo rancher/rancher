@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -78,7 +77,7 @@ func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(ctx, nil, client, sa, utils.FormatPrefix("local"))
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(ctx, nil, client, sa)
 	if err != nil {
 		return nil, err
 	}
