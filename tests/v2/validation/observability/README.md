@@ -5,6 +5,7 @@ The purpose of these tests is to ensure that the StackState integration in Ranch
 
 - Ensure you have an existing cluster that the user can access. If no downstream cluster is available in Rancher, it is recommended that the user creates one before running this test.
 - A StackState API key in the StackState UI is essential to proceed with the tests. Navigate to the StackState UI and create an instance using the cluster name from the previous step which in turn returns an api key.
+- For the tests TestDynamicUpgradeStackstateAgentChart, make sure to provide the version stackstate needs to be upgraded to. Otherwise the test will be skipped.
 
 ## Test Setup
 
@@ -25,4 +26,5 @@ stackstateConfigs:
   url: "stackstate_ui_server_address"
   serviceToken: "stackstate_user_service_token"
   clusterApiKey: "stackstate_cluster_apikey"
+  StackstateUpgradeVersion: "Stackstate_agent_version"
 ```
