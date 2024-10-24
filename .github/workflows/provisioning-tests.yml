@@ -1,15 +1,27 @@
 name: Provisioning tests
 on:
-  pull_request:
-    branches:
-      - main
-      - release/v*
-    paths-ignore:
-      # omit tests from triggering CI except when CI tests are changed
-      - 'tests/v2/validation/**'
-      - 'tests/v2/actions/**'
-      - 'tests/v2/codecoverage/**'
-      - 'tests/validation/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #     - release/v*
+  #   paths-ignore:
+  #     # omit tests from triggering CI except when CI tests are changed
+  #     - 'tests/v2/validation/**'
+  #     - 'tests/v2/actions/**'
+  #     - 'tests/v2/codecoverage/**'
+  #     - 'tests/validation/**'
+  workflow_call:
+    inputs:
+      parent_run_id:
+        type: string
+        description: "parent run_id to download images from"
+        required: true
+env:
+  TAG: v2.10-${{ github.sha }}-head
+  GIT_TAG: v2.10-${{ github.sha }}-head
+  COMMIT: ${{ github.sha }}
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
 jobs:
   provisioning_tests:
     strategy:
@@ -26,8 +38,15 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
-    name: Provisioning tests 
+    name: Provisioning tests
     runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    env:
+      REGISTRY: "127.0.0.1:5000"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,9 +56,31 @@ jobs:
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
           chmod +x ./.dapper
+      - name: Download Docker images artifact
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.parent_run_id }}
+          github-token: ${{ github.token }}
+          path: "/tmp"
+          merge-multiple: true
+      - name: Load agent image
+        run: |
+          ls /tmp/*.tar
+          image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_agent_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+
+          AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
+          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          echo "the image created is $AMD_IMAGE_AGENT"
+          docker image ls
       - name: Run tests
         run: ./.dapper provisioning-tests
         env:
           DRONE_BUILD_EVENT: "${{ github.event_name }}"
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
+          CATTLE_AGENT_IMAGE: "${{ env.REGISTRY }}/${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
