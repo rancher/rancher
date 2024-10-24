@@ -113,19 +113,8 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 			return err
 		}
 
-		// The AC already exists. The result of the Create (in `createdOrKnown`) is just the
-		// object given to it as argument. It is NOT the object found in the store. It is
-		// still needed as argument for Patch().
-		//
-		// Given that a Patch operation is (a) quick, and (b) does not throw an error when
-		// given a no-op, pulling the existing object and checking if the flag has the
-		// proper value or not is not really an optimization. Setting the flag is therefore
-		// done unconditionally. This ensures both existence and proper value without fuss.
-		//
-		// Note that the `add` operation works even when the flag field exists. It behaves
-		// like a `replace`. This may just be because the flag is a scalar field, neither
-		// object, nor array.
-
+		// Make sure the logoutAllSupported field is set correctly for the existing authConfig.
+		// Use patch to avoid fetching the object first.
 		patch, err := json.Marshal([]struct {
 			Op    string `json:"op"`
 			Path  string `json:"path"`
