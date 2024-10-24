@@ -97,8 +97,6 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 	}
 	annotations[auth.CleanupAnnotation] = auth.CleanupRancherLocked
 
-	// technote: An ObjectClient is used for the creation to ensure that all fields of all the
-	// possible AuthConfig variants make it into the store unharmed.
 	createdOrKnown, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        name,
