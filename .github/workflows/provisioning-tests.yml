@@ -1,15 +1,15 @@
 name: Provisioning tests
 on:
-  pull_request:
-    branches:
-      - main
-      - release/v*
-    paths-ignore:
-      # omit tests from triggering CI except when CI tests are changed
-      - 'tests/v2/validation/**'
-      - 'tests/v2/actions/**'
-      - 'tests/v2/codecoverage/**'
-      - 'tests/validation/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #     - release/v*
+  #   paths-ignore:
+  #     # omit tests from triggering CI except when CI tests are changed
+  #     - 'tests/v2/validation/**'
+  #     - 'tests/v2/actions/**'
+  #     - 'tests/v2/codecoverage/**'
+  #     - 'tests/validation/**'
   workflow_call:
     inputs:
       parent_run_id:
@@ -40,6 +40,13 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
     name: Provisioning tests
     runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    env:
+      REGISTRY: "127.0.0.1:5000"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,7 +77,8 @@ jobs:
           fi
 
           AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
-          docker tag "$image_agent_id" ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
           echo "the image created is $AMD_IMAGE_AGENT"
           docker image ls
       - name: Run tests
@@ -79,4 +87,4 @@ jobs:
           DRONE_BUILD_EVENT: "${{ github.event_name }}"
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
-          CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
+          CATTLE_AGENT_IMAGE: "${{ env.REGISTRY }}/${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
