@@ -23,12 +23,6 @@ type Config struct {
 	ProjectRoleTemplateBindings                map[string]managementClient.ProjectRoleTemplateBinding                `json:"projectRoleTemplateBindings,omitempty" yaml:"projectRoleTemplateBindings,omitempty"`
 	Clusters                                   map[string]managementClient.Cluster                                   `json:"clusters,omitempty" yaml:"clusters,omitempty"`
 	ClusterRegistrationTokens                  map[string]managementClient.ClusterRegistrationToken                  `json:"clusterRegistrationTokens,omitempty" yaml:"clusterRegistrationTokens,omitempty"`
-	Catalogs                                   map[string]managementClient.Catalog                                   `json:"catalogs,omitempty" yaml:"catalogs,omitempty"`
-	Templates                                  map[string]managementClient.Template                                  `json:"templates,omitempty" yaml:"templates,omitempty"`
-	CatalogTemplates                           map[string]managementClient.CatalogTemplate                           `json:"catalogTemplates,omitempty" yaml:"catalogTemplates,omitempty"`
-	CatalogTemplateVersions                    map[string]managementClient.CatalogTemplateVersion                    `json:"catalogTemplateVersions,omitempty" yaml:"catalogTemplateVersions,omitempty"`
-	TemplateVersions                           map[string]managementClient.TemplateVersion                           `json:"templateVersions,omitempty" yaml:"templateVersions,omitempty"`
-	TemplateContents                           map[string]managementClient.TemplateContent                           `json:"templateContents,omitempty" yaml:"templateContents,omitempty"`
 	Groups                                     map[string]managementClient.Group                                     `json:"groups,omitempty" yaml:"groups,omitempty"`
 	GroupMembers                               map[string]managementClient.GroupMember                               `json:"groupMembers,omitempty" yaml:"groupMembers,omitempty"`
 	SamlTokens                                 map[string]managementClient.SamlToken                                 `json:"samlTokens,omitempty" yaml:"samlTokens,omitempty"`
@@ -40,10 +34,6 @@ type Config struct {
 	Settings                                   map[string]managementClient.Setting                                   `json:"settings,omitempty" yaml:"settings,omitempty"`
 	Features                                   map[string]managementClient.Feature                                   `json:"features,omitempty" yaml:"features,omitempty"`
 	ComposeConfigs                             map[string]managementClient.ComposeConfig                             `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
-	ProjectCatalogs                            map[string]managementClient.ProjectCatalog                            `json:"projectCatalogs,omitempty" yaml:"projectCatalogs,omitempty"`
-	ClusterCatalogs                            map[string]managementClient.ClusterCatalog                            `json:"clusterCatalogs,omitempty" yaml:"clusterCatalogs,omitempty"`
-	MultiClusterApps                           map[string]managementClient.MultiClusterApp                           `json:"multiClusterApps,omitempty" yaml:"multiClusterApps,omitempty"`
-	MultiClusterAppRevisions                   map[string]managementClient.MultiClusterAppRevision                   `json:"multiClusterAppRevisions,omitempty" yaml:"multiClusterAppRevisions,omitempty"`
 	KontainerDrivers                           map[string]managementClient.KontainerDriver                           `json:"kontainerDrivers,omitempty" yaml:"kontainerDrivers,omitempty"`
 	EtcdBackups                                map[string]managementClient.EtcdBackup                                `json:"etcdBackups,omitempty" yaml:"etcdBackups,omitempty"`
 	CloudCredentials                           map[string]managementClient.CloudCredential                           `json:"cloudCredentials,omitempty" yaml:"cloudCredentials,omitempty"`
@@ -89,7 +79,5 @@ type Config struct {
 	Jobs                           map[string]projectClient.Job                           `json:"jobs,omitempty" yaml:"jobs,omitempty"`
 	CronJobs                       map[string]projectClient.CronJob                       `json:"cronJobs,omitempty" yaml:"cronJobs,omitempty"`
 	Workloads                      map[string]projectClient.Workload                      `json:"workloads,omitempty" yaml:"workloads,omitempty"`
-	Apps                           map[string]projectClient.App                           `json:"apps,omitempty" yaml:"apps,omitempty"`
-	AppRevisions                   map[string]projectClient.AppRevision                   `json:"appRevisions,omitempty" yaml:"appRevisions,omitempty"`
 	HorizontalPodAutoscalers       map[string]projectClient.HorizontalPodAutoscaler       `json:"horizontalPodAutoscalers,omitempty" yaml:"horizontalPodAutoscalers,omitempty"`
 }

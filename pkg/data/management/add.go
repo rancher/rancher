@@ -25,10 +25,6 @@ func Add(ctx context.Context, wrangler *wrangler.Context, management *config.Man
 		return err
 	}
 
-	if err := syncCatalogs(management); err != nil {
-		return err
-	}
-
 	if err = addDefaultPodSecurityAdmissionConfigurationTemplates(management); err != nil {
 		return err
 	}

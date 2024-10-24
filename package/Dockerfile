@@ -45,7 +45,6 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.9
 ARG CHART_DEFAULT_BRANCH=dev-v2.10
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
@@ -53,7 +52,6 @@ ARG RKE2_CHART_DEFAULT_BRANCH=main
 ARG CATTLE_KDM_BRANCH=dev-v2.10
 ARG VERSION=${VERSION}
 
-ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
@@ -106,10 +104,8 @@ ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_V
 ARG CATTLE_CSP_ADAPTER_MIN_VERSION
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
-    mkdir -p /var/lib/rancher-data/local-catalogs/library && \
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --depth 1 https://github.com/rancher/system-charts /var/lib/rancher-data/local-catalogs/system-library && \
     # Temporarily clone from our GitHub's main repo, to avoid unnecessary load
     # in git.rancher.io
     git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
@@ -118,8 +114,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     git clone -b $CATTLE_PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 && \
     git clone -b $CATTLE_RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 && \
     # Revert the previous change in git.rancher.io from .gitconfig
-    rm "${HOME}/.gitconfig" && \
-    git clone -b master --depth 1 https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/library
+    rm "${HOME}/.gitconfig"
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
     chown root:root /usr/bin/rancher-machine && \
@@ -154,19 +149,6 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
 RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin && \
     chown root:root /usr/bin/kustomize && \
     chmod +x /usr/bin/kustomize
-
-# set up helm 2
-RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
-    curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
-    ln -s /usr/bin/rancher-helm /usr/bin/helm && \
-    ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-    chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller
-
-# set up helm 3
-RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
-    mv /usr/bin/helm /usr/bin/helm_v3 && \
-    chown root:root /usr/bin/helm_v3 && \
-    chmod +x /usr/bin/helm_v3
 
 # Set up K3s: copy the necessary binaries from the K3s image.
 COPY --from=rancher/k3s:v1.31.1-k3s1 \

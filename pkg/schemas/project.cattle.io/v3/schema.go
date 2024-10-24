@@ -44,7 +44,6 @@ var (
 		Init(cronJobTypes).
 		Init(podTemplateSpecTypes).
 		Init(workloadTypes).
-		Init(appTypes).
 		Init(autoscalingTypes)
 )
 
@@ -109,34 +108,36 @@ type jobOverride struct {
 }
 
 func workloadTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.MustImportAndCustomize(&Version, v3.Workload{},
-		func(schema *types.Schema) {
-			toInclude := []string{"deployment", "replicationController", "statefulSet",
-				"daemonSet", "job", "cronJob", "replicaSet"}
-			for _, name := range toInclude {
-				baseSchema := schemas.Schema(&Version, name)
-				if baseSchema == nil {
-					continue
+	return schemas.
+		MustImport(&Version, v3.RollbackRevision{}).
+		MustImportAndCustomize(&Version, v3.Workload{},
+			func(schema *types.Schema) {
+				toInclude := []string{"deployment", "replicationController", "statefulSet",
+					"daemonSet", "job", "cronJob", "replicaSet"}
+				for _, name := range toInclude {
+					baseSchema := schemas.Schema(&Version, name)
+					if baseSchema == nil {
+						continue
+					}
+					for name, field := range baseSchema.ResourceFields {
+						schema.ResourceFields[name] = field
+					}
 				}
-				for name, field := range baseSchema.ResourceFields {
-					schema.ResourceFields[name] = field
+				schema.ResourceActions = map[string]types.Action{
+					"rollback": {
+						Input: "rollbackRevision",
+					},
+					"pause":    {},
+					"resume":   {},
+					"redeploy": {},
 				}
-			}
-			schema.ResourceActions = map[string]types.Action{
-				"rollback": {
-					Input: "rollbackRevision",
-				},
-				"pause":    {},
-				"resume":   {},
-				"redeploy": {},
-			}
-			schema.MustCustomizeField("name", func(field types.Field) types.Field {
-				field.Type = "dnsLabelRestricted"
-				field.Nullable = false
-				field.Required = true
-				return field
+				schema.MustCustomizeField("name", func(field types.Field) types.Field {
+					field.Type = "dnsLabelRestricted"
+					field.Nullable = false
+					field.Required = true
+					return field
+				})
 			})
-		})
 }
 
 func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
@@ -800,24 +801,6 @@ func volumeTypes(schemas *types.Schemas) *types.Schemas {
 				return field
 			})
 		}, projectOverride{})
-}
-
-func appTypes(schema *types.Schemas) *types.Schemas {
-	return schema.
-		AddMapperForType(&Version, v3.App{}, &m.Embed{Field: "status"}).
-		MustImport(&Version, v3.AppUpgradeConfig{}).
-		MustImport(&Version, v3.RollbackRevision{}).
-		MustImportAndCustomize(&Version, v3.App{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"upgrade": {
-					Input: "appUpgradeConfig",
-				},
-				"rollback": {
-					Input: "rollbackRevision",
-				},
-			}
-		}).
-		MustImport(&Version, v3.AppRevision{})
 }
 
 func podTemplateSpecTypes(schemas *types.Schemas) *types.Schemas {

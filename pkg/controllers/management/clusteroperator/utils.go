@@ -9,11 +9,9 @@ import (
 
 	"github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/catalog/manager"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
@@ -39,13 +37,9 @@ type OperatorController struct {
 	ClusterEnqueueAfter  func(name string, duration time.Duration)
 	SecretsCache         wranglerv1.SecretCache
 	Secrets              corev1.SecretInterface
-	TemplateCache        v3.CatalogTemplateCache
 	ProjectCache         v3.ProjectCache
-	AppLister            projectv3.AppLister
-	AppClient            projectv3.AppInterface
 	NsClient             corev1.NamespaceInterface
 	ClusterClient        v3.ClusterClient
-	CatalogManager       manager.CatalogManager
 	SystemAccountManager *systemaccount.Manager
 	DynamicClient        dynamic.NamespaceableResourceInterface
 	ClientDialer         typesDialer.Factory

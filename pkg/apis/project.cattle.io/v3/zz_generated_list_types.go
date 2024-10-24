@@ -26,40 +26,6 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AppList is a list of App resources
-type AppList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []App `json:"items"`
-}
-
-func NewApp(namespace, name string, obj App) *App {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("App").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// AppRevisionList is a list of AppRevision resources
-type AppRevisionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []AppRevision `json:"items"`
-}
-
-func NewAppRevision(namespace, name string, obj AppRevision) *AppRevision {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AppRevision").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // BasicAuthList is a list of BasicAuth resources
 type BasicAuthList struct {
 	metav1.TypeMeta `json:",inline"`

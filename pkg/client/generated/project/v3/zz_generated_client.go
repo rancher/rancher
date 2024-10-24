@@ -33,8 +33,6 @@ type Client struct {
 	Job                           JobOperations
 	CronJob                       CronJobOperations
 	Workload                      WorkloadOperations
-	App                           AppOperations
-	AppRevision                   AppRevisionOperations
 	HorizontalPodAutoscaler       HorizontalPodAutoscalerOperations
 }
 
@@ -74,8 +72,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Job = newJobClient(client)
 	client.CronJob = newCronJobClient(client)
 	client.Workload = newWorkloadClient(client)
-	client.App = newAppClient(client)
-	client.AppRevision = newAppRevisionClient(client)
 	client.HorizontalPodAutoscaler = newHorizontalPodAutoscalerClient(client)
 
 	return client, nil

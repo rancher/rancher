@@ -26,7 +26,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
@@ -53,7 +52,6 @@ var (
 		"field.cattle.io/resourceQuotaTemplateId",
 		"lifecycle.cattle.io/create.namespace-auth",
 		nslabels.ProjectIDFieldLabel,
-		helm.AppIDsLabel,
 	}
 
 	dryRun bool
