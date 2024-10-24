@@ -8,6 +8,7 @@ import (
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	kubenamespaces "github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/actions/namespaces"
+	"github.com/rancher/rancher/tests/v2/actions/observability"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/wait"
@@ -165,7 +166,7 @@ func newStackstateExtensionsInstallAction(p *ExtensionOptions) *types.ChartInsta
 }
 
 // InstallStackstateAgentChart is a private helper function that returns chart install action with stack state agent and payload options.
-func InstallStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, apiKey, url, systemProjectID string) error {
+func InstallStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs observability.StackStateConfigs, systemProjectID string) error {
 	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
 	if err != nil {
 		return err
@@ -178,7 +179,7 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 		Host:           serverSetting.Value,
 	}
 
-	chartInstallAction := newStackstateAgentChartInstallAction(stackstateAgentChartInstallActionPayload, apiKey, url, systemProjectID)
+	chartInstallAction := newStackstateAgentChartInstallAction(stackstateAgentChartInstallActionPayload, stackstateConfigs, systemProjectID)
 
 	catalogClient, err := client.GetClusterCatalogClient(installOptions.Cluster.ID)
 	if err != nil {
@@ -289,14 +290,14 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 }
 
 // newStackstateAgentChartInstallAction is a helper function that returns an array of newChartInstallActions for installing the stackstate agent charts
-func newStackstateAgentChartInstallAction(p *payloadOpts, apiKey, url, systemProjectID string) *types.ChartInstallAction {
+func newStackstateAgentChartInstallAction(p *payloadOpts, stackstateConfigs observability.StackStateConfigs, systemProjectID string) *types.ChartInstallAction {
 	stackstateValues := map[string]interface{}{
 		"stackstate": map[string]interface{}{
 			"cluster": map[string]interface{}{
 				"name": p.Cluster.Name,
 			},
-			"apiKey": apiKey,
-			"url":    url,
+			"apiKey": stackstateConfigs.ClusterApiKey,
+			"url":    stackstateConfigs.Url,
 		},
 	}
 
@@ -309,7 +310,7 @@ func newStackstateAgentChartInstallAction(p *payloadOpts, apiKey, url, systemPro
 }
 
 // UpgradeStackstateAgentChart is a helper function that upgrades the stackstate agent chart.
-func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, apiKey, url, systemProjectID string) error {
+func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs observability.StackStateConfigs, systemProjectID string) error {
 	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
 	if err != nil {
 		return err
@@ -322,7 +323,7 @@ func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *Install
 		Host:           serverSetting.Value,
 	}
 
-	chartUpgradeAction := newStackstateAgentChartUpgradeAction(stackstateAgentChartUpgradeActionPayload, apiKey, url)
+	chartUpgradeAction := newStackstateAgentChartUpgradeAction(stackstateAgentChartUpgradeActionPayload, stackstateConfigs)
 
 	catalogClient, err := client.GetClusterCatalogClient(installOptions.Cluster.ID)
 	if err != nil {
@@ -390,15 +391,15 @@ func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *Install
 }
 
 // newStackstateAgentChartUpgradeAction is a private helper function that returns chart upgrade action.
-func newStackstateAgentChartUpgradeAction(p *payloadOpts, apiKey, url string) *types.ChartUpgradeAction {
+func newStackstateAgentChartUpgradeAction(p *payloadOpts, stackstateConfigs observability.StackStateConfigs) *types.ChartUpgradeAction {
 
 	stackstateValues := map[string]interface{}{
 		"stackstate": map[string]interface{}{
 			"cluster": map[string]interface{}{
 				"name": p.Cluster.Name,
 			},
-			"apiKey": apiKey,
-			"url":    url,
+			"apiKey": stackstateConfigs.ClusterApiKey,
+			"url":    stackstateConfigs.Url,
 		},
 	}
 
