@@ -135,7 +135,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240923125127-ae858d002589
 	github.com/rancher/machine v0.15.0-rancher118
-	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
+	github.com/rancher/norman v0.0.0-20241029180745-ca404b515b0c
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.6.3
