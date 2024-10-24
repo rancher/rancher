@@ -24,8 +24,7 @@ import (
 // TEST_AZURE_APPLICATION_SECRET
 
 func TestMSGraphClient_GetUser(t *testing.T) {
-	secrets := newTestSecretsClient()
-	client := newTestClientWithSecretsClient(t, secrets)
+	client := newTestClient(t)
 
 	user, err := client.GetUser("testuser6@ranchertest.onmicrosoft.com")
 	if err != nil {
@@ -43,7 +42,6 @@ func TestMSGraphClient_GetUser(t *testing.T) {
 	}
 	assert.Equal(t, want, user)
 
-	client = newTestClientWithSecretsClient(t, secrets)
 	_, err = client.GetUser("testuser6@ranchertest.onmicrosoft.com")
 	if err != nil {
 		t.Fatal(err)
@@ -132,8 +130,8 @@ func TestMSGraphClient_ListGroupMemberships(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{
-		"15f6a947-9d67-4e7f-b1d0-f5f52145fed3",
-		"748274fd-3ec7-40d1-b08b-775c1a8ec1af",
+		"15f6a947-9d67-4e7f-b1d0-f5f52145fed3", "5e0d1316-aa15-4c94-83e1-7db91acc7795",
+		"6b2c23ed-626d-4ce4-a889-7c2043ace20e", "748274fd-3ec7-40d1-b08b-775c1a8ec1af",
 		"bf881716-8d6d-456f-b234-2b143dfd5cf0"}, groups)
 }
 
@@ -197,8 +195,10 @@ func newTestClientWithSecretsClient(t *testing.T, secrets normancorev1.SecretInt
 }
 
 func newTestSecretsClient() normancorev1.SecretInterface {
-	secrets := map[types.NamespacedName]*corev1.Secret{}
+	return newTestSecretsClientWithMap(map[types.NamespacedName]*corev1.Secret{})
+}
 
+func newTestSecretsClientWithMap(secrets map[types.NamespacedName]*corev1.Secret) normancorev1.SecretInterface {
 	sm := &fakes.SecretInterfaceMock{
 		GetNamespacedFunc: func(namespace, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
