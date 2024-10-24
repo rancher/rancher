@@ -91,6 +91,12 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 	}
 
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
 		if !tt.runFlag {
 			r.T().Logf("SKIPPED")
 			continue
@@ -103,7 +109,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 			r.T().Skip("Windows test requires access to vsphere")
 		}
 
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }
 
@@ -121,7 +127,13 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 	}
 
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, r.provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }
 
