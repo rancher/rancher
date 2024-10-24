@@ -2,12 +2,15 @@ package adunmigration
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/rancher/rancher/pkg/wrangler"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
@@ -259,6 +262,11 @@ func prepareClientContexts(clientConfig *restclient.Config) (*config.ScaledConte
 		logrus.Errorf("[%v] failed to create scaled context: %v", migrateAdUserOperation, err)
 		return nil, nil, err
 	}
+	wc, err := wrangler.NewContext(context.Background(), nil, clientConfig)
+	if err != nil {
+		logrus.Errorf("[%v] failed to create wrangler context: %v", migrateAdUserOperation, err)
+	}
+	sc.Wrangler = wc
 	adConfig, err := adConfiguration(sc)
 	if err != nil {
 		logrus.Errorf("[%v] failed to acquire ad configuration: %v", migrateAdUserOperation, err)
