@@ -156,9 +156,6 @@ func (ss *StackStateTestSuite) TestStackStateAgentChart() {
 	client, err := ss.client.WithSession(subSession)
 	require.NoError(ss.T(), err)
 
-	var stackstateConfigs observability.StackStateConfigs
-	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
-
 	initialStackstateAgent, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
 	require.NoError(ss.T(), err)
 
@@ -174,7 +171,7 @@ func (ss *StackStateTestSuite) TestStackStateAgentChart() {
 		require.NotNil(ss.T(), systemProject.ID)
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
-		err = charts.InstallStackstateAgentChart(ss.client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url, systemProjectID)
+		err = charts.InstallStackstateAgentChart(ss.client, ss.stackstateAgentInstallOptions, ss.stackstateConfigs, systemProjectID)
 		require.NoError(ss.T(), err)
 		log.Info("Stack state chart installed successfully")
 
@@ -226,9 +223,6 @@ func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
 		ss.T().Skip("Skipping the upgrade case, stackstate agent chart is already installed with the latest version")
 	}
 
-	var stackstateConfigs observability.StackStateConfigs
-	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
-
 	if !initialStackstateAgent.IsAlreadyInstalled {
 		systemProject, err := projects.GetProjectByName(client, ss.cluster.ID, systemProject)
 		require.NoError(ss.T(), err)
@@ -236,7 +230,7 @@ func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
 		ss.T().Log("Installing stackstate agent chart with the version before the latest version")
-		err = charts.InstallStackstateAgentChart(client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url, systemProjectID)
+		err = charts.InstallStackstateAgentChart(client, ss.stackstateAgentInstallOptions, ss.stackstateConfigs, systemProjectID)
 		require.NoError(ss.T(), err)
 
 		ss.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")
@@ -260,7 +254,7 @@ func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
 	require.NoError(ss.T(), err)
 
 	ss.T().Log("Upgrading stackstate agent chart to the latest version")
-	err = charts.UpgradeStackstateAgentChart(client, ss.stackstateAgentInstallOptions, stackstateConfigs.ClusterApiKey, stackstateConfigs.Url, systemProject)
+	err = charts.UpgradeStackstateAgentChart(client, ss.stackstateAgentInstallOptions, ss.stackstateConfigs, systemProject)
 	require.NoError(ss.T(), err)
 
 	ss.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")

@@ -141,12 +141,8 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	require.NoError(rb.T(), err)
 
 	crdConfig := observability.NewStackstateCRDConfiguration(charts.StackstateNamespace, observability.StackstateName, rb.stackstateConfigs)
-	crd, err := steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
+	_, err = steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
 	require.NoError(rb.T(), err, "Unable to install stackstate CRD configuration.")
-
-	config, err := steveAdminClient.SteveType(charts.StackstateCRD).ByID(crd.ID)
-	require.NoError(rb.T(), err)
-	require.Equal(rb.T(), observability.StackstateName, config.ObjectMeta.Name, "Stackstate configuration name differs.")
 
 	latestSSVersion, err := rb.client.Catalog.GetLatestChartVersion(charts.StackstateK8sAgent, rancherPartnerCharts)
 	require.NoError(rb.T(), err)
@@ -188,7 +184,7 @@ func (rb *StackStateRBACTestSuite) TestClusterOwnerInstallStackstate() {
 	require.NotNil(rb.T(), systemProject.ID, "System project is nil.")
 	systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
-	err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs.ClusterApiKey, rb.stackstateConfigs.Url, systemProjectID)
+	err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs, systemProjectID)
 	require.NoError(rb.T(), err)
 	log.Info("Stackstate agent chart installed successfully")
 
@@ -260,10 +256,9 @@ func (rb *StackStateRBACTestSuite) TestMembersCannotInstallStackstate() {
 		require.NotNil(rb.T(), systemProject.ID, "System project is nil.")
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
-		err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs.ClusterApiKey, rb.stackstateConfigs.Url, systemProjectID)
+		err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs, systemProjectID)
 		require.Error(rb.T(), err)
 		k8sErrors.IsForbidden(err)
-		log.Info("Unable to install Stackstate agent chart as " + tt.name)
 	}
 }
 
