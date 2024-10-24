@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/rancher/shepherd/clients/rancher"
@@ -24,11 +25,13 @@ const (
 	CrtbView                  Role = "clusterroletemplatebindings-view"
 	ProjectsCreate            Role = "projects-create"
 	ProjectsView              Role = "projects-view"
+	ManageWorkloads           Role = "workloads-manage"
 	ActiveStatus                   = "active"
 	ForbiddenError                 = "403 Forbidden"
 	DefaultNamespace               = "fleet-default"
 	LocalCluster                   = "local"
 	UserKind                       = "User"
+	ImageName                      = "nginx"
 )
 
 func (r Role) String() string {
@@ -70,4 +73,26 @@ func SetupUser(client *rancher.Client, globalRole string) (user *management.User
 		return
 	}
 	return
+}
+
+// VerifyRoleRules checks if the expected role rules match the actual rules.
+func VerifyRoleRules(expected, actual map[string][]string) error {
+	for resource, expectedVerbs := range expected {
+		actualVerbs, exists := actual[resource]
+		if !exists {
+			return fmt.Errorf("resource %s not found in role rules", resource)
+		}
+
+		expectedSet := make(map[string]struct{})
+		for _, verb := range expectedVerbs {
+			expectedSet[verb] = struct{}{}
+		}
+
+		for _, verb := range actualVerbs {
+			if _, found := expectedSet[verb]; !found {
+				return fmt.Errorf("verbs for resource %s do not match: expected %v, got %v", resource, expectedVerbs, actualVerbs)
+			}
+		}
+	}
+	return nil
 }
