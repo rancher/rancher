@@ -14,11 +14,11 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/observability"
 	"github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/rbac"
+	"github.com/rancher/rancher/tests/v2/actions/uiplugins"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extencharts "github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/clusters"
 	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
@@ -68,10 +68,9 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 
 	rb.client = client
 
-	log.Info("Getting cluster name from the config file and append cluster details in rb")
 	clusterName := client.RancherConfig.ClusterName
 	require.NotEmptyf(rb.T(), clusterName, "Cluster name to install should be set")
-	cluster, err := clusters.NewClusterMeta(rb.client, clusterName)
+	cluster, err := extensionscluster.NewClusterMeta(rb.client, clusterName)
 	require.NoError(rb.T(), err)
 	rb.cluster, err = rb.client.Management.Cluster.ByID(cluster.ID)
 	require.NoError(rb.T(), err)
@@ -87,11 +86,10 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
 	require.NoError(rb.T(), err)
 
-	log.Info("Verifying if the ui plugin repository for ui extensions exists.")
 	_, err = rb.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
-
 	if k8sErrors.IsNotFound(err) {
 		err = observability.CreateExtensionsRepo(rb.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
+		rb.T().Log("Created extensions repo for ui plugins.")
 	}
 	require.NoError(rb.T(), err)
 
@@ -99,24 +97,22 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
 	rb.stackstateConfigs = stackstateConfigs
 
-	log.Info("Crete a node driver with stackstate extensions ui to whitelist stackstate URL")
 	_, err = client.Management.NodeDriver.ByID(observability.StackstateName)
 	if strings.Contains(err.Error(), "Not Found") {
-		err = observability.InstallNodeDriver(rb.client, []string{rb.stackstateConfigs.Url})
+		err = observability.WhitelistStackstateDomains(rb.client, []string{rb.stackstateConfigs.Url})
 	}
 	require.NoError(rb.T(), err)
 
-	rb.T().Log("Checking if the stack state CRD is installed.")
 	crdsExists, err := rb.client.Steve.SteveType(observability.ApiExtenisonsCRD).ByID(observability.ObservabilitySteveType)
 	if crdsExists == nil && strings.Contains(err.Error(), "Not Found") {
 		err = observability.InstallStackstateCRD(rb.client)
+		rb.T().Log("Installed stackstate crd.")
 	}
 	require.NoError(rb.T(), err)
 
 	client, err = client.ReLogin()
 	require.NoError(rb.T(), err)
 
-	rb.T().Log("Checking if the stack state extension is already installed.")
 	initialStackstateExtension, err := extencharts.GetChartStatus(client, localCluster, charts.StackstateExtensionNamespace, charts.StackstateExtensionsName)
 	require.NoError(rb.T(), err)
 
@@ -124,18 +120,16 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 		latestUIPluginVersion, err := rb.client.Catalog.GetLatestChartVersion(charts.StackstateExtensionsName, charts.UIPluginName)
 		require.NoError(rb.T(), err)
 
-		rb.T().Log("Installing stackstate ui extensions")
-		extensionOptions := &charts.ExtensionOptions{
+		extensionOptions := &uiplugins.ExtensionOptions{
 			ChartName:   charts.StackstateExtensionsName,
 			ReleaseName: charts.StackstateExtensionsName,
 			Version:     latestUIPluginVersion,
 		}
 
-		err = charts.InstallStackstateExtension(client, extensionOptions)
+		err = uiplugins.InstallStackstateUiPlugin(client, extensionOptions)
 		require.NoError(rb.T(), err)
+		rb.T().Log("Installed stackstate ui plugin.")
 	}
-
-	log.Info("Adding stackstate extension configuration.")
 
 	steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
 	require.NoError(rb.T(), err)

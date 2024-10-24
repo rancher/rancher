@@ -43,8 +43,9 @@ func NewStackstateCRDConfiguration(namespace, name string, stackstateCRDConfig S
 	return crdConfig
 }
 
-// InstallNodeDriver is a helper that utilizes the rancher client and add the stackstate domains to whitelist them.
-func InstallNodeDriver(client *rancher.Client, whitelistDomains []string) error {
+// WhitelistStackstateDomains is a helper that utilizes the rancher client and add the stackstate domains to whitelist them.
+// This is a temporary solution from upstream and will need to be removed once this has been fixed.
+func WhitelistStackstateDomains(client *rancher.Client, whitelistDomains []string) error {
 
 	nodedriver := &management.NodeDriver{
 		Name:             StackstateName,
@@ -76,7 +77,6 @@ func InstallNodeDriver(client *rancher.Client, whitelistDomains []string) error 
 
 // InstallStackstateCRD is a helper that utilizes the rancher client and installs the stackstate crds.
 func InstallStackstateCRD(client *rancher.Client) error {
-
 	stackstateCRDConfig := apiextv1.CustomResourceDefinition{
 		TypeMeta:   metav1.TypeMeta{Kind: "CustomResourceDefinition", APIVersion: "apiextensions.k8s.io/v1"},
 		ObjectMeta: metav1.ObjectMeta{Name: ObservabilitySteveType},
