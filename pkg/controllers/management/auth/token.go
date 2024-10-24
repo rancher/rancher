@@ -3,6 +3,7 @@ package auth
 import (
 	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
+	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,16 +15,16 @@ const (
 )
 
 type TokenController struct {
-	tokens               v3.TokenInterface
-	userAttributes       v3.UserAttributeInterface
-	userAttributesLister v3.UserAttributeLister
+	tokens               wrangmgmtv3.TokenController
+	userAttributes       wrangmgmtv3.UserAttributeController
+	userAttributesLister wrangmgmtv3.UserAttributeCache
 }
 
 func newTokenController(mgmt *config.ManagementContext) *TokenController {
 	n := &TokenController{
-		tokens:               mgmt.Management.Tokens(""),
-		userAttributes:       mgmt.Management.UserAttributes(""),
-		userAttributesLister: mgmt.Management.UserAttributes("").Controller().Lister(),
+		tokens:               mgmt.Wrangler.Mgmt.Token(),
+		userAttributes:       mgmt.Wrangler.Mgmt.UserAttribute(),
+		userAttributesLister: mgmt.Wrangler.Mgmt.UserAttribute().Cache(),
 	}
 	return n
 }
@@ -104,7 +105,7 @@ func (t *TokenController) userAttributesNeedsRefresh(user string) (bool, error) 
 		return false, nil
 	}
 
-	userAttribute, err := t.userAttributesLister.Get("", user)
+	userAttribute, err := t.userAttributesLister.Get(user)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil
@@ -115,7 +116,7 @@ func (t *TokenController) userAttributesNeedsRefresh(user string) (bool, error) 
 }
 
 func (t *TokenController) triggerUserAttributesRefresh(user string) error {
-	userAttribute, err := t.userAttributesLister.Get("", user)
+	userAttribute, err := t.userAttributesLister.Get(user)
 	if err != nil {
 		return err
 	}

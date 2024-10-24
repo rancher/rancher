@@ -8,14 +8,12 @@ import (
 )
 
 type rtCleaner struct {
-	clusterLister v3.ClusterLister
-	mgmt          *config.ManagementContext
+	mgmt *config.ManagementContext
 }
 
 func newLegacyRTCleaner(mgmt *config.ManagementContext) *rtCleaner {
 	return &rtCleaner{
-		mgmt:          mgmt,
-		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
+		mgmt: mgmt,
 	}
 }
 
@@ -29,7 +27,7 @@ func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, erro
 	}
 
 	cleanedObj := rtCleanUp(obj)
-	return p.mgmt.Management.RoleTemplates("").Update(cleanedObj)
+	return p.mgmt.Wrangler.Mgmt.RoleTemplate().Update(cleanedObj)
 }
 
 // rtCleanUp returns a clean RoleTemplate based on filters specified within the function
