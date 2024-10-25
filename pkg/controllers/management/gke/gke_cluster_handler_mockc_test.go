@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
-	"github.com/golang/mock/gomock"
 	v1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
@@ -19,6 +18,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/mock/gomock"
 	secretv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"

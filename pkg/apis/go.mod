@@ -36,7 +36,7 @@ require (
 	github.com/rancher/gke-operator v1.9.4-rc.1
 	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
 	github.com/rancher/rke v1.6.4-rc.2
-	github.com/rancher/wrangler/v3 v3.0.0
+	github.com/rancher/wrangler/v3 v3.0.1-rc.4
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2
@@ -53,7 +53,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
-	github.com/go-openapi/swag v0.22.3 // indirect
+	github.com/go-openapi/swag v0.22.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
@@ -91,8 +91,8 @@ require (
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubernetes v1.30.1 // indirect
-	k8s.io/utils v0.0.0-20231127182322-b307cd553661 // indirect
-	sigs.k8s.io/cli-utils v0.35.0 // indirect
+	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0 // indirect
+	sigs.k8s.io/cli-utils v0.37.2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
