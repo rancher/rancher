@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/tls"
@@ -135,9 +136,15 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 	binaryURL := ""
 	if settings.WinsAgentVersion.Get() != "" {
 		if settings.ServerURL.Get() != "" {
-			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+			binaryURL = capr.FormatWindowsEnvVar(corev1.EnvVar{
+				Name:  "CATTLE_AGENT_BINARY_BASE_URL",
+				Value: fmt.Sprintf("%s/assets", settings.ServerURL.Get()),
+			}, false)
 		} else if defaultHost != "" {
-			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+			binaryURL = capr.FormatWindowsEnvVar(corev1.EnvVar{
+				Name:  "CATTLE_AGENT_BINARY_BASE_URL",
+				Value: fmt.Sprintf("https://%s/assets", defaultHost),
+			}, false)
 		}
 	}
 
@@ -156,22 +163,39 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
 		ca = systemtemplate.InternalCAChecksum()
 	}
+
 	if ca != "" {
-		ca = "$env:CATTLE_CA_CHECKSUM=\"" + ca + "\""
+		ca = capr.FormatWindowsEnvVar(corev1.EnvVar{
+			Name:  "CATTLE_CA_CHECKSUM",
+			Value: ca,
+		}, false)
 	}
+
+	var tokenEnvVar, cattleRoleNone string
 	if token != "" {
-		token = "$env:CATTLE_ROLE_NONE=\"true\"\n$env:CATTLE_TOKEN=\"" + token + "\""
+		tokenEnvVar = capr.FormatWindowsEnvVar(corev1.EnvVar{
+			Name:  "CATTLE_TOKEN",
+			Value: token,
+		}, false)
+		cattleRoleNone = capr.FormatWindowsEnvVar(corev1.EnvVar{
+			Name:  "CATTLE_ROLE_NONE",
+			Value: "\"true\"",
+		}, false)
 	}
+
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
 		if envVar.Value == "" {
 			continue
 		}
-		envVarBuf.WriteString(fmt.Sprintf("$env:%s=\"%s\"\n", envVar.Name, envVar.Value))
+		envVarBuf.WriteString(capr.FormatWindowsEnvVar(envVar, false))
 	}
 	server := ""
 	if settings.ServerURL.Get() != "" {
-		server = fmt.Sprintf("$env:CATTLE_SERVER=\"%s\"", settings.ServerURL.Get())
+		server = capr.FormatWindowsEnvVar(corev1.EnvVar{
+			Name:  "CATTLE_SERVER",
+			Value: settings.ServerURL.Get(),
+		}, false)
 	}
 
 	strictVerify := "false"
@@ -192,8 +216,9 @@ $env:CSI_PROXY_URL = "%s"
 $env:CSI_PROXY_VERSION = "%s"
 $env:CSI_PROXY_KUBELET_PATH = "C:%s/bin/kubelet.exe"
 $env:STRICT_VERIFY = "%s"
+%s
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion, dataDir, strictVerify)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, tokenEnvVar, csiProxyURL, csiProxyVersion, dataDir, strictVerify, cattleRoleNone)), nil
 }
