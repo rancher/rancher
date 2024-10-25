@@ -263,7 +263,7 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 
 # Enable exporting of the k3s images as part of the build process.
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS images
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS images
 
 ENV CATTLE_K3S_VERSION v1.31.1+k3s1
 
@@ -278,7 +278,7 @@ RUN go build -tags k3s_export -o export-images ./...
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS build
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS build
 ARG VERSION=dev
 ARG COMMIT
 ARG RKE_VERSION
