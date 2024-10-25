@@ -11,24 +11,25 @@ import (
 
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type fakeTokensManager struct {
-	getSecretFunc               func(userID string, provider string, fallbackTokens []*v3.Token) (string, error)
-	isMemberOfFunc              func(token v3.Token, group v3.Principal) bool
+	getSecretFunc               func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
+	isMemberOfFunc              func(token accessor.TokenAccessor, group v3.Principal) bool
 	createTokenAndSetCookieFunc func(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
 }
 
-func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error) {
+func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
 	if m.getSecretFunc != nil {
 		return m.getSecretFunc(userID, provider, fallbackTokens)
 	}
 	return "", nil
 }
 
-func (m *fakeTokensManager) IsMemberOf(token v3.Token, group v3.Principal) bool {
+func (m *fakeTokensManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
 	if m.isMemberOfFunc != nil {
 		return m.isMemberOfFunc(token, group)
 	}
@@ -132,7 +133,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}`)
 
 	fakeTokensManager := &fakeTokensManager{
-		isMemberOfFunc: func(token v3.Token, group v3.Principal) bool {
+		isMemberOfFunc: func(token accessor.TokenAccessor, group v3.Principal) bool {
 			return true
 		},
 	}
@@ -158,7 +159,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for groups and users.
-	found, err := provider.SearchPrincipals("dev", "", token)
+	found, err := provider.SearchPrincipals("dev", "", &token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +203,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for groups only.
-	found, err = provider.SearchPrincipals("dev", "group", token)
+	found, err = provider.SearchPrincipals("dev", "group", &token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +221,7 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	// Search for users only.
-	found, err = provider.SearchPrincipals("dev", "user", token)
+	found, err = provider.SearchPrincipals("dev", "user", &token)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -106,7 +106,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 		}
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := g.GetPrincipal(test.principalID, test.token)
+			got, err := g.GetPrincipal(test.principalID, &test.token)
 			if (err != nil) != test.wantErr {
 				t.Errorf("GetPrincipal() error = %v, wantErr %v", err, test.wantErr)
 				return
@@ -210,7 +210,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := g.SearchPrincipals(test.searchValue, test.principalType, v3.Token{})
+			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &v3.Token{})
 			if err != nil {
 				t.Errorf("SearchPrincipals() returned an error: %v", err)
 			}

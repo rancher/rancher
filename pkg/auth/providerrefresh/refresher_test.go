@@ -8,17 +8,23 @@ import (
 
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 func Test_refreshAttributes(t *testing.T) {
+	// TODO // addititional tests covering the new code handling ext tokens.
 	tests := []struct {
 		name                  string
 		user                  *v3.User
@@ -29,6 +35,10 @@ func Test_refreshAttributes(t *testing.T) {
 		enabled               bool
 		deleted               bool
 		want                  *v3.UserAttribute
+		eTokenSetup           func(
+			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+			uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+			users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList])
 	}{
 		{
 			name: "local user no tokens",
@@ -53,6 +63,16 @@ func Test_refreshAttributes(t *testing.T) {
 					"shibboleth": v3.Principals{},
 				},
 				ExtraByProvider: map[string]map[string][]string{},
+			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
 			},
 		},
 		{
@@ -97,6 +117,16 @@ func Test_refreshAttributes(t *testing.T) {
 					},
 				},
 			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
+			},
 		},
 		{
 			name: "local user with derived token",
@@ -140,6 +170,16 @@ func Test_refreshAttributes(t *testing.T) {
 					},
 				},
 			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
+			},
 		},
 		{
 			name: "user with derived token disabled in provider",
@@ -177,6 +217,16 @@ func Test_refreshAttributes(t *testing.T) {
 					"shibboleth": v3.Principals{},
 				},
 				ExtraByProvider: map[string]map[string][]string{},
+			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
 			},
 		},
 		{
@@ -231,6 +281,16 @@ func Test_refreshAttributes(t *testing.T) {
 					},
 				},
 			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
+			},
 		},
 		{
 			name: "shibboleth user",
@@ -273,6 +333,16 @@ func Test_refreshAttributes(t *testing.T) {
 						common.UserAttributeUserName:    []string{"user1"},
 					},
 				},
+			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
 			},
 		},
 		{
@@ -322,6 +392,16 @@ func Test_refreshAttributes(t *testing.T) {
 					"shibboleth": v3.Principals{},
 				},
 				ExtraByProvider: map[string]map[string][]string{},
+			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
 			},
 			providerDisabled: true,
 			deleted:          true,
@@ -380,6 +460,16 @@ func Test_refreshAttributes(t *testing.T) {
 					},
 				},
 			},
+			eTokenSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				uattrs *fake.MockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList],
+				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				// no ext tokens
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil).
+					AnyTimes()
+			},
 			providerDisabled:      true,
 			providerDisabledError: fmt.Errorf("unable to determine if provider was disabled"),
 			deleted:               false,
@@ -403,6 +493,17 @@ func Test_refreshAttributes(t *testing.T) {
 				},
 				saml.ShibbolethName: &mockShibbolethProvider{},
 			}
+
+			ctrl := gomock.NewController(t)
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			uattrs := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			if tt.eTokenSetup != nil {
+				tt.eTokenSetup(secrets, uattrs, users)
+			}
+
 			r := &refresher{
 				tokenLister: &fakes.TokenListerMock{
 					ListFunc: func(_ string, _ labels.Selector) ([]*v3.Token, error) {
@@ -426,6 +527,8 @@ func Test_refreshAttributes(t *testing.T) {
 						return nil, nil
 					},
 				}),
+				extTokenStore: exttokens.NewSystemTokenStore(secrets, uattrs, users,
+					exttokens.NewSupportActionHandler()),
 			}
 			got, err := r.refreshAttributes(tt.attribs)
 			assert.Nil(t, err)
@@ -523,11 +626,11 @@ func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
-func (p *mockLocalProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockLocalProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockLocalProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
@@ -539,12 +642,12 @@ func (p *mockLocalProvider) AuthenticateUser(ctx context.Context, input interfac
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return token.UserPrincipal, nil
+func (p *mockLocalProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+	return token.GetUserPrincipal(), nil
 }
 
 func (p *mockLocalProvider) CustomizeSchema(schema *types.Schema) {
@@ -583,11 +686,11 @@ func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
 	return p.enabled, p.enabledErr
 }
 
-func (p *mockShibbolethProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockShibbolethProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockShibbolethProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
@@ -599,12 +702,12 @@ func (p *mockShibbolethProvider) AuthenticateUser(ctx context.Context, input int
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return token.UserPrincipal, nil
+func (p *mockShibbolethProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+	return token.GetUserPrincipal(), nil
 }
 
 func (p *mockShibbolethProvider) CustomizeSchema(schema *types.Schema) {

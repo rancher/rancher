@@ -156,7 +156,7 @@ func TestProviderSearchPrincipal(t *testing.T) {
 
 	for _, tt := range principalSearchTests {
 		t.Run("searchKey "+tt.searchKey, func(t *testing.T) {
-			principals, err := provider.SearchPrincipals(tt.searchKey, "user", v3.Token{})
+			principals, err := provider.SearchPrincipals(tt.searchKey, "user", &v3.Token{})
 			require.NoError(t, err)
 
 			var names []string
