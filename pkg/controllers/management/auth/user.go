@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
-
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/clustermanager"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -18,8 +19,10 @@ import (
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 )
 
 type userLifecycle struct {
@@ -42,6 +45,7 @@ type userLifecycle struct {
 	userManager     user.Manager
 	clusterLister   wranglerv3.ClusterCache
 	clusterManager  *clustermanager.Manager
+	extTokenStore   *exttokenstore.SystemStore
 }
 
 const (
@@ -53,6 +57,9 @@ const (
 )
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
+
+	extTokenStore := exttokenstore.NewSystemFromWrangler(management.Wrangler)
+
 	lfc := &userLifecycle{
 		prtb:            management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 		crtb:            management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
@@ -66,6 +73,7 @@ func newUserLifecycle(management *config.ManagementContext, clusterManager *clus
 		userManager:     management.UserManager,
 		clusterLister:   management.Wrangler.Mgmt.Cluster().Cache(),
 		clusterManager:  clusterManager,
+		extTokenStore:   extTokenStore,
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
@@ -164,6 +172,39 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if user.Enabled != nil && !*user.Enabled {
+		// New functionality. Not done for norman tokens, here. See refresher.go which
+		// deletes/disables tokens when a user is disabled. Having it here makes it a more
+		// immediate response to the user's change of status.
+
+		extTokens, err := l.getExtTokensByUserName(user.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, token := range extTokens {
+			if token.GetIsDerived() {
+				// Non-login token. Only disable it
+				logrus.Infof("[%v] Disabling ext token %v for user %v",
+					userController, token.GetName(), token.GetUserID())
+				token.Spec.Enabled = pointer.Bool(false)
+				_, err := l.extTokenStore.Update(token, &metav1.UpdateOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("error updating ext token: %v", err)
+				}
+			} else {
+				// Login token. Delete it.
+				logrus.Infof("[%v] Deleting token %v for user %v",
+					userController, token.GetName(), token.GetUserID())
+				err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("error deleting ext token: %v", err)
+				}
+			}
+		}
+	}
+
 	return user, nil
 }
 
@@ -202,6 +243,10 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+	extTokens, err := l.getExtTokensByUserName(user.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	err = l.deleteClusterUserAttributes(user.Name, tokens)
 	if err != nil {
@@ -209,6 +254,10 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	}
 
 	err = l.deleteAllTokens(tokens)
+	if err != nil {
+		return nil, err
+	}
+	err = l.deleteAllExtTokens(extTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -307,6 +356,27 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 	return tokens, nil
 }
 
+func (l *userLifecycle) getExtTokensByUserName(username string) ([]*ext.Token, error) {
+	filterForUser := labels.Set(map[string]string{
+		exttokenstore.UserIDLabel: username,
+	})
+
+	objs, err := l.extTokenStore.List(&metav1.ListOptions{
+		LabelSelector: filterForUser.AsSelector().String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting ext tokens for user %s: %v", username, err)
+	}
+
+	// objs.Items is []ext.Token, i.e a value slice, not a pointer slice.
+	tokens := []*ext.Token{}
+	for _, token := range objs.Items {
+		tokens = append(tokens, &token)
+	}
+
+	return tokens, nil
+}
+
 func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) error {
 	for _, crtb := range crtbs {
 		var err error
@@ -388,6 +458,19 @@ func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 		err := l.tokens.Delete(token.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting token: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (l *userLifecycle) deleteAllExtTokens(tokens []*ext.Token) error {
+	for _, token := range tokens {
+		logrus.Infof("[%v] Deleting token %v for user %v",
+			userController, token.GetName(), token.GetUserID())
+		err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("error deleting ext token: %v", err)
 		}
 	}
 

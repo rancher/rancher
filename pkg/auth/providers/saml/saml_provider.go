@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
@@ -108,8 +109,8 @@ func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 }
 
 // Logout guards against a regular logout when the system has SLO, i.e. LogoutAll forced.
-func (s *Provider) Logout(apiContext *types.APIContext, token *v3.Token) error {
-	providerName := token.AuthProvider
+func (s *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+	providerName := token.GetAuthProvider()
 
 	logrus.Debugf("SAML [logout]: triggered by provider %s", providerName)
 
@@ -127,8 +128,8 @@ func (s *Provider) Logout(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }
 
-func (s *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
-	providerName := token.AuthProvider
+func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+	providerName := token.GetAuthProvider()
 
 	logrus.Debugf("SAML [logout-all]: triggered by provider %s", providerName)
 
@@ -320,20 +321,21 @@ func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
 	return err
 }
 
-func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
+func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token accessor.TokenAccessor) v3.Principal {
 	if principalType == s.userType {
 		princ.PrincipalType = common.UserPrincipalType
 		if token != nil {
-			princ.Me = s.isThisUserMe(token.UserPrincipal, princ)
+			tuprinc := token.GetUserPrincipal()
+			princ.Me = s.isThisUserMe(tuprinc, princ)
 			if princ.Me {
-				princ.LoginName = token.UserPrincipal.LoginName
-				princ.DisplayName = token.UserPrincipal.DisplayName
+				princ.LoginName = tuprinc.LoginName
+				princ.DisplayName = tuprinc.DisplayName
 			}
 		}
 	} else {
 		princ.PrincipalType = common.GroupPrincipalType
 		if token != nil {
-			princ.MemberOf = s.tokenMGR.IsMemberOf(*token, princ)
+			princ.MemberOf = s.tokenMGR.IsMemberOf(token, princ)
 		}
 	}
 
@@ -348,7 +350,7 @@ func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 // Otherwise it returns a "fake" principal of a requested type with the name as the searchKey.
 // If the principalType is empty, both user and group principals are returned.
 // This is done because SAML, in the absence of LDAP, doesn't have a user/group lookup mechanism.
-func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
+func (s *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	if s.hasLdapGroupSearch() {
 		principals, err := s.ldapProvider.SearchPrincipals(searchKey, principalType, token)
 		// only give response from ldap if it's configured
@@ -382,7 +384,7 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.To
 	return principals, nil
 }
 
-func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	externalID, principalType := splitPrincipalID(principalID)
 	if externalID == "" && principalType == "" {
 		return v3.Principal{}, fmt.Errorf("SAML: invalid id %v", principalID)
@@ -406,7 +408,7 @@ func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principa
 		Provider:    s.name,
 	}
 
-	p = s.toPrincipal(principalType, p, &token)
+	p = s.toPrincipal(principalType, p, token)
 	return p, nil
 }
 
