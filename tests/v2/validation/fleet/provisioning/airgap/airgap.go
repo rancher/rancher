@@ -50,7 +50,6 @@ func setupAirgapFleetResources(bastionUser, bastionIP, privateKey string) (strin
 	} else {
 		key, err = ssh.ParsePrivateKey([]byte(privateKey))
 	}
-
 	if err != nil {
 		return "", err
 	}
@@ -75,36 +74,50 @@ func updateLocalFleetRepo(bastionUser, bastionIP string, privateKey ssh.Signer) 
 	}
 	defer conn.Close()
 
-	// install git if it isn't on the bastion already
-	err = executeCommand(conn, "git version")
+	gitSession, err := conn.NewSession()
 	if err != nil {
-		gitSession, err := conn.NewSession()
-		if err != nil {
-			return "", err
-		}
-		defer gitSession.Close()
+		return "", err
+	}
+	defer gitSession.Close()
 
-		osOutput, err := gitSession.CombinedOutput("hostnamectl")
-		if err != nil {
-			return "", err
-		}
-		osString := string(osOutput)
+	var b strings.Builder
+	gitSession.Stdout = &b
+	gitSession.Stderr = &b
 
-		if strings.Contains(osString, "Ubuntu") {
-			err = executeCommand(conn, "sudo apt-get update && sudo apt-get install -y git")
-		} else if strings.Contains(osString, "SUSE") {
-			err = executeCommand(conn, "sudo zypper refresh && sudo zypper install git -y")
-		}
-		if err != nil {
+	// install git if it isn't on the bastion already
+	err = gitSession.Run("git version")
+	if err != nil {
+		if strings.Contains(b.String(), "no package named") {
+			installGitSession, err := conn.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer installGitSession.Close()
+
+			osOutput, err := installGitSession.CombinedOutput("hostnamectl")
+			if err != nil {
+				return "", err
+			}
+
+			osString := string(osOutput)
+
+			if strings.Contains(osString, "Ubuntu") {
+				err = executeCommand(conn, "sudo apt-get update && sudo apt-get install -y git")
+			} else if strings.Contains(osString, "SUSE") {
+				err = executeCommand(conn, "sudo zypper refresh && sudo zypper install git -y")
+			}
+			if err != nil {
+				return "", err
+			}
+
+		} else {
 			return "", err
 		}
 	}
 
 	err = executeCommand(conn, "cd ~/ && git clone --mirror "+rancherGithubURL+fleetExampleFolderName)
 	if err != nil {
-		if !strings.Contains(err.Error(), "128") {
-			return "", err
-		}
+		return "", err
 	}
 
 	err = executeCommand(conn, "sudo git config --system --add safe.directory '*'")

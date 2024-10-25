@@ -15,8 +15,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/rancher/tests/v2/actions/reports"
-	"github.com/rancher/rancher/tests/v2/validation/pipeline/rancherha/corralha"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning/registries"
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -56,12 +54,6 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 
 	a.clustersConfig = new(provisioninginput.Config)
 	config.LoadConfig(provisioninginput.ConfigurationFileKey, a.clustersConfig)
-
-	corralRancherHA := new(corralha.CorralRancherHA)
-	config.LoadConfig(corralha.CorralRancherHAConfigConfigurationFileKey, corralRancherHA)
-
-	registriesConfig := new(registries.Registries)
-	config.LoadConfig(registries.RegistriesConfigKey, registriesConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(a.T(), err)
@@ -199,8 +191,6 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestCustomClusterWithGitRepo() {
 			testClusterConfig.CNI = a.clustersConfig.CNIs[0]
 
 			clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(tt.client, testClusterConfig, a.corralPackage)
-			require.NoError(a.T(), err)
-
 			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(a.T(), err)
 
