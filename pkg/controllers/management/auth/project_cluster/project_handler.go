@@ -3,7 +3,6 @@ package project_cluster
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -77,12 +76,16 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.nsClient)
+	backingNamespace := orig.Name
+	if orig.Status.BackingNamespace != "" {
+		backingNamespace = orig.Status.BackingNamespace
+	}
+	_, err := reconcileResourceToNamespace(obj, ProjectCreateController, backingNamespace, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
 
-	obj, err = l.reconcileProjectCreatorRTB(obj)
+	obj, err = l.reconcileProjectCreatorRTB(orig, backingNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -132,43 +135,44 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 
 // Remove deletes all backing resources created by the project
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
+	projectNamespace := obj.Name
+	if obj.Status.BackingNamespace != "" {
+		projectNamespace = obj.Status.BackingNamespace
+	}
+
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
-	rbs, err := l.rbLister.List(obj.Name, labels.SelectorFromSet(set))
+	rbs, err := l.rbLister.List(projectNamespace, labels.SelectorFromSet(set))
 	returnErr = errors.Join(returnErr, err)
 
 	for _, rb := range rbs {
-		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
+		err := l.roleBindings.DeleteNamespaced(projectNamespace, rb.Name, &metav1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
 
-	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
+	err = deleteNamespace(ProjectRemoveController, projectNamespace, l.nsClient)
 	returnErr = errors.Join(returnErr, err)
 
 	return obj, returnErr
 }
 
-func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runtime.Object, error) {
-	project, ok := obj.(*apisv3.Project)
-	if !ok {
-		return obj, fmt.Errorf("expected project, got %T", obj)
-	}
-
+func (l *projectLifecycle) reconcileProjectCreatorRTB(project *apisv3.Project, nsName string) (runtime.Object, error) {
 	// If we specify no creator owner RBAC, exit
 	if _, ok := project.Annotations[NoCreatorRBACAnnotation]; ok {
 		logrus.Infof("[%s] annotation %s found. Skipping adding creator as owner", ProjectCreateController, NoCreatorRBACAnnotation)
-		return obj, nil
+		return project, nil
 	}
-	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
+
+	return apisv3.CreatorMadeOwner.DoUntilTrue(project, func() (runtime.Object, error) {
 		creatorID := project.Annotations[CreatorIDAnnotation]
 		if creatorID == "" {
 			logrus.Warnf("[%s] project %s has no creatorId annotation. Cannot add creator as owner", ProjectCreateController, project.Name)
-			return obj, nil
+			return project, nil
 		}
 
 		if apisv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 			// The projectRoleBindings are already completed, no need to check
-			return obj, nil
+			return project, nil
 		}
 
 		// If the project does not have the annotation it indicates the
@@ -181,13 +185,14 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 		roleMap := make(map[string][]string)
 		if err := json.Unmarshal([]byte(creatorRoleBindings), &roleMap); err != nil {
-			return obj, err
+			return project, err
 		}
 
 		var createdRoles []string
 		for _, role := range roleMap["required"] {
 			rtbName := "creator-" + role
-			if rtb, _ := l.prtbLister.Get(project.Name, rtbName); rtb != nil {
+
+			if rtb, _ := l.prtbLister.Get(nsName, rtbName); rtb != nil {
 				createdRoles = append(createdRoles, role)
 				// This projectRoleBinding exists, need to check all of them so keep going
 				continue
@@ -197,7 +202,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			prtb := &apisv3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      rtbName,
-					Namespace: project.Name,
+					Namespace: nsName,
 				},
 				ProjectName:      project.Namespace + ":" + project.Name,
 				RoleTemplateName: role,
@@ -215,7 +220,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			logrus.Infof("[%s] Creating creator projectRoleTemplateBinding for user %s for project %s", ProjectCreateController, creatorID, project.Name)
 			_, err := l.prtbClient.Create(prtb)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
-				return obj, err
+				return project, err
 			}
 
 			createdRoles = append(createdRoles, role)
@@ -226,7 +231,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 		roleMap["created"] = createdRoles
 		d, err := json.Marshal(roleMap)
 		if err != nil {
-			return obj, err
+			return project, err
 		}
 
 		project.Annotations[roleTemplatesRequiredAnnotation] = string(d)
@@ -238,6 +243,6 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 		_, err = l.projects.Update(project)
 
-		return obj, err
+		return project, err
 	})
 }

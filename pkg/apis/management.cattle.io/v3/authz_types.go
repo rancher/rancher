@@ -1,8 +1,6 @@
 package v3
 
 import (
-	"strings"
-
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -21,6 +19,8 @@ var (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="BACKINGNAMESPACE",type="string",JSONPath=".status.backingNamespace"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Project is a group of namespaces.
 // Projects are used to create a multi-tenant environment within a Kubernetes cluster by managing namespace operations,
@@ -51,6 +51,10 @@ type ProjectStatus struct {
 	// Conditions are a set of indicators about aspects of the project.
 	// +optional
 	Conditions []ProjectCondition `json:"conditions,omitempty"`
+
+	// BackingNamespace is the name of the namespace that contains resources associated with the project.
+	// +optional
+	BackingNamespace string `json:"backingNamespace,omitempty"`
 }
 
 // ProjectCondition is the status of an aspect of the project.
@@ -348,13 +352,6 @@ type ProjectRoleTemplateBinding struct {
 	// Deprecated.
 	// +optional
 	ServiceAccount string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
-}
-
-func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
-	if parts := strings.SplitN(p.ProjectName, ":", 2); len(parts) == 2 {
-		return parts[0]
-	}
-	return ""
 }
 
 // +genclient
