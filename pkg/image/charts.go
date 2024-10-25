@@ -12,7 +12,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
-	libhelm "github.com/rancher/rancher/pkg/helm"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/repo"
@@ -112,97 +111,9 @@ func (c Charts) checkChartVersionConstraint(version repo.ChartVersion) (bool, er
 	return false, nil
 }
 
-type SystemCharts struct {
-	Config ExportConfig
-}
-
 type Questions struct {
 	RancherMinVersion string `yaml:"rancher_min_version"`
 	RancherMaxVersion string `yaml:"rancher_max_version"`
-}
-
-// FetchImages finds all the images used by all the charts in a Rancher system charts repository and adds them to imageSet.
-// The images from the latest version of each chart are always added to the images set, whereas the remaining versions
-// are added only if the given Rancher version/tag satisfies the chart's Rancher version constraint defined in its questions file.
-func (sc SystemCharts) FetchImages(imagesSet map[string]map[string]struct{}) error {
-	if sc.Config.SystemChartsPath == "" || sc.Config.RancherVersion == "" {
-		return nil
-	}
-	// Load system charts virtual index
-	helm := libhelm.Helm{
-		LocalPath: sc.Config.SystemChartsPath,
-		IconPath:  sc.Config.SystemChartsPath,
-		Hash:      "",
-	}
-	virtualIndex, err := helm.LoadIndex()
-	if err != nil {
-		return errors.Wrapf(err, "failed to load system charts index")
-	}
-	// Filter index entries based on their Rancher version constraint
-	var filteredVersions libhelm.ChartVersions
-	for _, versions := range virtualIndex.IndexFile.Entries {
-		if len(versions) == 0 {
-			continue
-		}
-		// Always append the latest version of the chart unless it has been intentionally hidden with constraints
-		latestVersion := versions[0]
-		if isConstraintSatisfied, err := sc.checkChartVersionConstraint(*latestVersion); err != nil {
-			return errors.Wrapf(err, "failed to filter chart versions")
-		} else if isConstraintSatisfied {
-			filteredVersions = append(filteredVersions, latestVersion)
-		}
-		// Append the remaining versions of the chart if the chart exists in the systemChartsToCheckConstraints map
-		// and the given Rancher version satisfies the chart's Rancher version constraint defined in its questions file
-		chartName := versions[0].ChartMetadata.Name
-		if _, ok := systemChartsToCheckConstraints[chartName]; ok {
-			for _, version := range versions[1:] {
-				if isConstraintSatisfied, err := sc.checkChartVersionConstraint(*version); err != nil {
-					return errors.Wrapf(err, "failed to filter chart versions")
-				} else if isConstraintSatisfied {
-					filteredVersions = append(filteredVersions, version)
-				}
-			}
-		}
-	}
-	// Find values.yaml files in each chart's local files, and check for images to add to imageSet
-	for _, version := range filteredVersions {
-		for _, file := range version.LocalFiles {
-			if !isValuesFile(file) {
-				continue
-			}
-			values, err := decodeValuesFile(file)
-			if err != nil {
-				return err
-			}
-			tag, _ := systemChartsToIgnoreTags[version.Name]
-			chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
-			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, sc.Config.OsType, tag); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// checkChartVersionConstraint retrieves the value of a chart's Rancher version defined in its questions file, and
-// returns true if the Rancher version in the export configuration satisfies the chart's constraint, false otherwise.
-// If a chart does not have a Rancher version constraint defined, this function returns false.
-func (sc SystemCharts) checkChartVersionConstraint(version libhelm.ChartVersion) (bool, error) {
-	questionsPath := filepath.Join(sc.Config.SystemChartsPath, version.Dir, "questions.yaml")
-	questions, err := decodeQuestionsFile(questionsPath)
-	if os.IsNotExist(err) {
-		questionsPath = filepath.Join(sc.Config.SystemChartsPath, version.Dir, "questions.yml")
-		questions, err = decodeQuestionsFile(questionsPath)
-	}
-	if err != nil {
-		logrus.Warnf("skipping system chart, %s:%s does not have a questions file", version.ChartMetadata.Name, version.ChartMetadata.Version)
-		return false, nil
-	}
-	constraintStr := minMaxToConstraintStr(questions.RancherMinVersion, questions.RancherMaxVersion)
-	if constraintStr == "" {
-		return false, nil
-	}
-	return compareRancherVersionToConstraint(sc.Config.RancherVersion, constraintStr)
 }
 
 // compareRancherVersionToConstraint returns true if the Rancher version satisfies constraintStr, false otherwise.

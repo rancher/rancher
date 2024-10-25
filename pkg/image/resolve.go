@@ -63,7 +63,7 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 }
 
 // GetImages fetches the list of container images used in the sources provided in the exportConfig.
-// Rancher charts, system charts, system images and extension images of Rancher are fetched.
+// Rancher charts, system images and extension images of Rancher are fetched.
 // GetImages is called during runtime by Rancher catalog package which is deprecated.
 // It is actually used for generation rancher-images.txt for airgap scenarios.
 func GetImages(exportConfig ExportConfig, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages) ([]string, []string, error) {
@@ -73,12 +73,6 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	charts := Charts{exportConfig}
 	if err := charts.FetchImages(imagesSet); err != nil {
 		return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
-	}
-
-	// fetch images from system charts
-	systemCharts := SystemCharts{exportConfig}
-	if err := systemCharts.FetchImages(imagesSet); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to fetch images from system charts")
 	}
 
 	// fetch images from system images
