@@ -128,57 +128,6 @@ func NewAzureADProvider(namespace, name string, obj AzureADProvider) *AzureADPro
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// CatalogList is a list of Catalog resources
-type CatalogList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []Catalog `json:"items"`
-}
-
-func NewCatalog(namespace, name string, obj Catalog) *Catalog {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Catalog").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// CatalogTemplateList is a list of CatalogTemplate resources
-type CatalogTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []CatalogTemplate `json:"items"`
-}
-
-func NewCatalogTemplate(namespace, name string, obj CatalogTemplate) *CatalogTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CatalogTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// CatalogTemplateVersionList is a list of CatalogTemplateVersion resources
-type CatalogTemplateVersionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []CatalogTemplateVersion `json:"items"`
-}
-
-func NewCatalogTemplateVersion(namespace, name string, obj CatalogTemplateVersion) *CatalogTemplateVersion {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CatalogTemplateVersion").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // CloudCredentialList is a list of CloudCredential resources
 type CloudCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -570,40 +519,6 @@ func NewManagedChart(namespace, name string, obj ManagedChart) *ManagedChart {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MultiClusterAppList is a list of MultiClusterApp resources
-type MultiClusterAppList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []MultiClusterApp `json:"items"`
-}
-
-func NewMultiClusterApp(namespace, name string, obj MultiClusterApp) *MultiClusterApp {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("MultiClusterApp").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// MultiClusterAppRevisionList is a list of MultiClusterAppRevision resources
-type MultiClusterAppRevisionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []MultiClusterAppRevision `json:"items"`
-}
-
-func NewMultiClusterAppRevision(namespace, name string, obj MultiClusterAppRevision) *MultiClusterAppRevision {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("MultiClusterAppRevision").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeList is a list of Node resources
 type NodeList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -944,57 +859,6 @@ func NewSetting(namespace, name string, obj Setting) *Setting {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// TemplateList is a list of Template resources
-type TemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []Template `json:"items"`
-}
-
-func NewTemplate(namespace, name string, obj Template) *Template {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Template").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// TemplateContentList is a list of TemplateContent resources
-type TemplateContentList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []TemplateContent `json:"items"`
-}
-
-func NewTemplateContent(namespace, name string, obj TemplateContent) *TemplateContent {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("TemplateContent").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// TemplateVersionList is a list of TemplateVersion resources
-type TemplateVersionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []TemplateVersion `json:"items"`
-}
-
-func NewTemplateVersion(namespace, name string, obj TemplateVersion) *TemplateVersion {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("TemplateVersion").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // TokenList is a list of Token resources
 type TokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1039,40 +903,6 @@ type UserAttributeList struct {
 
 func NewUserAttribute(namespace, name string, obj UserAttribute) *UserAttribute {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("UserAttribute").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectCatalogList is a list of ProjectCatalog resources
-type ProjectCatalogList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectCatalog `json:"items"`
-}
-
-func NewProjectCatalog(namespace, name string, obj ProjectCatalog) *ProjectCatalog {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectCatalog").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterCatalogList is a list of ClusterCatalog resources
-type ClusterCatalogList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterCatalog `json:"items"`
-}
-
-func NewClusterCatalog(namespace, name string, obj ClusterCatalog) *ClusterCatalog {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterCatalog").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

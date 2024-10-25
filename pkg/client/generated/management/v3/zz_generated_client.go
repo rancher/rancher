@@ -20,12 +20,6 @@ type Client struct {
 	ProjectRoleTemplateBinding                ProjectRoleTemplateBindingOperations
 	Cluster                                   ClusterOperations
 	ClusterRegistrationToken                  ClusterRegistrationTokenOperations
-	Catalog                                   CatalogOperations
-	Template                                  TemplateOperations
-	CatalogTemplate                           CatalogTemplateOperations
-	CatalogTemplateVersion                    CatalogTemplateVersionOperations
-	TemplateVersion                           TemplateVersionOperations
-	TemplateContent                           TemplateContentOperations
 	Group                                     GroupOperations
 	GroupMember                               GroupMemberOperations
 	SamlToken                                 SamlTokenOperations
@@ -40,10 +34,6 @@ type Client struct {
 	Setting                                   SettingOperations
 	Feature                                   FeatureOperations
 	ComposeConfig                             ComposeConfigOperations
-	ProjectCatalog                            ProjectCatalogOperations
-	ClusterCatalog                            ClusterCatalogOperations
-	MultiClusterApp                           MultiClusterAppOperations
-	MultiClusterAppRevision                   MultiClusterAppRevisionOperations
 	KontainerDriver                           KontainerDriverOperations
 	EtcdBackup                                EtcdBackupOperations
 	CloudCredential                           CloudCredentialOperations
@@ -80,12 +70,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectRoleTemplateBinding = newProjectRoleTemplateBindingClient(client)
 	client.Cluster = newClusterClient(client)
 	client.ClusterRegistrationToken = newClusterRegistrationTokenClient(client)
-	client.Catalog = newCatalogClient(client)
-	client.Template = newTemplateClient(client)
-	client.CatalogTemplate = newCatalogTemplateClient(client)
-	client.CatalogTemplateVersion = newCatalogTemplateVersionClient(client)
-	client.TemplateVersion = newTemplateVersionClient(client)
-	client.TemplateContent = newTemplateContentClient(client)
 	client.Group = newGroupClient(client)
 	client.GroupMember = newGroupMemberClient(client)
 	client.SamlToken = newSamlTokenClient(client)
@@ -100,10 +84,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Setting = newSettingClient(client)
 	client.Feature = newFeatureClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
-	client.ProjectCatalog = newProjectCatalogClient(client)
-	client.ClusterCatalog = newClusterCatalogClient(client)
-	client.MultiClusterApp = newMultiClusterAppClient(client)
-	client.MultiClusterAppRevision = newMultiClusterAppRevisionClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)
 	client.EtcdBackup = newEtcdBackupClient(client)
 	client.CloudCredential = newCloudCredentialClient(client)
