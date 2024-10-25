@@ -22,8 +22,8 @@ import (
 	msgraphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	normancorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,7 +43,7 @@ const (
 // It first tries to fetch the token from the refresh token, if the access token is found in the database.
 // If that fails, it tries to acquire it directly from the auth provider with the credential (application secret in Azure).
 // It also checks that the access token has the necessary permissions.
-func NewMSGraphClient(config *v32.AzureADConfig, secrets normancorev1.SecretInterface) (*AzureMSGraphClient, error) {
+func NewMSGraphClient(config *v32.AzureADConfig, secrets wcorev1.SecretController) (*AzureMSGraphClient, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a cred from a secret: %w", err)
@@ -416,7 +416,7 @@ func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
 //
 // WARNING: The tokens are stored in plain-text in Kubernetes secrets.
 type accessTokenCache struct {
-	Secrets normancorev1.SecretInterface
+	Secrets wcorev1.SecretController
 }
 
 // Replace fetches the access token from a secret in Kubernetes.

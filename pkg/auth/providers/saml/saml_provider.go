@@ -18,10 +18,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +40,7 @@ const (
 type Provider struct {
 	ctx             context.Context
 	authConfigs     v3.AuthConfigInterface
-	secrets         corev1.SecretInterface
+	secrets         wcorev1.SecretController
 	samlTokens      v3.SamlTokenInterface
 	userMGR         user.Manager
 	tokenMGR        *tokens.Manager
@@ -60,7 +60,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	samlp := &Provider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		secrets:     mgmtCtx.Core.Secrets(""),
+		secrets:     mgmtCtx.Wrangler.Core.Secret(),
 		samlTokens:  mgmtCtx.Management.SamlTokens(""),
 		userMGR:     userMGR,
 		tokenMGR:    tokenMGR,

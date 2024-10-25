@@ -18,11 +18,11 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,7 @@ type Provider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
 	Retriever   unstructuredGetter
-	secrets     corev1.SecretInterface
+	secrets     wcorev1.SecretController
 	userMGR     user.Manager
 	tokenMGR    *tokens.Manager
 }
@@ -58,7 +58,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		ctx:         ctx,
 		Retriever:   mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		secrets:     mgmtCtx.Core.Secrets(""),
+		secrets:     mgmtCtx.Wrangler.Core.Secret(),
 		userMGR:     userMGR,
 		tokenMGR:    tokenMGR,
 	}

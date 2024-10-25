@@ -7,16 +7,16 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type authProvider struct {
 	authConfigs v3.AuthConfigInterface
-	secrets     corev1.SecretInterface
+	secrets     wcorev1.SecretController
 }
 
 func Register(ctx context.Context, apiContext *config.ScaledContext) {
@@ -27,7 +27,7 @@ func Register(ctx context.Context, apiContext *config.ScaledContext) {
 func newAuthProvider(apiContext *config.ScaledContext) *authProvider {
 	a := &authProvider{
 		authConfigs: apiContext.Management.AuthConfigs(""),
-		secrets:     apiContext.Core.Secrets(""),
+		secrets:     apiContext.Wrangler.Core.Secret(),
 	}
 	return a
 }
