@@ -11,11 +11,12 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/requests/mocks"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -36,7 +37,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 		desc                  string
 		req                   func() *http.Request
 		sar                   func(req *http.Request) sar.SubjectAccessReview
-		tokenCache            func() mgmtv3.TokenCache
+		extTokenStore         func() *exttokenstore.SystemStore
 		wantUserInfo          *user.DefaultInfo
 		wantNextHandlerCalled bool
 		wantErr               string
@@ -150,7 +151,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			tokenCache: func() mgmtv3.TokenCache {
+			extTokenStore: func() *exttokenstore.SystemStore {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().Get("kubeconfig-u-user5zfww").Return(&v3.Token{
 					ObjectMeta: metav1.ObjectMeta{
@@ -158,7 +159,85 @@ func TestAuthenticateImpersonation(t *testing.T) {
 					},
 					UserID: "impUser",
 				}, nil)
-				return cache
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				secrets.EXPECT().Cache().Return(nil)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				return store
+			},
+			wantUserInfo: &user.DefaultInfo{
+				Name:   "impUser",
+				UID:    "impUser",
+				Groups: []string{"system:authenticated"},
+				Extra: map[string][]string{
+					"foo":            {"bar"},
+					"requesttokenid": {"kubeconfig-u-user5zfww"},
+				},
+			},
+			wantNextHandlerCalled: true,
+			status:                http.StatusOK,
+		},
+		{
+			desc: "impersonate extras, ext token as origin",
+			req: func() *http.Request {
+				ctx := request.WithUser(context.Background(), userInfo)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User":                 {"impUser"},
+						"Impersonate-Extra-foo":            {"bar"},
+						"Impersonate-Extra-requesttokenid": {"kubeconfig-u-user5zfww"},
+					},
+				}
+				req = req.WithContext(ctx)
+
+				return req
+			},
+			sar: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+					"foo":            {"bar"},
+					"requesttokenid": {"kubeconfig-u-user5zfww"},
+				}).Return(true, nil)
+
+				return mock
+			},
+			extTokenStore: func() *exttokenstore.SystemStore {
+				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+				cache.EXPECT().
+					Get("kubeconfig-u-user5zfww").
+					Return(nil, errors.New("unexpected error"))
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+				secrets.EXPECT().Cache().Return(scache)
+				scache.EXPECT().
+					Get("cattle-tokens", "kubeconfig-u-user5zfww").
+					Return(&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "kubeconfig-u-user5zfww",
+						},
+						Data: map[string][]byte{
+							exttokenstore.FieldUserID: []byte("impUser"),
+							// everything else to satisfy the ext token read checks
+							exttokenstore.FieldAnnotations:    []byte("null"),
+							exttokenstore.FieldAuthProvider:   []byte("local"),
+							exttokenstore.FieldDisplayName:    []byte(""),
+							exttokenstore.FieldEnabled:        []byte("true"),
+							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
+							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldLabels:         []byte("null"),
+							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
+							exttokenstore.FieldLoginName:      []byte(""),
+							exttokenstore.FieldPrincipalID:    []byte("local://kubeconfig-u-user5zfww"),
+							exttokenstore.FieldTTL:            []byte("57600000"),
+							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+						},
+					}, nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				return store
 			},
 			wantUserInfo: &user.DefaultInfo{
 				Name:   "impUser",
@@ -288,7 +367,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			tokenCache: func() mgmtv3.TokenCache {
+			extTokenStore: func() *exttokenstore.SystemStore {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().Get("kubeconfig-u-user5zfww").Return(&v3.Token{
 					ObjectMeta: metav1.ObjectMeta{
@@ -296,7 +375,74 @@ func TestAuthenticateImpersonation(t *testing.T) {
 					},
 					UserID: "someoneelse",
 				}, nil)
-				return cache
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				secrets.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				return store
+			},
+			wantErr: "request token user does not match impersonation user",
+			status:  http.StatusForbidden,
+		},
+		{
+			desc: "user is not the owner of the request token, ext token as origin",
+			req: func() *http.Request {
+				ctx := request.WithUser(context.Background(), userInfo)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User":                 {"impUser"},
+						"Impersonate-Extra-requesttokenid": {"kubeconfig-u-user5zfww"},
+					},
+				}
+				req = req.WithContext(ctx)
+
+				return req
+			},
+			sar: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+					"requesttokenid": {"kubeconfig-u-user5zfww"},
+				}).Return(true, nil)
+
+				return mock
+			},
+			extTokenStore: func() *exttokenstore.SystemStore {
+				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+				cache.EXPECT().
+					Get("kubeconfig-u-user5zfww").
+					Return(nil, errors.New("unexpected error"))
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+				secrets.EXPECT().Cache().Return(scache)
+				scache.EXPECT().
+					Get("cattle-tokens", "kubeconfig-u-user5zfww").
+					Return(&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "kubeconfig-u-user5zfww",
+						},
+						Data: map[string][]byte{
+							exttokenstore.FieldUserID: []byte("someoneelse"),
+							// everything else to satisfy the ext token read checks
+							exttokenstore.FieldAnnotations:    []byte("null"),
+							exttokenstore.FieldAuthProvider:   []byte("local"),
+							exttokenstore.FieldDisplayName:    []byte(""),
+							exttokenstore.FieldEnabled:        []byte("true"),
+							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
+							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldLabels:         []byte("null"),
+							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
+							exttokenstore.FieldLoginName:      []byte(""),
+							exttokenstore.FieldPrincipalID:    []byte("local://kubeconfig-u-user5zfww"),
+							exttokenstore.FieldTTL:            []byte("57600000"),
+							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+						},
+					}, nil)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				return store
 			},
 			wantErr: "request token user does not match impersonation user",
 			status:  http.StatusForbidden,
@@ -324,10 +470,15 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			tokenCache: func() mgmtv3.TokenCache {
+			extTokenStore: func() *exttokenstore.SystemStore {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().Get(gomock.Any()).Times(0)
-				return cache
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				secrets.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				return store
 			},
 			wantErr: "multiple requesttokenid values",
 			status:  http.StatusForbidden,
@@ -447,10 +598,20 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 				return mock
 			},
-			tokenCache: func() mgmtv3.TokenCache {
+			extTokenStore: func() *exttokenstore.SystemStore {
+				// Note: Have to fail both norman and ext sides of the token fetch
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().Get("kubeconfig-u-user5zfww").Return(nil, errors.New("unexpected error"))
-				return cache
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+				secrets.EXPECT().Cache().Return(scache)
+				scache.EXPECT().
+					Get("cattle-tokens", "kubeconfig-u-user5zfww").
+					Return(nil, errors.New("unexpected error"))
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				return store
 			},
 			wantErr: "error getting request token",
 			status:  http.StatusForbidden,
@@ -486,8 +647,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 
 			req := test.req()
 			ia := &ImpersonatingAuth{sar: test.sar(req)}
-			if test.tokenCache != nil {
-				ia.tokenCache = test.tokenCache()
+			if test.extTokenStore != nil {
+				ia.extTokenStore = test.extTokenStore()
 			}
 
 			mh := &mockHandler{}

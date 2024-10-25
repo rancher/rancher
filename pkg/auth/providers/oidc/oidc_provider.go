@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -37,11 +38,11 @@ const (
 )
 
 type tokenManager interface {
-	IsMemberOf(token v3.Token, group v3.Principal) bool
+	IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool
 	UpdateSecret(userID, provider, secret string) error
 	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
 	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
-	GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error)
+	GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
 }
 
 type OpenIDCProvider struct {
@@ -79,11 +80,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
-func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
@@ -142,7 +143,7 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, nil
 }
 
-func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token v3.Token) ([]v3.Principal, error) {
+func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	var principals []v3.Principal
 
 	if principalType == "" {
@@ -161,7 +162,7 @@ func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, to
 	return principals, nil
 }
 
-func (o *OpenIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	var p v3.Principal
 
 	// parsing id to get the external id and type. Example oidc_<user|group>://<user sub | group name>
@@ -194,7 +195,7 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.P
 	} else {
 		p = o.groupToPrincipal(externalID)
 	}
-	p = o.toPrincipalFromToken(principalType, p, &token)
+	p = o.toPrincipalFromToken(principalType, p, token)
 	return p, nil
 }
 
@@ -281,20 +282,20 @@ func (o *OpenIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 	return p
 }
 
-func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
+func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token accessor.TokenAccessor) v3.Principal {
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
-			princ.Me = o.IsThisUserMe(token.UserPrincipal, princ)
+			princ.Me = o.IsThisUserMe(token.GetUserPrincipal(), princ)
 			if princ.Me {
-				princ.LoginName = token.UserPrincipal.LoginName
-				princ.DisplayName = token.UserPrincipal.DisplayName
+				princ.LoginName = token.GetUserPrincipal().LoginName
+				princ.DisplayName = token.GetUserPrincipal().DisplayName
 			}
 		}
 	} else {
 		princ.PrincipalType = GroupType
 		if token != nil {
-			princ.MemberOf = o.TokenMGR.IsMemberOf(*token, princ)
+			princ.MemberOf = o.TokenMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ

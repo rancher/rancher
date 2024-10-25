@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
@@ -155,11 +156,11 @@ func (m *mockUnstructured) DeepCopyObject() runtime.Object                      
 
 type fakeProvider struct{}
 
-func (f fakeProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (f fakeProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (f fakeProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (f fakeProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
@@ -171,11 +172,11 @@ func (f fakeProvider) AuthenticateUser(_ context.Context, _ interface{}) (v3.Pri
 	panic("implement me")
 }
 
-func (f fakeProvider) SearchPrincipals(_, _ string, _ v3.Token) ([]v3.Principal, error) {
+func (f fakeProvider) SearchPrincipals(_, _ string, _ accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("implement me")
 }
 
-func (f fakeProvider) GetPrincipal(_ string, _ v3.Token) (v3.Principal, error) {
+func (f fakeProvider) GetPrincipal(_ string, _ accessor.TokenAccessor) (v3.Principal, error) {
 	panic("implement me")
 }
 

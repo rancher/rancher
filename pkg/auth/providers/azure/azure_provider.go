@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -64,11 +65,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
-func (ap *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (ap *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (ap *Provider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (ap *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
@@ -125,14 +126,14 @@ func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Pri
 	return groupPrincipals, nil
 }
 
-func (ap *Provider) SearchPrincipals(name, principalType string, token v3.Token) ([]v3.Principal, error) {
+func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return nil, err
 	}
 	var principals []v3.Principal
 
-	azureClient, err := ap.newAzureClientFromToken(cfg, &token)
+	azureClient, err := ap.newAzureClientFromToken(cfg, token)
 	if err != nil {
 		return nil, err
 	}
@@ -160,10 +161,10 @@ func (ap *Provider) SearchPrincipals(name, principalType string, token v3.Token)
 		principals = append(principals, users...)
 		principals = append(principals, groups...)
 	}
-	return principals, ap.updateToken(azureClient, &token)
+	return principals, ap.updateToken(azureClient, token)
 }
 
-func (ap *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	var principal v3.Principal
 	var err error
 	cfg, err := ap.GetAzureConfigK8s()
@@ -171,7 +172,7 @@ func (ap *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Princip
 		return v3.Principal{}, err
 	}
 
-	azureClient, err := ap.newAzureClientFromToken(cfg, &token)
+	azureClient, err := ap.newAzureClientFromToken(cfg, token)
 	if err != nil {
 		return principal, err
 	}
@@ -192,7 +193,7 @@ func (ap *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Princip
 		return v3.Principal{}, err
 	}
 
-	return principal, ap.updateToken(azureClient, &token)
+	return principal, ap.updateToken(azureClient, token)
 }
 
 func (ap *Provider) CustomizeSchema(schema *types.Schema) {
@@ -289,16 +290,16 @@ func (ap *Provider) loginUser(config *v32.AzureADConfig, azureCredential *v32.Az
 	return userPrincipal, groupPrincipals, providerToken, nil
 }
 
-func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID string, token v3.Token) (v3.Principal, error) {
+func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	principal, err := client.GetUser(principalID)
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
-	principal.Me = samePrincipal(token.UserPrincipal, principal)
+	principal.Me = samePrincipal(token.GetUserPrincipal(), principal)
 	return principal, nil
 }
 
-func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, token v3.Token) (v3.Principal, error) {
+func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, token accessor.TokenAccessor) (v3.Principal, error) {
 	principal, err := client.GetGroup(id)
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
@@ -307,19 +308,19 @@ func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, tok
 	return principal, nil
 }
 
-func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
+func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(userPrincipalName,'%[1]s') or startswith(displayName,'%[1]s') or startswith(givenName,'%[1]s') or startswith(surname,'%[1]s')", name)
 	principals, err := client.ListUsers(filter)
 	if err != nil {
 		return nil, err
 	}
 	for _, principal := range principals {
-		principal.Me = samePrincipal(token.UserPrincipal, principal)
+		principal.Me = samePrincipal(token.GetUserPrincipal(), principal)
 	}
 	return principals, nil
 }
 
-func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
+func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(displayName,'%[1]s') or startswith(mail,'%[1]s') or startswith(mailNickname,'%[1]s')", name)
 	principals, err := client.ListGroups(filter)
 	if err != nil {
@@ -331,12 +332,12 @@ func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name
 	return principals, nil
 }
 
-func (ap *Provider) newAzureClientFromToken(cfg *v32.AzureADConfig, token *v32.Token) (clients.AzureClient, error) {
+func (ap *Provider) newAzureClientFromToken(cfg *v32.AzureADConfig, token accessor.TokenAccessor) (clients.AzureClient, error) {
 	var secret string
 	var deprecated = IsConfigDeprecated(cfg)
 	if deprecated {
 		var err error
-		secret, err = ap.tokenMGR.GetSecret(token.UserID, Name, []*v3.Token{token})
+		secret, err = ap.tokenMGR.GetSecret(token.GetUserID(), Name, []accessor.TokenAccessor{token})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
@@ -412,7 +413,7 @@ func (ap *Provider) GetAzureConfigK8s() (*v32.AzureADConfig, error) {
 
 // updateToken compares the current Azure access token to the one stored in the secret and updates if needed.
 // This is relevant only for access tokens to the deprecated Azure AD Graph API.
-func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) error {
+func (ap *Provider) updateToken(client clients.AzureClient, token accessor.TokenAccessor) error {
 	// For the new flow via Microsoft Graph, the caching and updating of the token to the Microsoft Graph API
 	// is handled separately via the SDK client cache.
 	cfg, err := ap.GetAzureConfigK8s()
@@ -428,12 +429,12 @@ func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) err
 		return fmt.Errorf("marshaling token to JSON: %w", err)
 	}
 
-	secret, err := ap.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{token})
+	secret, err := ap.tokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// providerToken doesn't exist as a secret, update on token.
-			if current, ok := token.ProviderInfo["access_token"]; ok && current != current {
-				token.ProviderInfo["access_token"] = current
+			if current, ok := token.GetProviderInfo()["access_token"]; ok && current != current {
+				token.GetProviderInfo()["access_token"] = current
 			}
 			return nil
 		}
@@ -444,7 +445,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) err
 		return nil
 	}
 
-	return ap.tokenMGR.UpdateSecret(token.UserID, token.AuthProvider, current)
+	return ap.tokenMGR.UpdateSecret(token.GetUserID(), token.GetAuthProvider(), current)
 }
 
 func formAzureRedirectURL(config map[string]interface{}) string {
@@ -535,9 +536,11 @@ func UpdateGroupCacheSize(size string) {
 
 	i, err := strconv.Atoi(size)
 	if err != nil {
+		logrus.Errorf("error parsing azure-group-cache-size, skipping update %v", err)
 		return
 	}
 	if i < 0 {
+		logrus.Error("azure-group-cache-size must be >= 0, skipping update")
 		return
 	}
 	clients.GroupCache.Resize(i)
