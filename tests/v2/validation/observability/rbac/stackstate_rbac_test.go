@@ -52,7 +52,7 @@ type StackStateRBACTestSuite struct {
 	cluster                       *management.Cluster
 	projectID                     string
 	stackstateAgentInstallOptions *charts.InstallOptions
-	stackstateConfigs             observability.StackStateConfigs
+	stackstateConfigs             *observability.StackStateConfig
 }
 
 func (rb *StackStateRBACTestSuite) TearDownSuite() {
@@ -75,7 +75,6 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	rb.cluster, err = rb.client.Management.Cluster.ByID(cluster.ID)
 	require.NoError(rb.T(), err)
 
-	log.Info("Creating a project and namespace for the chart to be installed in.")
 
 	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
 	projectTemplate.Name = charts.StackstateNamespace
@@ -88,14 +87,14 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 
 	_, err = rb.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
 	if k8sErrors.IsNotFound(err) {
-		err = observability.CreateExtensionsRepo(rb.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
-		rb.T().Log("Created extensions repo for ui plugins.")
+		err = uiplugins.CreateExtensionsRepo(rb.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
+		log.Info("Created extensions repo for ui plugins.")
 	}
 	require.NoError(rb.T(), err)
 
-	var stackstateConfigs observability.StackStateConfigs
+	var stackstateConfigs observability.StackStateConfig
 	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
-	rb.stackstateConfigs = stackstateConfigs
+	rb.stackstateConfigs = &stackstateConfigs
 
 	_, err = client.Management.NodeDriver.ByID(observability.StackstateName)
 	if strings.Contains(err.Error(), "Not Found") {
@@ -106,7 +105,7 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	crdsExists, err := rb.client.Steve.SteveType(observability.ApiExtenisonsCRD).ByID(observability.ObservabilitySteveType)
 	if crdsExists == nil && strings.Contains(err.Error(), "Not Found") {
 		err = observability.InstallStackstateCRD(rb.client)
-		rb.T().Log("Installed stackstate crd.")
+		log.Info("Installed stackstate crd.")
 	}
 	require.NoError(rb.T(), err)
 
@@ -126,9 +125,9 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 			Version:     latestUIPluginVersion,
 		}
 
-		err = uiplugins.InstallStackstateUiPlugin(client, extensionOptions)
+		err = uiplugins.InstallObservabilityUiPlugin(client, extensionOptions)
 		require.NoError(rb.T(), err)
-		rb.T().Log("Installed stackstate ui plugin.")
+		log.Info("Installed stackstate ui plugin.")
 	}
 
 	steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
@@ -191,14 +190,19 @@ func (rb *StackStateRBACTestSuite) TestClusterOwnerInstallStackstate() {
 	require.NoError(rb.T(), err)
 
 	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(rb.client, rb.client.RancherConfig.ClusterName, fleet.Namespace)
+
+	var clusterName string
 	if clusterObject != nil {
 		status := &provv1.ClusterStatus{}
 		err := steveV1.ConvertToK8sType(clusterObject.Status, status)
 		require.NoError(rb.T(), err)
-
-		podErrors := pods.StatusPods(client, status.ClusterName)
-		require.Empty(rb.T(), podErrors)
+		clusterName = status.ClusterName
+	} else {
+		clusterName, err = extensionscluster.GetClusterIDByName(rb.client, rb.client.RancherConfig.ClusterName)
+		require.NoError(rb.T(), err)
 	}
+	podErrors := pods.StatusPods(client, clusterName)
+	require.Empty(rb.T(), podErrors)
 }
 
 func (rb *StackStateRBACTestSuite) TestMembersCannotInstallStackstate() {

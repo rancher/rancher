@@ -31,18 +31,15 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var (
-	uiExtensionsRepo = "https://github.com/rancher/ui-plugin-charts"
-	uiGitBranch      = "main"
-	rancherUIPlugins = "rancher-ui-plugins"
-)
-
 const (
 	project                 = "management.cattle.io.project"
 	rancherPartnerCharts    = "rancher-partner-charts"
 	systemProject           = "System"
 	localCluster            = "local"
 	stackStateConfigFileKey = "stackstateConfigs"
+	uiExtensionsRepo        = "https://github.com/rancher/ui-plugin-charts"
+	uiGitBranch             = "main"
+	rancherUIPlugins        = "rancher-ui-plugins"
 )
 
 type StackStateTestSuite struct {
@@ -52,7 +49,7 @@ type StackStateTestSuite struct {
 	cluster                       *clusters.ClusterMeta
 	projectID                     string
 	stackstateAgentInstallOptions *charts.InstallOptions
-	stackstateConfigs             observability.StackStateConfigs
+	stackstateConfigs             *observability.StackStateConfig
 }
 
 func (ss *StackStateTestSuite) TearDownSuite() {
@@ -74,8 +71,6 @@ func (ss *StackStateTestSuite) SetupSuite() {
 	require.NoError(ss.T(), err)
 	ss.cluster = cluster
 
-	log.Info("Creating a project and namespace for the chart to be installed in.")
-
 	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
 	projectTemplate.Name = charts.StackstateNamespace
 	project, err := client.Steve.SteveType(project).Create(projectTemplate)
@@ -88,14 +83,14 @@ func (ss *StackStateTestSuite) SetupSuite() {
 	_, err = ss.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
 
 	if k8sErrors.IsNotFound(err) {
-		err = observability.CreateExtensionsRepo(ss.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
+		err = uiplugins.CreateExtensionsRepo(ss.client, rancherUIPlugins, uiExtensionsRepo, uiGitBranch)
 		log.Info("Created an extensions repo for ui plugins.")
 	}
 	require.NoError(ss.T(), err)
 
-	var stackstateConfigs observability.StackStateConfigs
+	var stackstateConfigs observability.StackStateConfig
 	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
-	ss.stackstateConfigs = stackstateConfigs
+	ss.stackstateConfigs = &stackstateConfigs
 
 	err = observability.WhitelistStackstateDomains(ss.client, []string{ss.stackstateConfigs.Url})
 	require.NoError(ss.T(), err)
@@ -107,7 +102,6 @@ func (ss *StackStateTestSuite) SetupSuite() {
 		log.Info("Installed stackstate CRD")
 	}
 	require.NoError(ss.T(), err)
-
 
 	client, err = client.ReLogin()
 	require.NoError(ss.T(), err)
@@ -125,9 +119,9 @@ func (ss *StackStateTestSuite) SetupSuite() {
 			Version:     latestUIPluginVersion,
 		}
 
-		err = uiplugins.InstallStackstateUiPlugin(client, extensionOptions)
+		err = uiplugins.InstallObservabilityUiPlugin(client, extensionOptions)
 		require.NoError(ss.T(), err)
-		ss.T().Log("Installed stackstate ui extensions")
+		log.Info("Installed stackstate ui extensions")
 	}
 
 	steveAdminClient, err := client.Steve.ProxyDownstream(localCluster)
@@ -136,12 +130,14 @@ func (ss *StackStateTestSuite) SetupSuite() {
 	crdConfig := observability.NewStackstateCRDConfiguration(charts.StackstateNamespace, observability.StackstateName, ss.stackstateConfigs)
 	crd, err := steveAdminClient.SteveType(charts.StackstateCRD).Create(crdConfig)
 	require.NoError(ss.T(), err)
-	ss.T().Log("Created stackstate ui extensions configuration")
+	log.Info("Created stackstate ui extensions configuration")
 
 	_, err = steveAdminClient.SteveType(charts.StackstateCRD).ByID(crd.ID)
 	require.NoError(ss.T(), err)
 
 	latestSSVersion, err := ss.client.Catalog.GetLatestChartVersion(charts.StackstateK8sAgent, rancherPartnerCharts)
+	require.NoError(ss.T(), err)
+
 	ss.stackstateAgentInstallOptions = &charts.InstallOptions{
 		Cluster:   cluster,
 		Version:   latestSSVersion,
@@ -208,16 +204,14 @@ func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
 	}
 
 	versionLatest := versionsList[0]
-	ss.T().Log(versionLatest)
 	versionBeforeLatest := versionsList[1]
-	ss.T().Log(versionBeforeLatest)
 	ss.stackstateAgentInstallOptions.Version = versionBeforeLatest
 
 	ss.T().Log("Checking if the stackstate agent chart is installed with one of the previous versions")
 	initialStackstateAgent, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
 	require.NoError(ss.T(), err)
 
-	if initialStackstateAgent.IsAlreadyInstalled || initialStackstateAgent.ChartDetails.Spec.Chart.Metadata.Version == versionLatest {
+	if initialStackstateAgent.IsAlreadyInstalled {
 		ss.T().Skip("Skipping the upgrade case, stackstate agent chart is already installed.")
 	}
 
@@ -239,15 +233,13 @@ func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
 	require.NoError(ss.T(), err)
 
 	stackstateAgentChartPreUpgrade, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
-
 	require.NoError(ss.T(), err)
 
 	// Validate current version of stackstate agent is one of the versions before latest
 	chartVersionPreUpgrade := stackstateAgentChartPreUpgrade.ChartDetails.Spec.Chart.Metadata.Version
 	require.Contains(ss.T(), versionsList[1:], chartVersionPreUpgrade)
 
-	ss.stackstateAgentInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.StackstateK8sAgent, rancherPartnerCharts)
-	require.NoError(ss.T(), err)
+	ss.stackstateAgentInstallOptions.Version = versionLatest
 
 	ss.T().Log("Upgrading stackstate agent chart to the latest version")
 	err = charts.UpgradeStackstateAgentChart(client, ss.stackstateAgentInstallOptions, ss.stackstateConfigs, systemProject.ID)
@@ -261,15 +253,22 @@ func (ss *StackStateTestSuite) TestUpgradeStackstateAgentChart() {
 	err = extencharts.WatchAndWaitDaemonSets(client, ss.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
 	require.NoError(ss.T(), err)
 
-	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(ss.client, ss.client.RancherConfig.ClusterName, fleet.Namespace)
+	clusterObject, _, err := extensionscluster.GetProvisioningClusterByName(ss.client, ss.client.RancherConfig.ClusterName, fleet.Namespace)
+	require.NoError(ss.T(), err)
+
+	var clusterName string
+
 	if clusterObject != nil {
 		status := &provv1.ClusterStatus{}
 		err := steveV1.ConvertToK8sType(clusterObject.Status, status)
 		require.NoError(ss.T(), err)
-
-		podErrors := pods.StatusPods(client, status.ClusterName)
-		require.Empty(ss.T(), podErrors)
+		clusterName = status.ClusterName
+	} else {
+		clusterName, err = extensionscluster.GetClusterIDByName(ss.client, ss.client.RancherConfig.ClusterName)
+		require.NoError(ss.T(), err)
 	}
+	podErrors := pods.StatusPods(client, clusterName)
+	require.Empty(ss.T(), podErrors)
 
 	stackstateAgentChartPostUpgrade, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
 	require.NoError(ss.T(), err)
@@ -316,14 +315,19 @@ func (ss *StackStateTestSuite) TestDynamicUpgradeStackstateAgentChart() {
 	require.NoError(ss.T(), err)
 
 	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(ss.client, ss.client.RancherConfig.ClusterName, fleet.Namespace)
+
+	var clusterName string
 	if clusterObject != nil {
 		status := &provv1.ClusterStatus{}
 		err := steveV1.ConvertToK8sType(clusterObject.Status, status)
 		require.NoError(ss.T(), err)
-
-		podErrors := pods.StatusPods(client, status.ClusterName)
-		require.Empty(ss.T(), podErrors)
+		clusterName = status.ClusterName
+	} else {
+		clusterName, err = extensionscluster.GetClusterIDByName(ss.client, ss.client.RancherConfig.ClusterName)
+		require.NoError(ss.T(), err)
 	}
+	podErrors := pods.StatusPods(client, clusterName)
+	require.Empty(ss.T(), podErrors)
 
 	stackstateAgentChartPostUpgrade, err := extencharts.GetChartStatus(client, ss.cluster.ID, charts.StackstateNamespace, charts.StackstateK8sAgent)
 	require.NoError(ss.T(), err)
