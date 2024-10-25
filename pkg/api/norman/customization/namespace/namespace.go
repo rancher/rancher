@@ -12,7 +12,6 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	schema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
@@ -98,9 +97,6 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 			}
 			return httperror.NewAPIError(httperror.NotFound, err.Error())
 		}
-		if ns.Annotations[helm.AppIDsLabel] != "" {
-			return errors.New("namespace is currently being used")
-		}
 		if projectID == "" {
 			delete(ns.Annotations, nslabels.ProjectIDFieldLabel)
 			delete(ns.Labels, nslabels.ProjectIDFieldLabel)
@@ -121,9 +117,8 @@ func NewFormatter(next types.Formatter) types.Formatter {
 		if next != nil {
 			next(request, resource)
 		}
-		annotations := convert.ToMapInterface(resource.Values["annotations"])
 		canUpdate := canUpdateNS(request, resource)
-		if canUpdate && convert.ToString(annotations[helm.AppIDsLabel]) == "" {
+		if canUpdate {
 			resource.AddAction(request, "move")
 		}
 	}

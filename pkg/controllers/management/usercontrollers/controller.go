@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -45,7 +44,6 @@ var (
 		"field.cattle.io/resourceQuotaTemplateId",
 		"lifecycle.cattle.io/create.namespace-auth",
 		nslabels.ProjectIDFieldLabel,
-		helm.AppIDsLabel,
 	}
 )
 
