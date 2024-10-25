@@ -4,6 +4,7 @@ import (
 	"sort"
 	"testing"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,7 +157,23 @@ func TestProviderSearchPrincipal(t *testing.T) {
 
 	for _, tt := range principalSearchTests {
 		t.Run("searchKey "+tt.searchKey, func(t *testing.T) {
-			principals, err := provider.SearchPrincipals(tt.searchKey, "user", v3.Token{})
+			principals, err := provider.SearchPrincipals(tt.searchKey, "user", &v3.Token{})
+			require.NoError(t, err)
+
+			var names []string
+			for _, p := range principals {
+				names = append(names, p.Name)
+			}
+
+			sort.Strings(names)
+			sort.Strings(tt.want)
+
+			require.Equal(t, tt.want, names)
+		})
+
+		// and the same behaviour for ext tokens
+		t.Run("searchKey "+tt.searchKey+", ext ", func(t *testing.T) {
+			principals, err := provider.SearchPrincipals(tt.searchKey, "user", &ext.Token{})
 			require.NoError(t, err)
 
 			var names []string
