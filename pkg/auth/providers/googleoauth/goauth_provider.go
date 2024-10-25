@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -130,7 +131,7 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 	return userPrincipal, groupPrincipals, string(oauthToken), nil
 }
 
-func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
+func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -139,7 +140,7 @@ func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, 
 		return principals, err
 	}
 
-	storedOauthToken, err := g.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
+	storedOauthToken, err := g.tokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -155,19 +156,19 @@ func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, 
 		return principals, err
 	}
 	for _, acc := range accounts {
-		principals = append(principals, g.toPrincipal(acc.Type, acc, &token))
+		principals = append(principals, g.toPrincipal(acc.Type, acc, token))
 	}
 	logrus.Debugf("[Google OAuth] SearchPrincipals: Returning principals")
 	return principals, nil
 }
 
-func (g *googleOauthProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	var principal v3.Principal
 	config, err := g.getGoogleOAuthConfigCR()
 	if err != nil {
 		return principal, err
 	}
-	storedOauthToken, err := g.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
+	storedOauthToken, err := g.tokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return principal, err
@@ -214,7 +215,7 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token v3.Token) (
 			acc.GivenName = user.Name.GivenName
 			acc.FamilyName = user.Name.FamilyName
 		}
-		return g.toPrincipal(userType, acc, &token), nil
+		return g.toPrincipal(userType, acc, token), nil
 	case groupType:
 		group, err := adminSvc.Groups.Get(externalID).Do()
 		if err != nil {
@@ -227,17 +228,17 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token v3.Token) (
 			}
 			return principal, err
 		}
-		return g.toPrincipal(groupType, Account{SubjectUniqueID: group.Id, Email: group.Email, Name: group.Name}, &token), nil
+		return g.toPrincipal(groupType, Account{SubjectUniqueID: group.Id, Email: group.Email, Name: group.Name}, token), nil
 	default:
 		return principal, fmt.Errorf("cannot get the google account due to invalid externalIDType %v", principalType)
 	}
 }
 
-func (g *googleOauthProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (g *googleOauthProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (g *googleOauthProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (g *googleOauthProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
@@ -369,7 +370,7 @@ func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v32.GoogleOauthCon
 	return nil
 }
 
-func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, token *v3.Token) v3.Principal {
+func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, token accessor.TokenAccessor) v3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Email
@@ -387,12 +388,12 @@ func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, to
 	if principalType == userType {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = g.isThisUserMe(token.UserPrincipal, princ)
+			princ.Me = g.isThisUserMe(token.GetUserPrincipal(), princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
-			princ.MemberOf = g.tokenMGR.IsMemberOf(*token, princ)
+			princ.MemberOf = g.tokenMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ
