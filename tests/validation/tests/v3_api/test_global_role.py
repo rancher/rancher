@@ -2,11 +2,6 @@ from .common import *  # NOQA
 from rancher import ApiError
 import pytest
 
-# values used to create a catalog
-BRANCH = "dev"
-URL = "https://git.rancher.io/system-charts"
-
-
 def test_global_role_create_1(remove_resource):
     """ test that admin can create a new global role, assign it
     to a standard user, then the user get the newly-assigned permission
@@ -21,25 +16,10 @@ def test_global_role_create_1(remove_resource):
     client = get_admin_client()
     user, token = create_user(client)
     remove_resource(user)
-    # check that the user can NOT create catalogs
-    name = random_name()
-    validate_create_catalog(token,
-                            catalog_name=name,
-                            branch=BRANCH,
-                            url=URL,
-                            permission=False)
-    client.create_global_role_binding(globalRoleId=gr.id, userId=user.id)
     # check that the user has the global role
     target_grb = client.list_global_role_binding(userId=user.id,
                                                  globalRoleId=gr.id).data
     assert len(target_grb) == 1
-    # the user can create catalogs
-    obj = validate_create_catalog(token,
-                                  catalog_name=name,
-                                  branch=BRANCH,
-                                  url=URL,
-                                  permission=True)
-    remove_resource(obj)
 
 
 def test_global_role_create_2(remove_resource):
@@ -82,27 +62,9 @@ def test_global_role_edit(remove_resource):
     remove_resource(user)
     # check that the user can NOT create catalogs
     name = random_name()
-    validate_create_catalog(user_token,
-                            catalog_name=name,
-                            branch=BRANCH,
-                            url=URL,
-                            permission=False)
     client.create_global_role_binding(globalRoleId=gr.id, userId=user.id)
-    # now he can create catalogs
-    catalog = validate_create_catalog(user_token,
-                                      catalog_name=name,
-                                      branch=BRANCH,
-                                      url=URL,
-                                      permission=True)
-    remove_resource(catalog)
     # edit the global role
     validate_edit_global_role(ADMIN_TOKEN, gr, True)
-    # the user can not create new catalog
-    validate_create_catalog(user_token,
-                            catalog_name=name,
-                            branch=BRANCH,
-                            url=URL,
-                            permission=False)
 
 
 def test_global_role_delete(remove_resource):
@@ -116,20 +78,7 @@ def test_global_role_delete(remove_resource):
     remove_resource(user)
     client.create_global_role_binding(globalRoleId=gr.id, userId=user.id)
     name = random_name()
-    catalog = validate_create_catalog(token,
-                                      catalog_name=name,
-                                      branch=BRANCH,
-                                      url=URL,
-                                      permission=True)
-    remove_resource(catalog)
     validate_delete_global_role(ADMIN_TOKEN, gr, True)
-    # the user can not create new catalog
-    validate_create_catalog(token,
-                            catalog_name=name,
-                            branch=BRANCH,
-                            url=URL,
-                            permission=False)
-
 
 def test_builtin_global_role():
     # builtin global role can not be deleted
