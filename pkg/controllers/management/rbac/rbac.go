@@ -20,10 +20,6 @@ const (
 	OwnerAccess                     = "owner"
 	MemberAccess                    = "member"
 	ReadOnlyAccess                  = "read-only"
-	MultiClusterAppResource         = "multiclusterapps"
-	MultiClusterAppRevisionResource = "multiclusterapprevisions"
-	GlobalDNSResource               = "globaldnses"
-	GlobalDNSProviderResource       = "globaldnsproviders"
 	ClusterTemplateResource         = "clustertemplates"
 	ClusterTemplateRevisionResource = "clustertemplaterevisions"
 	CloudCredentialResource         = "secrets"
@@ -68,13 +64,8 @@ func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creat
 		case ReadOnlyAccess:
 			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
 		default:
-			if resource == GlobalDNSProviderResource || resource == GlobalDNSResource {
-				// since these two resources only have one access type "owner" for their members
-				ownerAccessSubjects = append(ownerAccessSubjects, s)
-			} else {
-				// for mcapp and cluster templates which can have other access types
-				readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
-			}
+			// for mcapp and cluster templates which can have other access types
+			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
 		}
 	}
 
@@ -219,14 +210,6 @@ func GetRoleNameAndVerbs(roleAccess string, resourceName string, resourceType st
 	var verbs []string
 
 	switch resourceType {
-	case MultiClusterAppResource:
-		resourceName += "-m-"
-	case MultiClusterAppRevisionResource:
-		resourceName += "-mr-"
-	case GlobalDNSResource:
-		resourceName += "-g-"
-	case GlobalDNSProviderResource:
-		resourceName += "-gp-"
 	case ClusterTemplateResource:
 		resourceName += "-ct-"
 	case ClusterTemplateRevisionResource:

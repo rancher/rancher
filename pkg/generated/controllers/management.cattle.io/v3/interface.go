@@ -39,7 +39,6 @@ type Interface interface {
 	AzureADProvider() AzureADProviderController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
-	ClusterLogging() ClusterLoggingController
 	ClusterProxyConfig() ClusterProxyConfigController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
@@ -71,7 +70,6 @@ type Interface interface {
 	Preference() PreferenceController
 	Principal() PrincipalController
 	Project() ProjectController
-	ProjectLogging() ProjectLoggingController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
 	RancherUserNotification() RancherUserNotificationController
@@ -127,10 +125,6 @@ func (v *version) CloudCredential() CloudCredentialController {
 
 func (v *version) Cluster() ClusterController {
 	return generic.NewNonNamespacedController[*v3.Cluster, *v3.ClusterList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", v.controllerFactory)
-}
-
-func (v *version) ClusterLogging() ClusterLoggingController {
-	return generic.NewController[*v3.ClusterLogging, *v3.ClusterLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterLogging"}, "clusterloggings", true, v.controllerFactory)
 }
 
 func (v *version) ClusterProxyConfig() ClusterProxyConfigController {
@@ -255,10 +249,6 @@ func (v *version) Principal() PrincipalController {
 
 func (v *version) Project() ProjectController {
 	return generic.NewController[*v3.Project, *v3.ProjectList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Project"}, "projects", true, v.controllerFactory)
-}
-
-func (v *version) ProjectLogging() ProjectLoggingController {
-	return generic.NewController[*v3.ProjectLogging, *v3.ProjectLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectLogging"}, "projectloggings", true, v.controllerFactory)
 }
 
 func (v *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {

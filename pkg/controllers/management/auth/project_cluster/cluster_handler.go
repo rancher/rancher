@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -194,14 +193,6 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 			if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
 				annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
 			}
-		}
-
-		if name == project.System {
-			latestSystemVersion, err := systemimage.GetSystemImageVersion()
-			if err != nil {
-				return obj, err
-			}
-			annotations[project.SystemImageVersionAnnotation] = latestSystemVersion
 		}
 
 		project := &apisv3.Project{

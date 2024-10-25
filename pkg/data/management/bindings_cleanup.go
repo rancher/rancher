@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	dupeBindingsCleanupKey          = "DedupeBindingsDone"
-	orphanBindingsCleanupKey        = "CleanupOrphanBindingsDone"
-	orphanCatalogBindingsCleanupKey = "CleanupOrphanCatalogBindingsDone"
+	dupeBindingsCleanupKey   = "DedupeBindingsDone"
+	orphanBindingsCleanupKey = "CleanupOrphanBindingsDone"
 )
 
 func CleanupDuplicateBindings(scaledContext *config.ScaledContext, wContext *wrangler.Context) {
@@ -70,10 +69,6 @@ func CleanupOrphanBindings(scaledContext *config.ScaledContext, wContext *wrangl
 	if err != nil {
 		logrus.Errorf("failed to cleanup orphan bindings")
 	}
-	err = cleanupSpecificOrphanedBindings(scaledContext, wContext, orphanCatalogBindingsCleanupKey)
-	if err != nil {
-		logrus.Errorf("failed to cleanup orphan catalog bindings")
-	}
 }
 
 // Runs the cleanup process for orphaned bindings given a cleanupKey specifying which cleanup job should be run (orphanBindings or orphanCatalogBindings)
@@ -94,8 +89,6 @@ func cleanupSpecificOrphanedBindings(scaledContext *config.ScaledContext, wConte
 	// run cleanup
 	if cleanupKey == orphanBindingsCleanupKey {
 		err = clean.OrphanBindings(&scaledContext.RESTConfig)
-	} else {
-		err = clean.OrphanCatalogBindings(&scaledContext.RESTConfig)
 	}
 	if err != nil {
 		logrus.Warnf("[%v] error during orphan binding cleanup: %v", cleanupKey, err)

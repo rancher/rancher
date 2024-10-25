@@ -6,12 +6,9 @@ import (
 	"reflect"
 	"time"
 
-	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	mgmtconv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
@@ -96,7 +93,6 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	returnError := errors.Join(
 		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
 		gr.reconcileGlobalRole(obj),
-		gr.reconcileCatalogRole(obj),
 		gr.reconcileNamespacedRoles(obj),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
 		gr.setGRAsCompleted(obj),
@@ -115,7 +111,6 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	returnError := errors.Join(
 		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
 		gr.reconcileGlobalRole(obj),
-		gr.reconcileCatalogRole(obj),
 		gr.reconcileNamespacedRoles(obj),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
 		gr.setGRAsCompleted(obj),
@@ -175,95 +170,6 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 	}
 	globalRole.Annotations[crNameAnnotation] = crName
 	addCondition(globalRole, condition, ClusterRoleExists, crName, nil)
-	return nil
-}
-
-func (gr *globalRoleLifecycle) reconcileCatalogRole(globalRole *v3.GlobalRole) error {
-	// rules which give template/template version access need to have a specific namespaced role created, since the
-	// backend resources that they grant access to are namespaced resources
-	var catalogRules []v1.PolicyRule
-	for _, rule := range globalRole.Rules {
-		ruleGivesTemplateAccess := rbac.RuleGivesResourceAccess(rule, TemplateResourceRule)
-		ruleGivesTemplateVersionAccess := rbac.RuleGivesResourceAccess(rule, TemplateVersionResourceRule)
-		if !(ruleGivesTemplateAccess || ruleGivesTemplateVersionAccess) {
-			// if rule doesn't give access to templates or template versions, move on without evaluating further
-			continue
-		}
-		ruleCopy := rule.DeepCopy()
-		ruleCopy.APIGroups = []string{mgmt.GroupName}
-		ruleCopy.Resources = []string{}
-		// NonResource URLS are only used for ClusterRoles - these roles are namespaced, so no need to include
-		ruleCopy.NonResourceURLs = []string{}
-		if ruleGivesTemplateAccess {
-			ruleCopy.Resources = append(ruleCopy.Resources, catalogTemplateResourceRule)
-		}
-		if ruleGivesTemplateVersionAccess {
-			ruleCopy.Resources = append(ruleCopy.Resources, catalogTemplateVersionResourceRule)
-		}
-		catalogRules = append(catalogRules, *ruleCopy)
-	}
-	if len(catalogRules) == 0 {
-		return nil
-	}
-	// if this GR gives access to templates/template versions, create a role in cattle-global-data for access
-	roleName := globalRole.Name + "-" + GlobalCatalogRole
-	condition := metav1.Condition{
-		Type: CatalogRoleExists,
-	}
-	role, err := gr.rLister.Get(namespace.GlobalNamespace, roleName)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			addCondition(globalRole, condition, FailedToGetRole, roleName, err)
-			return err
-		}
-		role = &v1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      roleName,
-				Namespace: namespace.GlobalNamespace,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: globalRole.APIVersion,
-						Kind:       globalRole.Kind,
-						Name:       globalRole.Name,
-						UID:        globalRole.UID,
-					},
-				},
-			},
-			Rules: catalogRules,
-		}
-		_, err = gr.rClient.Create(role)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			addCondition(globalRole, condition, FailedToCreateRole, roleName, err)
-			return err
-		}
-	} else {
-		// if we found the role, make sure that the rules are up-to-date and give the same access as their grs
-		updateRule := false
-		for _, rule := range catalogRules {
-			ruleFound := false
-			for _, existingRule := range globalRole.Rules {
-				if reflect.DeepEqual(rule, existingRule) {
-					ruleFound = true
-					break
-				}
-			}
-			if !ruleFound {
-				// if we need to update any individual rule, just replace them all
-				updateRule = true
-				break
-			}
-		}
-		if updateRule {
-			newRole := role.DeepCopy()
-			newRole.Rules = catalogRules
-			_, err := gr.rClient.Update(newRole)
-			if err != nil {
-				addCondition(globalRole, condition, FailedToUpdateRole, roleName, err)
-				return err
-			}
-		}
-	}
-	addCondition(globalRole, condition, CatalogRoleExists, roleName, nil)
 	return nil
 }
 

@@ -113,13 +113,6 @@ func newTestHandler(t *testing.T) *handler {
 		},
 	}
 
-	clusterCatalogLister := &v3fakes.ClusterCatalogListerMock{
-		ListFunc: func(namespace string, selector labels.Selector) ([]*apimgmtv3.ClusterCatalog, error) {
-			var list []*apimgmtv3.ClusterCatalog
-			return list, nil
-		},
-	}
-
 	projectLister := &v3fakes.ProjectListerMock{
 		ListFunc: func(namespace string, selector labels.Selector) ([]*apimgmtv3.Project, error) {
 			var list []*apimgmtv3.Project
@@ -155,9 +148,8 @@ func newTestHandler(t *testing.T) *handler {
 				return cluster.DeepCopy(), nil
 			},
 		},
-		migrator:             NewMigrator(&secretLister, &secrets),
-		clusterCatalogLister: clusterCatalogLister,
-		projectLister:        projectLister,
+		migrator:      NewMigrator(&secretLister, &secrets),
+		projectLister: projectLister,
 	}
 }
 

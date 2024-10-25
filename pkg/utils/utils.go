@@ -9,6 +9,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+func Contains(collection []string, key string) bool {
+	for _, value := range collection {
+		if value == key {
+			return true
+		}
+	}
+
+	return false
+}
+
 func FormatResourceList(resources v1.ResourceList) string {
 	resourceStrings := make([]string, 0, len(resources))
 	for key, value := range resources {

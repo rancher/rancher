@@ -36,7 +36,6 @@ var (
 	AzureADProviderResourceName                           = "azureadproviders"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
-	ClusterLoggingResourceName                            = "clusterloggings"
 	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
@@ -68,7 +67,6 @@ var (
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
-	ProjectLoggingResourceName                            = "projectloggings"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
@@ -121,8 +119,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CloudCredentialList{},
 		&Cluster{},
 		&ClusterList{},
-		&ClusterLogging{},
-		&ClusterLoggingList{},
 		&ClusterProxyConfig{},
 		&ClusterProxyConfigList{},
 		&ClusterRegistrationToken{},
@@ -185,8 +181,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PrincipalList{},
 		&Project{},
 		&ProjectList{},
-		&ProjectLogging{},
-		&ProjectLoggingList{},
 		&ProjectNetworkPolicy{},
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},

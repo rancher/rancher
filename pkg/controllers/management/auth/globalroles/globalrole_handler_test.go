@@ -8,8 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	normanv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
@@ -50,16 +48,6 @@ var (
 		Verbs:     []string{"*"},
 		APIGroups: []string{"*"},
 		Resources: []string{"*"},
-	}
-	// templatePolicyRule gets transformed into catalogTemplatePolicyRule via reconcileCatalogRole
-	catalogTemplatePolicyRule = rbacv1.PolicyRule{
-		Verbs:     []string{"*"},
-		APIGroups: []string{mgmt.GroupName},
-		Resources: []string{
-			catalogTemplateResourceRule,
-			catalogTemplateVersionResourceRule,
-		},
-		NonResourceURLs: []string{},
 	}
 
 	defaultGR = v3.GlobalRole{
@@ -298,203 +286,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 			}
 			require.Equal(t, test.condition, rc)
 			require.Equal(t, ClusterRoleExists, c.Type)
-		})
-	}
-}
-
-func TestReconcileCatalogRole(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name            string
-		stateSetup      func(grTestState)
-		stateAssertions func(grTestStateChanges)
-		globalRole      *v3.GlobalRole
-		wantError       bool
-		condition       *reducedCondition
-	}{
-		{
-			name: "no catalog role",
-			globalRole: &v3.GlobalRole{
-				Rules: []rbacv1.PolicyRule{
-					catalogTemplatePolicyRule,
-				},
-			},
-			wantError: false,
-		},
-		{
-			name: "get role failed",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.GetFunc = func(namespace, name string) (*rbacv1.Role, error) {
-					return nil, fmt.Errorf("error")
-				}
-			},
-			globalRole: catalogGR.DeepCopy(),
-			wantError:  true,
-			condition: &reducedCondition{
-				reason: FailedToGetRole,
-				status: metav1.ConditionFalse,
-			},
-		},
-		{
-			name: "create role failed",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.GetFunc = func(namespace string, name string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(in1 *rbacv1.Role) (*rbacv1.Role, error) {
-					return nil, fmt.Errorf("error")
-				}
-			},
-			globalRole: catalogGR.DeepCopy(),
-			wantError:  true,
-			condition: &reducedCondition{
-				reason: FailedToCreateRole,
-				status: metav1.ConditionFalse,
-			},
-		},
-		{
-			name: "create role succeeds",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.GetFunc = func(namespace string, name string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					return nil, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 1)
-				r, ok := gtsc.createdRoles["catalogRole-global-catalog"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, catalogTemplatePolicyRule, r.Rules[0])
-			},
-			globalRole: catalogGR.DeepCopy(),
-			wantError:  false,
-			condition: &reducedCondition{
-				reason: CatalogRoleExists,
-				status: metav1.ConditionTrue,
-			},
-		},
-		{
-			name: "update role failed",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.GetFunc = func(namespace string, name string) (*rbacv1.Role, error) {
-					return &rbacv1.Role{
-						Rules: []rbacv1.PolicyRule{readPodPolicyRule},
-					}, nil
-				}
-				state.rClientMock.UpdateFunc = func(_ *rbacv1.Role) (*rbacv1.Role, error) {
-					return nil, fmt.Errorf("error")
-				}
-			},
-			globalRole: catalogGR.DeepCopy(),
-			wantError:  true,
-			condition: &reducedCondition{
-				reason: FailedToUpdateRole,
-				status: metav1.ConditionFalse,
-			},
-		},
-		{
-			name: "update role succeeds",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.GetFunc = func(namespace string, name string) (*rbacv1.Role, error) {
-					return &rbacv1.Role{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-role",
-						},
-						Rules: []rbacv1.PolicyRule{readPodPolicyRule},
-					}, nil
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					return nil, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 1)
-				r, ok := gtsc.createdRoles["test-role"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, catalogTemplatePolicyRule, r.Rules[0])
-			},
-			globalRole: catalogGR.DeepCopy(),
-			wantError:  false,
-			condition: &reducedCondition{
-				reason: CatalogRoleExists,
-				status: metav1.ConditionTrue,
-			},
-		},
-		{
-			name: "update role no changes",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.GetFunc = func(namespace string, name string) (*rbacv1.Role, error) {
-					return &rbacv1.Role{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-role",
-						},
-						Rules: []rbacv1.PolicyRule{readConfigPolicyRule},
-					}, nil
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					return nil, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 0)
-			},
-			// templatePolicyRule is a catalog rule, but it is covered by catalogTemplatePolicyRule
-			// so the update does not need to happen since the user has all needed rules
-			globalRole: &v3.GlobalRole{
-				Rules: []rbacv1.PolicyRule{
-					templatePolicyRule,
-					catalogTemplatePolicyRule,
-				},
-			},
-			wantError: false,
-			condition: &reducedCondition{
-				reason: CatalogRoleExists,
-				status: metav1.ConditionTrue,
-			},
-		},
-	}
-
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			grLifecycle := globalRoleLifecycle{}
-			state := setupTest(t)
-			if test.stateSetup != nil {
-				test.stateSetup(state)
-			}
-			grLifecycle.rLister = state.rListerMock
-			grLifecycle.rClient = state.rClientMock
-
-			err := grLifecycle.reconcileCatalogRole(test.globalRole)
-
-			if test.wantError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			if test.stateAssertions != nil {
-				test.stateAssertions(*state.stateChanges)
-			}
-			if test.condition != nil {
-				// only 1 ClusterRole is created, so there should only ever be 1 condition
-				require.Len(t, test.globalRole.Status.Conditions, 1)
-				c := test.globalRole.Status.Conditions[0]
-				require.Equal(t, test.condition.reason, c.Reason)
-				require.Equal(t, test.condition.status, c.Status)
-				require.Equal(t, CatalogRoleExists, c.Type)
-			}
 		})
 	}
 }
@@ -1415,7 +1206,7 @@ func TestSetGRAsInProgress(t *testing.T) {
 		{
 			name: "update gr status to InProgress",
 			oldGR: &v3.GlobalRole{
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Summary: SummaryCompleted,
 					Conditions: []metav1.Condition{
 						{
@@ -1431,7 +1222,7 @@ func TestSetGRAsInProgress(t *testing.T) {
 		{
 			name: "update gr with empty status to InProgress",
 			oldGR: &v3.GlobalRole{
-				Status: mgmtv3.GlobalRoleStatus{},
+				Status: v3.GlobalRoleStatus{},
 			},
 			updateReturn: nil,
 			wantError:    false,
@@ -1494,7 +1285,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1513,7 +1304,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1536,7 +1327,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{},
 				},
 			},
@@ -1561,7 +1352,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1584,7 +1375,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1607,7 +1398,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1677,7 +1468,7 @@ func TestSetGRAsTerminating(t *testing.T) {
 		{
 			name: "update gr status to Terminating",
 			oldGR: &v3.GlobalRole{
-				Status: mgmtv3.GlobalRoleStatus{
+				Status: v3.GlobalRoleStatus{
 					Summary: SummaryCompleted,
 					Conditions: []metav1.Condition{
 						{
@@ -1693,7 +1484,7 @@ func TestSetGRAsTerminating(t *testing.T) {
 		{
 			name: "update gr with empty status to Terminating",
 			oldGR: &v3.GlobalRole{
-				Status: mgmtv3.GlobalRoleStatus{},
+				Status: v3.GlobalRoleStatus{},
 			},
 			updateReturn: nil,
 			wantError:    false,

@@ -9,9 +9,7 @@ import (
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/norman/customization/app"
 	"github.com/rancher/rancher/pkg/api/norman/customization/authn"
-	"github.com/rancher/rancher/pkg/api/norman/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
@@ -20,7 +18,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/api/norman/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
 	"github.com/rancher/rancher/pkg/api/norman/customization/nodepool"
@@ -31,8 +28,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/secret"
 	"github.com/rancher/rancher/pkg/api/norman/customization/setting"
-	appStore "github.com/rancher/rancher/pkg/api/norman/store/app"
-	catalogStore "github.com/rancher/rancher/pkg/api/norman/store/catalog"
 	"github.com/rancher/rancher/pkg/api/norman/store/cert"
 	"github.com/rancher/rancher/pkg/api/norman/store/cluster"
 	clustertemplatestore "github.com/rancher/rancher/pkg/api/norman/store/clustertemplate"
@@ -41,7 +36,6 @@ import (
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
 	nodeStore "github.com/rancher/rancher/pkg/api/norman/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/norman/store/nodetemplate"
-	"github.com/rancher/rancher/pkg/api/norman/store/noopwatching"
 	"github.com/rancher/rancher/pkg/api/norman/store/preference"
 	rtStore "github.com/rancher/rancher/pkg/api/norman/store/roletemplate"
 	"github.com/rancher/rancher/pkg/api/norman/store/scoped"
@@ -107,23 +101,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &managementschema.Version,
-		client.CatalogType,
-		client.CatalogTemplateType,
-		client.CatalogTemplateVersionType,
-		client.ClusterCatalogType,
 		client.ComposeConfigType,
-		client.MultiClusterAppType,
-		client.MultiClusterAppRevisionType,
-		client.ProjectCatalogType,
-		client.TemplateType,
-		client.TemplateVersionType,
-		client.TemplateContentType,
 		client.RancherUserNotificationType,
-	)
-
-	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &projectschema.Version,
-		projectclient.AppType,
-		projectclient.AppRevisionType,
 	)
 
 	if err := factory.BatchWait(); err != nil {
@@ -152,15 +131,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	EtcdBackups(schemas, apiContext)
 	RancherUserNotifications(schemas, apiContext)
 
-	Templates(ctx, schemas, apiContext)
-	TemplateVersion(ctx, schemas, apiContext)
-	Catalog(schemas, apiContext)
-	ProjectCatalog(schemas, apiContext)
-	ClusterCatalog(schemas, apiContext)
-	App(schemas, apiContext, clusterManager)
-	TemplateContent(schemas)
-	MultiClusterApps(schemas, apiContext)
-
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
 	}
@@ -171,8 +141,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 	projectaction.SetProjectStore(schemas.Schema(&managementschema.Version, client.ProjectType), apiContext)
 	setupScopedTypes(schemas)
-
-	multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
 
 	return nil
 }
@@ -213,7 +181,6 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 		NodepoolGetter:                managementContext.Management,
 		NodeLister:                    managementContext.Management.Nodes("").Controller().Lister(),
 		ClusterClient:                 managementContext.Management.Clusters(""),
-		CatalogManager:                managementContext.CatalogManager,
 		UserMgr:                       managementContext.UserManager,
 		ClusterManager:                clusterManager,
 		NodeTemplateGetter:            managementContext.Management,
@@ -235,116 +202,8 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 		GrLister:                      managementContext.Management.GlobalRoles("").Controller().Lister(),
 	}
 
-	handler.CatalogTemplateVersionLister = managementContext.Management.CatalogTemplateVersions("").Controller().Lister()
 	schema.ActionHandler = handler.ClusterActionHandler
 	schema.Validator = clusterValidator.Validator
-}
-
-func Templates(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
-	schema.Scope = types.NamespaceScope
-	schema.Store = catalog.GetTemplateStore(ctx, managementContext)
-
-	wrapper := catalog.TemplateWrapper{
-		CatalogLister:                managementContext.Management.Catalogs("").Controller().Lister(),
-		ClusterCatalogLister:         managementContext.Management.ClusterCatalogs("").Controller().Lister(),
-		ProjectCatalogLister:         managementContext.Management.ProjectCatalogs("").Controller().Lister(),
-		CatalogTemplateVersionLister: managementContext.Management.CatalogTemplateVersions("").Controller().Lister(),
-		SecretLister:                 managementContext.Core.Secrets("").Controller().Lister(),
-	}
-	schema.Formatter = wrapper.TemplateFormatter
-	schema.LinkHandler = wrapper.TemplateIconHandler
-
-	schemaCatalogTemplate := schemas.Schema(&managementschema.Version, client.CatalogTemplateType)
-	schemaCatalogTemplate.CollectionMethods = []string{}
-	schemaCatalogTemplate.ResourceMethods = []string{}
-}
-
-func TemplateVersion(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.TemplateVersionType)
-	schema.Scope = types.NamespaceScope
-	schema.Store = proxy.NewProxyStore(ctx, managementContext.ClientGetter,
-		config.ManagementStorageContext,
-		scheme.Scheme,
-		[]string{"apis"},
-		"management.cattle.io",
-		"v3",
-		"CatalogTemplateVersion",
-		"catalogtemplateversions")
-	t := catalog.TemplateVerionFormatterWrapper{
-		CatalogLister:        managementContext.Management.Catalogs("").Controller().Lister(),
-		ClusterCatalogLister: managementContext.Management.ClusterCatalogs("").Controller().Lister(),
-		ProjectCatalogLister: managementContext.Management.ProjectCatalogs("").Controller().Lister(),
-		SecretLister:         managementContext.Core.Secrets("").Controller().Lister(),
-	}
-	schema.Formatter = t.TemplateVersionFormatter
-	schema.LinkHandler = t.TemplateVersionReadmeHandler
-	schema.Store = noopwatching.Wrap(schema.Store)
-
-	schemaCatalogTemplateVersion := schemas.Schema(&managementschema.Version, client.CatalogTemplateVersionType)
-	schemaCatalogTemplateVersion.CollectionMethods = []string{}
-	schemaCatalogTemplateVersion.ResourceMethods = []string{}
-}
-
-func TemplateContent(schemas *types.Schemas) {
-	schema := schemas.Schema(&managementschema.Version, client.TemplateContentType)
-	schema.Store = noopwatching.Wrap(schema.Store)
-	schema.CollectionMethods = []string{}
-}
-
-func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.CatalogType)
-	schema.Formatter = catalog.Formatter
-	handler := catalog.ActionHandler{
-		CatalogClient: managementContext.Management.Catalogs(""),
-	}
-	schema.ActionHandler = handler.RefreshActionHandler
-	schema.CollectionFormatter = catalog.CollectionFormatter
-	schema.LinkHandler = handler.ExportYamlHandler
-	schema.Validator = catalog.Validator
-	users := managementContext.Management.Users("")
-	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
-	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
-	secretLister := managementContext.Core.Secrets("").Controller().Lister()
-	secrets := managementContext.Core.Secrets("")
-	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, managementContext, users, grbLister, grLister, secretLister, secrets, clusterLister)
-}
-
-func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.ProjectCatalogType)
-	schema.Formatter = catalog.Formatter
-	handler := catalog.ActionHandler{
-		ProjectCatalogClient: managementContext.Management.ProjectCatalogs(""),
-	}
-	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
-	schema.CollectionFormatter = catalog.CollectionFormatter
-	schema.Validator = catalog.Validator
-	users := managementContext.Management.Users("")
-	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
-	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
-	secretLister := managementContext.Core.Secrets("").Controller().Lister()
-	secrets := managementContext.Core.Secrets("")
-	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, managementContext, users, grbLister, grLister, secretLister, secrets, clusterLister)
-}
-
-func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.ClusterCatalogType)
-	schema.Formatter = catalog.Formatter
-	handler := catalog.ActionHandler{
-		ClusterCatalogClient: managementContext.Management.ClusterCatalogs(""),
-	}
-	schema.ActionHandler = handler.RefreshClusterCatalogActionHandler
-	schema.CollectionFormatter = catalog.CollectionFormatter
-	schema.Validator = catalog.Validator
-	users := managementContext.Management.Users("")
-	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
-	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
-	secretLister := managementContext.Core.Secrets("").Controller().Lister()
-	secrets := managementContext.Core.Secrets("")
-	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, managementContext, users, grbLister, grLister, secretLister, secrets, clusterLister)
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {
@@ -473,32 +332,6 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	return nil
 }
 
-func App(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
-	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
-	store := &appStore.Store{
-		Store:                 schema.Store,
-		Apps:                  management.Project.Apps("").Controller().Lister(),
-		TemplateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
-		CatalogManager:        management.CatalogManager,
-		ClusterLister:         management.Management.Clusters("").Controller().Lister(),
-	}
-	schema.Store = store
-	wrapper := app.Wrapper{
-		Clusters:              management.Management.Clusters(""),
-		ClusterManager:        clusterManager,
-		CatalogManager:        management.CatalogManager,
-		TemplateVersionClient: management.Management.CatalogTemplateVersions(""),
-		TemplateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
-		AppGetter:             management.Project,
-		UserLister:            management.Management.Users("").Controller().Lister(),
-		UserManager:           management.UserManager,
-	}
-	schema.Formatter = app.Formatter
-	schema.ActionHandler = wrapper.ActionHandler
-	schema.LinkHandler = wrapper.LinkHandler
-	schema.Validator = wrapper.Validator
-}
-
 func Setting(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.SettingType)
 	schema.Formatter = setting.Formatter
@@ -589,7 +422,6 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		SysImages:       management.Management.RkeK8sSystemImages(""),
 		ConfigMapLister: management.Core.ConfigMaps("").Controller().Lister(),
 	}
-	lh.CatalogLister = management.Management.Catalogs("").Controller().Lister()
 	schema.ActionHandler = handler.ActionHandler
 	schema.CollectionFormatter = kontainerdriver.CollectionFormatter
 	schema.Formatter = kontainerdriver.NewFormatter(management)
@@ -599,35 +431,6 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
 	schema.Validator = kontainerDriverValidator.Validator
-}
-
-func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.MultiClusterAppType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
-	revisionSchema := schemas.Schema(&managementschema.Version, client.MultiClusterAppRevisionType)
-	revisionSchema.Store = namespacedresource.Wrap(revisionSchema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
-	wrapper := multiclusterapp.Wrapper{
-		MultiClusterApps:              management.Management.MultiClusterApps(""),
-		MultiClusterAppLister:         management.Management.MultiClusterApps("").Controller().Lister(),
-		MultiClusterAppRevisionLister: management.Management.MultiClusterAppRevisions("").Controller().Lister(),
-		PrtbLister:                    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		CrtbLister:                    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		RoleTemplateLister:            management.Management.RoleTemplates("").Controller().Lister(),
-		Users:                         management.Management.Users(""),
-		GrbLister:                     management.Management.GlobalRoleBindings("").Controller().Lister(),
-		GrLister:                      management.Management.GlobalRoles("").Controller().Lister(),
-		Prtbs:                         management.Management.ProjectRoleTemplateBindings(""),
-		Crtbs:                         management.Management.ClusterRoleTemplateBindings(""),
-		ProjectLister:                 management.Management.Projects("").Controller().Lister(),
-		ClusterLister:                 management.Management.Clusters("").Controller().Lister(),
-		Apps:                          management.Project.Apps(""),
-		TemplateVersionLister:         management.Management.CatalogTemplateVersions("").Controller().Lister(),
-		CatalogManager:                management.CatalogManager,
-	}
-	schema.Formatter = wrapper.Formatter
-	schema.ActionHandler = wrapper.ActionHandler
-	schema.LinkHandler = wrapper.LinkHandler
-	schema.Validator = wrapper.Validator
 }
 
 func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) {

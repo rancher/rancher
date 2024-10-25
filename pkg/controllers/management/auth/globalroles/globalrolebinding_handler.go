@@ -10,7 +10,6 @@ import (
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -31,18 +30,12 @@ var (
 )
 
 const (
-	catalogTemplateResourceRule        = "catalogtemplates"
-	catalogTemplateVersionResourceRule = "catalogtemplateversions"
-	crbNameAnnotation                  = "authz.management.cattle.io/crb-name"
-	crtbGrbOwnerIndex                  = "authz.management.cattle.io/crtb-owner"
-	crbNamePrefix                      = "cattle-globalrolebinding-"
-	GlobalCatalogRole                  = "global-catalog"
-	globalCatalogRoleBinding           = "global-catalog-binding"
-	TemplateResourceRule               = "templates"
-	TemplateVersionResourceRule        = "templateversions"
-	localClusterName                   = "local"
-	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner"
-	fleetWorkspacePermissionLabel      = "authz.management.cattle.io/fleet-workspace-permissions"
+	crbNameAnnotation             = "authz.management.cattle.io/crb-name"
+	crtbGrbOwnerIndex             = "authz.management.cattle.io/crtb-owner"
+	crbNamePrefix                 = "cattle-globalrolebinding-"
+	localClusterName              = "local"
+	grbOwnerLabel                 = "authz.management.cattle.io/grb-owner"
+	fleetWorkspacePermissionLabel = "authz.management.cattle.io/fleet-workspace-permissions"
 )
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
@@ -353,7 +346,8 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 				return fmt.Errorf("couldn't update ClusterRoleBinding %v: %w", crb.Name, err)
 			}
 		}
-		return grb.addRulesForTemplateAndTemplateVersions(globalRoleBinding, subject)
+
+		return nil
 	}
 
 	logrus.Infof("Creating new GlobalRoleBinding for GlobalRoleBinding %v", globalRoleBinding.Name)
@@ -393,65 +387,6 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	}
 	globalRoleBinding.Annotations[crbNameAnnotation] = crbName
 
-	return grb.addRulesForTemplateAndTemplateVersions(globalRoleBinding, subject)
-}
-
-func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(globalRoleBinding *v3.GlobalRoleBinding, subject v1.Subject) error {
-	// Check if the current globalRole has rules for templates and templateversions
-	gr, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	isCatalogRole := false
-	if gr != nil {
-		for _, rule := range gr.Rules {
-			if rbac.RuleGivesResourceAccess(rule, TemplateResourceRule) || rbac.RuleGivesResourceAccess(rule, TemplateVersionResourceRule) {
-				isCatalogRole = true
-				break
-			}
-		}
-	}
-	// Roles that give catalog access (i.e. that give access to template/templateversions in the management api group)
-	// are the only ones that need this special role/rolebinding created for them
-	if isCatalogRole {
-		roleName := gr.Name + "-" + GlobalCatalogRole
-		_, err := grb.roleLister.Get(namespace.GlobalNamespace, roleName)
-		if err != nil {
-			return err
-		}
-		// create a binding to the namespaced role which corresponds to the GlobalRole this grb refers to
-		grbName := globalRoleBinding.Name + "-" + globalCatalogRoleBinding
-		_, err = grb.roleBindingLister.Get(namespace.GlobalNamespace, grbName)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				rb := &v1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      grbName,
-						Namespace: namespace.GlobalNamespace,
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: globalRoleBinding.APIVersion,
-								Kind:       globalRoleBinding.Kind,
-								Name:       globalRoleBinding.Name,
-								UID:        globalRoleBinding.UID,
-							},
-						},
-					},
-					Subjects: []v1.Subject{subject},
-					RoleRef: v1.RoleRef{
-						Kind: "Role",
-						Name: roleName,
-					},
-				}
-				_, err = grb.roleBindings.Create(rb)
-				if err != nil && !apierrors.IsAlreadyExists(err) {
-					return err
-				}
-			} else {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
