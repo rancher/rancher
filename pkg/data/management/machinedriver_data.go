@@ -118,7 +118,13 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
 		linodeBuiltin = isCommandAvailable("docker-machine-driver-linode")
 	}
-	if err := addMachineDriver(Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.12/docker-machine-driver-linode_linux-amd64.zip", "/assets/rancher-ui-driver-linode/component.js", "5fab97320e3965607340567b11857e76a2d9d87fe6dbb3571cc3df04db432c14", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, management); err != nil {
+	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.12/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
+	linodeDriverChecksum := "5fab97320e3965607340567b11857e76a2d9d87fe6dbb3571cc3df04db432c14"
+	if runtime.GOARCH == "arm64" {
+		//overwrite arm driver version here
+		linodeDriverChecksum = "1d4cc22b5ffc9cb47446905e8e9303ad2043dea471f07f1ef16f255e4b738044"
+	}
+	if err := addMachineDriver(Linodedriver, linodeDriverURL, "/assets/rancher-ui-driver-linode/component.js", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OCIDriver, "https://github.com/rancher-plugins/rancher-machine-driver-oci/releases/download/v1.3.0/docker-machine-driver-oci-linux", "", "0a1afa6a0af85ecf3d77cc554960e36e1be5fd12b22b0155717b9289669e4021", []string{"*.oraclecloud.com"}, false, false, false, management); err != nil {
