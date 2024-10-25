@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 )
 
 const (
@@ -23,11 +24,12 @@ const (
 	GroupPrincipalType = "group"
 )
 
+// AuthProvider is the interface used to hide the provider differences from the rest of the system.
 type AuthProvider interface {
 	GetName() string
 	AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error)
-	SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error)
-	GetPrincipal(principalID string, token v3.Token) (v3.Principal, error)
+	SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error)
+	GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error)
 	CustomizeSchema(schema *types.Schema)
 	TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error)
 	RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error)
@@ -37,9 +39,9 @@ type AuthProvider interface {
 
 	// LogoutAll implements the "logout-all" action for the provider, if supported. If
 	// "logout-all" is not supported do nothing and return nil.
-	LogoutAll(apiContext *types.APIContext, token *v3.Token) error
+	LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error
 
 	// Logout implements a guard against invoking the "logout" action when "logout-all" is
 	// forced. If "logout-all" is not supported by the provider do nothing and return nil.
-	Logout(apiContext *types.APIContext, token *v3.Token) error
+	Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error
 }
