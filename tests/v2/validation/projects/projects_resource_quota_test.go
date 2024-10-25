@@ -95,13 +95,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestProjectWithoutResourceQuota() {
 	require.NoError(prq.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	deployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 10, "", "", false, false)
-	require.NoError(prq.T(), err)
-
-	log.Info("Verify that there are ten pods created in the deployment and they are in Running state.")
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + deployment.Name,
-	})
+	_, err = deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 10, "", "", false, false, true)
 	require.NoError(prq.T(), err)
 }
 
@@ -153,15 +147,11 @@ func (prq *ProjectsResourceQuotaTestSuite) TestProjectWithResourceQuota() {
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the first namespace with two replicas and verify that the pods are created.")
-	createdFirstDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 2, "", "", false, false)
-	require.NoError(prq.T(), err)
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, firstNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdFirstDeployment.Name,
-	})
+	createdFirstDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 2, "", "", false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another deployment in the first namespace with one replica. Verify that the deployment fails to create replicas.")
-	createdSecondDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 1, "", "", false, false)
+	createdSecondDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 1, "", "", false, false, false)
 	require.NoError(prq.T(), err)
 	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.TenSecondTimeout, func() (done bool, pollErr error) {
 		checkErr := checkDeploymentStatus(standardUserClient, prq.cluster.ID, firstNamespace.Name, createdSecondDeployment.Name, "ReplicaFailure", "FailedCreate", "forbidden: exceeded quota", 0)
@@ -174,7 +164,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestProjectWithResourceQuota() {
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the second namespace with two replicas. Verify that the deployment fails to create replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, secondNamespace.Name, 2, "", "", false, false)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, secondNamespace.Name, 2, "", "", false, false, false)
 	require.NoError(prq.T(), err)
 	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.TenSecondTimeout, func() (done bool, pollErr error) {
 		checkErr := checkDeploymentStatus(standardUserClient, prq.cluster.ID, secondNamespace.Name, createdDeployment.Name, "ReplicaFailure", "FailedCreate", "forbidden: exceeded quota", 0)
@@ -347,11 +337,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestQuotaDeletionPropagationToExistin
 	require.Empty(prq.T(), quotas)
 
 	log.Info("Create a deployment in the first namespace with ten replicas and verify that the pods are created.")
-	createdFirstDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false)
-	require.NoError(prq.T(), err)
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, createdNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdFirstDeployment.Name,
-	})
+	_, err = deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false, true)
 	require.NoError(prq.T(), err)
 }
 
@@ -392,11 +378,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestOverrideQuotaInNamespace() {
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the namespace with two replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, currentNamespace.Name, 2, "", "", false, false)
-	require.NoError(prq.T(), err)
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, currentNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, currentNamespace.Name, 2, "", "", false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Override the pod limit for the namespace and increase it from 2 to 3.")
@@ -424,12 +406,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestOverrideQuotaInNamespace() {
 	currentDeployment, err := getAndConvertDeployment(standardUserClient, prq.cluster.ID, createdDeployment)
 	require.NoError(prq.T(), err)
 	currentDeployment.Spec.Replicas = &replicas
-	_, err = deployment.UpdateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, currentDeployment)
-	require.NoError(prq.T(), err)
-
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
+	_, err = deployment.UpdateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, currentDeployment, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Increase the pod limit on the namespace from 3 to 4.")
@@ -470,13 +447,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceFromNoQuotaToQuotaPr
 	require.NoError(prq.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 2, "", "", false, false)
-	require.NoError(prq.T(), err)
-
-	log.Info("Verify that there are pods created in the deployment and are in Running state.")
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 2, "", "", false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another project in the downstream cluster with resource quota set.")
@@ -526,7 +497,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceFromNoQuotaToQuotaPr
 	currentDeployment, err := getAndConvertDeployment(standardUserClient, prq.cluster.ID, createdDeployment)
 	require.NoError(prq.T(), err)
 	currentDeployment.Spec.Replicas = &replicas
-	updatedDeployment, err := deployment.UpdateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, currentDeployment)
+	updatedDeployment, err := deployment.UpdateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, currentDeployment, false)
 	require.NoError(prq.T(), err)
 
 	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.TenSecondTimeout, func() (done bool, pollErr error) {
@@ -569,13 +540,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceFromQuotaToNoQuotaPr
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the namespace with two replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 2, "", "", false, false)
-	require.NoError(prq.T(), err)
-
-	log.Info("Verify that there are two pods created in the deployment and they are in Running state.")
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + createdDeployment.Name,
-	})
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 2, "", "", false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another project in the downstream cluster without any resource quota set.")
@@ -617,12 +582,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceFromQuotaToNoQuotaPr
 	currentDeployment, err := getAndConvertDeployment(standardUserClient, prq.cluster.ID, createdDeployment)
 	require.NoError(prq.T(), err)
 	currentDeployment.Spec.Replicas = &replicas
-	_, err = deployment.UpdateDeployment(standardUserClient, prq.cluster.ID, movedNamespace.Name, currentDeployment)
-	require.NoError(prq.T(), err)
-
-	err = charts.WatchAndWaitDeployments(standardUserClient, prq.cluster.ID, movedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + currentDeployment.Name,
-	})
+	_, err = deployment.UpdateDeployment(standardUserClient, prq.cluster.ID, movedNamespace.Name, currentDeployment, true)
 	require.NoError(prq.T(), err)
 }
 
@@ -655,7 +615,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceWithDeploymentTransi
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the second namespace with ten replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 10, "", "", false, false)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, updatedNamespace.Name, 10, "", "", false, false, false)
 	require.NoError(prq.T(), err)
 
 	log.Info("Verify that the deployment fails to create ten replicas.")
@@ -736,13 +696,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceBetweenProjectsWithN
 	require.NoError(prq.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	deployment, err := deployment.CreateDeployment(standardUserClient, createdProject.Namespace, updatedNamespace.Name, 10, "", "", false, false)
-	require.NoError(prq.T(), err)
-
-	log.Info("Verify that there are ten pods created in the deployment and they are in Running state.")
-	err = charts.WatchAndWaitDeployments(standardUserClient, createdProject.Namespace, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + deployment.Name,
-	})
+	deployment, err := deployment.CreateDeployment(standardUserClient, createdProject.Namespace, updatedNamespace.Name, 10, "", "", false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another project in the downstream cluster.")
