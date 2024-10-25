@@ -7,379 +7,426 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 func Test_refreshAttributes(t *testing.T) {
+	// common structures
+
+	userLocal := v3.User{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+		Username:   "admin",
+		PrincipalIDs: []string{
+			"local://user-abcde",
+		},
+	}
+
+	userShibboleth := v3.User{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+		Username:   "admin",
+		PrincipalIDs: []string{
+			"shibboleth_user://user1",
+		},
+	}
+
+	attribsIn := v3.UserAttribute{
+		ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+		GroupPrincipals: map[string]v3.Principals{},
+		ExtraByProvider: map[string]map[string][]string{},
+	}
+
+	wantNoExtra := v3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+		GroupPrincipals: map[string]v3.Principals{
+			"local":      v3.Principals{},
+			"shibboleth": v3.Principals{},
+		},
+		ExtraByProvider: map[string]map[string][]string{},
+	}
+
+	wantLocal := v3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+		GroupPrincipals: map[string]v3.Principals{
+			"local":      v3.Principals{},
+			"shibboleth": v3.Principals{},
+		},
+		ExtraByProvider: map[string]map[string][]string{
+			providers.LocalProvider: map[string][]string{
+				common.UserAttributePrincipalID: []string{"local://user-abcde"},
+				common.UserAttributeUserName:    []string{"admin"},
+			},
+		},
+	}
+
+	wantShibboleth := v3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+		GroupPrincipals: map[string]v3.Principals{
+			"local":      v3.Principals{},
+			"shibboleth": v3.Principals{},
+		},
+		ExtraByProvider: map[string]map[string][]string{
+			saml.ShibbolethName: map[string][]string{
+				common.UserAttributePrincipalID: []string{"shibboleth_user://user1"},
+				common.UserAttributeUserName:    []string{"user1"},
+			},
+		},
+	}
+
+	loginTokenLocal := v3.Token{
+		UserID:       "user-abcde",
+		IsDerived:    false,
+		AuthProvider: providers.LocalProvider,
+		UserPrincipal: v3.Principal{
+			Provider: providers.LocalProvider,
+			ExtraInfo: map[string]string{
+				common.UserAttributePrincipalID: "local://user-abcde",
+				common.UserAttributeUserName:    "admin",
+			},
+		},
+	}
+
+	derivedTokenLocal := loginTokenLocal
+	derivedTokenLocal.IsDerived = true
+
+	derivedTokenShibboleth := v3.Token{
+		UserID:       "user-abcde",
+		IsDerived:    true,
+		AuthProvider: saml.ShibbolethName,
+		UserPrincipal: v3.Principal{
+			Provider: saml.ShibbolethName,
+			ExtraInfo: map[string]string{
+				common.UserAttributePrincipalID: "shibboleth_user://user1",
+				common.UserAttributeUserName:    "user1",
+			},
+		},
+	}
+
+	// BEWARE: for the ext tokens we see here into the internals, in
+	// particular into the field structure of the backing secret.  Using the
+	// exported constants for field names should help detecting changes
+	// breaking things.
+
+	eLoginTokenLocal := ext.Token{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-login-local"},
+		Spec: ext.TokenSpec{
+			UserID: "user-abcde",
+			Kind:   exttokens.IsLogin,
+		},
+		Status: ext.TokenStatus{
+			AuthProvider: providers.LocalProvider,
+			LoginName:    "admin",
+			PrincipalID:  "local://user-abcde",
+		},
+	}
+
+	eLoginSecretLocal := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-login-local"},
+		Data: map[string][]byte{
+			exttokens.FieldAnnotations:    []byte("null"),
+			exttokens.FieldAuthProvider:   []byte(providers.LocalProvider),
+			exttokens.FieldDisplayName:    []byte(""),
+			exttokens.FieldEnabled:        []byte("true"),
+			exttokens.FieldHash:           []byte("kla9jkdmj"),
+			exttokens.FieldKind:           []byte(exttokens.IsLogin),
+			exttokens.FieldLabels:         []byte("null"),
+			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
+			exttokens.FieldLoginName:      []byte("admin"),
+			exttokens.FieldPrincipalID:    []byte("local://user-abcde"),
+			exttokens.FieldTTL:            []byte("4000"),
+			exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
+			exttokens.FieldUserID:         []byte("user-abcde"),
+		},
+	}
+
+	eDerivedTokenLocal := eLoginTokenLocal
+	eDerivedTokenLocal.ObjectMeta.Name = "user-abcde-derived-local"
+	eDerivedTokenLocal.Spec.Kind = ""
+
+	eDerivedSecretLocal := *eLoginSecretLocal.DeepCopy() // copy the map
+	eDerivedSecretLocal.ObjectMeta.Name = "user-abcde-derived-local"
+	eDerivedSecretLocal.Data[exttokens.FieldKind] = []byte("")
+
+	eDerivedTokenShibboleth := ext.Token{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-derived-shibboleth"},
+		Spec: ext.TokenSpec{
+			UserID: "user-abcde",
+			Kind:   "",
+		},
+		Status: ext.TokenStatus{
+			AuthProvider: saml.ShibbolethName,
+			LoginName:    "user1",
+			PrincipalID:  "shibboleth_user://user1",
+		},
+	}
+
+	eDerivedSecretShibboleth := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-derived-shibboleth"},
+		Data: map[string][]byte{
+			exttokens.FieldAnnotations:    []byte("null"),
+			exttokens.FieldAuthProvider:   []byte(saml.ShibbolethName),
+			exttokens.FieldDisplayName:    []byte(""),
+			exttokens.FieldEnabled:        []byte("true"),
+			exttokens.FieldHash:           []byte("kla9jkdmj"),
+			exttokens.FieldKind:           []byte(""),
+			exttokens.FieldLabels:         []byte("null"),
+			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
+			exttokens.FieldLoginName:      []byte("user1"),
+			exttokens.FieldPrincipalID:    []byte("shibboleth_user://user1"),
+			exttokens.FieldTTL:            []byte("4000"),
+			exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
+			exttokens.FieldUserID:         []byte("user-abcde"),
+		},
+	}
+
+	eTokenSetupEmpty := func(
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		scache *fake.MockCacheInterface[*corev1.Secret]) {
+		secrets.EXPECT().
+			List("cattle-tokens", gomock.Any()).
+			Return(&corev1.SecretList{}, nil).
+			AnyTimes()
+	}
+
+	eTokenSetupLoginLocal := func(
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		scache *fake.MockCacheInterface[*corev1.Secret]) {
+		secrets.EXPECT().
+			List("cattle-tokens", gomock.Any()).
+			Return(&corev1.SecretList{
+				Items: []corev1.Secret{
+					eLoginSecretLocal,
+				},
+			}, nil).
+			AnyTimes()
+	}
+
+	eTokenSetupDerivedLocal := func(
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		scache *fake.MockCacheInterface[*corev1.Secret]) {
+		secrets.EXPECT().
+			List("cattle-tokens", gomock.Any()).
+			Return(&corev1.SecretList{
+				Items: []corev1.Secret{
+					eDerivedSecretLocal,
+				},
+			}, nil).
+			AnyTimes()
+		scache.EXPECT().
+			Get("cattle-tokens", gomock.Any()).
+			Return(&eDerivedSecretLocal, nil).
+			AnyTimes()
+	}
+
+	eTokenSetupLocal := func(
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		scache *fake.MockCacheInterface[*corev1.Secret]) {
+		secrets.EXPECT().
+			List("cattle-tokens", gomock.Any()).
+			Return(&corev1.SecretList{
+				Items: []corev1.Secret{
+					eLoginSecretLocal,
+					eDerivedSecretLocal,
+				},
+			}, nil).
+			AnyTimes()
+		scache.EXPECT().
+			Get("cattle-tokens", "user-abcde-login-local").
+			Return(&eLoginSecretLocal, nil).
+			AnyTimes()
+		scache.EXPECT().
+			Get("cattle-tokens", "user-abcde-derived-local").
+			Return(&eDerivedSecretLocal, nil).
+			AnyTimes()
+	}
+
+	eTokenSetupDerivedShibboleth := func(
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		scache *fake.MockCacheInterface[*corev1.Secret]) {
+		secrets.EXPECT().
+			List("cattle-tokens", gomock.Any()).
+			Return(&corev1.SecretList{
+				Items: []corev1.Secret{
+					eDerivedSecretShibboleth,
+				},
+			}, nil).
+			AnyTimes()
+		scache.EXPECT().
+			Get("cattle-tokens", gomock.Any()).
+			Return(&eDerivedSecretShibboleth, nil).
+			AnyTimes()
+	}
+
 	tests := []struct {
 		name                  string
 		user                  *v3.User
-		attribs               *v3.UserAttribute
+		attribs               *v3.UserAttribute // argument to refreshAttributes
 		providerDisabled      bool
 		providerDisabledError error
 		tokens                []*v3.Token
+		eTokens               []*ext.Token
 		enabled               bool
 		deleted               bool
-		want                  *v3.UserAttribute
+		want                  *v3.UserAttribute // result expected from refreshAttributes
+		eTokenSetup           func(
+			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+			scache *fake.MockCacheInterface[*corev1.Secret])
 	}{
 		{
-			name: "local user no tokens",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"local://user-abcde",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens:  []*v3.Token{},
-			enabled: true,
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
+			name:        "local user no tokens",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			tokens:      []*v3.Token{},
+			eTokens:     []*ext.Token{},
+			enabled:     true,
+			want:        &wantNoExtra,
+			eTokenSetup: eTokenSetupEmpty,
+		},
+		// from here on out test cases are pairs testing the same thing, one each for legacy and ext tokens
+		{
+			name:        "local user with login token",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			tokens:      []*v3.Token{&loginTokenLocal},
+			enabled:     true,
+			want:        &wantLocal,
+			eTokenSetup: eTokenSetupEmpty,
 		},
 		{
-			name: "local user with login token",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"local://user-abcde",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens: []*v3.Token{
-				{
-					UserID:       "user-abcde",
-					IsDerived:    false,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						Provider: providers.LocalProvider,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-			},
-			enabled: true,
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
-					},
-				},
-			},
+			name:        "local user with ext login token",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			eTokens:     []*ext.Token{&eLoginTokenLocal},
+			enabled:     true,
+			want:        &wantLocal,
+			eTokenSetup: eTokenSetupLoginLocal,
 		},
 		{
-			name: "local user with derived token",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"local://user-abcde",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens: []*v3.Token{
-				{
-					UserID:       "user-abcde",
-					IsDerived:    true,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						Provider: providers.LocalProvider,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-			},
-			enabled: true,
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
-					},
-				},
-			},
+			name:        "local user with derived token",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			tokens:      []*v3.Token{&derivedTokenLocal},
+			enabled:     true,
+			want:        &wantLocal,
+			eTokenSetup: eTokenSetupEmpty,
 		},
 		{
-			name: "user with derived token disabled in provider",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"local://user-abcde",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens: []*v3.Token{
-				{
-					UserID:       "user-abcde",
-					IsDerived:    true,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						Provider: providers.LocalProvider,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-			},
-			enabled: false,
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
+			name:        "local user with derived ext token",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			eTokens:     []*ext.Token{&eDerivedTokenLocal},
+			enabled:     true,
+			want:        &wantLocal,
+			eTokenSetup: eTokenSetupDerivedLocal,
 		},
 		{
-			name: "user with login and derived tokens",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"local://user-abcde",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens: []*v3.Token{
-				{
-					UserID:       "user-abcde",
-					IsDerived:    false,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-				{
-					UserID:       "user-abcde",
-					IsDerived:    true,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-vwxyz",
-							common.UserAttributeUserName:    "nimda",
-						},
-					},
-				},
-			},
-			enabled: true,
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
-					},
-				},
-			},
+			name:        "user with derived token disabled in provider",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			tokens:      []*v3.Token{&derivedTokenLocal},
+			enabled:     false,
+			want:        &wantNoExtra,
+			eTokenSetup: eTokenSetupEmpty,
 		},
 		{
-			name: "shibboleth user",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"shibboleth_user://user1",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens: []*v3.Token{
-				{
-					UserID:       "user-abcde",
-					IsDerived:    true,
-					AuthProvider: saml.ShibbolethName,
-					UserPrincipal: v3.Principal{
-						Provider: saml.ShibbolethName,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "shibboleth_user://user1",
-							common.UserAttributeUserName:    "user1",
-						},
-					},
-				},
-			},
-			enabled: true,
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{
-					saml.ShibbolethName: map[string][]string{
-						common.UserAttributePrincipalID: []string{"shibboleth_user://user1"},
-						common.UserAttributeUserName:    []string{"user1"},
-					},
-				},
-			},
+			name:        "user with derived ext token disabled in provider",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			eTokens:     []*ext.Token{&eDerivedTokenLocal},
+			enabled:     false,
+			want:        &wantNoExtra,
+			eTokenSetup: eTokenSetupDerivedLocal,
 		},
 		{
-			name: "disabled provider, disabled/deleted tokens",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"local://user-abcde",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens: []*v3.Token{
-				{
-					UserID:       "user-abcde",
-					IsDerived:    false,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						Provider: providers.LocalProvider,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-				{
-					UserID:       "user-abcde",
-					IsDerived:    true,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						Provider: providers.LocalProvider,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-			},
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
+			name:        "user with login and derived tokens",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			tokens:      []*v3.Token{&loginTokenLocal, &derivedTokenLocal},
+			enabled:     true,
+			want:        &wantLocal,
+			eTokenSetup: eTokenSetupEmpty,
+		},
+		{
+			name:        "user with ext login and derived tokens",
+			user:        &userLocal,
+			attribs:     &attribsIn,
+			eTokens:     []*ext.Token{&eLoginTokenLocal, &eDerivedTokenLocal},
+			enabled:     true,
+			want:        &wantLocal,
+			eTokenSetup: eTokenSetupLocal,
+		},
+		{
+			name:        "shibboleth user",
+			user:        &userShibboleth,
+			attribs:     &attribsIn,
+			tokens:      []*v3.Token{&derivedTokenShibboleth},
+			enabled:     true,
+			want:        &wantShibboleth,
+			eTokenSetup: eTokenSetupEmpty,
+		},
+		{
+			name:        "shibboleth user, ext",
+			user:        &userShibboleth,
+			attribs:     &attribsIn,
+			eTokens:     []*ext.Token{&eDerivedTokenShibboleth},
+			enabled:     true,
+			want:        &wantShibboleth,
+			eTokenSetup: eTokenSetupDerivedShibboleth,
+		},
+		{
+			name:             "disabled provider, disabled/deleted tokens",
+			user:             &userLocal,
+			attribs:          &attribsIn,
+			tokens:           []*v3.Token{&loginTokenLocal, &derivedTokenLocal},
+			want:             &wantNoExtra,
+			eTokenSetup:      eTokenSetupEmpty,
 			providerDisabled: true,
 			deleted:          true,
 			enabled:          false,
 		},
 		{
-			name: "error in determining if provider is disabled, tokens left unchanged",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				Username:   "admin",
-				PrincipalIDs: []string{
-					"local://user-abcde",
-				},
-			},
-			attribs: &v3.UserAttribute{
-				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{},
-				ExtraByProvider: map[string]map[string][]string{},
-			},
-			tokens: []*v3.Token{
-				{
-					UserID:       "user-abcde",
-					IsDerived:    false,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						Provider: providers.LocalProvider,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-				{
-					UserID:       "user-abcde",
-					IsDerived:    true,
-					AuthProvider: providers.LocalProvider,
-					UserPrincipal: v3.Principal{
-						Provider: providers.LocalProvider,
-						ExtraInfo: map[string]string{
-							common.UserAttributePrincipalID: "local://user-abcde",
-							common.UserAttributeUserName:    "admin",
-						},
-					},
-				},
-			},
-			want: &v3.UserAttribute{
-				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
-				},
-				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
-					},
-				},
-			},
+			name:             "disabled provider, disabled/deleted ext tokens",
+			user:             &userLocal,
+			attribs:          &attribsIn,
+			eTokens:          []*ext.Token{&eLoginTokenLocal, &eDerivedTokenLocal},
+			want:             &wantNoExtra,
+			eTokenSetup:      eTokenSetupLocal,
+			providerDisabled: true,
+			deleted:          true,
+			enabled:          false,
+		},
+		{
+			name:                  "error in determining if provider is disabled, tokens left unchanged",
+			user:                  &userLocal,
+			attribs:               &attribsIn,
+			tokens:                []*v3.Token{&loginTokenLocal, &derivedTokenLocal},
+			want:                  &wantLocal,
+			eTokenSetup:           eTokenSetupEmpty,
+			providerDisabled:      true,
+			providerDisabledError: fmt.Errorf("unable to determine if provider was disabled"),
+			deleted:               false,
+			enabled:               true,
+		},
+		{
+			name:                  "error in determining if provider is disabled, ext tokens left unchanged",
+			user:                  &userLocal,
+			attribs:               &attribsIn,
+			eTokens:               []*ext.Token{&eLoginTokenLocal, &eDerivedTokenLocal},
+			want:                  &wantLocal,
+			eTokenSetup:           eTokenSetupLocal,
 			providerDisabled:      true,
 			providerDisabledError: fmt.Errorf("unable to determine if provider was disabled"),
 			deleted:               false,
@@ -391,6 +438,7 @@ func Test_refreshAttributes(t *testing.T) {
 		providers.LocalProvider: true,
 		saml.ShibbolethName:     true,
 	}
+
 	for _, tt := range tests {
 		tokenUpdateCalled := false
 		tokenDeleteCalled := false
@@ -403,6 +451,36 @@ func Test_refreshAttributes(t *testing.T) {
 				},
 				saml.ShibbolethName: &mockShibbolethProvider{},
 			}
+
+			ctrl := gomock.NewController(t)
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+
+			// standard capture of delete and update events. See
+			// also the `tokens` interface used by the refresher
+			// below, same thing for the legacy tokens.
+			secrets.EXPECT().
+				Update(gomock.Any()).
+				DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+					tokenUpdateCalled = true
+					return secret, nil
+				}).AnyTimes()
+			secrets.EXPECT().
+				Delete("cattle-tokens", gomock.Any(), gomock.Any()).
+				DoAndReturn(func(space, name string, opts *metav1.DeleteOptions) error {
+					tokenDeleteCalled = true
+					return nil
+				}).AnyTimes()
+
+			// additional ext token setup
+			if tt.eTokenSetup != nil {
+				tt.eTokenSetup(secrets, scache)
+			}
+
 			r := &refresher{
 				tokenLister: &fakes.TokenListerMock{
 					ListFunc: func(_ string, _ labels.Selector) ([]*v3.Token, error) {
@@ -426,6 +504,10 @@ func Test_refreshAttributes(t *testing.T) {
 						return nil, nil
 					},
 				}),
+				extTokenStore: exttokens.NewSystem(nil, secrets, users, nil,
+					exttokens.NewTimeHandler(),
+					exttokens.NewHashHandler(),
+					exttokens.NewAuthHandler()),
 			}
 			got, err := r.refreshAttributes(tt.attribs)
 			assert.Nil(t, err)
@@ -523,11 +605,11 @@ func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
-func (p *mockLocalProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockLocalProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockLocalProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
@@ -539,12 +621,12 @@ func (p *mockLocalProvider) AuthenticateUser(ctx context.Context, input interfac
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return token.UserPrincipal, nil
+func (p *mockLocalProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+	return token.GetUserPrincipal(), nil
 }
 
 func (p *mockLocalProvider) CustomizeSchema(schema *types.Schema) {
@@ -583,11 +665,11 @@ func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
 	return p.enabled, p.enabledErr
 }
 
-func (p *mockShibbolethProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockShibbolethProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (p *mockShibbolethProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
@@ -599,12 +681,12 @@ func (p *mockShibbolethProvider) AuthenticateUser(ctx context.Context, input int
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return token.UserPrincipal, nil
+func (p *mockShibbolethProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+	return token.GetUserPrincipal(), nil
 }
 
 func (p *mockShibbolethProvider) CustomizeSchema(schema *types.Schema) {

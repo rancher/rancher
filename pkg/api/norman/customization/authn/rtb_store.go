@@ -65,7 +65,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		if err != nil {
 			return nil, err
 		}
-		princ, err := providers.GetPrincipal(principalID, *token)
+		princ, err := providers.GetPrincipal(principalID, token)
 		if err != nil {
 			return nil, err
 		}
