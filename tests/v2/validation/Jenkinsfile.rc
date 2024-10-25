@@ -21,7 +21,7 @@ node {
     def testRunConfig = "testrunconfig.yaml"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
-    def branch = "release/v2.8"
+    def branch = "release/v2.9"
     def corralBranch = "main"
     def config = env.CONFIG
     def rancherToken = ""
@@ -74,11 +74,8 @@ node {
                           string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
                           string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
                           string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
-                          string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
-                          
-                          string(credentialsId: 'AWS_RSA_KEY_NAME', variable: 'AWS_RSA_KEY_NAME'),
+                          string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),                          
                           string(credentialsId: 'AWS_SSH_RSA_KEY', variable: 'AWS_SSH_RSA_KEY'),
-
                           string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
@@ -119,11 +116,9 @@ node {
               config = config.replace('${AWS_VPC}', env.AWS_VPC)
               config = config.replace('${AWS_SECURITY_GROUPS}', env.AWS_SECURITY_GROUPS)
               config = config.replace('${ADMIN_PASSWORD}', env.ADMIN_PASSWORD)
-              
               config = config.replace('${AZURE_CLIENT_ID}', env.AZURE_CLIENT_ID)
               config = config.replace('${AZURE_CLIENT_SECRET}', env.AZURE_CLIENT_SECRET)
               config = config.replace('${AZURE_SUBSCRIPTION_ID}', env.AZURE_SUBSCRIPTION_ID)
-
               config = config.replace('${AWS_SSH_PEM_KEY}', env.AWS_SSH_KEY_NAME)
               config = config.replace('${AWS_SSH_RSA_KEY}', env.AWS_SSH_RSA_KEY)
               config = config.replace('${RANCHER_LINODE_ACCESSKEY}', env.RANCHER_LINODE_ACCESSKEY)
@@ -132,6 +127,10 @@ node {
                 dir("./rancher/tests/v2/validation/.ssh") {
                   def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
                   writeFile file: AWS_SSH_KEY_NAME, text: decoded
+                }
+                dir("./tests/v2/validation/.ssh") {
+                  def decodedRsa = new String(AWS_SSH_RSA_KEY.decodeBase64())
+                  writeFile file: JENKINS_RKE_VALIDATION, text: decodedRsa
                 }
               }
               dir("./rancher/tests/v2/validation") {
@@ -268,11 +267,10 @@ node {
                           string(name: 'REPO', value: "${rancherRepo}"),
                           string(name: 'BRANCH', value: "${branch}"),
                           string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
-                          string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
+                          string(name: 'TEST_PACKAGE', value: "${env.TEST_PROVISIONING_PACKAGE}"),
                           string(name: 'GOTEST_TESTCASE', value: "${runFlag}"),
                           string(name: 'TAGS', value: tags),
                           string(name: 'CLI_VERSION', value: "${CLI_VERSION}"),
-                          string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_SINGLE_CLUSTER}"),
                         ]
 
                         jobs["$it-test-validation"] = { build job: individualJob, parameters: goValidationParams }
@@ -284,8 +282,7 @@ node {
                     }
 
                     if ("${env.TAGS}" != "") {
-                      // need to add RSA key to jenkins before windows will work
-                      // sh "./yq '.provisioningInput.machinePools += [{\"machinePoolConfig\": {\"windows\": true, \"quantity\": 1}}]' -i ${mainRancherConfigPath}"
+                      sh "./yq '.provisioningInput.machinePools += [{\"machinePoolConfig\": {\"windows\": true, \"quantity\": 1}}]' -i ${mainRancherConfigPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.aws_hostname_prefix = \"k3spro\"' -i ${mainRancherConfigPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.hostname = \"k3spro.qa.rancher.space\"' -i ${mainRancherConfigPath}"
                       sh "./yq e 'del(.corralConfigs.corralConfigVars.rancher_version)' -i ${mainRancherConfigPath}"
@@ -302,7 +299,7 @@ node {
                         string(name: 'REPO', value: "${rancherRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
                         string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
-                        string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
+                        string(name: 'TEST_PACKAGE', value: "${env.TEST_PROVISIONING_PACKAGE}"),
                         string(name: 'TAGS', value: "${env.TAGS}"),
                         string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_PROVISIONING}"),
                       ]
@@ -318,7 +315,7 @@ node {
                         text(name: 'CONFIG', value: config2Yaml),
                         string(name: 'REPO', value: "${rancherRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
-                        string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
+                        string(name: 'TEST_PACKAGE', value: "${env.TEST_CLI_PACKAGE}"),
                         string(name: 'TAGS', value: tags),
                         string(name: 'CLI_VERSION', value: "${CLI_VERSION}"),
                         string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_CLI}"),
@@ -333,17 +330,6 @@ node {
                       sh "./yq e 'del(.corralRancherHA)' -i ${mainRancherConfigPath}"
 
                       def config3Yaml = readFile(file: "${mainRancherConfigPath}")
-                      def goValidation3Params = [
-                        string(name: 'TIMEOUT', value: timeout),
-                        text(name: 'CONFIG', value: config3Yaml),
-                        string(name: 'REPO', value: "${rancherRepo}"),
-                        string(name: 'BRANCH', value: "${branch}"),
-                        string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
-                        string(name: 'TAGS', value: tags),
-                        string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_CORRAL}"),
-                      ]
-
-                      jobs["provisioning-corral-validation"] = { build job: corralJob, parameters: goValidation3Params }
                     }
                     parallel jobs
                   } catch(err) {
