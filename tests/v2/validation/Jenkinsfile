@@ -39,6 +39,7 @@ node {
                           string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
                           string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
                           string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                          string(credentialsId: 'AWS_SSH_RSA_KEY', variable: 'AWS_SSH_RSA_KEY'),
                           string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
                           string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
                           string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'),
@@ -81,7 +82,6 @@ node {
                           string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
                           string(credentialsId: 'SLACK_WEBHOOK', variable: 'SLACK_WEBHOOK'),
                           string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
-          
         withEnv(paramsMap) {
           stage('Checkout') {
             deleteDir()
@@ -100,6 +100,11 @@ node {
                     def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
                     writeFile file: AWS_SSH_KEY_NAME, text: decoded
                   }
+                }
+
+                dir("./tests/v2/validation/.ssh") {
+                  def decodedRsa = new String(AWS_SSH_RSA_KEY.decodeBase64())
+                  writeFile file: JENKINS_RKE_VALIDATION, text: decodedRsa
                 }
 
                 dir("./tests/v2/validation") {
