@@ -10,7 +10,7 @@ on:
 env:
   GOARCH: amd64
   CGO_ENABLED: 0
-  SETUP_GO_VERSION: '1.22.*'
+  SETUP_GO_VERSION: '1.23.*'
 
 jobs:
   run-tests:
