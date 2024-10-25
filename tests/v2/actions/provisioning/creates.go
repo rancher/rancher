@@ -1066,3 +1066,37 @@ func DisableUpdateConfig(client *rancher.Client) {
 		return nil
 	})
 }
+
+// CreateProvisioningRKE1ClusterWithClusterTemplate provisions an rke1 cluster by using the rke1 template and revision ID and other values from the template.
+func CreateProvisioningRKE1ClusterWithClusterTemplate(client *rancher.Client, templateID, revisionID string, nodesAndRoles []provisioninginput.NodePools, nodeTemplate *nodetemplates.NodeTemplate, answers *management.Answer) (*management.Cluster, error) {
+	clusterName := namegen.AppendRandomString("rke1cluster-template-")
+
+	rke1Cluster := &management.Cluster{
+		DockerRootDir:                 "/var/lib/docker",
+		Name:                          namegen.AppendRandomString("rketemplate-cluster-"),
+		ClusterTemplateID:             templateID,
+		ClusterTemplateRevisionID:     revisionID,
+		ClusterTemplateAnswers:        answers,
+		RancherKubernetesEngineConfig: nil,
+	}
+	clusterResp, err := shepherdclusters.CreateRKE1Cluster(client, rke1Cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
+
+	var nodeRoles []nodepools.NodeRoles
+	for _, nodes := range nodesAndRoles {
+		nodeRoles = append(nodeRoles, nodes.NodeRoles)
+	}
+	_, err = nodepools.NodePoolSetup(client, nodeRoles, clusterResp.ID, nodeTemplate.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	createdCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
+	return createdCluster, err
+}
