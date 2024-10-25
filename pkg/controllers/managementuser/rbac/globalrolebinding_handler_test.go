@@ -1,11 +1,12 @@
 package rbac
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
-	"testing"
-	"time"
 
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
