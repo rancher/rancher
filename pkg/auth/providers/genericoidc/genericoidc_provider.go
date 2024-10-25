@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -50,7 +51,7 @@ func (g *GenOIDCProvider) GetName() string {
 // that matches the searchValue.  If principalType is empty, both a user principal and a group principal will
 // be returned.  This is done because OIDC does not have a proper lookup mechanism.  In order
 // to provide some degree of functionality that allows manual entry for users/groups, this is the compromise.
-func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, _ v3.Token) ([]v3.Principal, error) {
+func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, _ accessor.TokenAccessor) ([]v3.Principal, error) {
 	var principals []v3.Principal
 
 	if principalType != GroupType {
@@ -76,7 +77,7 @@ func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, _ 
 	return principals, nil
 }
 
-func (g *GenOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (g *GenOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	var p v3.Principal
 
 	// parsing id to get the external id and type. Example genericoidc_<user|group>://<user sub | group name>
@@ -106,7 +107,7 @@ func (g *GenOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.P
 	} else {
 		p = g.groupToPrincipal(externalID)
 	}
-	p = g.toPrincipalFromToken(principalType, p, &token)
+	p = g.toPrincipalFromToken(principalType, p, token)
 	return p, nil
 }
 
@@ -155,20 +156,20 @@ func (g *GenOIDCProvider) getRedirectURL(config map[string]interface{}) string {
 
 // toPrincipalFromToken uses additional information about the principal found in the token, if available, to provide
 // a more detailed, useful Principal object.
-func (g *GenOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
+func (g *GenOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token accessor.TokenAccessor) v3.Principal {
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
-			princ.Me = g.IsThisUserMe(token.UserPrincipal, princ)
+			princ.Me = g.IsThisUserMe(token.GetUserPrincipal(), princ)
 			if princ.Me {
-				princ.LoginName = token.UserPrincipal.LoginName
-				princ.DisplayName = token.UserPrincipal.DisplayName
+				princ.LoginName = token.GetUserPrincipal().LoginName
+				princ.DisplayName = token.GetUserPrincipal().DisplayName
 			}
 		}
 	} else {
 		princ.PrincipalType = GroupType
 		if token != nil {
-			princ.MemberOf = g.TokenMGR.IsMemberOf(*token, princ)
+			princ.MemberOf = g.TokenMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ
