@@ -23,8 +23,8 @@ import (
 )
 
 type userLifecycle struct {
-	prtb2           v3.ProjectRoleTemplateBindingInterface
 	prtb            wranglerv3.ProjectRoleTemplateBindingController
+	crtb            wranglerv3.ClusterRoleTemplateBindingController
 	grb             wranglerv3.GlobalRoleBindingController
 	users           wranglerv3.UserController
 	tokens          wranglerv3.TokenController
@@ -310,13 +310,8 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) error {
 	for _, crtb := range crtbs {
 		var err error
-		if crtb.Namespace == "" {
-			logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
-			err = l.crtb.Delete(crtb.Name, &metav1.DeleteOptions{})
-		} else {
-			logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
-			err = l.crtb.Delete(crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
-		}
+		logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
+		err = l.crtb.Delete(crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting cluster role: %v", err)
 		}
@@ -328,13 +323,8 @@ func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) er
 func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) error {
 	for _, prtb := range prtbs {
 		var err error
-		if prtb.Namespace == "" {
-			logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
-			err = l.prtb.Delete(prtb.Name, &metav1.DeleteOptions{})
-		} else {
-			logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
-			err = l.prtb.Delete(prtb.Namespace, prtb.Name, &metav1.DeleteOptions{})
-		}
+		logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
+		err = l.prtb.Delete(prtb.Namespace, prtb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting projet role: %v", err)
 		}
