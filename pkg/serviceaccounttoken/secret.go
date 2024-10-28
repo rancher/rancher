@@ -3,7 +3,6 @@ package serviceaccounttoken
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 	"time"
 
@@ -161,17 +160,25 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 		return nil, fmt.Errorf("cannot get secret for nil service account")
 	}
 
-	annotations := maps.Clone(sa.Annotations)
+	annotations := sa.Annotations
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
 
 	secretAnn := annotations[ServiceAccountSecretRefAnnotation]
-	if secretAnn == "" {
-		return findSecretForSA(ctx, sa, secretLister, secretClient)
+	if secretAnn != "" {
+		secret, err := secretFromSA(ctx, sa, secretClient)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		// If secret is nil drops down to find by listing secrets.
+		if secret != nil {
+			return secret, nil
+		}
+		logrus.Infof("ServiceAccount secret did not exist for ServiceACcount %s falling back to listing mechanism", sa.Name)
 	}
 
-	return secretFromSA(ctx, sa, secretClient)
+	return findSecretForSA(ctx, sa, secretLister, secretClient)
 }
 
 func findSecretForSA(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {

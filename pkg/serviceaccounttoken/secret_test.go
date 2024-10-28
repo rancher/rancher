@@ -280,10 +280,10 @@ func TestServiceAccountSecret(t *testing.T) {
 			name:    "test SA annotated with secret - secret does not exist",
 			inputSA: annotatedSA,
 			stateSetup: func(ts testState) {
-				ts.clientset.Tracker().Add(referencedSecret)
+				ts.fakeLister.secrets = []*corev1.Secret{referencedSecret}
+				// No secrets in the clientset
 			},
-			wantSecret:       referencedSecret,
-			remainingSecrets: []*corev1.Secret{referencedSecret},
+			wantSecret: referencedSecret,
 		},
 		{
 			name:    "test SA not annotated with secret but valid secret available",
@@ -317,7 +317,7 @@ func TestServiceAccountSecret(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:    "test SA not annotated with secret removes additional secrets",
+			name:    "test SA with no valid secrets removes additional secrets",
 			inputSA: baseSA,
 			stateSetup: func(ts testState) {
 				ts.fakeLister.secrets = []*corev1.Secret{validSecret, invalidSecret}
