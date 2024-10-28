@@ -117,39 +117,6 @@ func checkAnnotationExistsInNamespace(client *rancher.Client, clusterID string, 
 	return nil
 }
 
-func checkNamespaceLabelsAndAnnotations(clusterID string, projectName string, namespace *corev1.Namespace) error {
-	var errorMessages []string
-	expectedLabels := map[string]string{
-		projects.ProjectIDAnnotation: projectName,
-	}
-
-	expectedAnnotations := map[string]string{
-		projects.ProjectIDAnnotation: clusterID + ":" + projectName,
-	}
-
-	for key, value := range expectedLabels {
-		if _, ok := namespace.Labels[key]; !ok {
-			errorMessages = append(errorMessages, fmt.Sprintf("expected label %s not present in namespace labels", key))
-		} else if namespace.Labels[key] != value {
-			errorMessages = append(errorMessages, fmt.Sprintf("label value mismatch for %s: expected %s, got %s", key, value, namespace.Labels[key]))
-		}
-	}
-
-	for key, value := range expectedAnnotations {
-		if _, ok := namespace.Annotations[key]; !ok {
-			errorMessages = append(errorMessages, fmt.Sprintf("expected annotation %s not present in namespace annotations", key))
-		} else if namespace.Annotations[key] != value {
-			errorMessages = append(errorMessages, fmt.Sprintf("annotation value mismatch for %s: expected %s, got %s", key, value, namespace.Annotations[key]))
-		}
-	}
-
-	if len(errorMessages) > 0 {
-		return fmt.Errorf(strings.Join(errorMessages, "\n"))
-	}
-
-	return nil
-}
-
 func getLatestStatusMessageFromDeployment(deployment *appv1.Deployment, messageType string) (string, string, error) {
 	latestTime := time.Time{}
 	latestMessage := ""
