@@ -197,12 +197,12 @@ func findSecretForSA(ctx context.Context, sa *corev1.ServiceAccount, secretListe
 			continue
 		}
 
-		logrus.Warnf("EnsureSecretForServiceAccount: secret [%s:%s] is invalid for service account [%s], deleting", s.Namespace, s.Name, sa.Name)
+		logrus.Warnf("EnsureSecretForServiceAccount: secret %s is invalid for service account [%s], deleting", logKeyFromObject(s), sa.Name)
 		err = secretClient.Delete(ctx, s.Name, metav1.DeleteOptions{})
 		if err != nil {
 			// we don't want to return the delete failure since the success/failure of the cleanup shouldn't affect
 			// the ability of the caller to use any identified, valid secret
-			logrus.Errorf("unable to delete secret [%s:%s]: %v", s.Namespace, s.Name, err)
+			logrus.Errorf("unable to delete secret %s: %v", logKeyFromObject(s), err)
 		}
 	}
 
@@ -282,27 +282,11 @@ func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 
 }
 
-// This should be replaced with a types.NamespacedName which stringifies to
-// <namespace>/<name> but that would change the log output format.
-func logKeyFromObject(obj namespacedObject) namespacedName {
-	return namespacedName{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}
-}
-
-type namespacedObject interface {
-	GetNamespace() string
+func logKeyFromObject(obj interface {
 	GetName() string
-}
-
-type namespacedName struct {
-	Name      string
-	Namespace string
-}
-
-func (n namespacedName) String() string {
-	return fmt.Sprintf("[%s:%s]", n.Namespace, n.Name)
+	GetNamespace() string
+}) string {
+	return fmt.Sprintf("[%s:%s]", obj.GetNamespace(), obj.GetName())
 }
 
 func secretRefFromSA(sa *corev1.ServiceAccount) (*types.NamespacedName, error) {
