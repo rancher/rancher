@@ -210,6 +210,8 @@ github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0Bsq
 github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f h1:7+HZb3PwI0cCUETyMDgPCvSta1y3idwBL8PHwSgelJk=
 github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
 github.com/bwesterb/go-ristretto v1.2.3/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
+github.com/caliskanugur/shepherd v0.0.0-20241028191100-6f21cf4cea05 h1:BbU0jJxGyxqxup3AjedKUOwsGsHgUKtDNTd+QIXAgW0=
+github.com/caliskanugur/shepherd v0.0.0-20241028191100-6f21cf4cea05/go.mod h1:J++Mv5VQPMrxeHO3drDJojpo8PXrfib/psOzmjRl7G4=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
@@ -840,8 +842,6 @@ github.com/rancher/rke v1.7.0-rc.1 h1:6rSHO8OoYZmE6TEChPK1clj2fcWtob0WGQvME9BEbm
 github.com/rancher/rke v1.7.0-rc.1/go.mod h1:VbDpfxcO2US2+mZUaLPr9vADjHLE7Gg5ZDbNmjKKBWY=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20241023152838-da6b36b3b5b4 h1:visRJX2dnsdIFCDNQdAVHuGrDKFLX8AkYI0xlJQ7C6k=
-github.com/rancher/shepherd v0.0.0-20241023152838-da6b36b3b5b4/go.mod h1:J++Mv5VQPMrxeHO3drDJojpo8PXrfib/psOzmjRl7G4=
 github.com/rancher/steve v0.0.0-20241028083559-fd9a516ecb9f h1:EaiK8tPU4v7wIOoZjcFXpgNLlbfNiOPxjSj7GihBkjs=
 github.com/rancher/steve v0.0.0-20241028083559-fd9a516ecb9f/go.mod h1:LWe5a9aeVks56JqTVr0SIwGRMS9TY+rIdwN59WDiEY0=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde h1:x5VZI/0TUx1MeZirh6e0OMAInhCmq6yRvD6897458Ng=
