@@ -842,8 +842,8 @@ github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHR
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20241023152838-da6b36b3b5b4 h1:visRJX2dnsdIFCDNQdAVHuGrDKFLX8AkYI0xlJQ7C6k=
 github.com/rancher/shepherd v0.0.0-20241023152838-da6b36b3b5b4/go.mod h1:J++Mv5VQPMrxeHO3drDJojpo8PXrfib/psOzmjRl7G4=
-github.com/rancher/steve v0.0.0-20241028083559-fd9a516ecb9f h1:EaiK8tPU4v7wIOoZjcFXpgNLlbfNiOPxjSj7GihBkjs=
-github.com/rancher/steve v0.0.0-20241028083559-fd9a516ecb9f/go.mod h1:LWe5a9aeVks56JqTVr0SIwGRMS9TY+rIdwN59WDiEY0=
+github.com/rancher/steve v0.0.0-20241028205536-b2f2bab3c4b3 h1:b+Fdwtjmqzt0xGIhZFNHtOgY2tAjQAUMa/oTbmba6Cg=
+github.com/rancher/steve v0.0.0-20241028205536-b2f2bab3c4b3/go.mod h1:WzfZOEsWZNcdTlE7kAh9nl4bzT5qyn07+5txsurGqqM=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde h1:x5VZI/0TUx1MeZirh6e0OMAInhCmq6yRvD6897458Ng=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde/go.mod h1:04o7UUy7ZFiMDEtHEjO1yS7IkO8TcsgjBl93Fcjq7Gg=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
@@ -1528,8 +1528,8 @@ k8s.io/gengo v0.0.0-20240826214909-a7b603a56eb7 h1:HCbtr1pVu/ElMcTTs18KdMtH5y6f7
 k8s.io/gengo v0.0.0-20240826214909-a7b603a56eb7/go.mod h1:FiNAH4ZV3gBg2Kwh89tzAEV2be7d5xI0vBa/VySYy3E=
 k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 h1:NGrVE502P0s0/1hudf8zjgwki1X/TByhmAoILTarmzo=
 k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70/go.mod h1:VH3AT8AaQOqiGjMF9p0/IM1Dj+82ZwjfxUP1IxaHE+8=
-k8s.io/helm v2.16.9+incompatible h1:yFz+WVaV9SA/DwOjTU8h7vGRs1EzKHF18OSF6dQ5w3o=
-k8s.io/helm v2.16.9+incompatible/go.mod h1:LZzlS4LQBHfciFOurYBFkCMTaZ0D1l+p0teMg7TSULI=
+k8s.io/helm v2.17.0+incompatible h1:Bpn6o1wKLYqKM3+Osh8e+1/K2g/GsQJ4F4yNF2+deao=
+k8s.io/helm v2.17.0+incompatible/go.mod h1:LZzlS4LQBHfciFOurYBFkCMTaZ0D1l+p0teMg7TSULI=
 k8s.io/klog v1.0.0 h1:Pt+yjF5aB1xDSVbau4VsWe+dQNzA0qv1LlXdC2dF6Q8=
 k8s.io/klog v1.0.0/go.mod h1:4Bi6QPql/J/LkTDqv7R/cd3hPo4k2DG6Ptcz060Ez5I=
 k8s.io/klog/v2 v2.2.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
