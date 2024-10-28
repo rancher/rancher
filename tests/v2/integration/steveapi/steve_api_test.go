@@ -30,6 +30,7 @@ import (
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -290,6 +291,14 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	impersonationSA := impersonationSABase + userID
 	err = serviceaccounts.IsServiceAccountReady(client, s.clusterID, impersonationNamespace, impersonationSA)
 	require.NoError(s.T(), err)
+
+	steveClient, err := client.Steve.ProxyDownstream(s.clusterID)
+	require.NoError(s.T(), err)
+
+	resp, err := steveClient.SteveType("rbac.authorization.k8s.io.clusterrole").ByID(impersonationSA)
+	require.NoError(s.T(), err)
+
+	logrus.Infof("cluster role is %v", resp.JSONResp)
 
 	// create project namespaces
 	for n := range namespaceMap {
@@ -2688,7 +2697,5 @@ func TestSteveLocal(t *testing.T) {
 }
 
 func TestSteveDownstream(t *testing.T) {
-	// TODO: Re-enable the test when the bug is fixed
-	t.Skip()
 	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }
