@@ -127,7 +127,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.5.14
-	github.com/rancher/steve v0.0.0-20241004194751-1d54556fdd0b
+	github.com/rancher/steve v0.0.0-20241028205544-b0e3b528a82f
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/robfig/cron v1.2.0
@@ -149,7 +149,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.9.0
+	helm.sh/helm/v3 v3.11.0
 	k8s.io/api v0.30.1
 	k8s.io/apiextensions-apiserver v0.28.9
 	k8s.io/apimachinery v0.30.1
@@ -157,7 +157,7 @@ require (
 	k8s.io/cli-runtime v0.28.6
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
-	k8s.io/helm v2.16.7+incompatible
+	k8s.io/helm v2.17.0+incompatible
 	k8s.io/kube-aggregator v0.28.6
 	k8s.io/kubectl v0.28.6
 	k8s.io/kubernetes v1.28.8
