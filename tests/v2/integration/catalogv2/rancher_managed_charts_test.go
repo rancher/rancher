@@ -140,6 +140,8 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
+	w.Require().Nil(app.Spec.Values)
+	w.Require().Nil(app.Spec.Chart.Values)
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
@@ -169,6 +171,8 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	w.Require().NoError(err)
 	w.Assert().Greater(originalLatestVersion, app.Spec.Chart.Metadata.Version)
+	w.Require().Nil(app.Spec.Values)
+	w.Require().Nil(app.Spec.Chart.Values)
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
@@ -185,6 +189,8 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	w.Require().NoError(err)
 
 	w.Assert().Equal(originalLatestVersion, app.Spec.Chart.Metadata.Version)
+	w.Require().Nil(app.Spec.Values)
+	w.Require().Nil(app.Spec.Chart.Values)
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
@@ -220,8 +226,10 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
 
-	_, at, err := w.waitForAksChart(rv1.StatusFailed, "rancher-aks-operator", 0)
+	app, at, err := w.waitForAksChart(rv1.StatusFailed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
+	w.Require().Nil(app.Spec.Values)
+	w.Require().Nil(app.Spec.Chart.Values)
 	list, err = w.catalogClient.Operations("cattle-system").List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
 	w.Require().LessOrEqual(countNumberOfOperations(list, "rancher-aks-operator", at), numberOfOps+2)
@@ -236,8 +244,10 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
-	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
+	app, _, err = w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
+	w.Require().Nil(app.Spec.Values)
+	w.Require().Nil(app.Spec.Chart.Values)
 	w.Assert().Equal(latestVersion, app.Spec.Chart.Metadata.Version)
 }
 
@@ -272,6 +282,8 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 
 	app, at, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
+	w.Require().Nil(app.Spec.Values)
+	w.Require().Nil(app.Spec.Chart.Values)
 
 	ops := w.catalogClient.Operations("cattle-system")
 	list, err := ops.List(ctx, metav1.ListOptions{})
@@ -289,8 +301,10 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 	_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
-	_, at, err = w.waitForAksChart(rv1.StatusFailed, "rancher-aks-operator", app.Spec.Version)
+	app, at, err = w.waitForAksChart(rv1.StatusFailed, "rancher-aks-operator", app.Spec.Version)
 	w.Require().NoError(err)
+	w.Require().Nil(app.Spec.Values)
+	w.Require().Nil(app.Spec.Chart.Values)
 	list, err = ops.List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
 	w.Require().LessOrEqual(countNumberOfOperations(list, "rancher-aks-operator", at), numberOfOps+2)
