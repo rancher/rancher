@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -352,6 +354,13 @@ type ProjectRoleTemplateBinding struct {
 	// Deprecated.
 	// +optional
 	ServiceAccount string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
+}
+
+func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
+	if parts := strings.SplitN(p.ProjectName, ":", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 // +genclient
