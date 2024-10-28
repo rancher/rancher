@@ -255,11 +255,12 @@ func TestServiceAccountSecret(t *testing.T) {
 		Type: corev1.SecretTypeServiceAccountToken,
 	}
 	tests := []struct {
-		name       string
-		stateSetup func(testState)
-		inputSA    *corev1.ServiceAccount
-		wantSecret *corev1.Secret
-		wantError  bool
+		name             string
+		stateSetup       func(testState)
+		inputSA          *corev1.ServiceAccount
+		wantSecret       *corev1.Secret
+		remainingSecrets []*corev1.Secret
+		wantError        bool
 	}{
 		{
 			name:      "test nil sa",
@@ -272,7 +273,8 @@ func TestServiceAccountSecret(t *testing.T) {
 			stateSetup: func(ts testState) {
 				ts.clientset.Tracker().Add(referencedSecret)
 			},
-			wantSecret: referencedSecret,
+			wantSecret:       referencedSecret,
+			remainingSecrets: []*corev1.Secret{referencedSecret},
 		},
 		{
 			name:    "test SA annotated with secret - secret does not exist",
@@ -280,19 +282,21 @@ func TestServiceAccountSecret(t *testing.T) {
 			stateSetup: func(ts testState) {
 				ts.clientset.Tracker().Add(referencedSecret)
 			},
-			wantSecret: referencedSecret,
+			wantSecret:       referencedSecret,
+			remainingSecrets: []*corev1.Secret{referencedSecret},
 		},
 		{
-			name:    "test SA NOT annotated with secret but valid secret available",
+			name:    "test SA not annotated with secret but valid secret available",
 			inputSA: baseSA,
 			stateSetup: func(ts testState) {
 				ts.fakeLister.secrets = []*corev1.Secret{validSecret}
 				ts.clientset.Tracker().Add(validSecret)
 			},
-			wantSecret: validSecret,
+			wantSecret:       validSecret,
+			remainingSecrets: []*corev1.Secret{referencedSecret},
 		},
 		{
-			name:    "test SA NOT annotated with secret and no secrets",
+			name:    "test SA not annotated with secret and no secrets",
 			inputSA: baseSA,
 		},
 		{
@@ -312,6 +316,17 @@ func TestServiceAccountSecret(t *testing.T) {
 			},
 			wantError: true,
 		},
+		{
+			name:    "test SA not annotated with secret removes additional secrets",
+			inputSA: baseSA,
+			stateSetup: func(ts testState) {
+				ts.fakeLister.secrets = []*corev1.Secret{validSecret, invalidSecret}
+				ts.clientset.Tracker().Add(validSecret)
+				ts.clientset.Tracker().Add(invalidSecret)
+			},
+			wantSecret:       validSecret,
+			remainingSecrets: []*corev1.Secret{},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -330,6 +345,9 @@ func TestServiceAccountSecret(t *testing.T) {
 			} else {
 				require.Nil(t, err)
 			}
+			secrets, err := secretsMock.List(context.Background(), metav1.ListOptions{})
+			require.NoError(t, err)
+			require.Equal(t, len(test.remainingSecrets), len(secrets.Items))
 		})
 	}
 }
