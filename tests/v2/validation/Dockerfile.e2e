@@ -1,6 +1,7 @@
 FROM registry.suse.com/bci/golang:1.22
 
 # Configure Go
+ENV GOFLAGS=-buildvcs=false
 ENV GOPATH /root/go
 ENV PATH ${PATH}:/root/go/bin
 
