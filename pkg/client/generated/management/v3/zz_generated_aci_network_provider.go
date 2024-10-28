@@ -33,6 +33,7 @@ const (
 	AciNetworkProviderFieldDurationWaitForNetwork               = "durationWaitForNetwork"
 	AciNetworkProviderFieldDynamicExternalSubnet                = "externDynamic"
 	AciNetworkProviderFieldEnableEndpointSlice                  = "enableEndpointSlice"
+	AciNetworkProviderFieldEnableHppDirect                      = "enableHppDirect"
 	AciNetworkProviderFieldEnableOpflexAgentReconnect           = "enableOpflexAgentReconnect"
 	AciNetworkProviderFieldEncapType                            = "encapType"
 	AciNetworkProviderFieldEpRegistry                           = "epRegistry"
@@ -70,6 +71,7 @@ const (
 	AciNetworkProviderFieldOpflexAgentOpflexAsyncjsonEnabled    = "opflexAgentOpflexAsyncjsonEnabled"
 	AciNetworkProviderFieldOpflexAgentOvsAsyncjsonEnabled       = "opflexAgentOvsAsyncjsonEnabled"
 	AciNetworkProviderFieldOpflexAgentPolicyRetryDelayTimer     = "opflexAgentPolicyRetryDelayTimer"
+	AciNetworkProviderFieldOpflexAgentResetWaitDelay            = "opflexAgentResetWaitDelay"
 	AciNetworkProviderFieldOpflexAgentStatistics                = "opflexAgentStatistics"
 	AciNetworkProviderFieldOpflexClientSSL                      = "opflexClientSsl"
 	AciNetworkProviderFieldOpflexDeviceDeleteTimeout            = "opflexDeviceDeleteTimeout"
@@ -152,6 +154,7 @@ type AciNetworkProvider struct {
 	DurationWaitForNetwork               string              `json:"durationWaitForNetwork,omitempty" yaml:"durationWaitForNetwork,omitempty"`
 	DynamicExternalSubnet                string              `json:"externDynamic,omitempty" yaml:"externDynamic,omitempty"`
 	EnableEndpointSlice                  string              `json:"enableEndpointSlice,omitempty" yaml:"enableEndpointSlice,omitempty"`
+	EnableHppDirect                      string              `json:"enableHppDirect,omitempty" yaml:"enableHppDirect,omitempty"`
 	EnableOpflexAgentReconnect           string              `json:"enableOpflexAgentReconnect,omitempty" yaml:"enableOpflexAgentReconnect,omitempty"`
 	EncapType                            string              `json:"encapType,omitempty" yaml:"encapType,omitempty"`
 	EpRegistry                           string              `json:"epRegistry,omitempty" yaml:"epRegistry,omitempty"`
@@ -189,6 +192,7 @@ type AciNetworkProvider struct {
 	OpflexAgentOpflexAsyncjsonEnabled    string              `json:"opflexAgentOpflexAsyncjsonEnabled,omitempty" yaml:"opflexAgentOpflexAsyncjsonEnabled,omitempty"`
 	OpflexAgentOvsAsyncjsonEnabled       string              `json:"opflexAgentOvsAsyncjsonEnabled,omitempty" yaml:"opflexAgentOvsAsyncjsonEnabled,omitempty"`
 	OpflexAgentPolicyRetryDelayTimer     string              `json:"opflexAgentPolicyRetryDelayTimer,omitempty" yaml:"opflexAgentPolicyRetryDelayTimer,omitempty"`
+	OpflexAgentResetWaitDelay            string              `json:"opflexAgentResetWaitDelay,omitempty" yaml:"opflexAgentResetWaitDelay,omitempty"`
 	OpflexAgentStatistics                string              `json:"opflexAgentStatistics,omitempty" yaml:"opflexAgentStatistics,omitempty"`
 	OpflexClientSSL                      string              `json:"opflexClientSsl,omitempty" yaml:"opflexClientSsl,omitempty"`
 	OpflexDeviceDeleteTimeout            string              `json:"opflexDeviceDeleteTimeout,omitempty" yaml:"opflexDeviceDeleteTimeout,omitempty"`
