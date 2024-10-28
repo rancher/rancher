@@ -139,7 +139,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.6.3
-	github.com/rancher/steve v0.0.0-20241002125954-dd27bd0c8d30
+	github.com/rancher/steve v0.0.0-20241028205540-7dafe0c662d1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.0.0
@@ -170,7 +170,7 @@ require (
 	k8s.io/apiserver v0.30.1
 	k8s.io/cli-runtime v0.30.1
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/helm v2.16.9+incompatible
+	k8s.io/helm v2.17.0+incompatible
 	k8s.io/kube-aggregator v0.30.1
 	k8s.io/kubectl v0.30.1
 	k8s.io/kubernetes v1.30.1
