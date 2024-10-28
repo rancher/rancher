@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	timeoutSeconds = int64(defaults.FiveMinuteTimeout)
+	timeoutSeconds = int64(defaults.TwoMinuteTimeout)
 )
 
 // InstallObservabilityUiPlugin is a helper function that installs the observability extension chart in the local cluster of rancher.
@@ -43,7 +43,6 @@ func InstallObservabilityUiPlugin(client *rancher.Client, installExtensionOption
 		if err != nil {
 			return err
 		}
-		log.Info("Uninstalled observability extension successfully.")
 
 		watchAppInterface, err := catalogClient.Apps(stackstateExtensionNamespace).Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + stackstateExtensionsName,
@@ -55,14 +54,16 @@ func InstallObservabilityUiPlugin(client *rancher.Client, installExtensionOption
 
 		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
 			chart := event.Object.(*v1.App)
-			if chart == nil {
-				return true, nil
-			} else if event.Type == watch.Deleted {
-				return true, nil
-			} else if event.Type == watch.Error {
+			if event.Type == watch.Error {
 				return false, fmt.Errorf("there was an error uninstalling stackstate extension")
+			} else if event.Type == watch.Deleted {
+				log.Info("Uninstalled observability extension successfully.")
+				return true, nil
+			} else if chart == nil {
+				return true, nil
 			}
 			return false, nil
+
 		})
 
 		return err
@@ -76,7 +77,7 @@ func InstallObservabilityUiPlugin(client *rancher.Client, installExtensionOption
 
 	watchAppInterface, err := catalogClient.Apps(stackstateExtensionNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + stackstateExtensionsName,
-		TimeoutSeconds: &timeoutSeconds,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
 		return err
@@ -145,6 +146,7 @@ func CreateExtensionsRepo(client *rancher.Client, rancherUiPluginsName, uiExtens
 			if event.Type == watch.Error {
 				return false, fmt.Errorf("there was an error deleting the cluster repo")
 			} else if event.Type == watch.Deleted {
+				log.Info("Removed extensions repo successfully.")
 				return true, nil
 			}
 			return false, nil

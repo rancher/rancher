@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/wait"
+	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -28,13 +29,14 @@ const (
 )
 
 var (
-	timeoutSeconds = int64(defaults.FiveMinuteTimeout)
+	timeoutSeconds = int64(defaults.TwoMinuteTimeout)
 )
 
 // InstallStackstateAgentChart is a private helper function that returns chart install action with stack state agent and payload options.
 func InstallStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string) error {
 	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
 	if err != nil {
+		log.Info("Error getting server setting.")
 		return err
 	}
 
@@ -49,6 +51,7 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 
 	catalogClient, err := client.GetClusterCatalogClient(installOptions.Cluster.ID)
 	if err != nil {
+		log.Info("Error getting catalogClient")
 		return err
 	}
 
@@ -71,12 +74,12 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 
 		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
 			chart := event.Object.(*catalogv1.App)
-			if event.Type == watch.Deleted {
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error uninstalling stackstate agent chart")
+			} else if event.Type == watch.Deleted {
 				return true, nil
 			} else if chart == nil {
 				return true, nil
-			} else if event.Type == watch.Error {
-				return false, fmt.Errorf("there was an error uninstalling stackstate agent chart")
 			}
 			return false, nil
 		})
@@ -130,16 +133,17 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 
 	err = catalogClient.InstallChart(chartInstallAction, RancherPartnerChartRepo)
 	if err != nil {
+		log.Info("Errored installing the chart")
 		return err
 	}
 
 	// wait for chart to be fully deployed
-	timeoutSeconds = int64(defaults.TenMinuteTimeout)
 	watchAppInterface, err := catalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + StackstateK8sAgent,
-		TimeoutSeconds: &timeoutSeconds,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
+		log.Info("Unable to obtain the installed app ")
 		return err
 	}
 
@@ -152,7 +156,9 @@ func InstallStackstateAgentChart(client *rancher.Client, installOptions *Install
 		}
 		return false, nil
 	})
+
 	if err != nil {
+		log.Info("Unable to obtain the status of the installed app ")
 		return err
 	}
 	return nil
@@ -217,7 +223,7 @@ func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *Install
 	// wait for chart to be in status pending upgrade
 	watchAppInterface, err := adminCatalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + StackstateK8sAgent,
-		TimeoutSeconds: &timeoutSeconds,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
 		return err
@@ -238,7 +244,7 @@ func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *Install
 
 	watchAppInterface, err = adminCatalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + StackstateK8sAgent,
-		TimeoutSeconds: &timeoutSeconds,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
 		return err
