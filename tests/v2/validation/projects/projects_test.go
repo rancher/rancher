@@ -189,14 +189,12 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceOutOfProject() {
 	require.NoError(pr.T(), err)
 
 	log.Info("Verify that the namespace has the label and annotation referencing the project.")
-	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pr.cluster.ID, createdProject.Name, createdNamespace.Name)
-	require.NoError(pr.T(), err)
-	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, createdNamespace.Name)
-	require.NoError(pr.T(), err)
-	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, updatedNamespace)
+	err = project.WaitForProjectIDUpdate(standardUserClient, pr.cluster.ID, createdProject.Name, createdNamespace.Name)
 	require.NoError(pr.T(), err)
 
 	log.Info("Move the namespace out of the project.")
+	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, createdNamespace.Name)
+	require.NoError(pr.T(), err)
 	delete(updatedNamespace.Labels, projects.ProjectIDAnnotation)
 	delete(updatedNamespace.Annotations, projects.ProjectIDAnnotation)
 
@@ -210,9 +208,7 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceOutOfProject() {
 	require.NoError(pr.T(), err, "Failed to move the namespace out of the project")
 
 	log.Info("Verify that the namespace does not have the label and annotation referencing the project.")
-	movedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, updatedNamespace.Name)
-	require.NoError(pr.T(), err)
-	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, movedNamespace)
+	err = project.WaitForProjectIDUpdate(standardUserClient, pr.cluster.ID, createdProject.Name, updatedNamespace.Name)
 	require.Error(pr.T(), err)
 }
 
@@ -246,11 +242,7 @@ func (pr *ProjectsTestSuite) TestProjectWithResourceQuotaAndContainerDefaultReso
 	require.NoError(pr.T(), err)
 
 	log.Info("Verify that the namespace has the label and annotation referencing the project.")
-	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pr.cluster.ID, createdProject.Name, createdNamespace.Name)
-	require.NoError(pr.T(), err)
-	currentNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, createdNamespace.Name)
-	require.NoError(pr.T(), err)
-	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, currentNamespace)
+	err = project.WaitForProjectIDUpdate(standardUserClient, pr.cluster.ID, createdProject.Name, createdNamespace.Name)
 	require.NoError(pr.T(), err)
 
 	log.Info("Verify that the pod limits and container default resource limit in the Project spec is accurate.")
@@ -263,27 +255,27 @@ func (pr *ProjectsTestSuite) TestProjectWithResourceQuotaAndContainerDefaultReso
 	require.Equal(pr.T(), memoryReservation, projectSpec.ContainerDefaultResourceLimit.RequestsMemory, "Memory reservation mismatch")
 
 	log.Info("Verify that the namespace has the annotation: field.cattle.io/resourceQuota.")
-	err = checkAnnotationExistsInNamespace(standardUserClient, pr.cluster.ID, currentNamespace.Name, resourceQuotaAnnotation, true)
+	err = checkAnnotationExistsInNamespace(standardUserClient, pr.cluster.ID, createdNamespace.Name, resourceQuotaAnnotation, true)
 	require.NoError(pr.T(), err, "'field.cattle.io/resourceQuota' annotation should exist")
 
 	log.Info("Verify that the resource quota validation for the namespace is successful.")
-	err = checkNamespaceResourceQuotaValidationStatus(standardUserClient, pr.cluster.ID, currentNamespace.Name, namespacePodLimit, true, "")
+	err = checkNamespaceResourceQuotaValidationStatus(standardUserClient, pr.cluster.ID, createdNamespace.Name, namespacePodLimit, true, "")
 	require.NoError(pr.T(), err)
 
 	log.Info("Verify that the resource quota object is created for the namespace and the pod limit in the resource quota is set to 2.")
-	err = checkNamespaceResourceQuota(standardUserClient, pr.cluster.ID, currentNamespace.Name, 2)
+	err = checkNamespaceResourceQuota(standardUserClient, pr.cluster.ID, createdNamespace.Name, 2)
 	require.NoError(pr.T(), err)
 
 	log.Info("Verify that the limit range object is created for the namespace and the resource limit in the limit range is accurate.")
-	err = checkLimitRange(standardUserClient, pr.cluster.ID, currentNamespace.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	err = checkLimitRange(standardUserClient, pr.cluster.ID, createdNamespace.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
 	require.NoError(pr.T(), err)
 
 	log.Info("Create a deployment in the namespace with two replicas and verify that the pods are created.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pr.cluster.ID, currentNamespace.Name, 2, "", "", false, false, true)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pr.cluster.ID, createdNamespace.Name, 2, "", "", false, false, true)
 	require.NoError(pr.T(), err, "Failed to create deployment in the namespace")
 
 	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
-	err = checkContainerResources(standardUserClient, pr.cluster.ID, currentNamespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	err = checkContainerResources(standardUserClient, pr.cluster.ID, createdNamespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
 	require.NoError(pr.T(), err)
 }
 
