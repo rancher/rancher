@@ -224,7 +224,7 @@ func secretFromSA(ctx context.Context, sa *corev1.ServiceAccount, secretClient c
 
 	secret, err := secretClient.Get(ctx, secretRef.Name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("could not get secrets for service account: %w", err)
+		return nil, fmt.Errorf("could not get secret for service account %s: %w (%v)", secretRef, err, apierrors.IsInternalError(err))
 	}
 
 	return secret, nil
@@ -274,7 +274,7 @@ func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 	}
 
 	// Rollback the optimistically created secret
-	logrus.Debugf("Rolling back ServiceAccount secret for %s", logKeyFromObject(secret))
+	logrus.Infof("Rolling back ServiceAccount secret for %s", logKeyFromObject(secret))
 	if err := secretClient.Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
 		return nil, false, fmt.Errorf("deleting optimistically locked secret for %s - %s: %w", logKeyFromObject(secret), logKeyFromObject(sa), err)
 	}
