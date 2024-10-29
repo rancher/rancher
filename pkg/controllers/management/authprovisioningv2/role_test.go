@@ -301,6 +301,29 @@ func Test_OnRemoveClusterRoleBinding(t *testing.T) {
 	}
 }
 
+type mockIndexGetter []runtime.Object
+
+func (m mockIndexGetter) GetByIndex(schema.GroupVersionKind, string, string) ([]runtime.Object, error) {
+	return m, nil
+}
+
+func Test_getResourceNames_sorted(t *testing.T) {
+	objs := []runtime.Object{
+		&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "b3"}},
+		&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "c5"}},
+		&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "b4"}},
+		&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "a2"}},
+		&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "a1"}},
+	}
+	want := []string{"a1", "a2", "b3", "b4", "c5"}
+
+	got, err := getResourceNames(mockIndexGetter(objs), resourceMatch{}, &provisioningv1.Cluster{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, want, got)
+}
+
 func createNameAndNamespaceAnnotation(n string) map[string]string {
 	return map[string]string{clusterNameLabel: n, clusterNamespaceLabel: n}
 }

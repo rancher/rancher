@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/dynamiclistener/cert"
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
+	"github.com/rancher/lasso/pkg/metrics"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -142,6 +143,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		return errors.Wrap(err, "failed to ListenAndServe for fleet")
 	}
 
+	ctx = metrics.WithContextID(ctx, "tlscontext")
 	if err := core.Start(ctx, 5); err != nil {
 		return err
 	}

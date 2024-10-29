@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	project "github.com/rancher/rancher/tests/v2/actions/projects"
 	rbac "github.com/rancher/rancher/tests/v2/actions/rbac"
+	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
@@ -188,6 +189,8 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceOutOfProject() {
 	require.NoError(pr.T(), err)
 
 	log.Info("Verify that the namespace has the label and annotation referencing the project.")
+	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pr.cluster.ID, createdProject.Name, createdNamespace.Name)
+	require.NoError(pr.T(), err)
 	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, createdNamespace.Name)
 	require.NoError(pr.T(), err)
 	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, updatedNamespace)
@@ -211,6 +214,77 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceOutOfProject() {
 	require.NoError(pr.T(), err)
 	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, movedNamespace)
 	require.Error(pr.T(), err)
+}
+
+func (pr *ProjectsTestSuite) TestProjectWithResourceQuotaAndContainerDefaultResourceLimit() {
+	subSession := pr.session.NewSession()
+	defer subSession.Cleanup()
+
+	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
+	standardUser, err := users.CreateUserWithRole(pr.client, users.UserConfig(), projects.StandardUser)
+	require.NoError(pr.T(), err, "Failed to create standard user")
+	standardUserClient, err := pr.client.AsUser(standardUser)
+	require.NoError(pr.T(), err)
+	err = users.AddClusterRoleToUser(pr.client, pr.cluster, standardUser, rbac.ClusterOwner.String(), nil)
+	require.NoError(pr.T(), err, "Failed to add the user as a cluster owner to the downstream cluster")
+
+	log.Info("Create a project (with resource quota and container default resource limit) and a namespace in the project.")
+	namespacePodLimit := "2"
+	projectPodLimit := "3"
+	cpuLimit := "100m"
+	cpuReservation := "50m"
+	memoryLimit := "64Mi"
+	memoryReservation := "32Mi"
+	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
+	projectTemplate.Spec.ContainerDefaultResourceLimit.LimitsCPU = cpuLimit
+	projectTemplate.Spec.ContainerDefaultResourceLimit.RequestsCPU = cpuReservation
+	projectTemplate.Spec.ContainerDefaultResourceLimit.LimitsMemory = memoryLimit
+	projectTemplate.Spec.ContainerDefaultResourceLimit.RequestsMemory = memoryReservation
+	projectTemplate.Spec.NamespaceDefaultResourceQuota.Limit.Pods = namespacePodLimit
+	projectTemplate.Spec.ResourceQuota.Limit.Pods = projectPodLimit
+	createdProject, createdNamespace, err := createProjectAndNamespace(standardUserClient, pr.cluster.ID, projectTemplate)
+	require.NoError(pr.T(), err)
+
+	log.Info("Verify that the namespace has the label and annotation referencing the project.")
+	err = project.WaitForProjectIDAnnotationUpdate(standardUserClient, pr.cluster.ID, createdProject.Name, createdNamespace.Name)
+	require.NoError(pr.T(), err)
+	currentNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, createdNamespace.Name)
+	require.NoError(pr.T(), err)
+	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, currentNamespace)
+	require.NoError(pr.T(), err)
+
+	log.Info("Verify that the pod limits and container default resource limit in the Project spec is accurate.")
+	projectSpec := createdProject.Spec
+	require.Equal(pr.T(), namespacePodLimit, projectSpec.NamespaceDefaultResourceQuota.Limit.Pods, "Namespace pod limit mismatch")
+	require.Equal(pr.T(), projectPodLimit, projectSpec.ResourceQuota.Limit.Pods, "Project pod limit mismatch")
+	require.Equal(pr.T(), cpuLimit, projectSpec.ContainerDefaultResourceLimit.LimitsCPU, "CPU limit mismatch")
+	require.Equal(pr.T(), cpuReservation, projectSpec.ContainerDefaultResourceLimit.RequestsCPU, "CPU reservation mismatch")
+	require.Equal(pr.T(), memoryLimit, projectSpec.ContainerDefaultResourceLimit.LimitsMemory, "Memory limit mismatch")
+	require.Equal(pr.T(), memoryReservation, projectSpec.ContainerDefaultResourceLimit.RequestsMemory, "Memory reservation mismatch")
+
+	log.Info("Verify that the namespace has the annotation: field.cattle.io/resourceQuota.")
+	err = checkAnnotationExistsInNamespace(standardUserClient, pr.cluster.ID, currentNamespace.Name, resourceQuotaAnnotation, true)
+	require.NoError(pr.T(), err, "'field.cattle.io/resourceQuota' annotation should exist")
+
+	log.Info("Verify that the resource quota validation for the namespace is successful.")
+	err = checkNamespaceResourceQuotaValidationStatus(standardUserClient, pr.cluster.ID, currentNamespace.Name, namespacePodLimit, true, "")
+	require.NoError(pr.T(), err)
+
+	log.Info("Verify that the resource quota object is created for the namespace and the pod limit in the resource quota is set to 2.")
+	err = checkNamespaceResourceQuota(standardUserClient, pr.cluster.ID, currentNamespace.Name, 2)
+	require.NoError(pr.T(), err)
+
+	log.Info("Verify that the limit range object is created for the namespace and the resource limit in the limit range is accurate.")
+	err = checkLimitRange(standardUserClient, pr.cluster.ID, currentNamespace.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pr.T(), err)
+
+	log.Info("Create a deployment in the namespace with two replicas and verify that the pods are created.")
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pr.cluster.ID, currentNamespace.Name, 2, "", "", false, false, true)
+	require.NoError(pr.T(), err, "Failed to create deployment in the namespace")
+
+	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
+	err = checkContainerResources(standardUserClient, pr.cluster.ID, currentNamespace.Name, createdDeployment.Name, cpuLimit, cpuReservation, memoryLimit, memoryReservation)
+	require.NoError(pr.T(), err)
 }
 
 func TestProjectsTestSuite(t *testing.T) {

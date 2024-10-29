@@ -3,9 +3,11 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 
@@ -66,9 +68,17 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	} else {
 		plugin.Status.CacheState = Pending
 	}
+
+	maxFileSize, err := strconv.ParseInt(settings.MaxUIPluginFileByteSize.Get(), 10, 64)
+	if err != nil {
+		logrus.Errorf("failed to convert setting MaxUIPluginFileByteSize to int64, using fallback. err: %s", err.Error())
+		maxFileSize = settings.DefaultMaxUIPluginFileSizeInBytes
+	}
+
 	for _, p := range cachedPlugins {
 		err2 := FsCache.SyncWithControllersCache(p)
 		if errors.Is(err2, errMaxFileSizeError) {
+			logrus.Errorf("one of the files is more than the defaultUIPluginFileByteSize limit %s", strconv.FormatInt(maxFileSize, 10))
 			// update CRD to remove cache
 			p.Spec.Plugin.NoCache = true
 			_, err2 := h.plugin.Update(p)

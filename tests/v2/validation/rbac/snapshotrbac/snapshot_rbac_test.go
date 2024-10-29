@@ -48,7 +48,7 @@ func (etcd *SnapshotRBACTestSuite) SetupSuite() {
 
 func (etcd *SnapshotRBACTestSuite) testRKE2K3SSnapshotRBAC(role string, standardUserClient *rancher.Client) {
 	log.Info("Test case - Take Etcd snapshot of a cluster as a " + role)
-	err := etcdsnapshot.CreateRKE2K3SSnapshot(standardUserClient, etcd.cluster.Name)
+	_, err := etcdsnapshot.CreateRKE2K3SSnapshot(standardUserClient, etcd.cluster.Name)
 	switch role {
 	case rbac.ClusterOwner.String(), rbac.RestrictedAdmin.String():
 		require.NoError(etcd.T(), err)
@@ -63,7 +63,7 @@ func (etcd *SnapshotRBACTestSuite) testRKE2K3SSnapshotRBAC(role string, standard
 
 func (etcd *SnapshotRBACTestSuite) testRKE1SnapshotRBAC(role string, standardUserClient *rancher.Client) {
 	log.Info("Test case - Take Etcd snapshot of an RKE1 cluster as a " + role)
-	err := etcdsnapshot.CreateRKE1Snapshot(standardUserClient, etcd.cluster.Name)
+	_, err := etcdsnapshot.CreateRKE1Snapshot(standardUserClient, etcd.cluster.Name)
 	switch role {
 	case rbac.ClusterOwner.String(), rbac.RestrictedAdmin.String():
 		require.NoError(etcd.T(), err)

@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/util/retry"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/memory"
 )
@@ -797,8 +798,8 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	require.NoError(c.T(), err)
 
 	retryNumber := 1
-	err = wait.Poll(200*time.Millisecond, 30*time.Second, func() (done bool, err error) {
-		cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(context.TODO(), 200*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		cr, err = c.catalogClient.ClusterRepos().Get(ctx, params.Name, metav1.GetOptions{})
 		assert.NoError(c.T(), err)
 
 		for _, condition := range cr.Status.Conditions {
@@ -817,9 +818,22 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 	require.NoError(c.T(), err)
 
 	downloadTime := cr.Status.DownloadTime
-	cr.Spec.GitBranch = "main"
-	cr, err = c.catalogClient.ClusterRepos().Update(context.TODO(), cr, metav1.UpdateOptions{})
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		cr, err = c.catalogClient.ClusterRepos().Get(context.TODO(), cr.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		cr.Spec.GitBranch = "main"
+		cr, err = c.catalogClient.ClusterRepos().Update(context.TODO(), cr, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	require.NoError(c.T(), err)
+
 	// Validate the ClusterRepo was created and resources were downloaded
 	clusterRepo, err := c.pollUntilDownloaded(params.Name, metav1.Time{})
 	require.NoError(c.T(), err)

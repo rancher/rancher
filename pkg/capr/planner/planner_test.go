@@ -124,7 +124,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:RESTART_STAMP", "$env:INSTALL_RKE2_EXEC"},
+				envs:            []string{"WINS_RESTART_STAMP", "INSTALL_RKE2_EXEC"},
 			},
 		},
 		{
@@ -148,6 +148,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 			entry := createTestPlanEntry(tt.args.os)
 			planner.retrievalFunctions.SystemAgentImage = func() string { return "system-agent" }
 			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
+			planner.retrievalFunctions.GetBootstrapManifests = func(cp *rkev1.RKEControlPlane) ([]plan.File, error) { return nil, nil }
 			// act
 			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
 
@@ -161,7 +162,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 			a.Contains(instruction.Image, tt.args.expectedVersion)
 			a.Contains(instruction.Args, tt.args.scriptName)
 			for _, e := range tt.args.envs {
-				a.True(findEnv(instruction.Env, e), "couldn't find %s in environment", e)
+				a.True(findEnvName(instruction.Env, e), "couldn't find %s in environment", e)
 			}
 		})
 	}
@@ -212,9 +213,13 @@ func createTestPlanEntryWithoutRoles(os string) *planEntry {
 	return entry
 }
 
-func findEnv(s []string, v string) bool {
+func findEnvName(s []string, v string) bool {
 	for _, item := range s {
-		if strings.Contains(item, v) {
+		split := strings.Split(item, "=")
+		if len(split) != 2 {
+			return false
+		}
+		if split[0] == v {
 			return true
 		}
 	}
@@ -518,6 +523,7 @@ func Test_getInstallerImage(t *testing.T) {
 			var planner Planner
 			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			planner.retrievalFunctions.SystemAgentImage = func() string { return "rancher/system-agent-installer-" }
+			planner.retrievalFunctions.GetBootstrapManifests = func(cp *rkev1.RKEControlPlane) ([]plan.File, error) { return nil, nil }
 
 			assert.Equal(t, tt.expected, planner.getInstallerImage(tt.controlPlane))
 		})

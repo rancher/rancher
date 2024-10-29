@@ -50,7 +50,7 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
 				envs:            []string{},
-				expectedEnvsLen: 2,
+				expectedEnvsLen: 3,
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -77,8 +77,8 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:HTTP_PROXY", "$env:HTTPS_PROXY", "$env:INSTALL_RKE2_EXEC"},
-				expectedEnvsLen: 4,
+				envs:            []string{"HTTP_PROXY", "HTTPS_PROXY", "INSTALL_RKE2_EXEC"},
+				expectedEnvsLen: 5,
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -106,7 +106,7 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 			a.Equal(p.Image, tt.args.expectedImage)
 			a.Equal(tt.args.expectedEnvsLen, len(p.Env))
 			for _, e := range tt.args.envs {
-				a.True(findEnv(p.Env, e), "couldn't find %s in environment", e)
+				a.True(findEnvName(p.Env, e), "couldn't find %s in environment", e)
 			}
 		})
 	}
@@ -149,7 +149,7 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:RESTART_STAMP"},
+				envs:            []string{"WINS_RESTART_STAMP"},
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -181,7 +181,7 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 			a.Contains(instruction.Args, tt.args.scriptName)
 			a.GreaterOrEqual(len(instruction.Env), 1)
 			for _, e := range tt.args.envs {
-				a.True(findEnv(instruction.Env, e), "couldn't find %s in environment", e)
+				a.True(findEnvName(instruction.Env, e), "couldn't find %s in environment", e)
 			}
 		})
 	}
@@ -211,7 +211,7 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 				os:              "linux",
 				command:         "sh",
 				scriptName:      "run.sh",
-				envs:            []string{"INSTALL_RKE2_SKIP_START=true"},
+				envs:            []string{"INSTALL_RKE2_SKIP_START"},
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -224,7 +224,7 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 				os:              "windows",
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
-				envs:            []string{"$env:INSTALL_RKE2_SKIP_START=\"true\""},
+				envs:            []string{"INSTALL_RKE2_SKIP_START"},
 				image:           "my/custom-image-",
 				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
@@ -253,7 +253,7 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 			a.Contains(p.Args, tt.args.scriptName)
 			a.GreaterOrEqual(len(p.Env), 1)
 			for _, e := range tt.args.envs {
-				a.True(findEnv(p.Env, e), "couldn't find %s in environment", e)
+				a.True(findEnvName(p.Env, e), "couldn't find %s in environment", e)
 			}
 		})
 	}

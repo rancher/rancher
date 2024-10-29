@@ -18,10 +18,12 @@ import (
 	"time"
 
 	"github.com/rancher/channelserver/pkg/model"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
+	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -31,6 +33,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -663,4 +666,53 @@ func ParseSnapshotClusterSpecOrError(snapshot *rkev1.ETCDSnapshot) (*provv1.Clus
 		}
 	}
 	return nil, fmt.Errorf("unable to find and decode snapshot ClusterSpec for snapshot")
+}
+
+func PreBootstrap(mgmtCluster *v3.Cluster) bool {
+	// if the upstream rancher _does not_ have pre-bootstrapping enabled just always return false.
+	if !features.ProvisioningPreBootstrap.Enabled() {
+		logrus.Debug("[pre-bootstrap] feature-flag disabled, skipping pre-bootstrap flow")
+		return false
+	}
+
+	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
+}
+
+// FormatWindowsEnvVar accepts a corev1.EnvVar and returns a string to be used in either
+// a Powershell script or the Rancher planner, indicated by the isPlanVariable parameter.
+// This function automatically configures the '$env:' prefix for a given environment variable,
+// automatically prefixes boolean values with '$', and surrounds string variables with double quotes as
+// needed. If the provided variable name incorrectly uses either '$env:' or '$' for the given isPlanVariable
+// value, it will be removed.
+func FormatWindowsEnvVar(envVar corev1.EnvVar, isPlanVariable bool) string {
+	lowerValue := strings.ToLower(envVar.Value)
+	isBool := lowerValue == "$true" || lowerValue == "$false" ||
+		lowerValue == "true" || lowerValue == "false"
+
+	// remove any user provided prefixes and quotations
+	envVar.Name = strings.TrimPrefix(envVar.Name, "$env:")
+	envVar.Value = strings.Trim(envVar.Value, "\"")
+
+	if !isBool {
+		format := ""
+		// Non-boolean variables are always treated as strings,
+		// even numbers
+		format = "$env:%s=\"%s\""
+		if isPlanVariable {
+			format = "%s=%s"
+		}
+
+		return fmt.Sprintf(format, envVar.Name, envVar.Value)
+	}
+
+	if !isPlanVariable {
+		if !strings.HasPrefix(envVar.Value, "$") {
+			envVar.Value = "$" + envVar.Value
+		}
+		return fmt.Sprintf("$env:%s=%s", envVar.Name, envVar.Value)
+	}
+
+	envVar.Value = strings.Trim(envVar.Value, "$")
+
+	return fmt.Sprintf("%s=%s", envVar.Name, envVar.Value)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	nodepools "github.com/rancher/rancher/tests/v2/actions/rke1/nodepools"
+	"github.com/rancher/rancher/tests/v2/actions/scalinginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
@@ -72,7 +73,8 @@ func (s *RKE1NodeReplacingTestSuite) TestReplacingRKE1Nodes() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			ReplaceRKE1Nodes(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.nodeRoles.Etcd, tt.nodeRoles.ControlPlane, tt.nodeRoles.Worker)
+			err := scalinginput.ReplaceRKE1Nodes(s.client, s.client.RancherConfig.ClusterName, tt.nodeRoles.Etcd, tt.nodeRoles.ControlPlane, tt.nodeRoles.Worker)
+			require.NoError(s.T(), err)
 		})
 	}
 }
