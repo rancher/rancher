@@ -41,12 +41,6 @@ const (
 
 func NewUserManagerNoBindings(scaledContext *config.ScaledContext) (user.Manager, error) {
 	userInformer := scaledContext.Wrangler.Mgmt.User().Informer()
-	//userIndexers := map[string]cache.IndexFunc{
-	//	userByPrincipalIndex: userByPrincipal,
-	//}
-	//if err := userInformer.AddIndexers(userIndexers); err != nil {
-	//	return nil, err
-	//}
 
 	return &userManager{
 		users:       scaledContext.Wrangler.Mgmt.User(),
