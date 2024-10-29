@@ -71,6 +71,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 			return errors.Wrap(err, "failed to setup TLS listener")
 		}
 	}
+	opts.DisplayServerLogs = true
 
 	opts.BindHost = bindHost
 
@@ -104,12 +105,13 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 
 	serverOptions := &server.ListenOpts{
-		Storage:       opts.Storage,
-		Secrets:       opts.Secrets,
-		CAName:        "tls-rancher-internal-ca",
-		CANamespace:   namespace.System,
-		CertNamespace: namespace.System,
-		CertName:      "tls-rancher-internal",
+		Storage:           opts.Storage,
+		Secrets:           opts.Secrets,
+		CAName:            "tls-rancher-internal-ca",
+		CANamespace:       namespace.System,
+		CertNamespace:     namespace.System,
+		CertName:          "tls-rancher-internal",
+		DisplayServerLogs: true,
 	}
 	clusterIP, err := getClusterIP(core.Core().V1().Service())
 	if err != nil {
