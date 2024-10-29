@@ -81,6 +81,7 @@ var OriginMap = map[string]string{
 	"longhornio-csi-resizer":                                  "https://github.com/longhorn/longhorn",
 	"machine":                                                 "https://github.com/rancher/machine",
 	"mirrored-amazon-aws-cli":                                 "https://github.com/aws/aws-cli",
+	"mirrored-brancz-kube-rbac-proxy":                         "https://github.com/brancz/kube-rbac-proxy",
 	"mirrored-appscode-kubed":                                 "https://github.com/kubeops/config-syncer",
 	"mirrored-banzaicloud-fluentd":                            "https://github.com/fluent/fluentd",
 	"mirrored-banzaicloud-logging-operator":                   "https://github.com/banzaicloud/logging-operator",
