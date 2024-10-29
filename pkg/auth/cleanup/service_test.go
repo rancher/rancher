@@ -278,7 +278,7 @@ func newMockCleanupService(t *testing.T,
 	}).AnyTimes()
 
 	return Service{
-		secretsInterface:                  getSecretInterfaceMock(ctrl, secretStore),
+		secretsInterface:                  getSecretControllerMock(ctrl, secretStore),
 		globalRoleBindingsCache:           grbCache,
 		globalRoleBindingsClient:          grbClient,
 		projectRoleTemplateBindingsCache:  prtbCache,
@@ -291,11 +291,9 @@ func newMockCleanupService(t *testing.T,
 	}
 }
 
-// Assuming you have generated a mock interface for v1.SecretInterface using gomock
-func getSecretInterfaceMock(ctrl *gomock.Controller, store map[string]*corev1.Secret) wcorev1.SecretController {
+func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.Secret) wcorev1.SecretController {
 	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
-	// Mock for Create
 	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 		if secret.Name == "" {
 			uniqueIdentifier := md5.Sum([]byte(time.Now().String()))
@@ -305,7 +303,6 @@ func getSecretInterfaceMock(ctrl *gomock.Controller, store map[string]*corev1.Se
 		return secret, nil
 	}).AnyTimes()
 
-	// Mock for ListNamespaced (List)
 	secretController.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace string, opts metav1.ListOptions) (*corev1.SecretList, error) {
 		var secrets []corev1.Secret
 		for _, secret := range store {
@@ -318,7 +315,6 @@ func getSecretInterfaceMock(ctrl *gomock.Controller, store map[string]*corev1.Se
 		}, nil
 	}).AnyTimes()
 
-	// Mock for GetNamespaced (Get)
 	secretController.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
 		secret, ok := store[fmt.Sprintf("%s:%s", namespace, name)]
 		if ok {
@@ -327,7 +323,6 @@ func getSecretInterfaceMock(ctrl *gomock.Controller, store map[string]*corev1.Se
 		return nil, errors.New("secret not found")
 	}).AnyTimes()
 
-	// Mock for DeleteNamespaced (Delete)
 	secretController.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
 		delete(store, fmt.Sprintf("%s:%s", namespace, name))
 		return nil
