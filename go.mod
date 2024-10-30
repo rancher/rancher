@@ -139,7 +139,7 @@ require (
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.0-rc.5
 	github.com/rancher/shepherd v0.0.0-20241023152838-da6b36b3b5b4
-	github.com/rancher/steve v0.0.0-20241028205536-b2f2bab3c4b3
+	github.com/rancher/steve v0.0.0-20241029132712-2175e090fe4b
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.0.1-rc.3
@@ -250,8 +250,10 @@ require (
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/urfave/cli/v2 v2.27.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0 // indirect
