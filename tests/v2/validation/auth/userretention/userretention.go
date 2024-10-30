@@ -14,16 +14,18 @@ import (
 )
 
 const (
-	disableInactiveUserAfter = "disable-inactive-user-after"
-	deleteInactiveUserAfter  = "delete-inactive-user-after"
-	userRetentionCron        = "user-retention-cron"
-	userRetentionDryRun      = "user-retention-dry-run"
-	lastloginLabel           = "cattle.io/last-login"
-	defaultWaitDuration      = 70 * time.Second
-	pollInterval             = 10 * time.Second
-	isActive                 = true
-	isInActive               = false
-	webhookErrorMessage      = "admission webhook \"rancher.cattle.io.settings.management.cattle.io\" denied the request: value: Invalid value:"
+	disableInactiveUserAfter  = "disable-inactive-user-after"
+	deleteInactiveUserAfter   = "delete-inactive-user-after"
+	userRetentionCron         = "user-retention-cron"
+	userRetentionDryRun       = "user-retention-dry-run"
+	authUserSessionTTLMinutes = "auth-user-session-ttl-minutes"
+	defaultAuthSessionTTL     = "960"
+	lastloginLabel            = "cattle.io/last-login"
+	defaultWaitDuration       = 70 * time.Second
+	pollInterval              = 10 * time.Second
+	isActive                  = true
+	isInActive                = false
+	webhookErrorMessage       = "admission webhook \"rancher.cattle.io.settings.management.cattle.io\" denied the request: value: Invalid value:"
 )
 
 func setupUserRetentionSettings(client *rancher.Client, disableAfterValue string, deleteAfterValue string, userRetentionCronValue string, dryRunValue string) error {
