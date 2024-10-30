@@ -259,17 +259,10 @@ func TestUpdated(t *testing.T) {
 }
 
 func Test_deleteAllCRTB(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	crtbMock := wranglerfake.NewMockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList](ctrl)
-
-	ul := &userLifecycle{
-		crtb: crtbMock,
-	}
-
 	tests := []struct {
 		name          string
 		inputCRTB     []*v3.ClusterRoleTemplateBinding
-		mockSetup     func()
+		mockSetup     func(crtbMock *wranglerfake.MockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList])
 		expectedError bool
 	}{
 		{
@@ -281,8 +274,8 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList]) {
+				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 			expectedError: false,
 		},
@@ -300,8 +293,8 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList]) {
+				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			},
 			expectedError: false,
 		},
@@ -321,6 +314,10 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
+			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList]) {
+				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			},
+			expectedError: false,
 		},
 		{
 			name: "crtbs (non and namespaced) deleted properly",
@@ -337,8 +334,8 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList]) {
+				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			},
 			expectedError: false,
 		},
@@ -357,8 +354,11 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList]) {
+				gomock.InOrder(
+					crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil),
+					crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("namespaced crtb not deleted")),
+				)
 			},
 			expectedError: true,
 		},
@@ -371,8 +371,8 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList]) {
+				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
 			},
 			expectedError: true,
 		},
@@ -380,7 +380,14 @@ func Test_deleteAllCRTB(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.mockSetup()
+			ctrl := gomock.NewController(t)
+			crtbMock := wranglerfake.NewMockControllerInterface[*wv3.ClusterRoleTemplateBinding, *wv3.ClusterRoleTemplateBindingList](ctrl)
+
+			tt.mockSetup(crtbMock)
+
+			ul := &userLifecycle{
+				crtb: crtbMock,
+			}
 
 			err := ul.deleteAllCRTB(tt.inputCRTB)
 
