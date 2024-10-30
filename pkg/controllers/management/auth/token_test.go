@@ -62,14 +62,14 @@ func TestSync(t *testing.T) {
 	// setup userAttributesLister mock instance
 	userAttributesListerMock := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(namespace string, name string) (*v3.UserAttribute, error) {
+		func(name string) (*v3.UserAttribute, error) {
 			userAttribute, ok := userAttributes[name]
 			if ok {
 				return userAttribute, nil
 			}
 			return nil, errors.NewNotFound(schema.GroupResource{}, name)
 		},
-	)
+	).AnyTimes()
 
 	testTokenController := TokenController{
 		tokens:               tokensMock,
@@ -129,19 +129,19 @@ func TestSync(t *testing.T) {
 			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
 			return userAttribute, nil
 		},
-	)
+	).AnyTimes()
 
 	// setup userAttributesLister mock instance
 	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(namespace string, name string) (*v3.UserAttribute, error) {
+		func(name string) (*v3.UserAttribute, error) {
 			userAttribute, ok := userAttributes[name]
 			if ok {
 				return userAttribute, nil
 			}
 			return nil, errors.NewNotFound(schema.GroupResource{}, name)
 		},
-	)
+	).AnyTimes()
 
 	testTokenErrorUpdateController := TokenController{
 		tokens:               tokensMock,
@@ -189,14 +189,14 @@ func TestSync(t *testing.T) {
 	// setup userAttributesLister mock instance
 	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(namespace string, name string) (*v3.UserAttribute, error) {
+		func(name string) (*v3.UserAttribute, error) {
 			userAttribute, ok := userAttributes[name]
 			if ok {
 				return userAttribute, nil
 			}
 			return nil, errors.NewNotFound(schema.GroupResource{}, name)
 		},
-	)
+	).AnyTimes()
 
 	testUserAttributeErrorUpdateController := TokenController{
 		tokens:               tokensMock,
@@ -248,12 +248,12 @@ func TestSync(t *testing.T) {
 			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
 			return userAttribute, nil
 		},
-	)
+	).AnyTimes()
 
 	// setup userAttributesLister mock instance
 	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(namespace string, name string) (*v3.UserAttribute, error) {
+		func(name string) (*v3.UserAttribute, error) {
 			return nil, errors.NewServiceUnavailable("test reason")
 		},
 	)
@@ -300,12 +300,12 @@ func TestSync(t *testing.T) {
 			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
 			return userAttribute, nil
 		},
-	)
+	).AnyTimes()
 
 	// setup userAttributesLister mock instance
 	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(namespace string, name string) (*v3.UserAttribute, error) {
+		func(name string) (*v3.UserAttribute, error) {
 			return nil, errors.NewNotFound(schema.GroupResource{}, name)
 		},
 	)
