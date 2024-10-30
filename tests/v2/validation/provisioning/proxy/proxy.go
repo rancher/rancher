@@ -1,7 +1,6 @@
 package proxy
 
 const (
-	//corralPackageProxyCustomClusterName = "proxyCustomCluster"
 	corralPackageAirgapCustomClusterName = "airgapCustomCluster"
 	corralBastionIP                      = "bastion_ip"
 	corralRegistryIP                     = "registry_ip"
