@@ -230,6 +230,7 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) ([
 		Prtbs:              w.Prtbs,
 		Crtbs:              w.Crtbs,
 		ProjectLister:      w.ProjectLister,
+		ProjectClient:      w.ProjectClient,
 		ClusterLister:      w.ClusterLister,
 	}
 	accessType, err := ma.GetAccessTypeOfCaller(callerID, creatorID, mcapp.Name, mcapp.Spec.Members)
