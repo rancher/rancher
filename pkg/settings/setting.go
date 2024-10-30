@@ -292,6 +292,10 @@ var (
 	// UnprivilegedJailUser controls whether jailed commands execute under a separate (unprivileged/non-root) user
 	// account. Setting it to false is only recommended for testing and development environments.
 	UnprivilegedJailUser = NewSetting("unprivileged-jail-user", "true")
+
+	// UseProjectNamespaceFix indicates to the webhook if project namespaces should be made using the existing model if false, or use the
+	// newer model if true
+	UseProjectNamespaceFix = NewSetting("use-project-namespace-fix", "false")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

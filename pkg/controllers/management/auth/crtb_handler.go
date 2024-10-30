@@ -176,7 +176,15 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 	for _, p := range projects {
-		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagmentPlaneResources, subject, binding); err != nil {
+		projectNamespace := p.Name
+		if p.Status.BackingNamespace != "" {
+			projectNamespace = p.Status.BackingNamespace
+		}
+		if p.DeletionTimestamp != nil {
+			logrus.Warnf("Project %v is being deleted, not creating membership bindings", projectNamespace)
+			continue
+		}
+		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, projectNamespace, projectManagementPlaneResources, subject, binding); err != nil {
 			return err
 		}
 	}
@@ -190,14 +198,18 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	}
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, p := range projects {
+		projectNamespace := p.Name
+		if p.Status.BackingNamespace != "" {
+			projectNamespace = p.Status.BackingNamespace
+		}
 		set := labels.Set(map[string]string{bindingKey: CrtbInProjectBindingOwner})
-		rbs, err := c.mgr.rbLister.List(p.Name, set.AsSelector())
+		rbs, err := c.mgr.rbLister.List(projectNamespace, set.AsSelector())
 		if err != nil {
 			return err
 		}
 		for _, rb := range rbs {
-			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, p.Name, binding.Name)
-			if err := c.mgr.mgmt.RBAC.RoleBindings(p.Name).Delete(rb.Name, &v1.DeleteOptions{}); err != nil {
+			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, projectNamespace, binding.Name)
+			if err := c.mgr.mgmt.RBAC.RoleBindings(projectNamespace).Delete(rb.Name, &v1.DeleteOptions{}); err != nil {
 				return err
 			}
 		}
