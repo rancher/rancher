@@ -380,3 +380,100 @@ func newDeletingMgmtCuster() *v3.Cluster {
 	c.DeletionTimestamp = &metav1.Time{}
 	return c
 }
+
+func Test_isProtectedRBACResource(t *testing.T) {
+	tests := []struct {
+		name string
+		obj  runtime.Object
+		want bool
+	}{
+		{
+			name: "role without required annotations",
+			obj: &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole", Namespace: "test",
+			}},
+			want: false,
+		},
+		{
+			name: "role with partial annotations",
+			obj: &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole", Namespace: "test",
+				Annotations: map[string]string{
+					"cluster.cattle.io/name": "test",
+				},
+			}},
+			want: false,
+		},
+		{
+			name: "role with expected annotations",
+			obj: &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole", Namespace: "test",
+				Annotations: map[string]string{
+					"cluster.cattle.io/name":      "test",
+					"cluster.cattle.io/namespace": "test",
+				},
+			}},
+			want: true,
+		},
+
+		{
+			name: "rolebinding without required annotations",
+			obj: &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole", Namespace: "test",
+			}},
+			want: false,
+		},
+		{
+			name: "rolebinding with expected annotations",
+			obj: &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole", Namespace: "test",
+				Annotations: map[string]string{
+					"cluster.cattle.io/name":      "test",
+					"cluster.cattle.io/namespace": "test",
+				},
+			}},
+			want: true,
+		},
+
+		{
+			name: "clusterrole without annotations",
+			obj: &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole",
+			}},
+			want: false,
+		},
+		{
+			name: "clusterrole with expected annotations",
+			obj: &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole",
+				Annotations: map[string]string{
+					"cluster.cattle.io/name": "test",
+				},
+			}},
+			want: true,
+		},
+
+		{
+			name: "clusterrolebinding without annotations",
+			obj: &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole",
+			}},
+			want: false,
+		},
+		{
+			name: "clusterrolebinding with expected annotations",
+			obj: &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{
+				Name: "myrole",
+				Annotations: map[string]string{
+					"cluster.cattle.io/name": "test",
+				},
+			}},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, isProtectedRBACResource(tt.obj), "isProtectedRBACResource(%v)", tt.obj)
+		})
+	}
+}
