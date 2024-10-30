@@ -25,7 +25,8 @@ func NewScopedStore(key string, store types.Store, pClient v3.ProjectInterface) 
 				if data == nil {
 					return data, nil
 				}
-				if key == "clusterId" {
+				v := convert.ToString(data[key])
+				if !strings.HasSuffix(v, ":"+convert.ToString(data[client.ProjectFieldNamespaceId])) && !strings.HasSuffix(v, "-"+convert.ToString(data[client.ProjectFieldNamespaceId])) {
 					data[key] = data[client.ProjectFieldNamespaceId]
 				}
 
