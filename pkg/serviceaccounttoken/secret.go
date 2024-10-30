@@ -224,7 +224,14 @@ func secretFromSA(ctx context.Context, sa *corev1.ServiceAccount, secretClient c
 
 	secret, err := secretClient.Get(ctx, secretRef.Name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("could not get secret for service account %s: %w (%v)", secretRef, err, apierrors.IsInternalError(err))
+		// During the encryption key update this can fail for deleted secrets.
+		// This manifests as an Internal Error from K8s.
+		// In this case, we can ignore it and let a secret be created.
+		if !apierrors.IsInternalError(err) {
+			return nil, fmt.Errorf("could not get secret for service account: %w", err)
+		}
+		logrus.Infof("internal error when getting a secret %s - not using the secret", secret.Name)
+		return nil, nil
 	}
 
 	return secret, nil
