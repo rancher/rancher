@@ -401,17 +401,10 @@ func Test_deleteAllCRTB(t *testing.T) {
 }
 
 func Test_deleteAllPRTB(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	prtbMock := wranglerfake.NewMockControllerInterface[*wv3.ProjectRoleTemplateBinding, *wv3.ProjectRoleTemplateBindingList](ctrl)
-
-	ul := &userLifecycle{
-		prtb: prtbMock,
-	}
-
 	tests := []struct {
 		name          string
 		inputPRTB     []*v3.ProjectRoleTemplateBinding
-		mockSetup     func()
+		mockSetup     func(*wranglerfake.MockControllerInterface[*wv3.ProjectRoleTemplateBinding, *wv3.ProjectRoleTemplateBindingList])
 		expectedError bool
 	}{
 		{
@@ -425,7 +418,7 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
+			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*wv3.ProjectRoleTemplateBinding, *wv3.ProjectRoleTemplateBindingList]) {
 				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			expectedError: false,
@@ -447,8 +440,8 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
-				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*wv3.ProjectRoleTemplateBinding, *wv3.ProjectRoleTemplateBindingList]) {
+				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			},
 			expectedError: false,
 		},
@@ -463,7 +456,7 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
+			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*wv3.ProjectRoleTemplateBinding, *wv3.ProjectRoleTemplateBindingList]) {
 				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
 			},
 			expectedError: true,
@@ -478,7 +471,7 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {
+			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*wv3.ProjectRoleTemplateBinding, *wv3.ProjectRoleTemplateBindingList]) {
 				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
 			},
 			expectedError: true,
@@ -487,8 +480,14 @@ func Test_deleteAllPRTB(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.mockSetup()
+			ctrl := gomock.NewController(t)
+			prtbMock := wranglerfake.NewMockControllerInterface[*wv3.ProjectRoleTemplateBinding, *wv3.ProjectRoleTemplateBindingList](ctrl)
 
+			tt.mockSetup(prtbMock)
+
+			ul := &userLifecycle{
+				prtb: prtbMock,
+			}
 			err := ul.deleteAllPRTB(tt.inputPRTB)
 
 			if tt.expectedError {
