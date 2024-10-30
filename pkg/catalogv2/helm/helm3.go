@@ -64,9 +64,7 @@ func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespac
 	}
 
 	if release.Chart != nil {
-		chart = &v1.Chart{
-			Values: release.Chart.Values,
-		}
+		chart = &v1.Chart{}
 		if release.Chart.Metadata != nil {
 			chart.Metadata = &v1.Metadata{
 				Name:        release.Chart.Metadata.Name,
@@ -112,7 +110,6 @@ func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespac
 		Name:             release.Name,
 		Info:             info,
 		Chart:            chart,
-		Values:           release.Config,
 		Resources:        nil,
 		Version:          release.Version,
 		Namespace:        release.Namespace,

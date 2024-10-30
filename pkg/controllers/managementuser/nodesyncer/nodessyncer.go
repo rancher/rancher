@@ -8,11 +8,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/pkg/errors"
 	cond "github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
@@ -21,6 +21,7 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -39,6 +40,13 @@ import (
 const (
 	AllNodeKey     = "_machine_all_"
 	annotationName = "management.cattle.io/nodesyncer"
+
+	// UpgradeEnabledLabel is a label which will be set to true on imported RKE2/K3s cluster nodes when the version in the
+	// cluster spec is higher than the version on the nodes. The system-upgrade-controller plan uses a label selector in
+	// the plan specification to determine which nodes must be upgraded. For newly added nodes, this label will not be
+	// applied until the version changes in the cluster spec, preventing unnecessary cordoning until an upgrade is
+	// required.
+	UpgradeEnabledLabel = "upgrade.cattle.io/kubernetes-upgrade"
 )
 
 type nodeSyncer struct {
@@ -135,7 +143,72 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error)
 		n.machines.Controller().Enqueue(n.clusterNamespace, AllNodeKey)
 	}
 
+	cluster, err := n.nodesSyncer.clusterLister.Get("", n.clusterNamespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		updateVersion string
+	)
+
+	// only applies to imported k3s/rke2 clusters
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+		if cluster.Spec.K3sConfig == nil {
+			return nil, nil
+		}
+		updateVersion = cluster.Spec.K3sConfig.Version
+	} else if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 {
+		if cluster.Spec.Rke2Config == nil {
+			return nil, nil
+		}
+		updateVersion = cluster.Spec.Rke2Config.Version
+	} else {
+		return nil, nil
+	}
+
+	// no version set on imported cluster
+	if updateVersion == "" {
+		return nil, nil
+	}
+
+	// if node is running a version lower than what is in the spec
+	if ok, err := IsNewerVersion(node.Status.NodeInfo.KubeletVersion, updateVersion); err != nil {
+		return nil, err
+	} else if ok {
+		node = node.DeepCopy()
+		node.Labels[UpgradeEnabledLabel] = "true"
+		return n.nodesSyncer.nodeClient.Update(node)
+	}
+
 	return nil, nil
+}
+
+// IsNewerVersion returns true if updated versions semver is newer and false if its
+// semver is older. If semver is equal then metadata is alphanumerically compared.
+func IsNewerVersion(prevVersion, updatedVersion string) (bool, error) {
+	parseErrMsg := "failed to parse version: %v"
+	prevVer, err := semver.NewVersion(strings.TrimPrefix(prevVersion, "v"))
+	if err != nil {
+		return false, fmt.Errorf(parseErrMsg, err)
+	}
+
+	updatedVer, err := semver.NewVersion(strings.TrimPrefix(updatedVersion, "v"))
+	if err != nil {
+		return false, fmt.Errorf(parseErrMsg, err)
+	}
+
+	switch updatedVer.Compare(*prevVer) {
+	case -1:
+		return false, nil
+	case 1:
+		return true, nil
+	default:
+		// using metadata to determine precedence is against semver standards
+		// this is ignored because it because k3s uses it to precedence between
+		// two versions based on same k8s version
+		return updatedVer.Metadata > prevVer.Metadata, nil
+	}
 }
 
 func (n *nodeSyncer) needUpdate(_ string, node *corev1.Node) (bool, error) {

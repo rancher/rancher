@@ -30,8 +30,10 @@ import (
 	"github.com/rancher/rancher/pkg/crds"
 	dashboardcrds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
+	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -179,7 +181,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	if features.Auth.Enabled() {
-		authServer, err = auth.NewServer(ctx, restConfig)
+		authServer, err = auth.NewServer(ctx, restConfig, wranglerContext)
 		if err != nil {
 			return nil, err
 		}
@@ -195,14 +197,20 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	extensionAPIServer, err := ext.NewExtensionAPIServer(wranglerContext)
+	if err != nil {
+		return nil, fmt.Errorf("extension api server: %w", err)
+	}
+
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
-		ServerVersion:   settings.ServerVersion.Get(),
-		Controllers:     steveControllers,
-		AccessSetLookup: wranglerContext.ASL,
-		AuthMiddleware:  steveauth.ExistingContext,
-		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
-		ClusterRegistry: opts.ClusterRegistry,
-		SQLCache:        features.UISQLCache.Enabled(),
+		ServerVersion:      settings.ServerVersion.Get(),
+		Controllers:        steveControllers,
+		AccessSetLookup:    wranglerContext.ASL,
+		AuthMiddleware:     steveauth.ExistingContext,
+		Next:               ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
+		ClusterRegistry:    opts.ClusterRegistry,
+		SQLCache:           features.UISQLCache.Enabled(),
+		ExtensionAPIServer: extensionAPIServer,
 	})
 	if err != nil {
 		return nil, err
@@ -271,6 +279,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if features.MCM.Enabled() {
 		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
 		nodedriver.Register(ctx, r.Wrangler)
+		kontainerdrivermetadata.Register(ctx, r.Wrangler)
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}

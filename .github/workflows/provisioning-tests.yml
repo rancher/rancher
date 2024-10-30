@@ -2,7 +2,14 @@ name: Provisioning tests
 on:
   pull_request:
     branches:
+      - main
       - release/v*
+    paths-ignore:
+      # omit tests from triggering CI except when CI tests are changed
+      - 'tests/v2/validation/**'
+      - 'tests/v2/actions/**'
+      - 'tests/v2/codecoverage/**'
+      - 'tests/validation/**'
 jobs:
   provisioning_tests:
     strategy:

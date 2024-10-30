@@ -9,19 +9,11 @@ source package-env
 
 cd ../package
 
-../scripts/k3s-images.sh
-
-# Make sure the used data.json is a release artifact
-
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
 fi
-if [ ${ARCH} == s390x ]; then
-    ETCD_UNSUPPORTED_ARCH=s390x
-fi
 
 mkdir -p ../dist
-cp ../bin/data.json ../dist/rancher-data.json
 
 cd ../bin
 

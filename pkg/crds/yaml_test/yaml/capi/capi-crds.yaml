@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: clusterclasses.cluster.x-k8s.io
@@ -487,8 +487,19 @@ spec:
                           x-kubernetes-int-or-string: true
                         nodeStartupTimeout:
                           description: |-
-                            Machines older than this duration without a node will be considered to have
-                            failed and will be remediated.
+                            NodeStartupTimeout allows to set the maximum time for MachineHealthCheck
+                            to consider a Machine unhealthy if a corresponding Node isn't associated
+                            through a `Spec.ProviderID` field.
+
+
+                            The duration set in this field is compared to the greatest of:
+                            - Cluster's infrastructure ready condition timestamp (if and when available)
+                            - Control Plane's initialized condition timestamp (if and when available)
+                            - Machine's infrastructure ready condition timestamp (if and when available)
+                            - Machine's metadata creation timestamp
+
+
+                            Defaults to 10 minutes.
                             If you wish to disable this feature, set the value explicitly to 0.
                           type: string
                         remediationTemplate:
@@ -984,6 +995,9 @@ spec:
                           Metadata is the metadata of a variable.
                           It can be used to add additional data for higher level tools to
                           a ClusterClassVariable.
+
+
+                          Deprecated: This field is deprecated and is going to be removed in the next apiVersion. Please use XMetadata in JSONSchemaProps instead.
                         properties:
                           annotations:
                             additionalProperties:
@@ -1082,6 +1096,12 @@ spec:
                                   NOTE: Can only be set if type is string.
                                 format: int64
                                 type: integer
+                              maxProperties:
+                                description: |-
+                                  MaxProperties is the maximum amount of entries in a map or properties in an object.
+                                  NOTE: Can only be set if type is object.
+                                format: int64
+                                type: integer
                               maximum:
                                 description: |-
                                   Maximum is the maximum of an integer or number variable.
@@ -1100,6 +1120,12 @@ spec:
                                 description: |-
                                   MinLength is the min length of a string variable.
                                   NOTE: Can only be set if type is string.
+                                format: int64
+                                type: integer
+                              minProperties:
+                                description: |-
+                                  MinProperties is the minimum amount of entries in a map or properties in an object.
+                                  NOTE: Can only be set if type is object.
                                 format: int64
                                 type: integer
                               minimum:
@@ -1146,6 +1172,86 @@ spec:
                                   which are not defined in the variable schema. This affects fields recursively,
                                   except if nested properties or additionalProperties are specified in the schema.
                                 type: boolean
+                              x-kubernetes-validations:
+                                description: XValidations describes a list of validation rules written in the CEL expression language.
+                                items:
+                                  description: ValidationRule describes a validation rule written in the CEL expression language.
+                                  properties:
+                                    fieldPath:
+                                      description: |-
+                                        FieldPath represents the field path returned when the validation fails.
+                                        It must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.
+                                        e.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`
+                                        If the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`
+                                        It does not support list numeric index.
+                                        It supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.
+                                        Numeric index of array is not supported.
+                                        For field name which contains special characters, use `['specialName']` to refer the field name.
+                                        e.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`
+                                      type: string
+                                    message:
+                                      description: |-
+                                        Message represents the message displayed when validation fails. The message is required if the Rule contains
+                                        line breaks. The message must not contain line breaks.
+                                        If unset, the message is "failed rule: {Rule}".
+                                        e.g. "must be a URL with the host matching spec.host"
+                                      type: string
+                                    messageExpression:
+                                      description: |-
+                                        MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.
+                                        Since messageExpression is used as a failure message, it must evaluate to a string.
+                                        If both message and messageExpression are present on a rule, then messageExpression will be used if validation
+                                        fails. If messageExpression results in a runtime error, the validation failure message is produced
+                                        as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string
+                                        that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset.
+                                        messageExpression has access to all the same variables as the rule; the only difference is the return type.
+                                        Example:
+                                        "x must be less than max ("+string(self.max)+")"
+                                      type: string
+                                    reason:
+                                      default: FieldValueInvalid
+                                      description: |-
+                                        Reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule.
+                                        The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
+                                        If not set, default to use "FieldValueInvalid".
+                                        All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
+                                      enum:
+                                        - FieldValueInvalid
+                                        - FieldValueForbidden
+                                        - FieldValueRequired
+                                        - FieldValueDuplicate
+                                      type: string
+                                    rule:
+                                      description: "Rule represents the expression which will be evaluated by CEL.\nref: https://github.com/google/cel-spec\nThe Rule is scoped to the location of the x-kubernetes-validations extension in the schema.\nThe `self` variable in the CEL expression is bound to the scoped value.\nIf the Rule is scoped to an object with properties, the accessible properties of the object are field selectable\nvia `self.field` and field presence can be checked via `has(self.field)`.\nIf the Rule is scoped to an object with additionalProperties (i.e. a map) the value of the map\nare accessible via `self[mapKey]`, map containment can be checked via `mapKey in self` and all entries of the map\nare accessible via CEL macros and functions such as `self.all(...)`.\nIf the Rule is scoped to an array, the elements of the array are accessible via `self[i]` and also by macros and\nfunctions.\nIf the Rule is scoped to a scalar, `self` is bound to the scalar value.\nExamples:\n- Rule scoped to a map of objects: {\"rule\": \"self.components['Widget'].priority < 10\"}\n- Rule scoped to a list of integers: {\"rule\": \"self.values.all(value, value >= 0 && value < 100)\"}\n- Rule scoped to a string value: {\"rule\": \"self.startsWith('kube')\"}\n\n\nUnknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields is not accessible in CEL\nexpressions. This includes:\n- Unknown field values that are preserved by object schemas with x-kubernetes-preserve-unknown-fields.\n- Object properties where the property schema is of an \"unknown type\". An \"unknown type\" is recursively defined as:\n  - A schema with no type and x-kubernetes-preserve-unknown-fields set to true\n  - An array where the items schema is of an \"unknown type\"\n  - An object where the additionalProperties schema is of an \"unknown type\"\n\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.\nAccessible property names are escaped according to the following rules when accessed in the expression:\n- '__' escapes to '__underscores__'\n- '.' escapes to '__dot__'\n- '-' escapes to '__dash__'\n- '/' escapes to '__slash__'\n- Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Rule accessing a property named \"namespace\": {\"rule\": \"self.__namespace__ > 0\"}\n  - Rule accessing a property named \"x-prop\": {\"rule\": \"self.x__dash__prop > 0\"}\n  - Rule accessing a property named \"redact__d\": {\"rule\": \"self.redact__underscores__d > 0\"}\n\n\nIf `rule` makes use of the `oldSelf` variable it is implicitly a\n`transition rule`.\n\n\nBy default, the `oldSelf` variable is the same type as `self`.\n\n\nTransition rules by default are applied only on UPDATE requests and are\nskipped if an old value could not be found."
+                                      type: string
+                                  required:
+                                    - rule
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                  - rule
+                                x-kubernetes-list-type: map
+                              x-metadata:
+                                description: |-
+                                  XMetadata is the metadata of a variable or a nested field within a variable.
+                                  It can be used to add additional data for higher level tools.
+                                properties:
+                                  annotations:
+                                    additionalProperties:
+                                      type: string
+                                    description: |-
+                                      Annotations is an unstructured key value map that can be used to store and
+                                      retrieve arbitrary metadata.
+                                      They are not queryable.
+                                    type: object
+                                  labels:
+                                    additionalProperties:
+                                      type: string
+                                    description: |-
+                                      Map of string keys and values that can be used to organize and categorize
+                                      (scope and select) variables.
+                                    type: object
+                                type: object
                             required:
                               - type
                             type: object
@@ -1198,8 +1304,19 @@ spec:
                                 x-kubernetes-int-or-string: true
                               nodeStartupTimeout:
                                 description: |-
-                                  Machines older than this duration without a node will be considered to have
-                                  failed and will be remediated.
+                                  NodeStartupTimeout allows to set the maximum time for MachineHealthCheck
+                                  to consider a Machine unhealthy if a corresponding Node isn't associated
+                                  through a `Spec.ProviderID` field.
+
+
+                                  The duration set in this field is compared to the greatest of:
+                                  - Cluster's infrastructure ready condition timestamp (if and when available)
+                                  - Control Plane's initialized condition timestamp (if and when available)
+                                  - Machine's infrastructure ready condition timestamp (if and when available)
+                                  - Machine's metadata creation timestamp
+
+
+                                  Defaults to 10 minutes.
                                   If you wish to disable this feature, set the value explicitly to 0.
                                 type: string
                               remediationTemplate:
@@ -1338,6 +1455,36 @@ spec:
                               new ones.
                               NOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.
                             properties:
+                              remediation:
+                                description: |-
+                                  Remediation controls the strategy of remediating unhealthy machines
+                                  and how remediating operations should occur during the lifecycle of the dependant MachineSets.
+                                properties:
+                                  maxInFlight:
+                                    anyOf:
+                                      - type: integer
+                                      - type: string
+                                    description: |-
+                                      MaxInFlight determines how many in flight remediations should happen at the same time.
+
+
+                                      Remediation only happens on the MachineSet with the most current revision, while
+                                      older MachineSets (usually present during rollout operations) aren't allowed to remediate.
+
+
+                                      Note: In general (independent of remediations), unhealthy machines are always
+                                      prioritized during scale down operations over healthy ones.
+
+
+                                      MaxInFlight can be set to a fixed number or a percentage.
+                                      Example: when this is set to 20%, the MachineSet controller deletes at most 20% of
+                                      the desired replicas.
+
+
+                                      If not set, remediation is limited to all machines (bounded by replicas)
+                                      under the active MachineSet's management.
+                                    x-kubernetes-int-or-string: true
+                                type: object
                               rollingUpdate:
                                 description: |-
                                   Rolling update config params. Present only if
@@ -1546,6 +1693,9 @@ spec:
                           - template
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                        - class
+                      x-kubernetes-list-type: map
                     machinePools:
                       description: |-
                         MachinePools is a list of machine pool classes that can be used to create
@@ -1759,6 +1909,9 @@ spec:
                           - template
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                        - class
+                      x-kubernetes-list-type: map
                   type: object
               type: object
             status:
@@ -1833,6 +1986,9 @@ spec:
                                 Metadata is the metadata of a variable.
                                 It can be used to add additional data for higher level tools to
                                 a ClusterClassVariable.
+
+
+                                Deprecated: This field is deprecated and is going to be removed in the next apiVersion.
                               properties:
                                 annotations:
                                   additionalProperties:
@@ -1928,6 +2084,12 @@ spec:
                                         NOTE: Can only be set if type is string.
                                       format: int64
                                       type: integer
+                                    maxProperties:
+                                      description: |-
+                                        MaxProperties is the maximum amount of entries in a map or properties in an object.
+                                        NOTE: Can only be set if type is object.
+                                      format: int64
+                                      type: integer
                                     maximum:
                                       description: |-
                                         Maximum is the maximum of an integer or number variable.
@@ -1946,6 +2108,12 @@ spec:
                                       description: |-
                                         MinLength is the min length of a string variable.
                                         NOTE: Can only be set if type is string.
+                                      format: int64
+                                      type: integer
+                                    minProperties:
+                                      description: |-
+                                        MinProperties is the minimum amount of entries in a map or properties in an object.
+                                        NOTE: Can only be set if type is object.
                                       format: int64
                                       type: integer
                                     minimum:
@@ -1992,6 +2160,86 @@ spec:
                                         which are not defined in the variable schema. This affects fields recursively,
                                         except if nested properties or additionalProperties are specified in the schema.
                                       type: boolean
+                                    x-kubernetes-validations:
+                                      description: XValidations describes a list of validation rules written in the CEL expression language.
+                                      items:
+                                        description: ValidationRule describes a validation rule written in the CEL expression language.
+                                        properties:
+                                          fieldPath:
+                                            description: |-
+                                              FieldPath represents the field path returned when the validation fails.
+                                              It must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.
+                                              e.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`
+                                              If the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`
+                                              It does not support list numeric index.
+                                              It supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.
+                                              Numeric index of array is not supported.
+                                              For field name which contains special characters, use `['specialName']` to refer the field name.
+                                              e.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`
+                                            type: string
+                                          message:
+                                            description: |-
+                                              Message represents the message displayed when validation fails. The message is required if the Rule contains
+                                              line breaks. The message must not contain line breaks.
+                                              If unset, the message is "failed rule: {Rule}".
+                                              e.g. "must be a URL with the host matching spec.host"
+                                            type: string
+                                          messageExpression:
+                                            description: |-
+                                              MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.
+                                              Since messageExpression is used as a failure message, it must evaluate to a string.
+                                              If both message and messageExpression are present on a rule, then messageExpression will be used if validation
+                                              fails. If messageExpression results in a runtime error, the validation failure message is produced
+                                              as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string
+                                              that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset.
+                                              messageExpression has access to all the same variables as the rule; the only difference is the return type.
+                                              Example:
+                                              "x must be less than max ("+string(self.max)+")"
+                                            type: string
+                                          reason:
+                                            default: FieldValueInvalid
+                                            description: |-
+                                              Reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule.
+                                              The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
+                                              If not set, default to use "FieldValueInvalid".
+                                              All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
+                                            enum:
+                                              - FieldValueInvalid
+                                              - FieldValueForbidden
+                                              - FieldValueRequired
+                                              - FieldValueDuplicate
+                                            type: string
+                                          rule:
+                                            description: "Rule represents the expression which will be evaluated by CEL.\nref: https://github.com/google/cel-spec\nThe Rule is scoped to the location of the x-kubernetes-validations extension in the schema.\nThe `self` variable in the CEL expression is bound to the scoped value.\nIf the Rule is scoped to an object with properties, the accessible properties of the object are field selectable\nvia `self.field` and field presence can be checked via `has(self.field)`.\nIf the Rule is scoped to an object with additionalProperties (i.e. a map) the value of the map\nare accessible via `self[mapKey]`, map containment can be checked via `mapKey in self` and all entries of the map\nare accessible via CEL macros and functions such as `self.all(...)`.\nIf the Rule is scoped to an array, the elements of the array are accessible via `self[i]` and also by macros and\nfunctions.\nIf the Rule is scoped to a scalar, `self` is bound to the scalar value.\nExamples:\n- Rule scoped to a map of objects: {\"rule\": \"self.components['Widget'].priority < 10\"}\n- Rule scoped to a list of integers: {\"rule\": \"self.values.all(value, value >= 0 && value < 100)\"}\n- Rule scoped to a string value: {\"rule\": \"self.startsWith('kube')\"}\n\n\nUnknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields is not accessible in CEL\nexpressions. This includes:\n- Unknown field values that are preserved by object schemas with x-kubernetes-preserve-unknown-fields.\n- Object properties where the property schema is of an \"unknown type\". An \"unknown type\" is recursively defined as:\n  - A schema with no type and x-kubernetes-preserve-unknown-fields set to true\n  - An array where the items schema is of an \"unknown type\"\n  - An object where the additionalProperties schema is of an \"unknown type\"\n\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.\nAccessible property names are escaped according to the following rules when accessed in the expression:\n- '__' escapes to '__underscores__'\n- '.' escapes to '__dot__'\n- '-' escapes to '__dash__'\n- '/' escapes to '__slash__'\n- Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Rule accessing a property named \"namespace\": {\"rule\": \"self.__namespace__ > 0\"}\n  - Rule accessing a property named \"x-prop\": {\"rule\": \"self.x__dash__prop > 0\"}\n  - Rule accessing a property named \"redact__d\": {\"rule\": \"self.redact__underscores__d > 0\"}\n\n\nIf `rule` makes use of the `oldSelf` variable it is implicitly a\n`transition rule`.\n\n\nBy default, the `oldSelf` variable is the same type as `self`.\n\n\nTransition rules by default are applied only on UPDATE requests and are\nskipped if an old value could not be found."
+                                            type: string
+                                        required:
+                                          - rule
+                                        type: object
+                                      type: array
+                                      x-kubernetes-list-map-keys:
+                                        - rule
+                                      x-kubernetes-list-type: map
+                                    x-metadata:
+                                      description: |-
+                                        XMetadata is the metadata of a variable or a nested field within a variable.
+                                        It can be used to add additional data for higher level tools.
+                                      properties:
+                                        annotations:
+                                          additionalProperties:
+                                            type: string
+                                          description: |-
+                                            Annotations is an unstructured key value map that can be used to store and
+                                            retrieve arbitrary metadata.
+                                            They are not queryable.
+                                          type: object
+                                        labels:
+                                          additionalProperties:
+                                            type: string
+                                          description: |-
+                                            Map of string keys and values that can be used to organize and categorize
+                                            (scope and select) variables.
+                                          type: object
+                                      type: object
                                   required:
                                     - type
                                   type: object
@@ -2026,7 +2274,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: clusterresourcesetbindings.addons.cluster.x-k8s.io
@@ -2310,7 +2558,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: clusterresourcesets.addons.cluster.x-k8s.io
@@ -2396,11 +2644,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -2561,11 +2811,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -2721,11 +2973,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -2827,7 +3081,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: clusters.cluster.x-k8s.io
@@ -3757,8 +4011,19 @@ spec:
                               x-kubernetes-int-or-string: true
                             nodeStartupTimeout:
                               description: |-
-                                Machines older than this duration without a node will be considered to have
-                                failed and will be remediated.
+                                NodeStartupTimeout allows to set the maximum time for MachineHealthCheck
+                                to consider a Machine unhealthy if a corresponding Node isn't associated
+                                through a `Spec.ProviderID` field.
+
+
+                                The duration set in this field is compared to the greatest of:
+                                - Cluster's infrastructure ready condition timestamp (if and when available)
+                                - Control Plane's initialized condition timestamp (if and when available)
+                                - Machine's infrastructure ready condition timestamp (if and when available)
+                                - Machine's metadata creation timestamp
+
+
+                                Defaults to 10 minutes.
                                 If you wish to disable this feature, set the value explicitly to 0.
                               type: string
                             remediationTemplate:
@@ -3910,10 +4175,10 @@ spec:
                                 properties:
                                   definitionFrom:
                                     description: |-
-                                      DefinitionFrom specifies where the definition of this Variable is from. DefinitionFrom is `inline` when the
-                                      definition is from the ClusterClass `.spec.variables` or the name of a patch defined in the ClusterClass
-                                      `.spec.patches` where the patch is external and provides external variables.
-                                      This field is mandatory if the variable has `DefinitionsConflict: true` in ClusterClass `status.variables[]`
+                                      DefinitionFrom specifies where the definition of this Variable is from.
+
+
+                                      Deprecated: This field is deprecated, must not be set anymore and is going to be removed in the next apiVersion.
                                     type: string
                                   name:
                                     description: Name of the variable.
@@ -3933,6 +4198,9 @@ spec:
                                   - value
                                 type: object
                               type: array
+                              x-kubernetes-list-map-keys:
+                                - name
+                              x-kubernetes-list-type: map
                           type: object
                       type: object
                     rolloutAfter:
@@ -3956,10 +4224,10 @@ spec:
                         properties:
                           definitionFrom:
                             description: |-
-                              DefinitionFrom specifies where the definition of this Variable is from. DefinitionFrom is `inline` when the
-                              definition is from the ClusterClass `.spec.variables` or the name of a patch defined in the ClusterClass
-                              `.spec.patches` where the patch is external and provides external variables.
-                              This field is mandatory if the variable has `DefinitionsConflict: true` in ClusterClass `status.variables[]`
+                              DefinitionFrom specifies where the definition of this Variable is from.
+
+
+                              Deprecated: This field is deprecated, must not be set anymore and is going to be removed in the next apiVersion.
                             type: string
                           name:
                             description: Name of the variable.
@@ -3979,6 +4247,9 @@ spec:
                           - value
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                        - name
+                      x-kubernetes-list-type: map
                     version:
                       description: The Kubernetes version of the cluster.
                       type: string
@@ -4035,8 +4306,19 @@ spec:
                                     x-kubernetes-int-or-string: true
                                   nodeStartupTimeout:
                                     description: |-
-                                      Machines older than this duration without a node will be considered to have
-                                      failed and will be remediated.
+                                      NodeStartupTimeout allows to set the maximum time for MachineHealthCheck
+                                      to consider a Machine unhealthy if a corresponding Node isn't associated
+                                      through a `Spec.ProviderID` field.
+
+
+                                      The duration set in this field is compared to the greatest of:
+                                      - Cluster's infrastructure ready condition timestamp (if and when available)
+                                      - Control Plane's initialized condition timestamp (if and when available)
+                                      - Machine's infrastructure ready condition timestamp (if and when available)
+                                      - Machine's metadata creation timestamp
+
+
+                                      Defaults to 10 minutes.
                                       If you wish to disable this feature, set the value explicitly to 0.
                                     type: string
                                   remediationTemplate:
@@ -4194,6 +4476,36 @@ spec:
                                   The deployment strategy to use to replace existing machines with
                                   new ones.
                                 properties:
+                                  remediation:
+                                    description: |-
+                                      Remediation controls the strategy of remediating unhealthy machines
+                                      and how remediating operations should occur during the lifecycle of the dependant MachineSets.
+                                    properties:
+                                      maxInFlight:
+                                        anyOf:
+                                          - type: integer
+                                          - type: string
+                                        description: |-
+                                          MaxInFlight determines how many in flight remediations should happen at the same time.
+
+
+                                          Remediation only happens on the MachineSet with the most current revision, while
+                                          older MachineSets (usually present during rollout operations) aren't allowed to remediate.
+
+
+                                          Note: In general (independent of remediations), unhealthy machines are always
+                                          prioritized during scale down operations over healthy ones.
+
+
+                                          MaxInFlight can be set to a fixed number or a percentage.
+                                          Example: when this is set to 20%, the MachineSet controller deletes at most 20% of
+                                          the desired replicas.
+
+
+                                          If not set, remediation is limited to all machines (bounded by replicas)
+                                          under the active MachineSet's management.
+                                        x-kubernetes-int-or-string: true
+                                    type: object
                                   rollingUpdate:
                                     description: |-
                                       Rolling update config params. Present only if
@@ -4268,10 +4580,10 @@ spec:
                                       properties:
                                         definitionFrom:
                                           description: |-
-                                            DefinitionFrom specifies where the definition of this Variable is from. DefinitionFrom is `inline` when the
-                                            definition is from the ClusterClass `.spec.variables` or the name of a patch defined in the ClusterClass
-                                            `.spec.patches` where the patch is external and provides external variables.
-                                            This field is mandatory if the variable has `DefinitionsConflict: true` in ClusterClass `status.variables[]`
+                                            DefinitionFrom specifies where the definition of this Variable is from.
+
+
+                                            Deprecated: This field is deprecated, must not be set anymore and is going to be removed in the next apiVersion.
                                           type: string
                                         name:
                                           description: Name of the variable.
@@ -4291,12 +4603,18 @@ spec:
                                         - value
                                       type: object
                                     type: array
+                                    x-kubernetes-list-map-keys:
+                                      - name
+                                    x-kubernetes-list-type: map
                                 type: object
                             required:
                               - class
                               - name
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                         machinePools:
                           description: MachinePools is a list of machine pools in the cluster.
                           items:
@@ -4393,10 +4711,10 @@ spec:
                                       properties:
                                         definitionFrom:
                                           description: |-
-                                            DefinitionFrom specifies where the definition of this Variable is from. DefinitionFrom is `inline` when the
-                                            definition is from the ClusterClass `.spec.variables` or the name of a patch defined in the ClusterClass
-                                            `.spec.patches` where the patch is external and provides external variables.
-                                            This field is mandatory if the variable has `DefinitionsConflict: true` in ClusterClass `status.variables[]`
+                                            DefinitionFrom specifies where the definition of this Variable is from.
+
+
+                                            Deprecated: This field is deprecated, must not be set anymore and is going to be removed in the next apiVersion.
                                           type: string
                                         name:
                                           description: Name of the variable.
@@ -4416,12 +4734,18 @@ spec:
                                         - value
                                       type: object
                                     type: array
+                                    x-kubernetes-list-map-keys:
+                                      - name
+                                    x-kubernetes-list-type: map
                                 type: object
                             required:
                               - class
                               - name
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                       type: object
                   required:
                     - class
@@ -4476,7 +4800,12 @@ spec:
                     type: object
                   type: array
                 controlPlaneReady:
-                  description: ControlPlaneReady defines if the control plane is ready.
+                  description: |-
+                    ControlPlaneReady denotes if the control plane became ready during initial provisioning
+                    to receive requests.
+                    NOTE: this field is part of the Cluster API contract and it is used to orchestrate provisioning.
+                    The value of this field is never updated after provisioning is completed. Please use conditions
+                    to check the operational state of the control plane.
                   type: boolean
                 failureDomains:
                   additionalProperties:
@@ -4529,7 +4858,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: extensionconfigs.runtime.cluster.x-k8s.io
@@ -4666,11 +4995,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -4790,7 +5121,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: ipaddressclaims.ipam.cluster.x-k8s.io
@@ -4873,10 +5204,15 @@ spec:
                   description: AddressRef is a reference to the address that was created for this claim.
                   properties:
                     name:
+                      default: ""
                       description: |-
                         Name of the referent.
-                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
                         TODO: Add other useful fields. apiVersion, kind, uid?
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
@@ -4968,6 +5304,9 @@ spec:
             spec:
               description: IPAddressClaimSpec is the desired state of an IPAddressClaim.
               properties:
+                clusterName:
+                  description: ClusterName is the name of the Cluster this object belongs to.
+                  type: string
                 poolRef:
                   description: PoolRef is a reference to the pool from which an IP address should be created.
                   properties:
@@ -4998,10 +5337,15 @@ spec:
                   description: AddressRef is a reference to the address that was created for this claim.
                   properties:
                     name:
+                      default: ""
                       description: |-
                         Name of the referent.
-                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
                         TODO: Add other useful fields. apiVersion, kind, uid?
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
@@ -5060,7 +5404,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: ipaddresses.ipam.cluster.x-k8s.io
@@ -5124,10 +5468,15 @@ spec:
                   description: ClaimRef is a reference to the claim this IPAddress was created for.
                   properties:
                     name:
+                      default: ""
                       description: |-
                         Name of the referent.
-                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
                         TODO: Add other useful fields. apiVersion, kind, uid?
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
@@ -5216,10 +5565,15 @@ spec:
                   description: ClaimRef is a reference to the claim this IPAddress was created for.
                   properties:
                     name:
+                      default: ""
                       description: |-
                         Name of the referent.
-                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
                         TODO: Add other useful fields. apiVersion, kind, uid?
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
@@ -5264,7 +5618,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: machinedeployments.cluster.x-k8s.io
@@ -5410,11 +5764,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -5958,11 +6314,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -6433,6 +6791,9 @@ spec:
                     The number of old MachineSets to retain to allow rollback.
                     This is a pointer to distinguish between explicit zero and not specified.
                     Defaults to 1.
+
+
+                    Deprecated: This field is deprecated and is going to be removed in the next apiVersion. Please see https://github.com/kubernetes-sigs/cluster-api/issues/10479 for more details.
                   format: int32
                   type: integer
                 rolloutAfter:
@@ -6475,11 +6836,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -6495,6 +6858,36 @@ spec:
                     The deployment strategy to use to replace existing machines with
                     new ones.
                   properties:
+                    remediation:
+                      description: |-
+                        Remediation controls the strategy of remediating unhealthy machines
+                        and how remediating operations should occur during the lifecycle of the dependant MachineSets.
+                      properties:
+                        maxInFlight:
+                          anyOf:
+                            - type: integer
+                            - type: string
+                          description: |-
+                            MaxInFlight determines how many in flight remediations should happen at the same time.
+
+
+                            Remediation only happens on the MachineSet with the most current revision, while
+                            older MachineSets (usually present during rollout operations) aren't allowed to remediate.
+
+
+                            Note: In general (independent of remediations), unhealthy machines are always
+                            prioritized during scale down operations over healthy ones.
+
+
+                            MaxInFlight can be set to a fixed number or a percentage.
+                            Example: when this is set to 20%, the MachineSet controller deletes at most 20% of
+                            the desired replicas.
+
+
+                            If not set, remediation is limited to all machines (bounded by replicas)
+                            under the active MachineSet's management.
+                          x-kubernetes-int-or-string: true
+                      type: object
                     rollingUpdate:
                       description: |-
                         Rolling update config params. Present only if
@@ -6855,7 +7248,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: machinehealthchecks.cluster.x-k8s.io
@@ -7022,11 +7415,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -7294,11 +7689,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -7484,12 +7881,25 @@ spec:
                   description: |-
                     Any further remediation is only allowed if at most "MaxUnhealthy" machines selected by
                     "selector" are not healthy.
+
+
+                    Deprecated: This field is deprecated and is going to be removed in the next apiVersion. Please see https://github.com/kubernetes-sigs/cluster-api/issues/10722 for more details.
                   x-kubernetes-int-or-string: true
                 nodeStartupTimeout:
                   description: |-
-                    Machines older than this duration without a node will be considered to have
-                    failed and will be remediated.
-                    If not set, this value is defaulted to 10 minutes.
+                    NodeStartupTimeout allows to set the maximum time for MachineHealthCheck
+                    to consider a Machine unhealthy if a corresponding Node isn't associated
+                    through a `Spec.ProviderID` field.
+
+
+                    The duration set in this field is compared to the greatest of:
+                    - Cluster's infrastructure ready condition timestamp (if and when available)
+                    - Control Plane's initialized condition timestamp (if and when available)
+                    - Machine's infrastructure ready condition timestamp (if and when available)
+                    - Machine's metadata creation timestamp
+
+
+                    Defaults to 10 minutes.
                     If you wish to disable this feature, set the value explicitly to 0.
                   type: string
                 remediationTemplate:
@@ -7570,11 +7980,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -7609,7 +8021,6 @@ spec:
                       - timeout
                       - type
                     type: object
-                  minItems: 1
                   type: array
                 unhealthyRange:
                   description: |-
@@ -7618,12 +8029,14 @@ spec:
                     Eg. "[3-5]" - This means that remediation will be allowed only when:
                     (a) there are at least 3 unhealthy machines (and)
                     (b) there are at most 5 unhealthy machines
+
+
+                    Deprecated: This field is deprecated and is going to be removed in the next apiVersion. Please see https://github.com/kubernetes-sigs/cluster-api/issues/10722 for more details.
                   pattern: ^\[[0-9]+-[0-9]+\]$
                   type: string
               required:
                 - clusterName
                 - selector
-                - unhealthyConditions
               type: object
             status:
               description: Most recently observed status of MachineHealthCheck resource
@@ -7709,7 +8122,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: machinepools.cluster.x-k8s.io
@@ -8811,7 +9224,6 @@ spec:
                     be ready.
                     Defaults to 0 (machine instance will be considered available as soon as it
                     is ready)
-                    NOTE: No logic is implemented for this field and it currently has no behaviour.
                   format: int32
                   type: integer
                 providerIDList:
@@ -9189,7 +9601,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: machines.cluster.x-k8s.io
@@ -10476,7 +10888,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
     cluster.x-k8s.io/provider: cluster-api
   name: machinesets.cluster.x-k8s.io
@@ -10604,11 +11016,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -11088,11 +11502,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string
@@ -11520,11 +11936,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                           - key
                           - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string

@@ -8,6 +8,7 @@ const (
 	NodeStatusFieldConditions         = "conditions"
 	NodeStatusFieldDockerInfo         = "dockerInfo"
 	NodeStatusFieldExternalIPAddress  = "externalIpAddress"
+	NodeStatusFieldFeatures           = "features"
 	NodeStatusFieldHostname           = "hostname"
 	NodeStatusFieldIPAddress          = "ipAddress"
 	NodeStatusFieldInfo               = "info"
@@ -31,6 +32,7 @@ type NodeStatus struct {
 	Conditions         []NodeCondition           `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	DockerInfo         *DockerInfo               `json:"dockerInfo,omitempty" yaml:"dockerInfo,omitempty"`
 	ExternalIPAddress  string                    `json:"externalIpAddress,omitempty" yaml:"externalIpAddress,omitempty"`
+	Features           *NodeFeatures             `json:"features,omitempty" yaml:"features,omitempty"`
 	Hostname           string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddress          string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
 	Info               *NodeInfo                 `json:"info,omitempty" yaml:"info,omitempty"`

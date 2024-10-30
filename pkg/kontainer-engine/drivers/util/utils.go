@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/utils"
 	rketypes "github.com/rancher/rke/types"
@@ -13,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -24,6 +26,10 @@ const (
 	oldClusterRoleBindingName = "netes-default-clusterRoleBinding"
 	newClusterRoleBindingName = "system-netes-default-clusterRoleBinding"
 )
+
+func UserAgentForCluster(cluster *managementv3.Cluster) string {
+	return fmt.Sprintf("%s cluster %s", rest.DefaultKubernetesUserAgent(), cluster.Name)
+}
 
 // GenerateServiceAccountToken generate a serviceAccountToken for clusterAdmin given a rest clientset
 func GenerateServiceAccountToken(clientset kubernetes.Interface, clusterName string) (string, error) {

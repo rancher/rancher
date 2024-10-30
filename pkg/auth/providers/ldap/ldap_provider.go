@@ -98,6 +98,14 @@ func IsNotConfigured(err error) bool {
 	return errors.Is(err, ErrorNotConfigured{})
 }
 
+func (p *ldapProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	return nil
+}
+
+func (p *ldapProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	return nil
+}
+
 func (p *ldapProvider) GetName() string {
 	return p.providerName
 }

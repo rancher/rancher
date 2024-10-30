@@ -7,34 +7,41 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
+	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/features"
+	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data"
+	deploymentControllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
+	k8sappsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
-	repoName         = "rancher-charts"
-	priorityClassKey = "priorityClassName"
+	repoName          = "rancher-charts"
+	sucDeploymentName = "system-upgrade-controller"
+	legacyAppLabel    = "io.cattle.field/appId"
 )
 
 var (
 	primaryImages = map[string]string{
-		chart.WebhookChartName:          "rancher/rancher-webhook",
-		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
+		chart.WebhookChartName:                 "rancher/rancher-webhook",
+		chart.ProvisioningCAPIChartName:        "rancher/mirrored-cluster-api-controller",
+		chart.SystemUpgradeControllerChartName: "rancher/system-upgrade-controller",
 	}
 	watchedSettings = map[string]struct{}{
-		settings.RancherWebhookVersion.Name:          {},
-		settings.RancherProvisioningCAPIVersion.Name: {},
-		settings.SystemDefaultRegistry.Name:          {},
-		settings.ShellImage.Name:                     {},
+		settings.RancherWebhookVersion.Name:               {},
+		settings.RancherProvisioningCAPIVersion.Name:      {},
+		settings.SystemDefaultRegistry.Name:               {},
+		settings.ShellImage.Name:                          {},
+		settings.SystemUpgradeControllerChartVersion.Name: {},
 	}
 )
 
@@ -43,6 +50,8 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 	h := &handler{
 		manager:          wContext.SystemChartsManager,
 		namespaces:       wContext.Core.Namespace(),
+		deployment:       wContext.Apps.Deployment().Cache(),
+		clusterRepo:      wContext.Catalog.ClusterRepo(),
 		chartsConfig:     chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
 		registryOverride: registryOverride,
 	}
@@ -54,12 +63,16 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 
 	// ensure the system charts are installed with the correct values when there are changes to the rancher config map
 	relatedresource.WatchClusterScoped(ctx, "bootstrap-configmap-charts", relatedConfigMaps, wContext.Catalog.ClusterRepo(), wContext.Core.ConfigMap())
+
+	wContext.Apps.Deployment().OnRemove(ctx, "legacy-k3sBasedUpgrader-deprecation", h.onDeployment)
 	return nil
 }
 
 type handler struct {
 	manager          chart.Manager
 	namespaces       corecontrollers.NamespaceController
+	deployment       deploymentControllers.DeploymentCache
+	clusterRepo      catalogcontrollers.ClusterRepoController
 	chartsConfig     chart.RancherConfigGetter
 	registryOverride string
 }
@@ -148,20 +161,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					},
 				}
 				// add priority class value
-				if priorityClassName, err := h.chartsConfig.GetGlobalValue(chart.PriorityClassKey); err != nil {
-					if !chart.IsNotFoundError(err) {
-						logrus.Warnf("Failed to get rancher %s for 'rancher-webhook': %s", chart.PriorityClassKey, err.Error())
-					}
-				} else {
-					values[priorityClassKey] = priorityClassName
-				}
-
+				h.setPriorityClass(values, chart.WebhookChartName)
 				// get custom values for the rancher-webhook
-				configMapValues, err := h.chartsConfig.GetChartValues(chart.WebhookChartName)
-				if err != nil && !chart.IsNotFoundError(err) {
-					logrus.Warnf("Failed to get rancher rancherWebhookValues %s", err.Error())
-				}
-
+				configMapValues := h.getChartValues(chart.WebhookChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
 			Enabled: func() bool { return true },
@@ -179,27 +181,89 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{}
 				// add priority class value
-				if priorityClassName, err := h.chartsConfig.GetGlobalValue(chart.PriorityClassKey); err != nil {
-					if !chart.IsNotFoundError(err) {
-						logrus.Warnf("Failed to get rancher %s for 'rancher-provisioning-capi': %s", chart.PriorityClassKey, err.Error())
-					}
-				} else {
-					values[priorityClassKey] = priorityClassName
-				}
-
+				h.setPriorityClass(values, chart.ProvisioningCAPIChartName)
 				// get custom values for the rancher-provisioning-capi
-				configMapValues, err := h.chartsConfig.GetChartValues(chart.ProvisioningCAPIChartName)
-				if err != nil && !chart.IsNotFoundError(err) {
-					logrus.Warnf("Failed to get rancher-provisioning-capi %s", err.Error())
-				}
-
+				configMapValues := h.getChartValues(chart.ProvisioningCAPIChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
 			Enabled:         func() bool { return true },
 			Uninstall:       !features.EmbeddedClusterAPI.Enabled(),
 			RemoveNamespace: !features.EmbeddedClusterAPI.Enabled(),
 		},
+		{
+			ReleaseNamespace:    namespace.System,
+			ChartName:           chart.SystemUpgradeControllerChartName,
+			ExactVersionSetting: settings.SystemUpgradeControllerChartVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{}
+				// add priority class value
+				h.setPriorityClass(values, chart.SystemUpgradeControllerChartName)
+				// get custom values for system-upgrade-controller
+				configMapValues := h.getChartValues(chart.SystemUpgradeControllerChartName)
+				return data.MergeMaps(values, configMapValues)
+			},
+			Enabled: func() bool {
+				toEnable := false
+				suc, err := h.deployment.Get(namespace.System, sucDeploymentName)
+
+				// the absence of the deployment or the absence of the legacy label on the existing deployment indicate
+				// that the old rancher-k3s/rke2-upgrader Project App has been removed
+				if err != nil {
+					logrus.Debugf("[systemcharts] failed to get the deployment %s/%s: %s", namespace.System, sucDeploymentName, err.Error())
+					if errors.IsNotFound(err) {
+						toEnable = true
+					}
+				}
+				if suc != nil {
+					if _, ok := suc.Labels[legacyAppLabel]; !ok {
+						toEnable = true
+					}
+				}
+				logrus.Debugf("[systemcharts] feature ManagedSystemUpgradeController = %t, toEnable = %t",
+					features.ManagedSystemUpgradeController.Enabled(), toEnable)
+
+				return features.ManagedSystemUpgradeController.Enabled() && toEnable
+			},
+		},
 	}
+}
+
+// onDeployment enqueues the rancher-charts ClusterRepo to the controller's processing queue
+// when a specific event occurs on the target deployment. It is currently used to manage
+// the migration from the legacy k3s-based-upgrader app to the system-upgrade-controller app.
+func (h *handler) onDeployment(_ string, d *k8sappsv1.Deployment) (*k8sappsv1.Deployment, error) {
+	if d != nil && d.Namespace == namespace.System && d.Name == sucDeploymentName {
+		if d.DeletionTimestamp != nil {
+			appName, ok := d.Labels[legacyAppLabel]
+			if ok {
+				logrus.Debugf("[systemcharts] found deployment %s/%s with label %s=%s", d.Namespace, d.Name, legacyAppLabel, appName)
+				if appName == k3sbasedupgrade.K3sAppName || appName == k3sbasedupgrade.Rke2AppName {
+					logrus.Debugf("[systemcharts] enqueue %s", repoName)
+					h.clusterRepo.Enqueue(repoName)
+				}
+			}
+		}
+	}
+	return d, nil
+}
+
+// setPriorityClass attempts to retrieve the priority class for rancher pods and set it in the specified map
+func (h *handler) setPriorityClass(values map[string]interface{}, chartName string) {
+	priorityClassName, err := h.chartsConfig.GetGlobalValue(chart.PriorityClassKey)
+	if err == nil {
+		values[chart.PriorityClassKey] = priorityClassName
+	} else if !chart.IsNotFoundError(err) {
+		logrus.Warnf("[systemcharts] Failed to get rancher %s for %s: %s", chart.PriorityClassKey, chartName, err.Error())
+	}
+}
+
+// getChartValues attempts to retrieve chart values for the specified chart
+func (h *handler) getChartValues(chartName string) map[string]interface{} {
+	configMapValues, err := h.chartsConfig.GetChartValues(chartName)
+	if err != nil && !chart.IsNotFoundError(err) {
+		logrus.Warnf("[systemcharts] Failed to get chart values for %s: %s", chartName, err.Error())
+	}
+	return configMapValues
 }
 
 func relatedFeatures(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {

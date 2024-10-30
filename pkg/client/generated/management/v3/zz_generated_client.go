@@ -44,8 +44,6 @@ type Client struct {
 	ClusterCatalog                            ClusterCatalogOperations
 	MultiClusterApp                           MultiClusterAppOperations
 	MultiClusterAppRevision                   MultiClusterAppRevisionOperations
-	GlobalDns                                 GlobalDnsOperations
-	GlobalDnsProvider                         GlobalDnsProviderOperations
 	KontainerDriver                           KontainerDriverOperations
 	EtcdBackup                                EtcdBackupOperations
 	CloudCredential                           CloudCredentialOperations
@@ -106,8 +104,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ClusterCatalog = newClusterCatalogClient(client)
 	client.MultiClusterApp = newMultiClusterAppClient(client)
 	client.MultiClusterAppRevision = newMultiClusterAppRevisionClient(client)
-	client.GlobalDns = newGlobalDnsClient(client)
-	client.GlobalDnsProvider = newGlobalDnsProviderClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)
 	client.EtcdBackup = newEtcdBackupClient(client)
 	client.CloudCredential = newCloudCredentialClient(client)

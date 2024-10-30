@@ -118,6 +118,44 @@ func WaitForProjectFinalizerToUpdate(client *rancher.Client, projectName string,
 	return nil
 }
 
+// WaitForProjectIDUpdate is a helper that waits for the project-id annotation and label to be updated in a specified namespace
+func WaitForProjectIDUpdate(client *rancher.Client, clusterID, projectName, namespaceName string) error {
+	expectedAnnotations := map[string]string{
+		projectsapi.ProjectIDAnnotation: clusterID + ":" + projectName,
+	}
+
+	expectedLabels := map[string]string{
+		projectsapi.ProjectIDAnnotation: projectName,
+	}
+
+	err := kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.OneMinuteTimeout, func() (done bool, pollErr error) {
+		namespace, pollErr := namespaces.GetNamespaceByName(client, clusterID, namespaceName)
+		if pollErr != nil {
+			return false, pollErr
+		}
+
+		for key, expectedValue := range expectedAnnotations {
+			if actualValue, ok := namespace.Annotations[key]; !ok || actualValue != expectedValue {
+				return false, nil
+			}
+		}
+
+		for key, expectedValue := range expectedLabels {
+			if actualValue, ok := namespace.Labels[key]; !ok || actualValue != expectedValue {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // UpdateProjectNamespaceFinalizer is a helper to update the finalizer in a project
 func UpdateProjectNamespaceFinalizer(client *rancher.Client, existingProject *v3.Project, finalizer []string) (*v3.Project, error) {
 	updatedProject := existingProject.DeepCopy()

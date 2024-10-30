@@ -3,22 +3,20 @@ package principals
 import (
 	"context"
 	"encoding/json"
-
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	"net/http"
-
 	"fmt"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 type principalsHandler struct {
@@ -72,7 +70,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 	context := map[string]string{"resource": "principals", "apiGroup": "management.cattle.io"}
 	principals = h.ac.FilterList(apiContext, apiContext.Schema, principals, context)
 
-	apiContext.WriteResponse(200, principals)
+	apiContext.WriteResponse(http.StatusOK, principals)
 	return nil
 }
 
@@ -87,8 +85,13 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 	if apiContext.ID != "" {
 		princ, err := providers.GetPrincipal(apiContext.ID, *token)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return httperror.NewAPIError(httperror.NotFound, err.Error())
+			}
+
 			return err
 		}
+
 		p, err := convertPrincipal(apiContext.Schema, princ)
 		if err != nil {
 			return err
@@ -97,7 +100,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		context := map[string]string{"resource": "principals", "apiGroup": "management.cattle.io"}
 		p = h.ac.Filter(apiContext, apiContext.Schema, p, context)
 
-		apiContext.WriteResponse(200, p)
+		apiContext.WriteResponse(http.StatusOK, p)
 		return nil
 	}
 
@@ -116,7 +119,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		principals = append(principals, x)
 	}
 
-	apiContext.WriteResponse(200, principals)
+	apiContext.WriteResponse(http.StatusOK, principals)
 	return nil
 }
 

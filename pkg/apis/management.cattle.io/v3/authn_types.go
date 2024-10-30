@@ -37,7 +37,7 @@ type Token struct {
 	UserID          string            `json:"userId" norman:"type=reference[user]"`
 	AuthProvider    string            `json:"authProvider"`
 	TTLMillis       int64             `json:"ttl"`
-	LastUpdateTime  string            `json:"lastUpdateTime"`
+	LastUsedAt      *metav1.Time      `json:"lastUsedAt,omitempty"`
 	IsDerived       bool              `json:"isDerived"`
 	Description     string            `json:"description"`
 	Expired         bool              `json:"expired"`

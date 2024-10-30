@@ -1,6 +1,8 @@
 package data
 
 import (
+	"encoding/json"
+
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
@@ -17,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func AuthConfigs(management *config.ManagementContext) error {
@@ -94,7 +97,7 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 	}
 	annotations[auth.CleanupAnnotation] = auth.CleanupRancherLocked
 
-	_, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
+	createdOrKnown, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
@@ -103,8 +106,31 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 		Enabled:            enabled,
 		LogoutAllSupported: sloSupported,
 	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
+	if err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+
+		// Make sure the logoutAllSupported field is set correctly for the existing authConfig.
+		// Use patch to avoid fetching the object first.
+		patch, err := json.Marshal([]struct {
+			Op    string `json:"op"`
+			Path  string `json:"path"`
+			Value any    `json:"value"`
+		}{{
+			Op:    "add",
+			Path:  "/logoutAllSupported",
+			Value: sloSupported,
+		}})
+		if err != nil {
+			return err
+		}
+
+		_, err = management.Management.AuthConfigs("").ObjectClient().
+			Patch(name, createdOrKnown, types.JSONPatchType, patch)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

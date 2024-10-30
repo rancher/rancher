@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rancher/norman/types/slice"
@@ -23,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/transport"
 )
 
 const (
@@ -36,6 +38,7 @@ func NewFactory(apiContext *config.ScaledContext, wrangler *wrangler.Context) (*
 		clusterLister: apiContext.Management.Clusters("").Controller().Lister(),
 		nodeLister:    apiContext.Management.Nodes("").Controller().Lister(),
 		TunnelServer:  wrangler.TunnelServer,
+		dialHolders:   map[string]*transport.DialHolder{},
 	}, nil
 }
 
@@ -43,6 +46,9 @@ type Factory struct {
 	nodeLister    v3.NodeLister
 	clusterLister v3.ClusterLister
 	TunnelServer  *remotedialer.Server
+
+	dialHolders     map[string]*transport.DialHolder
+	dialHoldersLock sync.RWMutex
 }
 
 func (f *Factory) ClusterDialer(clusterName string, retryOnError bool) (dialer.Dialer, error) {
@@ -54,6 +60,37 @@ func (f *Factory) ClusterDialer(clusterName string, retryOnError bool) (dialer.D
 		}
 		return d(ctx, network, address)
 	}, nil
+}
+
+func (f *Factory) ClusterDialHolder(clusterName string, retryOnError bool) (*transport.DialHolder, error) {
+	// Get cached dialHolder, if available
+	f.dialHoldersLock.RLock()
+	cached, ok := f.dialHolders[clusterName]
+	f.dialHoldersLock.RUnlock()
+	if ok {
+		return cached, nil
+	}
+
+	// Lock for writing
+	f.dialHoldersLock.Lock()
+	defer f.dialHoldersLock.Unlock()
+
+	// Check for possible writes while waiting
+	if cached, ok := f.dialHolders[clusterName]; ok {
+		return cached, nil
+	}
+
+	// Create new dialHolder
+	clusterDialer, err := f.ClusterDialer(clusterName, retryOnError)
+	if err != nil {
+		return nil, err
+	}
+	dialHolder := &transport.DialHolder{Dial: clusterDialer}
+
+	// Save in the cache
+	f.dialHolders[clusterName] = dialHolder
+
+	return dialHolder, nil
 }
 
 func IsCloudDriver(cluster *v3.Cluster) bool {
@@ -173,6 +210,11 @@ func (f *Factory) translateClusterAddress(cluster *v3.Cluster, clusterHostPort, 
 	return address
 }
 
+var nativeDialer dialer.Dialer = (&net.Dialer{
+	Timeout:   30 * time.Second,
+	KeepAlive: 30 * time.Second,
+}).DialContext
+
 func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) (dialer.Dialer, error) {
 	cluster, err := f.clusterLister.Get("", clusterName)
 	if err != nil {
@@ -181,14 +223,14 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 
 	if cluster.Spec.Internal {
 		// For local (embedded, or import) we just assume we can connect directly
-		return native()
+		return nativeDialer, nil
 	}
 
 	hostPort := hostPort(cluster)
 	logrus.Tracef("dialerFactory: apiEndpoint hostPort for cluster [%s] is [%s]", clusterName, hostPort)
 	if (address == hostPort || isProxyAddress(address)) && IsPublicCloudDriver(cluster) {
 		// For cloud drivers we just connect directly to the k8s API, not through the tunnel.  All other go through tunnel
-		return native()
+		return nativeDialer, nil
 	}
 
 	if f.TunnelServer.HasSession(cluster.Name) {
@@ -269,14 +311,6 @@ func hostPort(cluster *v3.Cluster) string {
 		return u.Host
 	}
 	return u.Host + ":443"
-}
-
-func native() (dialer.Dialer, error) {
-	netDialer := net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}
-	return netDialer.DialContext, nil
 }
 
 func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, error) {

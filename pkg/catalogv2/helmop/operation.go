@@ -191,7 +191,7 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 	}
 
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.addCpTaintsToTolerations(status.Tolerations)
+		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -214,7 +214,7 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 	}
 
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.addCpTaintsToTolerations(status.Tolerations)
+		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -237,7 +237,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 	}
 
 	if status.AutomaticCPTolerations {
-		status.Tolerations, err = s.addCpTaintsToTolerations(status.Tolerations)
+		status.Tolerations, err = s.AddCpTaintsToTolerations(status.Tolerations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
 		}
@@ -464,6 +464,11 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 			chartUpgrade,
 			upgradeArgs,
 		}
+
+		// Add the labels to the command arguments to indicate the chart is from a cluster repo
+		cmd.ArgObjects = append(cmd.ArgObjects, map[string]interface{}{
+			"labels": fmt.Sprintf("%s=%s", catalog.ClusterRepoNameLabel, repoName),
+		})
 
 		status.Release = chartUpgrade.ReleaseName
 		commands = append(commands, cmd)
@@ -808,6 +813,10 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 				"install": "true",
 			})
 		}
+		// Add the labels to the command arguments to indicate the chart is from a cluster repo
+		cmd.ArgObjects = append(cmd.ArgObjects, map[string]interface{}{
+			"labels": fmt.Sprintf("%s=%s", catalog.ClusterRepoNameLabel, repoName),
+		})
 
 		status.Release = chartInstall.ReleaseName
 
@@ -1138,8 +1147,8 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 	}
 }
 
-// addCpTaintsToTolerations gets the list of control plane nodes and adds their taints to the given tolerations.
-func (s *Operations) addCpTaintsToTolerations(tolerations []corev1.Toleration) ([]corev1.Toleration, error) {
+// AddCpTaintsToTolerations gets the list of control plane nodes and adds their taints to the given tolerations.
+func (s *Operations) AddCpTaintsToTolerations(tolerations []corev1.Toleration) ([]corev1.Toleration, error) {
 	cpList, err := s.nodes.List(metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/control-plane=true"})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list control plane nodes: %w", err)

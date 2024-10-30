@@ -194,7 +194,13 @@ func (ac *authConfigController) refreshUsers(obj *v3.AuthConfig) error {
 
 // resetAuthConfig takes an Auth Config as a map and deletes all entries except those with basic metadata fields.
 func resetAuthConfig(cfg map[string]any) {
-	retainFields := map[string]bool{"apiVersion": true, "kind": true, "metadata": true, "type": true}
+	retainFields := map[string]bool{
+		"apiVersion":         true,
+		"kind":               true,
+		"metadata":           true,
+		"type":               true,
+		"logoutAllSupported": true,
+	}
 	for field := range cfg {
 		if !retainFields[field] {
 			delete(cfg, field)

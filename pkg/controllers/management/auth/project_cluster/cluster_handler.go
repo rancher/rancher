@@ -194,12 +194,17 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		clusterAnnotations := metaAccessor.GetAnnotations()
 		annotations := map[string]string{}
 
-		if creatorID := clusterAnnotations[CreatorIDAnnotation]; creatorID != "" {
-			annotations[CreatorIDAnnotation] = creatorID
-		}
+		// If we have noCreatorRBAC annotation, propagate the annotation to the project and don't add creatorId annotation
+		if noCreatorRBAC, ok := clusterAnnotations[NoCreatorRBACAnnotation]; ok {
+			annotations[NoCreatorRBACAnnotation] = noCreatorRBAC
+		} else {
+			if creatorID := clusterAnnotations[CreatorIDAnnotation]; creatorID != "" {
+				annotations[CreatorIDAnnotation] = creatorID
+			}
 
-		if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
-			annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
+			if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
+				annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
+			}
 		}
 
 		if name == project.System {
@@ -331,12 +336,16 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 }
 
 func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runtime.Object, error) {
-	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
-		cluster, ok := obj.(*apisv3.Cluster)
-		if !ok {
-			return obj, fmt.Errorf("expected cluster, got %T", obj)
-		}
+	cluster, ok := obj.(*apisv3.Cluster)
+	if !ok {
+		return obj, fmt.Errorf("expected cluster, got %T", obj)
+	}
 
+	if _, ok := cluster.Annotations[NoCreatorRBACAnnotation]; ok {
+		logrus.Infof("[%s] annotation %s found. Skipping adding creator as owner", ClusterCreateController, NoCreatorRBACAnnotation)
+		return obj, nil
+	}
+	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		creatorID := cluster.Annotations[CreatorIDAnnotation]
 		if creatorID == "" {
 			logrus.Warnf("[%s] cluster %s has no creatorId annotation. Cannot add creator as owner", ClusterCreateController, cluster.Name)

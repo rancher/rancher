@@ -44,8 +44,6 @@ type Config struct {
 	ClusterCatalogs                            map[string]managementClient.ClusterCatalog                            `json:"clusterCatalogs,omitempty" yaml:"clusterCatalogs,omitempty"`
 	MultiClusterApps                           map[string]managementClient.MultiClusterApp                           `json:"multiClusterApps,omitempty" yaml:"multiClusterApps,omitempty"`
 	MultiClusterAppRevisions                   map[string]managementClient.MultiClusterAppRevision                   `json:"multiClusterAppRevisions,omitempty" yaml:"multiClusterAppRevisions,omitempty"`
-	GlobalDnss                                 map[string]managementClient.GlobalDns                                 `json:"globalDnses,omitempty" yaml:"globalDnses,omitempty"`
-	GlobalDnsProviders                         map[string]managementClient.GlobalDnsProvider                         `json:"globalDnsProviders,omitempty" yaml:"globalDnsProviders,omitempty"`
 	KontainerDrivers                           map[string]managementClient.KontainerDriver                           `json:"kontainerDrivers,omitempty" yaml:"kontainerDrivers,omitempty"`
 	EtcdBackups                                map[string]managementClient.EtcdBackup                                `json:"etcdBackups,omitempty" yaml:"etcdBackups,omitempty"`
 	CloudCredentials                           map[string]managementClient.CloudCredential                           `json:"cloudCredentials,omitempty" yaml:"cloudCredentials,omitempty"`

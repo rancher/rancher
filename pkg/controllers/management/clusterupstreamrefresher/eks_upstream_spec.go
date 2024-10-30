@@ -85,7 +85,7 @@ func BuildEKSUpstreamSpec(secretClient wranglerv1.SecretClient, cluster *mgmtv3.
 	if err != nil {
 		return nil, err
 	}
-	upstreamSpec, _, err := ekscontroller.BuildUpstreamClusterState(ctx, cluster.Spec.DisplayName, cluster.Status.EKSStatus.ManagedLaunchTemplateID, clusterState, nodeGroupStates, ec2Service, false)
+	upstreamSpec, _, err := ekscontroller.BuildUpstreamClusterState(ctx, cluster.Spec.DisplayName, cluster.Status.EKSStatus.ManagedLaunchTemplateID, clusterState, nodeGroupStates, ec2Service, eksService, false)
 	if err != nil {
 		// If we get an error here, then syncing is broken
 		return nil, err

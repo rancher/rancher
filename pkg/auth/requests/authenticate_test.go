@@ -15,11 +15,14 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
 )
@@ -50,6 +53,14 @@ type fakeProvider struct {
 
 func (p *fakeProvider) IsDisabledProvider() (bool, error) {
 	return p.disabled, nil
+}
+
+func (p *fakeProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
+func (p *fakeProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
 }
 
 func (p *fakeProvider) GetName() string {
@@ -148,11 +159,14 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	mockIndexer.AddIndexers(cache.Indexers{tokenKeyIndex: tokenKeyIndexer})
 	mockIndexer.Add(token)
 
-	tokenClient := &mgmtFakes.TokenInterfaceMock{
-		GetFunc: func(name string, options metav1.GetOptions) (*v3.Token, error) {
-			return token, nil
-		},
-	}
+	var patchData []byte
+	ctrl := gomock.NewController(t)
+	tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+	tokenClient.EXPECT().Get(token.Name, metav1.GetOptions{}).Return(token, nil).AnyTimes()
+	tokenClient.EXPECT().Patch(token.Name, k8stypes.JSONPatchType, gomock.Any()).DoAndReturn(func(name string, pt k8stypes.PatchType, data []byte, subresources ...any) (*apiv3.Token, error) {
+		patchData = data
+		return nil, nil
+	}).AnyTimes()
 
 	userAttribute := &v3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
@@ -207,12 +221,16 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		userLister:          userLister,
 		clusterRouter:       clusterrouter.GetClusterID,
 		refreshUser:         userRefresher.refreshUser,
+		now: func() time.Time {
+			return now
+		},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/namespaces", nil)
 	req.Header.Set("Authorization", "Bearer "+token.Name+":"+token.Token)
 
 	t.Run("authenticate", func(t *testing.T) {
+		patchData = nil
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
@@ -228,6 +246,69 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.True(t, userRefresher.called)
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
+		require.NotEmpty(t, patchData)
+	})
+
+	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
+		oldTokenLastUsedAt := token.LastUsedAt
+		defer func() {
+			token.LastUsedAt = oldTokenLastUsedAt
+		}()
+		lastUsedAt := metav1.NewTime(now.Truncate(time.Second))
+		token.LastUsedAt = &lastUsedAt
+		patchData = nil
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Empty(t, patchData)
+	})
+
+	t.Run("past and future lastUsedAt are updated", func(t *testing.T) {
+		oldTokenLastUsedAt := token.LastUsedAt
+		defer func() {
+			token.LastUsedAt = oldTokenLastUsedAt
+		}()
+		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
+		token.LastUsedAt = &lastUsedAt
+		patchData = nil
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.NotEmpty(t, patchData)
+
+		lastUsedAt = metav1.NewTime(now.Add(time.Second).Truncate(time.Second))
+		token.LastUsedAt = &lastUsedAt
+		patchData = nil
+
+		resp, err = authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.NotEmpty(t, patchData)
+	})
+
+	t.Run("error updating lastUsedAt doesn't fail the request", func(t *testing.T) {
+		oldTokenLastUsedAt := token.LastUsedAt
+		defer func() {
+			token.LastUsedAt = oldTokenLastUsedAt
+			authenticator.tokenClient = tokenClient
+		}()
+		client := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		client.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("some error")).Times(1)
+		authenticator.tokenClient = client
+
+		lastUsedAt := metav1.NewTime(now.Add(-time.Second).Truncate(time.Second))
+		token.LastUsedAt = &lastUsedAt
+		patchData = nil
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Empty(t, patchData)
 	})
 
 	t.Run("token fetched with token client", func(t *testing.T) {
@@ -369,15 +450,14 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	})
 
 	t.Run("token not found", func(t *testing.T) {
-		oldTokenClientGetFunc := tokenClient.GetFunc
 		defer func() {
 			mockIndexer.Add(token)
-			tokenClient.GetFunc = oldTokenClientGetFunc
+			authenticator.tokenClient = tokenClient
 		}()
 		mockIndexer.Delete(token)
-		tokenClient.GetFunc = func(name string, options metav1.GetOptions) (*v3.Token, error) {
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
-		}
+		client := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		client.EXPECT().Get(token.Name, metav1.GetOptions{}).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, token.Name)).Times(1)
+		authenticator.tokenClient = client
 
 		userRefresher.reset()
 
@@ -388,15 +468,14 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	})
 
 	t.Run("failed to retrieve auth token with the token client", func(t *testing.T) {
-		oldTokenClientGetFunc := tokenClient.GetFunc
 		defer func() {
 			mockIndexer.Add(token)
-			tokenClient.GetFunc = oldTokenClientGetFunc
+			authenticator.tokenClient = tokenClient
 		}()
 		mockIndexer.Delete(token)
-		tokenClient.GetFunc = func(name string, options metav1.GetOptions) (*v3.Token, error) {
-			return nil, fmt.Errorf("some error")
-		}
+		client := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		client.EXPECT().Get(token.Name, metav1.GetOptions{}).Return(nil, fmt.Errorf("some error")).Times(1)
+		authenticator.tokenClient = client
 
 		userRefresher.reset()
 

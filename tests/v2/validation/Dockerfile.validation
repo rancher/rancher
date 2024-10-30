@@ -22,7 +22,9 @@ ENV CORRAL_VERSION="v1.1.1"
 RUN go install github.com/rancherlabs/corral@${CORRAL_VERSION}
 
 RUN mkdir /root/.ssh && chmod 600 .ssh/jenkins-*
-RUN ssh-keygen -f .ssh/jenkins-* -y > /root/.ssh/public.pub
+RUN for pem_file in .ssh/jenkins-*; do \
+      ssh-keygen -f "$pem_file" -y > "/root/.ssh/$(basename "$pem_file").pub"; \
+    done
 
 RUN CGO_ENABLED=0
 

@@ -301,7 +301,7 @@ func (c AzureMSGraphClient) getOIDFromLogin(config *v32.AzureADConfig, credentia
 	}
 
 	// Acquire the OID exchanging the Code to verify the user
-	oidFromCode, err := oidFromAuthCode(credential.Code, config, c.GraphEndpointURL, c.ConfidentialClient)
+	oidFromCode, err := oidFromAuthCode(credential.Code, config)
 	if err != nil {
 		return "", fmt.Errorf("getting OID from AuthCode: %w", err)
 	}
@@ -380,8 +380,26 @@ func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
 }
 
 // oidFromAuthCode exchanges the AuthCode for a IDToken, returning the user OID
-func oidFromAuthCode(code string, config *v32.AzureADConfig, endpointURL string, confidentialClient confidential.Client) (string, error) {
-	authResult, err := confidentialClient.AcquireTokenByAuthCode(context.Background(), code, config.RancherURL, []string{endpointURL})
+func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
+	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
+	if err != nil {
+		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
+	}
+	authorityURL, err := url.JoinPath(config.Endpoint, config.TenantID)
+	if err != nil {
+		return "", fmt.Errorf("could not create token authority url: %w", err)
+	}
+
+	// NOTE: This uses a new client which is not associated to a token cache,
+	// this means that the token is never cached (and no user tokens are cached)
+	// this keeps the cache-size down and improves security.
+	confidentialClientApp, err := confidential.New(authorityURL, config.ApplicationID, cred)
+	if err != nil {
+		return "", err
+	}
+	scope := fmt.Sprintf("%s/%s", config.GraphEndpoint, ".default")
+
+	authResult, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), token, config.RancherURL, []string{scope})
 	if err != nil {
 		return "", err
 	}

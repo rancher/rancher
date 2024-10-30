@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
 	"github.com/rancher/rancher/pkg/api/norman/customization/etcdbackup"
 	"github.com/rancher/rancher/pkg/api/norman/customization/feature"
-	"github.com/rancher/rancher/pkg/api/norman/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
@@ -38,7 +37,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/store/cluster"
 	clustertemplatestore "github.com/rancher/rancher/pkg/api/norman/store/clustertemplate"
 	featStore "github.com/rancher/rancher/pkg/api/norman/store/feature"
-	globaldnsAPIStore "github.com/rancher/rancher/pkg/api/norman/store/globaldns"
 	globalRoleStore "github.com/rancher/rancher/pkg/api/norman/store/globalrole"
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
 	nodeStore "github.com/rancher/rancher/pkg/api/norman/store/node"
@@ -58,7 +56,7 @@ import (
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
-	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -121,8 +119,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.TemplateType,
 		client.TemplateVersionType,
 		client.TemplateContentType,
-		client.GlobalDnsType,
-		client.GlobalDnsProviderType,
 		client.RancherUserNotificationType,
 	)
 
@@ -165,8 +161,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	App(schemas, apiContext, clusterManager)
 	TemplateContent(schemas)
 	MultiClusterApps(schemas, apiContext)
-	GlobalDNSs(schemas, apiContext, localClusterEnabled)
-	GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -181,7 +175,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	setupPasswordTypes(ctx, schemas, apiContext)
 
 	multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
-	GlobalDNSProvidersPwdWrap(schemas, apiContext, localClusterEnabled)
 
 	return nil
 }
@@ -440,6 +433,7 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 		management.Core.Namespaces(""),
 		management.Management.NodeTemplates("").Controller().Lister(),
 		management.Wrangler.Provisioning.Cluster().Cache(),
+		management.Management.Tokens("").Controller().Lister(),
 	)
 	credSchema.Validator = cred.Validator
 }
@@ -587,14 +581,10 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
 	metadataHandler := md.MetadataController{
-		SystemImagesLister:   management.Management.RkeK8sSystemImages("").Controller().Lister(),
-		SystemImages:         management.Management.RkeK8sSystemImages(""),
-		ServiceOptionsLister: management.Management.RkeK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:       management.Management.RkeK8sServiceOptions(""),
-		AddonsLister:         management.Management.RkeAddons("").Controller().Lister(),
-		Addons:               management.Management.RkeAddons(""),
-		SettingLister:        management.Management.Settings("").Controller().Lister(),
-		Settings:             management.Management.Settings(""),
+		SystemImagesController:   management.Wrangler.Mgmt.RkeK8sSystemImage(),
+		ServiceOptionsController: management.Wrangler.Mgmt.RkeK8sServiceOption(),
+		Addons:                   management.Wrangler.Mgmt.RkeAddon(),
+		Settings:                 management.Wrangler.Mgmt.Setting(),
 	}
 
 	handler := kontainerdriver.ActionHandler{
@@ -646,43 +636,6 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 	schema.ActionHandler = wrapper.ActionHandler
 	schema.LinkHandler = wrapper.LinkHandler
 	schema.Validator = wrapper.Validator
-}
-
-func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
-	gdns := globaldns.Wrapper{
-		GlobalDNSes:           management.Management.GlobalDnses(""),
-		GlobalDNSLister:       management.Management.GlobalDnses("").Controller().Lister(),
-		PrtbLister:            management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		MultiClusterAppLister: management.Management.MultiClusterApps("").Controller().Lister(),
-		Users:                 management.Management.Users(""),
-		GrbLister:             management.Management.GlobalRoleBindings("").Controller().Lister(),
-		GrLister:              management.Management.GlobalRoles("").Controller().Lister(),
-	}
-	schema := schemas.Schema(&managementschema.Version, client.GlobalDnsType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
-	schema.Formatter = gdns.Formatter
-	schema.ActionHandler = gdns.ActionHandler
-	schema.Validator = gdns.Validator
-	schema.Store = globaldnsAPIStore.Wrap(schema.Store)
-	if !localClusterEnabled {
-		schema.CollectionMethods = []string{}
-		schema.ResourceMethods = []string{}
-	}
-}
-
-func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
-	schema := schemas.Schema(&managementschema.Version, client.GlobalDnsProviderType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
-	schema.Store = globaldnsAPIStore.ProviderWrap(schema.Store)
-	if !localClusterEnabled {
-		schema.CollectionMethods = []string{}
-		schema.ResourceMethods = []string{}
-	}
-}
-
-func GlobalDNSProvidersPwdWrap(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
-	schema := schemas.Schema(&managementschema.Version, client.GlobalDnsProviderType)
-	schema.Store = globaldnsAPIStore.ProviderPwdWrap(schema.Store)
 }
 
 func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) {

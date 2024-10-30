@@ -55,6 +55,10 @@ func (s *AuthConfigSuite) SetupSuite() {
 			SchemaObject: v3.AuthConfig{},
 			NonNamespace: true,
 		},
+		crd.CRD{
+			SchemaObject: v3.User{},
+			NonNamespace: true,
+		},
 	).BatchWait()
 	assert.NoError(t, err)
 
@@ -76,6 +80,11 @@ func (s *AuthConfigSuite) SetupSuite() {
 			Group:   "management.cattle.io",
 			Version: "v3",
 			Kind:    "AuthConfig",
+		},
+		schema.GroupVersionKind{
+			Group:   "management.cattle.io",
+			Version: "v3",
+			Kind:    "User",
 		},
 	)
 

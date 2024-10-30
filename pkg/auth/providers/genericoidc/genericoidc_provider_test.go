@@ -238,8 +238,11 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 				"authEndpoint": "https://ranchertest.io/auth",
 			},
 			expected: map[string]interface{}{
-				"redirectUrl": "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
-				"scopes":      "openid profile email",
+				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
+				"scopes":             "openid profile email",
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
 			},
 		},
 	}

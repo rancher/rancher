@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -116,7 +117,7 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 		return setErrorCondition(repo, err, newStatus, interval, repoCondition, r.clusterRepos)
 	}
 
-	err = ensureIndexConfigMap(repo, newStatus, r.configMaps)
+	err = ensureIndexConfigMap(newStatus, r.configMaps)
 	if err != nil {
 		err = fmt.Errorf("failed to ensure index config map: %w", err)
 		return setErrorCondition(repo, err, newStatus, interval, repoCondition, r.clusterRepos)
@@ -316,7 +317,7 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 	return setErrorCondition(repository, nil, newStatus, interval, repoCondition, r.clusterRepos)
 }
 
-func ensureIndexConfigMap(repo *catalog.ClusterRepo, status *catalog.RepoStatus, configMap corev1controllers.ConfigMapClient) error {
+func ensureIndexConfigMap(status *catalog.RepoStatus, configMap corev1controllers.ConfigMapClient) error {
 	// Charts from the clusterRepo will be unavailable if the IndexConfigMap recorded in the status does not exist.
 	// By resetting the value of IndexConfigMapName, IndexConfigMapNamespace, IndexConfigMapResourceVersion to "",
 	// the method shouldRefresh will return true and trigger the rebuild of the IndexConfigMap and accordingly update the status.
@@ -327,6 +328,7 @@ func ensureIndexConfigMap(repo *catalog.ClusterRepo, status *catalog.RepoStatus,
 				status.IndexConfigMapName = ""
 				status.IndexConfigMapNamespace = ""
 				status.IndexConfigMapResourceVersion = ""
+				status.ShouldNotSkip = true
 				return nil
 			}
 			logrus.Errorf("Error while fetching index config map %s : %v", status.IndexConfigMapName, err)
@@ -409,10 +411,6 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		return true
 	}
 
-	if newStatus.IndexConfigMapName == "" {
-		return false
-	}
-
 	if newStatus.ObservedGeneration < clusterRepo.Generation {
 		newStatus.NumberOfRetries = 0
 		newStatus.NextRetryAt = metav1.Time{}
@@ -439,6 +437,7 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		controller.EnqueueAfter(clusterRepo.Name, interval)
 		return true
 	}
+
 	return false
 }
 
@@ -463,7 +462,7 @@ func setConditionWithInterval(clusterRepo *catalog.ClusterRepo,
 	condMessage string,
 	controller catalogcontrollers.ClusterRepoController,
 ) (*catalog.ClusterRepo, error) {
-	newErr := fmt.Errorf(condMessage)
+	newErr := errors.New(condMessage)
 	downloaded := condition.Cond(cond)
 
 	if apierrors.IsConflict(err) {

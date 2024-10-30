@@ -48,7 +48,7 @@ func (mr *MockSubjectAccessReviewMockRecorder) UserCanImpersonateExtras(req, use
 }
 
 // UserCanImpersonateGroup mocks base method.
-func (m *MockSubjectAccessReview) UserCanImpersonateGroup(req *http.Request, user string, group string) (bool, error) {
+func (m *MockSubjectAccessReview) UserCanImpersonateGroup(req *http.Request, user, group string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UserCanImpersonateGroup", req, user, group)
 	ret0, _ := ret[0].(bool)
@@ -60,6 +60,21 @@ func (m *MockSubjectAccessReview) UserCanImpersonateGroup(req *http.Request, use
 func (mr *MockSubjectAccessReviewMockRecorder) UserCanImpersonateGroup(req, user, group interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserCanImpersonateGroup", reflect.TypeOf((*MockSubjectAccessReview)(nil).UserCanImpersonateGroup), req, user, group)
+}
+
+// UserCanImpersonateServiceAccount mocks base method.
+func (m *MockSubjectAccessReview) UserCanImpersonateServiceAccount(req *http.Request, user, sa string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserCanImpersonateServiceAccount", req, user, sa)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserCanImpersonateServiceAccount indicates an expected call of UserCanImpersonateServiceAccount.
+func (mr *MockSubjectAccessReviewMockRecorder) UserCanImpersonateServiceAccount(req, user, sa interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserCanImpersonateServiceAccount", reflect.TypeOf((*MockSubjectAccessReview)(nil).UserCanImpersonateServiceAccount), req, user, sa)
 }
 
 // UserCanImpersonateUser mocks base method.

@@ -65,6 +65,12 @@ var (
 		true,
 		false,
 		false)
+	ManagedSystemUpgradeController = newFeature(
+		"managed-system-upgrade-controller",
+		"Enable the installation of the system-upgrade-controller app as a managed system chart",
+		true,
+		false,
+		false)
 	RKE2 = newFeature(
 		"rke2",
 		"Enable provisioning of RKE2",
@@ -130,6 +136,12 @@ var (
 		"rke1-ui",
 		"Enable RKE1 provisioning in the Rancher UI",
 		true,
+		true,
+		true)
+	ProvisioningPreBootstrap = newFeature(
+		"provisioningprebootstrap",
+		"Support running pre-bootstrap workloads on downstream clusters",
+		false,
 		true,
 		true)
 )

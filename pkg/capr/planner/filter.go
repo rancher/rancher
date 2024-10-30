@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rancher/channelserver/pkg/model"
 	"github.com/rancher/norman/types/convert"
@@ -9,14 +10,14 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 )
 
-func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
+func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) error {
 	var (
 		isServer = isControlPlane(entry) || isEtcd(entry)
 		release  = capr.GetKDMReleaseData(context.TODO(), controlPlane)
 	)
 
 	if release == nil {
-		return
+		return fmt.Errorf("could not find release data")
 	}
 
 	for k, v := range config {
@@ -26,6 +27,7 @@ func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKECont
 			delete(config, k)
 		}
 	}
+	return nil
 }
 
 func filterField(isServer bool, k string, v interface{}, release model.Release) (interface{}, bool) {

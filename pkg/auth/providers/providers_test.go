@@ -155,6 +155,14 @@ func (m *mockUnstructured) DeepCopyObject() runtime.Object                      
 
 type fakeProvider struct{}
 
+func (f fakeProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
+func (f fakeProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
 func (f fakeProvider) GetName() string {
 	panic("implement me")
 }

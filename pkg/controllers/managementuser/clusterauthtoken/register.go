@@ -12,7 +12,17 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const tokenByUserAndClusterIndex = "auth.management.cattle.io/token-by-user-and-cluster"
+const (
+	tokenByUserAndClusterIndex = "auth.management.cattle.io/token-by-user-and-cluster"
+
+	clusterController              = "cat-cluster-controller-deferred"
+	tokenController                = "cat-token-controller"
+	settingController              = "cat-setting-controller"
+	userController                 = "cat-user-controller"
+	userAttributeController        = "cat-user-attribute-controller"
+	clusterUserAttributeController = "cat-cluster-user-attribute-controller"
+	clusterAuthTokenController     = "cat-cluster-auth-token-controller"
+)
 
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	tokenInformer := scaledContext.Management.Tokens("").Controller().Informer()
@@ -30,7 +40,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	})
 
 	clusters := cluster.Management.Management.Clusters("")
-	clusters.AddHandler(ctx, "clusterauthtoken-deferred", func(key string, obj *v3.Cluster) (runtime.Object, error) {
+	clusters.AddHandler(ctx, clusterController, func(key string, obj *v3.Cluster) (runtime.Object, error) {
 		if obj != nil &&
 			obj.Name == cluster.ClusterName &&
 			obj.Spec.LocalClusterAuthEndpoint.Enabled {
@@ -42,6 +52,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
+	tokenCache := cluster.Management.Wrangler.Mgmt.Token().Cache()
+	tokenClient := cluster.Management.Wrangler.Mgmt.Token()
 
 	namespace := common.DefaultNamespace
 	clusterName := cluster.ClusterName
@@ -57,7 +69,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	userAttributeLister := cluster.Management.Management.UserAttributes("").Controller().Lister()
 	settingInterface := cluster.Management.Management.Settings("")
 
-	cluster.Management.Management.Settings("").AddHandler(ctx, "cat-setting-controller", (&settingHandler{
+	cluster.Management.Management.Settings("").AddHandler(ctx, settingController, (&settingHandler{
 		namespace,
 		clusterConfigMap,
 		clusterConfigMapLister,
@@ -65,7 +77,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	}).Sync)
 
 	cluster.Management.Management.Tokens("").AddClusterScopedLifecycle(ctx,
-		"cat-token-controller",
+		tokenController,
 		clusterName,
 		&tokenHandler{
 			namespace,
@@ -78,23 +90,28 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 			userAttributeLister,
 		})
 
-	cluster.Management.Management.Users("").AddHandler(ctx, "cat-user-controller", (&userHandler{
+	cluster.Management.Management.Users("").AddHandler(ctx, userController, (&userHandler{
 		namespace,
 		clusterUserAttribute,
 		clusterUserAttributeLister,
 	}).Sync)
 
-	cluster.Management.Management.UserAttributes("").AddHandler(ctx, "cat-user-attribute-controller", (&userAttributeHandler{
+	cluster.Management.Management.UserAttributes("").AddHandler(ctx, userAttributeController, (&userAttributeHandler{
 		namespace,
 		clusterUserAttribute,
 		clusterUserAttributeLister,
 	}).Sync)
 
-	cluster.Cluster.ClusterUserAttributes(namespace).AddHandler(ctx, "cat-cluster-user-attribute-controller", (&clusterUserAttributeHandler{
+	cluster.Cluster.ClusterUserAttributes(namespace).AddHandler(ctx, clusterUserAttributeController, (&clusterUserAttributeHandler{
 		userAttribute,
 		userAttributeLister,
 		clusterUserAttribute,
 	}).Sync)
+
+	cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, (&clusterAuthTokenHandler{
+		tokenCache:  tokenCache,
+		tokenClient: tokenClient,
+	}).sync)
 }
 
 func tokenUserClusterKey(token *managementv3.Token) string {

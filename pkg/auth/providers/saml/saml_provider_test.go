@@ -112,6 +112,14 @@ type mockLdapProvider struct {
 	isLdapConfigured bool
 }
 
+func (p *mockLdapProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
+func (p *mockLdapProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	panic("not implemented")
+}
+
 func (p *mockLdapProvider) GetName() string {
 	return p.providerName
 }
