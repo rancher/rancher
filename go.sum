@@ -111,6 +111,8 @@ github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbi
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7OputlJIzU=
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
+github.com/JonCrowther/shepherd v0.0.0-20241031122308-160804455fa6 h1:cpL+VFhB3q+jbdznWXRXwAcrB0fAb/T6RzZOjWW+Vj4=
+github.com/JonCrowther/shepherd v0.0.0-20241031122308-160804455fa6/go.mod h1:J++Mv5VQPMrxeHO3drDJojpo8PXrfib/psOzmjRl7G4=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/Masterminds/goutils v1.1.1 h1:5nUrii3FMTL5diU80unEVvNevw1nH4+ZV4DSLVJLSYI=
@@ -840,8 +842,6 @@ github.com/rancher/rke v1.7.0-rc.5 h1:kBRwXTW8CYPXvCcPLISiwGTCvJ8K/+b35D5ES0Icdu
 github.com/rancher/rke v1.7.0-rc.5/go.mod h1:+x++Mvl0A3jIzNLiu8nkraqZXiHg6VPWv0Xl4iQCg+A=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20241030152146-6e890f967c71 h1:c2eMCuvZysW6kNh27labmv18Ts/8aawqUNPCVSaWRkk=
-github.com/rancher/shepherd v0.0.0-20241030152146-6e890f967c71/go.mod h1:4MBg4t2pXDMxdv2cpluqGl725xNyFpMvTBwtwpoFXVQ=
 github.com/rancher/steve v0.0.0-20241028205536-b2f2bab3c4b3 h1:b+Fdwtjmqzt0xGIhZFNHtOgY2tAjQAUMa/oTbmba6Cg=
 github.com/rancher/steve v0.0.0-20241028205536-b2f2bab3c4b3/go.mod h1:WzfZOEsWZNcdTlE7kAh9nl4bzT5qyn07+5txsurGqqM=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde h1:x5VZI/0TUx1MeZirh6e0OMAInhCmq6yRvD6897458Ng=
