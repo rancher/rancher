@@ -11,52 +11,67 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func TestProviderSearchPrincipalShortNames(t *testing.T) {
-	// If the query string is less than searchIndexDefaultLen
-	// we query the indexer.
-	// Longer queries use the userLister and match.
-	provider := Provider{
-		userIndexer: newTestUserIndexer(
-			&v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "u-12345",
-				},
-				Username:    "test",
-				DisplayName: "Test User",
+func TestProviderSearchPrincipal(t *testing.T) {
+	testUsers := []*v3.User{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-12345",
 			},
-			&v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "u-23456",
-				},
-				Username:    "other",
-				DisplayName: "Other User",
+			Username:    "test",
+			DisplayName: "Test User",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-23456",
 			},
-			&v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "u-34567",
-				},
-				Username:    "otter",
-				DisplayName: "Significant Otter",
+			Username:    "other",
+			DisplayName: "Other User",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-34567",
 			},
-			&v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "u-45678",
-				},
-				Username:    "johns",
-				DisplayName: "John Smith",
+			Username:    "otter",
+			DisplayName: "Significant Otter",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-45678",
 			},
-			&v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "u-56789",
-				},
-				Username:    "edubois",
-				DisplayName: "Émile Dubois",
+			Username:    "johns",
+			DisplayName: "John Smith",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-56789",
 			},
-		),
-		groupIndexer: newTestGroupIndexer(), // Only needed to prevent nil-pointer.
+			Username:    "edubois",
+			DisplayName: "Émile Dubois",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-67890",
+			},
+			Username:    "jalicia",
+			DisplayName: "Alicia Johns",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-7890a",
+			},
+			Username:    "jalice",
+			DisplayName: "Alice Johnson",
+		},
 	}
 
-	shortNameTests := []struct {
+	provider := Provider{
+		userLister:   fakeUserLister{users: testUsers},
+		userIndexer:  newTestUserIndexer(testUsers...),
+		groupIndexer: newTestGroupIndexer(),
+		groupLister:  fakeGroupLister{},
+	}
+
+	principalSearchTests := []struct {
 		searchKey string
 		want      []string
 	}{
@@ -116,56 +131,15 @@ func TestProviderSearchPrincipalShortNames(t *testing.T) {
 			searchKey: "emile",
 			want:      []string{"local://u-56789"},
 		},
-	}
-
-	for _, tt := range shortNameTests {
-		t.Run("searchKey "+tt.searchKey, func(t *testing.T) {
-			principals, err := provider.SearchPrincipals(tt.searchKey, "user", v3.Token{})
-			require.NoError(t, err)
-
-			var names []string
-			for _, p := range principals {
-				names = append(names, p.Name)
-			}
-
-			sort.Strings(names)
-			sort.Strings(tt.want)
-
-			require.Equal(t, names, tt.want)
-		})
-	}
-}
-
-func TestProviderSearchPrincipalsLongSearch(t *testing.T) {
-	// For longer search strings we query and match on all users!
-	provider := Provider{
-		userLister: fakeUserLister{
-			users: []*v3.User{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "u-12345",
-					},
-					Username:    "test",
-					DisplayName: "Test User",
-				},
-				&v3.User{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "u-56789",
-					},
-					Username:    "edubois",
-					DisplayName: "Émile Dubois",
-				},
-			},
+		{
+			searchKey: "Émile Dubois",
+			want:      []string{"local://u-56789"},
 		},
-		groupLister:  fakeGroupLister{},
-		userIndexer:  newTestUserIndexer(),
-		groupIndexer: newTestGroupIndexer(),
-	}
+		{
+			searchKey: "émile dubois",
+			want:      []string{"local://u-56789"},
+		},
 
-	longNameTests := []struct {
-		searchKey string
-		want      []string
-	}{
 		{
 			searchKey: "test user",
 			want:      []string{"local://u-12345"},
@@ -180,7 +154,7 @@ func TestProviderSearchPrincipalsLongSearch(t *testing.T) {
 		},
 	}
 
-	for _, tt := range longNameTests {
+	for _, tt := range principalSearchTests {
 		t.Run("searchKey "+tt.searchKey, func(t *testing.T) {
 			principals, err := provider.SearchPrincipals(tt.searchKey, "user", v3.Token{})
 			require.NoError(t, err)
@@ -193,7 +167,68 @@ func TestProviderSearchPrincipalsLongSearch(t *testing.T) {
 			sort.Strings(names)
 			sort.Strings(tt.want)
 
-			require.Equal(t, names, tt.want)
+			require.Equal(t, tt.want, names)
+		})
+	}
+}
+
+func TestUserSearchIndexer(t *testing.T) {
+	indexerTests := []struct {
+		user        *v3.User
+		wantIndexed []string
+	}{
+		{
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "u-12345",
+				},
+				Username:    "test",
+				DisplayName: "Test User",
+			},
+			wantIndexed: []string{
+				"te", "tes", "test", "test ", "test u",
+				"u-", "u-1", "u-12", "u-123", "u-1234", "user",
+			},
+		},
+		{
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "u-56789",
+				},
+				Username:    "edubois",
+				DisplayName: "Émile Dubois",
+			},
+			wantIndexed: []string{
+				"dubois", "ed", "edu", "edub", "edubo",
+				"eduboi", "em", "emi", "emil", "emile", "emile ", "u-",
+				"u-5", "u-56", "u-567", "u-5678", "émile",
+			},
+		},
+		{
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "u-67890",
+				},
+				Username:    "jalicia",
+				DisplayName: "Alicia Johns",
+			},
+			wantIndexed: []string{
+				"al", "ali", "alic", "alici", "alicia",
+				"ja", "jal", "jali", "jalic", "jalici", "johns", "u-",
+				"u-6", "u-67", "u-678", "u-6789",
+			},
+		},
+	}
+
+	for _, tt := range indexerTests {
+		t.Run(tt.user.Name, func(t *testing.T) {
+			indexed, err := userSearchIndexer(tt.user)
+			require.NoError(t, err)
+
+			sort.Strings(indexed)
+			sort.Strings(tt.wantIndexed)
+
+			require.Equal(t, tt.wantIndexed, indexed)
 		})
 	}
 }

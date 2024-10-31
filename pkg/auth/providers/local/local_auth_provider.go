@@ -498,9 +498,12 @@ func (l *Provider) CleanupResources(*v3.AuthConfig) error {
 }
 
 func userMatchesSearchKey(user *v3.User, searchKey string) bool {
+	normalizedDisplayName := strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName)))
+	normalizedSearchKey := strings.ToLower(normalizeWhitespace(simplifyString(searchKey)))
+
 	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
-		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizeWhitespace(searchKey)) ||
-		strings.Contains(strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName))), normalizeWhitespace(searchKey)))
+		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizedSearchKey) ||
+		strings.Contains(normalizedDisplayName, normalizedSearchKey))
 }
 
 func normalizeWhitespace(s string) string {
