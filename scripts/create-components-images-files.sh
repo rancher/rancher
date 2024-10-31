@@ -17,11 +17,6 @@ mkdir -p ../dist
 
 cd ../bin
 
-if [ ! -d build/system-charts ]; then
-    mkdir -p build
-    git clone --depth=1 --no-tags --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts $SYSTEM_CHART_REPO_DIR
-fi
-
 if [ ! -d $CHART_REPO_DIR ]; then
     git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
 fi
