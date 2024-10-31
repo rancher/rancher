@@ -34,18 +34,16 @@ import (
 )
 
 const (
-	clusterNameAnnotation  = "cluster.x-k8s.io/cluster-name"
+	labelWorker            = "labelSelector=node-role.kubernetes.io/worker=true"
 	kubeSystemNamespace    = "kube-system"
-	portLimit              = 65534
 	cloudControllerManager = "aws-cloud-controller-manager"
 )
 
 type PortTestSuite struct {
 	suite.Suite
-	client      *rancher.Client
-	session     *session.Session
-	cluster     *management.Cluster
-	clusterName string
+	client  *rancher.Client
+	session *session.Session
+	cluster *management.Cluster
 }
 
 func (p *PortTestSuite) TearDownSuite() {
@@ -61,10 +59,10 @@ func (p *PortTestSuite) SetupSuite() {
 	p.client = client
 
 	log.Info("Getting cluster name from the config file and append cluster details in connection")
-	p.clusterName = client.RancherConfig.ClusterName
-	require.NotEmptyf(p.T(), p.clusterName, "Cluster name to install should be set")
+	clusterName := client.RancherConfig.ClusterName
+	require.NotEmptyf(p.T(), clusterName, "Cluster name to install should be set")
 
-	clusterID, err := clusters.GetClusterIDByName(p.client, p.clusterName)
+	clusterID, err := clusters.GetClusterIDByName(p.client, clusterName)
 	require.NoError(p.T(), err, "Error getting cluster ID")
 
 	p.cluster, err = p.client.Management.Cluster.ByID(clusterID)
@@ -82,9 +80,7 @@ func (p *PortTestSuite) TestHostPort() {
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
-	//This must be a valid port number, 0 < hostPort < 65536
-	//Using a random port to avoid 'port in use' failures and allow the test to be rerun
-	hostPort := rand.IntN(65534) + 1
+	hostPort := getHostPort()
 
 	testContainerPodTemplate := newPodTemplateWithTestContainer()
 	testContainerPodTemplate.Spec.Containers[0].Ports = []corev1.ContainerPort{
@@ -107,13 +103,12 @@ func (p *PortTestSuite) TestHostPort() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	p.T().Logf("Getting the node using the cluster name [%v]", p.clusterName)
-	query, err := url.ParseQuery(fmt.Sprintf("%s=%s", clusterNameAnnotation, p.clusterName))
+	p.T().Logf("Getting the node using the label [%v]", labelWorker)
+	query, err := url.ParseQuery(labelWorker)
 	assert.NoError(p.T(), err)
 
 	nodeList, err := steveClient.SteveType("node").List(query)
 	assert.NoError(p.T(), err)
-	assert.NotEmpty(p.T(), nodeList, err)
 	assert.NotEmpty(p.T(), nodeList.Data)
 
 	for _, machine := range nodeList.Data {
@@ -121,6 +116,8 @@ func (p *PortTestSuite) TestHostPort() {
 		newNode := &corev1.Node{}
 		err = steveV1.ConvertToK8sType(machine.JSONResp, newNode)
 		assert.NoError(p.T(), err)
+
+		// Project Network Isolation should be enabled when setting up the cluster for this test
 		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
 
 		p.T().Log("Executing the SSH shell command on the node")
@@ -155,9 +152,7 @@ func (p *PortTestSuite) TestNodePort() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	//It will allocate a port from a range 30000-32767
-	//Using a random port to avoid 'port in use' failures and allow the test to be rerun
-	nodePort := rand.IntN(2767) + 30000
+	nodePort := getNodePort()
 
 	serviceName := namegen.AppendRandomString("test-service")
 	p.T().Logf("Creating service with name [%v]", serviceName)
@@ -175,13 +170,12 @@ func (p *PortTestSuite) TestNodePort() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	p.T().Logf("Getting the node using the cluster name [%v]", p.clusterName)
-	query, err := url.ParseQuery(fmt.Sprintf("%s=%s", clusterNameAnnotation, p.clusterName))
+	p.T().Logf("Getting the node using the label [%v]", labelWorker)
+	query, err := url.ParseQuery(labelWorker)
 	assert.NoError(p.T(), err)
 
 	nodeList, err := steveClient.SteveType("node").List(query)
 	assert.NoError(p.T(), err)
-	assert.NotEmpty(p.T(), nodeList, err)
 	assert.NotEmpty(p.T(), nodeList.Data)
 
 	for _, machine := range nodeList.Data {
@@ -228,9 +222,7 @@ func (p *PortTestSuite) TestClusterIP() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	//This must be a valid port number, 0 < hostPort < 65536
-	//Using a random port to avoid 'port in use' failures and allow the test to be rerun
-	hostPort := rand.IntN(65534) + 1
+	hostPort := getHostPort()
 
 	serviceName := namegen.AppendRandomString("test-service")
 	p.T().Logf("Creating service with name [%v]", serviceName)
@@ -309,13 +301,8 @@ func (p *PortTestSuite) TestLoadBalance() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	//This must be a valid port number, 0 < hostPort < 65536
-	//Using a random port to avoid 'port in use' failures and allow the test to be rerun
-	hostPort := rand.IntN(65534) + 1
-
-	//It will allocate a port from a range 30000-32767
-	//Using a random port to avoid 'port in use' failures and allow the test to be rerun
-	nodePort := rand.IntN(2767) + 30000
+	hostPort := getHostPort()
+	nodePort := getNodePort()
 
 	serviceName := namegen.AppendRandomString("test-service")
 	p.T().Logf("Creating service with name [%v]", serviceName)
@@ -334,13 +321,12 @@ func (p *PortTestSuite) TestLoadBalance() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	p.T().Logf("Getting the node using the cluster name [%v]", p.clusterName)
-	query, err := url.ParseQuery(fmt.Sprintf("%s=%s", clusterNameAnnotation, p.clusterName))
+	p.T().Logf("Getting the node using the label [%v]", labelWorker)
+	query, err := url.ParseQuery(labelWorker)
 	assert.NoError(p.T(), err)
 
 	nodeList, err := steveClient.SteveType("node").List(query)
 	assert.NoError(p.T(), err)
-	assert.NotEmpty(p.T(), nodeList, err)
 	assert.NotEmpty(p.T(), nodeList.Data)
 
 	for _, machine := range nodeList.Data {
@@ -359,6 +345,19 @@ func (p *PortTestSuite) TestLoadBalance() {
 		require.NoError(p.T(), err)
 		require.True(p.T(), strings.Contains(log, daemonsetName))
 	}
+}
+
+// This must be a valid port number, 10250 < hostPort < 65536
+// The range 1-10250 are reserved to Rancher
+// Using a random port to avoid 'port in use' failures and allow the test to be rerun
+func getHostPort() int {
+	return rand.IntN(55283) + 10251
+}
+
+// It will allocate a port from a range 30000-32767
+// Using a random port to avoid 'port in use' failures and allow the test to be rerun
+func getNodePort() int {
+	return rand.IntN(2767) + 30000
 }
 
 func TestPortTestSuite(t *testing.T) {
