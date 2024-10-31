@@ -86,8 +86,8 @@ github.com/rancher/aks-operator v1.10.0-rc.2 h1:Efbrf9bZZ/fu9yjTSwj7htOtG/Y5xlY3
 github.com/rancher/aks-operator v1.10.0-rc.2/go.mod h1:n7CBXwN5mpJZT7/3PYg6cWBAVCqjayhaUiRtTCH1FMQ=
 github.com/rancher/eks-operator v1.10.0-rc.2 h1:StjPwsrZ6GY5G47xhIYC9y6rP5r9roMbpAemazRTuR0=
 github.com/rancher/eks-operator v1.10.0-rc.2/go.mod h1:coW31jIfImAHdGsepc7yCXSuixdclQkJn3y26E9tsss=
-github.com/rancher/fleet/pkg/apis v0.11.0-beta.2 h1:NKES0uiPFHBBi7ag2ZbfVbMILTqZt2GdpaxAT1p6xHw=
-github.com/rancher/fleet/pkg/apis v0.11.0-beta.2/go.mod h1:BnNQzIwjbGEnDBtpN2yDFYr32KhejzarPYBUiTR71tU=
+github.com/rancher/fleet/pkg/apis v0.11.0-rc.1 h1:/KGNOpfMjQpe9rzPpeaA5EyBI5Vjd84exLhWy2sz+tE=
+github.com/rancher/fleet/pkg/apis v0.11.0-rc.1/go.mod h1:pmy6S1vc6bMZ73MhwfdC2+7tUC6EyUQstSv7BMyLt6s=
 github.com/rancher/gke-operator v1.10.0-rc.2 h1:zo6nqyJPACJbRGEpy/u1T1mpknCieNKm9Nin7shQ2XI=
 github.com/rancher/gke-operator v1.10.0-rc.2/go.mod h1:k3oIJMCilpaLHeHPRy90S3pfZ05vbe+b+g1ISiHQbLo=
 github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813 h1:V/LY8pUHZG9Kc+xEDWDOryOnCU6/Q+Lsr9QQEQnshpU=
@@ -96,8 +96,8 @@ github.com/rancher/norman v0.0.0-20241001183610-78a520c160ab h1:ihK6See3y/JilqZl
 github.com/rancher/norman v0.0.0-20241001183610-78a520c160ab/go.mod h1:qX/OG/4wY27xSAcSdRilUBxBumV6Ey2CWpAeaKnBQDs=
 github.com/rancher/rke v1.7.0-rc.5 h1:kBRwXTW8CYPXvCcPLISiwGTCvJ8K/+b35D5ES0IcduM=
 github.com/rancher/rke v1.7.0-rc.5/go.mod h1:+x++Mvl0A3jIzNLiu8nkraqZXiHg6VPWv0Xl4iQCg+A=
-github.com/rancher/wrangler/v3 v3.0.1-rc.3 h1:C2d1GoP500SEFARVcb6EpbcNaXH3i8Yu9fzAe/0n4C0=
-github.com/rancher/wrangler/v3 v3.0.1-rc.3/go.mod h1:gUPHS1ANs2NyByfeERHwkGiQ1rlIa8BpTJZtNSgMlZw=
+github.com/rancher/wrangler/v3 v3.0.1-rc.4 h1:TOFp9Vv+D+O52MeuTM9M/aTT6OB/QZMoBchPfTSFMSc=
+github.com/rancher/wrangler/v3 v3.0.1-rc.4/go.mod h1:cGBYMrchAW13we6LlubfXAv1EJ3z0QzsXiGKTPr+IXg=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
