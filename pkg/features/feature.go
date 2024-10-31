@@ -136,7 +136,7 @@ var (
 		"provisioningprebootstrap",
 		"Support running pre-bootstrap workloads on downstream clusters",
 		false,
-		true,
+		false,
 		true)
 )
 
