@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/wrangler"
+
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
