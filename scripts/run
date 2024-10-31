@@ -28,8 +28,8 @@ export CATTLE_FEATURES="harvester=false"
 # Permission granted by Akihiro Suda <akihiro.suda.cz@hco.ntt.co.jp> (https://github.com/rancher/k3d/issues/493#issuecomment-827405962) #
 # Moby License Apache 2.0: https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/LICENSE                           #
 #########################################################################################################################################
-# only run this if rancher is not running in kubernetes cluster
-if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+# only run this if rancher is not running in kubernetes cluster and if the init cgroup does not already exist
+if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; then
   # move the processes from the root group to the /init group,
   # otherwise writing subtree_control fails with EBUSY.
   mkdir -p /sys/fs/cgroup/init
