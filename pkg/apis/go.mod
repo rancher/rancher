@@ -30,10 +30,10 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.9.3
-	github.com/rancher/eks-operator v1.9.3
+	github.com/rancher/aks-operator v1.9.4-rc.2
+	github.com/rancher/eks-operator v1.9.4-rc.2
 	github.com/rancher/fleet/pkg/apis v0.10.0
-	github.com/rancher/gke-operator v1.9.3
+	github.com/rancher/gke-operator v1.9.4-rc.1
 	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
 	github.com/rancher/rke v1.6.4-rc.2
 	github.com/rancher/wrangler/v3 v3.0.0
@@ -46,7 +46,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
