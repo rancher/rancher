@@ -10,7 +10,14 @@ RUN zypper in -y wget git
 # therefore they can be based off the BUILD PLATFORM architecture.
 ARG BUILDARCH
 
-COPY --from=rancher /usr/bin/helm_v3 /usr/bin/helm_v3
+ENV HELM_VERSION v3.16.1 \
+    HELM_URL_V3=https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz
+
+# set up helm 3
+RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
+    mv /usr/bin/helm /usr/bin/helm_v3 && \
+    chown root:root /usr/bin/helm_v3 && \
+    chmod +x /usr/bin/helm_v3
 
 ENV YQ_VERSION=v4.44.2
 RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O - | \
@@ -26,6 +33,6 @@ RUN /src/scripts/export-config
 RUN /src/scripts/chart/ci
 
 FROM scratch
-COPY --from=rancher /usr/bin/helm_v3 /helm
+COPY --from=build /usr/bin/helm_v3 /helm
 COPY --from=build /src/bin/chart/*/*.tgz /
 COPY package/installer-run.sh /run.sh
