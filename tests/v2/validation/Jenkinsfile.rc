@@ -328,8 +328,6 @@ node {
                       sh "./yq e 'del(.flags.desiredflags)' -i ${mainRancherConfigPath}"
                       sh "./yq e '.flags.desiredflags = \"Short|Long\"' -i ${mainRancherConfigPath}"
                       sh "./yq e 'del(.corralRancherHA)' -i ${mainRancherConfigPath}"
-
-                      def config3Yaml = readFile(file: "${mainRancherConfigPath}")
                     }
                     parallel jobs
                   } catch(err) {
@@ -371,6 +369,7 @@ node {
               }
               sh "docker rmi -f ${imageName}"
               sh "docker volume rm -f ${validationVolume}"
+              slackSend(channel: "${SLACK_CHANNEL}", message: "${env.JOB_NAME} Build #${env.BUILD_NUMBER} finished. More details: ${env.BUILD_URL}")
             }
           } // dir 
         } // withEnv
