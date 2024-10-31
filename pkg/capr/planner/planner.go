@@ -1074,16 +1074,6 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 			return nodePlan, config, joinedServer, err
 		}
 
-		bootstrapManifests, err := p.retrievalFunctions.GetBootstrapManifests(controlPlane)
-		if err != nil {
-			return nodePlan, config, joinedServer, err
-		}
-		if len(bootstrapManifests) > 0 {
-			logrus.Debugf("[planner] adding pre-bootstrap manifests")
-			nodePlan.Files = append(nodePlan.Files, bootstrapManifests...)
-			return nodePlan, config, joinedServer, err
-		}
-
 		nodePlan, err = p.addManifests(nodePlan, controlPlane, entry)
 		if err != nil {
 			return nodePlan, config, joinedServer, err
