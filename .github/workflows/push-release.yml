@@ -571,12 +571,37 @@ jobs:
         run: ./scripts/create-components-images-files.sh
       - name: Move files
         run: |
-          mv $HOME/bin/* ./dist
-          mv ./bin/*.txt ./dist
-          mv ./bin/*.sh ./dist
-          mv ./bin/*.ps1 ./dist
+          rm -rf dist && mkdir dist
+          mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
       - name: Create sha256sum.txt file
         run: ./scripts/artifacts-hashes.sh
+      - name: Generate sha256sum file and upload artifacts
+        shell: bash
+        run: |
+          set -ex
+
+          artifacts=(
+            "rancher-components.txt"
+            "rancher-data.json"
+            "rancher-images-origins.txt"
+            "rancher-images-sources.txt"
+            "rancher-images.txt"
+            "rancher-load-images.ps1"
+            "rancher-load-images.sh"
+            "rancher-mirror-to-rancher-org.ps1"
+            "rancher-mirror-to-rancher-org.sh"
+            "rancher-rke-k8s-versions.txt"
+            "rancher-save-images.ps1"
+            "rancher-save-images.sh"
+            "rancher-windows-images-sources.txt"
+            "rancher-windows-images.txt"
+          )
+
+          for artifact in "${artifacts[@]}"; do
+            mv "./bin/$artifact" "./dist/$artifact"
+          done
+
+          ./scripts/artifacts-hashes.sh ./dist
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
