@@ -60,9 +60,6 @@ func CompareConditions(s1 []metav1.Condition, s2 []metav1.Condition) bool {
 				c1.Status == c2.Status &&
 				c1.Reason == c2.Reason &&
 				c1.Message == c2.Message
-			if found {
-				continue
-			}
 		}
 		if !found {
 			return false
