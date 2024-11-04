@@ -4,15 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher/pkg/controllers/status"
-
-	wrangler "github.com/rancher/wrangler/v3/pkg/name"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	genv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rancherbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	rbac "k8s.io/api/rbac/v1"

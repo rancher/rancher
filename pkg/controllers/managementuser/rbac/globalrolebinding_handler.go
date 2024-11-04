@@ -2,14 +2,11 @@ package rbac
 
 import (
 	"fmt"
-	"time"
-
-	"github.com/rancher/rancher/pkg/controllers/status"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"k8s.io/client-go/util/retry"
 
 	"github.com/rancher/norman/types/slice"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -20,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -190,10 +188,6 @@ func grbByUserAndRole(obj interface{}) ([]string, error) {
 	}
 
 	return []string{rbac.GetGRBTargetKey(grb) + "-" + grb.GlobalRoleName}, nil
-}
-
-var timeNow = func() time.Time {
-	return time.Now()
 }
 
 func (c *grbHandler) updateStatus(grb *apisv3.GlobalRoleBinding, remoteConditions []metav1.Condition) error {

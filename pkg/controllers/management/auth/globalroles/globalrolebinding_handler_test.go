@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher/pkg/controllers/status"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	apisv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	normanv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"

@@ -4,21 +4,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher/pkg/controllers/status"
-	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	"go.uber.org/mock/gomock"
-
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestSync(t *testing.T) {
