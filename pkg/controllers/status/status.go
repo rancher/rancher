@@ -56,11 +56,11 @@ func CompareConditions(s1 []metav1.Condition, s2 []metav1.Condition) bool {
 	for _, c1 := range s1 {
 		found := false
 		for _, c2 := range s2 {
-			if c1.Type == c2.Type &&
+			found = c1.Type == c2.Type &&
 				c1.Status == c2.Status &&
 				c1.Reason == c2.Reason &&
-				c1.Message == c2.Message {
-				found = true
+				c1.Message == c2.Message
+			if found {
 				continue
 			}
 		}
