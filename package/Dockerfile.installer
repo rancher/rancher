@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:15.6 AS build
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:15.7 AS build
 
 RUN zypper in -y wget git
 
