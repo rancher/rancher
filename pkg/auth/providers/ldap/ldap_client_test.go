@@ -8,16 +8,14 @@ import (
 	"testing"
 	"time"
 
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
-
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 )

@@ -27,14 +27,14 @@ import (
 
 func TestCleanupClientSecretsNilConfig(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	secrets := getSecretInterfaceMock(ctrl, map[string]*corev1.Secret{})
+	secrets := getSecretControllerMock(ctrl, map[string]*corev1.Secret{})
 	err := CleanupClientSecrets(secrets, nil)
 	require.Error(t, err)
 }
 
 func TestCleanupClientSecretsUnknownConfig(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	secrets := getSecretInterfaceMock(ctrl, map[string]*corev1.Secret{})
+	secrets := getSecretControllerMock(ctrl, map[string]*corev1.Secret{})
 
 	config := &v3.AuthConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "unknownConfig"},
@@ -62,7 +62,7 @@ func TestCleanupClientSecretsKnownConfig(t *testing.T) {
 
 	initialStore := map[string]*corev1.Secret{}
 	ctrl := gomock.NewController(t)
-	secrets := getSecretInterfaceMock(ctrl, initialStore)
+	secrets := getSecretControllerMock(ctrl, initialStore)
 
 	_, err := secrets.Create(&v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -131,7 +131,7 @@ func TestCleanupDeprecatedSecretsKnownConfig(t *testing.T) {
 	secretName := fmt.Sprintf("%s-%s", strings.ToLower(config.Name), "access-token")
 	initialStore := map[string]*corev1.Secret{}
 	ctrl := gomock.NewController(t)
-	secrets := getSecretInterfaceMock(ctrl, initialStore)
+	secrets := getSecretControllerMock(ctrl, initialStore)
 
 	_, err := secrets.Create(&v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -152,7 +152,7 @@ func TestCleanupDeprecatedSecretsKnownConfig(t *testing.T) {
 	assert.Nil(t, s, "expected the secret to be nil")
 }
 
-func getSecretInterfaceMock(ctrl *gomock.Controller, store map[string]*corev1.Secret) wcorev1.SecretController {
+func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.Secret) wcorev1.SecretController {
 	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
 	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
@@ -210,7 +210,7 @@ func TestCleanupClientSecretsOKTAConfig(t *testing.T) {
 
 	initialStore := map[string]*corev1.Secret{}
 	ctrl := gomock.NewController(t)
-	secrets := getSecretInterfaceMock(ctrl, initialStore)
+	secrets := getSecretControllerMock(ctrl, initialStore)
 
 	_, err := secrets.Create(&v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

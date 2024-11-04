@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/wrangler"
-
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -19,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

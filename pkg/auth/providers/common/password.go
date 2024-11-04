@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -17,7 +16,7 @@ const SecretsNamespace = namespace.GlobalNamespace
 
 // NameForSecret returns a string with the namespace:name for the provided
 // Secret.
-func NameForSecret(s *corev1.Secret) string {
+func NameForSecret(s *v1.Secret) string {
 	return fmt.Sprintf("%s:%s", s.GetNamespace(), s.GetName())
 }
 

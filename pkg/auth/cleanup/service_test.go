@@ -9,13 +9,12 @@ import (
 	"testing"
 	"time"
 
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
