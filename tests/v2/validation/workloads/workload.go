@@ -96,7 +96,7 @@ func rollbackDeployment(client *rancher.Client, clusterID, namespaceName string,
 	}
 
 	backoff := kwait.Backoff{
-		Duration: 1 * time.Second,
+		Duration: 5 * time.Second,
 		Factor:   1,
 		Jitter:   0,
 		Steps:    10,

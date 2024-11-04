@@ -132,7 +132,7 @@ func WatchAndWaitPodContainerRunning(client *rancher.Client, clusterID, namespac
 	namespacedClient := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName)
 
 	backoff := kwait.Backoff{
-		Duration: 1 * time.Second,
+		Duration: 5 * time.Second,
 		Factor:   1,
 		Jitter:   0,
 		Steps:    10,
