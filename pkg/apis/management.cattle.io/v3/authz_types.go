@@ -233,7 +233,7 @@ type GlobalRoleBinding struct {
 	// +kubebuilder:validation:Required
 	GlobalRoleName string `json:"globalRoleName" norman:"required,noupdate,type=reference[globalRole]"`
 
-	// Status is the most recently observed status of the GlobalRoleBinding. BEWARE. This is read from and written to by __two__ controllers.
+	// Status is the most recently observed status of the GlobalRoleBinding. Note, that this is read from and written to by __two__ controllers.
 	// +optional
 	Status GlobalRoleBindingStatus `json:"status,omitempty"`
 }

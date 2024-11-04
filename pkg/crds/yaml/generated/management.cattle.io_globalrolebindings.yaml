@@ -53,7 +53,7 @@ spec:
             type: object
           status:
             description: Status is the most recently observed status of the GlobalRoleBinding.
-              BEWARE. This is read from and written to by __two__ controllers.
+              Note, that this is read from and written to by __two__ controllers.
             properties:
               lastUpdateTime:
                 description: LastUpdateTime is a k8s timestamp of the last time the
