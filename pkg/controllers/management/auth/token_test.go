@@ -32,7 +32,7 @@ func TestSync(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 
-	// setup tockens mock instance
+	// setup tokens mock instance
 	tokensMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
 	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
 		func(token *v3.Token) (*v3.Token, error) {
@@ -105,7 +105,7 @@ func TestSync(t *testing.T) {
 	}
 
 	// test error from token update
-	// setup tockens mock instance
+	// setup tokens mock instance
 	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
 	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
 		func(token *v3.Token) (*v3.Token, error) {
@@ -160,7 +160,7 @@ func TestSync(t *testing.T) {
 	assert.NotNilf(t, err, "handler should return err when token client's update function returns error")
 
 	// test error from userattribute update
-	// setup tockens mock instance
+	// setup tokens mock instance
 	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
 	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
 		func(token *v3.Token) (*v3.Token, error) {
@@ -223,7 +223,7 @@ func TestSync(t *testing.T) {
 	assert.NotNilf(t, err, "handler should return err when userattribute client's update function returns error")
 
 	// test non-notfound error from userattribute lister get
-	// setup tockens mock instance
+	// setup tokens mock instance
 	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
 	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
 		func(token *v3.Token) (*v3.Token, error) {
@@ -275,7 +275,7 @@ func TestSync(t *testing.T) {
 	assert.NotNilf(t, err, "handler should return err when userattribute lister's get function returns non-notfound error")
 
 	// test notfound error from userattribute lister get
-	// setup tockens mock instance
+	// setup tokens mock instance
 	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
 	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
 		func(token *v3.Token) (*v3.Token, error) {
