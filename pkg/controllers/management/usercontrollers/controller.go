@@ -242,6 +242,17 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRole(userContext *config.U
 			Resources:     []string{"validatingwebhookconfigurations", "mutatingwebhookconfigurations"},
 			ResourceNames: []string{WebhookConfigurationName},
 		},
+		// This is needed for removing finalizers from deployments
+		{
+			Verbs:     []string{"list", "get", "update"},
+			APIGroups: []string{"apps"},
+			Resources: []string{"deployments"},
+		},
+		{
+			Verbs:     []string{"list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		},
 	}
 	clusterRole := rbacV1.ClusterRole{
 		ObjectMeta: meta,
