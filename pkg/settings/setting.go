@@ -323,10 +323,6 @@ var (
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
 
-	// UseProjectNamespaceFix indicates to the webhook if project namespaces should be made using the existing model if false, or use the
-	// newer model if true
-	UseProjectNamespaceFix = NewSetting("use-project-namespace-fix", "true")
-
 	// The following settings are only used by the UI, but need to be known to Rancher so that they're not removed.
 	_ = NewSetting("eula-agreed", "")
 	_ = NewSetting("display-add-extension-repos-banner", "")
