@@ -171,7 +171,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext)
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 	projectaction.SetProjectStore(schemas.Schema(&managementschema.Version, client.ProjectType), apiContext)
-	setupScopedTypes(schemas, apiContext)
+	setupScopedTypes(schemas)
 	setupPasswordTypes(ctx, schemas, apiContext)
 
 	multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
@@ -185,8 +185,7 @@ func setupPasswordTypes(ctx context.Context, schemas *types.Schemas, management 
 	passwordStore.SetPasswordStore(schemas, secretStore, nsStore)
 }
 
-func setupScopedTypes(schemas *types.Schemas, management *config.ScaledContext) {
-	projectClient := management.Management.Projects("")
+func setupScopedTypes(schemas *types.Schemas) {
 	for _, schema := range schemas.Schemas() {
 		if schema.Scope != types.NamespaceScope || schema.Store == nil || schema.Store.Context() != config.ManagementStorageContext {
 			continue
@@ -202,7 +201,7 @@ func setupScopedTypes(schemas *types.Schemas, management *config.ScaledContext) 
 				continue
 			}
 
-			schema.Store = scoped.NewScopedStore(key, schema.Store, projectClient)
+			schema.Store = scoped.NewScopedStore(key, schema.Store)
 			ns.Required = false
 			schema.ResourceFields["namespaceId"] = ns
 			break
@@ -628,7 +627,6 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		Prtbs:                         management.Management.ProjectRoleTemplateBindings(""),
 		Crtbs:                         management.Management.ClusterRoleTemplateBindings(""),
 		ProjectLister:                 management.Management.Projects("").Controller().Lister(),
-		ProjectClient:                 management.Management.Projects(""),
 		ClusterLister:                 management.Management.Clusters("").Controller().Lister(),
 		Apps:                          management.Project.Apps(""),
 		TemplateVersionLister:         management.Management.CatalogTemplateVersions("").Controller().Lister(),

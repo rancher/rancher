@@ -87,13 +87,13 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 		},
 	}
 
-	obj, err := lifecycle.reconcileProjectCreatorRTB(project, clusterID)
+	obj, err := lifecycle.reconcileProjectCreatorRTB(project)
 	require.NoError(t, err)
 	require.NotNil(t, obj)
 
 	require.Len(t, prtbs, 1)
 	assert.Equal(t, "creator-project-owner", prtbs[0].Name)
-	assert.Equal(t, clusterID, prtbs[0].Namespace)
+	assert.Equal(t, "p-abcdef", prtbs[0].Namespace)
 	assert.Equal(t, clusterID+":p-abcdef", prtbs[0].ProjectName)
 	assert.Equal(t, "", prtbs[0].UserName)
 	assert.Equal(t, userPrincipalName, prtbs[0].UserPrincipalName)
@@ -109,7 +109,7 @@ func TestReconcileProjectCreatorRTBNoCreatorRBAC(t *testing.T) {
 			},
 		},
 	}
-	obj, err := lifecycle.reconcileProjectCreatorRTB(project, clusterID)
+	obj, err := lifecycle.reconcileProjectCreatorRTB(project)
 	assert.NoError(t, err)
 	assert.NotNil(t, obj)
 }

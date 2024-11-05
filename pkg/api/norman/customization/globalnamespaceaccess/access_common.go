@@ -37,7 +37,6 @@ type MemberAccess struct {
 	Prtbs              v3.ProjectRoleTemplateBindingInterface
 	Crtbs              v3.ClusterRoleTemplateBindingInterface
 	ProjectLister      v3.ProjectLister
-	ProjectClient      v3.ProjectInterface
 	ClusterLister      v3.ClusterLister
 }
 
@@ -64,7 +63,7 @@ func (ma *MemberAccess) IsAdmin(callerID string) (bool, error) {
 		return false, err
 	}
 	if u == nil {
-		return false, fmt.Errorf("no user found with ID %v", callerID)
+		return false, fmt.Errorf("No user found with ID %v", callerID)
 	}
 	// Get globalRoleBinding for this user
 	grbs, err := ma.GrbLister.List("", labels.NewSelector())
@@ -181,19 +180,9 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		callerIsProjectOwner := false
 		callerIsProjectMember := false
 		callerIsClusterOwner := false
-
-		backingNamespace := pname
-		p, err := ma.ProjectClient.GetNamespaced(cname, pname, v1.GetOptions{})
+		prtbs, err := ma.PrtbLister.List(pname, labels.NewSelector())
 		if err != nil {
-			return fmt.Errorf("unable to get project %s in namespace %s: %w", pname, cname, err)
-		}
-		if p.Status.BackingNamespace != "" {
-			backingNamespace = p.Status.BackingNamespace
-		}
-
-		prtbs, err := ma.PrtbLister.List(backingNamespace, labels.NewSelector())
-		if err != nil {
-			return fmt.Errorf("unable to get PRTBs in namespace %s: %w", backingNamespace, err)
+			return err
 		}
 		for _, prtb := range prtbs {
 			if prtb.UserName == callerID {
@@ -535,29 +524,21 @@ func (ma *MemberAccess) RemoveRolesFromTargets(targetProjects, rolesToRemove []s
 			return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
 		}
 		clusterName, projectName := split[0], split[1]
-		backingNamespace := projectName
-		p, err := ma.ProjectClient.GetNamespaced(clusterName, projectName, v1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("unable to get project %s in namespace %s: %w", projectName, clusterName, err)
-		}
-		if p.Status.BackingNamespace != "" {
-			backingNamespace = p.Status.BackingNamespace
-		}
-		prtbs, err := ma.PrtbLister.List(backingNamespace, labels.NewSelector())
+		clustersCovered := make(map[string]bool)
+		prtbs, err := ma.PrtbLister.List(projectName, labels.NewSelector())
 		if err != nil {
 			return err
 		}
 		for _, prtb := range prtbs {
 			if prtb.UserPrincipalName == systemUserPrincipalID {
 				if removeAllRoles || rolesToRemoveMap[prtb.RoleTemplateName] {
-					if err = ma.Prtbs.DeleteNamespaced(backingNamespace, prtb.Name, &v1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+					if err = ma.Prtbs.DeleteNamespaced(projectName, prtb.Name, &v1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 						return err
 					}
 				}
 			}
 		}
 
-		clustersCovered := make(map[string]bool)
 		if !clustersCovered[clusterName] {
 			crtbs, err := ma.CrtbLister.List(clusterName, labels.NewSelector())
 			if err != nil {
