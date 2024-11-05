@@ -42,7 +42,6 @@ type Wrapper struct {
 	Prtbs                         v3.ProjectRoleTemplateBindingInterface
 	Crtbs                         v3.ClusterRoleTemplateBindingInterface
 	ProjectLister                 v3.ProjectLister
-	ProjectClient                 v3.ProjectInterface
 	ClusterLister                 v3.ClusterLister
 	Apps                          pv3.AppInterface
 	TemplateVersionLister         v3.CatalogTemplateVersionLister
@@ -103,7 +102,6 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		Prtbs:              w.Prtbs,
 		Crtbs:              w.Crtbs,
 		ProjectLister:      w.ProjectLister,
-		ProjectClient:      w.ProjectClient,
 		ClusterLister:      w.ClusterLister,
 	}
 	var targetProjects []string

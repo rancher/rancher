@@ -32,7 +32,6 @@ type MCAppController struct {
 	prtbLister                    v3.ProjectRoleTemplateBindingLister
 	crtbs                         v3.ClusterRoleTemplateBindingInterface
 	crtbLister                    v3.ClusterRoleTemplateBindingLister
-	projectClient                 v3.ProjectInterface
 	rtLister                      v3.RoleTemplateLister
 	users                         v3.UserInterface
 	userManager                   user.Manager
@@ -66,7 +65,6 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		prtbLister:                    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		crtbs:                         management.Management.ClusterRoleTemplateBindings(""),
 		crtbLister:                    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		projectClient:                 management.Management.Projects(""),
 		rtLister:                      management.Management.RoleTemplates("").Controller().Lister(),
 		userManager:                   management.UserManager,
 		users:                         management.Management.Users(""),
@@ -152,17 +150,9 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 			projectName := split[1]
 
 			if rt.Context == "project" {
-				backingNamespace := projectName
-				project, err := mc.projectClient.GetNamespaced(clusterName, projectName, v1.GetOptions{})
-				if err != nil {
-					return nil, err
-				}
-				if project.Status.BackingNamespace != "" {
-					backingNamespace = project.Status.BackingNamespace
-				}
 				prtbName = mcapp.Name + "-" + r
 				// check if these prtbs already exist
-				if err = mc.createPrtb(backingNamespace, p.ProjectName, prtbName, r, systemUser.Name, systemUserPrincipalID); err != nil {
+				if err = mc.createPrtb(projectName, p.ProjectName, prtbName, r, systemUser.Name, systemUserPrincipalID); err != nil {
 					return nil, err
 				}
 			} else if rt.Context == "cluster" {
@@ -362,14 +352,14 @@ func (c *ClusterController) updateAnswersForCluster(clusterName string, mcapp *v
 	}
 }
 
-func (mc *MCAppController) createPrtb(projectNamespace, projectID, prtbName, roleTemplateName, systemUserName, systemUserPrincipalID string) error {
-	_, err := mc.prtbLister.Get(projectNamespace, prtbName)
+func (mc *MCAppController) createPrtb(projectName, projectID, prtbName, roleTemplateName, systemUserName, systemUserPrincipalID string) error {
+	_, err := mc.prtbLister.Get(projectName, prtbName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			_, err := mc.prtbs.Create(&v3.ProjectRoleTemplateBinding{
 				ObjectMeta: v1.ObjectMeta{
 					Name:      prtbName,
-					Namespace: projectNamespace,
+					Namespace: projectName,
 				},
 				UserName:          systemUserName,
 				UserPrincipalName: systemUserPrincipalID,
