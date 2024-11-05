@@ -37,13 +37,15 @@ const (
 	labelWorker            = "labelSelector=node-role.kubernetes.io/worker=true"
 	kubeSystemNamespace    = "kube-system"
 	cloudControllerManager = "aws-cloud-controller-manager"
+	defaultPort            = 80
 )
 
 type PortTestSuite struct {
 	suite.Suite
-	client  *rancher.Client
-	session *session.Session
-	cluster *management.Cluster
+	client    *rancher.Client
+	session   *session.Session
+	cluster   *management.Cluster
+	namespace *corev1.Namespace
 }
 
 func (p *PortTestSuite) TearDownSuite() {
@@ -67,15 +69,16 @@ func (p *PortTestSuite) SetupSuite() {
 
 	p.cluster, err = p.client.Management.Cluster.ByID(clusterID)
 	require.NoError(p.T(), err)
+
+	log.Info("Creating new project and namespace")
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(p.client, p.cluster.ID)
+	require.NoError(p.T(), err)
+	p.namespace = namespace
 }
 
 func (p *PortTestSuite) TestHostPort() {
 	subSession := p.session.NewSession()
 	defer subSession.Cleanup()
-
-	log.Info("Creating new project and namespace")
-	_, namespace, err := projectsapi.CreateProjectAndNamespace(p.client, p.cluster.ID)
-	require.NoError(p.T(), err)
 
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
@@ -86,7 +89,7 @@ func (p *PortTestSuite) TestHostPort() {
 	testContainerPodTemplate.Spec.Containers[0].Ports = []corev1.ContainerPort{
 		corev1.ContainerPort{
 			HostPort:      int32(hostPort),
-			ContainerPort: 80,
+			ContainerPort: defaultPort,
 			Protocol:      corev1.ProtocolTCP,
 		},
 	}
@@ -94,13 +97,13 @@ func (p *PortTestSuite) TestHostPort() {
 	daemonsetName := namegen.AppendRandomString("test-daemonset")
 
 	p.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
-	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, namespace.Name, testContainerPodTemplate, true, nil)
+	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, p.namespace.Name, testContainerPodTemplate, true, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(p.T(), err)
 	assert.Equal(p.T(), createdDaemonSet.Name, daemonsetName)
 
 	p.T().Logf("Waiting for daemonset [%v] to have expected number of available replicas", daemonsetName)
-	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
+	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
 	p.T().Logf("Getting the node using the label [%v]", labelWorker)
@@ -120,7 +123,6 @@ func (p *PortTestSuite) TestHostPort() {
 		// Project Network Isolation should be enabled when setting up the cluster for this test
 		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
 
-		p.T().Log("Executing the SSH shell command on the node")
 		log, err := curlCommand(p.client, p.cluster.ID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
 		require.NoError(p.T(), err)
 		require.True(p.T(), strings.Contains(log, daemonsetName))
@@ -131,10 +133,6 @@ func (p *PortTestSuite) TestNodePort() {
 	subSession := p.session.NewSession()
 	defer subSession.Cleanup()
 
-	log.Info("Creating new project and namespace")
-	_, namespace, err := projectsapi.CreateProjectAndNamespace(p.client, p.cluster.ID)
-	require.NoError(p.T(), err)
-
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
@@ -143,13 +141,13 @@ func (p *PortTestSuite) TestNodePort() {
 	daemonsetName := namegen.AppendRandomString("test-daemonset")
 
 	p.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
-	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, namespace.Name, testContainerPodTemplate, true, nil)
+	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, p.namespace.Name, testContainerPodTemplate, true, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(p.T(), err)
 	assert.Equal(p.T(), createdDaemonSet.Name, daemonsetName)
 
 	p.T().Logf("Waiting for daemonset [%v] to have expected number of available replicas", daemonsetName)
-	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
+	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
 	nodePort := getNodePort()
@@ -159,11 +157,11 @@ func (p *PortTestSuite) TestNodePort() {
 	ports := []corev1.ServicePort{
 		{
 			Protocol: corev1.ProtocolTCP,
-			Port:     80,
+			Port:     defaultPort,
 			NodePort: int32(nodePort),
 		},
 	}
-	nodePortservice := services.NewServiceTemplate(serviceName, namespace.Name, corev1.ServiceTypeNodePort, ports, daemonsetTemplate.Spec.Template.Labels)
+	nodePortservice := services.NewServiceTemplate(serviceName, p.namespace.Name, corev1.ServiceTypeNodePort, ports, daemonsetTemplate.Spec.Template.Labels)
 	serviceResp, err := services.CreateService(steveClient, nodePortservice)
 	require.NoError(p.T(), err)
 
@@ -190,7 +188,6 @@ func (p *PortTestSuite) TestNodePort() {
 			nodeIP = kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
 		}
 
-		p.T().Log("Executing the SSH shell command on the node")
 		log, err := curlCommand(p.client, p.cluster.ID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(nodePort)))
 		require.NoError(p.T(), err)
 		require.True(p.T(), strings.Contains(log, daemonsetName))
@@ -201,10 +198,6 @@ func (p *PortTestSuite) TestClusterIP() {
 	subSession := p.session.NewSession()
 	defer subSession.Cleanup()
 
-	log.Info("Creating new project and namespace")
-	_, namespace, err := projectsapi.CreateProjectAndNamespace(p.client, p.cluster.ID)
-	require.NoError(p.T(), err)
-
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
@@ -213,13 +206,13 @@ func (p *PortTestSuite) TestClusterIP() {
 	daemonsetName := namegen.AppendRandomString("test-daemonset")
 
 	p.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
-	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, namespace.Name, testContainerPodTemplate, true, nil)
+	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, p.namespace.Name, testContainerPodTemplate, true, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(p.T(), err)
 	assert.Equal(p.T(), createdDaemonSet.Name, daemonsetName)
 
 	p.T().Logf("Waiting for daemonset [%v] to have expected number of available replicas", daemonsetName)
-	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
+	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
 	hostPort := getHostPort()
@@ -230,10 +223,10 @@ func (p *PortTestSuite) TestClusterIP() {
 		{
 			Protocol:   corev1.ProtocolTCP,
 			Port:       int32(hostPort),
-			TargetPort: intstr.FromInt(80),
+			TargetPort: intstr.FromInt(defaultPort),
 		},
 	}
-	clusterIPService := services.NewServiceTemplate(serviceName, namespace.Name, corev1.ServiceTypeClusterIP, ports, daemonsetTemplate.Spec.Template.Labels)
+	clusterIPService := services.NewServiceTemplate(serviceName, p.namespace.Name, corev1.ServiceTypeClusterIP, ports, daemonsetTemplate.Spec.Template.Labels)
 	serviceResp, err := services.CreateService(steveClient, clusterIPService)
 	require.NoError(p.T(), err)
 
@@ -251,7 +244,6 @@ func (p *PortTestSuite) TestClusterIP() {
 
 	clusterIP := newService.Spec.ClusterIP
 
-	p.T().Log("Executing the SSH shell command on the node")
 	log, err := curlCommand(p.client, p.cluster.ID, fmt.Sprintf("%s:%s/name.html", clusterIP, strconv.Itoa(hostPort)))
 	require.NoError(p.T(), err)
 	require.True(p.T(), strings.Contains(log, daemonsetName))
@@ -280,10 +272,6 @@ func (p *PortTestSuite) TestLoadBalance() {
 		p.T().Skip("Load Balance test requires access to cloud provider.")
 	}
 
-	log.Info("Creating new project and namespace")
-	_, namespace, err := projectsapi.CreateProjectAndNamespace(p.client, p.cluster.ID)
-	require.NoError(p.T(), err)
-
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
@@ -292,13 +280,13 @@ func (p *PortTestSuite) TestLoadBalance() {
 	daemonsetName := namegen.AppendRandomString("test-daemonset")
 
 	p.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
-	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, namespace.Name, testContainerPodTemplate, true, nil)
+	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, p.namespace.Name, testContainerPodTemplate, true, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(p.T(), err)
 	assert.Equal(p.T(), createdDaemonSet.Name, daemonsetName)
 
 	p.T().Logf("Waiting for daemonset [%v] to have expected number of available replicas", daemonsetName)
-	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, namespace.Name, metav1.ListOptions{})
+	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
 	hostPort := getHostPort()
@@ -310,11 +298,11 @@ func (p *PortTestSuite) TestLoadBalance() {
 		{
 			Protocol:   corev1.ProtocolTCP,
 			Port:       int32(hostPort),
-			TargetPort: intstr.FromInt(80),
+			TargetPort: intstr.FromInt(defaultPort),
 			NodePort:   int32(nodePort),
 		},
 	}
-	lbService := services.NewServiceTemplate(serviceName, namespace.Name, corev1.ServiceTypeLoadBalancer, ports, daemonsetTemplate.Spec.Selector.MatchLabels)
+	lbService := services.NewServiceTemplate(serviceName, p.namespace.Name, corev1.ServiceTypeLoadBalancer, ports, daemonsetTemplate.Spec.Selector.MatchLabels)
 	serviceResp, err := services.CreateService(steveClient, lbService)
 	require.NoError(p.T(), err)
 
@@ -340,7 +328,6 @@ func (p *PortTestSuite) TestLoadBalance() {
 			nodeIP = kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
 		}
 
-		p.T().Log("Executing the SSH shell command on the node")
 		log, err := curlCommand(p.client, p.cluster.ID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(nodePort)))
 		require.NoError(p.T(), err)
 		require.True(p.T(), strings.Contains(log, daemonsetName))
