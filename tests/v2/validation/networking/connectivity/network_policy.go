@@ -1,16 +1,18 @@
 package connectivity
 
 import (
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
 const (
 	pingPodProjectName = "ping-project"
-
-	containerName  = "test1"
-	containerImage = "ranchertest/mytestcontainer"
+	containerName      = "test1"
+	containerImage     = "ranchertest/mytestcontainer"
 )
 
 type resourceNames struct {
@@ -63,4 +65,16 @@ func newPodTemplateWithTestContainer() corev1.PodTemplateSpec {
 func newTestContainerMinimal() corev1.Container {
 	pullPolicy := corev1.PullAlways
 	return workloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil, nil, nil, nil)
+}
+
+// curlCommand is a helper to run a curl command on an SSH shell node
+func curlCommand(client *rancher.Client, clusterID string, url string) (string, error) {
+	logrus.Infof("Executing the kubectl command curl %s on the node", url)
+	execCmd := []string{"curl", url}
+	log, err := kubectl.Command(client, nil, clusterID, execCmd, "")
+	if err != nil {
+		return "", err
+	}
+	logrus.Infof("Log of the curl command curl {%v}", log)
+	return log, nil
 }
