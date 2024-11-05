@@ -38,7 +38,6 @@ var projectManagementPlaneResources = map[string]string{
 	"secrets":                     "",
 }
 var prtbClusterManagmentPlaneResources = map[string]string{
-	"notifiers":               "management.cattle.io",
 	"clustercatalogs":         "management.cattle.io",
 	"catalogtemplates":        "management.cattle.io",
 	"catalogtemplateversions": "management.cattle.io",

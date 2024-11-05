@@ -56,30 +56,3 @@ def mock_receiver_alert():
     server.start()
     yield server
     server.stop()
-
-
-@pytest.mark.skip
-def test_add_notifier(admin_mc, remove_resource, mock_receiver_alert):
-    client = admin_mc.client
-
-    # Add the notifier dingtalk and microsoftTeams
-    notifier_dingtalk = client.create_notifier(name="dingtalk",
-                                               clusterId="local",
-                                               dingtalkConfig=dingtalk_config)
-
-    notifier_microsoft_teams = client.create_notifier(
-        name="microsoftTeams",
-        clusterId="local",
-        msteamsConfig=microsoft_teams_config)
-
-    client.action(obj=notifier_microsoft_teams,
-                  action_name="send",
-                  msteamsConfig=microsoft_teams_config)
-
-    client.action(obj=notifier_dingtalk,
-                  action_name="send",
-                  dingtalkConfig=dingtalk_config)
-
-    # Remove the notifiers
-    remove_resource(notifier_dingtalk)
-    remove_resource(notifier_microsoft_teams)

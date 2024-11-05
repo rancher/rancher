@@ -51,7 +51,6 @@ var clusterManagementPlaneResources = map[string]string{
 	"etcdbackups":                 "management.cattle.io",
 	"nodes":                       "management.cattle.io",
 	"nodepools":                   "management.cattle.io",
-	"notifiers":                   "management.cattle.io",
 	"projects":                    "management.cattle.io",
 	"etcdsnapshots":               "rke.cattle.io",
 }
