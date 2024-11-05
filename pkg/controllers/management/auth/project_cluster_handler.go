@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -92,17 +93,12 @@ func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	backingNamespace := orig.Name
-	if orig.Status.BackingNamespace != "" {
-		backingNamespace = orig.Status.BackingNamespace
-	}
-
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController, backingNamespace)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController)
 	if err != nil {
 		return nil, err
 	}
 
-	obj, err = l.mgr.reconcileCreatorRTB(obj, backingNamespace)
+	obj, err = l.mgr.reconcileCreatorRTB(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -151,23 +147,19 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 }
 
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
-	projectNamespace := obj.Name
-	if obj.Status.BackingNamespace != "" {
-		projectNamespace = obj.Status.BackingNamespace
-	}
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
-	rbs, err := l.mgr.rbLister.List(projectNamespace, labels.SelectorFromSet(set))
+	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
 	if err != nil {
 		returnErr = multierror.Append(returnErr, err)
 	}
 	for _, rb := range rbs {
-		err := l.mgr.roleBindings.DeleteNamespaced(projectNamespace, rb.Name, &v1.DeleteOptions{})
+		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
 		if err != nil {
 			returnErr = multierror.Append(returnErr, err)
 		}
 	}
-	err = l.mgr.deleteNamespace(projectRemoveController, projectNamespace)
+	err = l.mgr.deleteNamespace(obj, projectRemoveController)
 	if err != nil {
 		returnErr = multierror.Append(returnErr, err)
 	}
@@ -184,7 +176,7 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController, orig.Name)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +204,7 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		}
 	}
 
-	obj, err = l.mgr.reconcileCreatorRTB(obj, orig.Name)
+	obj, err = l.mgr.reconcileCreatorRTB(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +253,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	if err != nil {
 		returnErr = multierror.Append(returnErr, err)
 	}
-	err = l.mgr.deleteNamespace(clusterRemoveController, obj.Name)
+	err = l.mgr.deleteNamespace(obj, clusterRemoveController)
 	if err != nil {
 		returnErr = multierror.Append(returnErr, err)
 	}
@@ -373,7 +365,7 @@ func (m *mgr) deleteSystemProject(cluster *apisv3.Cluster, controller string) er
 	return deleteError
 }
 
-func (m *mgr) reconcileCreatorRTB(obj runtime.Object, nsName string) (runtime.Object, error) {
+func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	return v32.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -419,7 +411,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object, nsName string) (runtime.Ob
 			for _, role := range roleMap["required"] {
 				rtbName := "creator-" + role
 
-				if rtb, _ := m.prtbLister.Get(nsName, rtbName); rtb != nil {
+				if rtb, _ := m.prtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
 					createdRoles = append(createdRoles, role)
 					// This projectRoleBinding exists, need to check all of them so keep going
 					continue
@@ -428,7 +420,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object, nsName string) (runtime.Ob
 				// The projectRoleBinding doesn't exist yet so create it
 				om := v1.ObjectMeta{
 					Name:      rtbName,
-					Namespace: nsName,
+					Namespace: metaAccessor.GetName(),
 				}
 
 				logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
@@ -528,15 +520,20 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object, nsName string) (runtime.Ob
 	})
 }
 
-func (m *mgr) deleteNamespace(controller string, nsName string) error {
+func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
+	o, err := meta.Accessor(obj)
+	if err != nil {
+		return condition.Error("MissingMetadata", err)
+	}
+
 	nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
-	ns, err := nsClient.Get(context.TODO(), nsName, v1.GetOptions{})
+	ns, err := nsClient.Get(context.TODO(), o.GetName(), v1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if ns.Status.Phase != v12.NamespaceTerminating {
-		logrus.Infof("[%s] Deleting namespace %s", controller, nsName)
-		err = nsClient.Delete(context.TODO(), nsName, v1.DeleteOptions{})
+		logrus.Infof("[%s] Deleting namespace %s", controller, o.GetName())
+		err = nsClient.Delete(context.TODO(), o.GetName(), v1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -544,27 +541,31 @@ func (m *mgr) deleteNamespace(controller string, nsName string) error {
 	return err
 }
 
-func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string, nsName string) (runtime.Object, error) {
+func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string) (runtime.Object, error) {
 	return v32.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
+		o, err := meta.Accessor(obj)
+		if err != nil {
+			return obj, condition.Error("MissingMetadata", err)
+		}
 		t, err := meta.TypeAccessor(obj)
 		if err != nil {
 			return obj, condition.Error("MissingTypeMetadata", err)
 		}
 
-		ns, _ := m.nsLister.Get("", nsName)
+		ns, _ := m.nsLister.Get("", o.GetName())
 		if ns == nil {
 			nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
-			logrus.Infof("[%v] Creating namespace %v", controller, nsName)
+			logrus.Infof("[%v] Creating namespace %v", controller, o.GetName())
 			_, err := nsClient.Create(context.TODO(), &v12.Namespace{
 				ObjectMeta: v1.ObjectMeta{
-					Name: nsName,
+					Name: o.GetName(),
 					Annotations: map[string]string{
 						"management.cattle.io/system-namespace": "true",
 					},
 				},
 			}, v1.CreateOptions{})
 			if err != nil {
-				return obj, condition.Error("NamespaceCreationFailure", fmt.Errorf("failed to create namespace for %v %v: %w", t.GetKind(), nsName, err))
+				return obj, condition.Error("NamespaceCreationFailure", errors.Wrapf(err, "failed to create namespace for %v %v", t.GetKind(), o.GetName()))
 			}
 		}
 
