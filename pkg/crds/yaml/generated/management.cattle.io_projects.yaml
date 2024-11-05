@@ -14,14 +14,7 @@ spec:
     singular: project
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.backingNamespace
-      name: BACKINGNAMESPACE
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: AGE
-      type: date
-    name: v3
+  - name: v3
     schema:
       openAPIV3Schema:
         description: |-
@@ -277,10 +270,6 @@ spec:
           status:
             description: Status is the most recently observed status of the project.
             properties:
-              backingNamespace:
-                description: BackingNamespace is the name of the namespace that contains
-                  resources associated with the project.
-                type: string
               conditions:
                 description: Conditions are a set of indicators about aspects of the
                   project.
@@ -317,4 +306,3 @@ spec:
         type: object
     served: true
     storage: true
-    subresources: {}

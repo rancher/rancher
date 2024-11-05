@@ -84,7 +84,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, orig.Name, l.nsLister, l.nsClient)
+	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	}
 	returnErr = errors.Join(
 		l.deleteSystemProject(obj, ClusterRemoveController),
-		deleteNamespace(ClusterRemoveController, obj.Name, l.nsClient),
+		deleteNamespace(obj, ClusterRemoveController, l.nsClient),
 	)
 	return obj, returnErr
 }
