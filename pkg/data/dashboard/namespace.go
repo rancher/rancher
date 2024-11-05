@@ -37,7 +37,7 @@ func addCattleGlobalNamespaces(ctx context.Context, k8s kubernetes.Interface) er
 	if err != nil {
 		return err
 	}
-	if features.UIExtension.Enabled() {
+	if features.MCM.Enabled() && features.UIExtension.Enabled() {
 		_, err = k8s.CoreV1().Namespaces().Get(ctx, namespace.UIPluginNamespace, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			_, err = k8s.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
