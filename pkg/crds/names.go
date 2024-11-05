@@ -117,7 +117,7 @@ func ClusterAuthCRDs() []string {
 	}
 }
 
-// MCMCRDs returns a list of CRD names needed for Multi CLuster Management.
+// MCMCRDs returns a list of CRD names needed for Multi Cluster Management.
 func MCMCRDs() []string {
 	return []string{
 		"authconfigs.management.cattle.io",
@@ -125,9 +125,6 @@ func MCMCRDs() []string {
 		"catalogtemplates.management.cattle.io",
 		"catalogtemplateversions.management.cattle.io",
 		"clusters.management.cattle.io",
-		"clusteralerts.management.cattle.io",
-		"clusteralertgroups.management.cattle.io",
-		"clusteralertrules.management.cattle.io",
 		"clustercatalogs.management.cattle.io",
 		"clustermonitorgraphs.management.cattle.io",
 		"clusterregistrationtokens.management.cattle.io",
@@ -154,9 +151,6 @@ func MCMCRDs() []string {
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
 		"preferences.management.cattle.io",
 		"projects.management.cattle.io",
-		"projectalerts.management.cattle.io",
-		"projectalertgroups.management.cattle.io",
-		"projectalertrules.management.cattle.io",
 		"projectcatalogs.management.cattle.io",
 		"projectmonitorgraphs.management.cattle.io",
 		"projectnetworkpolicys.management.cattle.io",
@@ -201,9 +195,6 @@ var MigratedResources = map[string]bool{
 	"catalogtemplateversions.management.cattle.io":                    false,
 	"certificates.project.cattle.io":                                  false,
 	"cloudcredentials.management.cattle.io":                           false,
-	"clusteralertgroups.management.cattle.io":                         false,
-	"clusteralertrules.management.cattle.io":                          false,
-	"clusteralerts.management.cattle.io":                              false,
 	"clusterauthtokens.cluster.cattle.io":                             false,
 	"clusterclasses.cluster.x-k8s.io":                                 false,
 	"clusterloggings.management.cattle.io":                            false,
@@ -257,9 +248,6 @@ var MigratedResources = map[string]bool{
 	"podsecurityadmissionconfigurationtemplates.management.cattle.io": false,
 	"preferences.management.cattle.io":                                false,
 	"principals.management.cattle.io":                                 false,
-	"projectalertgroups.management.cattle.io":                         false,
-	"projectalertrules.management.cattle.io":                          false,
-	"projectalerts.management.cattle.io":                              false,
 	"projectloggings.management.cattle.io":                            false,
 	"projectmonitorgraphs.management.cattle.io":                       false,
 	"projectnetworkpolicies.management.cattle.io":                     false,
