@@ -296,10 +296,7 @@ func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 
 }
 
-func logKeyFromObject(obj interface {
-	GetName() string
-	GetNamespace() string
-}) string {
+func logKeyFromObject(obj metav1.Object) string {
 	return fmt.Sprintf("[%s:%s]", obj.GetNamespace(), obj.GetName())
 }
 
