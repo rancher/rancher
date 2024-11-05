@@ -19,7 +19,12 @@ env:
   REPO: ${{ github.repository_owner }}
 jobs:
   test:
-    runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
+    runs-on:
+      - runs-on
+      - spot=capacity-optimized
+      - runner=32cpu-linux-x64
+      - family=c7i-flex+c7i+c7a
+      - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
       K3D_VERSION: v5.7.1

@@ -26,8 +26,13 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
-    name: Provisioning tests 
-    runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
+    name: Provisioning tests
+    runs-on:
+      - runs-on
+      - spot=capacity-optimized
+      - runner=32cpu-linux-x64
+      - family=c7i-flex+c7i+c7a
+      - run-id=${{ github.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
