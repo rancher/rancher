@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -ex
+
 cd "$(dirname "$0")/.." || return
 
 source scripts/artifacts-list.sh
@@ -7,8 +9,6 @@ source scripts/artifacts-list.sh
 if (( ${#ARTIFACTS[@]} == 0 ));then
   >&2 echo "missing ARTIFACTS env var"
   exit 1
-else
-  echo "${ARTIFACTS[*]}"
 fi
 
 if [[ -z "${ARTIFACTS_BASE_DIR}" ]]; then
