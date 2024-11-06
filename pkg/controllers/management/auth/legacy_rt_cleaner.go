@@ -2,8 +2,8 @@ package auth
 
 import (
 	"github.com/rancher/rancher/pkg/api/norman/store/roletemplate"
+	wv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -21,7 +21,7 @@ func newLegacyRTCleaner(mgmt *config.ManagementContext) *rtCleaner {
 }
 
 // sync cleans up all roleTemplates to drop cluster-scoped lifecycle handler finalizers
-func (p *rtCleaner) sync(key string, obj *normanv3.RoleTemplate) (runtime.Object, error) {
+func (p *rtCleaner) sync(key string, obj *wv3.RoleTemplate) (runtime.Object, error) {
 	if key == "" || obj == nil {
 		return nil, nil
 	}
@@ -34,7 +34,7 @@ func (p *rtCleaner) sync(key string, obj *normanv3.RoleTemplate) (runtime.Object
 }
 
 // rtCleanUp returns a clean RoleTemplate based on filters specified within the function
-func rtCleanUp(obj *normanv3.RoleTemplate) *normanv3.RoleTemplate {
+func rtCleanUp(obj *wv3.RoleTemplate) *wv3.RoleTemplate {
 	obj.SetFinalizers(cleanFinalizers(obj.GetFinalizers(), "clusterscoped.controller.cattle.io/cluster-roletemplate-sync_"))
 	cleanAnnotations := cleanAnnotations(obj.GetAnnotations(), "lifecycle.cattle.io/create.cluster-roletemplate-sync_")
 
