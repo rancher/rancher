@@ -101,7 +101,7 @@ def test_wl_cronjob():
                                             "successfulJobsHistoryLimit": 10})
     validate_workload(p_client, workload, "cronJob", ns.name)
 
-#Converted to go test in TestWorkloadUpgrade
+#Converted to go test in TestDeploymentUpgrade
 def test_wl_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -166,7 +166,7 @@ def test_wl_upgrade():
     validate_workload(p_client, workload, "deployment", ns.name, 2)
     validate_workload_image(p_client, workload, TEST_IMAGE_OS_BASE, ns)
 
-#Converted to go test in TestWorkloadPodScaleUp
+#Converted to go test in TestDeploymentPodScaleUp
 def test_wl_pod_scale_up():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -195,7 +195,7 @@ def test_wl_pod_scale_up():
     validate_workload(p_client, workload, "deployment", ns.name, 3)
     validate_pods_are_running_by_id(allpods, workload, ns.name)
 
-#Converted to go test in TestWorkloadPodScaleDown
+#Converted to go test in TestDeploymentPodScaleDown
 def test_wl_pod_scale_down():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -226,7 +226,7 @@ def test_wl_pod_scale_down():
     validate_workload(p_client, workload, "deployment", ns.name)
     validate_pods_are_running_by_id(allpods, workload, ns.name)
 
-#Converted to go test in TestWorkloadPauseOrchestration
+#Converted to go test in TestDeploymentPauseOrchestration
 def test_wl_pause_orchestration():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -362,7 +362,7 @@ def test_wl_with_lb():
     workload = wait_for_wl_to_active(p_client, workload)
     validate_lb(p_client, workload, source_port)
 
-
+#Converted to go test in TestClusterIPScaleAndUpgrade
 def test_wl_with_clusterIp_scale_and_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
@@ -416,7 +416,7 @@ def test_wl_with_clusterIp_scale_and_upgrade():
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
 
-
+#Converted to go test in TestNodePortScaleAndUpgrade
 @skip_host_node_port
 def test_wl_with_nodePort_scale_and_upgrade():
     p_client = namespace["p_client"]
@@ -460,7 +460,7 @@ def test_wl_with_nodePort_scale_and_upgrade():
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
-
+#Converted to go test in TestHostPortScaleAndUpgrade
 # Windows could not support host port for now.
 @skip_test_windows_os
 @skip_host_node_port
@@ -511,7 +511,7 @@ def test_wl_with_hostPort_scale_and_upgrade():
     wait_for_pods_in_workload(p_client, workload, 1)
     validate_hostPort(p_client, workload, source_port, namespace["cluster"])
 
-
+#Converted to go test in TestLoadBalanceScaleAndUpgrade
 @if_check_lb
 def test_wl_with_lb_scale_and_upgrade():
     p_client = namespace["p_client"]
