@@ -40,7 +40,6 @@ type AirGapRKE2CustomClusterTestSuite struct {
 	session        *session.Session
 	corralPackage  *corral.Packages
 	clustersConfig *provisioninginput.Config
-	registryFQDN   string
 	fleetGitRepo   *v1alpha1.GitRepo
 }
 
@@ -92,15 +91,9 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 	privateKey := corralConfig.CorralConfigVars[corralPrivateKey]
 	privateKey = strings.Replace(privateKey, "\\n", "\n", -1)
 	privateKey = strings.Replace(privateKey, "\"", "", -1)
-	privateKey = fmt.Sprintf("%s", privateKey)
 
 	err = corral.UpdateCorralConfig(corralBastionIP, bastionIP)
 	require.NoError(a.T(), err)
-
-	registrySetting, err := client.Management.Setting.ByID(systemRegistry)
-	require.NoError(a.T(), err)
-
-	a.registryFQDN = registrySetting.Value
 
 	internalIP, err := setupAirgapFleetResources(bastionUser, bastionIP, privateKey)
 	require.NoError(a.T(), err, "failed to setup local git repo on bastion")
@@ -138,9 +131,6 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 		},
 	}
 
-	a.client, err = a.client.ReLogin()
-	require.NoError(a.T(), err)
-
 	if a.clustersConfig.RKE2KubernetesVersions == nil {
 		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(a.client)
 		require.NoError(a.T(), err)
@@ -156,54 +146,45 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 func (a *AirGapRKE2CustomClusterTestSuite) TestCustomClusterWithGitRepo() {
 	fleetVersion, err := fleet.GetDeploymentVersion(a.client, fleet.FleetControllerName, fleet.LocalName)
 	require.NoError(a.T(), err)
+
 	singleNodeRoles := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
-	tests := []struct {
-		name        string
-		client      *rancher.Client
-		machinePool []provisioninginput.MachinePools
-	}{
-		{fleet.FleetName + " " + fleetVersion + "-" + permutations.RKE2AirgapCluster, a.standardClient, singleNodeRoles},
-	}
-	for _, tt := range tests {
+	testSession := session.NewSession()
+	defer testSession.Cleanup()
 
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
+	adminClient, err := a.client.WithSession(testSession)
+	require.NoError(a.T(), err)
 
-		adminClient, err := a.client.WithSession(testSession)
+	provisioningConfig := *a.clustersConfig
+
+	provisioningConfig.Hardened = true
+	provisioningConfig.MachinePools = singleNodeRoles
+
+	a.Run(fleet.FleetName+" "+fleetVersion+"-"+permutations.RKE2AirgapCluster, func() {
+
+		logrus.Info("Deploying airgap fleet gitRepo")
+		gitRepoObject, err := extensionsfleet.CreateFleetGitRepo(adminClient, a.fleetGitRepo)
 		require.NoError(a.T(), err)
 
-		provisioningConfig := *a.clustersConfig
+		logrus.Info("Deploying Custom Airgap Cluster")
+		testClusterConfig := clusters.ConvertConfigToClusterConfig(&provisioningConfig)
 
-		provisioningConfig.Hardened = true
-		provisioningConfig.MachinePools = tt.machinePool
+		testClusterConfig.KubernetesVersion = a.clustersConfig.RKE2KubernetesVersions[0]
+		testClusterConfig.CNI = a.clustersConfig.CNIs[0]
 
-		a.Run(tt.name, func() {
+		clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(a.standardClient, testClusterConfig, a.corralPackage)
+		reports.TimeoutClusterReport(clusterObject, err)
+		require.NoError(a.T(), err)
 
-			logrus.Info("Deploying airgap fleet gitRepo")
-			gitRepoObject, err := extensionsfleet.CreateFleetGitRepo(adminClient, a.fleetGitRepo)
-			require.NoError(a.T(), err)
+		provisioning.VerifyCluster(a.T(), a.standardClient, testClusterConfig, clusterObject)
 
-			logrus.Info("Deploying Custom Airgap Cluster")
-			testClusterConfig := clusters.ConvertConfigToClusterConfig(&provisioningConfig)
+		status := &apisV1.ClusterStatus{}
+		err = steveV1.ConvertToK8sType(clusterObject.Status, status)
+		require.NoError(a.T(), err)
 
-			testClusterConfig.KubernetesVersion = a.clustersConfig.RKE2KubernetesVersions[0]
-			testClusterConfig.CNI = a.clustersConfig.CNIs[0]
-
-			clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(tt.client, testClusterConfig, a.corralPackage)
-			reports.TimeoutClusterReport(clusterObject, err)
-			require.NoError(a.T(), err)
-
-			provisioning.VerifyCluster(a.T(), tt.client, testClusterConfig, clusterObject)
-
-			status := &apisV1.ClusterStatus{}
-			err = steveV1.ConvertToK8sType(clusterObject.Status, status)
-			require.NoError(a.T(), err)
-
-			err = fleet.VerifyGitRepo(adminClient, gitRepoObject.ID, status.ClusterName, clusterObject.ID)
-			require.NoError(a.T(), err)
-		})
-	}
+		err = fleet.VerifyGitRepo(adminClient, gitRepoObject.ID, status.ClusterName, clusterObject.ID)
+		require.NoError(a.T(), err)
+	})
 
 }
 
