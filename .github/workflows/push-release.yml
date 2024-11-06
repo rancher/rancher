@@ -673,7 +673,7 @@ jobs:
       - name: Generate sha256sum file
         shell: bash
         env:
-          CHECKSUM_FILE: "images-digests-sha256sum.txt"
+          CHECKSUM_FILE: ${{ env.CHECKSUM_FILE }}
           ARTIFACTS_BASE_DIR: ${{ runner.temp }}
           ARTIFACTS_TYPE: "digests"
         run: scripts/artifacts-hashes.sh
