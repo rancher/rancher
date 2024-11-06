@@ -587,6 +587,8 @@ jobs:
           private-key: ${{ env.PRIVATE_KEY }}
       - name: Generate sha256sum
         shell: bash
+        env:
+          ARTIFACTS_TYPE: "components"
         run: scripts/artifacts-hashes
       - name: Add release notes
         env:
@@ -670,7 +672,11 @@ jobs:
           cp "${{ env.WINDOWS_2019_FILE }}" "${{ env.WINDOWS_2022_FILE }}"
       - name: Generate sha256sum file
         shell: bash
-        run:  scripts/generate-images-digests-sha256sum.txt
+        env:
+          CHECKSUM_FILE: "images-digests-sha256sum.txt"
+          ARTIFACTS_BASE_DIR: ${{ runner.temp }}
+          ARTIFACTS_TYPE: "digests"
+        run: scripts/artifacts-hashes.sh
       - name: Read App Secrets
         uses: rancher-eio/read-vault-secrets@main
         with:
