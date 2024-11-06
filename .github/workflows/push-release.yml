@@ -657,7 +657,7 @@ jobs:
           echo "LINUX_ARM64_FILE=${{ runner.temp }}/rancher-images-digests-linux-arm64.txt" >> $GITHUB_ENV
           echo "WINDOWS_2019_FILE=${{ runner.temp }}/rancher-images-digests-windows-ltsc2019.txt" >> $GITHUB_ENV
           echo "WINDOWS_2022_FILE=${{ runner.temp }}/rancher-images-digests-windows-ltsc2022.txt" >> $GITHUB_ENV
-          echo "CHECKSUM_FILE=${{ runner.temp }}/images-digests-sha256sum.txt" >> $GITHUB_ENV
+          echo "CHECKSUM_FILE=images-digests-sha256sum.txt" >> $GITHUB_ENV
       - name: Generate linux docker digests
         shell: bash
         run: |
@@ -697,4 +697,4 @@ jobs:
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.LINUX_ARM64_FILE }} --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.WINDOWS_2019_FILE }} --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.WINDOWS_2022_FILE }} --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.CHECKSUM_FILE }} --clobber
+          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ runner.temp }}/${{ env.CHECKSUM_FILE }} --clobber
