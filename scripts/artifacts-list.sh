@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# this list doesn't include sha256sum.txt and the rancher-images-digests-*.txt files
 export ARTIFACTS=(
   "rancher-components.txt"
   "rancher-data.json"

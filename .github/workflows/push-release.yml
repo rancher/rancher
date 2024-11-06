@@ -542,7 +542,7 @@ jobs:
       id-token: write
     env:
       REGISTRY: ""
-      CHECKSUM_FILE: "dist/sha256sum.txt"
+      CHECKSUM_FILE: "sha256sum.txt"
       ARTIFACTS_BASE_DIR: "bin"
     steps:
       - name: Checkout code
@@ -571,12 +571,8 @@ jobs:
       - name: Create components and images files
         shell: bash
         run: ./scripts/create-components-images-files.sh
-      - name: Move files
-        run: |
-          set -ex
-          rm -rf dist || true
-          mkdir -p dist
-          mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
+      - name: Move rke-k8s version file
+        run: mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
       - name: Read App Secrets
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -614,12 +610,16 @@ jobs:
 
           source scripts/artifacts-list.sh
 
+          if (( ${#ARTIFACTS[@]} == 0 ));then
+            >&2 echo "missing ARTIFACTS env var"
+            exit 1
+          fi
           for artifact in "${ARTIFACTS[@]}"; do
             aws s3 cp "$ARTIFACTS_BASE_DIR/$artifact" s3://prime-artifacts/rancher/${{ env.TAG }}
             gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$artifact" --clobber
           done
 
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$CHECKSUM_FILE" --clobber
+          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
   docker-image-digests:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s

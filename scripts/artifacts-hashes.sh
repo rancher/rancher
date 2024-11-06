@@ -21,5 +21,5 @@ CHECKSUM_FILE=${CHECKSUM_FILE:-"dist/sha256sum.txt"}
 for artifact in "${ARTIFACTS[@]}"; do
   sum_file=$(sha256sum "$ARTIFACTS_BASE_DIR/$artifact")
   sum=$(echo "$sum_file" | awk '{print $1}')
-  echo "$sum $artifact" >> "$CHECKSUM_FILE"
+  echo "$sum $artifact" >> "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE"
 done
