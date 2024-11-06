@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 
-cd $(dirname $0)/..
+cd "$(dirname "$0")/.." || return
 
-# either use the first arg or bin
-dist_folder=${1:-"./dist"}
+source scripts/artifacts-list.sh
 
-for filename in "$dist_folder"/*; do
-  sum_file=$(sha256sum "$filename")
+if (( ${#ARTIFACTS[@]} == 0 ));then
+  >&2 echo "missing ARTIFACTS env var"
+  exit 1
+else
+  echo "${ARTIFACTS[*]}"
+fi
+
+if [[ -z "${ARTIFACTS_BASE_DIR}" ]]; then
+  >&2 echo "missing ARTIFACTS_BASE_DIR env var"
+  exit 1
+fi
+
+CHECKSUM_FILE=${CHECKSUM_FILE:-"dist/sha256sum.txt"}
+
+for artifact in "${ARTIFACTS[@]}"; do
+  sum_file=$(sha256sum "$ARTIFACTS_BASE_DIR/$artifact")
   sum=$(echo "$sum_file" | awk '{print $1}')
-  file_path=$(echo "$sum_file" | awk '{print $2}')
-  file=${file_path#"$dist_folder/"}
-  echo "$sum $file" >> "./$dist_folder/sha256sum.txt"
+  echo "$sum $artifact" >> "$CHECKSUM_FILE"
 done
