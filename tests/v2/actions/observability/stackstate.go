@@ -14,10 +14,16 @@ import (
 )
 
 const (
+	// Public Constants
 	StackstateName         = "stackstate"
 	ObservabilitySteveType = "configurations.observability.rancher.io"
 	CrdGroup               = "observability.rancher.io"
 	ApiExtenisonsCRD       = "apiextensions.k8s.io.customresourcedefinition"
+
+	// Private Constants
+	localURL      = "local://"
+	inactiveState = "inactive"
+	activeState   = "active"
 )
 
 // NewStackstateCRDConfiguration is a constructor that takes in the configuration and creates an unstructured type to install the CRD
@@ -46,8 +52,8 @@ func WhitelistStackstateDomains(client *rancher.Client, whitelistDomains []strin
 		Name:             StackstateName,
 		Active:           false,
 		WhitelistDomains: whitelistDomains,
-		URL:              "local://",
-		State:            "inactive",
+		URL:              localURL,
+		State:            inactiveState,
 	}
 
 	stackstateNodeDriver, err := client.Management.NodeDriver.Create(nodedriver)
@@ -61,7 +67,7 @@ func WhitelistStackstateDomains(client *rancher.Client, whitelistDomains []strin
 			return false, err
 		}
 
-		if resp.State == "inactive" {
+		if resp.State == inactiveState {
 			return true, nil
 		}
 		return false, nil
@@ -140,7 +146,7 @@ func InstallStackstateCRD(client *rancher.Client) error {
 			return false, err
 		}
 
-		if resp.ObjectMeta.State.Name == "active" {
+		if resp.ObjectMeta.State.Name == activeState {
 			return true, nil
 		}
 		return false, nil

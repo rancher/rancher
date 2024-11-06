@@ -31,13 +31,10 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var (
-	uiExtensionsRepo = "https://github.com/rancher/ui-plugin-charts"
-	uiGitBranch      = "main"
-	rancherUIPlugins = "rancher-ui-plugins"
-)
-
 const (
+	uiExtensionsRepo        = "https://github.com/rancher/ui-plugin-charts"
+	uiGitBranch             = "main"
+	rancherUIPlugins        = "rancher-ui-plugins"
 	project                 = "management.cattle.io.project"
 	rancherPartnerCharts    = "rancher-partner-charts"
 	systemProject           = "System"
@@ -74,7 +71,6 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	require.NoError(rb.T(), err)
 	rb.cluster, err = rb.client.Management.Cluster.ByID(cluster.ID)
 	require.NoError(rb.T(), err)
-
 
 	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
 	projectTemplate.Name = charts.StackstateNamespace

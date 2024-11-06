@@ -26,5 +26,5 @@ stackstateConfigs:
   url: "stackstate_ui_server_address"
   serviceToken: "stackstate_user_service_token"
   clusterApiKey: "stackstate_cluster_apikey"
-  StackstateUpgradeVersion: "Stackstate_agent_version" #optional
+  upgradeVersion: "Stackstate_agent_version" #optional
 ```

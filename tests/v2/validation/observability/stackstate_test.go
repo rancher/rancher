@@ -77,7 +77,10 @@ func (ss *StackStateTestSuite) SetupSuite() {
 	require.NoError(ss.T(), err)
 	ss.projectID = project.ID
 
-	_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
+	ssNamespaceExists, err := namespaces.GetNamespaceByName(client, cluster.ID, charts.StackstateNamespace)
+	if ssNamespaceExists == nil && k8sErrors.IsNotFound(err) {
+		_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
+	}
 	require.NoError(ss.T(), err)
 
 	_, err = ss.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
@@ -286,7 +289,7 @@ func (ss *StackStateTestSuite) TestDynamicUpgradeStackstateAgentChart() {
 	client, err := ss.client.WithSession(subSession)
 	require.NoError(ss.T(), err)
 
-	versionToUpgrade := ss.stackstateConfigs.StackstateUpgradeVersion
+	versionToUpgrade := ss.stackstateConfigs.UpgradeVersion
 	if versionToUpgrade == "" {
 		ss.T().Skip("Skipping the test as no user version provided")
 	}
@@ -299,7 +302,7 @@ func (ss *StackStateTestSuite) TestDynamicUpgradeStackstateAgentChart() {
 		ss.T().Skip("Skipping the test, as stackstate agent chart is already installed with the provided version or stackstate agent is not installed.")
 	}
 
-	ss.stackstateAgentInstallOptions.Version = ss.stackstateConfigs.StackstateUpgradeVersion
+	ss.stackstateAgentInstallOptions.Version = ss.stackstateConfigs.UpgradeVersion
 	require.NoError(ss.T(), err)
 
 	ss.T().Log("Upgrading stackstate agent chart to the user provided version")
