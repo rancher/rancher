@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
@@ -33,8 +32,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -75,11 +72,6 @@ var (
 	}
 )
 
-const (
-	// The finalizer is added by Wrangler to deployments, please check the `systemcharts` package for more details
-	legacyK3sBasedUpgraderDeprecationFinalizer = "wrangler.cattle.io/legacy-k3sBasedUpgrader-deprecation"
-)
-
 type getNSFunc func(*kubernetes.Clientset) ([]string, error)
 
 func Cluster() error {
@@ -113,19 +105,6 @@ func Cluster() error {
 	}
 
 	var errors []error
-
-	// First, scale the cattle-cluster-agent down to 0 to stop it from running controllers,
-	// particularly the `systemcharts` handler that adds finalizers to deployments
-	if err := scaleDownClusterAgent(client); err != nil {
-		errors = append(errors, err)
-	}
-
-	// Deployments should be cleaned up before removing namespaces, specifically by removing the finalizer.
-	deploymentErr := cleanupDeployments(client)
-	if len(deploymentErr) > 0 {
-		errors = append(errors, deploymentErr...)
-	}
-
 	var toRemove = make([]string, len(nsToRemove))
 	copy(toRemove, nsToRemove)
 
@@ -291,117 +270,6 @@ func cleanupNamespaces(client *kubernetes.Clientset) []error {
 
 	return errs
 
-}
-
-// scaleDownClusterAgent ensures to scale down the cattle-cluster-agent deployment to zero
-func scaleDownClusterAgent(client *kubernetes.Clientset) error {
-	logrus.Info("Attempting to scale down the cattle-cluster-agent deployment")
-	err := tryUpdate(func() error {
-		agent, err := client.AppsV1().Deployments(namespace.System).Get(context.TODO(), "cattle-cluster-agent", metav1.GetOptions{})
-		if err != nil {
-			if apierror.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-
-		var updated bool
-		if agent.Spec.Replicas != nil && *agent.Spec.Replicas != 0 {
-			var zero int32 = 0
-			agent.Spec.Replicas = &zero
-			updated = true
-		}
-		// for the usage of the annotation, please check the package `scaleavailable`
-		val := agent.Annotations[scaleavailable.AvailableAnnotation]
-		if val != "invalid" {
-			agent.Annotations[scaleavailable.AvailableAnnotation] = "invalid"
-			updated = true
-		}
-
-		if updated {
-			logrus.Info("Scaling down cattle-cluster-agent")
-			if !dryRun {
-				_, err = client.AppsV1().Deployments(namespace.System).Update(context.TODO(), agent, metav1.UpdateOptions{})
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	logrus.Info("Waiting for cattle-cluster-agent's pods to be removed")
-	var backoff = wait.Backoff{
-		Duration: 1 * time.Second,
-		Factor:   1.5,
-		Jitter:   0,
-		Steps:    5,
-	}
-	return wait.ExponentialBackoff(backoff, func() (bool, error) {
-		set := labels.Set(map[string]string{"app": "cattle-cluster-agent"})
-		podList, err := client.CoreV1().Pods(namespace.System).List(context.TODO(), metav1.ListOptions{LabelSelector: set.String()})
-		if err != nil {
-			if apierror.IsNotFound(err) {
-				return true, nil
-			}
-			return false, err
-		}
-		if podList != nil && len(podList.Items) > 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-}
-
-func cleanupDeployments(client *kubernetes.Clientset) []error {
-	logrus.Info("Starting cleanup of deployments")
-	deployments, err := client.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return []error{err}
-	}
-	var errs []error
-	for _, item := range deployments.Items {
-		err = tryUpdate(func() error {
-			deployment, err := client.AppsV1().Deployments(item.Namespace).Get(context.TODO(), item.Name, metav1.GetOptions{})
-			if err != nil {
-				if apierror.IsNotFound(err) {
-					return nil
-				}
-				return err
-			}
-			var updated bool
-			// Cleanup finalizers
-			if len(deployment.Finalizers) > 0 {
-				var finalizers []string
-				for _, finalizer := range deployment.Finalizers {
-					if finalizer != legacyK3sBasedUpgraderDeprecationFinalizer {
-						finalizers = append(finalizers, finalizer)
-					}
-				}
-				if len(deployment.Finalizers) != len(finalizers) {
-					updated = true
-					deployment.Finalizers = finalizers
-				}
-			}
-			if updated {
-				logrus.Infof("Updating deployment: %s", deployment.Name)
-				if !dryRun {
-					_, err = client.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
-					if err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errs
 }
 
 func cleanupClusterRoleBindings(client *kubernetes.Clientset) []error {

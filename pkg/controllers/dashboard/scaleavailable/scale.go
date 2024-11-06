@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	AvailableAnnotation = "management.cattle.io/scale-available"
+	availableAnnotation = "management.cattle.io/scale-available"
 )
 
 type handler struct {
@@ -30,14 +30,14 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 	}
 	deploymentCache := wrangler.Apps.Deployment().Cache()
 	wrangler.Apps.Deployment().OnChange(ctx, "scale-available", h.OnChange)
-	deploymentCache.AddIndexer(AvailableAnnotation, func(obj *appsv1.Deployment) ([]string, error) {
-		if val := obj.Annotations[AvailableAnnotation]; val != "" {
-			return []string{AvailableAnnotation}, nil
+	deploymentCache.AddIndexer(availableAnnotation, func(obj *appsv1.Deployment) ([]string, error) {
+		if val := obj.Annotations[availableAnnotation]; val != "" {
+			return []string{availableAnnotation}, nil
 		}
 		return nil, nil
 	})
 	relatedresource.Watch(ctx, "scale-available-trigger", func(namespace, name string, obj runtime.Object) (result []relatedresource.Key, _ error) {
-		deps, err := deploymentCache.GetByIndex(AvailableAnnotation, AvailableAnnotation)
+		deps, err := deploymentCache.GetByIndex(availableAnnotation, availableAnnotation)
 		if err != nil {
 			return nil, err
 		}
@@ -55,7 +55,7 @@ func (h *handler) OnChange(key string, deployment *appsv1.Deployment) (*appsv1.D
 	if deployment == nil {
 		return nil, nil
 	}
-	numStr := deployment.Annotations[AvailableAnnotation]
+	numStr := deployment.Annotations[availableAnnotation]
 	if numStr == "" {
 		return deployment, nil
 	}
