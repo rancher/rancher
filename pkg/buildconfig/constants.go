@@ -7,5 +7,5 @@ const (
 	DefaultShellVersion     = "rancher/shell:v0.3.0-rc.2"
 	FleetVersion            = "105.0.0+up0.11.0-rc.2"
 	ProvisioningCAPIVersion = "105.0.0+up0.4.0"
-	WebhookVersion          = "105.0.0+up0.6.1-rc.9"
+	WebhookVersion          = "105.0.0+up0.6.1-rc.12"
 )
