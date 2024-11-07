@@ -663,7 +663,7 @@ jobs:
         shell: bash
         run: |
           export LINUX_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-images.txt
-          release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "$${LINUX_IMAGES_URL}" --output-file "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE"
+          release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${LINUX_IMAGES_URL}" --output-file "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE"
           cp "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE" "$ARTIFACTS_BASE_DIR/$LINUX_ARM64_FILE"
       - name: Generate windows docker digests
         shell: bash
