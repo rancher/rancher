@@ -32,3 +32,6 @@ Examples:
 - test_deployment_update_2()
 - test_deployment_with_secret_create()
 - test_deployment_with_secret_update()
+- test_monitoring_enable()
+- test_monitoring_update()
+- test_notifier_create()

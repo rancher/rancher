@@ -41,6 +41,8 @@ var clusterManagementPlaneResources = map[string]string{
 	"clusterscans":                "management.cattle.io",
 	"catalogtemplates":            "management.cattle.io",
 	"catalogtemplateversions":     "management.cattle.io",
+	"clusteralertrules":           "management.cattle.io",
+	"clusteralertgroups":          "management.cattle.io",
 	"clustercatalogs":             "management.cattle.io",
 	"clusterloggings":             "management.cattle.io",
 	"clustermonitorgraphs":        "management.cattle.io",
@@ -49,6 +51,7 @@ var clusterManagementPlaneResources = map[string]string{
 	"etcdbackups":                 "management.cattle.io",
 	"nodes":                       "management.cattle.io",
 	"nodepools":                   "management.cattle.io",
+	"notifiers":                   "management.cattle.io",
 	"projects":                    "management.cattle.io",
 	"etcdsnapshots":               "rke.cattle.io",
 }
