@@ -617,7 +617,7 @@ jobs:
             exit 1
           fi
           for artifact in "${ARTIFACTS[@]}"; do
-            aws s3 cp "$ARTIFACTS_BASE_DIR/$artifact" s3://prime-artifacts/rancher/${{ env.TAG }}
+            aws s3 cp "$ARTIFACTS_BASE_DIR/$artifact" "s3://prime-artifacts/rancher/${{ env.TAG }}/$artifact"
             gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$artifact" --clobber
           done
 
