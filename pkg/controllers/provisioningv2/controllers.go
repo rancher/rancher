@@ -2,9 +2,11 @@ package provisioningv2
 
 import (
 	"context"
+
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetcluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetworkspace"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/harvestercleanup"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/machineconfigcleanup"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/managedchart"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/provisioningcluster"
@@ -28,5 +30,9 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		managedchart.Register(ctx, clients)
 		fleetcluster.Register(ctx, clients)
 		fleetworkspace.Register(ctx, clients)
+	}
+
+	if features.Harvester.Enabled() {
+		harvestercleanup.Register(ctx, clients)
 	}
 }
