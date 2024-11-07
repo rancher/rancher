@@ -542,6 +542,8 @@ jobs:
       id-token: write
     env:
       REGISTRY: ""
+      CHECKSUM_FILE: "sha256sum.txt"
+      ARTIFACTS_BASE_DIR: "bin"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -569,10 +571,8 @@ jobs:
       - name: Create components and images files
         shell: bash
         run: ./scripts/create-components-images-files.sh
-      - name: Move files
-        run: |
-          rm -rf dist && mkdir dist
-          mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
+      - name: Move rke-k8s version file
+        run: mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
       - name: Read App Secrets
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -585,43 +585,43 @@ jobs:
         with:
           app-id: ${{ env.APP_ID }}
           private-key: ${{ env.PRIVATE_KEY }}
-      - name: Generate sha256sum file and upload artifacts
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Generate sha256sum
         shell: bash
-        run: |
-          set -ex
-
-          artifacts=(
-            "rancher-components.txt"
-            "rancher-data.json"
-            "rancher-images-origins.txt"
-            "rancher-images-sources.txt"
-            "rancher-images.txt"
-            "rancher-load-images.ps1"
-            "rancher-load-images.sh"
-            "rancher-mirror-to-rancher-org.ps1"
-            "rancher-mirror-to-rancher-org.sh"
-            "rancher-rke-k8s-versions.txt"
-            "rancher-save-images.ps1"
-            "rancher-save-images.sh"
-            "rancher-windows-images-sources.txt"
-            "rancher-windows-images.txt"
-          )
-
-          for artifact in "${artifacts[@]}"; do
-            mv "./bin/$artifact" "./dist/$artifact"
-          done
-
-          ./scripts/artifacts-hashes.sh ./dist
-
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
+        env:
+          ARTIFACTS_TYPE: "components"
+        run: scripts/artifacts-hashes
       - name: Add release notes
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          NOTES=$(cat ./dist/rancher-components.txt)
+          NOTES=$(cat bin/rancher-components.txt)
           gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
+      - name: Upload artifacts to bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -ex
+
+          source scripts/artifacts-list.sh
+
+          if (( ${#ARTIFACTS[@]} == 0 ));then
+            >&2 echo "missing ARTIFACTS env var"
+            exit 1
+          fi
+          for artifact in "${ARTIFACTS[@]}"; do
+            aws s3 cp "$ARTIFACTS_BASE_DIR/$artifact" s3://prime-artifacts/rancher/${{ env.TAG }}
+            gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$artifact" --clobber
+          done
+
+          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
   docker-image-digests:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
@@ -657,6 +657,7 @@ jobs:
           echo "LINUX_ARM64_FILE=${{ runner.temp }}/rancher-images-digests-linux-arm64.txt" >> $GITHUB_ENV
           echo "WINDOWS_2019_FILE=${{ runner.temp }}/rancher-images-digests-windows-ltsc2019.txt" >> $GITHUB_ENV
           echo "WINDOWS_2022_FILE=${{ runner.temp }}/rancher-images-digests-windows-ltsc2022.txt" >> $GITHUB_ENV
+          echo "CHECKSUM_FILE=images-digests-sha256sum.txt" >> $GITHUB_ENV
       - name: Generate linux docker digests
         shell: bash
         run: |
@@ -669,6 +670,13 @@ jobs:
           export WINDOWS_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-windows-images.txt
           release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${WINDOWS_IMAGES_URL}" --output-file "${{ env.WINDOWS_2019_FILE }}"
           cp "${{ env.WINDOWS_2019_FILE }}" "${{ env.WINDOWS_2022_FILE }}"
+      - name: Generate sha256sum file
+        shell: bash
+        env:
+          CHECKSUM_FILE: ${{ env.CHECKSUM_FILE }}
+          ARTIFACTS_BASE_DIR: ${{ runner.temp }}
+          ARTIFACTS_TYPE: "digests"
+        run: scripts/artifacts-hashes.sh
       - name: Read App Secrets
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -689,3 +697,4 @@ jobs:
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.LINUX_ARM64_FILE }} --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.WINDOWS_2019_FILE }} --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.WINDOWS_2022_FILE }} --clobber
+          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ runner.temp }}/${{ env.CHECKSUM_FILE }} --clobber
