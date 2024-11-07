@@ -8,12 +8,12 @@ import (
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -23,24 +23,24 @@ import (
 )
 
 type userLifecycle struct {
-	prtb            wranglerv3.ProjectRoleTemplateBindingController
-	crtb            wranglerv3.ClusterRoleTemplateBindingController
+	prtb            v3.ProjectRoleTemplateBindingInterface
+	crtb            v3.ClusterRoleTemplateBindingInterface
 	grb             wranglerv3.GlobalRoleBindingController
-	users           wranglerv3.UserController
-	tokens          wranglerv3.TokenController
-	namespaces      wcorev1.NamespaceController
-	namespaceLister wcorev1.NamespaceCache
-	secrets         wcorev1.SecretController
-	secretsLister   wcorev1.SecretCache
-	prtbLister      wranglerv3.ProjectRoleTemplateBindingCache
-	crtbLister      wranglerv3.ClusterRoleTemplateBindingCache
-	grbLister       wranglerv3.GlobalRoleBindingCache
+	users           v3.UserInterface
+	tokens          v3.TokenInterface
+	namespaces      v1.NamespaceInterface
+	namespaceLister v1.NamespaceLister
+	secrets         v1.SecretInterface
+	secretsLister   v1.SecretLister
+	prtbLister      v3.ProjectRoleTemplateBindingLister
+	crtbLister      v3.ClusterRoleTemplateBindingLister
+	grbLister       v3.GlobalRoleBindingLister
 	prtbIndexer     cache.Indexer
 	crtbIndexer     cache.Indexer
 	grbIndexer      cache.Indexer
 	tokenIndexer    cache.Indexer
 	userManager     user.Manager
-	clusterLister   wranglerv3.ClusterCache
+	clusterLister   v3.ClusterLister
 	clusterManager  *clustermanager.Manager
 }
 
@@ -54,17 +54,17 @@ const (
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
 	lfc := &userLifecycle{
-		prtb:            management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
-		crtb:            management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		prtb:            management.Management.ProjectRoleTemplateBindings(""),
+		crtb:            management.Management.ClusterRoleTemplateBindings(""),
 		grb:             management.Wrangler.Mgmt.GlobalRoleBinding(),
-		users:           management.Wrangler.Mgmt.User(),
-		tokens:          management.Wrangler.Mgmt.Token(),
-		namespaces:      management.Wrangler.Core.Namespace(),
-		secrets:         management.Wrangler.Core.Secret(),
-		secretsLister:   management.Wrangler.Core.Secret().Cache(),
-		namespaceLister: management.Wrangler.Core.Namespace().Cache(),
+		users:           management.Management.Users(""),
+		tokens:          management.Management.Tokens(""),
+		namespaces:      management.Core.Namespaces(""),
+		secrets:         management.Core.Secrets(""),
+		secretsLister:   management.Core.Secrets("").Controller().Lister(),
+		namespaceLister: management.Core.Namespaces("").Controller().Lister(),
 		userManager:     management.UserManager,
-		clusterLister:   management.Wrangler.Mgmt.Cluster().Cache(),
+		clusterLister:   management.Management.Clusters("").Controller().Lister(),
 		clusterManager:  clusterManager,
 	}
 
@@ -310,8 +310,13 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) error {
 	for _, crtb := range crtbs {
 		var err error
-		logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
-		err = l.crtb.Delete(crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
+		if crtb.Namespace == "" {
+			logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
+			err = l.crtb.Delete(crtb.Name, &metav1.DeleteOptions{})
+		} else {
+			logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
+			err = l.crtb.DeleteNamespaced(crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
+		}
 		if err != nil {
 			return fmt.Errorf("error deleting cluster role: %v", err)
 		}
@@ -323,8 +328,13 @@ func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) er
 func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) error {
 	for _, prtb := range prtbs {
 		var err error
-		logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
-		err = l.prtb.Delete(prtb.Namespace, prtb.Name, &metav1.DeleteOptions{})
+		if prtb.Namespace == "" {
+			logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
+			err = l.prtb.Delete(prtb.Name, &metav1.DeleteOptions{})
+		} else {
+			logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
+			err = l.prtb.DeleteNamespaced(prtb.Namespace, prtb.Name, &metav1.DeleteOptions{})
+		}
 		if err != nil {
 			return fmt.Errorf("error deleting projet role: %v", err)
 		}
@@ -359,7 +369,7 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 	// find the set of clusters associated with a list of tokens
 	set := make(map[string]*v3.Cluster)
 	for _, token := range tokens {
-		cluster, err := l.clusterLister.Get(token.ClusterName)
+		cluster, err := l.clusterLister.Get("", token.ClusterName)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				continue
@@ -385,7 +395,7 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 	for _, token := range tokens {
 		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
-		err := l.tokens.Delete(token.Name, &metav1.DeleteOptions{})
+		err := l.tokens.DeleteNamespaced(token.Namespace, token.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting token: %v", err)
 		}
@@ -395,7 +405,7 @@ func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 }
 
 func (l *userLifecycle) deleteUserNamespace(username string) error {
-	namespace, err := l.namespaceLister.Get(username)
+	namespace, err := l.namespaceLister.Get("", username)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil // nothing to delete
@@ -427,7 +437,7 @@ func (l *userLifecycle) deleteUserSecret(username string) error {
 	}
 
 	logrus.Infof("[%v] Deleting secret backing user %v", userController, username)
-	return l.secrets.Delete("cattle-system", username+"-secret", &metav1.DeleteOptions{})
+	return l.secrets.DeleteNamespaced("cattle-system", username+"-secret", &metav1.DeleteOptions{})
 }
 
 func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) {

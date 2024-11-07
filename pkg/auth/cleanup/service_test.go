@@ -292,6 +292,7 @@ func newMockCleanupService(t *testing.T,
 
 func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.Secret) wcorev1.SecretController {
 	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+
 	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 		if secret.Name == "" {
 			uniqueIdentifier := md5.Sum([]byte(time.Now().String()))

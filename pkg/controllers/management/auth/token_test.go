@@ -9,9 +9,8 @@ import (
 	tokens2 "github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,53 +29,36 @@ func TestSync(t *testing.T) {
 	tokens := make(map[string]*v3.Token)
 	userAttributes := make(map[string]*v3.UserAttribute)
 
-	ctrl := gomock.NewController(t)
-
-	// setup tokens mock instance
-	tokensMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
-	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(token *v3.Token) (*v3.Token, error) {
-			tokens[token.Name] = token.DeepCopy()
-			return token, nil
-		},
-	).AnyTimes()
-	tokensMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(name string, opts metav1.GetOptions) (*v3.Token, error) {
-			token, ok := tokens[name]
-			if ok {
-				return token, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
-	// setup userAttribute mock instance
-	userAttributesMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
-	userAttributesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
-			return userAttribute, nil
-		},
-	)
-
-	// setup userAttributesLister mock instance
-	userAttributesListerMock := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(name string) (*v3.UserAttribute, error) {
-			userAttribute, ok := userAttributes[name]
-			if ok {
-				return userAttribute, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
 	testTokenController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: &fakes.TokenInterfaceMock{
+			UpdateFunc: func(token *v3.Token) (*v3.Token, error) {
+				tokens[token.Name] = token.DeepCopy()
+				return token, nil
+			},
+			GetFunc: func(name string, opts metav1.GetOptions) (*v3.Token, error) {
+				token, ok := tokens[name]
+				if ok {
+					return token, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
+				return userAttribute, nil
+			},
+		},
+		userAttributesLister: &fakes.UserAttributeListerMock{
+			GetFunc: func(namespace string, name string) (*v3.UserAttribute, error) {
+				userAttribute, ok := userAttributes[name]
+				if ok {
+					return userAttribute, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
 	}
-
 	testCases := populateTestCases(tokens, userAttributes)
 	for _, testcase := range testCases {
 		testErr := fmt.Sprintf("test case failed: %s", testcase.description)
@@ -100,53 +82,39 @@ func TestSync(t *testing.T) {
 		if testcase.inputUserAttribute == nil {
 			continue
 		}
-		returnUserAttribute, _ := testTokenController.userAttributesLister.Get(testcase.inputUserAttribute.Name)
+		returnUserAttribute, _ := testTokenController.userAttributesLister.Get("", testcase.inputUserAttribute.Name)
 		assert.Equalf(t, testcase.expectedOutputUserAttribute, returnUserAttribute, fmt.Sprintf("%s", testcase.inputToken.Name), testErr)
 	}
 
 	// test error from token update
-	// setup tokens mock instance
-	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
-	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(token *v3.Token) (*v3.Token, error) {
-			return nil, errors.NewServiceUnavailable("test reason")
-		},
-	).AnyTimes()
-	tokensMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(name string, opts metav1.GetOptions) (*v3.Token, error) {
-			token, ok := tokens[name]
-			if ok {
-				return token, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
-	// setup userAttribute mock instance
-	userAttributesMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
-	userAttributesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
-			return userAttribute, nil
-		},
-	).AnyTimes()
-
-	// setup userAttributesLister mock instance
-	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(name string) (*v3.UserAttribute, error) {
-			userAttribute, ok := userAttributes[name]
-			if ok {
-				return userAttribute, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
 	testTokenErrorUpdateController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: &fakes.TokenInterfaceMock{
+			UpdateFunc: func(token *v3.Token) (*v3.Token, error) {
+				return nil, errors.NewServiceUnavailable("test reason")
+			},
+			GetFunc: func(name string, opts metav1.GetOptions) (*v3.Token, error) {
+				token, ok := tokens[name]
+				if ok {
+					return token, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
+				return userAttribute, nil
+			},
+		},
+		userAttributesLister: &fakes.UserAttributeListerMock{
+			GetFunc: func(namespace string, name string) (*v3.UserAttribute, error) {
+				userAttribute, ok := userAttributes[name]
+				if ok {
+					return userAttribute, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
 	}
 	genericTestToken := &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
@@ -160,50 +128,35 @@ func TestSync(t *testing.T) {
 	assert.NotNilf(t, err, "handler should return err when token client's update function returns error")
 
 	// test error from userattribute update
-	// setup tokens mock instance
-	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
-	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(token *v3.Token) (*v3.Token, error) {
-			tokens[token.Name] = token.DeepCopy()
-			return token, nil
-		},
-	).AnyTimes()
-	tokensMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(name string, opts metav1.GetOptions) (*v3.Token, error) {
-			token, ok := tokens[name]
-			if ok {
-				return token, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
-	// setup userAttribute mock instance
-	userAttributesMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
-	userAttributesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-			return nil, errors.NewServiceUnavailable("test reason")
-		},
-	)
-
-	// setup userAttributesLister mock instance
-	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(name string) (*v3.UserAttribute, error) {
-			userAttribute, ok := userAttributes[name]
-			if ok {
-				return userAttribute, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
 	testUserAttributeErrorUpdateController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: &fakes.TokenInterfaceMock{
+			UpdateFunc: func(token *v3.Token) (*v3.Token, error) {
+				tokens[token.Name] = token.DeepCopy()
+				return token, nil
+			},
+			GetFunc: func(name string, opts metav1.GetOptions) (*v3.Token, error) {
+				token, ok := tokens[name]
+				if ok {
+					return token, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				return nil, errors.NewServiceUnavailable("test reason")
+			},
+		},
+		userAttributesLister: &fakes.UserAttributeListerMock{
+			GetFunc: func(namespace string, name string) (*v3.UserAttribute, error) {
+				userAttribute, ok := userAttributes[name]
+				if ok {
+					return userAttribute, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
 	}
-
 	genericTestToken = &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testtoken",
@@ -223,47 +176,32 @@ func TestSync(t *testing.T) {
 	assert.NotNilf(t, err, "handler should return err when userattribute client's update function returns error")
 
 	// test non-notfound error from userattribute lister get
-	// setup tokens mock instance
-	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
-	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(token *v3.Token) (*v3.Token, error) {
-			tokens[token.Name] = token.DeepCopy()
-			return token, nil
-		},
-	).AnyTimes()
-	tokensMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(name string, opts metav1.GetOptions) (*v3.Token, error) {
-			token, ok := tokens[name]
-			if ok {
-				return token, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
-	// setup userAttribute mock instance
-	userAttributesMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
-	userAttributesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
-			return userAttribute, nil
-		},
-	).AnyTimes()
-
-	// setup userAttributesLister mock instance
-	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(name string) (*v3.UserAttribute, error) {
-			return nil, errors.NewServiceUnavailable("test reason")
-		},
-	)
-
 	testUserAttributeErrorGetController := TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: &fakes.TokenInterfaceMock{
+			UpdateFunc: func(token *v3.Token) (*v3.Token, error) {
+				tokens[token.Name] = token.DeepCopy()
+				return token, nil
+			},
+			GetFunc: func(name string, opts metav1.GetOptions) (*v3.Token, error) {
+				token, ok := tokens[name]
+				if ok {
+					return token, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
+				return userAttribute, nil
+			},
+		},
+		userAttributesLister: &fakes.UserAttributeListerMock{
+			GetFunc: func(namespace string, name string) (*v3.UserAttribute, error) {
+				return nil, errors.NewServiceUnavailable("test reason")
+			},
+		},
 	}
-
 	genericTestToken = &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testtoken",
@@ -275,47 +213,32 @@ func TestSync(t *testing.T) {
 	assert.NotNilf(t, err, "handler should return err when userattribute lister's get function returns non-notfound error")
 
 	// test notfound error from userattribute lister get
-	// setup tokens mock instance
-	tokensMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
-	tokensMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(token *v3.Token) (*v3.Token, error) {
-			tokens[token.Name] = token.DeepCopy()
-			return token, nil
-		},
-	).AnyTimes()
-	tokensMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(name string, opts metav1.GetOptions) (*v3.Token, error) {
-			token, ok := tokens[name]
-			if ok {
-				return token, nil
-			}
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	).AnyTimes()
-
-	// setup userAttribute mock instance
-	userAttributesMock = wranglerfake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
-	userAttributesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
-			return userAttribute, nil
-		},
-	).AnyTimes()
-
-	// setup userAttributesLister mock instance
-	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-	userAttributesListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-		func(name string) (*v3.UserAttribute, error) {
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
-		},
-	)
-
 	testUserAttributeErrorGetController = TokenController{
-		tokens:               tokensMock,
-		userAttributes:       userAttributesMock,
-		userAttributesLister: userAttributesListerMock,
+		tokens: &fakes.TokenInterfaceMock{
+			UpdateFunc: func(token *v3.Token) (*v3.Token, error) {
+				tokens[token.Name] = token.DeepCopy()
+				return token, nil
+			},
+			GetFunc: func(name string, opts metav1.GetOptions) (*v3.Token, error) {
+				token, ok := tokens[name]
+				if ok {
+					return token, nil
+				}
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
+				return userAttribute, nil
+			},
+		},
+		userAttributesLister: &fakes.UserAttributeListerMock{
+			GetFunc: func(namespace string, name string) (*v3.UserAttribute, error) {
+				return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			},
+		},
 	}
-
 	genericTestToken = &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testtoken",
