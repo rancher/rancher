@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	fakes "github.com/rancher/rancher/pkg/controllers/management/auth/fakes"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	coreFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	v1 "k8s.io/api/core/v1"
+	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -257,10 +258,16 @@ func TestUpdated(t *testing.T) {
 }
 
 func Test_deleteAllCRTB(t *testing.T) {
+	ctrbMock := &managementFakes.ClusterRoleTemplateBindingInterfaceMock{}
+
+	ul := &userLifecycle{
+		crtb: ctrbMock,
+	}
+
 	tests := []struct {
 		name          string
 		inputCRTB     []*v3.ClusterRoleTemplateBinding
-		mockSetup     func(crtbMock *wranglerfake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList])
+		mockSetup     func()
 		expectedError bool
 	}{
 		{
@@ -272,8 +279,10 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]) {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			mockSetup: func() {
+				ctrbMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -291,8 +300,10 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]) {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			mockSetup: func() {
+				ctrbMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -312,8 +323,10 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]) {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			mockSetup: func() {
+				ctrbMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -332,8 +345,13 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]) {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			mockSetup: func() {
+				ctrbMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
+				ctrbMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -352,11 +370,13 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]) {
-				gomock.InOrder(
-					crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil),
-					crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("namespaced crtb not deleted")),
-				)
+			mockSetup: func() {
+				ctrbMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
+				ctrbMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("namespaced crtb not deleted")
+				}
 			},
 			expectedError: true,
 		},
@@ -369,8 +389,10 @@ func Test_deleteAllCRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(crtbMock *wranglerfake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]) {
-				crtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
+			mockSetup: func() {
+				ctrbMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
@@ -378,14 +400,7 @@ func Test_deleteAllCRTB(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			crtbMock := wranglerfake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
-
-			tt.mockSetup(crtbMock)
-
-			ul := &userLifecycle{
-				crtb: crtbMock,
-			}
+			tt.mockSetup()
 
 			err := ul.deleteAllCRTB(tt.inputCRTB)
 
@@ -399,10 +414,16 @@ func Test_deleteAllCRTB(t *testing.T) {
 }
 
 func Test_deleteAllPRTB(t *testing.T) {
+	prtbMock := &managementFakes.ProjectRoleTemplateBindingInterfaceMock{}
+
+	ul := &userLifecycle{
+		prtb: prtbMock,
+	}
+
 	tests := []struct {
 		name          string
 		inputPRTB     []*v3.ProjectRoleTemplateBinding
-		mockSetup     func(*wranglerfake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList])
+		mockSetup     func()
 		expectedError bool
 	}{
 		{
@@ -416,8 +437,10 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]) {
-				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockSetup: func() {
+				prtbMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -438,8 +461,13 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]) {
-				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			mockSetup: func() {
+				prtbMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
+				prtbMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -454,8 +482,10 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]) {
-				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
+			mockSetup: func() {
+				prtbMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
@@ -469,8 +499,10 @@ func Test_deleteAllPRTB(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(prtbMock *wranglerfake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]) {
-				prtbMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
+			mockSetup: func() {
+				prtbMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
@@ -478,14 +510,8 @@ func Test_deleteAllPRTB(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			prtbMock := wranglerfake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+			tt.mockSetup()
 
-			tt.mockSetup(prtbMock)
-
-			ul := &userLifecycle{
-				prtb: prtbMock,
-			}
 			err := ul.deleteAllPRTB(tt.inputPRTB)
 
 			if tt.expectedError {
@@ -498,9 +524,8 @@ func Test_deleteAllPRTB(t *testing.T) {
 }
 
 func Test_deleteUserNamespace(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	namespaceMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl)
-	namespaceListerMock := wranglerfake.NewMockNonNamespacedCacheInterface[*v1.Namespace](ctrl)
+	namespaceMock := &coreFakes.NamespaceInterfaceMock{}
+	namespaceListerMock := &coreFakes.NamespaceListerMock{}
 
 	ul := &userLifecycle{
 		namespaces:      namespaceMock,
@@ -517,8 +542,12 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "delete namespace",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get(gomock.Any()).Return(&v1.Namespace{}, nil)
-				namespaceMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
+				namespaceListerMock.GetFunc = func(namespace, name string) (*v12.Namespace, error) {
+					return &v12.Namespace{}, nil
+				}
+				namespaceMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -526,7 +555,9 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "error getting namespace",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get(gomock.Any()).Return(nil, fmt.Errorf("some error"))
+				namespaceListerMock.GetFunc = func(namespace, name string) (*v12.Namespace, error) {
+					return nil, fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
@@ -534,8 +565,12 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "error deleting namespace",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get(gomock.Any()).Return(&v1.Namespace{}, nil)
-				namespaceMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
+				namespaceListerMock.GetFunc = func(namespace, name string) (*v12.Namespace, error) {
+					return &v12.Namespace{}, nil
+				}
+				namespaceMock.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
@@ -543,11 +578,13 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "namespace is in termination state",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get(gomock.Any()).Return(&v1.Namespace{
-					Status: v1.NamespaceStatus{
-						Phase: v1.NamespaceTerminating,
-					},
-				}, nil)
+				namespaceListerMock.GetFunc = func(namespace, name string) (*v12.Namespace, error) {
+					return &v12.Namespace{
+						Status: v12.NamespaceStatus{
+							Phase: v12.NamespaceTerminating,
+						},
+					}, nil
+				}
 			},
 			expectedError: false,
 		},
@@ -555,10 +592,12 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "namespace was not found",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get(gomock.Any()).Return(nil, errors.NewNotFound(schema.GroupResource{
-					Group:    management.GroupName,
-					Resource: "Namespace",
-				}, "testns"))
+				namespaceListerMock.GetFunc = func(namespace, name string) (*v12.Namespace, error) {
+					return nil, errors.NewNotFound(schema.GroupResource{
+						Group:    management.GroupName,
+						Resource: "Namespace",
+					}, "testns")
+				}
 			},
 			expectedError: false,
 		},
@@ -580,9 +619,8 @@ func Test_deleteUserNamespace(t *testing.T) {
 }
 
 func Test_deleteUserSecret(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	secretsMock := wranglerfake.NewMockControllerInterface[*v1.Secret, *v1.SecretList](ctrl)
-	secretsListerMock := wranglerfake.NewMockCacheInterface[*v1.Secret](ctrl)
+	secretsMock := &coreFakes.SecretInterfaceMock{}
+	secretsListerMock := &coreFakes.SecretListerMock{}
 
 	ul := &userLifecycle{
 		secrets:       secretsMock,
@@ -599,8 +637,12 @@ func Test_deleteUserSecret(t *testing.T) {
 			name:     "delete secret",
 			username: "testuser",
 			mockSetup: func() {
-				secretsListerMock.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&v1.Secret{}, nil)
-				secretsMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				secretsListerMock.GetFunc = func(namespace, name string) (*v12.Secret, error) {
+					return &v12.Secret{}, nil
+				}
+				secretsMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
 			},
 			expectedError: false,
 		},
@@ -608,7 +650,9 @@ func Test_deleteUserSecret(t *testing.T) {
 			name:     "error getting secret",
 			username: "testuser",
 			mockSetup: func() {
-				secretsListerMock.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("some error"))
+				secretsListerMock.GetFunc = func(namespace, name string) (*v12.Secret, error) {
+					return nil, fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
@@ -616,8 +660,12 @@ func Test_deleteUserSecret(t *testing.T) {
 			name:     "error deleting secret",
 			username: "testuser",
 			mockSetup: func() {
-				secretsListerMock.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&v1.Secret{}, nil)
-				secretsMock.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("some error"))
+				secretsListerMock.GetFunc = func(namespace, name string) (*v12.Secret, error) {
+					return &v12.Secret{}, nil
+				}
+				secretsMock.DeleteNamespacedFunc = func(namespace, name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
@@ -625,10 +673,12 @@ func Test_deleteUserSecret(t *testing.T) {
 			name:     "secret not found",
 			username: "testuser",
 			mockSetup: func() {
-				secretsListerMock.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errors.NewNotFound(schema.GroupResource{
-					Group:    management.GroupName,
-					Resource: "Secrets",
-				}, "testsecret"))
+				secretsListerMock.GetFunc = func(namespace, name string) (*v12.Secret, error) {
+					return nil, errors.NewNotFound(schema.GroupResource{
+						Group:    management.GroupName,
+						Resource: "Secrets",
+					}, "testsecret")
+				}
 			},
 			expectedError: false,
 		},
@@ -650,9 +700,7 @@ func Test_deleteUserSecret(t *testing.T) {
 }
 
 func Test_removeLegacyFinalizers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	//usersMock := &managementFakes.UserInterfaceMock{}
-	usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+	usersMock := &managementFakes.UserInterfaceMock{}
 
 	ul := &userLifecycle{
 		users: usersMock,
@@ -689,15 +737,16 @@ func Test_removeLegacyFinalizers(t *testing.T) {
 				},
 			},
 			mockSetup: func() {
-				usersMock.EXPECT().Update(gomock.Any()).Return(
-					&v3.User{
+				usersMock.UpdateFunc = func(in1 *v3.User) (*v3.User, error) {
+					return &v3.User{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "testuser",
 							Finalizers: []string{
 								"controller.cattle.io/test-finalizer",
 							},
 						},
-					}, nil)
+					}, nil
+				}
 			},
 			expectedError: false,
 		},
@@ -713,7 +762,9 @@ func Test_removeLegacyFinalizers(t *testing.T) {
 				},
 			},
 			mockSetup: func() {
-				usersMock.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("some error"))
+				usersMock.UpdateFunc = func(in1 *v3.User) (*v3.User, error) {
+					return nil, fmt.Errorf("some error")
+				}
 			},
 			expectedError: true,
 		},
