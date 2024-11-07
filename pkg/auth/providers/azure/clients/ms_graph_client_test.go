@@ -19,6 +19,9 @@ import (
 
 // NOTE: This will require the following environment variables setup
 //
+// WARNING: The test data is connected to Azure so tests can fail because the
+// data changed upstream.
+//
 // TEST_AZURE_TENANT_ID
 // TEST_AZURE_APPLICATION_ID
 // TEST_AZURE_APPLICATION_SECRET
@@ -61,7 +64,7 @@ func TestMSGraphClient_ListUsers(t *testing.T) {
 		displayNames = append(displayNames, v.DisplayName)
 	}
 
-	assert.Len(t, users, 41)
+	assert.Len(t, users, 91)
 }
 
 func TestMSGraphClient_ListUsers_with_filter(t *testing.T) {
