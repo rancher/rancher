@@ -28,6 +28,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -402,6 +403,12 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 				err = os.WriteFile(fullPath, []byte(fileContents), 0600)
 				if err != nil {
 					return err
+				}
+				if !devMode && settings.UnprivilegedJailUser.Get() == "true" {
+					err = jailer.SetJailOwnership(fullPath)
+					if err != nil {
+						return err
+					}
 				}
 				// Add the field and path
 				if devMode {
