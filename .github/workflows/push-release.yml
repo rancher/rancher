@@ -589,7 +589,7 @@ jobs:
         shell: bash
         env:
           ARTIFACTS_TYPE: "components"
-        run: scripts/artifacts-hashes
+        run: scripts/artifacts-hashes.sh
       - name: Add release notes
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
