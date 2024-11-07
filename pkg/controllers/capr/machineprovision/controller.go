@@ -9,6 +9,17 @@ import (
 	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	"github.com/rancher/rancher/pkg/controllers/management/node"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
@@ -29,33 +40,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/tools/clientcmd"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
-
-	k8dynamic "k8s.io/client-go/dynamic"
-
-	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	"github.com/rancher/rancher/pkg/controllers/management/node"
-	"github.com/rancher/rancher/pkg/features"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
-	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
-	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/wrangler"
 )
 
 const (
 	createJobConditionType = "CreateJob"
 	deleteJobConditionType = "DeleteJob"
 
-	forceRemoveMachineAnn       = "provisioning.cattle.io/force-machine-remove"
-	removedAllPVCsAnnotationKey = "harvesterhci.io/removeAllPersistentVolumeClaims"
+	forceRemoveMachineAnn = "provisioning.cattle.io/force-machine-remove"
 )
 
 type infraObject struct {
@@ -313,12 +307,6 @@ func (h *handler) namespaceIsRemoved(obj runtime.Object) (bool, error) {
 func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, error) {
 	if removed, err := h.namespaceIsRemoved(obj); err != nil || removed {
 		return obj, err
-	}
-
-	if features.Harvester.Enabled() {
-		if _, err := h.onRemoveHarvester(key, obj); err != nil {
-			return obj, err
-		}
 	}
 
 	infra, err := newInfraObject(obj)
@@ -931,102 +919,4 @@ func ExecutingMachineMessage(podLabels map[string]string, namespace string) stri
 		podLabels[InfraMachineKind],
 		podLabels[CapiMachineName],
 	)
-}
-
-// onRemoveHarvester adds an annotation to the `VirtualMachine` resource
-// of the downstream cluster that informs the Harvester node driver to
-// remove all PVCs when the VM is deleted from it.
-// There is no other way to do this because the node driver does not know
-// whether the node is only deleted because it is to be redeployed or
-// whether it is to be permanently deleted because the parent cluster is
-// deleted.
-func (h *handler) onRemoveHarvester(key string, obj runtime.Object) (runtime.Object, error) {
-	if obj.GetObjectKind().GroupVersionKind().Kind != "HarvesterMachine" {
-		return obj, nil
-	}
-
-	infra, err := newInfraObject(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	capiCluster, err := capr.GetCAPIClusterFromLabel(obj, h.capiClusterCache)
-	if err != nil && !apierrors.IsNotFound(err) {
-		logrus.Errorf("[machineprovision] %s: error getting cluster (apiversion=cluster.x-k8s.io): %v", key, err)
-		return obj, err
-	}
-	if err != nil && apierrors.IsNotFound(err) {
-		logrus.Debugf("[machineprovision] %s: there is no cluster (apiversion=cluster.x-k8s.io). Continue ...", key)
-		return obj, nil
-	}
-
-	// Skip if the cluster (cluster.x-k8s.io) is not being deleted.
-	if capiCluster.DeletionTimestamp.IsZero() {
-		return obj, nil
-	}
-
-	rancherCluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), capiCluster.Name)
-	if err != nil {
-		logrus.Errorf("[machineprovision] %s: error getting cluster (apiversion=provisioning.cattle.io): %v", key, err)
-		return obj, err
-	}
-
-	secret, err := GetCloudCredentialSecret(h.secrets, "", rancherCluster.Spec.CloudCredentialSecretName)
-	if err != nil {
-		logrus.Errorf("[machineprovision] %s: error getting cloud credential secret: %v", key, err)
-		return obj, err
-	}
-
-	restConfig, err := clientcmd.RESTConfigFromKubeConfig(secret.Data["harvestercredentialConfig-kubeconfigContent"])
-	if err != nil {
-		logrus.Errorf("[machineprovision] %s: error getting REST config from cloud credential secret: %v", key, err)
-		return obj, err
-	}
-
-	// We need to use the dynamic client here because we do not want to import
-	// the kubevirt API into Rancher.
-	dynamicClient, err := k8dynamic.NewForConfig(restConfig)
-	if err != nil {
-		logrus.Errorf("[machineprovision] %s: error getting dynamic client: %v", key, err)
-		return obj, err
-	}
-
-	resourceGVR := schema.GroupVersionResource{
-		Group: "kubevirt.io", Version: "v1", Resource: "virtualmachines",
-	}
-	resourceName := infra.meta.GetName()
-	resourceNamespace := infra.data.String("spec", "vmNamespace")
-
-	resource, err := dynamicClient.Resource(resourceGVR).Namespace(resourceNamespace).Get(context.TODO(), resourceName, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		logrus.Errorf("[machineprovision] %s: error getting VM (gvr=%s, namespace=%s, name=%s): %v",
-			key, resourceGVR.String(), resourceNamespace, resourceName, err)
-		return obj, err
-	}
-	if err != nil && apierrors.IsNotFound(err) {
-		logrus.Debugf("[machineprovision] %s: there is no VM (gvr=%s, namespace=%s, name=%s). Continue ...",
-			key, resourceGVR.String(), resourceNamespace, resourceName)
-		return obj, nil
-	}
-
-	annotations := resource.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	if _, ok := annotations[removedAllPVCsAnnotationKey]; !ok {
-		annotations[removedAllPVCsAnnotationKey] = "true"
-		resource.SetAnnotations(annotations)
-
-		_, err = dynamicClient.Resource(resourceGVR).Namespace(resourceNamespace).Update(context.TODO(), resource, metav1.UpdateOptions{})
-		if err != nil {
-			logrus.Errorf("[machineprovision] %s: error updating VM (gvr=%s, namespace=%s, name=%s): %v",
-				key, resourceGVR.String(), resourceNamespace, resourceName, err)
-			return obj, err
-		}
-
-		logrus.Infof("[machineprovision] %s: VM successfully marked for removal (gvr=%s, namespace=%s, name=%s)",
-			key, resourceGVR.String(), resourceNamespace, resourceName)
-	}
-
-	return obj, nil
 }
