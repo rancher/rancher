@@ -403,6 +403,12 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 				if err != nil {
 					return err
 				}
+				if !devMode && settings.UnprivilegedJailUser.Get() == "true" {
+					err = jailer.SetJailOwnership(fullPath)
+					if err != nil {
+						return err
+					}
+				}
 				// Add the field and path
 				if devMode {
 					config[driverField] = fullPath
