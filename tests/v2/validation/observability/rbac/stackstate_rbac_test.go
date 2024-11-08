@@ -1,4 +1,4 @@
-package observability
+package rbac
 
 import (
 	"context"
@@ -78,7 +78,10 @@ func (rb *StackStateRBACTestSuite) SetupSuite() {
 	require.NoError(rb.T(), err)
 	rb.projectID = project.ID
 
-	_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
+	ssNamespaceExists, err := namespaces.GetNamespaceByName(client, cluster.ID, charts.StackstateNamespace)
+	if ssNamespaceExists == nil && k8sErrors.IsNotFound(err) {
+		_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
+	}
 	require.NoError(rb.T(), err)
 
 	_, err = rb.client.Catalog.ClusterRepos().Get(context.TODO(), rancherUIPlugins, meta.GetOptions{})
@@ -173,32 +176,34 @@ func (rb *StackStateRBACTestSuite) TestClusterOwnerInstallStackstate() {
 	require.NotNil(rb.T(), systemProject.ID, "System project is nil.")
 	systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
-	err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs, systemProjectID)
-	require.NoError(rb.T(), err)
-	log.Info("Stackstate agent chart installed successfully")
-
-	rb.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")
-	err = extencharts.WatchAndWaitDeployments(client, rb.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
-	require.NoError(rb.T(), err)
-
-	rb.T().Log("Verifying the daemonsets of stackstate agent chart to have expected number of available replicas nodes")
-	err = extencharts.WatchAndWaitDaemonSets(client, rb.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
-	require.NoError(rb.T(), err)
-
-	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(rb.client, rb.client.RancherConfig.ClusterName, fleet.Namespace)
-
-	var clusterName string
-	if clusterObject != nil {
-		status := &provv1.ClusterStatus{}
-		err := steveV1.ConvertToK8sType(clusterObject.Status, status)
+	rb.Run(charts.StackstateK8sAgent+" "+rb.stackstateAgentInstallOptions.Version, func() {
+		err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs, systemProjectID)
 		require.NoError(rb.T(), err)
-		clusterName = status.ClusterName
-	} else {
-		clusterName, err = extensionscluster.GetClusterIDByName(rb.client, rb.client.RancherConfig.ClusterName)
+		log.Info("Stackstate agent chart installed successfully")
+
+		rb.T().Log("Verifying the deployments of stackstate agent chart to have expected number of available replicas")
+		err = extencharts.WatchAndWaitDeployments(client, rb.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
 		require.NoError(rb.T(), err)
-	}
-	podErrors := pods.StatusPods(client, clusterName)
-	require.Empty(rb.T(), podErrors)
+
+		rb.T().Log("Verifying the daemonsets of stackstate agent chart to have expected number of available replicas nodes")
+		err = extencharts.WatchAndWaitDaemonSets(client, rb.cluster.ID, charts.StackstateNamespace, meta.ListOptions{})
+		require.NoError(rb.T(), err)
+
+		clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(rb.client, rb.client.RancherConfig.ClusterName, fleet.Namespace)
+
+		var clusterName string
+		if clusterObject != nil {
+			status := &provv1.ClusterStatus{}
+			err := steveV1.ConvertToK8sType(clusterObject.Status, status)
+			require.NoError(rb.T(), err)
+			clusterName = status.ClusterName
+		} else {
+			clusterName, err = extensionscluster.GetClusterIDByName(rb.client, rb.client.RancherConfig.ClusterName)
+			require.NoError(rb.T(), err)
+		}
+		podErrors := pods.StatusPods(client, clusterName)
+		require.Empty(rb.T(), podErrors)
+	})
 }
 
 func (rb *StackStateRBACTestSuite) TestMembersCannotInstallStackstate() {
@@ -249,10 +254,11 @@ func (rb *StackStateRBACTestSuite) TestMembersCannotInstallStackstate() {
 		require.NoError(rb.T(), err)
 		require.NotNil(rb.T(), systemProject.ID, "System project is nil.")
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
-
-		err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs, systemProjectID)
-		require.Error(rb.T(), err)
-		k8sErrors.IsForbidden(err)
+		rb.Run(charts.StackstateK8sAgent+" "+rb.stackstateAgentInstallOptions.Version, func() {
+			err = charts.InstallStackstateAgentChart(standardClient, rb.stackstateAgentInstallOptions, rb.stackstateConfigs, systemProjectID)
+			require.Error(rb.T(), err)
+			k8sErrors.IsForbidden(err)
+		})
 	}
 }
 
