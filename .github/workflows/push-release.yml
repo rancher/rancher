@@ -13,7 +13,7 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   REGISTRY: "docker.io"
-  GH_CLI_VERSION: 2.57.0
+  GH_CLI_VERSION: 2.61.0
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
