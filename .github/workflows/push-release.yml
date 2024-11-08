@@ -83,9 +83,11 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
             secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
       - name: Upload chart to bucket
+        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
         run: |
           AWS_ACCESS_KEY_ID=${{ env.OPTIMUS_CHARTS_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.OPTIMUS_CHARTS_SECRET_KEY }} aws s3 cp --recursive ./bin/chart s3://charts.optimus.rancher.io/server-charts
       - name: Invalidate Cloudfront cache
+        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
         env:
           CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
         shell: bash
