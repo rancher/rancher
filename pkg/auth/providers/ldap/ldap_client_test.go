@@ -10,12 +10,13 @@ import (
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
+
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
@@ -30,7 +31,7 @@ func Test_ldapProvider_loginUser(t *testing.T) {
 	type fields struct {
 		ctx                   context.Context
 		authConfigs           v3.AuthConfigInterface
-		secrets               wcorev1.SecretController
+		secrets               corev1.SecretInterface
 		userMGR               mockUserManager
 		tokenMGR              *tokens.Manager
 		certs                 string

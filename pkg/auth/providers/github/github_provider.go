@@ -18,10 +18,10 @@ import (
 	util2 "github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +42,7 @@ type tokensManager interface {
 type ghProvider struct {
 	ctx          context.Context
 	authConfigs  v3.AuthConfigInterface
-	secrets      wcorev1.SecretController
+	secrets      corev1.SecretInterface
 	getConfig    func() (*v32.GithubConfig, error)
 	githubClient *GClient
 	userMGR      user.Manager
@@ -57,7 +57,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	provider := &ghProvider{
 		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
-		secrets:      mgmtCtx.Wrangler.Core.Secret(),
+		secrets:      mgmtCtx.Core.Secrets(""),
 		githubClient: githubClient,
 		userMGR:      userMGR,
 		tokenMGR:     tokenMGR,

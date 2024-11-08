@@ -19,10 +19,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +40,7 @@ type OpenIDCProvider struct {
 	Type        string
 	CTX         context.Context
 	AuthConfigs v3.AuthConfigInterface
-	Secrets     wcorev1.SecretController
+	Secrets     corev1.SecretInterface
 	UserMGR     user.Manager
 	TokenMGR    *tokens.Manager
 }
@@ -64,7 +64,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		Type:        client.OIDCConfigType,
 		CTX:         ctx,
 		AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-		Secrets:     mgmtCtx.Wrangler.Core.Secret(),
+		Secrets:     mgmtCtx.Core.Secrets(""),
 		UserMGR:     userMGR,
 		TokenMGR:    tokenMGR,
 	}
