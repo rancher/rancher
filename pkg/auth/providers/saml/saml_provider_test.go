@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,12 +22,6 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	ctx := context.Background()
 	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
 	require.NoError(t, err, "Failed to create NewScaledContext")
-
-	// Create the dummy wrangler context
-	wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{})
-	require.NoError(t, err, "Failed to create wranglerContext")
-	mgmtCtx.Wrangler = wranglerContext
-
 	tokenMGR := tokens.NewManager(ctx, mgmtCtx)
 	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
 	require.True(t, ok, "Failed to Configure a valid Provider")

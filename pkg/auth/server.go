@@ -56,8 +56,6 @@ func NewServer(ctx context.Context, cfg *rest.Config, wContext *wrangler.Context
 		return nil, err
 	}
 
-	sc.Wrangler = wContext
-
 	sc.UserManager, err = common.NewUserManagerNoBindings(sc)
 	if err != nil {
 		return nil, err
@@ -67,6 +65,8 @@ func NewServer(ctx context.Context, cfg *rest.Config, wContext *wrangler.Context
 	if err != nil {
 		return nil, err
 	}
+
+	sc.Wrangler = wContext
 
 	authenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
 	authManagement, err := newAPIManagement(ctx, sc)
