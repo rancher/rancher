@@ -196,7 +196,7 @@ func CreateAndValidateSnapshotRKE1(client *rancher.Client, podTemplate *corev1.P
 		return nil, "", nil, nil, err
 	}
 
-	err = VerifySnapshots(client, clusterName, createdSnapshotIDs, isRKE1)
+	err = VerifyRKE1Snapshots(client, clusterName, createdSnapshotIDs)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
@@ -338,9 +338,13 @@ func CreateAndValidateSnapshotV2Prov(client *rancher.Client, podTemplate *corev1
 	snapshotToRestore := createdSnapshots[0].ID
 	createdSnapshotIDs := []string{}
 	// prioritize s3 snapshots over local.
+	s3Found := false
+
 	for _, snapshot := range createdSnapshots {
-		if strings.Contains(snapshot.ID, "-s3") {
+		store, ok := snapshot.Annotations["etcdsnapshot.rke.io/storage"]
+		if ok && store == "s3" {
 			snapshotToRestore = snapshot.ID
+			s3Found = true
 		}
 		createdSnapshotIDs = append(createdSnapshotIDs, snapshot.ID)
 	}
@@ -350,7 +354,7 @@ func CreateAndValidateSnapshotV2Prov(client *rancher.Client, podTemplate *corev1
 		return nil, "", nil, nil, err
 	}
 
-	if cluster.Spec.RKEConfig.ETCD.S3 != nil && !strings.Contains(snapshotToRestore, "-s3") {
+	if cluster.Spec.RKEConfig.ETCD.S3 != nil && !s3Found {
 		return nil, "", nil, nil, fmt.Errorf("s3 is enabled for the cluster, but selected snapshot is not from s3")
 	}
 
@@ -371,7 +375,7 @@ func CreateAndValidateSnapshotV2Prov(client *rancher.Client, podTemplate *corev1
 		return nil, "", nil, nil, err
 	}
 
-	err = VerifySnapshots(client, clusterName, createdSnapshotIDs, isRKE1)
+	err = VerifyV2ProvSnapshots(client, clusterName, createdSnapshotIDs)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
