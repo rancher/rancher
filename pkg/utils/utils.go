@@ -19,23 +19,6 @@ func FormatResourceList(resources v1.ResourceList) string {
 	return strings.Join(resourceStrings, ",")
 }
 
-// FormatPrefix converts the provided string into a form suitable for use as a
-// generateName prefix.
-//
-// It does this by converting to lower-case and appending a "-" character.
-func FormatPrefix(s string) string {
-	if s == "" {
-		return s
-	}
-
-	s = strings.ToLower(s)
-	if !strings.HasSuffix(s, "-") {
-		s = s + "-"
-	}
-
-	return s
-}
-
 // IsPlainIPV6 will return true if the given address is a plain IPV6 address and not encapsulated or similar.
 func IsPlainIPV6(address string) bool {
 	if net.ParseIP(address) != nil && strings.Count(address, ":") >= 2 {
