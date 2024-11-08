@@ -15,10 +15,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,7 +59,7 @@ var (
 type ldapProvider struct {
 	ctx                   context.Context
 	authConfigs           v3.AuthConfigInterface
-	secrets               wcorev1.SecretController
+	secrets               corev1.SecretInterface
 	userMGR               user.Manager
 	tokenMGR              *tokens.Manager
 	certs                 string
@@ -74,7 +74,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	return &ldapProvider{
 		ctx:                   ctx,
 		authConfigs:           mgmtCtx.Management.AuthConfigs(""),
-		secrets:               mgmtCtx.Wrangler.Core.Secret(),
+		secrets:               mgmtCtx.Core.Secrets(""),
 		userMGR:               userMGR,
 		tokenMGR:              tokenMGR,
 		providerName:          providerName,

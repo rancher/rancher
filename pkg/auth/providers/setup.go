@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
@@ -33,7 +34,7 @@ func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, sche
 	Configure(ctx, management)
 
 	authConfigBaseSchema := schemas.Schema(&managementschema.Version, client.AuthConfigType)
-	authConfigBaseSchema.Store = secrets.Wrap(authConfigBaseSchema.Store, management.Wrangler.Core.Secret())
+	authConfigBaseSchema.Store = secrets.Wrap(authConfigBaseSchema.Store, management.Core.Secrets(namespace.GlobalNamespace))
 	for _, authConfigSubtype := range authConfigTypes {
 		subSchema := schemas.Schema(&managementschema.Version, authConfigSubtype)
 		GetProviderByType(authConfigSubtype).CustomizeSchema(subSchema)

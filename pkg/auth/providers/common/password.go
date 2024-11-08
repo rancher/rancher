@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +16,7 @@ const SecretsNamespace = namespace.GlobalNamespace
 
 // NameForSecret returns a string with the namespace:name for the provided
 // Secret.
-func NameForSecret(s *v1.Secret) string {
+func NameForSecret(s *corev1.Secret) string {
 	return fmt.Sprintf("%s:%s", s.GetNamespace(), s.GetName())
 }
 
@@ -30,7 +30,7 @@ func NameForSecret(s *v1.Secret) string {
 // desired state it is overwritten.
 //
 // It returns a string with the namespace:name of the created Secret.
-func CreateOrUpdateSecrets(secrets wcorev1.SecretController, secretInfo, field, authType string) (string, error) {
+func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo, field, authType string) (string, error) {
 	if secretInfo == "" {
 		return "", nil
 	}
@@ -45,7 +45,7 @@ func CreateOrUpdateSecrets(secrets wcorev1.SecretController, secretInfo, field, 
 		Type:       v1.SecretTypeOpaque,
 	}
 
-	curr, err := secrets.Cache().Get(SecretsNamespace, name)
+	curr, err := secrets.Controller().Lister().Get(SecretsNamespace, name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", fmt.Errorf("error getting secret for %s : %w", name, err)
 	}
@@ -65,7 +65,7 @@ func CreateOrUpdateSecrets(secrets wcorev1.SecretController, secretInfo, field, 
 	return NameForSecret(secret), nil
 }
 
-func ReadFromSecret(secrets wcorev1.SecretController, secretInfo string, field string) (string, error) {
+func ReadFromSecret(secrets corev1.SecretInterface, secretInfo string, field string) (string, error) {
 	if strings.HasPrefix(secretInfo, SecretsNamespace) {
 		data, err := ReadFromSecretData(secrets, secretInfo)
 		if err != nil {
@@ -80,11 +80,11 @@ func ReadFromSecret(secrets wcorev1.SecretController, secretInfo string, field s
 	return secretInfo, nil
 }
 
-func ReadFromSecretData(secrets wcorev1.SecretController, secretInfo string) (map[string][]byte, error) {
+func ReadFromSecretData(secrets corev1.SecretInterface, secretInfo string) (map[string][]byte, error) {
 	if strings.HasPrefix(secretInfo, SecretsNamespace) {
 		split := strings.SplitN(secretInfo, ":", 2)
 		if len(split) == 2 {
-			secret, err := secrets.Get(split[0], split[1], metav1.GetOptions{})
+			secret, err := secrets.GetNamespaced(split[0], split[1], metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("error getting secret %s: %w", secretInfo, err)
 			}
@@ -101,12 +101,12 @@ func GetFullSecretName(configType string, field string) string {
 }
 
 // DeleteSecret deletes a secret associated with an auth provider.
-func DeleteSecret(secrets wcorev1.SecretController, configType string, field string) error {
+func DeleteSecret(secrets corev1.SecretInterface, configType string, field string) error {
 	secretName := fmt.Sprintf("%s-%s", strings.ToLower(configType), strings.ToLower(field))
-	return secrets.Delete(SecretsNamespace, secretName, &metav1.DeleteOptions{})
+	return secrets.DeleteNamespaced(SecretsNamespace, secretName, &metav1.DeleteOptions{})
 }
 
 // SavePasswordSecret creates a secret out of a password, config type, and field name.
-func SavePasswordSecret(secrets wcorev1.SecretController, password string, fieldName string, authType string) (string, error) {
+func SavePasswordSecret(secrets corev1.SecretInterface, password string, fieldName string, authType string) (string, error) {
 	return CreateOrUpdateSecrets(secrets, password, strings.ToLower(fieldName), strings.ToLower(authType))
 }
