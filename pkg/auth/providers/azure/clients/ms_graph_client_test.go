@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	apismgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	normancorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,9 +27,7 @@ import (
 // TEST_AZURE_APPLICATION_SECRET
 
 func TestMSGraphClient_GetUser(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	secrets := newTestSecretsClient(ctrl)
-	client := newTestClientWithSecretsClient(t, secrets)
+	client := newTestClient(t)
 
 	user, err := client.GetUser("testuser6@ranchertest.onmicrosoft.com")
 	if err != nil {
@@ -174,11 +171,10 @@ func TestMSGraphClient_ListGroupMemberships_with_filter(t *testing.T) {
 
 func newTestClient(t *testing.T) *AzureMSGraphClient {
 	t.Helper()
-	ctrl := gomock.NewController(t)
-	return newTestClientWithSecretsClient(t, newTestSecretsClient(ctrl))
+	return newTestClientWithSecretsClient(t, newTestSecretsClient())
 }
 
-func newTestClientWithSecretsClient(t *testing.T, secrets wcorev1.SecretController) *AzureMSGraphClient {
+func newTestClientWithSecretsClient(t *testing.T, secrets normancorev1.SecretInterface) *AzureMSGraphClient {
 	t.Helper()
 	tenantID, applicationID, applicationSecret := os.Getenv("TEST_AZURE_TENANT_ID"), os.Getenv("TEST_AZURE_APPLICATION_ID"), os.Getenv("TEST_AZURE_APPLICATION_SECRET")
 
@@ -201,58 +197,66 @@ func newTestClientWithSecretsClient(t *testing.T, secrets wcorev1.SecretControll
 	return client
 }
 
-func newTestSecretsClient(ctrl *gomock.Controller) *wranglerfake.MockControllerInterface[*corev1.Secret, *corev1.SecretList] {
-	secrets := map[types.NamespacedName]*corev1.Secret{}
+func newTestSecretsClient() normancorev1.SecretInterface {
+	return newTestSecretsClientWithMap(map[types.NamespacedName]*corev1.Secret{})
+}
 
-	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-
-	secretController.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
-		namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
-		if s, ok := secrets[namespacedName]; ok {
-			return s, nil
-		}
-		return nil, apierrors.NewNotFound(core.Resource("Secret"), namespacedName.String())
-	}).AnyTimes()
-
-	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-		if secret.StringData != nil {
-			if secret.Data == nil {
-				secret.Data = map[string][]byte{}
+func newTestSecretsClientWithMap(secrets map[types.NamespacedName]*corev1.Secret) normancorev1.SecretInterface {
+	sm := &fakes.SecretInterfaceMock{
+		GetNamespacedFunc: func(namespace, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
+			namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
+			if s, ok := secrets[namespacedName]; ok {
+				return s, nil
 			}
-			for k, v := range secret.StringData {
-				secret.Data[k] = []byte(v)
+
+			return nil, apierrors.NewNotFound(core.Resource("Secret"), namespacedName.String())
+		},
+
+		CreateFunc: func(in1 *corev1.Secret) (*corev1.Secret, error) {
+			if in1.StringData != nil {
+				if in1.Data == nil {
+					in1.Data = map[string][]byte{}
+				}
+				for k, v := range in1.StringData {
+					in1.Data[k] = []byte(v)
+				}
+				in1.StringData = nil
 			}
-			secret.StringData = nil
-		}
-		secrets[client.ObjectKeyFromObject(secret)] = secret
-		return secret, nil
-	}).AnyTimes()
+			secrets[client.ObjectKeyFromObject(in1)] = in1
+			return in1, nil
+		},
 
-	secretController.EXPECT().Update(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-		if secret.StringData != nil {
-			if secret.Data == nil {
-				secret.Data = map[string][]byte{}
+		UpdateFunc: func(in1 *corev1.Secret) (*corev1.Secret, error) {
+			if in1.StringData != nil {
+				if in1.Data == nil {
+					in1.Data = map[string][]byte{}
+				}
+				for k, v := range in1.StringData {
+					in1.Data[k] = []byte(v)
+				}
+				in1.StringData = nil
 			}
-			for k, v := range secret.StringData {
-				secret.Data[k] = []byte(v)
+			secrets[client.ObjectKeyFromObject(in1)] = in1
+			return in1, nil
+		},
+
+		ControllerFunc: func() normancorev1.SecretController {
+			return &fakes.SecretControllerMock{
+				ListerFunc: func() normancorev1.SecretLister {
+					return &fakes.SecretListerMock{
+						GetFunc: func(namespace, name string) (*corev1.Secret, error) {
+							namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
+							if s, ok := secrets[namespacedName]; ok {
+								return s, nil
+							}
+
+							return nil, apierrors.NewNotFound(core.Resource("Secret"), namespacedName.String())
+						},
+					}
+				},
 			}
-			secret.StringData = nil
-		}
-		secrets[client.ObjectKeyFromObject(secret)] = secret
-		return secret, nil
-	}).AnyTimes()
+		},
+	}
 
-	secretCache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
-
-	secretCache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.Secret, error) {
-		namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
-		if s, ok := secrets[namespacedName]; ok {
-			return s, nil
-		}
-		return nil, apierrors.NewNotFound(core.Resource("Secret"), namespacedName.String())
-	}).AnyTimes()
-
-	secretController.EXPECT().Cache().Return(secretCache).AnyTimes()
-
-	return secretController
+	return sm
 }

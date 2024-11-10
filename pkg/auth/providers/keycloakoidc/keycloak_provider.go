@@ -39,7 +39,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 			Type:        client.KeyCloakOIDCConfigType,
 			CTX:         ctx,
 			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-			Secrets:     mgmtCtx.Wrangler.Core.Secret(),
+			Secrets:     mgmtCtx.Core.Secrets(""),
 			UserMGR:     userMGR,
 			TokenMGR:    tokenMGR,
 		},
