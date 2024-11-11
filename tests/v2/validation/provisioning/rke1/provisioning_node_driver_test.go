@@ -99,7 +99,6 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamicInput() {
-
 	if len(r.provisioningConfig.NodePools) == 0 {
 		r.T().Skip()
 	}

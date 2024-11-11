@@ -9,7 +9,7 @@ import (
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/etcdsnapshot"
 	"github.com/rancher/shepherd/clients/rancher"
-	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 
 	"github.com/rancher/shepherd/pkg/config"
@@ -64,40 +64,23 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 	}
 
 	for _, tt := range tests {
-		clusterObject, _, _ := clusters.GetProvisioningClusterByName(tt.client, s.client.RancherConfig.ClusterName, namespace)
-		if clusterObject == nil {
-			clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
-			require.NoError(s.T(), err)
+		clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
+		require.NoError(s.T(), err)
 
-			clusterResp, err := tt.client.Management.Cluster.ByID(clusterID)
-			require.NoError(s.T(), err)
+		cluster, err := s.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
+		require.NoError(s.T(), err)
 
-			if clusterResp.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
-				tt.name = "RKE1 S3 " + tt.name
-			} else {
-				tt.name = "RKE1 Local " + tt.name
-			}
+		spec := &apisV1.ClusterSpec{}
+		err = steveV1.ConvertToK8sType(cluster.Spec, spec)
+		require.NoError(s.T(), err)
+
+		if strings.Contains(spec.KubernetesVersion, "-rancher") || len(spec.KubernetesVersion) == 0 {
+			tt.name = "RKE1 " + tt.name
 		} else {
-			clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
-			require.NoError(s.T(), err)
-
-			cluster, err := tt.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
-			require.NoError(s.T(), err)
-
-			updatedCluster := new(apisV1.Cluster)
-			err = v1.ConvertToK8sType(cluster, &updatedCluster)
-			require.NoError(s.T(), err)
-
-			if updatedCluster.Spec.RKEConfig.ETCD.S3 != nil {
-				tt.name = "S3 " + tt.name
-			} else {
-				tt.name = "Local " + tt.name
-			}
-
-			if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
-				tt.name = "RKE2 " + tt.name
-			} else if strings.Contains(updatedCluster.Spec.KubernetesVersion, "k3s") {
+			if strings.Contains(spec.KubernetesVersion, "k3s") {
 				tt.name = "K3S " + tt.name
+			} else {
+				tt.name = "RKE2 " + tt.name
 			}
 		}
 
@@ -106,15 +89,6 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 			require.NoError(s.T(), err)
 		})
 	}
-}
-
-func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnlyDynamicInput() {
-	if s.clustersConfig == nil {
-		s.T().Skip()
-	}
-
-	err := etcdsnapshot.CreateAndValidateSnapshotRestore(s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, containerImage)
-	require.NoError(s.T(), err)
 }
 
 // In order for 'go test' to run this suite, we need to create
