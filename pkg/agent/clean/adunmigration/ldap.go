@@ -2,6 +2,7 @@ package adunmigration
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -11,6 +12,12 @@ import (
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
+	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,12 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
-	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/types/config"
 )
 
 // Rancher 2.7.5 serialized binary GUIDs from LDAP using this pattern, so this
@@ -183,7 +184,7 @@ func findLdapUser(guid string, lConn *ldapv3.Conn, adConfig *v3.ActiveDirectoryC
 
 func adConfiguration(sc *config.ScaledContext) (*v3.ActiveDirectoryConfig, error) {
 	authConfigs := sc.Management.AuthConfigs("")
-	secrets := sc.Core.Secrets("")
+	secrets := sc.Wrangler.Core.Secret()
 
 	authConfigObj, err := authConfigs.ObjectClient().UnstructuredClient().Get("activedirectory", metav1.GetOptions{})
 	if err != nil {
@@ -260,6 +261,11 @@ func prepareClientContexts(clientConfig *restclient.Config) (*config.ScaledConte
 		logrus.Errorf("[%v] failed to create scaled context: %v", migrateAdUserOperation, err)
 		return nil, nil, err
 	}
+	wc, err := wrangler.NewContext(context.Background(), nil, clientConfig)
+	if err != nil {
+		logrus.Errorf("[%v] failed to create wrangler context: %v", migrateAdUserOperation, err)
+	}
+	sc.Wrangler = wc
 	adConfig, err := adConfiguration(sc)
 	if err != nil {
 		logrus.Errorf("[%v] failed to acquire ad configuration: %v", migrateAdUserOperation, err)

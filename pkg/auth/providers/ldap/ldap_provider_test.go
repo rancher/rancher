@@ -9,9 +9,9 @@ import (
 	"github.com/rancher/norman/objectclient"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -82,7 +82,7 @@ func Test_ldapProvider_getLDAPConfig(t *testing.T) {
 	type fields struct {
 		ctx                   context.Context
 		authConfigs           v3.AuthConfigInterface
-		secrets               corev1.SecretInterface
+		secrets               wcorev1.SecretController
 		userMGR               user.Manager
 		tokenMGR              *tokens.Manager
 		certs                 string
