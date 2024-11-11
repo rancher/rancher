@@ -86,8 +86,8 @@ github.com/rancher/aks-operator v1.10.0 h1:9PGJUyzso2Tg9o64sYI6++mCke9ToRchvN5uZ
 github.com/rancher/aks-operator v1.10.0/go.mod h1:n7CBXwN5mpJZT7/3PYg6cWBAVCqjayhaUiRtTCH1FMQ=
 github.com/rancher/eks-operator v1.10.0 h1:a3l3nmoIf5EiYS4BQ+a9Z8+0WwZ3duek6gnrT6VZKwk=
 github.com/rancher/eks-operator v1.10.0/go.mod h1:coW31jIfImAHdGsepc7yCXSuixdclQkJn3y26E9tsss=
-github.com/rancher/fleet/pkg/apis v0.11.0-rc.2 h1:ZSCdGlmtd0UEZaHgFG2W3c6tx4wjO9x30wPVNJDssZU=
-github.com/rancher/fleet/pkg/apis v0.11.0-rc.2/go.mod h1:NO2Vo3bZ1jhjT6Bt+/ydij8O1xeQ1706LeAqWqIhvZQ=
+github.com/rancher/fleet/pkg/apis v0.11.0 h1:4OjUfgGdGMQUOHDI8HWN79N9P4U5g9XiPCCbrkZVOMo=
+github.com/rancher/fleet/pkg/apis v0.11.0/go.mod h1:8nvuO8x0z7ydpW0eZJEEEPHI0Bmb9T5L3igH0t+0dDk=
 github.com/rancher/gke-operator v1.10.0 h1:vV9jLErnH5VRBpK/kCzem8T7/yEDqLVXIcv20Or7e7I=
 github.com/rancher/gke-operator v1.10.0/go.mod h1:k3oIJMCilpaLHeHPRy90S3pfZ05vbe+b+g1ISiHQbLo=
 github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813 h1:V/LY8pUHZG9Kc+xEDWDOryOnCU6/Q+Lsr9QQEQnshpU=
@@ -96,8 +96,8 @@ github.com/rancher/norman v0.0.0-20241001183610-78a520c160ab h1:ihK6See3y/JilqZl
 github.com/rancher/norman v0.0.0-20241001183610-78a520c160ab/go.mod h1:qX/OG/4wY27xSAcSdRilUBxBumV6Ey2CWpAeaKnBQDs=
 github.com/rancher/rke v1.7.0-rc.5 h1:kBRwXTW8CYPXvCcPLISiwGTCvJ8K/+b35D5ES0IcduM=
 github.com/rancher/rke v1.7.0-rc.5/go.mod h1:+x++Mvl0A3jIzNLiu8nkraqZXiHg6VPWv0Xl4iQCg+A=
-github.com/rancher/wrangler/v3 v3.1.0-rc.1 h1:tEZZjDj4lOyQeqEcrl6d5Xr+QAS04vOInS43QqJz1LQ=
-github.com/rancher/wrangler/v3 v3.1.0-rc.1/go.mod h1:gUPHS1ANs2NyByfeERHwkGiQ1rlIa8BpTJZtNSgMlZw=
+github.com/rancher/wrangler/v3 v3.1.0 h1:8ETBnQOEcZaR6WBmUSysWW7WnERBOiNTMJr4Dj3UG/s=
+github.com/rancher/wrangler/v3 v3.1.0/go.mod h1:gUPHS1ANs2NyByfeERHwkGiQ1rlIa8BpTJZtNSgMlZw=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=

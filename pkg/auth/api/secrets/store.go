@@ -8,10 +8,10 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 )
 
-func Wrap(store types.Store, secrets wcorev1.SecretController) types.Store {
+func Wrap(store types.Store, secrets corev1.SecretInterface) types.Store {
 	return &Store{
 		Store:   store,
 		Secrets: secrets,
@@ -20,7 +20,7 @@ func Wrap(store types.Store, secrets wcorev1.SecretController) types.Store {
 
 type Store struct {
 	types.Store
-	Secrets wcorev1.SecretController
+	Secrets corev1.SecretInterface
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {

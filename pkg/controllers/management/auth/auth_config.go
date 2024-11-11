@@ -52,7 +52,7 @@ func newAuthConfigController(context context.Context, mgmt *config.ManagementCon
 	controller := &authConfigController{
 		users:                   mgmt.Management.Users("").Controller().Lister(),
 		authRefresher:           providerrefresh.NewUserAuthRefresher(context, scaledContext),
-		cleanup:                 cleanup.NewCleanupService(mgmt.Wrangler.Core.Secret(), mgmt.Wrangler.Mgmt),
+		cleanup:                 cleanup.NewCleanupService(mgmt.Core.Secrets(""), mgmt.Wrangler.Mgmt),
 		authConfigsUnstructured: scaledContext.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 	}
 	return controller
