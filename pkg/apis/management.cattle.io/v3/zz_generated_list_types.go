@@ -213,23 +213,6 @@ func NewCluster(namespace, name string, obj Cluster) *Cluster {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterLoggingList is a list of ClusterLogging resources
-type ClusterLoggingList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterLogging `json:"items"`
-}
-
-func NewClusterLogging(namespace, name string, obj ClusterLogging) *ClusterLogging {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterLogging").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ClusterProxyConfigList is a list of ClusterProxyConfig resources
 type ClusterProxyConfigList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -784,23 +767,6 @@ type ProjectList struct {
 
 func NewProject(namespace, name string, obj Project) *Project {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Project").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectLoggingList is a list of ProjectLogging resources
-type ProjectLoggingList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectLogging `json:"items"`
-}
-
-func NewProjectLogging(namespace, name string, obj ProjectLogging) *ProjectLogging {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectLogging").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
