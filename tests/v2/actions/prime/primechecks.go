@@ -5,7 +5,6 @@ import (
 
 	"github.com/rancher/shepherd/clients/rancher"
 	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/rancherversion"
 )
 
 const (
@@ -15,7 +14,7 @@ const (
 
 // CheckUIBrand checks the UI brand of Rancher Prime. If the Rancher instance is not Rancher Prime, the UI brand should be blank.
 func CheckUIBrand(client *rancher.Client, isPrime bool, rancherBrand *client.Setting, brand string) error {
-	if isPrime && brand != rancherBrand.Value {
+	if isPrime && brand != rancherBrand.Default {
 		return fmt.Errorf("error: Rancher Prime UI brand %s does not match defined UI brand %s", rancherBrand.Value, brand)
 	}
 
@@ -23,9 +22,9 @@ func CheckUIBrand(client *rancher.Client, isPrime bool, rancherBrand *client.Set
 }
 
 // CheckVersion checks the if Rancher Prime is set to true and the version of Rancher.
-func CheckVersion(isPrime bool, rancherVersion string, serverConfig *rancherversion.Config) error {
-	if isPrime && rancherVersion != serverConfig.RancherVersion {
-		return fmt.Errorf("error: Rancher Prime: %t | Version: %s", isPrime, serverConfig.RancherVersion)
+func CheckVersion(isPrime bool, rancherVersion string, serverConfig *client.Setting) error {
+	if isPrime && rancherVersion != serverConfig.Value {
+		return fmt.Errorf("error: Rancher Prime: %t | Version: %s", isPrime, serverConfig.Value)
 	}
 
 	return nil
