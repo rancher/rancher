@@ -642,7 +642,7 @@ jobs:
         uses: actions/checkout@v4
       - name: install dependencies
         shell: bash
-        run: zypper install -y aws-cli wget jq
+        run: zypper install -y aws-cli wget jq awk
       - name: install gh
         shell: bash
         run: |
