@@ -30,27 +30,28 @@ snapshotInput:
     worker: false
 ```
 
-Additionally, S3 is a supported restore option. If you choose to use S3, then you must have it already enabled on the downstream cluster.
+Additionally, S3 is a supported restore option. If you choose to use S3, then you must have it already enabled on the downstream cluster. Please note that the `TestSnapshotReplaceNodes` test is specifically for S3-enabled clusters.
 
 These tests utilize Go build tags. Due to this, see the below example on how to run the tests:
 
 ### Snapshot restore
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreETCDOnlyTestSuite/TestSnapshotRestoreETCDOnly"` \
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreETCDOnlyTestSuite/TestSnapshotRestoreETCDOnlyDynamicInput"`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreETCDOnlyTestSuite/TestSnapshotRestoreETCDOnly"`
 
 ### Snapshot restore with K8s upgrade
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreK8sUpgradeTestSuite/TestSnapshotRestoreK8sUpgrade"` \
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreK8sUpgradeTestSuite/TestSnapshotRestoreK8sUpgradeDynamicInput"`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreK8sUpgradeTestSuite/TestSnapshotRestoreK8sUpgrade"`
 
-### Sanpshot restore with upgrade strategy
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreUpgradeStrategyTestSuite/TestSnapshotRestoreUpgradeStrategy"` \
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreUpgradeStrategyTestSuite/TestSnapshotRestoreUpgradeStrategyDynamicInput"`
+### Snapshot restore with upgrade strategy
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreUpgradeStrategyTestSuite/TestSnapshotRestoreUpgradeStrategy"`
 
-### Sanpshot restore - Windows clusters
+### S3 snapshot restore
+Note: This test is meant to be ran only with downstream clusters that have S3 backups enabled. If you are looking to utilize local backups, use one of the other tests instead.
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestS3SnapshotTestSuite/TestS3SnapshotRestore"`
+
+### Snapshot restore - Windows clusters
 Note: This test will only work with Windows nodes existing in the cluster. Run this test with a vSphere Windows node driver cluster or a custom cluster with a Windows node present.
 
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreWindowsTestSuite/TestSnapshotRestoreWindows"` \
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreWindowsTestSuite/TestSnapshotRestoreWindowsDynamicInput"`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreWindowsTestSuite/TestSnapshotRestoreWindows"`
 
-### Sanpshot additional tests
+### Snapshot additional tests
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotAdditionalTestsTestSuite$"`
