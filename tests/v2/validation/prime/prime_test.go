@@ -20,6 +20,7 @@ const (
 	systemRegistry = "system-default-registry"
 	localCluster   = "local"
 	uiBrand        = "ui-brand"
+	serverVersion  = "server-version"
 )
 
 type PrimeTestSuite struct {
@@ -63,10 +64,10 @@ func (t *PrimeTestSuite) TestPrimeUIBrand() {
 }
 
 func (t *PrimeTestSuite) TestPrimeVersion() {
-	serverConfig, err := rancherversion.RequestRancherVersion(t.client.RancherConfig.Host)
+	serverVersion, err := t.client.Management.Setting.ByID(serverVersion)
 	require.NoError(t.T(), err)
 
-	checkVersion := prime.CheckVersion(t.isPrime, t.rancherVersion, serverConfig)
+	checkVersion := prime.CheckVersion(t.isPrime, t.rancherVersion, serverVersion)
 	assert.NoError(t.T(), checkVersion)
 }
 

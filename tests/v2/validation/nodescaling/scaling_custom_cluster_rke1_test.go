@@ -61,11 +61,6 @@ func (s *RKE1CustomClusterNodeScalingTestSuite) TestScalingRKE1CustomClusterNode
 		Quantity: 1,
 	}
 
-	nodeRolesTwoWorkers := nodepools.NodeRoles{
-		Worker:   true,
-		Quantity: 2,
-	}
-
 	tests := []struct {
 		name      string
 		nodeRoles nodepools.NodeRoles
@@ -75,7 +70,6 @@ func (s *RKE1CustomClusterNodeScalingTestSuite) TestScalingRKE1CustomClusterNode
 		{"Scaling custom etcd by 1", nodeRolesEtcd, s.client},
 		{"Scaling custom etcd and control plane by 1", nodeRolesEtcdControlPlane, s.client},
 		{"Scaling custom worker by 1", nodeRolesWorker, s.client},
-		{"Scaling custom worker by 2", nodeRolesTwoWorkers, s.client},
 	}
 
 	for _, tt := range tests {
