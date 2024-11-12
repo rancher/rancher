@@ -50,4 +50,10 @@ type UIPluginStatus struct {
 	// CacheState is the cache status of the plugin.
 	// +nullable
 	CacheState string `json:"cacheState,omitempty"`
+	// Error is the error message if any.
+	Error string `json:"error,omitempty"`
+	// Ready is the readiness of the plugin.
+	// Defaults to false.
+	// +kubebuilder:default:=false
+	Ready bool `json:"ready,omitempty"`
 }
