@@ -340,7 +340,7 @@ def test_wl_with_clusterIp():
     test_pods = wait_for_pods_in_workload(p_client, workload_for_test, 2)
     validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
 
-#Converted to go test in TestLoadBalance
+#Converted to go test in TestLoadBalancer
 @if_check_lb
 def test_wl_with_lb():
     p_client = namespace["p_client"]

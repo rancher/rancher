@@ -180,14 +180,14 @@ func (p *PortTestSuite) TestClusterIP() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	hostPort := getHostPort()
+	port := getHostPort()
 
 	serviceName := namegen.AppendRandomString("test-service")
 	p.T().Logf("Creating service with name [%v]", serviceName)
 	ports := []corev1.ServicePort{
 		{
 			Protocol:   corev1.ProtocolTCP,
-			Port:       int32(hostPort),
+			Port:       int32(port),
 			TargetPort: intstr.FromInt(defaultPort),
 		},
 	}
@@ -198,14 +198,16 @@ func (p *PortTestSuite) TestClusterIP() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	p.validateClusterIP(steveClient, serviceResp.ID, hostPort, daemonsetName)
+	p.validateClusterIP(steveClient, serviceResp.ID, port, daemonsetName)
 }
 
-func (p *PortTestSuite) TestLoadBalance() {
+func (p *PortTestSuite) TestLoadBalancer() {
 	subSession := p.session.NewSession()
 	defer subSession.Cleanup()
 
-	p.validateCloudManager()
+	if !p.isCloudManagerEnabled() {
+		p.T().Skip("Load Balance test requires access to cloud provider.")
+	}
 
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
@@ -224,7 +226,7 @@ func (p *PortTestSuite) TestLoadBalance() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	hostPort := getHostPort()
+	port := getHostPort()
 	nodePort := getNodePort()
 
 	serviceName := namegen.AppendRandomString("test-service")
@@ -232,7 +234,7 @@ func (p *PortTestSuite) TestLoadBalance() {
 	ports := []corev1.ServicePort{
 		{
 			Protocol:   corev1.ProtocolTCP,
-			Port:       int32(hostPort),
+			Port:       int32(port),
 			TargetPort: intstr.FromInt(defaultPort),
 			NodePort:   int32(nodePort),
 		},
@@ -276,14 +278,14 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	})
 	require.NoError(p.T(), err)
 
-	hostPort := getHostPort()
+	port := getHostPort()
 
 	serviceName := namegen.AppendRandomString("test-service")
 	p.T().Logf("Creating service with name [%v]", serviceName)
 	ports := []corev1.ServicePort{
 		{
 			Protocol:   corev1.ProtocolTCP,
-			Port:       int32(hostPort),
+			Port:       int32(port),
 			TargetPort: intstr.FromInt(defaultPort),
 		},
 	}
@@ -300,7 +302,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 	p.validateWorkload(deploymentTemplate, containerImage, 3, namespace.Name)
-	p.validateClusterIP(steveClient, serviceResp.ID, hostPort, deploymentName)
+	p.validateClusterIP(steveClient, serviceResp.ID, port, deploymentName)
 
 	log.Info("Scaling down deployment")
 	replicas = int32(2)
@@ -308,7 +310,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 	p.validateWorkload(deploymentTemplate, containerImage, 2, namespace.Name)
-	p.validateClusterIP(steveClient, serviceResp.ID, hostPort, deploymentName)
+	p.validateClusterIP(steveClient, serviceResp.ID, port, deploymentName)
 
 	log.Info("Upgrating deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
@@ -319,7 +321,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 	p.validateWorkload(deploymentTemplate, containerImage, 2, namespace.Name)
-	p.validateClusterIP(steveClient, serviceResp.ID, hostPort, deploymentName)
+	p.validateClusterIP(steveClient, serviceResp.ID, port, deploymentName)
 }
 
 func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
@@ -470,7 +472,9 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	subSession := p.session.NewSession()
 	defer subSession.Cleanup()
 
-	p.validateCloudManager()
+	if !p.isCloudManagerEnabled() {
+		p.T().Skip("Load Balance test requires access to cloud provider.")
+	}
 
 	log.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(p.client, p.cluster.ID)
@@ -497,7 +501,7 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	})
 	require.NoError(p.T(), err)
 
-	hostPort := getHostPort()
+	port := getHostPort()
 	nodePort := getNodePort()
 
 	serviceName := namegen.AppendRandomString("test-service")
@@ -505,7 +509,7 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	ports := []corev1.ServicePort{
 		{
 			Protocol:   corev1.ProtocolTCP,
-			Port:       int32(hostPort),
+			Port:       int32(port),
 			TargetPort: intstr.FromInt(defaultPort),
 			NodePort:   int32(nodePort),
 		},
@@ -725,7 +729,7 @@ func (p *PortTestSuite) validateLoadBalance(steveClient *steveV1.Client, nodePor
 	}
 }
 
-func (p *PortTestSuite) validateCloudManager() {
+func (p *PortTestSuite) isCloudManagerEnabled() bool {
 	log.Info("Checking cluster version and if the cloud-controller-manager is installed")
 	catalogClient, err := p.client.GetClusterCatalogClient(p.cluster.ID)
 	require.NoError(p.T(), err)
@@ -742,8 +746,10 @@ func (p *PortTestSuite) validateCloudManager() {
 
 	_, err = catalogClient.Apps(kubeSystemNamespace).Get(context.TODO(), cloudControllerManager, metav1.GetOptions{})
 	if !strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") && err != nil && strings.Contains(err.Error(), "not found") {
-		p.T().Skip("Load Balance test requires access to cloud provider.")
+		return false
 	}
+
+	return true
 }
 
 func (p *PortTestSuite) validateNodePool(steveClient *steveV1.Client) {
