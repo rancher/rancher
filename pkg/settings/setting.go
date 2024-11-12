@@ -110,7 +110,6 @@ var (
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
 	SystemNamespaces                    = NewSetting("system-namespaces", strings.Join(systemNamespaces, ","))
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")
-	TelemetryOpt                        = NewSetting("telemetry-opt", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                          = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
@@ -327,8 +326,9 @@ var (
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
 
-	// The following settings are only used outside of Rancher (UI, telemetry)
-	// but needed to be known so that Rancher doesn't remove them on startup.
+	// The following settings are only used outside of Rancher (for example,
+	// by the UI) but need to be known so that Rancher doesn't remove them
+	// on startup.
 	_ = NewSetting("eula-agreed", "")
 	_ = NewSetting("display-add-extension-repos-banner", "")
 	_ = NewSetting("ui-logo-light", "")
@@ -338,7 +338,6 @@ var (
 	_ = NewSetting("has-support", "")
 	_ = NewSetting("auth-password-requirements-description", "")
 	_ = NewSetting("api-host", "")
-	_ = NewSetting("telemetry-uid", "")
 
 	// UnprivilegedJailUser controls whether jailed commands execute under a separate (unprivileged/non-root) user
 	// account. Setting it to false is only recommended for testing and development environments.
