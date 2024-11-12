@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -39,16 +41,21 @@ var (
 //
 // This should only be started in the leader pod.
 func StartServiceAccountSecretCleaner(ctx context.Context, client clientcorev1.CoreV1Interface) error {
+	if strings.ToLower(os.Getenv("DISABLE_SECRET_CLEANER")) == "true" {
+		logrus.Info("ServiceAccountSecretCleaner disabled - not starting")
+		return nil
+	}
+
 	secrets := client.Secrets(impersonationNamespace)
 	serviceAccounts := client.ServiceAccounts(impersonationNamespace)
-
-	logrus.Info("Starting ServiceAccountSecretCleaner")
-	ticker := time.NewTicker(cleanCycleDelay)
 
 	secretsQueue, err := loadSecretQueue(ctx, secrets, pageSize)
 	if err != nil {
 		return err
 	}
+
+	logrus.Infof("Starting ServiceAccountSecretCleaner with %v secrets", secretsQueue.List.Len())
+	ticker := time.NewTicker(cleanCycleDelay)
 
 	go func() {
 		for {
@@ -61,7 +68,10 @@ func StartServiceAccountSecretCleaner(ctx context.Context, client clientcorev1.C
 					logrus.Error(err)
 				}
 				if l := secretsQueue.List.Len(); l > 0 {
-					logrus.Infof("SecretCleaner has %v secrets remaining", l)
+					logrus.Infof("ServiceAccountSecretCleaner has %v secrets remaining", l)
+				} else {
+					logrus.Info("ServiceAccountSecretCleaner has no secrets remaining - terminating")
+					return
 				}
 				// This ensures that no matter how long the cleaning takes,
 				// we'll alwas keep the same cycle time.

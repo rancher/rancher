@@ -107,6 +107,40 @@ func TestStartServiceAccountSecretCleaner(t *testing.T) {
 	require.Equal(t, 2, len(secretList.Items))
 }
 
+func TestStartServiceAccountSecretCleanerWhenDisabled(t *testing.T) {
+	oldDelay := cleanCycleDelay
+	oldBatchSize := cleaningBatchSize
+
+	t.Cleanup(func() {
+		cleanCycleDelay = oldDelay
+		cleaningBatchSize = oldBatchSize
+	})
+
+	cleanCycleDelay = 500 * time.Millisecond
+	cleaningBatchSize = 5
+
+	var secrets []runtime.Object
+	for i := range 7 {
+		secrets = append(secrets, newSecret(fmt.Sprintf("test-%v", i)))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	k8sClient := fake.NewSimpleClientset(secrets...)
+
+	t.Setenv("DISABLE_SECRET_CLEANER", "true")
+
+	StartServiceAccountSecretCleaner(ctx, k8sClient.CoreV1())
+	<-time.After(time.Second)
+	cancel()
+
+	secretList, err := k8sClient.CoreV1().Secrets(impersonationNamespace).List(
+		context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+
+	// No secrets should be deleted.
+	require.Equal(t, 7, len(secretList.Items))
+}
+
 func withNoLabels(s *corev1.Secret) {
 	s.ObjectMeta.Labels = map[string]string{}
 }
