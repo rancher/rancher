@@ -8,9 +8,10 @@ const (
 	// defaultRegistrySettingID is a private constant string that contains the ID of system default registry setting.
 	defaultRegistrySettingID = "system-default-registry"
 	// serverURLSettingID is a private constant string that contains the ID of server URL setting.
-	serverURLSettingID = "server-url"
-	rancherChartsName  = "rancher-charts"
-	active             = "active"
+	serverURLSettingID   = "server-url"
+	rancherChartsName    = "rancher-charts"
+	rancherPartnerCharts = "rancher-partner-charts"
+	active               = "active"
 )
 
 // InstallOptions is a struct of the required options to install a chart.
