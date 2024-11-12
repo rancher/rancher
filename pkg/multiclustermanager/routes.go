@@ -30,7 +30,6 @@ import (
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
-	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/version"
@@ -116,7 +115,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
 	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
-	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3").Handler(managementAPI)
