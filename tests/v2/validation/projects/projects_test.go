@@ -271,7 +271,7 @@ func (pr *ProjectsTestSuite) TestProjectWithResourceQuotaAndContainerDefaultReso
 	require.NoError(pr.T(), err)
 
 	log.Info("Create a deployment in the namespace with two replicas and verify that the pods are created.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pr.cluster.ID, createdNamespace.Name, 2, "", "", false, false, true)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, pr.cluster.ID, createdNamespace.Name, 2, "", "", false, false, false, true)
 	require.NoError(pr.T(), err, "Failed to create deployment in the namespace")
 
 	log.Info("Verify that the resource limits and requests for the container in the pod spec is accurate.")
