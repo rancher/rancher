@@ -101,6 +101,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		authServer *auth.Server
 	)
 
+	logrus.Infof("CAPI chart version: %s", settings.RancherProvisioningCAPIVersion.Get())
+	logrus.Infof("Webhook chart version: %s", settings.RancherWebhookVersion.Get())
+
 	if opts == nil {
 		opts = &Options{}
 	}

@@ -137,6 +137,8 @@ $GOBIN test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
   exit 1
 }
 
+dump_rancher_logs
+
 echo Running tox tests
 INT_TESTS_STARTED=true
 cd ./tests/integration
