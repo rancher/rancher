@@ -129,8 +129,6 @@ jobs:
             latest=false
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        with:
-          image: registry.suse.com/rancher/mirrored-binfmt:latest
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Create k3s images file
@@ -175,7 +173,7 @@ jobs:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     services:
       registry:
-        image: registry.suse.com/suse/registry:2.8
+        image: registry:2
         ports:
           - 5000:5000
     env:
@@ -207,8 +205,6 @@ jobs:
             latest=false
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        with:
-          image: registry.suse.com/rancher/mirrored-binfmt:latest
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -476,8 +472,6 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        with:
-          image: registry.suse.com/rancher/mirrored-binfmt:latest
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Download chart
