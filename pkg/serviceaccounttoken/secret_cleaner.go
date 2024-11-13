@@ -54,6 +54,8 @@ func StartServiceAccountSecretCleaner(ctx context.Context, client clientcorev1.C
 		return err
 	}
 
+	startTime := time.Now()
+
 	logrus.Infof("Starting ServiceAccountSecretCleaner with %v secrets", secretsQueue.List.Len())
 	ticker := time.NewTicker(cleanCycleDelay)
 
@@ -70,7 +72,7 @@ func StartServiceAccountSecretCleaner(ctx context.Context, client clientcorev1.C
 				if l := secretsQueue.List.Len(); l > 0 {
 					logrus.Infof("ServiceAccountSecretCleaner has %v secrets remaining", l)
 				} else {
-					logrus.Info("ServiceAccountSecretCleaner has no secrets remaining - terminating")
+					logrus.Infof("ServiceAccountSecretCleaner has no secrets remaining - terminating at %v", time.Since(startTime))
 					return
 				}
 				// This ensures that no matter how long the cleaning takes,
@@ -108,7 +110,7 @@ func CleanServiceAccountSecrets(ctx context.Context, secrets clientv1.SecretInte
 	}
 
 	for _, secret := range toBeDeleted {
-		logrus.Infof("Deleting ServiceAccount Secret %s", logKeyFromObject(secret))
+		logrus.Debugf("Deleting ServiceAccount Secret %s", logKeyFromObject(secret))
 		if err := secrets.Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
 			deletionErr = errors.Join(deletionErr, err)
 		}
