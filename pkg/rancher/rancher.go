@@ -272,7 +272,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
 	}
-	if features.UIExtension.Enabled() {
+
+	if features.MCM.Enabled() && features.UIExtension.Enabled() {
 		plugin.Register(ctx, r.Wrangler)
 	}
 
