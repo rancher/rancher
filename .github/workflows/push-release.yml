@@ -13,6 +13,7 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   REGISTRY: "stgregistry.suse.com"
+  DOCKERIO_REGISTRY: "docker.io"
   AWS_DEFAULT_REGION: "us-east-1"
 jobs:
   unit-tests:
@@ -170,7 +171,7 @@ jobs:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     services:
       registry:
-        image: registry:2
+        image: registry.suse.com/suse/registry:2.8
         ports:
           - 5000:5000
     env:
@@ -272,7 +273,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
-      - name: Login to Docker Hub
+      - name: Login to registry
         uses: docker/login-action@v3
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
@@ -353,20 +354,28 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
+      - name: Login to registry
         uses: docker/login-action@v3
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
           registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.REGISTRY}}/${{ env.IMAGE }}:${{ env.TAG }} ${{ env.REGISTRY}}/${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY}}/${{ env.IMAGE }}:${{ env.TAG }}-arm64
@@ -389,20 +398,28 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
+      - name: Login to registry
         uses: docker/login-action@v3
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
           registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Create manifest list and push
         run: |
           # docker manifest is used with windows images to maintain os.version in the manifest
@@ -465,6 +482,14 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
       - name: Docker Registry Login
         uses: docker/login-action@v3
         with:
@@ -506,8 +531,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -521,12 +544,22 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
+      - name: Login to registry
         uses: docker/login-action@v3
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
           registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.REGISTRY}}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} ${{ env.REGISTRY}}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY}}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
