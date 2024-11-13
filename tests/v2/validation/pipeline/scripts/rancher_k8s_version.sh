@@ -4,13 +4,13 @@ latest_rancher_version=$(curl -s https://prime.ribs.rancher.io/index.html | grep
 echo "Latest Rancher Version: $latest_rancher_version"
 
 k8s_versions=$(curl -s "https://prime.ribs.rancher.io/rancher/${latest_rancher_version}/rancher-images.txt" | grep "rancher/hardened-kubernetes:" | awk -F':' '{print $2}'  | awk -F '-build' '{print $1}' | sort -V | awk -F '.' '
-        {versions[$1"."$2] = $0} # Keep only the latest version for each major.minor
+        {versions[$1"."$2] = $0} 
         END {
-            for (v in versions) print versions[v]","
+            for (v in versions) print versions[v]""
         }' | sort -V | tail -n 2)
 
 
 # Output the results
-echo "Latest Kubernetes Versions:"
-echo "$k8s_versions"
+echo "Latest Kubernetes Versions: "
+echo "$k8s_versions" 
 

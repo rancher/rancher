@@ -169,9 +169,18 @@ node {
                   def configContents = env.CONFIG
 
                   def rancherK8sVersions = ""
+
+                  echo "Printing the contents of the directory"
+
+                  sh "ls -l"
+
+                  sh "pwd"
+
+                  echo "Before the start of script."
+
                   try{
                       rancherK8sVersions= sh (
-                        script: "${workPath}pipeline/scripts/rancher_k8s_version.sh",
+                        script: "./pipeline/scripts/rancher_k8s_version.sh",
                         returnStdout: true
                       )
                     } catch(err){
