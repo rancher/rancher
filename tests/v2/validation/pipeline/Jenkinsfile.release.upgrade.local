@@ -150,6 +150,14 @@ node {
           dir ("./") {
             try {
               stage('Configure and Build') {
+                config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+                config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+                config = config.replace('${AWS_IAM_PROFILE}', env.AWS_IAM_PROFILE)
+                config = config.replace('${AWS_REGION}', env.AWS_REGION)
+                config = config.replace('${AWS_VPC}', env.AWS_VPC)
+                config = config.replace('${AWS_SECURITY_GROUPS}', env.AWS_SECURITY_GROUPS)
+                config = config.replace('${ADMIN_PASSWORD}', env.ADMIN_PASSWORD)
+            
                 if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
                   dir("./rancher/tests/v2/validation/.ssh") {
                     def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
@@ -160,9 +168,37 @@ node {
                   def filename = "config.yaml"
                   def configContents = env.CONFIG
 
+                  def rancherK8sVersions = ""
+                  try{
+                      rancherK8sVersions= sh (
+                        script: "${workPath}pipeline/scripts/rancher_k8s_version.sh",
+                        returnStdout: true
+                      )
+                    } catch(err){
+                     echo "Unable to get the versions of rancher and k8s " + err
+                    }
+
+                  // Parse the output
+                  def lines = rancherK8sVersions.split('\n')
+                  def rancherVersion = lines[0].replace("Latest Rancher Version: ", "").trim()
+                  def k8sVersions = lines[1].replace("Latest Kubernetes Versions: ", "").trim()
+
+                  def versionArray = k8sVersions.split(',')
+                  def preUpgradeK8s = versionArray[0]?.trim() 
+                  def postUpgradeK8s = versionArray[1]?.trim() 
+
+                  echo "Rancher Version: ${rancherVersion}"
+                  echo "Kubernetes Versions: ${k8sVersions}"
+
+                  sh "./yq e '.corralConfigs.corralConfigVars.rancher_image_tag = \"${rancherVersion}\"' -i ${configPath}"
+                  sh "./yq e '.corralConfigs.corralConfigVars.rancher_version = \"${rancherVersion}\"' -i ${configPath}"
+                  sh "./yq e '.corralConfigs.corralConfigVars.kubernetes_version = \"${preUpgradeK8s}\"' -i ${configPath}"
+                  sh "./yq e '.rancher.host = \"${rancherHostName}\"' -i ${configPath}"
+
                   writeFile file: filename, text: configContents
                   env.CATTLE_TEST_CONFIG = workPath+filename
                 }
+
                 dir ("./") {
                   sh "./rancher/tests/v2/validation/configure.sh"
                   sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e --build-arg CORRAL_VERSION=${env.CORRAL_VERSION} --build-arg RKE_VERSION=${env.RKE_VERSION} -t ${imageName}"
