@@ -246,7 +246,7 @@ func (p *PortTestSuite) TestLoadBalancer() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	p.validateLoadBalance(steveClient, nodePort, daemonsetName)
+	p.validateLoadBalancer(steveClient, nodePort, daemonsetName)
 }
 
 func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
@@ -312,7 +312,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	p.validateWorkload(deploymentTemplate, containerImage, 2, namespace.Name)
 	p.validateClusterIP(steveClient, serviceResp.ID, port, deploymentName)
 
-	log.Info("Upgrating deployment")
+	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
 		c.Name = namegen.AppendRandomString("test-upgrade")
 	}
@@ -335,7 +335,9 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
-	p.validateNodePool(steveClient)
+	if !p.isNodePool(steveClient) {
+		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes.")
+	}
 
 	hostPort := getHostPort()
 
@@ -380,7 +382,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	p.validateWorkload(deploymentTemplate, containerImage, 2, namespace.Name)
 	p.validateHostPortSSH(steveClient, hostPort, deploymentName, namespace.Name)
 
-	log.Info("Upgrating deployment")
+	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
 		c.Name = namegen.AppendRandomString("test-upgrade")
 	}
@@ -456,7 +458,7 @@ func (p *PortTestSuite) TestNodePortScaleAndUpgrade() {
 	p.validateWorkload(deploymentTemplate, containerImage, 2, namespace.Name)
 	p.validateNodePort(steveClient, nodePort, deploymentName)
 
-	log.Info("Upgrating deployment")
+	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
 		c.Name = namegen.AppendRandomString("test-upgrade")
 	}
@@ -528,7 +530,7 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 	p.validateWorkload(deploymentTemplate, containerImage, 3, namespace.Name)
-	p.validateLoadBalance(steveClient, nodePort, deploymentName)
+	p.validateLoadBalancer(steveClient, nodePort, deploymentName)
 
 	log.Info("Scaling down deployment")
 	replicas = int32(2)
@@ -536,9 +538,9 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 	p.validateWorkload(deploymentTemplate, containerImage, 2, namespace.Name)
-	p.validateLoadBalance(steveClient, nodePort, deploymentName)
+	p.validateLoadBalancer(steveClient, nodePort, deploymentName)
 
-	log.Info("Upgrating deployment")
+	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
 		c.Name = namegen.AppendRandomString("test-upgrade")
 	}
@@ -547,7 +549,7 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 	p.validateWorkload(deploymentTemplate, containerImage, 2, namespace.Name)
-	p.validateLoadBalance(steveClient, nodePort, deploymentName)
+	p.validateLoadBalancer(steveClient, nodePort, deploymentName)
 }
 
 // This must be a valid port number, 10250 < hostPort < 65536
@@ -703,7 +705,7 @@ func (p *PortTestSuite) validateHostPortSSH(steveClient *steveV1.Client, hostPor
 	}
 }
 
-func (p *PortTestSuite) validateLoadBalance(steveClient *steveV1.Client, nodePort int, workloadName string) {
+func (p *PortTestSuite) validateLoadBalancer(steveClient *steveV1.Client, nodePort int, workloadName string) {
 	p.T().Logf("Getting the node using the label [%v]", labelWorker)
 	query, err := url.ParseQuery(labelWorker)
 	assert.NoError(p.T(), err)
@@ -752,7 +754,7 @@ func (p *PortTestSuite) isCloudManagerEnabled() bool {
 	return true
 }
 
-func (p *PortTestSuite) validateNodePool(steveClient *steveV1.Client) {
+func (p *PortTestSuite) isNodePool(steveClient *steveV1.Client) bool {
 	log.Info("Checking node pool")
 
 	p.T().Logf("Getting the node using the label [%v]", labelWorker)
@@ -763,9 +765,7 @@ func (p *PortTestSuite) validateNodePool(steveClient *steveV1.Client) {
 	assert.NoError(p.T(), err)
 	assert.NotEmpty(p.T(), nodeList.Data)
 
-	if len(nodeList.Data) < 3 {
-		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes.")
-	}
+	return len(nodeList.Data) >= 3
 }
 
 func TestPortTestSuite(t *testing.T) {
