@@ -56,7 +56,9 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	pattern := FSCacheRootDir + "/*/*"
 	fsCacheFiles, err := fsCacheFilepathGlob(pattern)
 	if err != nil {
-		return plugin, fmt.Errorf("failed to get files from filesystem cache: %w", err)
+		err = fmt.Errorf("failed to get files from filesystem cache: %w", err)
+		logrus.Errorf(err.Error())
+		return plugin, err
 	}
 	FsCache.SyncWithIndex(&Index, fsCacheFiles)
 	if plugin == nil {
@@ -84,6 +86,8 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 			_, err2 := h.plugin.Update(p)
 			if err2 != nil {
 				logrus.Errorf("failed to update plugin [%s] noCache flag: %s", p.Spec.Plugin.Name, err2.Error())
+				p.Status.Ready = false
+				p.Status.Error = "Failed to cache plugin due to max file size limit"
 				continue
 			}
 			// delete files that were written
@@ -93,16 +97,25 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 				continue
 			}
 			p.Status.CacheState = Disabled
-		} else {
+		} else if err2 != nil {
+			p.Status.Ready = false
+			p.Status.Error = "Failed to cache plugin"
 			err = err2
+		} else {
+			p.Status.Ready = true
+			p.Status.Error = ""
 		}
 	}
 	if err != nil {
-		return plugin, fmt.Errorf("failed to sync filesystem cache with controller cache: %w", err)
+		err = fmt.Errorf("failed to sync filesystem cache with controller cache: %w", err)
+		logrus.Errorf(err.Error())
+		return plugin, err
 	}
 	if !plugin.Spec.Plugin.NoCache {
 		plugin.Status.CacheState = Cached
 	}
-
+	if plugin.Status.Ready {
+		plugin.Status.Error = ""
+	}
 	return plugin, nil
 }
