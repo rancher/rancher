@@ -101,6 +101,9 @@ jobs:
       matrix:
         os: [linux]
         arch: [x64, arm64]
+    permissions:
+      contents: read
+      id-token: write
     env:
       ARCH: ${{ matrix.arch }}
     steps:
@@ -115,6 +118,18 @@ jobs:
       - name: install yq
         shell: bash
         run: sudo snap install yq
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - id: env 
@@ -173,9 +188,12 @@ jobs:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     services:
       registry:
-        image: registry:2
+        image: registry.suse.com/suse/registry:2.8
         ports:
           - 5000:5000
+    permissions:
+      contents: read
+      id-token: write
     env:
       REGISTRY: "127.0.0.1:5000"
       ARCH: ${{ matrix.arch }}
@@ -191,6 +209,18 @@ jobs:
       - name: install yq
         shell: bash
         run: sudo snap install yq
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -280,6 +310,7 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Build Windows Server Image
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
@@ -325,6 +356,7 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Push server image
         run: |
           image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -367,6 +399,7 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-arm64
@@ -389,8 +422,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -402,6 +433,9 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Create manifest list and push
         run: |
           # docker manifest is used with windows images to maintain os.version in the manifest
@@ -470,6 +504,7 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -505,15 +540,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_INSTALLER }}
-          flavor: |
-            latest=false
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -525,6 +551,16 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_INSTALLER }}
+          flavor: |
+            latest=false
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
