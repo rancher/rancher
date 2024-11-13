@@ -99,6 +99,9 @@ jobs:
       matrix:
         os: [linux]
         arch: [x64, arm64]
+    permissions:
+      contents: read
+      id-token: write
     env:
       ARCH: ${{ matrix.arch }}
     steps:
@@ -125,6 +128,18 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -174,6 +189,9 @@ jobs:
         image: registry.suse.com/suse/registry:2.8
         ports:
           - 5000:5000
+    permissions:
+      contents: read
+      id-token: write
     env:
       REGISTRY: "127.0.0.1:5000"
       ARCH: ${{ matrix.arch }}
@@ -201,6 +219,18 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
