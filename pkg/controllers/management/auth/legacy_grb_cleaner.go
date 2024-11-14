@@ -31,7 +31,7 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	}
 
 	cleanedObj := gbrCleanUp(obj)
-	return p.mgmt.Management.GlobalRoleBindings("").Update(cleanedObj)
+	return p.mgmt.Wrangler.Mgmt.GlobalRoleBinding().Update(cleanedObj)
 }
 
 // gbrCleanUp returns a clean GlobalRoleBinding based on filters specified within the function

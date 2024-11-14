@@ -3,7 +3,6 @@ package etcdsnapshot
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/rancher/shepherd/clients/rancher"
@@ -16,25 +15,59 @@ import (
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-// VerifySnapshots verifies that all snapshots come to an active state, and the correct number
+const (
+	expectedRKE1SnapshotLen = 1
+)
+
+// VerifyRKE1Snapshots verifies that all snapshots come to an active state, and the correct number
 // of snapshots were taken based on the number of nodes and snapshot type (s3 vs. local)
-func VerifySnapshots(client *rancher.Client, clusterName string, snapshotIDs []string, isRKE1 bool) error {
+func VerifyRKE1Snapshots(client *rancher.Client, clusterName string, snapshotIDs []string) error {
+	err := kwait.PollUntilContextTimeout(context.TODO(), 5*time.Second, extdefault.FiveMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+		var snapshotObj any
+		var state string
+
+		for _, snapshotID := range snapshotIDs {
+			snapshotObj, err = client.Management.EtcdBackup.ByID(snapshotID)
+			state = snapshotObj.(*management.EtcdBackup).State
+
+			if err != nil {
+				return false, nil
+			}
+
+			if state != "active" {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// RKE1 doesn't give us snapshot-per-node. It gives us one object representing the snapshot for the cluster.
+	if expectedRKE1SnapshotLen != len(snapshotIDs) {
+		logrus.Info(snapshotIDs)
+		return fmt.Errorf("unexpected number of snapshots. Expected %v but have %v", expectedRKE1SnapshotLen, len(snapshotIDs))
+	}
+
+	return nil
+}
+
+// VerifyV2ProvSnapshots verifies that all snapshots come to an active state, and the correct number
+// of snapshots were taken based on the number of nodes and snapshot type (s3 vs. local)
+func VerifyV2ProvSnapshots(client *rancher.Client, clusterName string, snapshotIDs []string) error {
 	isS3 := false
 	err := kwait.PollUntilContextTimeout(context.TODO(), 5*time.Second, extdefault.FiveMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var snapshotObj any
 		var state string
 
 		for _, snapshotID := range snapshotIDs {
-			if isRKE1 {
-				snapshotObj, err = client.Management.EtcdBackup.ByID(snapshotID)
-				state = snapshotObj.(*management.EtcdBackup).State
-			} else {
-				snapshotObj, err = client.Steve.SteveType(shepherdsnapshot.SnapshotSteveResourceType).ByID(snapshotID)
-				state = snapshotObj.(*steveV1.SteveAPIObject).ObjectMeta.State.Name
+			snapshotObj, err = client.Steve.SteveType(shepherdsnapshot.SnapshotSteveResourceType).ByID(snapshotID)
+			state = snapshotObj.(*steveV1.SteveAPIObject).ObjectMeta.State.Name
 
-				if strings.HasSuffix(snapshotObj.(*steveV1.SteveAPIObject).Name, "-s3") {
-					isS3 = true
-				}
+			store, ok := snapshotObj.(*steveV1.SteveAPIObject).Annotations["etcdsnapshot.rke.io/storage"]
+			if ok && store == "s3" {
+				isS3 = true
 			}
 
 			if err != nil {
@@ -58,9 +91,7 @@ func VerifySnapshots(client *rancher.Client, clusterName string, snapshotIDs []s
 
 	expectedNewSnapshots, _ := MatchNodeToAnyEtcdRole(client, clusterID)
 
-	if isRKE1 {
-		expectedNewSnapshots = 1
-	} else if isS3 {
+	if isS3 {
 		expectedNewSnapshots = expectedNewSnapshots * 2
 	}
 

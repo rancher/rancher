@@ -6,23 +6,21 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/norman/httperror"
-
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -49,8 +47,8 @@ var scopes = []string{UserScope, GroupScope}
 type adProvider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
-	configMaps  corev1.ConfigMapLister
-	secrets     corev1.SecretInterface
+	configMaps  wcorev1.ConfigMapCache
+	secrets     wcorev1.SecretController
 	userMGR     user.Manager
 	certs       string
 	caPool      *x509.CertPool
@@ -61,8 +59,8 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	return &adProvider{
 		ctx:         ctx,
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		configMaps:  mgmtCtx.Core.ConfigMaps("").Controller().Lister(),
-		secrets:     mgmtCtx.Core.Secrets(""),
+		configMaps:  mgmtCtx.Wrangler.Core.ConfigMap().Cache(),
+		secrets:     mgmtCtx.Wrangler.Core.Secret(),
 		userMGR:     userMGR,
 		tokenMGR:    tokenMGR,
 	}

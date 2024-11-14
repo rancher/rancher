@@ -62,7 +62,7 @@ replace (
 
 require (
 	github.com/antihax/optional v1.0.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20241023011518-955534c18d04
+	github.com/rancher/rancher/pkg/apis v0.0.0-20241113133627-598640d1556c
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -129,7 +129,7 @@ require (
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1-rc.2
 	github.com/rancher/eks-operator v1.10.0
-	github.com/rancher/fleet/pkg/apis v0.11.0-rc.4
+	github.com/rancher/fleet/pkg/apis v0.11.0
 	github.com/rancher/gke-operator v1.10.0
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813
@@ -138,7 +138,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.0-rc.5
-	github.com/rancher/shepherd v0.0.0-20241023152838-da6b36b3b5b4
+	github.com/rancher/shepherd v0.0.0-20241113142845-1338e51b4891
 	github.com/rancher/steve v0.0.0-20241029132712-2175e090fe4b
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2

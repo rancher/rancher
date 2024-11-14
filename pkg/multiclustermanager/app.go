@@ -29,7 +29,6 @@ import (
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemtokens"
-	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -210,10 +209,6 @@ func (m *mcm) Start(ctx context.Context) error {
 		})
 		if err != nil {
 			return err
-		}
-
-		if err := telemetry.Start(ctx, m.httpsListenPort, m.ScaledContext); err != nil {
-			return errors.Wrap(err, "failed to telemetry")
 		}
 
 		go adunmigration.UnmigrateAdGUIDUsersOnce(m.ScaledContext)

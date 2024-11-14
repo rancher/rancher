@@ -70,7 +70,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 	// cached without having sufficient API permissions. Rancher has no precise control over when this secret is cached.
 	defer func() {
 		if err != nil {
-			if err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{}); err != nil {
+			if err = ap.secrets.Delete(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{}); err != nil {
 				logrus.Errorf("Failed to delete the Azure AD access token secret from Kubernetes")
 			}
 		}
