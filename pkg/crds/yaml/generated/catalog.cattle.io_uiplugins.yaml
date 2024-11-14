@@ -96,6 +96,9 @@ spec:
                   Ready is the readiness of the plugin.
                   Defaults to false.
                 type: boolean
+              retryAt:
+                description: RetryAt is the time at which the plugin should be retried.
+                type: boolean
             type: object
         required:
         - spec
