@@ -115,7 +115,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		}
 	}
 
-	if err := createMembershipRoles(obj, "cluster", l.crClient); err != nil {
+	if err := createMembershipRoles(obj, l.crClient); err != nil {
 		return nil, err
 	}
 
