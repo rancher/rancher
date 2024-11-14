@@ -49,19 +49,25 @@ func (rtl *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 		return nil, nil
 	}
 
+	clusterRoles := clusterRolesForRoleTemplate(rt)
+	for _, cr := range clusterRoles {
+		if err := rbac.CreateOrUpdateResource(cr, rtl.crClient, rbac.AreClusterRolesSame); err != nil {
+			return nil, err
+		}
+	}
+
+	return rt, nil
+}
+
+func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
 	// The rules for the role template includes external rules
 	rules := append(rt.Rules, rt.ExternalRules...)
 
-	// 1. Cluster role with rules
-	cr := rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rt.Name), rt.Name, rules)
-	if err := rbac.CreateOrUpdateResource(cr, rtl.crClient, rbac.AreClusterRolesSame); err != nil {
-		return nil, err
-	}
-
-	// 2. Aggregating cluster role
-	cr = rbac.BuildAggregatingClusterRole(rt, rbac.ClusterRoleNameFor)
-	if err := rbac.CreateOrUpdateResource(cr, rtl.crClient, rbac.AreAggregatingClusterRolesSame); err != nil {
-		return nil, err
+	res := []*rbacv1.ClusterRole{
+		// 1. Cluster role with rules
+		rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rt.Name), rt.Name, rules),
+		// 2. Aggregating cluster role
+		rbac.BuildAggregatingClusterRole(rt, rbac.ClusterRoleNameFor),
 	}
 
 	// Projects can have 2 extra cluster roles for global resources
