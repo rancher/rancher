@@ -56,4 +56,6 @@ type UIPluginStatus struct {
 	// Defaults to false.
 	// +kubebuilder:default:=false
 	Ready bool `json:"ready,omitempty"`
+	// RetryAt is the time at which the plugin should be retried.
+	RetryAt bool `json:"retryAt,omitempty"`
 }
