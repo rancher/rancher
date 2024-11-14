@@ -13,6 +13,7 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   REGISTRY: "docker.io"
+  DOCKERIO_REGISTRY: "docker.io"
   GH_CLI_VERSION: 2.57.0
 jobs:
   unit-tests:
@@ -220,7 +221,7 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
-          registry: ${{ env.REGISTRY }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
