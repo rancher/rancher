@@ -26,7 +26,7 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
-    name: Provisioning tests 
+    name: Provisioning tests
     runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
     steps:
       - name: Checkout
@@ -47,3 +47,33 @@ jobs:
           DRONE_BUILD_EVENT: "${{ github.event_name }}"
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
+
+  prebootstrap_provisioning_tests:
+    name: Provisioning Tests (w/ Prebootstrap)
+    runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - V2PROV_TEST_DIST: "rke2"
+        - V2PROV_TEST_DIST: "k3s"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: testdata
+        run: mkdir -p build/testdata
+      - name: Install Dapper
+        run: |
+          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
+          chmod +x ./.dapper
+      - name: Configure Docker for cgroupfs
+        run: |
+          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+      - name: Run tests
+        run: ./.dapper provisioning-tests
+        env:
+          DRONE_BUILD_EVENT: "${{ github.event_name }}"
+          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_Provisioning_.*$"
+          V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
+          PREBOOTSTRAP: "true"

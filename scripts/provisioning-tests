@@ -162,6 +162,20 @@ trap cleanup exit
 echo "Waiting for Rancher to be healthy"
 ./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
 
+if [ -z $PREBOOTSTRAP ]; then
+  echo "PREBOOTSTRAP specified - enabling feature flag"
+  ./scripts/retry \
+    --timeout 30 \
+    --sleep 2 \
+    "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get -o json features.management.cattle.io provisioningprebootstrap | jq '.spec.value = true' | kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml apply -f - 2>/dev/null"
+
+  sleep 10
+
+  echo "Waiting for Rancher to be healthy...again"
+  ./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
+fi
+
+
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
   --timeout 300 `# Time out after 300 seconds (5 min)` \
