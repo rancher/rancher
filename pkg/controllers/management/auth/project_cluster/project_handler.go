@@ -85,7 +85,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 		return nil, err
 	}
 
-	if err := createMembershipRoles(obj, "cluster", l.crClient); err != nil {
+	if err := createMembershipRoles(obj, l.crClient); err != nil {
 		return nil, err
 	}
 
