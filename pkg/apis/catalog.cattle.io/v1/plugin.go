@@ -56,6 +56,8 @@ type UIPluginStatus struct {
 	// Defaults to false.
 	// +kubebuilder:default:=false
 	Ready bool `json:"ready,omitempty"`
+	// RetryNumber is the number of times the plugin has been retried.
+	RetryNumber int `json:"retryNumber,omitempty"`
 	// RetryAt is the time at which the plugin should be retried.
-	RetryAt bool `json:"retryAt,omitempty"`
+	RetryAt metav1.Time `json:"retryAt,omitempty"`
 }
