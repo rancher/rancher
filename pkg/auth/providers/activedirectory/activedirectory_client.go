@@ -6,12 +6,11 @@ import (
 	"reflect"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/slice"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -20,7 +19,7 @@ import (
 
 var defaultUserAttributes = []string{MemberOfAttribute, ObjectClass, ObjectGUIDAttribute}
 
-func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveDirectoryConfig, caPool *x509.CertPool, testServiceAccountBind bool) (v3.Principal, []v3.Principal, error) {
+func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveDirectoryConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
 	username := adCredential.Username
@@ -28,7 +27,6 @@ func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveD
 	if password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
-	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
 
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
@@ -36,47 +34,50 @@ func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveD
 	}
 	defer lConn.Close()
 
-	serviceAccountPassword := config.ServiceAccountPassword
-	serviceAccountUserName := config.ServiceAccountUsername
-	if testServiceAccountBind {
-		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, config.DefaultLoginDomain, lConn)
-		if err != nil {
-			return v3.Principal{}, nil, err
-		}
-	}
-
-	logrus.Debug("Binding username password")
-	err = lConn.Bind(externalID, password)
-	if err != nil {
-		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
-			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
-		}
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
-	}
-
-	samName := username
+	sAMAccountName := username
 	if strings.Contains(username, `\`) {
-		samName = strings.SplitN(username, `\`, 2)[1]
+		sAMAccountName = strings.SplitN(username, `\`, 2)[1]
 	}
 
-	query := fmt.Sprintf("(%v=%v)", config.UserLoginAttribute, ldapv3.EscapeFilter(samName))
-	logrus.Debugf("LDAP Search query: {%s}", query)
-
-	search := ldap.NewWholeSubtreeSearchRequest(
-		config.UserSearchBase,
-		query,
-		config.GetUserSearchAttributes(defaultUserAttributes...),
-	)
-
-	result, err := lConn.Search(search)
+	err = ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountUsername, config.DefaultLoginDomain, lConn)
 	if err != nil {
 		return v3.Principal{}, nil, err
 	}
 
-	if len(result.Entries) < 1 {
-		return v3.Principal{}, nil, fmt.Errorf("Cannot locate user information for %s", search.Filter)
-	} else if len(result.Entries) > 1 {
-		return v3.Principal{}, nil, fmt.Errorf("ldap user search found more than one result")
+	filter := fmt.Sprintf(
+		"(&(%s=%s)%s)",
+		config.UserLoginAttribute,
+		ldapv3.EscapeFilter(sAMAccountName),
+		strings.TrimSpace(config.UserLoginFilter),
+	)
+	logrus.Debugf("LDAP Search query: {%s}", filter)
+
+	searchRequest := ldap.NewWholeSubtreeSearchRequest(
+		config.UserSearchBase,
+		filter,
+		config.GetUserSearchAttributes(defaultUserAttributes...),
+	)
+
+	result, err := lConn.Search(searchRequest)
+	if err == nil {
+		if nEntries := len(result.Entries); nEntries < 1 {
+			err = fmt.Errorf("cannot locate user information for %s", searchRequest.Filter)
+		} else if nEntries > 1 {
+			err = fmt.Errorf("ldap user search found more than one result")
+		}
+	}
+	if err != nil {
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
+	}
+
+	logrus.Debug("Binding username password")
+	externalID := ldap.GetUserExternalID(username, config.DefaultLoginDomain)
+	err = lConn.Bind(externalID, password)
+	if err != nil {
+		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
+		}
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, config, lConn)
@@ -107,10 +108,7 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	}
 	defer lConn.Close()
 
-	serviceAccountPassword := config.ServiceAccountPassword
-	serviceAccountUserName := config.ServiceAccountUsername
-
-	err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, config.DefaultLoginDomain, lConn)
+	err = ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountUsername, config.DefaultLoginDomain, lConn)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +120,7 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 
 	dn := externalID
 
-	logrus.Debugf("LDAP Refetch principals base DN : {%s}", dn)
+	logrus.Debugf("LDAP Refetch principals base DN: {%s}", dn)
 
 	search := ldap.NewBaseObjectSearchRequest(
 		dn,
@@ -135,9 +133,9 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 		return nil, err
 	}
 
-	if len(result.Entries) < 1 {
-		return nil, fmt.Errorf("Cannot locate user information for %s", search.Filter)
-	} else if len(result.Entries) > 1 {
+	if nEntries := len(result.Entries); nEntries < 1 {
+		return nil, fmt.Errorf("cannot locate user information for %s", search.Filter)
+	} else if nEntries > 1 {
 		return nil, fmt.Errorf("ldap user search found more than one result")
 	}
 
@@ -442,14 +440,14 @@ func (p *adProvider) searchUser(name string, config *v32.ActiveDirectoryConfig, 
 	for _, attr := range srchAttributes {
 		srchAttrs += fmt.Sprintf("(%v=%v*)", attr, name)
 	}
-	// UserSearchFilter should be follow AD search filter syntax, enclosed by parentheses
+	// UserSearchFilter should follow AD search filter syntax, and be enclosed in parentheses
 	query += srchAttrs + ")" + config.UserSearchFilter + ")"
 	logrus.Debugf("LDAPProvider searchUser query: %s", query)
 	return p.searchLdap(query, UserScope, config, lConn)
 }
 
 func (p *adProvider) searchGroup(name string, config *v32.ActiveDirectoryConfig, lConn *ldapv3.Conn) ([]v3.Principal, error) {
-	// GroupSearchFilter should be follow AD search filter syntax, enclosed by parentheses
+	// GroupSearchFilter should follow AD search filter syntax, and enclosed in parentheses
 	query := "(&(" + ObjectClass + "=" + config.GroupObjectClass + ")(" + config.GroupSearchAttribute + "=" + name + "*)" + config.GroupSearchFilter + ")"
 	logrus.Debugf("LDAPProvider searchGroup query: %s", query)
 	return p.searchLdap(query, GroupScope, config, lConn)
