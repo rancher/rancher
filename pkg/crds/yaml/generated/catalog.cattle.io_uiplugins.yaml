@@ -98,7 +98,12 @@ spec:
                 type: boolean
               retryAt:
                 description: RetryAt is the time at which the plugin should be retried.
-                type: boolean
+                format: date-time
+                type: string
+              retryNumber:
+                description: RetryNumber is the number of times the plugin has been
+                  retried.
+                type: integer
             type: object
         required:
         - spec
