@@ -9,7 +9,8 @@ import (
 func Register(ctx context.Context, workload *config.UserContext) {
 	management := workload.Management.WithAgent("rbac-role-templates")
 
-	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, "cluster-crtb-handler", newCRTBLifecycle(workload))
+	// FIXME: is this needed? wrong copy&paste?
+	// management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, "cluster-crtb-handler", newCRTBLifecycle(workload))
 
 	rth := newRoleTemplateHandler(workload)
 	management.Wrangler.Mgmt.RoleTemplate().OnChange(ctx, "cluster-roletemplate-change-handler", rth.OnChange)
