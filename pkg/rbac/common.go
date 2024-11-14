@@ -419,7 +419,7 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	aggregatingCRName := AggregatedClusterRoleNameFor(crName)
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: crName,
+			Name: aggregatingCRName,
 			// Label so other cluster roles can aggregate this one
 			Labels: map[string]string{
 				aggregationLabel: aggregatingCRName,
