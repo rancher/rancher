@@ -611,7 +611,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 }
 
 // grantManagementProjectScopedPrivilegesInClusterNamespace ensures that project roles grant permissions to certain cluster-scoped
-// resources(notifier, clusterpipelines). These resources exists in cluster namespace but need to be shared between projects.
+// resources. These resources exists in cluster namespace but need to be shared between projects.
 func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleTemplateName, clusterNamespace string, resources map[string]string,
 	subject v1.Subject, binding *v3.ProjectRoleTemplateBinding) error {
 	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
