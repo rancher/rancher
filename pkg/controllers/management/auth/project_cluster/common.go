@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,7 +45,7 @@ func deleteNamespace(obj runtime.Object, controller string, nsClient v1.Namespac
 	return err
 }
 
-func reconcileResourceToNamespace(obj runtime.Object, controller string, nsLister corev1.NamespaceLister, nsClient v1.NamespaceInterface) (runtime.Object, error) {
+func reconcileResourceToNamespace(obj runtime.Object, controller string, nsLister corev1.NamespaceCache, nsClient v1.NamespaceInterface) (runtime.Object, error) {
 	return apisv3.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		o, err := meta.Accessor(obj)
 		if err != nil {
@@ -56,7 +56,7 @@ func reconcileResourceToNamespace(obj runtime.Object, controller string, nsListe
 			return obj, err
 		}
 
-		ns, _ := nsLister.Get("", o.GetName())
+		ns, _ := nsLister.Get(o.GetName())
 		if ns == nil {
 			logrus.Infof("[%v] Creating namespace %v", controller, o.GetName())
 			_, err := nsClient.Create(context.TODO(), &v12.Namespace{

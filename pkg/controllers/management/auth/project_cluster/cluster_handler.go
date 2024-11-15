@@ -11,12 +11,11 @@ import (
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
-	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/types/config"
+	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,31 +44,31 @@ var (
 )
 
 type clusterLifecycle struct {
-	clusterClient      v3.ClusterInterface
-	crtbLister         v3.ClusterRoleTemplateBindingLister
-	crtbClient         v3.ClusterRoleTemplateBindingInterface
-	nsLister           corev1.NamespaceLister
+	clusterClient      v3.ClusterController
+	crtbLister         v3.ClusterRoleTemplateBindingCache
+	crtbClient         v3.ClusterRoleTemplateBindingController
+	nsLister           corev1.NamespaceCache
 	nsClient           k8scorev1.NamespaceInterface
-	projects           wranglerv3.ProjectClient
-	projectLister      v3.ProjectLister
+	projects           v3.ProjectClient
+	projectLister      v3.ProjectCache
 	rbLister           rbacv1.RoleBindingLister
 	roleBindings       rbacv1.RoleBindingInterface
-	roleTemplateLister v3.RoleTemplateLister
+	roleTemplateLister v3.RoleTemplateCache
 }
 
 // NewClusterLifecycle creates and returns a clusterLifecycle from a given ManagementContext
 func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle {
 	return &clusterLifecycle{
-		clusterClient:      management.Management.Clusters(""),
-		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		crtbClient:         management.Management.ClusterRoleTemplateBindings(""),
-		nsLister:           management.Core.Namespaces("").Controller().Lister(),
+		clusterClient:      management.Wrangler.Mgmt.Cluster(),
+		crtbLister:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		crtbClient:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		nsLister:           management.Wrangler.Core.Namespace().Cache(),
 		nsClient:           management.K8sClient.CoreV1().Namespaces(),
 		projects:           management.Wrangler.Mgmt.Project(),
-		projectLister:      management.Management.Projects("").Controller().Lister(),
+		projectLister:      management.Wrangler.Mgmt.Project().Cache(),
 		rbLister:           management.RBAC.RoleBindings("").Controller().Lister(),
 		roleBindings:       management.RBAC.RoleBindings(""),
-		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
+		roleTemplateLister: management.Wrangler.Mgmt.RoleTemplate().Cache(),
 	}
 }
 
@@ -103,7 +102,8 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
+		cluster := obj.(*apisv3.Cluster)
+		_, err = l.clusterClient.Update(cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,8 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
+		cluster := obj.(*apisv3.Cluster)
+		_, err = l.clusterClient.Update(cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +257,7 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 		return obj, nil
 	}
 
-	rt, err := l.roleTemplateLister.List("", labels.NewSelector())
+	rt, err := l.roleTemplateLister.List(labels.NewSelector())
 	if err != nil {
 		return obj, err
 	}
