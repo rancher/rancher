@@ -58,6 +58,7 @@ export DIST=${V2PROV_TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
 export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
+export CATTLE_FEATURES=${CATTLE_FEATURES}
 
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
@@ -150,17 +151,6 @@ export -f dump_rancher_logs
 # much
 #tail -F /tmp/rancher.log &
 #TPID=$!
-
-# enabling the `provisioningprebootstrap` feature flag if we're running that suite
-if echo "${V2PROV_TEST_RUN_REGEX}" | grep -q PreBootstrap ; then
-  echo "running PreBootstrap suite - enabling feature flag"
-
-  if [ -z "${CATTLE_FEATURES}" ]; then
-    export CATTLE_FEATURES="provisioningprebootstrap=true"
-  else
-    export CATTLE_FEATURES="${CATTLE_FEATURES},provisioningprebootstrap=true"
-  fi
-fi
 
 trap "exit 1" 42
 PWRAPPROC="$$"
