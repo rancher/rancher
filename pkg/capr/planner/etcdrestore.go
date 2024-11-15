@@ -672,7 +672,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 			stopPlan.Instructions = append(stopPlan.Instructions, generateRemoveTLSAndCredDirInstructions(controlPlane)...)
 		}
 		if !equality.Semantic.DeepEqual(server.Plan.Plan, stopPlan) {
-			if err := p.store.UpdatePlan(server, stopPlan, joinedServer, 0, 0, true); err != nil {
+			if err := p.store.UpdatePlan(server, stopPlan, joinedServer, 0, 0); err != nil {
 				return err
 			}
 			updated = true
