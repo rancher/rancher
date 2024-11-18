@@ -47,6 +47,8 @@ type UIPluginEntry struct {
 }
 
 type UIPluginStatus struct {
+	// ObservedGeneration is used by Rancher controller to track the latest generation of the resource that it triggered on.
+	ObservedGeneration int64 `json:"observedGeneration"`
 	// CacheState is the cache status of the plugin.
 	// +nullable
 	CacheState string `json:"cacheState,omitempty"`
