@@ -30,6 +30,8 @@ func main() {
 
 	configPackage := corral.PackagesConfig()
 
+	logrus.Info("Debug: Corral configs: ", corralConfig)
+
 	environmentFlags := environmentflag.NewEnvironmentFlags()
 	environmentflag.LoadEnvironmentFlags(environmentflag.ConfigurationFileKey, environmentFlags)
 	installRancher := environmentFlags.GetValue(environmentflag.InstallRancher)
