@@ -49,17 +49,24 @@ type PackageJSON struct {
 }
 
 // SyncWithControllersCache takes in a UI Plugin object and syncs the filesystem cache with it
-func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin) error {
+func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) error {
 	plugin := p.Spec.Plugin
 	if plugin.NoCache {
 		logrus.Debugf("skipped caching plugin [Name: %s Version: %s] cache is disabled [noCache: %v]", plugin.Name, plugin.Version, plugin.NoCache)
 		return nil
 	}
-	if isCached, err := c.isCached(plugin.Name, plugin.Version); err != nil {
-		return fmt.Errorf("failed to check if plugin is cached. Error: %w", err)
-	} else if isCached {
-		logrus.Debugf("skipped caching plugin [Name: %s Version: %s] is already cached", plugin.Name, plugin.Version)
-		return nil
+	if forceUpdate {
+		err := c.Delete(plugin.Name, plugin.Version)
+		if err != nil {
+			return fmt.Errorf("failed to delete cache during forceUpdate. Error: %w", err)
+		}
+	} else {
+		if isCached, err := c.isCached(plugin.Name, plugin.Version); err != nil {
+			return fmt.Errorf("failed to check if plugin is cached. Error: %w", err)
+		} else if isCached {
+			logrus.Debugf("skipped caching plugin [Name: %s Version: %s] is already cached", plugin.Name, plugin.Version)
+			return nil
+		}
 	}
 	version, err := getVersionFromPackageJSON(fmt.Sprintf("%s/%s", plugin.Endpoint, PackageJSONFilename))
 	if err != nil {
