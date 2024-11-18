@@ -90,7 +90,7 @@ func (r *roleTemplateHandler) OnChange(key string, rt *v3.RoleTemplate) (*v3.Rol
 		return nil, err
 	}
 	acr := rbac.BuildAggregatingClusterRole(rt, rbac.ClusterManagementPlaneClusterRoleNameFor)
-	if err := rbac.CreateOrUpdateResource(acr, r.crClient, rbac.AreAggregatingClusterRolesSame); err != nil {
+	if err := rbac.CreateOrUpdateResource(acr, r.crClient, rbac.AreClusterRolesSame); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +100,7 @@ func (r *roleTemplateHandler) OnChange(key string, rt *v3.RoleTemplate) (*v3.Rol
 		return nil, err
 	}
 	acr = rbac.BuildAggregatingClusterRole(rt, rbac.ClusterManagementPlaneClusterRoleNameFor)
-	if err := rbac.CreateOrUpdateResource(acr, r.crClient, rbac.AreAggregatingClusterRolesSame); err != nil {
+	if err := rbac.CreateOrUpdateResource(acr, r.crClient, rbac.AreClusterRolesSame); err != nil {
 		return nil, err
 	}
 
