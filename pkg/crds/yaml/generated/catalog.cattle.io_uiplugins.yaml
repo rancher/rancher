@@ -90,6 +90,11 @@ spec:
               error:
                 description: Error is the error message if any.
                 type: string
+              observedGeneration:
+                description: ObservedGeneration is used by Rancher controller to track
+                  the latest generation of the resource that it triggered on.
+                format: int64
+                type: integer
               ready:
                 default: false
                 description: |-
@@ -104,6 +109,8 @@ spec:
                 description: RetryNumber is the number of times the plugin has been
                   retried.
                 type: integer
+            required:
+            - observedGeneration
             type: object
         required:
         - spec

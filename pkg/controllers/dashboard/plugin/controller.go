@@ -48,9 +48,9 @@ type handler struct {
 }
 
 func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin, error) {
-	if plugin != nil && plugin.Status.RetryAt.After(timeNow()) {
-		return nil, nil
-	}
+	triggered := timeNow().UTC()
+	forceUpdate := false
+	//indexing all plugins
 	cachedPlugins, err := h.pluginCache.List(h.systemNamespace, labels.Everything())
 	if err != nil {
 		return plugin, fmt.Errorf("failed to list plugins from cache: %w", err)
@@ -77,7 +77,16 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 		return plugin, err
 	}
 	FsCache.SyncWithIndex(&Index, fsCacheFiles)
+	//plugin specific logic
 	if plugin == nil {
+		return plugin, nil
+	}
+	if plugin.Generation > plugin.Status.ObservedGeneration {
+		forceUpdate = true
+		plugin.Status.RetryNumber = 0
+		plugin.Status.RetryAt = metav1.Time{}
+	}
+	if !plugin.Status.RetryAt.IsZero() && plugin.Status.RetryAt.After(triggered) {
 		return plugin, nil
 	}
 	defer h.plugin.UpdateStatus(plugin)
@@ -94,7 +103,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	}
 
 	for _, p := range cachedPlugins {
-		err2 := FsCache.SyncWithControllersCache(p)
+		err2 := FsCache.SyncWithControllersCache(p, forceUpdate)
 		if errors.Is(err2, errMaxFileSizeError) {
 			logrus.Errorf("one of the files is more than the defaultUIPluginFileByteSize limit %s", strconv.FormatInt(maxFileSize, 10))
 			// update CRD to remove cache
@@ -122,20 +131,23 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 			p.Status.Error = ""
 		}
 	}
+	plugin.Status.ObservedGeneration = plugin.Generation
 	if err != nil {
 		err = fmt.Errorf("failed to sync filesystem cache with controller cache: %w", err)
 		logrus.Errorf(err.Error())
-		backoff := calculateBackoff(plugin.Status.RetryNumber)
+		backoff := calculateBackoff(plugin.Status.RetryNumber).Round(time.Second)
 		plugin.Status.RetryNumber++
-		plugin.Status.RetryAt = metav1.NewTime(time.Now().Add(backoff))
+		plugin.Status.RetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
 		h.plugin.EnqueueAfter(plugin.Namespace, plugin.Name, backoff)
-		return plugin, err
+		return plugin, nil
 	}
 	if !plugin.Spec.Plugin.NoCache {
 		plugin.Status.CacheState = Cached
 	}
 	if plugin.Status.Ready {
 		plugin.Status.Error = ""
+		plugin.Status.RetryNumber = 0
+		plugin.Status.RetryAt = metav1.Time{}
 	}
 	return plugin, nil
 }
