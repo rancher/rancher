@@ -42,6 +42,7 @@ const (
 	aggregatorSuffix                  = "aggregator"
 	promotedSuffix                    = "promoted"
 	clusterManagementPlaneSuffix      = "cluster-mgmt"
+	projectManagementPlaneSuffix      = "project-mgmt"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -441,6 +442,12 @@ func AggregatedClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, aggregatorSuffix)
 }
 
+// ClusterManagementPlaneClusterRoleNameFor appends the cluster management plane suffix to a string safely (ie <= 63 characters)
 func ClusterManagementPlaneClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, clusterManagementPlaneSuffix)
+}
+
+// ProjectManagementPlaneClusterRoleNameFor appends the project management plane suffix to a string safely (ie <= 63 characters)
+func ProjectManagementPlaneClusterRoleNameFor(s string) string {
+	return name.SafeConcatName(s, projectManagementPlaneSuffix)
 }
