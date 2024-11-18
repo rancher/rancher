@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -109,7 +110,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 
 	memberRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            resourceName + "-member",
+			Name:            name.SafeConcatName(resourceName + "member"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Annotations:     annotations,
 		},
@@ -125,7 +126,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 
 	ownerRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            resourceName + "-owner",
+			Name:            name.SafeConcatName(resourceName + "owner"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Annotations:     annotations,
 		},

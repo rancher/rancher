@@ -43,7 +43,7 @@ func newRoleTemplateHandler(w *wrangler.Context) *roleTemplateHandler {
 }
 
 // OnChange creates all management plane cluster roles that will be needed. If there are no management plane rules in the role template, no cluster roles will be created.
-func (r *roleTemplateHandler) OnChange(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	if rt == nil || rt.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -85,7 +85,7 @@ func (r *roleTemplateHandler) OnChange(key string, rt *v3.RoleTemplate) (*v3.Rol
 	return rt, nil
 }
 
-func (r *roleTemplateHandler) OnRemove(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	rtName := rbac.ClusterRoleNameFor(rt.Name)
 	clusterScopedCRName := rbac.ClusterManagementPlaneClusterRoleNameFor(rtName)
 	clusterScopedACRName := rbac.AggregatedClusterRoleNameFor(clusterScopedCRName)
