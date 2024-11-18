@@ -330,46 +330,38 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 // If not, it also updates the current ClusterRole fields to match the desired ClusterRole.
 // The fields it checks are:
 //
-//   - Rules
+//   - Rules or AggregationRule
 //   - Cluster role owner annotation
 //   - Aggregation label
 func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1.ClusterRole) {
 	same := true
-	if !reflect.DeepEqual(currentCR.Rules, wantedCR.Rules) {
-		same = false
-		currentCR.AggregationRule = wantedCR.AggregationRule
-	}
-	if currentCR.Annotations[clusterRoleOwnerAnnotation] != wantedCR.Annotations[clusterRoleOwnerAnnotation] {
-		same = false
-		currentCR.Annotations[clusterRoleOwnerAnnotation] = wantedCR.Annotations[clusterRoleOwnerAnnotation]
-	}
-	if currentCR.Labels[aggregationLabel] != wantedCR.Labels[aggregationLabel] {
-		same = false
-		currentCR.Labels[aggregationLabel] = wantedCR.Labels[aggregationLabel]
-	}
-	return same, currentCR
-}
 
-// AreAggregatingClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.
-// If not, it also updates the current ClusterRole fields to match the desired ClusterRole.
-// The fields it checks are:
-//
-//   - AggregationRule
-//   - Cluster role owner annotation
-//   - Aggregation label
-func AreAggregatingClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1.ClusterRole) {
-	same := true
-	if !reflect.DeepEqual(currentCR.AggregationRule, wantedCR.AggregationRule) {
-		same = false
-		currentCR.AggregationRule = wantedCR.AggregationRule
+	if wantedCR.AggregationRule == nil {
+		if currentCR.AggregationRule != nil {
+			same = false
+			currentCR.AggregationRule = nil
+		}
+		if !reflect.DeepEqual(currentCR.Rules, wantedCR.Rules) {
+			same = false
+			currentCR.Rules = wantedCR.Rules
+		}
+	} else {
+		if !reflect.DeepEqual(currentCR.AggregationRule, wantedCR.AggregationRule) {
+			same = false
+			currentCR.AggregationRule = wantedCR.AggregationRule
+		}
+		if len(currentCR.Rules) > 0 {
+			same = false
+			currentCR.Rules = nil
+		}
 	}
-	if currentCR.Annotations[clusterRoleOwnerAnnotation] != wantedCR.Annotations[clusterRoleOwnerAnnotation] {
+	if got, want := currentCR.Annotations[clusterRoleOwnerAnnotation], wantedCR.Annotations[clusterRoleOwnerAnnotation]; got != want {
 		same = false
-		currentCR.Annotations[clusterRoleOwnerAnnotation] = wantedCR.Annotations[clusterRoleOwnerAnnotation]
+		metav1.SetMetaDataAnnotation(&currentCR.ObjectMeta, clusterRoleOwnerAnnotation, want)
 	}
-	if currentCR.Labels[aggregationLabel] != wantedCR.Labels[aggregationLabel] {
+	if got, want := currentCR.Labels[aggregationLabel], wantedCR.Labels[aggregationLabel]; got != want {
 		same = false
-		currentCR.Labels[aggregationLabel] = wantedCR.Labels[aggregationLabel]
+		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, aggregationLabel, want)
 	}
 	return same, currentCR
 }
@@ -420,7 +412,7 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	aggregatingCRName := AggregatedClusterRoleNameFor(crName)
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: crName,
+			Name: aggregatingCRName,
 			// Label so other cluster roles can aggregate this one
 			Labels: map[string]string{
 				aggregationLabel: aggregatingCRName,
