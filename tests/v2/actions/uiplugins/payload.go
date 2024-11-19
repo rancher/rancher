@@ -24,7 +24,6 @@ func newPluginsInstall(name, version string, chartValues map[string]interface{})
 	return &chartInstall
 }
 
-
 // newPluginUninstallAction is a private constructor that creates a default payload for chart uninstall action with all disabled options.
 func newPluginUninstallAction() *types.ChartUninstallAction {
 	return &types.ChartUninstallAction{

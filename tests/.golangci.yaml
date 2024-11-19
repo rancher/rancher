@@ -1,0 +1,51 @@
+linters:
+  fast: false
+  disable-all: true
+  enable:
+    #Code Formatting
+    - gofmt #checks whether code was gofmt-ed
+    #Style and Patterns Checking
+    - asasalint #check for pass []any as any in variadic func(...any
+    - errcheck #it is a program for checking for unchecked errors in Go code
+    - goconst #find in Go repeated strings that could be replaced by a constant
+    - gosimple #it simplify the code
+    - misspell #finds commonly misspelled English words
+    #Unused Code
+    - unused #checks Go code for unused constants, variables, functions and types
+    - unparam #report unused function parameters
+    - ineffassign #detect when assignments to existing variables are not used
+    - unconvert #remove unnecessary type conversions from Go source
+    - whitespace #checks for unnecessary newlines at the start and end of functions
+    #Bugs
+    - staticcheck #it's a set of rules from staticcheck
+    - govet #it examines Go source code and reports suspicious constructs
+    - revive #it stricter, configurable, extensible, and beautiful drop-in replacement for golint
+    - gocritic #provides diagnostics that check for bugs, performance and style issues
+    - gosec #inspects source code for security problems
+    - nilerr #finds the code that returns nil even if it checks that the error is not nil
+    #Tests
+    - testifylint #checks usage of github.com/stretchr/testify
+    - thelper #detects tests helpers which is not start with t.Helper() method.
+linters-settings:
+  govet:
+    check-shadowing: false
+  gofmt:
+    simplify: false
+  asasalint:
+    ignore-test: false
+issues:
+  exclude-dirs:
+    - vendor
+    - pkg/client
+    - pkg/generated
+    - tests/framework/clients/rancher/generated
+  new: false
+  fix: false
+run:
+  timeout: 10m
+  tests: true
+output:
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true
+  show-stats: false
