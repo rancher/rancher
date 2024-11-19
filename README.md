@@ -8,15 +8,16 @@
 Rancher is an open source container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
 
 ## Latest Release
+
+* v2.10
+  * Latest - v2.10.0 - `rancher/rancher:v2.10.0` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.10.0).
+  * Stable - v2.10.0 - `rancher/rancher:v2.10.0` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.10.0).
 * v2.9
-  * Latest - v2.9.3 - `rancher/rancher:v2.9.3` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.9.3).
-  * Stable - v2.9.3 - `rancher/rancher:v2.9.3` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.9.3).
+  * Latest - v2.9.4 - `rancher/rancher:v2.9.4` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.9.4).
+  * Stable - v2.9.4 - `rancher/rancher:v2.9.4` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.9.4).
 * v2.8
   * Latest - v2.8.5 - `rancher/rancher:v2.8.5` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.8.5).
   * Stable - v2.8.5 - `rancher/rancher:v2.8.5` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.8.5).
-* v2.7
-  * Latest - v2.7.10 - `rancher/rancher:v2.7.10` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.10).
-  * Stable - v2.7.10 - `rancher/rancher:v2.7.10` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.10).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
@@ -52,6 +53,7 @@ Rancher also includes other open source libraries and projects, [see go.mod](htt
 Refer to the [build docs](docs/build.md) on how to customize the building and packaging of Rancher.
 
 ## Support, Discussion, and Community
+
 If you need any help with Rancher, please join us at either our [Rancher forums](http://forums.rancher.com/) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
 
 Please submit any Rancher bugs, issues, and feature requests to [rancher/rancher](https://github.com/rancher/rancher/issues).
