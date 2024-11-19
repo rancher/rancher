@@ -596,16 +596,8 @@ jobs:
         run: |
           NOTES=$(cat bin/rancher-components.txt)
           gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
       - name: Upload artifacts to bucket
         env:
-          AWS_ACCESS_KEY_ID: ${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -ex
@@ -617,7 +609,6 @@ jobs:
             exit 1
           fi
           for artifact in "${ARTIFACTS[@]}"; do
-            aws s3 cp "$ARTIFACTS_BASE_DIR/$artifact" "s3://prime-artifacts/rancher/${{ env.TAG }}/$artifact"
             gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$artifact" --clobber
           done
 
