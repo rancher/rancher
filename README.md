@@ -53,7 +53,6 @@ Rancher also includes other open source libraries and projects, [see go.mod](htt
 Refer to the [build docs](docs/build.md) on how to customize the building and packaging of Rancher.
 
 ## Support, Discussion, and Community
-
 If you need any help with Rancher, please join us at either our [Rancher forums](http://forums.rancher.com/) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
 
 Please submit any Rancher bugs, issues, and feature requests to [rancher/rancher](https://github.com/rancher/rancher/issues).
