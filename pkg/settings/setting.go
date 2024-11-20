@@ -122,7 +122,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.9")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "release-v2.9")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
@@ -322,10 +322,6 @@ var (
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
-
-	// UseProjectNamespaceFix indicates to the webhook if project namespaces should be made using the existing model if false, or use the
-	// newer model if true
-	UseProjectNamespaceFix = NewSetting("use-project-namespace-fix", "true")
 
 	// The following settings are only used by the UI, but need to be known to Rancher so that they're not removed.
 	_ = NewSetting("eula-agreed", "")

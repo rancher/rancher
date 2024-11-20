@@ -62,8 +62,8 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.9
-ARG CHART_DEFAULT_BRANCH=dev-v2.9
+ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.9
+ARG CHART_DEFAULT_BRANCH=release-v2.9
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
@@ -233,8 +233,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.9.3
-ENV CATTLE_DASHBOARD_UI_VERSION v2.9.3
+ENV CATTLE_UI_VERSION 2.9.4
+ENV CATTLE_DASHBOARD_UI_VERSION v2.9.4
 ENV CATTLE_CLI_VERSION v2.9.2
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install

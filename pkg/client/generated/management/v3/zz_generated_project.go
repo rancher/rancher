@@ -7,7 +7,6 @@ import (
 const (
 	ProjectType                               = "project"
 	ProjectFieldAnnotations                   = "annotations"
-	ProjectFieldBackingNamespace              = "backingNamespace"
 	ProjectFieldClusterID                     = "clusterId"
 	ProjectFieldConditions                    = "conditions"
 	ProjectFieldContainerDefaultResourceLimit = "containerDefaultResourceLimit"
@@ -30,7 +29,6 @@ const (
 type Project struct {
 	types.Resource
 	Annotations                   map[string]string       `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	BackingNamespace              string                  `json:"backingNamespace,omitempty" yaml:"backingNamespace,omitempty"`
 	ClusterID                     string                  `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions                    []ProjectCondition      `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	ContainerDefaultResourceLimit *ContainerResourceLimit `json:"containerDefaultResourceLimit,omitempty" yaml:"containerDefaultResourceLimit,omitempty"`

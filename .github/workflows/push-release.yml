@@ -12,8 +12,9 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  REGISTRY: "docker.io"
-  GH_CLI_VERSION: 2.57.0
+  REGISTRY: "stgregistry.suse.com"
+  DOCKERIO_REGISTRY: "docker.io"
+  AWS_DEFAULT_REGION: "us-east-1"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -78,29 +79,30 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
-      - name: Authenticate with Google Cloud
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | OPTIMUS_CHARTS_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | OPTIMUS_CHARTS_SECRET_KEY ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
+      - name: Upload chart to bucket
         if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ env.GOOGLE_AUTH }}
-      - name: Upload
+        run: |
+          AWS_ACCESS_KEY_ID=${{ env.OPTIMUS_CHARTS_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.OPTIMUS_CHARTS_SECRET_KEY }} aws s3 cp --recursive ./bin/chart s3://charts.optimus.rancher.io/server-charts
+      - name: Invalidate Cloudfront cache
         if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-        uses: google-github-actions/upload-cloud-storage@v2
-        with:
-          destination: releases.rancher.com/server-charts
-          path: ./bin/chart
-          parent: false
-          process_gcloudignore: false
-          predefinedAcl: publicRead
-          headers: |-
-            cache-control: public,no-cache,proxy-revalidate
+        env:
+          CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
+        shell: bash
+        run: |
+          AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }} aws cloudfront create-invalidation --distribution-id ${{ env.CHARTS_DISTRIBUTION_ID }} --paths "/*"
   build-server:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
       matrix:
         os: [linux]
         arch: [x64, arm64]
+    permissions:
+      contents: read
+      id-token: write
     env:
       ARCH: ${{ matrix.arch }}
     steps:
@@ -127,6 +129,18 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -173,9 +187,12 @@ jobs:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     services:
       registry:
-        image: registry:2
+        image: registry.suse.com/suse/registry:2.8
         ports:
           - 5000:5000
+    permissions:
+      contents: read
+      id-token: write
     env:
       REGISTRY: "127.0.0.1:5000"
       ARCH: ${{ matrix.arch }}
@@ -203,6 +220,18 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -273,13 +302,14 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
-      - name: Login to Docker Hub
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
+      - name: Login to registry
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Build Windows Server Image
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
@@ -318,13 +348,14 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
       - name: Docker Registry Login
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Push server image
         run: |
           image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -354,12 +385,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
@@ -367,6 +398,15 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-arm64
@@ -389,12 +429,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
@@ -402,6 +442,15 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Create manifest list and push
         run: |
           # docker manifest is used with windows images to maintain os.version in the manifest
@@ -411,6 +460,7 @@ jobs:
 
           docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
 
+          # docker buildx imagetools create pushes to the registry by default, which is not the same behavior as docker manifest create
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
             --append ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
             --append ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 
@@ -462,13 +512,22 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
-      - name: Docker Registry Login
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -504,8 +563,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -517,6 +574,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
@@ -524,6 +583,15 @@ jobs:
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.DOCKERIO_REGISTRY }}
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
@@ -537,7 +605,7 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
-      contents: write
+      contents: read
       id-token: write
     env:
       REGISTRY: ""
@@ -572,21 +640,9 @@ jobs:
         run: |
           rm -rf dist && mkdir dist
           mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
-      - name: Create App Token
-        uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
+      - name: Create sha256sum.txt file
+        run: ./scripts/artifacts-hashes.sh
       - name: Generate sha256sum file and upload artifacts
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         shell: bash
         run: |
           set -ex
@@ -613,78 +669,12 @@ jobs:
           done
 
           ./scripts/artifacts-hashes.sh ./dist
-
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
-      - name: Add release notes
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          NOTES=$(cat ./dist/rancher-components.txt)
-          gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
-  docker-image-digests:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
-    needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y aws-cli wget jq
-      - name: install gh
-        shell: bash
-        run: |
-          mkdir -p /tmp/gh
-          curl -fsL https://github.com/cli/cli/releases/download/v${{ env.GH_CLI_VERSION }}/gh_${{ env.GH_CLI_VERSION }}_linux_amd64.tar.gz | tar xvzf - --strip-components=1 -C /tmp/gh
-          mv /tmp/gh/bin/gh /usr/bin/gh
-          chmod +x /usr/bin/gh
-      - name: Setup Environment Variables
-        uses: ./.github/actions/setup-tag-env
-      - name: Setup ecm-distro-tools
-        uses: rancher/ecm-distro-tools@v0.42.0
-        with:
-          version: v0.42.0
-      - name: Setup Env
-        shell: bash
-        run: |
-          mkdir -p ${{ runner.temp }}
-          echo "LINUX_AMD64_FILE=${{ runner.temp }}/rancher-images-digests-linux-amd64.txt" >> $GITHUB_ENV
-          echo "LINUX_ARM64_FILE=${{ runner.temp }}/rancher-images-digests-linux-arm64.txt" >> $GITHUB_ENV
-          echo "WINDOWS_2019_FILE=${{ runner.temp }}/rancher-images-digests-windows-ltsc2019.txt" >> $GITHUB_ENV
-          echo "WINDOWS_2022_FILE=${{ runner.temp }}/rancher-images-digests-windows-ltsc2022.txt" >> $GITHUB_ENV
-      - name: Generate linux docker digests
-        shell: bash
-        run: |
-          export LINUX_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-images.txt
-          release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${LINUX_IMAGES_URL}" --output-file "${{ env.LINUX_AMD64_FILE }}"
-          cp "${{ env.LINUX_AMD64_FILE }}" "${{ env.LINUX_ARM64_FILE }}"
-      - name: Generate windows docker digests
-        shell: bash
-        run: |
-          export WINDOWS_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-windows-images.txt
-          release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${WINDOWS_IMAGES_URL}" --output-file "${{ env.WINDOWS_2019_FILE }}"
-          cp "${{ env.WINDOWS_2019_FILE }}" "${{ env.WINDOWS_2022_FILE }}"
-      - name: Read App Secrets
+      - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
-      - name: Create App Token
-        uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
-      - name: Upload digests
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
+      - name: Upload artifacts to bucket
         run: |
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.LINUX_AMD64_FILE }} --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.LINUX_ARM64_FILE }} --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.WINDOWS_2019_FILE }} --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ${{ env.WINDOWS_2022_FILE }} --clobber
+          AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./dist s3://prime-artifacts/rancher/${{ env.TAG }}

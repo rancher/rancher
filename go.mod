@@ -109,9 +109,9 @@ require (
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
-	github.com/microsoft/kiota-abstractions-go v1.0.0
-	github.com/microsoftgraph/msgraph-sdk-go v1.0.0
-	github.com/microsoftgraph/msgraph-sdk-go-core v1.0.0
+	github.com/microsoft/kiota-abstractions-go v1.7.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.51.0
+	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/locker v1.0.1
@@ -124,20 +124,20 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
-	github.com/rancher/aks-operator v1.9.4-rc.2
+	github.com/rancher/aks-operator v1.9.4
 	github.com/rancher/apiserver v0.0.0-20240708202538-39a6f2535146
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.0
-	github.com/rancher/eks-operator v1.9.4-rc.2
+	github.com/rancher/eks-operator v1.9.4
 	github.com/rancher/fleet/pkg/apis v0.10.0
-	github.com/rancher/gke-operator v1.9.4-rc.1
+	github.com/rancher/gke-operator v1.9.4
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240923125127-ae858d002589
 	github.com/rancher/machine v0.15.0-rancher118
 	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
-	github.com/rancher/rke v1.6.4-rc.2
+	github.com/rancher/rke v1.6.4
 	github.com/rancher/steve v0.0.0-20241031174805-c4ebbe629ff1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
@@ -234,10 +234,11 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
-	github.com/microsoft/kiota-authentication-azure-go v1.0.0 // indirect
-	github.com/microsoft/kiota-http-go v1.0.0 // indirect
+	github.com/microsoft/kiota-authentication-azure-go v1.1.0 // indirect
+	github.com/microsoft/kiota-http-go v1.4.4 // indirect
 	github.com/microsoft/kiota-serialization-form-go v1.0.0 // indirect
-	github.com/microsoft/kiota-serialization-json-go v1.0.0 // indirect
+	github.com/microsoft/kiota-serialization-json-go v1.0.8 // indirect
+	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
 	github.com/microsoft/kiota-serialization-text-go v1.0.0 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
@@ -245,9 +246,9 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
-	github.com/stoewer/go-strcase v1.2.0 // indirect
+	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
+	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.20.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.20.0 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect

@@ -5,12 +5,8 @@ import (
 	"testing"
 	"time"
 
-	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	corefakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +14,7 @@ import (
 )
 
 var (
-	errDefault  = fmt.Errorf("error")
+	e           = fmt.Errorf("error")
 	defaultCRTB = v3.ClusterRoleTemplateBinding{
 		UserName:           "test",
 		GroupName:          "",
@@ -41,23 +37,10 @@ var (
 			Name: "test-project",
 		},
 	}
-	backingNamespaceProject = v3.Project{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "test-project",
-		},
-		Status: apisv3.ProjectStatus{
-			BackingNamespace: "c-ABC-p-XYZ",
-		},
-	}
 	deletingProject = v3.Project{
 		ObjectMeta: v1.ObjectMeta{
 			Name:              "deleting-project",
 			DeletionTimestamp: &v1.Time{Time: time.Now()},
-		},
-	}
-	defaultBinding = rbacv1.RoleBinding{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "test-binding",
 		},
 	}
 )
@@ -83,7 +66,7 @@ func TestReconcileBindings(t *testing.T) {
 			name: "error getting cluster",
 			stateSetup: func(cts crtbTestState) {
 				cts.clusterListerMock.GetFunc = func(namespace, name string) (*v3.Cluster, error) {
-					return nil, errDefault
+					return nil, e
 				}
 			},
 			wantError: true,
@@ -108,7 +91,7 @@ func TestReconcileBindings(t *testing.T) {
 				}
 				cts.managerMock.EXPECT().
 					checkReferencedRoles("roleTemplate", "cluster", gomock.Any()).
-					Return(true, errDefault)
+					Return(true, e)
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
@@ -125,7 +108,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(true, nil)
 				cts.managerMock.EXPECT().
 					ensureClusterMembershipBinding("clustername-clusterowner", gomock.Any(), gomock.Any(), true, gomock.Any()).
-					Return(errDefault)
+					Return(e)
 
 			},
 			wantError: true,
@@ -146,7 +129,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(nil)
 				cts.managerMock.EXPECT().
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errDefault)
+					Return(e)
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
@@ -168,7 +151,7 @@ func TestReconcileBindings(t *testing.T) {
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
 				cts.projectListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Project, error) {
-					return nil, errDefault
+					return nil, e
 				}
 			},
 			wantError: true,
@@ -196,7 +179,7 @@ func TestReconcileBindings(t *testing.T) {
 				}
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "test-project", gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errDefault)
+					Return(e)
 
 			},
 			wantError: true,
@@ -255,32 +238,6 @@ func TestReconcileBindings(t *testing.T) {
 			crtb: defaultCRTB.DeepCopy(),
 		},
 		{
-			name: "successfully reconcile clustermember with backingNamespace",
-			stateSetup: func(cts crtbTestState) {
-				cts.managerMock.EXPECT().
-					checkReferencedRoles("roleTemplate", "cluster", gomock.Any()).
-					Return(false, nil)
-				cts.managerMock.EXPECT().
-					ensureClusterMembershipBinding("clustername-clustermember", gomock.Any(), gomock.Any(), false, gomock.Any()).
-					Return(nil)
-				cts.managerMock.EXPECT().
-					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil)
-				cts.managerMock.EXPECT().
-					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "c-ABC-p-XYZ", gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil)
-				cts.clusterListerMock.GetFunc = func(namespace, name string) (*v3.Cluster, error) {
-					c := defaultCluster.DeepCopy()
-					return c, nil
-				}
-				cts.projectListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Project, error) {
-					p := backingNamespaceProject.DeepCopy()
-					return []*v3.Project{p}, nil
-				}
-			},
-			crtb: defaultCRTB.DeepCopy(),
-		},
-		{
 			name: "skip projects that are deleting",
 			stateSetup: func(cts crtbTestState) {
 				cts.managerMock.EXPECT().
@@ -295,7 +252,7 @@ func TestReconcileBindings(t *testing.T) {
 				// This should not be called
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "deleting-project", gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errDefault).AnyTimes()
+					Return(e).AnyTimes()
 				cts.clusterListerMock.GetFunc = func(namespace, name string) (*v3.Cluster, error) {
 					c := defaultCluster.DeepCopy()
 					return c, nil
@@ -344,112 +301,4 @@ func setupTest(t *testing.T) crtbTestState {
 		projectListerMock: &projectListerMock,
 	}
 	return state
-}
-
-func Test_removeMGMTClusterScopedPrivilegesInProjectNamespace(t *testing.T) {
-	tests := []struct {
-		name                  string
-		projectListFunc       func(string, labels.Selector) ([]*apisv3.Project, error)
-		roleBindingListFunc   func(string, labels.Selector) ([]*rbacv1.RoleBinding, error)
-		roleBindingDeleteFunc func(string, string, *v1.DeleteOptions) error
-		binding               *v3.ClusterRoleTemplateBinding
-		wantErr               bool
-	}{
-		{
-			name: "error listing projects",
-			projectListFunc: func(s1 string, s2 labels.Selector) ([]*apisv3.Project, error) {
-				return nil, errDefault
-			},
-			binding: defaultCRTB.DeepCopy(),
-			wantErr: true,
-		},
-		{
-			name: "error listing rolebindings",
-			projectListFunc: func(s1 string, s2 labels.Selector) ([]*apisv3.Project, error) {
-				return []*apisv3.Project{
-					defaultProject.DeepCopy(),
-				}, nil
-			},
-			roleBindingListFunc: func(s1 string, s2 labels.Selector) ([]*rbacv1.RoleBinding, error) {
-				return nil, errDefault
-			},
-			binding: defaultCRTB.DeepCopy(),
-			wantErr: true,
-		},
-		{
-			name: "error deleting rolebindings",
-			projectListFunc: func(s1 string, s2 labels.Selector) ([]*apisv3.Project, error) {
-				return []*apisv3.Project{
-					defaultProject.DeepCopy(),
-				}, nil
-			},
-			roleBindingListFunc: func(s1 string, s2 labels.Selector) ([]*rbacv1.RoleBinding, error) {
-				return []*rbacv1.RoleBinding{
-					defaultBinding.DeepCopy(),
-				}, nil
-			},
-			roleBindingDeleteFunc: func(s1, s2 string, do *v1.DeleteOptions) error {
-				return errDefault
-			},
-			binding: defaultCRTB.DeepCopy(),
-			wantErr: true,
-		},
-		{
-			name: "successfully delete rolebindings no backing namespace",
-			projectListFunc: func(s1 string, s2 labels.Selector) ([]*apisv3.Project, error) {
-				return []*apisv3.Project{
-					defaultProject.DeepCopy(),
-				}, nil
-			},
-			roleBindingListFunc: func(s1 string, s2 labels.Selector) ([]*rbacv1.RoleBinding, error) {
-				assert.Equal(t, defaultProject.Name, s1)
-				return []*rbacv1.RoleBinding{
-					defaultBinding.DeepCopy(),
-				}, nil
-			},
-			roleBindingDeleteFunc: func(s1, s2 string, do *v1.DeleteOptions) error {
-				assert.Equal(t, defaultProject.Name, s1)
-				return nil
-			},
-			binding: defaultCRTB.DeepCopy(),
-		},
-		{
-			name: "successfully delete rolebindings with backing namespace",
-			projectListFunc: func(s1 string, s2 labels.Selector) ([]*apisv3.Project, error) {
-				return []*apisv3.Project{
-					backingNamespaceProject.DeepCopy(),
-				}, nil
-			},
-			roleBindingListFunc: func(s1 string, s2 labels.Selector) ([]*rbacv1.RoleBinding, error) {
-				assert.Equal(t, backingNamespaceProject.Status.BackingNamespace, s1)
-				return []*rbacv1.RoleBinding{
-					defaultBinding.DeepCopy(),
-				}, nil
-			},
-			roleBindingDeleteFunc: func(s1, s2 string, do *v1.DeleteOptions) error {
-				assert.Equal(t, backingNamespaceProject.Status.BackingNamespace, s1)
-				return nil
-			},
-			binding: defaultCRTB.DeepCopy(),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := fakes.ProjectListerMock{}
-			p.ListFunc = tt.projectListFunc
-			rbl := corefakes.RoleBindingListerMock{}
-			rbl.ListFunc = tt.roleBindingListFunc
-			rbi := corefakes.RoleBindingInterfaceMock{}
-			rbi.DeleteNamespacedFunc = tt.roleBindingDeleteFunc
-
-			c := &crtbLifecycle{
-				projectLister: &p,
-				rbLister:      &rbl,
-				rbClient:      &rbi,
-			}
-			if err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(tt.binding); (err != nil) != tt.wantErr {
-				t.Errorf("crtbLifecycle.removeMGMTClusterScopedPrivilegesInProjectNamespace() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
 }
