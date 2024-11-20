@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	extnamespaces "github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
-	"github.com/rancher/rancher/tests/v2/actions/kubeapi/secrets"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
@@ -14,6 +12,8 @@ import (
 	"github.com/rancher/shepherd/pkg/api/scheme"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	extnamespaces "github.com/slickwarren/rancher-tests/actions/kubeapi/namespaces"
+	"github.com/slickwarren/rancher-tests/actions/kubeapi/secrets"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	authzv1 "k8s.io/api/authorization/v1"

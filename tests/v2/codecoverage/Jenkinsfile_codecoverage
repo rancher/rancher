@@ -1,7 +1,7 @@
 #!groovy
 node {
     def rootPath = "/root/go/src/github.com/rancher/rancher/"
-    def workPath = "/root/go/src/github.com/rancher/rancher/tests/v2/codecoverage/"
+    def workPath = "/root/go/src/github.com/slickwarren/rancher-tests/codecoverage/"
     def job_name = "${JOB_NAME}"
     def code_cover_volume = "CodeCoverageTestReportSharedVolume"
 
@@ -18,7 +18,7 @@ node {
     def cleanupContainer = "code-cover-cleanup"
     def goImageName = "rancher-code-coverage-${job_name}"
     def envFile = ".env"
-    def codeCoverageDir = "github.com/rancher/rancher/tests/v2/codecoverage/ranchercover"
+    def codeCoverageDir = "github.com/slickwarren/rancher-tests/codecoverage/ranchercover"
     def codeCoverageTest = "-run TestRetrieveCoverageReports"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.8"
