@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -x
 
-cd  ~/go/src/github.com/rancher/rancher/tests/v2/codecoverage/ranchercover/cover
+cd  ~/go/src/github.com/slickwarren/rancher-tests/codecoverage/ranchercover/cover
 
 ls -al
 

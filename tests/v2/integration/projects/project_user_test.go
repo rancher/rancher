@@ -3,12 +3,12 @@ package integration
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/v2/actions/namespaces"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/slickwarren/rancher-tests/actions/namespaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
