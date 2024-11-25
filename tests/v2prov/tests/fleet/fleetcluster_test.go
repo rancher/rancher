@@ -1,6 +1,7 @@
 package fleetcluster_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -8,7 +9,6 @@ import (
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
@@ -122,7 +122,7 @@ func Test_Fleet_Cluster(t *testing.T) {
 	require.Eventually(func() bool {
 		cluster, err = clients.Fleet.Cluster().Get("fleet-local", "local", metav1.GetOptions{})
 		if err == nil && cluster != nil && cluster.Status.Summary.Ready > 0 {
-			assert.Equal(t, &linuxAffinity, cluster.Spec.AgentAffinity)
+			return reflect.DeepEqual(&linuxAffinity, cluster.Spec.AgentAffinity)
 		}
 		return false
 	}, waitFor, tick)
@@ -144,5 +144,5 @@ func Test_Fleet_Cluster(t *testing.T) {
 		require.Equal(resourceReq.Limits, container.Resources.Limits)
 		require.Equal(resourceReq.Requests, container.Resources.Requests)
 	}
-	require.Contains(tolerations[0], agent.Spec.Template.Spec.Tolerations)
+	require.Contains(agent.Spec.Template.Spec.Tolerations, tolerations[0])
 }
