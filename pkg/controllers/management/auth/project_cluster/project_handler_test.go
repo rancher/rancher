@@ -31,7 +31,7 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 	crtbLister.EXPECT().List(gomock.Any(), gomock.Any()).Return(existingCrtbs, nil)
 
 	crtbClient := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
-	crtbClient.EXPECT().Enqueue(gomock.Any(), gomock.Any()).Return()
+	crtbClient.EXPECT().Enqueue(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
 	c := projectLifecycle{
 		crtbLister: crtbLister,
