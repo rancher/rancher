@@ -47,7 +47,7 @@ func VerifyRoleBindingsForUser(t *testing.T, user *management.User, adminClient 
 	switch role {
 	case ClusterOwner, ClusterMember:
 		assert.Equal(t, 1, len(userRoleBindings))
-	case ProjectOwner, ProjectMember, RestrictedAdmin:
+	case ProjectOwner, ProjectMember:
 		assert.Equal(t, 2, len(userRoleBindings))
 	}
 }
@@ -61,11 +61,6 @@ func VerifyUserCanListCluster(t *testing.T, client, standardClient *rancher.Clie
 	err = v1.ConvertToK8sType(clusterList.Data[0].Status, clusterStatus)
 	require.NoError(t, err)
 
-	if role == RestrictedAdmin {
-		adminClusterList, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
-		require.NoError(t, err)
-		assert.Equal(t, (len(adminClusterList.Data) - 1), len(clusterList.Data))
-	}
 	assert.Equal(t, 1, len(clusterList.Data))
 	actualClusterID := clusterStatus.ClusterName
 	assert.Equal(t, clusterID, actualClusterID)
@@ -80,7 +75,7 @@ func VerifyUserCanListProject(t *testing.T, client, standardClient *rancher.Clie
 	require.NoError(t, err)
 
 	switch role {
-	case ClusterOwner, RestrictedAdmin:
+	case ClusterOwner:
 		assert.Equal(t, len(projectListAdmin), len(projectListNonAdmin))
 		assert.Equal(t, projectListAdmin, projectListNonAdmin)
 	case ClusterMember:
@@ -95,7 +90,7 @@ func VerifyUserCanListProject(t *testing.T, client, standardClient *rancher.Clie
 func VerifyUserCanCreateProjects(t *testing.T, client, standardClient *rancher.Client, clusterID string, role Role) {
 	memberProject, err := standardClient.Management.Project.Create(projects.NewProjectConfig(clusterID))
 	switch role {
-	case ClusterOwner, ClusterMember, RestrictedAdmin:
+	case ClusterOwner, ClusterMember:
 		require.NoError(t, err)
 		log.Info("Created project as a ", role, " is ", memberProject.Name)
 		actualStatus := fmt.Sprintf("%v", memberProject.State)
@@ -115,7 +110,7 @@ func VerifyUserCanCreateNamespace(t *testing.T, client, standardClient *rancher.
 	createdNamespace, checkErr := namespaces.CreateNamespace(standardClient, namespaceName, "{}", map[string]string{}, map[string]string{}, project)
 
 	switch role {
-	case ClusterOwner, ProjectOwner, ProjectMember, RestrictedAdmin:
+	case ClusterOwner, ProjectOwner, ProjectMember:
 		require.NoError(t, checkErr)
 		log.Info("Created a namespace as role ", role, createdNamespace.Name)
 		assert.Equal(t, namespaceName, createdNamespace.Name)
@@ -149,7 +144,7 @@ func VerifyUserCanListNamespace(t *testing.T, client, standardClient *rancher.Cl
 	sortedNamespaceListNonAdmin := namespaceListNonAdmin.Names()
 
 	switch role {
-	case ClusterOwner, RestrictedAdmin:
+	case ClusterOwner:
 		require.NoError(t, err)
 		assert.Equal(t, len(sortedNamespaceListAdmin), len(sortedNamespaceListNonAdmin))
 		assert.Equal(t, sortedNamespaceListAdmin, sortedNamespaceListNonAdmin)
@@ -181,7 +176,7 @@ func VerifyUserCanDeleteNamespace(t *testing.T, client, standardClient *rancher.
 	err = steveStandardClient.SteveType(namespaces.NamespaceSteveType).Delete(namespaceID)
 
 	switch role {
-	case ClusterOwner, ProjectOwner, ProjectMember, RestrictedAdmin:
+	case ClusterOwner, ProjectOwner, ProjectMember:
 		require.NoError(t, err)
 	case ClusterMember:
 		require.Error(t, err)
@@ -200,8 +195,6 @@ func VerifyUserCanAddClusterRoles(t *testing.T, client, memberClient *rancher.Cl
 	case ProjectOwner, ProjectMember:
 		require.Error(t, errUserRole)
 		assert.Contains(t, errUserRole.Error(), ForbiddenError)
-	case RestrictedAdmin:
-		require.NoError(t, errUserRole)
 	}
 }
 
@@ -217,10 +210,6 @@ func VerifyUserCanAddProjectRoles(t *testing.T, client *rancher.Client, project 
 		require.NoError(t, errUserRole)
 		assert.Equal(t, 1, len(projectList))
 		assert.Equal(t, project.Name, projectList[0])
-
-	case RestrictedAdmin:
-		require.NoError(t, errUserRole)
-		assert.Contains(t, projectList, project.Name)
 
 	case ProjectMember:
 		require.Error(t, errUserRole)

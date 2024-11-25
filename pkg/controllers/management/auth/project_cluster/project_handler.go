@@ -2,7 +2,6 @@ package project_cluster
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -132,20 +130,7 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 
 // Remove deletes all backing resources created by the project
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
-	rbs, err := l.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	returnErr = errors.Join(returnErr, err)
-
-	for _, rb := range rbs {
-		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
-		returnErr = errors.Join(returnErr, err)
-	}
-
-	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
-	returnErr = errors.Join(returnErr, err)
-
-	return obj, returnErr
+	return obj, deleteNamespace(obj, ProjectRemoveController, l.nsClient)
 }
 
 func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runtime.Object, error) {

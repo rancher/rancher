@@ -123,7 +123,7 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 }
 
 func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	if obj.GlobalRoleName == rbac.GlobalAdmin || obj.GlobalRoleName == rbac.GlobalRestrictedAdmin {
+	if obj.GlobalRoleName == rbac.GlobalAdmin {
 		return obj, grb.deleteAdminBinding(obj)
 	}
 	// Don't need to delete the created ClusterRole or RoleBindings because owner reference will take care of them
@@ -323,11 +323,6 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	}
 
 	subject := rbac.GetGRBSubject(globalRoleBinding)
-	if globalRoleBinding.GlobalRoleName == rbac.GlobalRestrictedAdmin {
-		if err := grb.syncDownstreamClusterPermissions(subject, globalRoleBinding); err != nil {
-			return err
-		}
-	}
 
 	crb, _ := grb.crbLister.Get("", crbName)
 	if crb != nil {
@@ -458,136 +453,6 @@ func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(gl
 		}
 	}
 	return nil
-}
-
-func (grb *globalRoleBindingLifecycle) syncDownstreamClusterPermissions(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
-	if err := grb.createRestrictedAdminCRBsForUserClusters(subject, globalRoleBinding); err != nil {
-		return err
-	}
-
-	return grb.grantRestrictedAdminUserClusterPermissions(subject, globalRoleBinding)
-}
-
-func (grb *globalRoleBindingLifecycle) createRestrictedAdminCRBsForUserClusters(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
-	// Get CR for each downstream cluster, create CRB with this subject for each such CR
-	r, _ := labels.NewRequirement(rbac.RestrictedAdminCRForClusters, selection.Exists, []string{})
-	crs, err := grb.crLister.List("", labels.NewSelector().Add(*r))
-	if err != nil {
-		return err
-	}
-
-	var returnErr error
-	for _, cr := range crs {
-		clusterName := cr.Labels[rbac.RestrictedAdminCRForClusters]
-		crbName := clusterName + rbac.RestrictedAdminCRBForClusters + globalRoleBinding.Name
-		crb, err := grb.crbLister.Get("", crbName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			returnErr = errors.Join(returnErr, err)
-			continue
-		}
-		if crb != nil {
-			continue
-		}
-		_, err = grb.crbClient.Create(&v1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            crbName,
-				OwnerReferences: cr.OwnerReferences,
-			},
-			RoleRef: v1.RoleRef{
-				Kind: "ClusterRole",
-				Name: cr.Name,
-			},
-			Subjects: []v1.Subject{subject},
-		})
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			returnErr = errors.Join(returnErr, err)
-		}
-	}
-	return returnErr
-}
-
-func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermissions(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
-	var returnErr error
-	clusters, err := grb.clusterLister.List("", labels.NewSelector())
-	if err != nil {
-		return err
-	}
-	for _, cluster := range clusters {
-		if cluster.Name == "local" {
-			continue
-		}
-		rbName := fmt.Sprintf("%s-%s", globalRoleBinding.Name, rbac.RestrictedAdminClusterRoleBinding)
-		_, err := grb.roleBindingLister.Get(cluster.Name, rbName)
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				returnErr = errors.Join(returnErr, err)
-				continue
-			}
-			_, err := grb.roleBindings.Create(&v1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      rbName,
-					Namespace: cluster.Name,
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: globalRoleBinding.APIVersion,
-							Kind:       globalRoleBinding.Kind,
-							UID:        globalRoleBinding.UID,
-							Name:       globalRoleBinding.Name,
-						},
-					},
-				},
-				RoleRef: v1.RoleRef{
-					Name: rbac.ClusterCRDsClusterRole,
-					Kind: "ClusterRole",
-				},
-				Subjects: []v1.Subject{subject},
-			})
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				returnErr = errors.Join(returnErr, err)
-				continue
-			}
-		}
-
-		projects, err := grb.projectLister.List(cluster.Name, labels.NewSelector())
-		if err != nil {
-			returnErr = errors.Join(returnErr, err)
-			continue
-		}
-
-		for _, project := range projects {
-			rbName := fmt.Sprintf("%s-%s", globalRoleBinding.Name, rbac.RestrictedAdminProjectRoleBinding)
-			_, err := grb.roleBindingLister.Get(project.Name, rbName)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					_, err := grb.roleBindings.Create(&v1.RoleBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      rbName,
-							Namespace: project.Name,
-							OwnerReferences: []metav1.OwnerReference{
-								{
-									APIVersion: globalRoleBinding.APIVersion,
-									Kind:       globalRoleBinding.Kind,
-									UID:        globalRoleBinding.UID,
-									Name:       globalRoleBinding.Name,
-								},
-							},
-						},
-						RoleRef: v1.RoleRef{
-							Name: rbac.ProjectCRDsClusterRole,
-							Kind: "ClusterRole",
-						},
-						Subjects: []v1.Subject{subject},
-					})
-					if err != nil && !apierrors.IsAlreadyExists(err) {
-						returnErr = errors.Join(returnErr, err)
-					}
-				} else {
-					returnErr = errors.Join(returnErr, err)
-				}
-			}
-		}
-	}
-	return returnErr
 }
 
 // reconcileNamespacedRoleBindings ensures that RoleBindings exist for each namespace listed in NamespacedRules

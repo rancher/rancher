@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/norman/types/slice"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -90,50 +89,13 @@ func (ma *MemberAccess) IsAdmin(callerID string) (bool, error) {
 	return false, nil
 }
 
-func (ma *MemberAccess) IsRestrictedAdmin(callerID string) (bool, error) {
-	u, err := ma.Users.Controller().Lister().Get("", callerID)
-	if err != nil {
-		return false, err
-	}
-	if u == nil {
-		return false, fmt.Errorf("No user found with ID %v", callerID)
-	}
-
-	// Get globalRoleBinding for this user
-	grbs, err := ma.GrbLister.List("", labels.NewSelector())
-	if err != nil {
-		return false, err
-	}
-	for _, grb := range grbs {
-		if grb.UserName == callerID {
-			if grb.GlobalRoleName == rbac.GlobalRestrictedAdmin {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}
-
 func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []string, callerID string) error {
 	isAdmin, err := ma.IsAdmin(callerID)
 	if err != nil {
 		return err
 	}
-	var isRestrictedAdmin, localTargets bool
-	if !isAdmin {
-		isRestrictedAdmin, err = ma.IsRestrictedAdmin(callerID)
-		if err != nil {
-			return err
-		}
-		if isRestrictedAdmin {
-			localTargets, err = hasLocalTargets(targetProjects)
-			if err != nil {
-				return err
-			}
-		}
-	}
 
-	if isAdmin || (isRestrictedAdmin && !localTargets) {
+	if isAdmin {
 		for _, t := range targetProjects {
 			if err := ma.checkProjectExists(t); err != nil {
 				return err
