@@ -31,11 +31,12 @@ import (
 
 type AirGapRKE2CustomClusterTestSuite struct {
 	suite.Suite
-	client         *rancher.Client
-	session        *session.Session
-	corralPackage  *corral.Packages
-	clustersConfig *provisioninginput.Config
-	registryFQDN   string
+	client             *rancher.Client
+	standardUserClient *rancher.Client
+	session            *session.Session
+	corralPackage      *corral.Packages
+	clustersConfig     *provisioninginput.Config
+	registryFQDN       string
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TearDownSuite() {
@@ -100,11 +101,11 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 
 		err = corral.SetCorralSSHKeys(corralRancherHA.Name)
 		require.NoError(a.T(), err)
+
 		a.registryFQDN = registryFQDN
 	} else {
 		a.registryFQDN = registriesConfig.ExistingNoAuthRegistryURL
 	}
-
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapRKE2CustomCluster() {
@@ -117,12 +118,11 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapRKE2CustomClust
 		client      *rancher.Client
 		machinePool []provisioninginput.MachinePools
 	}{
-		{"1 Node All Roles " + provisioninginput.StandardClientName.String() + "-" + permutations.RKE2AirgapCluster + "-", a.client, nodeRolesAll},
-		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String() + "-" + permutations.RKE2AirgapCluster + "-", a.client, nodeRolesShared},
-		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String() + "-" + permutations.RKE2AirgapCluster + "-", a.client, nodeRolesDedicated},
+		{"1 Node all Roles " + provisioninginput.StandardClientName.String(), a.standardUserClient, nodeRolesAll},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), a.standardUserClient, nodeRolesShared},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), a.standardUserClient, nodeRolesDedicated},
 	}
 	for _, tt := range tests {
-
 		a.clustersConfig.MachinePools = tt.machinePool
 
 		if a.clustersConfig.RKE2KubernetesVersions == nil {
@@ -134,7 +134,6 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapRKE2CustomClust
 
 		permutations.RunTestPermutations(&a.Suite, tt.name, tt.client, a.clustersConfig, permutations.RKE2AirgapCluster, nil, a.corralPackage)
 	}
-
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapUpgradeRKE2CustomCluster() {
@@ -147,13 +146,12 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapUpgradeRKE2Cust
 		client      *rancher.Client
 		machinePool []provisioninginput.MachinePools
 	}{
-		{"Upgrade 1 Node All Roles from " + provisioninginput.StandardClientName.String() + "-" + permutations.RKE2AirgapCluster + "-", a.client, nodeRolesAll},
-		{"Upgrade 2 nodes - etcd|cp roles per 1 node from " + provisioninginput.StandardClientName.String() + "-" + permutations.RKE2AirgapCluster + "-", a.client, nodeRolesShared},
-		{"Upgrade 3 nodes - 1 role per node from " + provisioninginput.StandardClientName.String() + "-" + permutations.RKE2AirgapCluster + "-", a.client, nodeRolesDedicated},
+		{"Upgrading 1 node all Roles from " + provisioninginput.StandardClientName.String(), a.standardUserClient, nodeRolesAll},
+		{"Upgrading 2 nodes - etcd|cp roles per 1 node from " + provisioninginput.StandardClientName.String(), a.standardUserClient, nodeRolesShared},
+		{"Upgrading 3 nodes - 1 role per node from " + provisioninginput.StandardClientName.String(), a.standardUserClient, nodeRolesDedicated},
 	}
 
 	for _, tt := range tests {
-
 		a.clustersConfig.MachinePools = tt.machinePool
 
 		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(a.client)
@@ -164,6 +162,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapUpgradeRKE2Cust
 		if a.clustersConfig.RKE2KubernetesVersions != nil {
 			rke2Versions = a.clustersConfig.RKE2KubernetesVersions
 		}
+
 		numOfRKE2Versions := len(rke2Versions)
 
 		testConfig := clusters.ConvertConfigToClusterConfig(a.clustersConfig)
@@ -172,8 +171,8 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapUpgradeRKE2Cust
 
 		versionToUpgrade := rke2Versions[numOfRKE2Versions-1]
 		tt.name += testConfig.KubernetesVersion + " to " + versionToUpgrade
-		a.Run(tt.name, func() {
 
+		a.Run(tt.name, func() {
 			clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(a.client, testConfig, a.corralPackage)
 			require.NoError(a.T(), err)
 
@@ -196,10 +195,8 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapUpgradeRKE2Cust
 			require.NoError(a.T(), err)
 
 			provisioning.VerifyCluster(a.T(), a.client, testConfig, upgradedCluster)
-
 		})
 	}
-
 }
 
 // In order for 'go test' to run this suite, we need to create

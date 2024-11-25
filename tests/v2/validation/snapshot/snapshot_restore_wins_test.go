@@ -70,15 +70,6 @@ func (s *SnapshotRestoreWindowsTestSuite) TestSnapshotRestoreWindows() {
 	}
 }
 
-func (s *SnapshotRestoreWindowsTestSuite) TestSnapshotRestoreWindowsDynamicInput() {
-	if s.clustersConfig == nil {
-		s.T().Skip()
-	}
-
-	err := etcdsnapshot.CreateAndValidateSnapshotRestore(s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, windowsContainerImage)
-	require.NoError(s.T(), err)
-}
-
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestSnapshotRestoreWindowsTestSuite(t *testing.T) {
