@@ -9,7 +9,7 @@ import (
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/shepherd/clients/rancher"
-	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
@@ -48,23 +48,35 @@ func (c *ClusterDeleteTestSuite) TestDeletingCluster() {
 		clusterID, err := clusters.GetV1ProvisioningClusterByName(c.client, c.client.RancherConfig.ClusterName)
 		require.NoError(c.T(), err)
 
-		cluster, err := tt.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
+		cluster, err := c.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
 		require.NoError(c.T(), err)
 
-		updatedCluster := new(apisV1.Cluster)
-		err = v1.ConvertToK8sType(cluster, &updatedCluster)
+		spec := &apisV1.ClusterSpec{}
+		err = steveV1.ConvertToK8sType(cluster.Spec, spec)
 		require.NoError(c.T(), err)
 
-		if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
-			tt.name = "Deleting RKE2 " + tt.name
+		if strings.Contains(spec.KubernetesVersion, "-rancher") || len(spec.KubernetesVersion) == 0 {
+			tt.name = "Deleting RKE1 " + tt.name
+
+			clusterID, err = clusters.GetClusterIDByName(c.client, c.client.RancherConfig.ClusterName)
+			require.NoError(c.T(), err)
+
+			c.Run(tt.name, func() {
+				clusters.DeleteRKE1Cluster(tt.client, clusterID)
+				provisioning.VerifyDeleteRKE1Cluster(c.T(), tt.client, clusterID)
+			})
 		} else {
-			tt.name = "Deleting K3S " + tt.name
-		}
+			if strings.Contains(spec.KubernetesVersion, "k3s") {
+				tt.name = "Deleting K3S " + tt.name
+			} else {
+				tt.name = "Deleting RKE2 " + tt.name
+			}
 
-		c.Run(tt.name, func() {
-			clusters.DeleteK3SRKE2Cluster(tt.client, clusterID)
-			provisioning.VerifyDeleteRKE2K3SCluster(c.T(), tt.client, clusterID)
-		})
+			c.Run(tt.name, func() {
+				clusters.DeleteK3SRKE2Cluster(tt.client, clusterID)
+				provisioning.VerifyDeleteRKE2K3SCluster(c.T(), tt.client, clusterID)
+			})
+		}
 	}
 }
 

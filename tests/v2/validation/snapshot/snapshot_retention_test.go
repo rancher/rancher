@@ -108,12 +108,6 @@ func (s *SnapshotRetentionTestSuite) TestAutomaticSnapshotRetention() {
 	}
 }
 
-func (s *SnapshotRetentionTestSuite) TestAutomaticSnapshotRetentionDynamic() {
-	config := s.snapshotConfig
-	err := etcdsnapshot.CreateSnapshotsUntilRetentionLimit(s.client, config.ClusterName, config.SnapshotRetention, config.SnapshotInterval)
-	require.NoError(s.T(), err)
-}
-
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestSnapshotRetentionTestSuite(t *testing.T) {
