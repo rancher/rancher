@@ -59,9 +59,7 @@ func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 			require.NoError(r.T(), rotateRKE1Certs(r.client, r.client.RancherConfig.ClusterName))
 			require.NoError(r.T(), rotateRKE1Certs(r.client, r.client.RancherConfig.ClusterName))
 		})
-
 	} else {
-
 		if strings.Contains(spec.KubernetesVersion, "k3s") {
 			clusterType = "K3s"
 		} else {
@@ -73,7 +71,6 @@ func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 			require.NoError(r.T(), rotateCerts(r.client, r.client.RancherConfig.ClusterName))
 		})
 	}
-
 }
 
 func TestCertRotationTestSuite(t *testing.T) {
