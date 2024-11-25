@@ -12,10 +12,10 @@ import (
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -51,8 +51,8 @@ type clusterLifecycle struct {
 	nsClient           k8scorev1.NamespaceInterface
 	projects           v3.ProjectClient
 	projectLister      v3.ProjectCache
-	rbLister           rbacv1.RoleBindingLister
-	roleBindings       rbacv1.RoleBindingInterface
+	rbLister           rbacv1.RoleBindingCache
+	roleBindings       rbacv1.RoleBindingController
 	roleTemplateLister v3.RoleTemplateCache
 }
 
@@ -66,8 +66,8 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 		nsClient:           management.K8sClient.CoreV1().Namespaces(),
 		projects:           management.Wrangler.Mgmt.Project(),
 		projectLister:      management.Wrangler.Mgmt.Project().Cache(),
-		rbLister:           management.RBAC.RoleBindings("").Controller().Lister(),
-		roleBindings:       management.RBAC.RoleBindings(""),
+		rbLister:           management.Wrangler.RBAC.RoleBinding().Cache(),
+		roleBindings:       management.Wrangler.RBAC.RoleBinding(),
 		roleTemplateLister: management.Wrangler.Mgmt.RoleTemplate().Cache(),
 	}
 }
