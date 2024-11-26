@@ -65,9 +65,7 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tok
 // Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
 func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
 	// Generate and deliver desired plan for the bootstrap/init node first.
-	if err := p.reconcile(controlPlane, tokensSecret, clusterPlan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
-		"1", "", controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions,
-		-1, 1, false, true); err != nil {
+	if err := p.reconcile(controlPlane, tokensSecret, clusterPlan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting, "1", "", controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions, -1, 1, false); err != nil {
 		return err
 	}
 
