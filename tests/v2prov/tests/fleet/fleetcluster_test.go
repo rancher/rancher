@@ -99,7 +99,7 @@ func Test_Fleet_Cluster(t *testing.T) {
 	for _, container := range agent.Spec.Template.Spec.InitContainers {
 		require.Empty(container.Resources)
 	}
-	require.GreaterOrEqual(len(agent.Spec.Template.Spec.Containers), 1)
+	require.Len(agent.Spec.Template.Spec.Containers, 2)
 	for _, container := range agent.Spec.Template.Spec.Containers {
 		require.Empty(container.Resources)
 	}
@@ -139,7 +139,7 @@ func Test_Fleet_Cluster(t *testing.T) {
 		require.Equal(resourceReq.Limits, container.Resources.Limits)
 		require.Equal(resourceReq.Requests, container.Resources.Requests)
 	}
-	require.GreaterOrEqual(len(agent.Spec.Template.Spec.Containers), 1)
+	require.Len(agent.Spec.Template.Spec.Containers, 2)
 	for _, container := range agent.Spec.Template.Spec.Containers {
 		require.Equal(resourceReq.Limits, container.Resources.Limits)
 		require.Equal(resourceReq.Requests, container.Resources.Requests)
