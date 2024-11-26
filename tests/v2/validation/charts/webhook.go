@@ -8,10 +8,9 @@ import (
 )
 
 const (
-	resourceName    = "rancher.cattle.io"
-	restrictedAdmin = "restricted-admin"
-	admin           = "admin"
-	localCluster    = "local"
+	resourceName = "rancher.cattle.io"
+	admin        = "admin"
+	localCluster = "local"
 )
 
 func getWebhookNames(client *rancher.Client, clusterID, resourceName string) ([]string, error) {

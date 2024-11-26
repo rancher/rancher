@@ -132,10 +132,6 @@ spec:
         - name: CATTLE_SYSTEM_CATALOG
           value: bundled
 {{- end }}
-{{- if .Values.restrictedAdmin }}
-        - name: CATTLE_RESTRICTED_DEFAULT_ADMIN
-          value: "true"
-{{- end}}
 {{- if .Values.bootstrapPassword }}
         - name: CATTLE_BOOTSTRAP_PASSWORD
           valueFrom:

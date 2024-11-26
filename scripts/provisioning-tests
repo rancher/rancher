@@ -72,6 +72,8 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
+export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(yq '.provisioningCAPIVersion' < build.yaml)
+
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Only set SOME_K8S_VERSION if it is empty -- for KDM provisioning tests, this value should already be populated
 # Get the last release for $DIST, which is usually the latest version or an experimental version.

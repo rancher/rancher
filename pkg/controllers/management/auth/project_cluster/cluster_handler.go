@@ -17,8 +17,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
@@ -146,16 +144,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 		return obj, generic.ErrSkip
 	}
 
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminClusterRoleBinding: "true"}
-	rbs, err := l.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	returnErr = errors.Join(returnErr, err)
-
-	for _, rb := range rbs {
-		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
-		returnErr = errors.Join(returnErr, err)
-	}
-	returnErr = errors.Join(
+	returnErr := errors.Join(
 		l.deleteSystemProject(obj, ClusterRemoveController),
 		deleteNamespace(obj, ClusterRemoveController, l.nsClient),
 	)
@@ -283,38 +272,18 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 
 	annoMap := make(map[string][]string)
 
-	var restrictedAdmin bool
-	if settings.RestrictedDefaultAdmin.Get() == "true" {
-		restrictedAdmin = true
-	}
-
 	// Created isn't used in this function, but it is required in the annotation data
 	annoMap["created"] = []string{}
 	annoMap["required"] = []string{}
 
 	switch context {
 	case "project":
-		// If we are in restricted mode, ensure the default projects are not granting
-		// permissions to the restricted-admin
-		if restrictedAdmin {
-			proj := obj.(*apisv3.Project)
-			if proj.Spec.ClusterName == "local" && (proj.Spec.DisplayName == "Default" || proj.Spec.DisplayName == "System") {
-				break
-			}
-		}
-
 		for _, role := range rt {
 			if role.ProjectCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)
 			}
 		}
 	case "cluster":
-		// If we are in restricted mode, ensure we don't give the default restricted-admin
-		// the default permissions in the cluster
-		if restrictedAdmin && accessor.GetName() == "local" {
-			break
-		}
-
 		for _, role := range rt {
 			if role.ClusterCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)

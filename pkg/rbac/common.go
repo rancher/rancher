@@ -20,17 +20,10 @@ import (
 )
 
 const (
-	NamespaceID                       = "namespaceId"
-	ProjectID                         = "projectId"
-	ClusterID                         = "clusterId"
-	GlobalAdmin                       = "admin"
-	GlobalRestrictedAdmin             = "restricted-admin"
-	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
-	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
-	ProjectCRDsClusterRole            = "project-crd-clusterRole"
-	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
-	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
-	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
+	NamespaceID = "namespaceId"
+	ProjectID   = "projectId"
+	ClusterID   = "clusterId"
+	GlobalAdmin = "admin"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -107,13 +100,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 }
 
 func GrbCRBName(grb *v3.GlobalRoleBinding) string {
-	var prefix string
-	if grb.GlobalRoleName == GlobalAdmin {
-		prefix = "globaladmin-"
-	} else {
-		prefix = "globalrestrictedadmin-"
-	}
-	return prefix + GetGRBTargetKey(grb)
+	return "globaladmin-" + GetGRBTargetKey(grb)
 }
 
 // GetGRBSubject creates and returns a subject that is

@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 
-	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/session"
 
 	log "github.com/sirupsen/logrus"
@@ -107,27 +106,6 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 			log.WithField("", listStr).Info("List of webhooks obtained for the ", tt.cluster)
 		})
 	}
-}
-
-func (w *WebhookTestSuite) TestWebhookEscalationCheck() {
-	w.Run("Verify escalation check", func() {
-		newUser, err := users.CreateUserWithRole(w.client, users.UserConfig(), restrictedAdmin)
-		require.NoError(w.T(), err)
-		w.T().Logf("Created user: %v", newUser.Name)
-
-		restrictedAdminClient, err := w.client.AsUser(newUser)
-		require.NoError(w.T(), err)
-
-		getAdminRole, err := restrictedAdminClient.Management.GlobalRole.ByID(admin)
-		require.NoError(w.T(), err)
-		updatedAdminRole := *getAdminRole
-		updatedAdminRole.NewUserDefault = true
-
-		_, err = restrictedAdminClient.Management.GlobalRole.Update(getAdminRole, updatedAdminRole)
-		require.Error(w.T(), err)
-		errMessage := "admission webhook \"rancher.cattle.io.globalroles.management.cattle.io\" denied the request"
-		assert.Contains(w.T(), err.Error(), errMessage)
-	})
 }
 
 func TestWebhookTestSuite(t *testing.T) {

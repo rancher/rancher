@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/values"
 	c "github.com/rancher/rancher/pkg/api/norman/customization/catalog"
-	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -156,14 +155,8 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil {
 		return nil, err
 	}
-	if isSystemCatalog {
-		isRestrictedAdmin, err := s.isRestrictedAdmin(apiContext)
-		if err != nil {
-			return nil, err
-		}
-		if strings.ToLower(settings.SystemCatalog.Get()) == "bundled" || isRestrictedAdmin {
-			return nil, httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprint("not allowed to edit system-library catalog"))
-		}
+	if isSystemCatalog && strings.ToLower(settings.SystemCatalog.Get()) == "bundled" {
+		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprint("not allowed to edit system-library catalog"))
 	}
 	existing, err := s.ByID(apiContext, schema, id)
 	if err != nil {
@@ -264,17 +257,6 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 	return data, err
-}
-
-func (s *Store) isRestrictedAdmin(apiContext *types.APIContext) (bool, error) {
-	ma := gaccess.MemberAccess{
-		Users:     s.Users,
-		GrLister:  s.GrLister,
-		GrbLister: s.GrbLister,
-	}
-	callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-
-	return ma.IsRestrictedAdmin(callerID)
 }
 
 // isSystemCatalog checks whether the catalog is the the system catalog maintained by rancher

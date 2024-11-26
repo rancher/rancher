@@ -602,11 +602,12 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.False(t, userRefresher.called)
 	})
 	t.Run("failed to verify token: mismatched", func(t *testing.T) {
-		oldTokenCreationTimestamp := token.CreationTimestamp
-		defer func() { token.CreationTimestamp = oldTokenCreationTimestamp }()
-		token.CreationTimestamp = metav1.NewTime(now.Add(-time.Duration(token.TTLMillis)*time.Millisecond - 1))
-
 		userRefresher.reset()
+
+		mismatchedToken := "5cncldxmczdzsqtj7kwxqldjf6dhnn5vhr42vqd6mt878wrvwnrwc8"
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/namespaces", nil)
+		req.Header.Set("Authorization", "Bearer "+token.Name+":"+mismatchedToken)
 
 		resp, err := authenticator.Authenticate(req)
 		require.ErrorIs(t, err, ErrMustAuthenticate)

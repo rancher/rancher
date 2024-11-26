@@ -2,15 +2,11 @@ package management
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"reflect"
-	"sort"
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -22,7 +18,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -85,31 +80,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Admin", "admin").
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
-
-	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
-	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
-	restrictedAdminRole.
-		addRule().apiGroups("").resources("secrets").verbs("create").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("globalrolebindings").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch").
-		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("features").verbs("update", "patch", "security-enable").resourceNames("external-rules")
-
-	// restricted-admin can edit settings if rancher is bootstrapped with restricted-admin role
-	if settings.RestrictedDefaultAdmin.Get() == "true" {
-		restrictedAdminRole.
-			addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
-	}
 
 	userRole := addUserRules(rb.addRole("User", "user"))
 	userRole.
@@ -580,9 +550,6 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 		}
 		if len(bindings.Items) == 0 {
 			adminRole := "admin"
-			if settings.RestrictedDefaultAdmin.Get() == "true" {
-				adminRole = "restricted-admin"
-			}
 			_, err = management.Mgmt.GlobalRoleBinding().Create(
 				&v3.GlobalRoleBinding{
 					ObjectMeta: v1.ObjectMeta{
@@ -696,78 +663,5 @@ func bootstrapDefaultRoles(management *config.ManagementContext) error {
 		}
 	}
 
-	return nil
-}
-
-func addClusterRoleForNamespacedCRDs(management *config.ManagementContext) error {
-	var returnErr error
-	// If adding Rules for new CRDs to the below ClusterRole, make sure to add them in a sorted order
-	// ClusterCRDsClusterRole is a CR containing rules for granting restricted-admins access to all CRDs that can be created in a v3.Cluster's namespace
-	cr := rbacv1.ClusterRole{
-		ObjectMeta: v1.ObjectMeta{
-			Name: rbac.ClusterCRDsClusterRole,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"management.cattle.io"},
-				Resources: []string{"*"},
-				Verbs:     []string{"*"},
-			},
-		},
-	}
-	err := createOrUpdateClusterRole(management, cr)
-	returnErr = errors.Join(returnErr, err)
-
-	// ProjectCRDsClusterRole is a CR containing rules for granting restricted-admins access to all CRDs that can be created in a
-	// v3.Cluster and v3.Project's namespace
-	cr = rbacv1.ClusterRole{
-		ObjectMeta: v1.ObjectMeta{
-			Name: rbac.ProjectCRDsClusterRole,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"management.cattle.io"},
-				Resources: []string{"*"},
-				Verbs:     []string{"*"},
-			},
-			{
-				APIGroups: []string{"project.cattle.io"},
-				Resources: []string{"*"},
-				Verbs:     []string{"*"},
-			},
-		},
-	}
-	err = createOrUpdateClusterRole(management, cr)
-	returnErr = errors.Join(returnErr, err)
-
-	return returnErr
-}
-
-func createOrUpdateClusterRole(management *config.ManagementContext, cr rbacv1.ClusterRole) error {
-	for _, rule := range cr.Rules {
-		sort.Slice(rule.APIGroups, func(i, j int) bool { return rule.APIGroups[i] < rule.APIGroups[j] })
-	}
-	sort.Slice(cr.Rules, func(i, j int) bool {
-		return cr.Rules[i].APIGroups[0] < cr.Rules[j].APIGroups[0]
-	})
-	_, err := management.RBAC.ClusterRoles("").Create(&cr)
-	if err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			existingCR, err := management.RBAC.ClusterRoles("").Get(cr.Name, v1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if reflect.DeepEqual(cr.Rules, existingCR.Rules) {
-				return nil
-			}
-			existingCR.Rules = cr.Rules
-			_, err = management.RBAC.ClusterRoles("").Update(existingCR)
-			return err
-		})
-		return err
-	}
 	return nil
 }
