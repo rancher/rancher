@@ -111,7 +111,7 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	crtbLister := fake.NewMockCacheInterface[*apisv3.ClusterRoleTemplateBinding](ctrl)
-	crtbLister.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil)
+	crtbLister.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
 	crtbClient := fake.NewMockControllerInterface[*apisv3.ClusterRoleTemplateBinding, *apisv3.ClusterRoleTemplateBindingList](ctrl)
 	crtbClient.EXPECT().Create(gomock.Any()).Return(func(obj *apisv3.ClusterRoleTemplateBinding) (*apisv3.ClusterRoleTemplateBinding, error) {
@@ -120,7 +120,7 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	}).AnyTimes()
 
 	clusterClient := fake.NewMockNonNamespacedControllerInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
-	clusterClient.EXPECT().Get(gomock.Any(), gomock.Any()).Return(cluster, nil)
+	clusterClient.EXPECT().Get(gomock.Any(), gomock.Any()).Return(cluster, nil).AnyTimes()
 	clusterClient.EXPECT().Update(gomock.Any()).Return(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
 		return obj, nil
 	}).AnyTimes()
