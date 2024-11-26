@@ -117,13 +117,13 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	crtbClient.EXPECT().Create(gomock.Any()).Return(func(obj *apisv3.ClusterRoleTemplateBinding) (*apisv3.ClusterRoleTemplateBinding, error) {
 		crtbs = append(crtbs, obj)
 		return obj, nil
-	})
+	}).AnyTimes()
 
 	clusterClient := fake.NewMockNonNamespacedControllerInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
 	clusterClient.EXPECT().Get(gomock.Any(), gomock.Any()).Return(cluster, nil)
 	clusterClient.EXPECT().Update(gomock.Any()).Return(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
 		return obj, nil
-	})
+	}).AnyTimes()
 
 	lifecycle := &clusterLifecycle{
 		crtbLister:    crtbLister,
