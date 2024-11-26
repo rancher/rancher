@@ -57,10 +57,10 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	prtbLister.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
 	prtbClient := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
-	prtbClient.EXPECT().Create(gomock.Any()).Return(func(obj *v3.ProjectRoleTemplateBinding) *v3.ProjectRoleTemplateBinding {
+	prtbClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 		prtbs = append(prtbs, obj)
-		return obj
-	}, nil).AnyTimes()
+		return obj, nil
+	}).AnyTimes()
 
 	projects := fake.NewMockControllerInterface[*v3.Project, *v3.ProjectList](ctrl)
 	projects.EXPECT().Update(gomock.Any()).Return(func(obj *v3.Project) (*v3.Project, error) {
