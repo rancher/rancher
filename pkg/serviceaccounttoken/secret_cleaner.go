@@ -36,20 +36,23 @@ var (
 	cleaningBatchSize int64 = 1000
 )
 
+type secretCacheLister interface {
+	List(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
+}
+
 // StartServiceAccountSecretCleaner starts a background process to cleanup old
 // service accounts secrets.
 //
 // This should only be started in the leader pod.
-func StartServiceAccountSecretCleaner(ctx context.Context, client clientcorev1.CoreV1Interface) error {
+func StartServiceAccountSecretCleaner(ctx context.Context, secretsCache secretCacheLister, client clientcorev1.CoreV1Interface) error {
 	if strings.ToLower(os.Getenv("DISABLE_SECRET_CLEANER")) == "true" {
 		logrus.Info("ServiceAccountSecretCleaner disabled - not starting")
 		return nil
 	}
 
-	secrets := client.Secrets(impersonationNamespace)
 	serviceAccounts := client.ServiceAccounts(impersonationNamespace)
 
-	secretsQueue, err := loadSecretQueue(ctx, secrets, pageSize)
+	secretsQueue, err := loadSecretQueue(ctx, secretsCache)
 	if err != nil {
 		return err
 	}
@@ -58,6 +61,8 @@ func StartServiceAccountSecretCleaner(ctx context.Context, client clientcorev1.C
 
 	logrus.Infof("Starting ServiceAccountSecretCleaner with %v secrets", secretsQueue.List.Len())
 	ticker := time.NewTicker(cleanCycleDelay)
+
+	secrets := client.Secrets(impersonationNamespace)
 
 	go func() {
 		for {
@@ -153,78 +158,25 @@ func labelSelectorForSecrets() (labels.Selector, error) {
 	return labelSelector, nil
 }
 
-func loadSecretQueue(ctx context.Context, secrets clientv1.SecretInterface, pageSize int64) (*queue[*corev1.Secret], error) {
+func loadSecretQueue(ctx context.Context, secretsCache secretCacheLister) (*queue[*corev1.Secret], error) {
 	selector, err := labelSelectorForSecrets()
 	if err != nil {
 		return nil, err
 	}
 
 	q := newQueue[*corev1.Secret]()
-	paginator := newSecretsPaginator(secrets, pageSize, selector)
-	for paginator.hasMoreSecrets() {
-		secrets, err := paginator.nextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
+	secrets, err := secretsCache.List(impersonationNamespace, selector)
+	if err != nil {
+		return nil, err
+	}
 
-		for _, secret := range secrets {
-			// We don't want to store the data for the Secret.
-			// Maybe use PartialObjectMetadata?
-			stripped := secret.DeepCopy()
-			stripped.Data = nil
-			q.enqueue(stripped)
-		}
+	for _, secret := range secrets {
+		// We don't want to store the data for the Secret.
+		// Maybe use PartialObjectMetadata?
+		stripped := secret.DeepCopy()
+		stripped.Data = nil
+		q.enqueue(stripped)
 	}
 
 	return q, nil
-}
-
-func newSecretsPaginator(secrets clientv1.SecretInterface, pageSize int64, selector labels.Selector) *secretsPaginator {
-	return &secretsPaginator{
-		client:    secrets,
-		pageSize:  pageSize,
-		firstPage: true,
-		selector:  selector,
-	}
-}
-
-type secretsPaginator struct {
-	client   clientv1.SecretInterface
-	pageSize int64
-	selector labels.Selector
-
-	firstPage     bool
-	nextPageToken string
-}
-
-// hasMoreSecrets returns true if there are more secrets to be fetched.
-func (l *secretsPaginator) hasMoreSecrets() bool {
-	return l.firstPage || l.nextPageToken != ""
-}
-
-// nextPage returns the next set of namespaces from the iterator.
-//
-// If no pages remain, an error is returned.
-func (l *secretsPaginator) nextPage(ctx context.Context) ([]corev1.Secret, error) {
-	if !l.hasMoreSecrets() {
-		return nil, errors.New("no more pages")
-	}
-
-	options := metav1.ListOptions{
-		Limit:         l.pageSize,
-		LabelSelector: l.selector.String(),
-	}
-
-	if l.nextPageToken != "" {
-		options.Continue = l.nextPageToken
-	}
-
-	secretsList, err := l.client.List(ctx, options)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list secrets: %w", err)
-	}
-	l.firstPage = false
-	l.nextPageToken = secretsList.ListMeta.Continue
-
-	return secretsList.Items, nil
 }

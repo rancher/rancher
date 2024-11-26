@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/fake"
@@ -95,9 +96,10 @@ func TestStartServiceAccountSecretCleaner(t *testing.T) {
 		secrets = append(secrets, newSecret(fmt.Sprintf("test-%v", i)))
 	}
 
+	stubCache := newStubLister(secrets...)
 	ctx, cancel := context.WithCancel(context.Background())
 	k8sClient := fake.NewSimpleClientset(secrets...)
-	StartServiceAccountSecretCleaner(ctx, k8sClient.CoreV1())
+	StartServiceAccountSecretCleaner(ctx, stubCache, k8sClient.CoreV1())
 	<-time.After(time.Second)
 	cancel()
 
@@ -129,7 +131,8 @@ func TestStartServiceAccountSecretCleanerWhenDisabled(t *testing.T) {
 
 	t.Setenv("DISABLE_SECRET_CLEANER", "true")
 
-	StartServiceAccountSecretCleaner(ctx, k8sClient.CoreV1())
+	stubCache := newStubLister(secrets...)
+	StartServiceAccountSecretCleaner(ctx, stubCache, k8sClient.CoreV1())
 	<-time.After(time.Second)
 	cancel()
 
@@ -206,4 +209,29 @@ func toRuntimeObjects(secrets []*corev1.Secret) []runtime.Object {
 	}
 
 	return result
+}
+
+func newStubLister(objs ...runtime.Object) *stubSecretLister {
+	l := &stubSecretLister{}
+	for _, s := range objs {
+		secret := s.(*corev1.Secret)
+		l.secrets = append(l.secrets, secret)
+	}
+
+	return l
+}
+
+type stubSecretLister struct {
+	secrets []*corev1.Secret
+}
+
+func (l stubSecretLister) List(namespace string, selector labels.Selector) ([]*corev1.Secret, error) {
+	var result []*corev1.Secret
+	for _, v := range l.secrets {
+		if selector.Matches(labels.Set(v.ObjectMeta.Labels)) {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
 }

@@ -301,7 +301,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 	})
 
 	r.Wrangler.OnLeader(func(ctx context.Context) error {
-		serviceaccounttoken.StartServiceAccountSecretCleaner(ctx, r.Wrangler.K8s.CoreV1())
+		serviceaccounttoken.StartServiceAccountSecretCleaner(ctx,
+			r.Wrangler.Core.Secret().Cache(),
+			r.Wrangler.K8s.CoreV1())
 		return nil
 	})
 
