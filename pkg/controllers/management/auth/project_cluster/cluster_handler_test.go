@@ -121,7 +121,7 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 
 	clusterClient := fake.NewMockNonNamespacedControllerInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
 	clusterClient.EXPECT().Get(gomock.Any(), gomock.Any()).Return(cluster, nil).AnyTimes()
-	clusterClient.EXPECT().Update(gomock.Any()).Return(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
+	clusterClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
 		return obj, nil
 	}).AnyTimes()
 

@@ -63,9 +63,9 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	}).AnyTimes()
 
 	projects := fake.NewMockControllerInterface[*v3.Project, *v3.ProjectList](ctrl)
-	projects.EXPECT().Update(gomock.Any()).Return(func(obj *v3.Project) (*v3.Project, error) {
+	projects.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.Project) (*v3.Project, error) {
 		return obj, nil
-	})
+	}).AnyTimes()
 
 	lifecycle := &projectLifecycle{
 		prtbLister: prtbLister,
