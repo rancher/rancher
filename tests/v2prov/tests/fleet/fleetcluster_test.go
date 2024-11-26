@@ -1,6 +1,7 @@
 package fleetcluster_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -8,7 +9,6 @@ import (
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
@@ -88,16 +88,21 @@ func Test_Fleet_Cluster(t *testing.T) {
 		cluster, err = clients.Fleet.Cluster().Get("fleet-local", "local", metav1.GetOptions{})
 		return err == nil && cluster != nil && cluster.Status.Summary.Ready > 0
 	}, waitFor, tick)
-	require.Equal(cluster.Spec.AgentAffinity, &builtinAffinity)
+	require.Equal(&builtinAffinity, cluster.Spec.AgentAffinity)
 	require.Nil(cluster.Spec.AgentResources)
 	require.Empty(cluster.Spec.AgentTolerations)
 
 	// fleet-agent deployment has affinity
-	agent, err := clients.Apps.Deployment().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
+	agent, err := clients.Apps.StatefulSet().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
 	require.NoError(err)
-	require.Equal(agent.Spec.Template.Spec.Affinity, &builtinAffinity)
-	require.Len(agent.Spec.Template.Spec.Containers, 1)
-	require.Empty(agent.Spec.Template.Spec.Containers[0].Resources)
+	require.Equal(&builtinAffinity, agent.Spec.Template.Spec.Affinity)
+	for _, container := range agent.Spec.Template.Spec.InitContainers {
+		require.Empty(container.Resources)
+	}
+	require.Len(agent.Spec.Template.Spec.Containers, 2)
+	for _, container := range agent.Spec.Template.Spec.Containers {
+		require.Empty(container.Resources)
+	}
 	require.NotEmpty(agent.Spec.Template.Spec.Tolerations) // Fleet has built-in tolerations
 
 	// change settings on management cluster, results should show up in fleet-agent deployment
@@ -117,21 +122,27 @@ func Test_Fleet_Cluster(t *testing.T) {
 	require.Eventually(func() bool {
 		cluster, err = clients.Fleet.Cluster().Get("fleet-local", "local", metav1.GetOptions{})
 		if err == nil && cluster != nil && cluster.Status.Summary.Ready > 0 {
-			assert.Equal(t, cluster.Spec.AgentAffinity, &linuxAffinity)
+			return reflect.DeepEqual(&linuxAffinity, cluster.Spec.AgentAffinity)
 		}
 		return false
 	}, waitFor, tick)
 
-	require.Equal(cluster.Spec.AgentAffinity, &linuxAffinity)
-	require.Equal(cluster.Spec.AgentResources, resourceReq)
+	require.Equal(&linuxAffinity, cluster.Spec.AgentAffinity)
+	require.Equal(resourceReq, cluster.Spec.AgentResources)
 	require.Contains(cluster.Spec.AgentTolerations, tolerations[0])
 
 	// changes are present in deployment
-	agent, err = clients.Apps.Deployment().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
+	agent, err = clients.Apps.StatefulSet().Get(cluster.Status.Agent.Namespace, "fleet-agent", metav1.GetOptions{})
 	require.NoError(err)
-	require.Equal(agent.Spec.Template.Spec.Affinity, &linuxAffinity)
-	require.Len(agent.Spec.Template.Spec.Containers, 1)
-	require.Equal(agent.Spec.Template.Spec.Containers[0].Resources.Limits, resourceReq.Limits)
-	require.Equal(agent.Spec.Template.Spec.Containers[0].Resources.Requests, resourceReq.Requests)
+	require.Equal(&linuxAffinity, agent.Spec.Template.Spec.Affinity)
+	for _, container := range agent.Spec.Template.Spec.InitContainers {
+		require.Equal(resourceReq.Limits, container.Resources.Limits)
+		require.Equal(resourceReq.Requests, container.Resources.Requests)
+	}
+	require.Len(agent.Spec.Template.Spec.Containers, 2)
+	for _, container := range agent.Spec.Template.Spec.Containers {
+		require.Equal(resourceReq.Limits, container.Resources.Limits)
+		require.Equal(resourceReq.Requests, container.Resources.Requests)
+	}
 	require.Contains(agent.Spec.Template.Spec.Tolerations, tolerations[0])
 }
