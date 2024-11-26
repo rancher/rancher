@@ -67,6 +67,9 @@ source ./scripts/version
 export CATTLE_AGENT_IMAGE="rancher/rancher-agent:head"
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
+export CATTLE_MACHINE_PROVISION_IMAGE="jq20/machine:v0.15.0-test11"
+echo "Using Machine image $CATTLE_MACHINE_PROVISION_IMAGE"
+
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
