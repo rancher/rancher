@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -92,7 +93,9 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 		rbClient:      management.RBAC.RoleBindings(""),
 		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crbClient:     management.RBAC.ClusterRoleBindings(""),
-		crtbClient:    management.Management.ClusterRoleTemplateBindings(""),
+		crtbClient:    management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		crtbCache:     management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		s:             status.NewStatus(),
 	}
 	return prtb, crtb
 }
@@ -608,7 +611,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 }
 
 // grantManagementProjectScopedPrivilegesInClusterNamespace ensures that project roles grant permissions to certain cluster-scoped
-// resources(notifier, clusterpipelines). These resources exists in cluster namespace but need to be shared between projects.
+// resources. These resources exists in cluster namespace but need to be shared between projects.
 func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleTemplateName, clusterNamespace string, resources map[string]string,
 	subject v1.Subject, binding *v3.ProjectRoleTemplateBinding) error {
 	roles, err := m.gatherAndDedupeRoles(roleTemplateName)

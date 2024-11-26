@@ -43,7 +43,6 @@ type Interface interface {
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
 	ClusterCatalog() ClusterCatalogController
-	ClusterLogging() ClusterLoggingController
 	ClusterProxyConfig() ClusterProxyConfigController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
@@ -78,7 +77,6 @@ type Interface interface {
 	Principal() PrincipalController
 	Project() ProjectController
 	ProjectCatalog() ProjectCatalogController
-	ProjectLogging() ProjectLoggingController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
 	RancherUserNotification() RancherUserNotificationController
@@ -153,10 +151,6 @@ func (v *version) Cluster() ClusterController {
 
 func (v *version) ClusterCatalog() ClusterCatalogController {
 	return generic.NewController[*v3.ClusterCatalog, *v3.ClusterCatalogList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterCatalog"}, "clustercatalogs", true, v.controllerFactory)
-}
-
-func (v *version) ClusterLogging() ClusterLoggingController {
-	return generic.NewController[*v3.ClusterLogging, *v3.ClusterLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterLogging"}, "clusterloggings", true, v.controllerFactory)
 }
 
 func (v *version) ClusterProxyConfig() ClusterProxyConfigController {
@@ -293,10 +287,6 @@ func (v *version) Project() ProjectController {
 
 func (v *version) ProjectCatalog() ProjectCatalogController {
 	return generic.NewController[*v3.ProjectCatalog, *v3.ProjectCatalogList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectCatalog"}, "projectcatalogs", true, v.controllerFactory)
-}
-
-func (v *version) ProjectLogging() ProjectLoggingController {
-	return generic.NewController[*v3.ProjectLogging, *v3.ProjectLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectLogging"}, "projectloggings", true, v.controllerFactory)
 }
 
 func (v *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {

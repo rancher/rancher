@@ -29,16 +29,12 @@ var projectManagementPlaneResources = map[string]string{
 	"catalogtemplates":            "management.cattle.io",
 	"catalogtemplateversions":     "management.cattle.io",
 	"sourcecodeproviderconfigs":   "project.cattle.io",
-	"projectloggings":             "management.cattle.io",
-	"projectalertrules":           "management.cattle.io",
-	"projectalertgroups":          "management.cattle.io",
 	"projectcatalogs":             "management.cattle.io",
 	"projectmonitorgraphs":        "management.cattle.io",
 	"projectroletemplatebindings": "management.cattle.io",
 	"secrets":                     "",
 }
 var prtbClusterManagmentPlaneResources = map[string]string{
-	"notifiers":               "management.cattle.io",
 	"clustercatalogs":         "management.cattle.io",
 	"catalogtemplates":        "management.cattle.io",
 	"catalogtemplateversions": "management.cattle.io",

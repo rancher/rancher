@@ -40,7 +40,6 @@ var (
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
 	ClusterCatalogResourceName                            = "clustercatalogs"
-	ClusterLoggingResourceName                            = "clusterloggings"
 	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
@@ -75,7 +74,6 @@ var (
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
 	ProjectCatalogResourceName                            = "projectcatalogs"
-	ProjectLoggingResourceName                            = "projectloggings"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
@@ -139,8 +137,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterList{},
 		&ClusterCatalog{},
 		&ClusterCatalogList{},
-		&ClusterLogging{},
-		&ClusterLoggingList{},
 		&ClusterProxyConfig{},
 		&ClusterProxyConfigList{},
 		&ClusterRegistrationToken{},
@@ -209,8 +205,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectList{},
 		&ProjectCatalog{},
 		&ProjectCatalogList{},
-		&ProjectLogging{},
-		&ProjectLoggingList{},
 		&ProjectNetworkPolicy{},
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},

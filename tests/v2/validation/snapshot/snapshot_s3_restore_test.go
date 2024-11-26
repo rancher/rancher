@@ -19,18 +19,18 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type SnapshotRestoreK8sUpgradeTestSuite struct {
+type S3SnapshotRestoreTestSuite struct {
 	suite.Suite
 	session        *session.Session
 	client         *rancher.Client
 	clustersConfig *etcdsnapshot.Config
 }
 
-func (s *SnapshotRestoreK8sUpgradeTestSuite) TearDownSuite() {
+func (s *S3SnapshotRestoreTestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *SnapshotRestoreK8sUpgradeTestSuite) SetupSuite() {
+func (s *S3SnapshotRestoreTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -43,10 +43,10 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) SetupSuite() {
 	s.client = client
 }
 
-func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
-	snapshotRestoreK8sVersion := &etcdsnapshot.Config{
+func (s *S3SnapshotRestoreTestSuite) TestS3SnapshotRestore() {
+	snapshotRestoreNone := &etcdsnapshot.Config{
 		UpgradeKubernetesVersion: "",
-		SnapshotRestore:          "kubernetesVersion",
+		SnapshotRestore:          "none",
 		RecurringRestores:        1,
 	}
 
@@ -55,7 +55,7 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 		etcdSnapshot *etcdsnapshot.Config
 		client       *rancher.Client
 	}{
-		{"Restore Kubernetes version and etcd", snapshotRestoreK8sVersion, s.client},
+		{"S3 Restore", snapshotRestoreNone, s.client},
 	}
 
 	for _, tt := range tests {
@@ -88,6 +88,6 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestSnapshotRestoreK8sUpgradeTestSuite(t *testing.T) {
-	suite.Run(t, new(SnapshotRestoreK8sUpgradeTestSuite))
+func TestS3SnapshotTestSuite(t *testing.T) {
+	suite.Run(t, new(S3SnapshotRestoreTestSuite))
 }

@@ -12,7 +12,6 @@ initial_system_namespaces = set(["kube-node-lease",
                                  "cattle-global-data",
                                  "cattle-global-nt",
                                  "cattle-fleet-system"])
-loggingNamespace = "cattle-logging"
 operatorNamespace = "rancher-operator-system"
 
 
@@ -51,10 +50,6 @@ def test_system_namespaces_assigned(admin_cc):
     system_namespaces_names = set(
         [ns['name'] for ns in system_namespaces])
 
-    # If clusterLogging tests run before this, cattle-logging
-    # will be present in current system_namespaces, removing it
-    if loggingNamespace in system_namespaces_names:
-        system_namespaces_names.remove(loggingNamespace)
     if operatorNamespace in system_namespaces_names:
         system_namespaces_names.remove(operatorNamespace)
 
