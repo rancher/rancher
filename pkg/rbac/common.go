@@ -20,12 +20,10 @@ import (
 )
 
 const (
-	NamespaceID            = "namespaceId"
-	ProjectID              = "projectId"
-	ClusterID              = "clusterId"
-	GlobalAdmin            = "admin"
-	ClusterCRDsClusterRole = "cluster-crd-clusterRole"
-	ProjectCRDsClusterRole = "project-crd-clusterRole"
+	NamespaceID = "namespaceId"
+	ProjectID   = "projectId"
+	ClusterID   = "clusterId"
+	GlobalAdmin = "admin"
 )
 
 // BuildSubjectFromRTB This function will generate
