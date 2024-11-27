@@ -438,7 +438,7 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 	if config.AcrValue != "" {
 		acrValue, err := parseACRFromAccessToken(oauth2Token.AccessToken)
 		if err != nil {
-			return userInfo, oauth2Token, fmt.Errorf("failed to parse ACR from access token: %w", err)
+			return userInfo, oauth2Token, err
 		}
 		if !isValidACR(acrValue, config.AcrValue) {
 			return userInfo, oauth2Token, errors.New("failed to validate ACR")
@@ -503,7 +503,7 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *v32
 	if config.AcrValue != "" {
 		acrValue, err := parseACRFromAccessToken(token.AccessToken)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse ACR from access storedToken: %w", err)
+			return nil, err
 		}
 		if !isValidACR(acrValue, config.AcrValue) {
 			return nil, errors.New("failed due to invalid ACR")
@@ -642,15 +642,15 @@ func parseACRFromAccessToken(accessToken string) (string, error) {
 	// we already validated the incoming token
 	token, _, err := parser.ParseUnverified(accessToken, jwt.MapClaims{})
 	if err != nil {
-		return "", fmt.Errorf("failed to parse token: %w", err)
+		return "", fmt.Errorf("failed to parse JWT token: %w", err)
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("invalid access token jwt.MapClaims format")
+		return "", errors.New("failed to parse claims in JWT token: invalid jwt.MapClaims format")
 	}
 	acrValue, found := claims["acr"].(string)
 	if !found {
-		return "", fmt.Errorf("acr claim invalid or not found in token: (acr=%v)", claims["acr"])
+		return "", fmt.Errorf("ACR claim invalid or not found in token: (acr=%v)", claims["acr"])
 	}
 	return acrValue, nil
 }
