@@ -36,12 +36,12 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 		return nil, nil
 	}
 
-	crb, err := rbac.BuildClusterRoleBindingFromCRTB(crtb, crtb.RoleTemplateName)
+	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
+	crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, ownerLabel, crtb.RoleTemplateName)
 	if err != nil {
 		return nil, err
 	}
 
-	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
 	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: ownerLabel})
 	if err != nil {
 		return nil, err
