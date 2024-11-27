@@ -3,20 +3,14 @@ package roletemplates
 import (
 	"errors"
 	"fmt"
-	"reflect"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/name"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	crtbOwnerLabel = "authz.cluster.cattle.io/crtb-owner"
 )
 
 type crtbHandler struct {
@@ -42,12 +36,12 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 		return nil, nil
 	}
 
-	crb, err := buildClusterRoleBinding(crtb)
+	crb, err := rbac.BuildClusterRoleBindingFromCRTB(crtb, crtb.RoleTemplateName)
 	if err != nil {
 		return nil, err
 	}
 
-	ownerLabel := createCRTBOwnerLabel(crtb.Name)
+	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
 	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: ownerLabel})
 	if err != nil {
 		return nil, err
@@ -56,7 +50,7 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 	// Find if there is a CRB that already exists and delete all excess CRBs
 	var matchingCRB *v1.ClusterRoleBinding
 	for _, currentCRB := range currentCRBs.Items {
-		if areClusterRoleBindingsSame(crb, &currentCRB) && matchingCRB == nil {
+		if rbac.AreClusterRoleBindingsSame(crb, &currentCRB) && matchingCRB == nil {
 			matchingCRB = &currentCRB
 			continue
 		}
@@ -85,7 +79,7 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 // OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding
 func (c *crtbHandler) OnRemove(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	lo := metav1.ListOptions{
-		LabelSelector: createCRTBOwnerLabel(crtb.Name),
+		LabelSelector: rbac.CreateCRTBOwnerLabel(crtb.Name),
 	}
 
 	crbs, err := c.crbClient.List(lo)
@@ -107,39 +101,4 @@ func (c *crtbHandler) OnRemove(key string, crtb *v3.ClusterRoleTemplateBinding) 
 		}
 	}
 	return nil, returnError
-}
-
-// buildClusterRoleBinding returns the ClusterRoleBinding needed for a CRTB
-func buildClusterRoleBinding(crtb *v3.ClusterRoleTemplateBinding) (*v1.ClusterRoleBinding, error) {
-	ownerLabel := createCRTBOwnerLabel(crtb.Name)
-	roleRef := v1.RoleRef{
-		Kind: "ClusterRole",
-		Name: rbac.AggregatedClusterRoleNameFor(crtb.RoleTemplateName),
-	}
-
-	subject, err := rbac.BuildSubjectFromRTB(crtb)
-	if err != nil {
-		return nil, err
-	}
-
-	return &v1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "crb-",
-			Labels:       map[string]string{ownerLabel: "true"},
-		},
-		RoleRef:  roleRef,
-		Subjects: []v1.Subject{subject},
-	}, nil
-
-}
-
-// areRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
-func areClusterRoleBindingsSame(crb1, crb2 *v1.ClusterRoleBinding) bool {
-	return reflect.DeepEqual(crb1.Subjects, crb2.Subjects) &&
-		reflect.DeepEqual(crb1.RoleRef, crb2.RoleRef)
-}
-
-// createCRTBOwnerLabel creates an owner label given a CRTB name
-func createCRTBOwnerLabel(crtbName string) string {
-	return name.SafeConcatName(crtbOwnerLabel, crtbName)
 }

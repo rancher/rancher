@@ -100,7 +100,7 @@ func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 	)
 }
 
-// getAllRules collects all policy rules that the RoleTemplate applies. Specifically it searches for external rules
+// getAllRules collects all policy rules that the RoleTemplate applies. Specifically it searches for external rules.
 func (r *roleTemplateHandler) getAllRules(rt *v3.RoleTemplate) ([]v1.PolicyRule, error) {
 	var rules []v1.PolicyRule
 	if rt.External {
@@ -122,7 +122,7 @@ func (r *roleTemplateHandler) getAllRules(rt *v3.RoleTemplate) ([]v1.PolicyRule,
 	return rules, nil
 }
 
-// getManagementPlaneRules filters a set of rules based on the map passed in. Used to provide special resources that have cluster/project scope
+// getManagementPlaneRules filters a set of rules based on the map passed in. Used to provide special resources that have cluster/project scope.
 func getManagementPlaneRules(rules []v1.PolicyRule, managementResources map[string]string) []v1.PolicyRule {
 	var managementRules []v1.PolicyRule
 	for _, rule := range rules {

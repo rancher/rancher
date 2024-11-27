@@ -1,8 +1,6 @@
 package roletemplates
 
 import (
-	"reflect"
-
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -33,21 +31,21 @@ func createOrUpdateMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, rtCont
 		Name: roleName,
 	}
 
-	subject, err := pkgrbac.BuildSubjectFromRTB(crtb)
+	wantedCRB, err := buildMembershipBinding(roleRef, crtb)
 	if err != nil {
 		return err
 	}
-
-	crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject)
-	wantedCRB := buildMembershipBinding(roleRef, crbName, subject)
-	existingCRB, err := crbController.Get(crbName, metav1.GetOptions{})
+	existingCRB, err := crbController.Get(wantedCRB.Name, metav1.GetOptions{})
 	if err == nil {
-		// TODO update if there are labels or annotations we want
-
 		// If the role referenced or subjects are wrong, delete and re-create the CRB
-		if !reflect.DeepEqual(wantedCRB.RoleRef, existingCRB.RoleRef) ||
-			!reflect.DeepEqual(wantedCRB.Subjects, existingCRB.Subjects) {
-			if err := crbController.Delete(crbName, &metav1.DeleteOptions{}); err != nil {
+		if pkgrbac.AreClusterRoleBindingsSame(wantedCRB, existingCRB) {
+			// Update Label
+			rtbLabel := pkgrbac.GetRTBLabel(crtb.ObjectMeta)
+			existingCRB.Labels[rtbLabel] = "true"
+			_, err := crbController.Update(existingCRB)
+			return err
+		} else {
+			if err := crbController.Delete(wantedCRB.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 		}
@@ -55,21 +53,46 @@ func createOrUpdateMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, rtCont
 		return err
 	}
 
-	_, err = crbController.Create(&wantedCRB)
+	_, err = crbController.Create(wantedCRB)
 	return err
 }
 
-func buildMembershipBinding(roleRef v1.RoleRef, crbName string, subject v1.Subject) v1.ClusterRoleBinding {
-	// TODO what labels and annotations do we need?
-	return v1.ClusterRoleBinding{
+func deleteMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, crbController crbacv1.ClusterRoleBindingController) error {
+	label := pkgrbac.GetRTBLabel(crtb.ObjectMeta)
+	listOption := metav1.ListOptions{LabelSelector: label}
+	crbs, err := crbController.List(listOption)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range crbs.Items {
+		delete(c.Labels, label)
+		// If there are no items in Labels, the user is no longer a member/owner
+		if len(c.Labels) == 0 {
+			return crbController.Delete(c.Name, &metav1.DeleteOptions{})
+		}
+	}
+	return nil
+}
+
+func buildMembershipBinding(roleRef v1.RoleRef, crtb *v3.ClusterRoleTemplateBinding) (*v1.ClusterRoleBinding, error) {
+	subject, err := pkgrbac.BuildSubjectFromRTB(crtb)
+	if err != nil {
+		return nil, err
+	}
+
+	crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject)
+	rtbLabel := pkgrbac.GetRTBLabel(crtb.ObjectMeta)
+
+	return &v1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        crbName,
 			Annotations: map[string]string{},
-			Labels:      map[string]string{},
+			Labels:      map[string]string{rtbLabel: "true"},
 		},
 		Subjects: []v1.Subject{subject},
 		RoleRef:  roleRef,
-	}
+	}, nil
 }
 
 func getMembershipRoleName(rt *v3.RoleTemplate) string {
