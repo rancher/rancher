@@ -36,7 +36,6 @@ import (
 	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
@@ -298,13 +297,6 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}
 
 		return runMigrations(r.Wrangler)
-	})
-
-	r.Wrangler.OnLeader(func(ctx context.Context) error {
-		serviceaccounttoken.StartServiceAccountSecretCleaner(ctx,
-			r.Wrangler.Core.Secret().Cache(),
-			r.Wrangler.K8s.CoreV1())
-		return nil
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {

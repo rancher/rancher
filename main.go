@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rancher"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -216,6 +218,13 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	if err != nil {
 		return err
 	}
+
+	server.Wrangler.OnLeader(func(ctx context.Context) error {
+		serviceaccounttoken.StartServiceAccountSecretCleaner(ctx,
+			server.Wrangler.Core.Secret().Cache(),
+			server.Wrangler.K8s.CoreV1())
+		return nil
+	})
 
 	return server.ListenAndServe(ctx)
 }
