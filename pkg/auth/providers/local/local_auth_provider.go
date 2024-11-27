@@ -412,7 +412,8 @@ func userSearchIndexer(obj interface{}) ([]string, error) {
 	splitToLower := func(s string, limit int) []string {
 		var lowers []string
 		for _, v := range strings.Fields(s) {
-			lowers = append(lowers, strings.ToLower(v)[:minOf(limit, len(v))])
+			lv := strings.ToLower(v)
+			lowers = append(lowers, lv[:minOf(limit, len(lv))])
 		}
 
 		return lowers
@@ -448,8 +449,10 @@ func minOf(length int, defaultLen int) int {
 func indexField(field string, maxIndex int) []string {
 	var fieldIndexes []string
 	for i := 2; i <= maxIndex; i++ {
-		fieldIndexes = append(fieldIndexes, strings.ToLower(
-			string([]rune(simplifyString(field))[0:i])))
+		fi := string([]rune(simplifyString(field))[0:i])
+		fieldIndexes = append(fieldIndexes, strings.TrimFunc(strings.ToLower(fi), func(r rune) bool {
+			return r == 0
+		}))
 	}
 
 	return fieldIndexes
