@@ -236,7 +236,6 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 		return nil, err
 	}
 
-	//do not need userInfo or oauth2Token since we are only processing groups
 	claimInfo, err := o.getClaimInfoFromToken(&o.CTX, config, &oauthToken, user.Name)
 	if err != nil {
 		return groupPrincipals, err
