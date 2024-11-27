@@ -507,7 +507,7 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx *context.Context, config *v3
 			return nil, fmt.Errorf("failed to parse ACR from access storedToken: %w", err)
 		}
 		if !isValidACR(acrValue, config.AcrValue) {
-			return nil, errors.New("failed to validate ACR")
+			return nil, errors.New("failed due to invalid ACR")
 		}
 	}
 
