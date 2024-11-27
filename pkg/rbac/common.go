@@ -37,6 +37,7 @@ const (
 	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
 	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
 	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
+	crtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
 	aggregationLabel                  = "management.cattle.io/aggregates"
 	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
@@ -427,6 +428,35 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	}
 }
 
+// BuildClusterRoleBinding returns the ClusterRoleBinding needed for a CRTB. It is bound to the ClusterRole specified by roleRefName.
+func BuildClusterRoleBindingFromCRTB(crtb *v3.ClusterRoleTemplateBinding, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
+	ownerLabel := CreateCRTBOwnerLabel(crtb.Name)
+	roleRef := rbacv1.RoleRef{
+		Kind: "ClusterRole",
+		Name: AggregatedClusterRoleNameFor(roleRefName),
+	}
+
+	subject, err := BuildSubjectFromRTB(crtb)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "crb-",
+			Labels:       map[string]string{ownerLabel: "true"},
+		},
+		RoleRef:  roleRef,
+		Subjects: []rbacv1.Subject{subject},
+	}, nil
+}
+
+// AreRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
+func AreClusterRoleBindingsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
+	return reflect.DeepEqual(crb1.Subjects, crb2.Subjects) &&
+		reflect.DeepEqual(crb1.RoleRef, crb2.RoleRef)
+}
+
 // ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName
 func ClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s)
@@ -450,4 +480,9 @@ func ClusterManagementPlaneClusterRoleNameFor(s string) string {
 // ProjectManagementPlaneClusterRoleNameFor appends the project management plane suffix to a string safely (ie <= 63 characters)
 func ProjectManagementPlaneClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, projectManagementPlaneSuffix)
+}
+
+// CreateCRTBOwnerLabel creates an owner label given a CRTB name
+func CreateCRTBOwnerLabel(crtbName string) string {
+	return name.SafeConcatName(crtbOwnerLabel, crtbName)
 }
