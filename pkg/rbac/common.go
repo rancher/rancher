@@ -38,6 +38,7 @@ const (
 	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
 	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
 	crtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
+	prtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
 	aggregationLabel                  = "management.cattle.io/aggregates"
 	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
@@ -428,15 +429,14 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	}
 }
 
-// BuildClusterRoleBinding returns the ClusterRoleBinding needed for a CRTB. It is bound to the ClusterRole specified by roleRefName.
-func BuildClusterRoleBindingFromCRTB(crtb *v3.ClusterRoleTemplateBinding, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
-	ownerLabel := CreateCRTBOwnerLabel(crtb.Name)
+// BuildClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the ClusterRole specified by roleRefName.
+func BuildClusterRoleBindingFromRTB(rtb metav1.Object, ownerLabel, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
 	roleRef := rbacv1.RoleRef{
 		Kind: "ClusterRole",
 		Name: AggregatedClusterRoleNameFor(roleRefName),
 	}
 
-	subject, err := BuildSubjectFromRTB(crtb)
+	subject, err := BuildSubjectFromRTB(rtb)
 	if err != nil {
 		return nil, err
 	}
@@ -485,4 +485,9 @@ func ProjectManagementPlaneClusterRoleNameFor(s string) string {
 // CreateCRTBOwnerLabel creates an owner label given a CRTB name
 func CreateCRTBOwnerLabel(crtbName string) string {
 	return name.SafeConcatName(crtbOwnerLabel, crtbName)
+}
+
+// CreatePRTBOwnerLabel creates an owner label given a PRTB name
+func CreatePRTBOwnerLabel(prtbName string) string {
+	return name.SafeConcatName(prtbOwnerLabel, prtbName)
 }
