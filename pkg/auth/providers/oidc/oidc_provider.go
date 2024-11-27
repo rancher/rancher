@@ -445,7 +445,7 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 		}
 	}
 
-	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
+	logrus.Debugf("[generic oidc] getUserInfo: getting user info for user %s", userName)
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
 	if err != nil {
 		return userInfo, oauth2Token, err
@@ -510,7 +510,7 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *v32
 		}
 	}
 
-	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
+	logrus.Debugf("[generic oidc] getUserInfo: getting user info for user %s", userName)
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, token))
 	if err != nil {
 		return nil, err
