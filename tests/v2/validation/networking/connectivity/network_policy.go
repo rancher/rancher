@@ -75,6 +75,5 @@ func curlCommand(client *rancher.Client, clusterID string, url string) (string, 
 	if err != nil {
 		return "", err
 	}
-	logrus.Infof("Log of the curl command curl {%v}", log)
 	return log, nil
 }
