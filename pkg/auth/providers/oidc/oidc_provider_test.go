@@ -414,9 +414,8 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				Name:     providerName,
 				TokenMGR: test.tokenManagerMock(oidcResp.token),
 			}
-			ctx := context.TODO()
 
-			claimsInfo, err := o.getClaimInfoFromToken(&ctx, test.config(port), test.storedToken(port), userId)
+			claimsInfo, err := o.getClaimInfoFromToken(context.TODO(), test.config(port), test.storedToken(port), userId)
 
 			assert.Equal(t, test.expectedClaimInfo, claimsInfo)
 			if test.expectedErrorMessage == "" {

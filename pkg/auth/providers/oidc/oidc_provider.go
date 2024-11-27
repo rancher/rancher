@@ -236,7 +236,7 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 		return nil, err
 	}
 
-	claimInfo, err := o.getClaimInfoFromToken(&o.CTX, config, &oauthToken, user.Name)
+	claimInfo, err := o.getClaimInfoFromToken(o.CTX, config, &oauthToken, user.Name)
 	if err != nil {
 		return groupPrincipals, err
 	}
@@ -457,12 +457,12 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 	return userInfo, oauth2Token, nil
 }
 
-func (o *OpenIDCProvider) getClaimInfoFromToken(ctx *context.Context, config *v32.OIDCConfig, token *oauth2.Token, userName string) (*ClaimInfo, error) {
+func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *v32.OIDCConfig, token *oauth2.Token, userName string) (*ClaimInfo, error) {
 	var userInfo *oidc.UserInfo
 	var err error
 	var claimInfo *ClaimInfo
 
-	updatedContext, err := AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
+	updatedContext, err := AddCertKeyToContext(ctx, config.Certificate, config.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
