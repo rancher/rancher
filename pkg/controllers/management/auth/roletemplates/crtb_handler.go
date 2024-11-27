@@ -60,19 +60,24 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, err
 	}
 
-	// Create membership binding
-	if err := createOrUpdateMembershipBinding(crtb, c.rtController, c.crbController); err != nil {
+	rt, err := c.rtController.Get(crtb.RoleTemplateName, metav1.GetOptions{})
+	if err != nil {
 		return nil, err
 	}
 
-	rtName := crtb.RoleTemplateName
+	// Create membership binding
+	if err := createOrUpdateMembershipBinding(crtb, rt, c.crbController); err != nil {
+		return nil, err
+	}
+
 	crbsNeeded := map[*rbacv1.ClusterRoleBinding]bool{}
+	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
 
 	// Check if there is a project management role to bind to
-	projectMagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(rtName)
+	projectMagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err := c.crController.Get(projectMagementRoleName, metav1.GetOptions{})
 	if err == nil && cr != nil {
-		crb, err := rbac.BuildClusterRoleBindingFromCRTB(crtb, projectMagementRoleName)
+		crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, ownerLabel, projectMagementRoleName)
 		if err != nil {
 			return nil, err
 		}
@@ -82,10 +87,10 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	}
 
 	// Check if there is a cluster management role to bind to
-	clusterManagementRoleName := rbac.ClusterManagementPlaneClusterRoleNameFor(rtName)
+	clusterManagementRoleName := rbac.ClusterManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err = c.crController.Get(clusterManagementRoleName, metav1.GetOptions{})
 	if err != nil && cr != nil {
-		crb, err := rbac.BuildClusterRoleBindingFromCRTB(crtb, clusterManagementRoleName)
+		crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, ownerLabel, clusterManagementRoleName)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +99,6 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, err
 	}
 
-	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
 	currentCRBs, err := c.crbController.List(metav1.ListOptions{LabelSelector: ownerLabel})
 	if err != nil {
 		return nil, err
@@ -132,14 +136,14 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
 	currentCRBs, err := c.crbController.List(metav1.ListOptions{LabelSelector: ownerLabel})
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(returnErr, err)
 	}
 
 	for _, crb := range currentCRBs.Items {
 		errors.Join(returnErr, c.crbController.Delete(crb.Name, &metav1.DeleteOptions{}))
 	}
 
-	return crtb, nil
+	return crtb, returnErr
 }
 
 // reconcileSubject ensures that the user referenced by the role template binding exists

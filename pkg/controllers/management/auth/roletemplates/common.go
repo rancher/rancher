@@ -3,7 +3,6 @@ package roletemplates
 import (
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -19,12 +18,7 @@ const (
 	projectOwner   = "project-owner"
 )
 
-func createOrUpdateMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, rtController mgmtv3.RoleTemplateController, crbController crbacv1.ClusterRoleBindingController) error {
-	rt, err := rtController.Get(crtb.RoleTemplateName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
+func createOrUpdateMembershipBinding(crtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
 	roleName := getMembershipRoleName(rt)
 	roleRef := v1.RoleRef{
 		Kind: "ClusterRole",
@@ -40,7 +34,7 @@ func createOrUpdateMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, rtCont
 		// If the role referenced or subjects are wrong, delete and re-create the CRB
 		if pkgrbac.AreClusterRoleBindingsSame(wantedCRB, existingCRB) {
 			// Update Label
-			rtbLabel := pkgrbac.GetRTBLabel(crtb.ObjectMeta)
+			rtbLabel := getRTBLabel(crtb)
 			existingCRB.Labels[rtbLabel] = "true"
 			_, err := crbController.Update(existingCRB)
 			return err
@@ -57,8 +51,8 @@ func createOrUpdateMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, rtCont
 	return err
 }
 
-func deleteMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, crbController crbacv1.ClusterRoleBindingController) error {
-	label := pkgrbac.GetRTBLabel(crtb.ObjectMeta)
+func deleteMembershipBinding(rtb metav1.Object, crbController crbacv1.ClusterRoleBindingController) error {
+	label := getRTBLabel(rtb)
 	listOption := metav1.ListOptions{LabelSelector: label}
 	crbs, err := crbController.List(listOption)
 	if err != nil {
@@ -75,14 +69,14 @@ func deleteMembershipBinding(crtb *v3.ClusterRoleTemplateBinding, crbController 
 	return nil
 }
 
-func buildMembershipBinding(roleRef v1.RoleRef, crtb *v3.ClusterRoleTemplateBinding) (*v1.ClusterRoleBinding, error) {
-	subject, err := pkgrbac.BuildSubjectFromRTB(crtb)
+func buildMembershipBinding(roleRef v1.RoleRef, rtb metav1.Object) (*v1.ClusterRoleBinding, error) {
+	subject, err := pkgrbac.BuildSubjectFromRTB(rtb)
 	if err != nil {
 		return nil, err
 	}
 
 	crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject)
-	rtbLabel := pkgrbac.GetRTBLabel(crtb.ObjectMeta)
+	rtbLabel := getRTBLabel(rtb)
 
 	return &v1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -111,4 +105,8 @@ func getMembershipRoleName(rt *v3.RoleTemplate) string {
 
 func isOwnerRole(rt *v3.RoleTemplate) bool {
 	return rt.Builtin && (rt.Context == clusterContext && rt.Name == clusterOwner || rt.Context == clusterContext && rt.Name == projectOwner)
+}
+
+func getRTBLabel(obj metav1.Object) string {
+	return name.SafeConcatName(obj.GetNamespace() + "_" + obj.GetName())
 }
