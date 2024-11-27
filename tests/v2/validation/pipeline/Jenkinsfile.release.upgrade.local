@@ -340,6 +340,13 @@ node {
                         script: "./yq -i '.upgradeInput.clusters[0].name = .rancher.clusterName' ./${patchedConfigsDir}/$it",
                         returnStdout: true
                       )
+
+                      def clusterName = sh(
+                        script: "./yq e '.upgradeInput.clusters[0].name' ./${patchedConfigsDir}/${configFile}",
+                        returnStdout: true
+                      ).trim()
+
+                       echo "Updated cluster name in ${configFile}: ${clusterName}"
                     } catch(err){
                      echo "Cluster mapping had failures: " + err
                     }
