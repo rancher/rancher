@@ -188,6 +188,7 @@ var OriginMap = map[string]string{
 	"mirrored-metrics-server":                                 "https://github.com/kubernetes-sigs/metrics-server",
 	"mirrored-minio-mc":                                       "https://github.com/minio/mc",
 	"mirrored-minio-minio":                                    "https://github.com/minio/minio",
+        "mirrored-neuvector-compliance-config":                    "https://github.com/neuvector/compliance-config",
 	"mirrored-neuvector-controller":                           "https://github.com/neuvector/neuvector",
 	"mirrored-neuvector-enforcer":                             "https://github.com/neuvector/neuvector",
 	"mirrored-neuvector-manager":                              "https://github.com/neuvector/manager",
