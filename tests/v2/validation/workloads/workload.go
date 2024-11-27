@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/kubectl"
@@ -16,16 +19,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/rancher/shepherd/pkg/wrangler"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
 	revisionAnnotation = "deployment.kubernetes.io/revision"
+	nginxImageName     = "nginx"
+	ubuntuImageName    = "ubuntu"
+	redisImageName     = "redis"
+	podSteveType       = "pod"
 )
 
 func validateDeploymentUpgrade(t *testing.T, client *rancher.Client, clusterName string, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) {
 	log.Info("Waiting deployment comes up active")
 	err := charts.WatchAndWaitDeployments(client, clusterName, namespaceName, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + appv1Deployment.Name,
+		FieldSelector:  "metadata.name=" + appv1Deployment.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	require.NoError(t, err)
 
@@ -61,10 +70,57 @@ func validateDeploymentScale(t *testing.T, client *rancher.Client, clusterName s
 }
 
 func rollbackDeployment(client *rancher.Client, clusterID, namespaceName string, deploymentName string, revision int) (string, error) {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return "", err
+	}
+
+	namespaceClient := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName)
+	podsResp, err := namespaceClient.List(nil)
+	if err != nil {
+		return "", err
+	}
+
+	//Collect the pod IDs that are expected to be deleted after the rollback
+	expectBeDeletedIds := []string{}
+	for _, podResp := range podsResp.Data {
+		expectBeDeletedIds = append(expectBeDeletedIds, podResp.ID)
+	}
+
+	//Execute the roolback
 	deploymentCmd := fmt.Sprintf("deployment.apps/%s", deploymentName)
 	revisionCmd := fmt.Sprintf("--to-revision=%s", strconv.Itoa(revision))
 	execCmd := []string{"kubectl", "rollout", "undo", "-n", namespaceName, deploymentCmd, revisionCmd}
 	logCmd, err := kubectl.Command(client, nil, clusterID, execCmd, "")
+	if err != nil {
+		return "", err
+	}
+
+	backoff := kwait.Backoff{
+		Duration: 5 * time.Second,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    10,
+	}
+
+	//Waiting for all expectedToBeDeletedIds to be deleted
+	err = kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		for _, id := range expectBeDeletedIds {
+			//If the expected delete ID doesn't exist, it should be ignored
+			podResp, err := namespaceClient.ByID(id)
+			if err != nil && strings.Contains(err.Error(), "404 Not Found") {
+				continue
+			}
+			if err != nil {
+				return false, err
+			}
+			if podResp != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+
 	return logCmd, err
 }
 
