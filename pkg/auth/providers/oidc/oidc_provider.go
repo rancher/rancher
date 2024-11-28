@@ -38,8 +38,6 @@ const (
 
 type tokenManager interface {
 	IsMemberOf(token v3.Token, group v3.Principal) bool
-	GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal
-	UpdateToken(token *v3.Token) (*v3.Token, error)
 	UpdateSecret(userID, provider, secret string) error
 	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
 	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
