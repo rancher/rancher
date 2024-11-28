@@ -631,7 +631,7 @@ func isValidACR(claimACR string, configuredACR string) bool {
 	}
 
 	if claimACR != configuredACR {
-		logrus.Infof("acr value in token does not match configured acr value")
+		logrus.Infof("[generic oidc] acr value in token does not match configured acr value")
 		return false
 	}
 	return true
