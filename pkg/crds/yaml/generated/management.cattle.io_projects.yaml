@@ -14,7 +14,17 @@ spec:
     singular: project
   scope: Namespaced
   versions:
-  - name: v3
+  - additionalPrinterColumns:
+    - jsonPath: .spec.clusterName
+      name: CLUSTERNAME
+      type: string
+    - jsonPath: .spec.displayName
+      name: DISPLAYNAME
+      type: string
+    - jsonPath: .spec.description
+      name: DESCRIPTION
+      type: string
+    name: v3
     schema:
       openAPIV3Schema:
         description: |-
@@ -306,3 +316,4 @@ spec:
         type: object
     served: true
     storage: true
+    subresources: {}
