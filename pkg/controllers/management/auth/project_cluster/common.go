@@ -110,7 +110,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 
 	memberRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name.SafeConcatName(resourceName + "member"),
+			Name:            name.SafeConcatName(resourceName, "member"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Annotations:     annotations,
 		},
@@ -126,7 +126,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 
 	ownerRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name.SafeConcatName(resourceName + "owner"),
+			Name:            name.SafeConcatName(resourceName, "owner"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Annotations:     annotations,
 		},
@@ -149,6 +149,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 	return nil
 }
 
+// newOwnerReference create an OwnerReference from a runtime.Object.
 func newOwnerReference(obj runtime.Object) (metav1.OwnerReference, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {

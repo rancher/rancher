@@ -18,14 +18,15 @@ const (
 	projectOwner   = "project-owner"
 )
 
-func createOrUpdateMembershipBinding(crtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
+// createOrUpdateMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster or project specified by the CRTB or PRTB.
+func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
 	roleName := getMembershipRoleName(rt)
 	roleRef := v1.RoleRef{
 		Kind: "ClusterRole",
 		Name: roleName,
 	}
 
-	wantedCRB, err := buildMembershipBinding(roleRef, crtb)
+	wantedCRB, err := buildMembershipBinding(roleRef, rtb)
 	if err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func createOrUpdateMembershipBinding(crtb metav1.Object, rt *v3.RoleTemplate, cr
 		// If the role referenced or subjects are wrong, delete and re-create the CRB
 		if pkgrbac.AreClusterRoleBindingsSame(wantedCRB, existingCRB) {
 			// Update Label
-			rtbLabel := getRTBLabel(crtb)
+			rtbLabel := getRTBLabel(rtb)
 			existingCRB.Labels[rtbLabel] = "true"
 			_, err := crbController.Update(existingCRB)
 			return err
@@ -51,6 +52,7 @@ func createOrUpdateMembershipBinding(crtb metav1.Object, rt *v3.RoleTemplate, cr
 	return err
 }
 
+// deleteMembershipBinding checks if the user is still a member of the Project or Cluster specified by PRTB/CRTB. If they are no longer a member, delete the bindings.
 func deleteMembershipBinding(rtb metav1.Object, crbController crbacv1.ClusterRoleBindingController) error {
 	label := getRTBLabel(rtb)
 	listOption := metav1.ListOptions{LabelSelector: label}
@@ -69,6 +71,7 @@ func deleteMembershipBinding(rtb metav1.Object, crbController crbacv1.ClusterRol
 	return nil
 }
 
+// buildMembershipBinding returns the ClusterRoleBinding needed to give membership to the Cluster or Project.
 func buildMembershipBinding(roleRef v1.RoleRef, rtb metav1.Object) (*v1.ClusterRoleBinding, error) {
 	subject, err := pkgrbac.BuildSubjectFromRTB(rtb)
 	if err != nil {
@@ -89,6 +92,7 @@ func buildMembershipBinding(roleRef v1.RoleRef, rtb metav1.Object) (*v1.ClusterR
 	}, nil
 }
 
+// getMembershipRoleName returns the name of the membership role based on the RoleTemplate.
 func getMembershipRoleName(rt *v3.RoleTemplate) string {
 	var resourceName string
 	if rt.Context == clusterContext {
@@ -97,16 +101,18 @@ func getMembershipRoleName(rt *v3.RoleTemplate) string {
 		resourceName = apisv3.ProjectResourceName
 	}
 	if isOwnerRole(rt) {
-		return name.SafeConcatName(resourceName + "owner")
+		return name.SafeConcatName(resourceName, "owner")
 	} else {
-		return name.SafeConcatName(resourceName + "member")
+		return name.SafeConcatName(resourceName, "member")
 	}
 }
 
+// isOwnerRole returns if the RoleTemplate is an Owner role. If not it is considered a Member role.
 func isOwnerRole(rt *v3.RoleTemplate) bool {
 	return rt.Builtin && (rt.Context == clusterContext && rt.Name == clusterOwner || rt.Context == clusterContext && rt.Name == projectOwner)
 }
 
+// getRTBLabel returns the label to be used to indicate what PRTB/CRTB make use of a membership role.
 func getRTBLabel(obj metav1.Object) string {
 	return name.SafeConcatName(obj.GetNamespace() + "_" + obj.GetName())
 }
