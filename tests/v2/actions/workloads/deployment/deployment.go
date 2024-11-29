@@ -22,7 +22,7 @@ const (
 )
 
 // CreateDeployment is a helper to create a deployment with or without a secret/configmap
-func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes, watchDeployment bool) (*appv1.Deployment, error) {
+func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes, isRegistrySecret, watchDeployment bool) (*appv1.Deployment, error) {
 	deploymentName := namegen.AppendRandomString("testdeployment")
 	containerName := namegen.AppendRandomString("testcontainer")
 	pullPolicy := corev1.PullAlways
@@ -31,7 +31,12 @@ func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, r
 	var podTemplate corev1.PodTemplateSpec
 
 	if secretName != "" || configMapName != "" {
-		podTemplate = pods.NewPodTemplateWithConfig(secretName, configMapName, useEnvVars, useVolumes)
+		if isRegistrySecret {
+			podTemplate = pods.NewPodTemplateWithConfig(secretName, configMapName, useEnvVars, useVolumes)
+			podTemplate.Spec.ImagePullSecrets = append(podTemplate.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secretName})
+		} else {
+			podTemplate = pods.NewPodTemplateWithConfig(secretName, configMapName, useEnvVars, useVolumes)
+		}
 	} else {
 		containerTemplate := workloads.NewContainer(
 			containerName,

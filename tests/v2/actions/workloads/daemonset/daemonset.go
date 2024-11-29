@@ -20,7 +20,7 @@ var DaemonsetGroupVersionResource = schema.GroupVersionResource{
 
 // CreateDaemonset is a helper to create a daemonset
 func CreateDaemonset(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes bool) (*appv1.DaemonSet, error) {
-	deploymentTemplate, err := deployment.CreateDeployment(client, clusterID, namespaceName, replicaCount, secretName, configMapName, useEnvVars, useVolumes, true)
+	deploymentTemplate, err := deployment.CreateDeployment(client, clusterID, namespaceName, replicaCount, secretName, configMapName, useEnvVars, useVolumes, false, true)
 	if err != nil {
 		return nil, err
 	}

@@ -91,7 +91,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestProjectWithoutResourceQuota() {
 	require.NoError(prq.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	_, err = deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false, true)
+	_, err = deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false, false, true)
 	require.NoError(prq.T(), err)
 }
 
@@ -139,11 +139,11 @@ func (prq *ProjectsResourceQuotaTestSuite) TestProjectWithResourceQuota() {
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the first namespace with two replicas and verify that the pods are created.")
-	createdFirstDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 2, "", "", false, false, true)
+	createdFirstDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 2, "", "", false, false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another deployment in the first namespace with one replica. Verify that the deployment fails to create replicas.")
-	createdSecondDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 1, "", "", false, false, false)
+	createdSecondDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, firstNamespace.Name, 1, "", "", false, false, false, false)
 	require.NoError(prq.T(), err)
 	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.TenSecondTimeout, func() (done bool, pollErr error) {
 		checkErr := checkDeploymentStatus(standardUserClient, prq.cluster.ID, firstNamespace.Name, createdSecondDeployment.Name, "ReplicaFailure", "FailedCreate", "forbidden: exceeded quota", 0)
@@ -156,7 +156,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestProjectWithResourceQuota() {
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the second namespace with two replicas. Verify that the deployment fails to create replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, secondNamespace.Name, 2, "", "", false, false, false)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, secondNamespace.Name, 2, "", "", false, false, false, false)
 	require.NoError(prq.T(), err)
 	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.TenSecondTimeout, func() (done bool, pollErr error) {
 		checkErr := checkDeploymentStatus(standardUserClient, prq.cluster.ID, secondNamespace.Name, createdDeployment.Name, "ReplicaFailure", "FailedCreate", "forbidden: exceeded quota", 0)
@@ -321,7 +321,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestQuotaDeletionPropagationToExistin
 	require.Empty(prq.T(), quotas)
 
 	log.Info("Create a deployment in the first namespace with ten replicas and verify that the pods are created.")
-	_, err = deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false, true)
+	_, err = deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false, false, true)
 	require.NoError(prq.T(), err)
 }
 
@@ -358,7 +358,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestOverrideQuotaInNamespace() {
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the namespace with two replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 2, "", "", false, false, true)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 2, "", "", false, false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Override the pod limit for the namespace and increase it from 2 to 3.")
@@ -423,7 +423,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceFromNoQuotaToQuotaPr
 	require.NoError(prq.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 2, "", "", false, false, true)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 2, "", "", false, false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another project in the downstream cluster with resource quota set.")
@@ -512,7 +512,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceFromQuotaToNoQuotaPr
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the namespace with two replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 2, "", "", false, false, true)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 2, "", "", false, false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another project in the downstream cluster without any resource quota set.")
@@ -583,7 +583,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceWithDeploymentTransi
 	require.NoError(prq.T(), err)
 
 	log.Info("Create a deployment in the second namespace with ten replicas.")
-	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false, false)
+	createdDeployment, err := deployment.CreateDeployment(standardUserClient, prq.cluster.ID, createdNamespace.Name, 10, "", "", false, false, false, false)
 	require.NoError(prq.T(), err)
 
 	log.Info("Verify that the deployment fails to create ten replicas.")
@@ -662,7 +662,7 @@ func (prq *ProjectsResourceQuotaTestSuite) TestMoveNamespaceBetweenProjectsWithN
 	require.NoError(prq.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	deployment, err := deployment.CreateDeployment(standardUserClient, createdProject.Namespace, createdNamespace.Name, 10, "", "", false, false, true)
+	deployment, err := deployment.CreateDeployment(standardUserClient, createdProject.Namespace, createdNamespace.Name, 10, "", "", false, false, false, true)
 	require.NoError(prq.T(), err)
 
 	log.Info("Create another project in the downstream cluster.")
