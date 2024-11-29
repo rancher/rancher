@@ -130,6 +130,7 @@ currentLoop:
 	return crtb, nil
 }
 
+// OnRemove deletes Cluster Role Bindings that are owned by the CRTB. It also removes the membership binding if no other CRTBs give membership access.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	returnErr := deleteMembershipBinding(crtb, c.crbController)
 

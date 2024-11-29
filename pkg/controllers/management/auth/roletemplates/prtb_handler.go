@@ -36,6 +36,10 @@ func newPRTBHandler(management *config.ManagementContext) *prtbHandler {
 	}
 }
 
+// OnChange syncs the required resources used to implement a PRTB. It does the following:
+//   - Create the specified user if it doesn't already exist.
+//   - Create the membership bindings to give access to the cluster.
+//   - Create a binding to the project management role if it exists.
 func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	// Create user
 	prtb, err := p.reconcileSubject(prtb)
@@ -89,6 +93,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	return prtb, nil
 }
 
+// OnRemove deletes Cluster Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	returnErr := deleteMembershipBinding(prtb, p.crbController)
 
@@ -105,6 +110,7 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	return prtb, returnErr
 }
 
+// reconcileSubject ensures that both the UserPrincipalName and UserName are set, creating the user if UserPrincipalName is set but not UserName.
 func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil

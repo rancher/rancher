@@ -58,6 +58,7 @@ func (rtl *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 	return rt, nil
 }
 
+// clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate
 func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
 	// The rules for the role template includes external rules
 	rules := append(rt.Rules, rt.ExternalRules...)

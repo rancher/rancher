@@ -85,6 +85,7 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 	return rt, nil
 }
 
+// OnRemove deletes all Cluster Roles in the local cluster created by the RoleTemplate
 func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	rtName := rbac.ClusterRoleNameFor(rt.Name)
 	clusterScopedCRName := rbac.ClusterManagementPlaneClusterRoleNameFor(rtName)
