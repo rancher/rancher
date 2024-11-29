@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	minWait    = 10 * time.Second
-	maxWait    = 30 * time.Minute
-	maxRetries = 10
+	minWait = 10 * time.Second
+	maxWait = 30 * time.Minute
 )
 
 var timeNow = time.Now
@@ -72,8 +71,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	pattern := FSCacheRootDir + "/*/*"
 	fsCacheFiles, err := fsCacheFilepathGlob(pattern)
 	if err != nil {
-		err = fmt.Errorf("failed to get files from filesystem cache: %w", err)
-		logrus.Errorf(err.Error())
+		logrus.WithError(err).Error("failed to get files from filesystem cache")
 		return plugin, err
 	}
 	FsCache.SyncWithIndex(&Index, fsCacheFiles)
@@ -110,6 +108,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 			p.Spec.Plugin.NoCache = true
 			_, err2 := h.plugin.Update(p)
 			if err2 != nil {
+				p.Spec.Plugin.NoCache = false
 				logrus.Errorf("failed to update plugin [%s] noCache flag: %s", p.Spec.Plugin.Name, err2.Error())
 				p.Status.Ready = false
 				p.Status.Error = "Failed to cache plugin due to max file size limit"
@@ -118,6 +117,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 			// delete files that were written
 			err2 = FsCache.Delete(p.Spec.Plugin.Name, p.Spec.Plugin.Version)
 			if err2 != nil {
+				p.Spec.Plugin.NoCache = false
 				logrus.Error(err2)
 				continue
 			}
@@ -133,8 +133,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	}
 	plugin.Status.ObservedGeneration = plugin.Generation
 	if err != nil {
-		err = fmt.Errorf("failed to sync filesystem cache with controller cache: %w", err)
-		logrus.Errorf(err.Error())
+		logrus.WithError(err).Error("failed to sync filesystem cache with controller cache")
 		backoff := calculateBackoff(plugin.Status.RetryNumber).Round(time.Second)
 		plugin.Status.RetryNumber++
 		plugin.Status.RetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
@@ -155,9 +154,6 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 // calculateBackoff gets the amount of time to wait for the next call.
 // Reference: https://github.com/oras-project/oras-go/blob/main/registry/remote/retry/policy.go#L95
 func calculateBackoff(numberOfRetries int) time.Duration {
-	if numberOfRetries > maxRetries {
-		return maxWait
-	}
 	var h maphash.Hash
 	h.SetSeed(maphash.MakeSeed())
 	rand := rand.New(rand.NewSource(int64(h.Sum64())))
