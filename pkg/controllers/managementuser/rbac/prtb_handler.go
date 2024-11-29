@@ -109,10 +109,13 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
 	}
-
 	rt, err := p.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		return fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", binding.Name, binding.RoleTemplateName)
+			return nil
+		}
+		return err
 	}
 
 	// Get namespaces belonging to project
