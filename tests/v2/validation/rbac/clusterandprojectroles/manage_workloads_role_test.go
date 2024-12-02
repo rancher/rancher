@@ -228,7 +228,7 @@ func (mw *ManageWorkloadsRoleTestSuite) TestManageWorkloadsRoleForDeployments() 
 	workloadUser, workloadUserClient := mw.testSetupWorkloadUserAndAddToProject(adminProject)
 
 	log.Infof("As user %s, create a new deployment in the namespace within the project %s.", workloadUser.Name, adminProject.Name)
-	createdDeployment, err := deployment.CreateDeployment(workloadUserClient, mw.cluster.ID, adminNamespace.Name, 1, "", "", false, false, true)
+	createdDeployment, err := deployment.CreateDeployment(workloadUserClient, mw.cluster.ID, adminNamespace.Name, 1, "", "", false, false, false, true)
 	require.NoError(mw.T(), err, "Failed to create the deployment.")
 
 	log.Infof("As user %s, list the deployment %s.", workloadUser.Username, createdDeployment.Name)
