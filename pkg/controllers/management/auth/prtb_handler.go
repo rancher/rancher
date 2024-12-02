@@ -174,6 +174,11 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	// if roletemplate is not builtin, check if it's inherited/cloned
 	isOwnerRole, err := p.mgr.checkReferencedRoles(binding.RoleTemplateName, projectContext, 0)
 	if err != nil {
+		var notFoundErr *roleTemplateNotFoundErr
+		if errors.As(err, &notFoundErr) {
+			logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", binding.Name, binding.RoleTemplateName)
+			return nil
+		}
 		return err
 	}
 	var projectRoleName string

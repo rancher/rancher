@@ -201,6 +201,13 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext, 0)
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToCheckReferencedRole, err)
+
+		var notFoundErr *roleTemplateNotFoundErr
+		if errors.As(err, &notFoundErr) {
+			logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", binding.Name, binding.RoleTemplateName)
+			return nil
+		}
+
 		return err
 	}
 	var clusterRoleName string
