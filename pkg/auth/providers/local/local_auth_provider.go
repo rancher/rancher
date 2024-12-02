@@ -443,6 +443,10 @@ func indexField(field string, maxIndex int) []string {
 	var fieldIndexes []string
 	for i := 2; i <= maxIndex; i++ {
 		simplified := []rune(simplifyString(field))
+
+		// This calculates the string to be indexed after it has been
+		// simplified because it may now be shorter than it was when maxIndex
+		// was calculated for the call to indexField.
 		fi := string(simplified)[0:min(len(simplified), i)]
 
 		fieldIndexes = append(fieldIndexes, strings.ToLower(fi))
