@@ -1,6 +1,8 @@
 package secrets
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rancher/shepherd/clients/rancher"
@@ -14,7 +16,7 @@ const (
 )
 
 // CreateSecret is a helper to create a secret using wrangler client
-func CreateSecret(client *rancher.Client, clusterID, namespaceName string, data map[string][]byte) (*corev1.Secret, error) {
+func CreateSecret(client *rancher.Client, clusterID, namespaceName string, data map[string][]byte, secretType corev1.SecretType) (*corev1.Secret, error) {
 	var ctx *wrangler.Context
 	var err error
 
@@ -28,7 +30,7 @@ func CreateSecret(client *rancher.Client, clusterID, namespaceName string, data 
 	}
 
 	secretName := namegen.AppendRandomString("testsecret")
-	secretTemplate := NewSecretTemplate(secretName, namespaceName, data, corev1.SecretTypeOpaque)
+	secretTemplate := NewSecretTemplate(secretName, namespaceName, data, secretType)
 
 	createdSecret, err := ctx.Core.Secret().Create(&secretTemplate)
 	if err != nil {
@@ -50,4 +52,34 @@ func UpdateSecretData(secret *corev1.Secret, newData map[string][]byte) *corev1.
 	}
 
 	return updatedSecretObj
+}
+
+// CreateRegistrySecretDockerConfigJSON is a helper to generate dockerconfigjson content for a registry secret
+func CreateRegistrySecretDockerConfigJSON(registryconfig *Config) (string, error) {
+	registry := registryconfig.Name
+	username := registryconfig.Username
+	password := registryconfig.Password
+
+	if username == "" || password == "" {
+		return "", fmt.Errorf("missing registry credentials in the config file")
+	}
+
+	auth := map[string]interface{}{
+		"username": username,
+		"password": password,
+		"auth":     base64.StdEncoding.EncodeToString([]byte(username + ":" + password)),
+	}
+
+	config := map[string]interface{}{
+		"auths": map[string]interface{}{
+			registry: auth,
+		},
+	}
+
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
+
+	return string(configJSON), nil
 }
