@@ -61,7 +61,7 @@ func (d *DeploymentTestSuite) TestDeploymentSideKick() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	createdDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false, true)
+	createdDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false, false, true)
 	require.NoError(d.T(), err)
 
 	log.Info("Waiting for all pods to be running")
@@ -105,7 +105,7 @@ func (d *DeploymentTestSuite) TestDeploymentUpgrade() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	upgradeDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false, true)
+	upgradeDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentUpgrade(d.T(), d.client, d.cluster.ID, namespace.Name, upgradeDeployment, "1", nginxImageName, 2)
@@ -179,7 +179,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleUp() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	scaleUpDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false, true)
+	scaleUpDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 1, "", "", false, false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleUpDeployment, nginxImageName, 1)
@@ -212,7 +212,7 @@ func (d *DeploymentTestSuite) TestDeploymentPodScaleDown() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	scaleDownDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 3, "", "", false, false, true)
+	scaleDownDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 3, "", "", false, false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, scaleDownDeployment, nginxImageName, 3)
@@ -245,7 +245,7 @@ func (d *DeploymentTestSuite) TestDeploymentPauseOrchestration() {
 	require.NoError(d.T(), err)
 
 	log.Info("Creating new deployment")
-	pauseDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false, true)
+	pauseDeployment, err := deployment.CreateDeployment(d.client, d.cluster.ID, namespace.Name, 2, "", "", false, false, false, true)
 	require.NoError(d.T(), err)
 
 	validateDeploymentScale(d.T(), d.client, d.cluster.ID, namespace.Name, pauseDeployment, nginxImageName, 2)
