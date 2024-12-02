@@ -58,6 +58,7 @@ func (ct *ClusterTemplateRKE1RBACTestSuite) SetupSuite() {
 		ct.provisioningConfig.CNIs = []string{clustertemplates.CniCalico}
 	}
 
+	provisioning.DisableUpdateConfig(ct.client)
 }
 
 func (ct *ClusterTemplateRKE1RBACTestSuite) TestClusterTemplateEnforcementForStandardUser() {
