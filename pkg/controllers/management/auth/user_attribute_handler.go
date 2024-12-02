@@ -82,7 +82,7 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 		// Stop retrying if the token has expired.
 		if errors.As(err, &retrieveErr) {
 			if retrieveErr.ErrorCode == "invalid_grant" {
-				logrus.Warnf("Token has expired. UserAttributes won't be refreshed until the user %s logs in. Error message: %s", name, err.Error())
+				logrus.Warnf("Token has expired. UserAttributes won't be refreshed until the user %s logs in. Error message: %s", name, err)
 				return nil, nil
 			}
 		}
