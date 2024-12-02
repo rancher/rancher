@@ -24,21 +24,11 @@ const (
 )
 
 var projectManagementPlaneResources = map[string]string{
-	"apps":                        "project.cattle.io",
-	"apprevisions":                "project.cattle.io",
-	"catalogtemplates":            "management.cattle.io",
-	"catalogtemplateversions":     "management.cattle.io",
 	"sourcecodeproviderconfigs":   "project.cattle.io",
-	"projectcatalogs":             "management.cattle.io",
-	"projectmonitorgraphs":        "management.cattle.io",
 	"projectroletemplatebindings": "management.cattle.io",
 	"secrets":                     "",
 }
-var prtbClusterManagmentPlaneResources = map[string]string{
-	"clustercatalogs":         "management.cattle.io",
-	"catalogtemplates":        "management.cattle.io",
-	"catalogtemplateversions": "management.cattle.io",
-}
+var prtbClusterManagmentPlaneResources = map[string]string{}
 
 type prtbLifecycle struct {
 	mgr           managerInterface

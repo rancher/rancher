@@ -28,8 +28,6 @@ import (
 )
 
 var (
-	AppResourceName                           = "apps"
-	AppRevisionResourceName                   = "apprevisions"
 	BasicAuthResourceName                     = "basicauths"
 	CertificateResourceName                   = "certificates"
 	DockerCredentialResourceName              = "dockercredentials"
@@ -64,10 +62,6 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&App{},
-		&AppList{},
-		&AppRevision{},
-		&AppRevisionList{},
 		&BasicAuth{},
 		&BasicAuthList{},
 		&Certificate{},

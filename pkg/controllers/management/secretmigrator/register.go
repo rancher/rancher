@@ -27,12 +27,6 @@ type handler struct {
 	clusters                 v3.ClusterInterface
 	provisioningClusters     provv1.ClusterController
 	clusterTemplateRevisions v3.ClusterTemplateRevisionInterface
-	catalogLister            v3.CatalogLister
-	catalogs                 v3.CatalogInterface
-	clusterCatalogLister     v3.ClusterCatalogLister
-	clusterCatalogs          v3.ClusterCatalogInterface
-	projectCatalogLister     v3.ProjectCatalogLister
-	projectCatalogs          v3.ProjectCatalogInterface
 	projectLister            v3.ProjectLister
 	// AuthConfigs contain internal-only fields that deal with various auth providers.
 	// Those fields are not present everywhere, nor are they defined in the CRD. Given
@@ -60,18 +54,11 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		clusters:                 management.Management.Clusters(""),
 		provisioningClusters:     management.Wrangler.Provisioning.Cluster(),
 		clusterTemplateRevisions: management.Management.ClusterTemplateRevisions(""),
-		catalogLister:            management.Management.Catalogs("").Controller().Lister(),
-		catalogs:                 management.Management.Catalogs(""),
-		clusterCatalogLister:     management.Management.ClusterCatalogs("").Controller().Lister(),
-		clusterCatalogs:          management.Management.ClusterCatalogs(""),
-		projectCatalogLister:     management.Management.ProjectCatalogs("").Controller().Lister(),
-		projectCatalogs:          management.Management.ProjectCatalogs(""),
 		projectLister:            management.Management.Projects("").Controller().Lister(),
 	}
 	management.Management.AuthConfigs("").AddHandler(ctx, "authconfigs-secret-migrator", h.syncAuthConfig)
 	management.Management.Clusters("").AddHandler(ctx, "cluster-secret-migrator", h.sync)
 	management.Management.ClusterTemplateRevisions("").AddHandler(ctx, "clustertemplaterevision-secret-migrator", h.syncTemplate)
-	management.Management.Catalogs("").AddHandler(ctx, "catalog-secret-migrator", h.syncCatalog)
 
 	management.Wrangler.Provisioning.Cluster().OnChange(ctx, "harvester-secret-migrator", h.syncHarvesterCloudConfig)
 	management.Wrangler.Provisioning.Cluster().OnRemove(ctx, "cloud-config-secret-remover", h.cloudConfigSecretRemover)

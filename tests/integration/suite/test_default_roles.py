@@ -207,7 +207,7 @@ def test_project_create_role_locked(admin_mc, cleanup_roles, remove_resource):
 
 @pytest.mark.nonparallel
 def test_user_create_default_role(admin_mc, cleanup_roles, remove_resource):
-    test_roles = ['user-base', 'settings-manage', 'catalogs-use']
+    test_roles = ['user-base', 'settings-manage']
     principal = "local://fakeuser"
     client = admin_mc.client
 
@@ -233,7 +233,7 @@ def test_user_create_default_role(admin_mc, cleanup_roles, remove_resource):
                        'True', client, user, timeout=5)
 
     user = client.reload(user)
-    assert len(user.globalRoleBindings()) == 3
+    assert len(user.globalRoleBindings()) == 2
     for binding in user.globalRoleBindings():
         assert binding.globalRoleId in test_roles
 

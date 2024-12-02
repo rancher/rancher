@@ -5,7 +5,6 @@ import (
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/codegen/generator"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/schemas/factory"
@@ -39,8 +38,6 @@ func main() {
 				Types: []interface{}{
 					// All structs with an embedded ObjectMeta field will be picked up
 					"./pkg/apis/management.cattle.io/v3",
-					v3.ProjectCatalog{},
-					v3.ClusterCatalog{},
 				},
 				GenerateTypes: true,
 			},

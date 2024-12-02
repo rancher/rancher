@@ -37,12 +37,8 @@ type Interface interface {
 	AuthProvider() AuthProviderController
 	AuthToken() AuthTokenController
 	AzureADProvider() AzureADProviderController
-	Catalog() CatalogController
-	CatalogTemplate() CatalogTemplateController
-	CatalogTemplateVersion() CatalogTemplateVersionController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
-	ClusterCatalog() ClusterCatalogController
 	ClusterProxyConfig() ClusterProxyConfigController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
@@ -64,8 +60,6 @@ type Interface interface {
 	KontainerDriver() KontainerDriverController
 	LocalProvider() LocalProviderController
 	ManagedChart() ManagedChartController
-	MultiClusterApp() MultiClusterAppController
-	MultiClusterAppRevision() MultiClusterAppRevisionController
 	Node() NodeController
 	NodeDriver() NodeDriverController
 	NodePool() NodePoolController
@@ -76,7 +70,6 @@ type Interface interface {
 	Preference() PreferenceController
 	Principal() PrincipalController
 	Project() ProjectController
-	ProjectCatalog() ProjectCatalogController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
 	RancherUserNotification() RancherUserNotificationController
@@ -87,9 +80,6 @@ type Interface interface {
 	SamlProvider() SamlProviderController
 	SamlToken() SamlTokenController
 	Setting() SettingController
-	Template() TemplateController
-	TemplateContent() TemplateContentController
-	TemplateVersion() TemplateVersionController
 	Token() TokenController
 	User() UserController
 	UserAttribute() UserAttributeController
@@ -129,28 +119,12 @@ func (v *version) AzureADProvider() AzureADProviderController {
 	return generic.NewNonNamespacedController[*v3.AzureADProvider, *v3.AzureADProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADProvider"}, "azureadproviders", v.controllerFactory)
 }
 
-func (v *version) Catalog() CatalogController {
-	return generic.NewNonNamespacedController[*v3.Catalog, *v3.CatalogList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Catalog"}, "catalogs", v.controllerFactory)
-}
-
-func (v *version) CatalogTemplate() CatalogTemplateController {
-	return generic.NewController[*v3.CatalogTemplate, *v3.CatalogTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CatalogTemplate"}, "catalogtemplates", true, v.controllerFactory)
-}
-
-func (v *version) CatalogTemplateVersion() CatalogTemplateVersionController {
-	return generic.NewController[*v3.CatalogTemplateVersion, *v3.CatalogTemplateVersionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CatalogTemplateVersion"}, "catalogtemplateversions", true, v.controllerFactory)
-}
-
 func (v *version) CloudCredential() CloudCredentialController {
 	return generic.NewController[*v3.CloudCredential, *v3.CloudCredentialList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CloudCredential"}, "cloudcredentials", true, v.controllerFactory)
 }
 
 func (v *version) Cluster() ClusterController {
 	return generic.NewNonNamespacedController[*v3.Cluster, *v3.ClusterList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", v.controllerFactory)
-}
-
-func (v *version) ClusterCatalog() ClusterCatalogController {
-	return generic.NewController[*v3.ClusterCatalog, *v3.ClusterCatalogList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterCatalog"}, "clustercatalogs", true, v.controllerFactory)
 }
 
 func (v *version) ClusterProxyConfig() ClusterProxyConfigController {
@@ -237,14 +211,6 @@ func (v *version) ManagedChart() ManagedChartController {
 	return generic.NewController[*v3.ManagedChart, *v3.ManagedChartList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, v.controllerFactory)
 }
 
-func (v *version) MultiClusterApp() MultiClusterAppController {
-	return generic.NewController[*v3.MultiClusterApp, *v3.MultiClusterAppList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MultiClusterApp"}, "multiclusterapps", true, v.controllerFactory)
-}
-
-func (v *version) MultiClusterAppRevision() MultiClusterAppRevisionController {
-	return generic.NewController[*v3.MultiClusterAppRevision, *v3.MultiClusterAppRevisionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MultiClusterAppRevision"}, "multiclusterapprevisions", true, v.controllerFactory)
-}
-
 func (v *version) Node() NodeController {
 	return generic.NewController[*v3.Node, *v3.NodeList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Node"}, "nodes", true, v.controllerFactory)
 }
@@ -285,10 +251,6 @@ func (v *version) Project() ProjectController {
 	return generic.NewController[*v3.Project, *v3.ProjectList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Project"}, "projects", true, v.controllerFactory)
 }
 
-func (v *version) ProjectCatalog() ProjectCatalogController {
-	return generic.NewController[*v3.ProjectCatalog, *v3.ProjectCatalogList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectCatalog"}, "projectcatalogs", true, v.controllerFactory)
-}
-
 func (v *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {
 	return generic.NewController[*v3.ProjectNetworkPolicy, *v3.ProjectNetworkPolicyList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectNetworkPolicy"}, "projectnetworkpolicies", true, v.controllerFactory)
 }
@@ -327,18 +289,6 @@ func (v *version) SamlToken() SamlTokenController {
 
 func (v *version) Setting() SettingController {
 	return generic.NewNonNamespacedController[*v3.Setting, *v3.SettingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Setting"}, "settings", v.controllerFactory)
-}
-
-func (v *version) Template() TemplateController {
-	return generic.NewNonNamespacedController[*v3.Template, *v3.TemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Template"}, "templates", v.controllerFactory)
-}
-
-func (v *version) TemplateContent() TemplateContentController {
-	return generic.NewNonNamespacedController[*v3.TemplateContent, *v3.TemplateContentList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "TemplateContent"}, "templatecontents", v.controllerFactory)
-}
-
-func (v *version) TemplateVersion() TemplateVersionController {
-	return generic.NewNonNamespacedController[*v3.TemplateVersion, *v3.TemplateVersionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "TemplateVersion"}, "templateversions", v.controllerFactory)
 }
 
 func (v *version) Token() TokenController {

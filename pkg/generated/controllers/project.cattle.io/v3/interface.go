@@ -31,8 +31,6 @@ func init() {
 }
 
 type Interface interface {
-	App() AppController
-	AppRevision() AppRevisionController
 	BasicAuth() BasicAuthController
 	Certificate() CertificateController
 	DockerCredential() DockerCredentialController
@@ -54,14 +52,6 @@ func New(controllerFactory controller.SharedControllerFactory) Interface {
 
 type version struct {
 	controllerFactory controller.SharedControllerFactory
-}
-
-func (v *version) App() AppController {
-	return generic.NewController[*v3.App, *v3.AppList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "App"}, "apps", true, v.controllerFactory)
-}
-
-func (v *version) AppRevision() AppRevisionController {
-	return generic.NewController[*v3.AppRevision, *v3.AppRevisionList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "AppRevision"}, "apprevisions", true, v.controllerFactory)
 }
 
 func (v *version) BasicAuth() BasicAuthController {

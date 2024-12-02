@@ -7,11 +7,8 @@ outputs:
   CATTLE_K3S_VERSION: 
     description: "CATTLE_K3S_VERSION from package/Dockerfile"
     value: ${{ steps.vars.outputs.CATTLE_K3S_VERSION }}
-  CATTLE_HELM_VERSION: 
-    description: "CATTLE_HELM_VERSION from package/Dockerfile"
-    value: ${{ steps.vars.outputs.CATTLE_HELM_VERSION }}
   HELM_VERSION: 
-    description: "HELM_VERSION from package/Dockerfile"
+    description: "HELM_VERSION from package/Dockerfile.installer"
     value: ${{ steps.vars.outputs.HELM_VERSION }}
   GO_VERSION: 
     description: "GO_VERSION from package/Dockerfile"
@@ -43,8 +40,7 @@ runs:
         source scripts/export-config
         CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
         CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
-        HELM_VERSION=$(grep -m1 'ENV HELM_VERSION' package/Dockerfile | awk '{print $3}')
-        CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION' package/Dockerfile | awk '{print $3}')
+        HELM_VERSION=$(grep -m1 'ENV HELM_VERSION' package/Dockerfile.installer | awk '{print $3}')
         GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
         HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION' Dockerfile.dapper | awk '{print $3}')
         RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
@@ -67,10 +63,6 @@ runs:
         fi
         if [[ -z "$HELM_VERSION" ]]; then
           echo "HELM_VERSION not found"
-          exit 1
-        fi
-        if [[ -z "$CATTLE_HELM_VERSION" ]]; then
-          echo "CATTLE_HELM_VERSION not found"
           exit 1
         fi
         if [[ -z "$GO_VERSION" ]]; then
@@ -104,7 +96,7 @@ runs:
         echo "CATTLE_KDM_BRANCH=$CATTLE_KDM_BRANCH" >> $GITHUB_OUTPUT
         echo "CATTLE_K3S_VERSION=$CATTLE_K3S_VERSION" >> $GITHUB_OUTPUT 
         echo "HELM_VERSION=$HELM_VERSION" >> $GITHUB_OUTPUT 
-        echo "CATTLE_HELM_VERSION=$CATTLE_HELM_VERSION" >> $GITHUB_OUTPUT 
+
         echo "GO_VERSION=$GO_VERSION" >> $GITHUB_OUTPUT 
         echo "HELM_UNITTEST_VERSION=$HELM_UNITTEST_VERSION" >> $GITHUB_OUTPUT
         echo "RKE_VERSION=$RKE_VERSION" >> $GITHUB_OUTPUT 

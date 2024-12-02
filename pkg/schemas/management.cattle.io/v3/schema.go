@@ -32,7 +32,6 @@ var (
 		Init(podSecurityAdmissionTypes).
 		Init(authzTypes).
 		Init(clusterTypes).
-		Init(catalogTypes).
 		Init(authnTypes).
 		Init(tokens).
 		Init(schemaTypes).
@@ -41,9 +40,6 @@ var (
 		Init(globalTypes).
 		Init(rkeTypes).
 		Init(composeType).
-		Init(projectCatalogTypes).
-		Init(clusterCatalogTypes).
-		Init(multiClusterAppTypes).
 		Init(kontainerTypes).
 		Init(etcdBackupTypes).
 		Init(credTypes).
@@ -124,43 +120,6 @@ func driverMetadataTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RkeK8sSystemImage{}).
 		MustImport(&Version, v3.RkeK8sServiceOption{}).
 		MustImport(&Version, v3.RkeAddon{})
-}
-
-func catalogTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		AddMapperForType(&Version, v3.Catalog{},
-			&m.Move{From: "catalogKind", To: "kind"},
-			&m.Embed{Field: "status"},
-			&m.Drop{Field: "helmVersionCommits"},
-		).
-		MustImport(&Version, v3.CatalogRefresh{}).
-		MustImportAndCustomize(&Version, v3.Catalog{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"refresh": {Output: "catalogRefresh"},
-			}
-			schema.CollectionActions = map[string]types.Action{
-				"refresh": {Output: "catalogRefresh"},
-			}
-		}).
-		AddMapperForType(&Version, v3.Template{},
-			m.DisplayName{},
-		).
-		MustImport(&Version, v3.Template{}, struct {
-			VersionLinks map[string]string
-		}{}).
-		AddMapperForType(&Version, v3.CatalogTemplate{},
-			m.DisplayName{},
-			m.Drop{Field: "namespaceId"},
-		).
-		MustImport(&Version, v3.CatalogTemplate{}, struct {
-			VersionLinks map[string]string
-		}{}).
-		AddMapperForType(&Version, v3.CatalogTemplateVersion{},
-			m.Drop{Field: "namespaceId"},
-		).
-		MustImport(&Version, v3.CatalogTemplateVersion{}).
-		MustImport(&Version, v3.TemplateVersion{}).
-		MustImport(&Version, v3.TemplateContent{})
 }
 
 func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
@@ -706,66 +665,6 @@ func globalTypes(schema *types.Schemas) *types.Schemas {
 
 func composeType(schemas *types.Schemas) *types.Schemas {
 	return schemas.MustImport(&Version, v3.ComposeConfig{})
-}
-
-func projectCatalogTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		AddMapperForType(&Version, v3.ProjectCatalog{},
-			&m.Move{From: "catalogKind", To: "kind"},
-			&m.Embed{Field: "status"},
-			&m.Drop{Field: "helmVersionCommits"},
-			&mapper.NamespaceIDMapper{}).
-		MustImportAndCustomize(&Version, v3.ProjectCatalog{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"refresh": {Output: "catalogRefresh"},
-			}
-			schema.CollectionActions = map[string]types.Action{
-				"refresh": {Output: "catalogRefresh"},
-			}
-		})
-}
-
-func clusterCatalogTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		AddMapperForType(&Version, v3.ClusterCatalog{},
-			&m.Move{From: "catalogKind", To: "kind"},
-			&m.Embed{Field: "status"},
-			&m.Drop{Field: "helmVersionCommits"},
-			&mapper.NamespaceIDMapper{}).
-		MustImportAndCustomize(&Version, v3.ClusterCatalog{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"refresh": {Output: "catalogRefresh"},
-			}
-			schema.CollectionActions = map[string]types.Action{
-				"refresh": {Output: "catalogRefresh"},
-			}
-		})
-}
-
-func multiClusterAppTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		AddMapperForType(&Version, v3.MultiClusterApp{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.MultiClusterAppRevision{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.Member{}, m.Drop{Field: "userName"}, m.Drop{Field: "displayName"}).
-		MustImport(&Version, v3.MultiClusterApp{}).
-		MustImport(&Version, v3.Target{}).
-		MustImport(&Version, v3.UpgradeStrategy{}).
-		MustImport(&Version, v3.MultiClusterAppRollbackInput{}).
-		MustImport(&Version, v3.MultiClusterAppRevision{}).
-		MustImport(&Version, v3.UpdateMultiClusterAppTargetsInput{}).
-		MustImportAndCustomize(&Version, v3.MultiClusterApp{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"rollback": {
-					Input: "multiClusterAppRollbackInput",
-				},
-				"addProjects": {
-					Input: "updateMultiClusterAppTargetsInput",
-				},
-				"removeProjects": {
-					Input: "updateMultiClusterAppTargetsInput",
-				},
-			}
-		})
 }
 
 func kontainerTypes(schemas *types.Schemas) *types.Schemas {

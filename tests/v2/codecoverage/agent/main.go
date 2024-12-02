@@ -80,7 +80,6 @@ func runAgent(ctx context.Context) {
 			err = errors.Join(
 				clean.DuplicateBindings(nil),
 				clean.OrphanBindings(nil),
-				clean.OrphanCatalogBindings(nil),
 			)
 		} else {
 			err = run(ctx)

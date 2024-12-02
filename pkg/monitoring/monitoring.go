@@ -23,7 +23,6 @@ const (
 	//CattlePrometheusRuleLabelKey The label info of PrometheusRule
 	CattlePrometheusRuleLabelKey           = "source"
 	CattleAlertingPrometheusRuleLabelValue = "rancher-alert"
-	RancherMonitoringTemplateName          = "system-library-rancher-monitoring"
 )
 
 var (

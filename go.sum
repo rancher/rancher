@@ -195,8 +195,6 @@ github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/bep/debounce v1.2.1 h1:v67fRdBA9UQu2NhLFXrSg0Brw7CexQekrBwDMM8bzeY=
-github.com/bep/debounce v1.2.1/go.mod h1:H8yggRPQKLUhUoqrJC1bO2xNya7vanpDl7xR3ISbCJ0=
 github.com/blang/semver v3.5.1+incompatible h1:cQNTCjp13qL8KC3Nbxr/y2Bqb63oX6wdnnjpJbkM4JQ=
 github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
@@ -842,8 +840,8 @@ github.com/rancher/rke v1.7.0-rc.5 h1:kBRwXTW8CYPXvCcPLISiwGTCvJ8K/+b35D5ES0Icdu
 github.com/rancher/rke v1.7.0-rc.5/go.mod h1:+x++Mvl0A3jIzNLiu8nkraqZXiHg6VPWv0Xl4iQCg+A=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20241113142845-1338e51b4891 h1:JbWVRcIEjz2xdpfotFiCDZVjlcwGXXwLkhjevK+GCco=
-github.com/rancher/shepherd v0.0.0-20241113142845-1338e51b4891/go.mod h1:TD6hF654momYGPQ0plWbigLSF1My6KhaxcTjWoJF/nU=
+github.com/rancher/shepherd v0.0.0-20241126193749-5be627a102bf h1:N7SCVDrbx+fce1fenMo4s7Z8afyVmuIsMUl+IgBZmFQ=
+github.com/rancher/shepherd v0.0.0-20241126193749-5be627a102bf/go.mod h1:5J3FwxqQxZZ4LnxgmiEkdVuBnEt1bPL9HYXu7oz77jg=
 github.com/rancher/steve v0.0.0-20241105024748-6ee8201c8d94 h1:AOcpMf91Dd3PasncRYHB/tNWlPiOqvYzd0Aw9Q5KPro=
 github.com/rancher/steve v0.0.0-20241105024748-6ee8201c8d94/go.mod h1:BuNXoRaqXRbzTm+fXBVkL5WVKL3okX0qBsoFK4Dfluo=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde h1:x5VZI/0TUx1MeZirh6e0OMAInhCmq6yRvD6897458Ng=
