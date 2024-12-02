@@ -9,6 +9,7 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
@@ -215,6 +216,29 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",
 			upgradingMessage(c, workerPlan.Status.Applying))
 		return h.enqueueOrUpdate(cluster, workerPlanMessage)
+	}
+
+	var (
+		isMasterPlanVersionNewer, isWorkerPlanVersionNewer bool
+		err                                                error
+	)
+	if masterPlan.Name != "" && masterPlan.Spec.Version != "" {
+		isMasterPlanVersionNewer, err = nodesyncer.IsNewerVersion(cluster.Status.Version.GitVersion, masterPlan.Spec.Version)
+		if err != nil {
+			return cluster, err
+		}
+	}
+	if workerPlan.Name != "" && workerPlan.Spec.Version != "" {
+		isWorkerPlanVersionNewer, err = nodesyncer.IsNewerVersion(cluster.Status.Version.GitVersion, workerPlan.Spec.Version)
+		if err != nil {
+			return cluster, err
+		}
+	}
+	// If the version specified in either the master plan or the worker plan is newer than the cluster's current version,
+	// it indicates that the cluster upgrade is still in progress.
+	if isMasterPlanVersionNewer || isWorkerPlanVersionNewer {
+		h.clusterEnqueueAfter(cluster.Name, time.Second*5) // prevent controller from remaining in this state
+		return cluster, nil
 	}
 
 	// if we made it this far nothing is applying
