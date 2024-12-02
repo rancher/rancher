@@ -60,7 +60,7 @@ func (f *FleetWithProvisioningTestSuite) SetupSuite() {
 		Spec: v1alpha1.GitRepoSpec{
 			Repo:            fleet.ExampleRepo,
 			Branch:          fleet.BranchName,
-			Paths:           []string{fleet.GitRepoPathLinux},
+			Paths:           []string{"hardened"},
 			CorrectDrift:    &v1alpha1.CorrectDrift{},
 			ImageScanCommit: v1alpha1.CommitSpec{AuthorName: "", AuthorEmail: ""},
 			Targets: []v1alpha1.GitTarget{
@@ -156,6 +156,7 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 
 		provisioningConfig.Hardened = true
 		provisioningConfig.MachinePools = tt.machinePools
+		provisioningConfig.PSACT = string(provisioninginput.RancherRestricted)
 
 		f.Run(tt.name, func() {
 			logrus.Info("Deploying public fleet gitRepo")
