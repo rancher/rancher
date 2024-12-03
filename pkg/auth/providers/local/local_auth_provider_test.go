@@ -218,6 +218,17 @@ func TestUserSearchIndexer(t *testing.T) {
 				"u-6", "u-67", "u-678", "u-6789",
 			},
 		},
+		{
+			// Non-Unicode string lower-cased to ASCII.
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "u-99900",
+				},
+				Username:    "\u212ael",
+				DisplayName: "\u212aelvin Smith",
+			},
+			wantIndexed: []string{"ke", "kel", "kelv", "kelvi", "kelvin", "smith", "u-", "u-9", "u-99", "u-999", "u-9990"},
+		},
 	}
 
 	for _, tt := range indexerTests {
