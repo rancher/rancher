@@ -10,11 +10,11 @@ RUN zypper in -y wget git
 # therefore they can be based off the BUILD PLATFORM architecture.
 ARG BUILDARCH
 
-ENV HELM_VERSION v3.16.1 \
-    HELM_URL_V3=https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz
 
 # set up helm 3
-RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
+ENV HELM_VERSION v3.16.1
+RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O - | \
+    tar -xz --strip-components=1 -C /usr/bin && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
     chown root:root /usr/bin/helm_v3 && \
     chmod +x /usr/bin/helm_v3
