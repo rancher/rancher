@@ -4,13 +4,11 @@ import (
 	"testing"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
@@ -61,18 +59,16 @@ func TestClusterLifeCycleCreateProjectAnnotations(t *testing.T) {
 				return project, nil
 			})
 
+			projectLister := fake.NewMockCacheInterface[*apisv3.Project](ctrl)
+			projectLister.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+
+			roleTemplateLister := fake.NewMockNonNamespacedCacheInterface[*apisv3.RoleTemplate](ctrl)
+			roleTemplateLister.EXPECT().List(gomock.Any()).Return(nil, nil)
+
 			lifecycle := &clusterLifecycle{
-				projectLister: &mgmtFakes.ProjectListerMock{
-					ListFunc: func(namespace string, selector labels.Selector) (ret []*apisv3.Project, err error) {
-						return nil, nil
-					},
-				},
-				roleTemplateLister: &mgmtFakes.RoleTemplateListerMock{
-					ListFunc: func(namespace string, selector labels.Selector) (ret []*apisv3.RoleTemplate, err error) {
-						return nil, nil
-					},
-				},
-				projects: projects,
+				projects:           projects,
+				projectLister:      projectLister,
+				roleTemplateLister: roleTemplateLister,
 			}
 
 			cluster := &apisv3.Cluster{
@@ -112,26 +108,27 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 		},
 	}
 
+	ctrl := gomock.NewController(t)
+
+	crtbLister := fake.NewMockCacheInterface[*apisv3.ClusterRoleTemplateBinding](ctrl)
+	crtbLister.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	crtbClient := fake.NewMockControllerInterface[*apisv3.ClusterRoleTemplateBinding, *apisv3.ClusterRoleTemplateBindingList](ctrl)
+	crtbClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *apisv3.ClusterRoleTemplateBinding) (*apisv3.ClusterRoleTemplateBinding, error) {
+		crtbs = append(crtbs, obj)
+		return obj, nil
+	}).AnyTimes()
+
+	clusterClient := fake.NewMockNonNamespacedControllerInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
+	clusterClient.EXPECT().Get(gomock.Any(), gomock.Any()).Return(cluster, nil).AnyTimes()
+	clusterClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
+		return obj, nil
+	}).AnyTimes()
+
 	lifecycle := &clusterLifecycle{
-		crtbLister: &mgmtFakes.ClusterRoleTemplateBindingListerMock{
-			GetFunc: func(namespace string, name string) (*apisv3.ClusterRoleTemplateBinding, error) {
-				return nil, nil
-			},
-		},
-		crtbClient: &mgmtFakes.ClusterRoleTemplateBindingInterfaceMock{
-			CreateFunc: func(obj *apisv3.ClusterRoleTemplateBinding) (*apisv3.ClusterRoleTemplateBinding, error) {
-				crtbs = append(crtbs, obj)
-				return obj, nil
-			},
-		},
-		clusterClient: &mgmtFakes.ClusterInterfaceMock{
-			GetFunc: func(name string, opts v1.GetOptions) (*apisv3.Cluster, error) {
-				return cluster, nil
-			},
-			UpdateFunc: func(in1 *apisv3.Cluster) (*apisv3.Cluster, error) {
-				return in1, nil
-			},
-		},
+		crtbLister:    crtbLister,
+		crtbClient:    crtbClient,
+		clusterClient: clusterClient,
 	}
 
 	obj, err := lifecycle.reconcileClusterCreatorRTB(cluster)
