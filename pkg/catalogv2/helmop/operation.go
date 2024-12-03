@@ -1039,9 +1039,13 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 			Effect:   "NoSchedule",
 		},
 		{
+			Key:      "node-role.kubernetes.io/control-plane",
+			Operator: corev1.TolerationOpExists,
+			Effect:   "NoSchedule",
+		},
+		{
 			Key:      "node-role.kubernetes.io/etcd",
-			Operator: corev1.TolerationOpEqual,
-			Value:    "true",
+			Operator: corev1.TolerationOpExists,
 			Effect:   "NoExecute",
 		},
 		{
