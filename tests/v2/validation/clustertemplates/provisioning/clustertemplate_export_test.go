@@ -82,8 +82,9 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 
 	ct.cluster, err = ct.client.Management.Cluster.ByID(cluster.ID)
 	require.NoError(ct.T(), err)
-	
+
 	provisioning.VerifyRKE1Cluster(ct.T(), standardClient, clusterConfig, ct.cluster)
+	provisioning.DisableUpdateConfig(ct.client)
 }
 
 func (ct *ClusterTemplateExportTestSuite) TestExportClusterTemplate() {
