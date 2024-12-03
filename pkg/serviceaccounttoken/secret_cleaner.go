@@ -8,11 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	clientcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -21,6 +23,8 @@ const (
 	// this can't be imported from the impersonation namespace because of a
 	// cycle.
 	impersonationNamespace string = "cattle-impersonation-system"
+
+	serviceAccountSecretRefIndex string = ".serviceAccountSecretRef"
 
 	pageSize int64 = 100
 )
@@ -36,23 +40,45 @@ var (
 	cleaningBatchSize int64 = 1000
 )
 
-type secretCacheLister interface {
+type secretsCache interface {
 	List(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
+}
+
+type serviceAccountsCache interface {
+	GetByIndex(indexName, key string) ([]*corev1.ServiceAccount, error)
+	AddIndexer(indexName string, indexer generic.Indexer[*corev1.ServiceAccount])
+}
+
+// setupServiceAccountsCache must be called early on to setup the correct
+// indexing on service accounts.
+func setupServiceAccountsCache(cache serviceAccountsCache) {
+	cache.AddIndexer(serviceAccountSecretRefIndex, func(s *corev1.ServiceAccount) ([]string, error) {
+		if s.ObjectMeta.Annotations == nil {
+			return nil, nil
+		}
+		annotation := s.ObjectMeta.Annotations[ServiceAccountSecretRefAnnotation]
+		if annotation != "" {
+			return []string{annotation}, nil
+		}
+
+		return nil, nil
+	})
 }
 
 // StartServiceAccountSecretCleaner starts a background process to cleanup old
 // service accounts secrets.
 //
 // This should only be started in the leader pod.
-func StartServiceAccountSecretCleaner(ctx context.Context, secretsCache secretCacheLister, client clientcorev1.CoreV1Interface) error {
-	if strings.ToLower(os.Getenv("DISABLE_SECRET_CLEANER")) == "true" {
+func StartServiceAccountSecretCleaner(ctx context.Context, secrets secretsCache, serviceAccounts serviceAccountsCache, client clientcorev1.CoreV1Interface) error {
+	secretCleanerDisabled := strings.ToLower(os.Getenv("DISABLE_SECRET_CLEANER")) == "true"
+	if secretCleanerDisabled {
 		logrus.Info("ServiceAccountSecretCleaner disabled - not starting")
 		return nil
 	}
 
-	serviceAccounts := client.ServiceAccounts(impersonationNamespace)
+	setupServiceAccountsCache(serviceAccounts)
 
-	secretsQueue, err := loadSecretQueue(ctx, secretsCache)
+	secretsQueue, err := loadSecretQueue(secrets)
 	if err != nil {
 		return err
 	}
@@ -62,8 +88,6 @@ func StartServiceAccountSecretCleaner(ctx context.Context, secretsCache secretCa
 	logrus.Infof("Starting ServiceAccountSecretCleaner with %v secrets", secretsQueue.List.Len())
 	ticker := time.NewTicker(cleanCycleDelay)
 
-	secrets := client.Secrets(impersonationNamespace)
-
 	go func() {
 		for {
 			select {
@@ -71,7 +95,7 @@ func StartServiceAccountSecretCleaner(ctx context.Context, secretsCache secretCa
 				logrus.Info("terminating service account secret cleaner")
 				return
 			case <-ticker.C:
-				if err := CleanServiceAccountSecrets(ctx, secrets, serviceAccounts, secretsQueue.dequeue(cleaningBatchSize)); err != nil {
+				if err := CleanServiceAccountSecrets(ctx, client.Secrets(impersonationNamespace), serviceAccounts, secretsQueue.dequeue(cleaningBatchSize)); err != nil {
 					logrus.Error(err)
 				}
 				if l := secretsQueue.List.Len(); l > 0 {
@@ -92,14 +116,14 @@ func StartServiceAccountSecretCleaner(ctx context.Context, secretsCache secretCa
 
 // CleanServiceAccountSecrets removes unused Secrets for ServiceAccountTokens from a
 // namespace in batches.
-func CleanServiceAccountSecrets(ctx context.Context, secrets clientv1.SecretInterface, serviceAccounts clientv1.ServiceAccountInterface, secretsToDelete []*corev1.Secret) error {
+func CleanServiceAccountSecrets(ctx context.Context, secrets clientv1.SecretInterface, serviceAccounts serviceAccountsCache, secretsToDelete []types.NamespacedName) error {
 	var deletionErr error
 	var deletedCount int64
-	var toBeDeleted []*corev1.Secret
+	var toBeDeleted []types.NamespacedName
 
 	for i := range secretsToDelete {
-		secret := secretsToDelete[i]
-		serviceAccount, err := findServiceAccountForSecret(ctx, secret, serviceAccounts)
+		secretRef := secretsToDelete[i]
+		serviceAccount, err := findServiceAccountForSecret(ctx, secretRef, serviceAccounts)
 		if err != nil {
 			deletionErr = errors.Join(deletionErr, err)
 			continue
@@ -111,12 +135,12 @@ func CleanServiceAccountSecrets(ctx context.Context, secrets clientv1.SecretInte
 			continue
 		}
 
-		toBeDeleted = append(toBeDeleted, secret)
+		toBeDeleted = append(toBeDeleted, secretRef)
 	}
 
-	for _, secret := range toBeDeleted {
-		logrus.Debugf("Deleting ServiceAccount Secret %s", logKeyFromObject(secret))
-		if err := secrets.Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
+	for _, secretRef := range toBeDeleted {
+		logrus.Debugf("Deleting ServiceAccount Secret %s", secretRef)
+		if err := secrets.Delete(ctx, secretRef.Name, metav1.DeleteOptions{}); err != nil {
 			deletionErr = errors.Join(deletionErr, err)
 		}
 		deletedCount++
@@ -129,18 +153,15 @@ func CleanServiceAccountSecrets(ctx context.Context, secrets clientv1.SecretInte
 	return deletionErr
 }
 
-func findServiceAccountForSecret(ctx context.Context, secret *corev1.Secret, serviceAccounts clientv1.ServiceAccountInterface) (*corev1.ServiceAccount, error) {
-	serviceAccountList, err := serviceAccounts.List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{
-		"authz.cluster.cattle.io/impersonator": "true",
-	}).String()})
+func findServiceAccountForSecret(ctx context.Context, secretRef types.NamespacedName, serviceAccounts serviceAccountsCache) (*corev1.ServiceAccount, error) {
+	secretAnnotation := secretRef.String()
+	serviceAccountList, err := serviceAccounts.GetByIndex(serviceAccountSecretRefIndex, secretAnnotation)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list service accounts when cleaning: %w", err)
 	}
-	secretAnnotation := secret.Namespace + "/" + secret.Name
-	for _, sa := range serviceAccountList.Items {
-		if sa.Annotations != nil && sa.Annotations[ServiceAccountSecretRefAnnotation] == secretAnnotation {
-			return &sa, nil
-		}
+
+	if len(serviceAccountList) > 0 {
+		return serviceAccountList[0], nil
 	}
 
 	return nil, nil
@@ -158,24 +179,21 @@ func labelSelectorForSecrets() (labels.Selector, error) {
 	return labelSelector, nil
 }
 
-func loadSecretQueue(ctx context.Context, secretsCache secretCacheLister) (*queue[*corev1.Secret], error) {
+func loadSecretQueue(secrets secretsCache) (*queue[types.NamespacedName], error) {
 	selector, err := labelSelectorForSecrets()
 	if err != nil {
 		return nil, err
 	}
 
-	q := newQueue[*corev1.Secret]()
-	secrets, err := secretsCache.List(impersonationNamespace, selector)
+	q := newQueue[types.NamespacedName]()
+	loaded, err := secrets.List(impersonationNamespace, selector)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, secret := range secrets {
-		// We don't want to store the data for the Secret.
+	for _, secret := range loaded {
 		// Maybe use PartialObjectMetadata?
-		stripped := secret.DeepCopy()
-		stripped.Data = nil
-		q.enqueue(stripped)
+		q.enqueue(types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace})
 	}
 
 	return q, nil

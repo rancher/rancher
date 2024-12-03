@@ -220,8 +220,10 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	}
 
 	server.Wrangler.OnLeader(func(ctx context.Context) error {
-		serviceaccounttoken.StartServiceAccountSecretCleaner(ctx,
+		serviceaccounttoken.StartServiceAccountSecretCleaner(
+			ctx,
 			server.Wrangler.Core.Secret().Cache(),
+			server.Wrangler.Core.ServiceAccount().Cache(),
 			server.Wrangler.K8s.CoreV1())
 		return nil
 	})

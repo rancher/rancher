@@ -3,12 +3,10 @@ package serviceaccounttoken
 import (
 	"container/list"
 	"sync"
-
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// newQueue is a new queue for runtime.Objects.
-func newQueue[T runtime.Object](objs ...T) *queue[T] {
+// newQueue is a new queue for comparables.
+func newQueue[T comparable](objs ...T) *queue[T] {
 	q := &queue[T]{List: list.New()}
 	q.enqueue(objs...)
 
@@ -16,7 +14,7 @@ func newQueue[T runtime.Object](objs ...T) *queue[T] {
 }
 
 // Simple queued list
-type queue[T runtime.Object] struct {
+type queue[T comparable] struct {
 	sync.Mutex
 	*list.List
 }
