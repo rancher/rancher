@@ -36,28 +36,32 @@ const (
 )
 
 // upgradeLocalCluster is a function to upgrade a local cluster.
-func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, containerImage string) {
-	clusterObject, err := extensionscluster.GetClusterIDByName(client, clusterName)
+func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, containerImage string) {
+	clusterObject, err := extensionscluster.GetClusterIDByName(client, cluster.Name)
 	require.NoError(u.T(), err)
 
 	clusterResp, err := client.Management.Cluster.ByID(clusterObject)
 	require.NoError(u.T(), err)
 
+	if cluster.VersionToUpgrade == "" {
+		u.T().Skip(u.T(), cluster.VersionToUpgrade, "Kubernetes version to upgrade is not provided, skipping the test") 
+	}
+
 	if clusterResp.Labels[provider] == rke {
-		testConfig.KubernetesVersion = cluster.ProvisioningInput.RKE1KubernetesVersions[0]
+		testConfig.KubernetesVersion = cluster.VersionToUpgrade
 		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
 	} else if clusterResp.Labels[provider] == rke2 {
-		testConfig.KubernetesVersion = cluster.ProvisioningInput.RKE2KubernetesVersions[0]
+		testConfig.KubernetesVersion = cluster.VersionToUpgrade
 		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
 	} else {
-		testConfig.KubernetesVersion = cluster.ProvisioningInput.K3SKubernetesVersions[0]
+		testConfig.KubernetesVersion = cluster.VersionToUpgrade
 		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
 	}
 
 	u.Run(testName, func() {
-		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest, nil, containerImage)
+		createPreUpgradeWorkloads(u.T(), client, cluster.Name, cluster.FeaturesToTest, nil, containerImage)
 
-		clusterMeta, err := extensionscluster.NewClusterMeta(client, clusterName)
+		clusterMeta, err := extensionscluster.NewClusterMeta(client, cluster.Name)
 		require.NoError(u.T(), err)
 
 		initCluster, err := bundledclusters.NewWithClusterMeta(clusterMeta)
@@ -70,7 +74,7 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 		updatedCluster, err := initClusterResp.UpdateKubernetesVersion(client, &testConfig.KubernetesVersion)
 		require.NoError(u.T(), err)
 
-		err = waitForLocalClusterUpgrade(client, clusterName)
+		err = waitForLocalClusterUpgrade(client, cluster.Name)
 		require.NoError(u.T(), err)
 
 		upgradedCluster, err := client.Management.Cluster.ByID(updatedCluster.V3.ID)
@@ -79,7 +83,7 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 
 		logrus.Infof("Local cluster has been upgraded to: %s", upgradedCluster.Version.GitVersion)
 
-		createPostUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest)
+		createPostUpgradeWorkloads(u.T(), client, cluster.Name, cluster.FeaturesToTest)
 	})
 }
 
