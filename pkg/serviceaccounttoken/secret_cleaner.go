@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -70,8 +69,7 @@ func setupServiceAccountsCache(cache serviceAccountsCache) {
 //
 // This should only be started in the leader pod.
 func StartServiceAccountSecretCleaner(ctx context.Context, secrets secretsCache, serviceAccounts serviceAccountsCache, client clientcorev1.CoreV1Interface) error {
-	secretCleanerDisabled := strings.ToLower(os.Getenv("DISABLE_SECRET_CLEANER")) == "true"
-	if secretCleanerDisabled {
+	if !features.CleanStaleSecrets.Enabled() {
 		logrus.Info("ServiceAccountSecretCleaner disabled - not starting")
 		return nil
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -125,7 +126,11 @@ func TestStartServiceAccountSecretCleanerWhenDisabled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	k8sClient := fake.NewSimpleClientset(secrets...)
 
-	t.Setenv("DISABLE_SECRET_CLEANER", "true")
+	existingState := features.CleanStaleSecrets.Enabled()
+	t.Cleanup(func() {
+		features.CleanStaleSecrets.Set(existingState)
+	})
+	features.CleanStaleSecrets.Set(false)
 
 	stubSecrets := newStubSecrets(secrets...)
 	stubServiceAccounts := newServiceAccountsFake()
