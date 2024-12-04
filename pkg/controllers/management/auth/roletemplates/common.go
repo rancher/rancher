@@ -30,26 +30,32 @@ func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crb
 	if err != nil {
 		return err
 	}
+	// Create if not found
 	existingCRB, err := crbController.Get(wantedCRB.Name, metav1.GetOptions{})
-	if err == nil {
-		// If the role referenced or subjects are wrong, delete and re-create the CRB
-		if pkgrbac.AreClusterRoleBindingsSame(wantedCRB, existingCRB) {
-			// Update Label
-			rtbLabel := getRTBLabel(rtb)
-			existingCRB.Labels[rtbLabel] = "true"
-			_, err := crbController.Update(existingCRB)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			_, err = crbController.Create(wantedCRB)
 			return err
-		} else {
-			if err := crbController.Delete(wantedCRB.Name, &metav1.DeleteOptions{}); err != nil {
-				return err
-			}
 		}
-	} else if !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	_, err = crbController.Create(wantedCRB)
-	return err
+	// If the role referenced or subjects are wrong, delete and re-create the CRB
+	if !pkgrbac.AreClusterRoleBindingContentsSame(wantedCRB, existingCRB) {
+		if err := crbController.Delete(wantedCRB.Name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+		_, err = crbController.Create(wantedCRB)
+		return err
+	}
+	// Update Label
+	rtbLabel := getRTBLabel(rtb)
+	if v, ok := existingCRB.Labels[rtbLabel]; !ok || v != "true" {
+		existingCRB.Labels[rtbLabel] = "true"
+		_, err = crbController.Update(existingCRB)
+		return err
+	}
+	return nil
 }
 
 // deleteMembershipBinding checks if the user is still a member of the Project or Cluster specified by PRTB/CRTB. If they are no longer a member, delete the bindings.
@@ -65,7 +71,9 @@ func deleteMembershipBinding(rtb metav1.Object, crbController crbacv1.ClusterRol
 		delete(c.Labels, label)
 		// If there are no items in Labels, the user is no longer a member/owner
 		if len(c.Labels) == 0 {
-			return crbController.Delete(c.Name, &metav1.DeleteOptions{})
+			return crbController.Delete(c.Name, &metav1.DeleteOptions{
+				Preconditions: &metav1.Preconditions{UID: &c.UID, ResourceVersion: &c.ResourceVersion},
+			})
 		}
 	}
 	return nil
@@ -108,6 +116,7 @@ func getMembershipRoleName(rt *v3.RoleTemplate) string {
 }
 
 // isOwnerRole returns if the RoleTemplate is an Owner role. If not it is considered a Member role.
+// The only valid OwnerRoles are the builtin "cluster-owner" and "project-owner" roles.
 func isOwnerRole(rt *v3.RoleTemplate) bool {
 	return rt.Builtin && (rt.Context == clusterContext && rt.Name == clusterOwner || rt.Context == clusterContext && rt.Name == projectOwner)
 }

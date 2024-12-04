@@ -50,7 +50,7 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 	// Find if there is a CRB that already exists and delete all excess CRBs
 	var matchingCRB *v1.ClusterRoleBinding
 	for _, currentCRB := range currentCRBs.Items {
-		if rbac.AreClusterRoleBindingsSame(crb, &currentCRB) && matchingCRB == nil {
+		if rbac.AreClusterRoleBindingContentsSame(crb, &currentCRB) && matchingCRB == nil {
 			matchingCRB = &currentCRB
 			continue
 		}
