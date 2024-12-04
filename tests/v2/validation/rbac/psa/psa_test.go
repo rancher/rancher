@@ -309,7 +309,7 @@ func (rb *PSATestSuite) TestPSA() {
 		require.Error(rb.T(), err)
 
 		rb.Run("Create a user with global role "+role, func() {
-			var userRole := rbac.StandardUser.String()
+			var userRole = rbac.StandardUser.String()
 			newUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), userRole)
 
 			require.NoError(rb.T(), err)
