@@ -24,8 +24,6 @@ const (
 	impersonationNamespace string = "cattle-impersonation-system"
 
 	serviceAccountSecretRefIndex string = ".serviceAccountSecretRef"
-
-	pageSize int64 = 100
 )
 
 var (
