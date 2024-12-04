@@ -452,7 +452,7 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, ownerLabel, roleRefName s
 }
 
 // AreRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
-func AreClusterRoleBindingsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
+func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
 	return reflect.DeepEqual(crb1.Subjects, crb2.Subjects) &&
 		reflect.DeepEqual(crb1.RoleRef, crb2.RoleRef)
 }

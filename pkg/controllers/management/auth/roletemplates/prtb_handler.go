@@ -75,7 +75,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 	var prtbHasBinding bool
 	for _, currentCRB := range currentCRBs.Items {
-		if rbac.AreClusterRoleBindingsSame(&currentCRB, crb) {
+		if rbac.AreClusterRoleBindingContentsSame(&currentCRB, crb) {
 			prtbHasBinding = true
 			continue
 		}
@@ -116,7 +116,11 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		return binding, nil
 	}
 
-	if binding.UserPrincipalName != "" && binding.UserName == "" {
+	if binding.UserPrincipalName == "" && binding.UserName == "" {
+		return nil, fmt.Errorf("binding %v has no subject", binding.Name)
+	}
+
+	if binding.UserName == "" {
 		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
 		user, err := p.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
 		if err != nil {
@@ -124,10 +128,9 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		}
 
 		binding.UserName = user.Name
-		return binding, nil
 	}
 
-	if binding.UserPrincipalName == "" && binding.UserName != "" {
+	if binding.UserPrincipalName == "" {
 		u, err := p.userController.Get(binding.UserName, metav1.GetOptions{})
 		if err != nil {
 			return binding, err
@@ -138,8 +141,7 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 				break
 			}
 		}
-		return binding, nil
 	}
 
-	return nil, fmt.Errorf("binding %v has no subject", binding.Name)
+	return binding, nil
 }

@@ -103,24 +103,23 @@ func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 
 // getAllRules collects all policy rules that the RoleTemplate applies. Specifically it searches for external rules.
 func (r *roleTemplateHandler) getAllRules(rt *v3.RoleTemplate) ([]v1.PolicyRule, error) {
-	var rules []v1.PolicyRule
-	if rt.External {
-		if rt.ExternalRules != nil {
-			rules = append(rules, rt.ExternalRules...)
-		} else {
-			externalRole, err := r.crClient.Get(rt.Name, metav1.GetOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				// dont error if it doesnt exist
-				return nil, err
-			}
-			if externalRole != nil {
-				rules = externalRole.Rules
-			}
-		}
-	} else {
-		rules = rt.Rules
+	if !rt.External {
+		return rt.Rules, nil
 	}
-	return rules, nil
+	if rt.ExternalRules != nil {
+		return rt.ExternalRules, nil
+	}
+
+	externalRole, err := r.crClient.Get(rt.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Don't error if it doesn't exist
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return externalRole.Rules, nil
 }
 
 // getManagementPlaneRules filters a set of rules based on the map passed in. Used to provide special resources that have cluster/project scope.
@@ -143,7 +142,7 @@ func getManagementPlaneRules(rules []v1.PolicyRule, managementResources map[stri
 // ruleContainsManagementPlaneRule takes a rule and checks if it has the resource and apigroup from the management plane rules.
 // If there are ResourceNames specified in the rule, it only applies to specific resources and doesn't count as a management plane rule.
 func ruleContainsManagementPlaneRule(resource, apiGroup string, rule v1.PolicyRule) bool {
-	return len(rule.ResourceNames) != 0 &&
-		slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, v1.ResourceAll) &&
-		slice.ContainsString(rule.APIGroups, apiGroup) || slice.ContainsString(rule.APIGroups, v1.APIGroupAll)
+	return len(rule.ResourceNames) == 0 &&
+		(slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, v1.ResourceAll)) &&
+		(slice.ContainsString(rule.APIGroups, apiGroup) || slice.ContainsString(rule.APIGroups, v1.APIGroupAll))
 }

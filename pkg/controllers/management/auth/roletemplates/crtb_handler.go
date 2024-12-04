@@ -47,8 +47,7 @@ func newCRTBHandler(management *config.ManagementContext) *crtbHandler {
 // OnChange syncs the required resources used to implement a CRTB. It does the following:
 //   - Create the specified user if it doesn't already exist.
 //   - Create the membership bindings to give access to the cluster.
-//   - Create a binding to the project management role if it exists.
-//   - Create a binding to the cluster management role if it exists.
+//   - Create a binding to the project and cluster management role if it exists.
 //
 // TODO add statuses
 func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
@@ -70,9 +69,26 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, err
 	}
 
-	crbsNeeded := map[*rbacv1.ClusterRoleBinding]bool{}
 	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
 
+	desiredCRBs, err := c.getDesiredClusterRoleBindings(crtb, ownerLabel)
+	if err != nil {
+		return nil, err
+	}
+
+	currentCRBs, err := c.crbController.List(metav1.ListOptions{LabelSelector: ownerLabel})
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.reconcileBindings(desiredCRBs, currentCRBs.Items)
+
+	return crtb, err
+}
+
+// getDesiredClusterRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed ClusterRoleBindings
+func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding, ownerLabel string) (map[string]*rbacv1.ClusterRoleBinding, error) {
+	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
 	// Check if there is a project management role to bind to
 	projectMagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err := c.crController.Get(projectMagementRoleName, metav1.GetOptions{})
@@ -81,7 +97,7 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		if err != nil {
 			return nil, err
 		}
-		crbsNeeded[crb] = true
+		desiredCRBs[crb.Name] = crb
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -94,40 +110,39 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		if err != nil {
 			return nil, err
 		}
-		crbsNeeded[crb] = true
+		desiredCRBs[crb.Name] = crb
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
-	currentCRBs, err := c.crbController.List(metav1.ListOptions{LabelSelector: ownerLabel})
-	if err != nil {
-		return nil, err
-	}
+	return desiredCRBs, nil
+}
 
-	// Find if CRBs already exists
-currentLoop:
-	for _, currentCRB := range currentCRBs.Items {
-		for desiredCRB := range crbsNeeded {
-			if rbac.AreClusterRoleBindingsSame(&currentCRB, desiredCRB) {
-				crbsNeeded[desiredCRB] = false
-				continue currentLoop
+// reconcileBindings takes a map of desired ClusterRoleBindings and a slice of already existing ClusterRoleBindings and ensures that all the desired CRBs exist.
+// It deletes any of the existing CRBs that are not needed.
+func (c *crtbHandler) reconcileBindings(desiredCRBs map[string]*rbacv1.ClusterRoleBinding, currentCRBs []rbacv1.ClusterRoleBinding) error {
+	for _, currentCRB := range currentCRBs {
+		if crb, ok := desiredCRBs[currentCRB.Name]; ok {
+			if rbac.AreClusterRoleBindingContentsSame(&currentCRB, crb) {
+				// If the cluster role binding already exists with the right contents, we can skip creating it.
+				delete(desiredCRBs, crb.Name)
+				continue
 			}
-			if err := c.crbController.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
-				return nil, err
-			}
+		}
+		// If the CRB is not a member of the desired CRBs or has different contents, delete it.
+		if err := c.crbController.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
+			return err
 		}
 	}
 
 	// For any CRBs that don't exist, create them
-	for crb, needed := range crbsNeeded {
-		if needed {
-			if _, err := c.crbController.Create(crb); err != nil {
-				return nil, err
-			}
+	for _, crb := range desiredCRBs {
+		if _, err := c.crbController.Create(crb); err != nil {
+			return err
 		}
 	}
 
-	return crtb, nil
+	return nil
 }
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB. It also removes the membership binding if no other CRTBs give membership access.
@@ -155,7 +170,12 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		return binding, nil
 	}
 
-	if binding.UserPrincipalName != "" && binding.UserName == "" {
+	if binding.UserPrincipalName == "" && binding.UserName == "" {
+		c.s.AddCondition(localConditions, condition, crtbHasNoSubject, fmt.Errorf("CRTB has no subject"))
+		return nil, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
+	}
+
+	if binding.UserName == "" {
 		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
 		user, err := c.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
 		if err != nil {
@@ -165,10 +185,9 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 
 		binding.UserName = user.Name
 		c.s.AddCondition(localConditions, condition, subjectExists, nil)
-		return binding, nil
 	}
 
-	if binding.UserPrincipalName == "" && binding.UserName != "" {
+	if binding.UserPrincipalName == "" {
 		u, err := c.userController.Get(binding.UserName, metav1.GetOptions{})
 		if err != nil {
 			c.s.AddCondition(localConditions, condition, failedToGetUser, err)
@@ -181,10 +200,7 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 			}
 		}
 		c.s.AddCondition(localConditions, condition, subjectExists, nil)
-		return binding, nil
 	}
 
-	c.s.AddCondition(localConditions, condition, crtbHasNoSubject, fmt.Errorf("CRTB has no subject"))
-
-	return nil, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
+	return binding, nil
 }
