@@ -3,8 +3,16 @@ package v1
 
 import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/providers/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// copied from package "pkg/auth/providers/common" (provider.go).
+	// BEWARE the local copies are necessary because import of the package
+	// triggers CI failure around modules and dependencies, crewjam/saml in
+	// particular.
+	UserAttributePrincipalID = "principalid"
+	UserAttributeUserName    = "username"
 )
 
 // +genclient
@@ -143,8 +151,8 @@ func (t *Token) GetUserPrincipal() apiv3.Principal {
 		Provider:      t.Status.AuthProvider,
 		PrincipalType: "user",
 		ExtraInfo: map[string]string{
-			common.UserAttributePrincipalID: t.Status.PrincipalID,
-			common.UserAttributeUserName:    t.Status.LoginName,
+			UserAttributePrincipalID: t.Status.PrincipalID,
+			UserAttributeUserName:    t.Status.LoginName,
 		},
 	}
 }
