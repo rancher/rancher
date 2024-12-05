@@ -43,6 +43,7 @@ const (
 	fieldTTL            = "ttl"
 	fieldUID            = "kube-uid"
 	fieldUserID         = "user-id"
+	// fieldIdleTimeout = "idle-timeout"	FUTURE ((USER ACTIVITY))
 
 	noUpdatePermission      = 0
 	fullUpdatePermission    = 1
@@ -357,6 +358,10 @@ func (t *SystemTokenStore) update(permissionLevel int, token *ext.Token, opts *m
 	newToken.Status.TokenValue = ""
 	return newToken, nil
 }
+
+// FUTURE ((USER ACTIVITY)) modify and fill in as required by the field type.
+// func (t *SystemTokenStore) UpdateIdleTimeout(name string, now time.Time) error {
+// }
 
 func (t *SystemTokenStore) UpdateLastUsedAt(name string, now time.Time) error {
 	// Operate directly on the backend secret holding the token
@@ -677,6 +682,9 @@ func secretFromToken(token *ext.Token) *corev1.Secret {
 	secret.StringData[fieldLastUpdateTime] = token.Status.LastUpdateTime
 	secret.StringData[fieldLastUsedAt] = lastUsedAsString
 
+	// FUTURE ((USER ACTIVITY)) change as required by the field type
+	// secret.StringData[fieldIdleTimeout] = fmt.Sprintf("%d", token.Status.IdleTimeout)
+
 	// Note:
 	// - While the derived expiration data is not stored, the user-related information is.
 	// - The expiration data is computed trivially from spec and resource data.
@@ -743,6 +751,19 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 		ttl = ThirtyDays
 	}
 	token.Spec.TTL = ttl
+
+	// FUTURE ((USER ACTIVITY)) change as required by the field type
+	//
+	// BEWARE. Depending on releases made this code may have to handle
+	// rancher instances containing ext tokens without idle information,
+	// without crashing. I.e. insert a default when the information is not
+	// present, instead of returning an error.
+	//
+	// idle, err := strconv.ParseInt(string(secret.Data[fieldIdleTimeout]), 10, 64)
+	// if err != nil {
+	// 	return token, err
+	// }
+	// token.Status.IdleTimeout = idle
 
 	tokenHash := string(secret.Data[fieldHash])
 	if tokenHash == "" {
