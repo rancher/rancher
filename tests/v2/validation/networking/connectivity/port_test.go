@@ -161,7 +161,7 @@ func (p *PortTestSuite) TestClusterIP() {
 
 	daemonsetName := namegen.AppendRandomString("test-daemonset")
 
-	//p.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
+	p.T().Logf("Creating a daemonset with the test container with name [%v]", daemonsetName)
 	daemonsetTemplate := shepworkloads.NewDaemonSetTemplate(daemonsetName, p.namespace.Name, testContainerPodTemplate, true, nil)
 	createdDaemonSet, err := steveClient.SteveType(workloads.DaemonsetSteveType).Create(daemonsetTemplate)
 	require.NoError(p.T(), err)
@@ -605,6 +605,7 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
+	require.True(p.T(), isWorkloadValid)
 
 	err = validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
 	require.NoError(p.T(), err)
