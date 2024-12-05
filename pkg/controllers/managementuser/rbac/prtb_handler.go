@@ -103,7 +103,7 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 
 func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	if binding.RoleTemplateName == "" {
-		logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
+		logrus.Warnf("ProjectRoleTemplateBinding %s has no role template set. Skipping.", binding.Name)
 		return nil
 	}
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
@@ -112,7 +112,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	rt, err := p.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", binding.Name, binding.RoleTemplateName)
+			logrus.Warnf("ProjectRoleTemplateBinding %s sets a non-existing role template %s. Skipping.", binding.Name, binding.RoleTemplateName)
 			return nil
 		}
 		return err

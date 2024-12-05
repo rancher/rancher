@@ -934,10 +934,6 @@ func buildRule(resource string, verbs map[string]string) v1.PolicyRule {
 	}
 }
 
-type roleTemplateNotFoundErr struct {
-	error
-}
-
 func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string, depthCounter int) (bool, error) {
 	if depthCounter == rolesCircularSoftLimit {
 		logrus.Warnf("roletemplate has caused %v recursive function calls", rolesCircularSoftLimit)
@@ -947,9 +943,6 @@ func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext str
 	}
 	roleTemplate, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
-		if apierrors.IsNotFound(err) && depthCounter == 0 {
-			return false, &roleTemplateNotFoundErr{err}
-		}
 		return false, err
 	}
 

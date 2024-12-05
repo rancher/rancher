@@ -15,6 +15,7 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -193,7 +194,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 	if cluster == nil {
-		err = fmt.Errorf("cannot create binding because cluster %v was not found", clusterName)
+		err = fmt.Errorf("cannot create binding because cluster %s was not found", clusterName)
 		c.s.AddCondition(localConditions, condition, clusterNotFound, err)
 		return err
 	}
@@ -202,9 +203,8 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToCheckReferencedRole, err)
 
-		var notFoundErr *roleTemplateNotFoundErr
-		if errors.As(err, &notFoundErr) {
-			logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", binding.Name, binding.RoleTemplateName)
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("ClusterRoleTemplateBinding %s sets a non-existing role template %s. Skipping.", binding.Name, binding.RoleTemplateName)
 			return nil
 		}
 
@@ -212,9 +212,9 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	}
 	var clusterRoleName string
 	if isOwnerRole {
-		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clusterowner", clusterName))
+		clusterRoleName = strings.ToLower(fmt.Sprintf("%s-clusterowner", clusterName))
 	} else {
-		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
+		clusterRoleName = strings.ToLower(fmt.Sprintf("%s-clustermember", clusterName))
 	}
 
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
@@ -267,7 +267,7 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 		}
 		for _, rb := range rbs {
 			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, p.Name, binding.Name)
-			if err := c.rbClient.DeleteNamespaced(p.Name, rb.Name, &v1.DeleteOptions{}); err != nil {
+			if err := c.rbClient.DeleteNamespaced(p.Name, rb.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 		}
@@ -296,7 +296,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, 
 	}
 
 	set := labels.Set(map[string]string{string(binding.UID): MembershipBindingOwnerLegacy})
-	crbs, err := c.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+	crbs, err := c.crbLister.List(metav1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToGetClusterRoleBindings, err)
 		return err
@@ -304,7 +304,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, 
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, crb := range crbs {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			crbToUpdate, updateErr := c.crbClient.Get(crb.Name, v1.GetOptions{})
+			crbToUpdate, updateErr := c.crbClient.Get(crb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
@@ -331,7 +331,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, 
 
 	for _, rb := range rbs {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			rbToUpdate, updateErr := c.rbClient.GetNamespaced(rb.Namespace, rb.Name, v1.GetOptions{})
+			rbToUpdate, updateErr := c.rbClient.GetNamespaced(rb.Namespace, rb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
@@ -353,7 +353,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, 
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crtbToUpdate, updateErr := c.crtbClient.Get(binding.Namespace, binding.Name, v1.GetOptions{})
+		crtbToUpdate, updateErr := c.crtbClient.Get(binding.Namespace, binding.Name, metav1.GetOptions{})
 		if updateErr != nil {
 			return updateErr
 		}
