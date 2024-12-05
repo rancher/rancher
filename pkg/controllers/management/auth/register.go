@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/roletemplates"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "k8s.io/api/rbac/v1"
@@ -72,11 +73,6 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	rtLegacy := newLegacyRTCleaner(management)
 	prtbServiceAccountFinder := newPRTBServiceAccountController(management)
 
-	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
-	management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)
-	management.Management.Users("").AddLifecycle(ctx, userController, u)
-	management.Management.RoleTemplates("").AddLifecycle(ctx, roleTemplateLifecycleName, rt)
-
 	management.Management.Clusters("").AddHandler(ctx, project_cluster.ClusterCreateController, c.Sync)
 	management.Management.Projects("").AddHandler(ctx, project_cluster.ProjectCreateController, p.Sync)
 	management.Management.ProjectRoleTemplateBindings("").AddHandler(ctx, prtbServiceAccountControllerName, prtbServiceAccountFinder.sync)
@@ -87,7 +83,15 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, "legacy-grb-cleaner", grbLegacy.sync)
 	management.Management.RoleTemplates("").AddHandler(ctx, "legacy-rt-cleaner", rtLegacy.sync)
 	globalroles.Register(ctx, management, clusterManager)
-	roletemplates.Register(ctx, management)
+
+	if features.AggregatedRoleTemplates.Enabled() {
+		roletemplates.Register(ctx, management)
+	} else {
+		management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
+		management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)
+		management.Management.RoleTemplates("").AddLifecycle(ctx, roleTemplateLifecycleName, rt)
+	}
+	management.Management.Users("").AddLifecycle(ctx, userController, u)
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
