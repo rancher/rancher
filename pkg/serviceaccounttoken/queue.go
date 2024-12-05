@@ -34,10 +34,10 @@ func (q *queue[T]) dequeue(n int64) []T {
 	var result []T
 
 	for i := n; i > 0; i-- {
-		e := q.Front()
 		if q.Len() == 0 {
 			return result
 		}
+		e := q.Front()
 		q.List.Remove(e)
 		result = append(result, e.Value.(T))
 	}

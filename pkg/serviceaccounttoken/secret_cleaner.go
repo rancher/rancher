@@ -46,22 +46,6 @@ type serviceAccountsCache interface {
 	AddIndexer(indexName string, indexer generic.Indexer[*corev1.ServiceAccount])
 }
 
-// setupServiceAccountsCache must be called early on to setup the correct
-// indexing on service accounts.
-func setupServiceAccountsCache(cache serviceAccountsCache) {
-	cache.AddIndexer(serviceAccountSecretRefIndex, func(s *corev1.ServiceAccount) ([]string, error) {
-		if s.ObjectMeta.Annotations == nil {
-			return nil, nil
-		}
-		annotation := s.ObjectMeta.Annotations[ServiceAccountSecretRefAnnotation]
-		if annotation != "" {
-			return []string{annotation}, nil
-		}
-
-		return nil, nil
-	})
-}
-
 // StartServiceAccountSecretCleaner starts a background process to cleanup old
 // service accounts secrets.
 //
@@ -101,7 +85,7 @@ func StartServiceAccountSecretCleaner(ctx context.Context, secrets secretsCache,
 					return
 				}
 				// This ensures that no matter how long the cleaning takes,
-				// we'll alwas keep the same cycle time.
+				// we'll always keep the same cycle time.
 				ticker.Reset(cleanCycleTime)
 			}
 		}
@@ -125,8 +109,7 @@ func CleanServiceAccountSecrets(ctx context.Context, secrets clientv1.SecretInte
 			continue
 		}
 
-		// If have a ServiceAccount for this secret, then we can leave it in
-		// place.
+		// If we have a ServiceAccount for this secret, then we can leave it in place.
 		if serviceAccount != nil {
 			continue
 		}
@@ -193,4 +176,20 @@ func loadSecretQueue(secrets secretsCache) (*queue[types.NamespacedName], error)
 	}
 
 	return q, nil
+}
+
+// setupServiceAccountsCache must be called early on to setup the correct
+// indexing on service accounts.
+func setupServiceAccountsCache(cache serviceAccountsCache) {
+	cache.AddIndexer(serviceAccountSecretRefIndex, func(s *corev1.ServiceAccount) ([]string, error) {
+		if s.ObjectMeta.Annotations == nil {
+			return nil, nil
+		}
+		annotation := s.ObjectMeta.Annotations[ServiceAccountSecretRefAnnotation]
+		if annotation != "" {
+			return []string{annotation}, nil
+		}
+
+		return nil, nil
+	})
 }
