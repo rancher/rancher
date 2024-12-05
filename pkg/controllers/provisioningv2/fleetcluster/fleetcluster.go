@@ -3,6 +3,7 @@ package fleetcluster
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -29,7 +30,7 @@ import (
 )
 
 const (
-	turtlesOwnedLab = "cluster-api.cattle.io/owned"
+	externallyManagedAnn = "provisioning.cattle.io/externally-managed"
 )
 
 // ClusterHostGetter provides cluster API server URL retrieval.
@@ -110,10 +111,14 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 		return cluster, nil
 	}
 
-	// Clusters labeled with turtlesOwned label will manage fleet deployment externally
-	_, turtlesOwned := cluster.Labels[turtlesOwnedLab]
+	// Clusters annotated with "provisioning.cattle.io/externally-managed": "true" to manage fleet deployment externally
+	var clusterExternallyManaged bool
+	// For legacy purposes of the way our API generally works, make sure the value is not set to "false"
+	if ann := cluster.Annotations[externallyManagedAnn]; ann != "" && (strings.ToLower(ann) != "false") {
+		clusterExternallyManaged = true
+	}
 
-	if cluster.Spec.FleetWorkspaceName == "" && !turtlesOwned {
+	if cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged {
 		def := settings.FleetDefaultWorkspaceName.Get()
 		if def == "" {
 			return cluster, nil

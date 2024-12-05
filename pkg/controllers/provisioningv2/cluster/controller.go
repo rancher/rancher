@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -45,7 +46,7 @@ const (
 	administratedAnn      = "provisioning.cattle.io/administrated"
 	mgmtClusterNameAnn    = "provisioning.cattle.io/management-cluster-name"
 	fleetWorkspaceNameAnn = "provisioning.cattle.io/fleet-workspace-name"
-	turtlesOwnedLab       = "cluster-api.cattle.io/owned"
+	externallyManagedAnn  = "provisioning.cattle.io/externally-managed"
 )
 
 var (
@@ -191,11 +192,15 @@ func (h *handler) isLegacyCluster(cluster interface{}) bool {
 // cluster FleetWorkspaceName is empty or if the cluster name does not match (c-XXXXX|local) where XXXXX is a random
 // string of characters.
 func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
-	// Clusters labeled with turtlesOwned label will ensure provisioning cluster is created
+	// Clusters annotated with "provisioning.cattle.io/externally-managed": "true" should get cluster created
 	// when the fleet workspace defaulting is disabled
-	_, turtlesOwned := cluster.Labels[turtlesOwnedLab]
+	var clusterExternallyManaged bool
+	// For legacy purposes of the way our API generally works, make sure the value is not set to "false"
+	if ann := cluster.Annotations[externallyManagedAnn]; ann != "" && (strings.ToLower(ann) != "false") {
+		clusterExternallyManaged = true
+	}
 
-	if !h.isLegacyCluster(cluster) || (cluster.Spec.FleetWorkspaceName == "" && !turtlesOwned) {
+	if !h.isLegacyCluster(cluster) || (cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged) {
 		return nil, status, nil
 	}
 	provCluster := &v1.Cluster{

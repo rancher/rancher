@@ -213,8 +213,8 @@ func TestAssignWorkspace(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: "fleet-default",
-					Labels: map[string]string{
-						turtlesOwnedLab: "",
+					Annotations: map[string]string{
+						externallyManagedAnn: "true",
 					},
 				},
 				Spec: apimgmtv3.ClusterSpec{},
@@ -226,8 +226,8 @@ func TestAssignWorkspace(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "local-cluster",
 					Namespace: "fleet-local",
-					Labels: map[string]string{
-						turtlesOwnedLab: "",
+					Annotations: map[string]string{
+						externallyManagedAnn: "true",
 					},
 				},
 				Spec: apimgmtv3.ClusterSpec{

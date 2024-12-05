@@ -64,8 +64,8 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 			cluster: &v3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "c-33333",
-					Labels: map[string]string{
-						turtlesOwnedLab: "",
+					Annotations: map[string]string{
+						externallyManagedAnn: "true",
 					},
 				},
 				Spec: v3.ClusterSpec{
