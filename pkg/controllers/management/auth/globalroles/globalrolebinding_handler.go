@@ -392,6 +392,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 			}
 		}
 
+		grb.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
 		return nil
 	}
 
@@ -433,6 +434,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	}
 	globalRoleBinding.Annotations[crbNameAnnotation] = crbName
 
+	grb.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
 	return nil
 }
 
