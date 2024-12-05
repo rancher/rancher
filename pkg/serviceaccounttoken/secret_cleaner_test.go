@@ -21,7 +21,10 @@ import (
 
 func TestCleanServiceAccountSecrets(t *testing.T) {
 	var secrets []*corev1.Secret
-	for i := range 7 {
+	totalSecrets := 7
+	cleanedSecrets := 5
+
+	for i := range totalSecrets {
 		saName := fmt.Sprintf("test-%v", i)
 		secrets = append(secrets, newSecret(saName, withLabels(map[string]string{
 			"cattle.io/service-account.name": saName,
@@ -34,20 +37,22 @@ func TestCleanServiceAccountSecrets(t *testing.T) {
 		context.Background(),
 		k8sClient.CoreV1().Secrets(impersonationNamespace),
 		stubServiceAccounts,
-		toNamespacedNames(secrets)[0:5])
+		toNamespacedNames(secrets)[0:cleanedSecrets])
 	require.NoError(t, err)
 
 	secretList, err := k8sClient.CoreV1().Secrets(impersonationNamespace).List(
 		context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 
-	require.Equal(t, 2, len(secretList.Items))
+	require.Equal(t, totalSecrets-cleanedSecrets, len(secretList.Items))
 }
 
 func TestCleanServiceAccountSecretsDoesNotRemoveReferencedSecrets(t *testing.T) {
 	var secrets []*corev1.Secret
+	totalSecrets := 4
+	cleanedSecrets := 3
 	var resources []runtime.Object
-	for i := range 4 {
+	for i := range totalSecrets {
 		s := newSecret(fmt.Sprintf("test-%v", i))
 		secrets = append(secrets, s)
 		resources = append(resources, s)
@@ -71,12 +76,14 @@ func TestCleanServiceAccountSecretsDoesNotRemoveReferencedSecrets(t *testing.T) 
 	secretList, err := k8sClient.CoreV1().Secrets(impersonationNamespace).List(context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(secretList.Items))
+	require.Equal(t, totalSecrets-cleanedSecrets, len(secretList.Items))
 }
 
 func TestStartServiceAccountSecretCleaner(t *testing.T) {
 	oldDelay := cleanCycleDelay
 	oldBatchSize := cleaningBatchSize
+	totalSecrets := 7
+	cleanedSecrets := 5
 
 	t.Cleanup(func() {
 		cleanCycleDelay = oldDelay
@@ -87,7 +94,7 @@ func TestStartServiceAccountSecretCleaner(t *testing.T) {
 	cleaningBatchSize = 5
 
 	var secrets []runtime.Object
-	for i := range 7 {
+	for i := range totalSecrets {
 		secrets = append(secrets, newSecret(fmt.Sprintf("test-%v", i)))
 	}
 
@@ -103,12 +110,13 @@ func TestStartServiceAccountSecretCleaner(t *testing.T) {
 	secretList, err := k8sClient.CoreV1().Secrets(impersonationNamespace).List(
 		context.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(secretList.Items))
+	require.Equal(t, totalSecrets-cleanedSecrets, len(secretList.Items))
 }
 
 func TestStartServiceAccountSecretCleanerWhenDisabled(t *testing.T) {
 	oldDelay := cleanCycleDelay
 	oldBatchSize := cleaningBatchSize
+	totalSecrets := 7
 
 	t.Cleanup(func() {
 		cleanCycleDelay = oldDelay
@@ -119,7 +127,7 @@ func TestStartServiceAccountSecretCleanerWhenDisabled(t *testing.T) {
 	cleaningBatchSize = 5
 
 	var secrets []runtime.Object
-	for i := range 7 {
+	for i := range totalSecrets {
 		secrets = append(secrets, newSecret(fmt.Sprintf("test-%v", i)))
 	}
 
@@ -144,7 +152,7 @@ func TestStartServiceAccountSecretCleanerWhenDisabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// No secrets should be deleted.
-	require.Equal(t, 7, len(secretList.Items))
+	require.Equal(t, totalSecrets, len(secretList.Items))
 }
 
 func withLabels(l map[string]string) func(*corev1.Secret) {
