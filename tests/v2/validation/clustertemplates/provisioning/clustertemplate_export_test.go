@@ -42,6 +42,11 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(ct.T(), err)
 
+	// Disabling configuration here is to avoid interference with other pipeline tests.
+	// Updates to the config are temporarily disabled during the test
+	// and are automatically enabled during cleanup.
+	provisioning.DisableUpdateConfig(client)
+
 	ct.client = client
 
 	provisioning.DisableUpdateConfig(ct.client)
