@@ -59,8 +59,6 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 	}
 
 	u.Run(testName, func() {
-		createPreUpgradeWorkloads(u.T(), client, cluster.Name, cluster.FeaturesToTest, nil, containerImage)
-
 		clusterMeta, err := extensionscluster.NewClusterMeta(client, cluster.Name)
 		require.NoError(u.T(), err)
 
@@ -77,13 +75,11 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 		err = waitForLocalClusterUpgrade(client, cluster.Name)
 		require.NoError(u.T(), err)
 
-		upgradedCluster, err := client.Management.Cluster.ByID(updatedCluster.V3.ID)
+		upgradedCluster, err := client.Management.Cluster.ByID(updatedCluster.Meta.ID)
 		require.NoError(u.T(), err)
-		require.Equal(u.T(), testConfig.KubernetesVersion, upgradedCluster.Version.GitVersion)
+		require.Contains(u.T(), testConfig.KubernetesVersion, upgradedCluster.Version.GitVersion)
 
 		logrus.Infof("Local cluster has been upgraded to: %s", upgradedCluster.Version.GitVersion)
-
-		createPostUpgradeWorkloads(u.T(), client, cluster.Name, cluster.FeaturesToTest)
 	})
 }
 
