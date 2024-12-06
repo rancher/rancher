@@ -47,7 +47,19 @@ type UIPluginEntry struct {
 }
 
 type UIPluginStatus struct {
+	// ObservedGeneration is used by Rancher controller to track the latest generation of the resource that it triggered on.
+	ObservedGeneration int64 `json:"observedGeneration"`
 	// CacheState is the cache status of the plugin.
 	// +nullable
 	CacheState string `json:"cacheState,omitempty"`
+	// Error is the error message if any.
+	Error string `json:"error,omitempty"`
+	// Ready is the readiness of the plugin.
+	// Defaults to false.
+	// +kubebuilder:default:=false
+	Ready bool `json:"ready,omitempty"`
+	// RetryNumber is the number of times the plugin has been retried.
+	RetryNumber int `json:"retryNumber,omitempty"`
+	// RetryAt is the time at which the plugin should be retried.
+	RetryAt metav1.Time `json:"retryAt,omitempty"`
 }
