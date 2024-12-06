@@ -6,7 +6,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -70,11 +69,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	require.NoError(r.T(), err)
 
 	r.standardUserClient = standardUserClient
-
-	// Disabling configuration here is to avoid interference with other pipeline tests.
-	// Updates to the config are temporarily disabled during the test
-	// and are automatically enabled during cleanup.
-	provisioning.DisableUpdateConfig(r.client)
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
