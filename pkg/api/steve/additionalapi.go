@@ -27,6 +27,7 @@ func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Hand
 		mux.Handle(configserver.ConnectAgent, connectHandler)
 		mux.Handle(configserver.ConnectConfigYamlPath, connectHandler)
 		mux.Handle(configserver.ConnectClusterInfo, connectHandler)
+		mux.Handle(configserver.ConnectClusterAgentYamlPath, connectHandler)
 		mux.Handle(installer.SystemAgentInstallPath, installer.Handler)
 		mux.Handle(installer.WindowsRke2InstallPath, installer.Handler)
 		return func(next http.Handler) http.Handler {
