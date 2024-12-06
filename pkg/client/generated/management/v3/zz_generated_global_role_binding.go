@@ -15,23 +15,25 @@ const (
 	GlobalRoleBindingFieldName             = "name"
 	GlobalRoleBindingFieldOwnerReferences  = "ownerReferences"
 	GlobalRoleBindingFieldRemoved          = "removed"
+	GlobalRoleBindingFieldStatus           = "status"
 	GlobalRoleBindingFieldUUID             = "uuid"
 	GlobalRoleBindingFieldUserID           = "userId"
 )
 
 type GlobalRoleBinding struct {
 	types.Resource
-	Annotations      map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created          string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID        string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	GlobalRoleID     string            `json:"globalRoleId,omitempty" yaml:"globalRoleId,omitempty"`
-	GroupPrincipalID string            `json:"groupPrincipalId,omitempty" yaml:"groupPrincipalId,omitempty"`
-	Labels           map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name             string            `json:"name,omitempty" yaml:"name,omitempty"`
-	OwnerReferences  []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Removed          string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	UUID             string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	UserID           string            `json:"userId,omitempty" yaml:"userId,omitempty"`
+	Annotations      map[string]string        `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created          string                   `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID        string                   `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	GlobalRoleID     string                   `json:"globalRoleId,omitempty" yaml:"globalRoleId,omitempty"`
+	GroupPrincipalID string                   `json:"groupPrincipalId,omitempty" yaml:"groupPrincipalId,omitempty"`
+	Labels           map[string]string        `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name             string                   `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences  []OwnerReference         `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed          string                   `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Status           *GlobalRoleBindingStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	UUID             string                   `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UserID           string                   `json:"userId,omitempty" yaml:"userId,omitempty"`
 }
 
 type GlobalRoleBindingCollection struct {
