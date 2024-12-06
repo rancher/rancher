@@ -10,18 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/upgradeinput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
 	"github.com/rancher/shepherd/extensions/defaults"
+
 	kcluster "github.com/rancher/shepherd/extensions/kubeapi/cluster"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -44,7 +43,7 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 	require.NoError(u.T(), err)
 
 	if cluster.VersionToUpgrade == "" {
-		u.T().Skip(u.T(), cluster.VersionToUpgrade, "Kubernetes version to upgrade is not provided, skipping the test") 
+		u.T().Skip(u.T(), cluster.VersionToUpgrade, "Kubernetes version to upgrade is not provided, skipping the test")
 	}
 
 	if clusterResp.Labels[provider] == rke {
@@ -68,11 +67,18 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 		initClusterResp, err := initCluster.Get(client)
 		require.NoError(u.T(), err)
 
+		preUpgradeCluster, err := client.Management.Cluster.ByID(clusterMeta.ID)
+		require.NoError(u.T(), err)
+
+		if strings.Contains(preUpgradeCluster.Version.GitVersion, testConfig.KubernetesVersion) {
+			u.T().Skipf("Skipping test: Kubernetes version %s already upgraded", testConfig.KubernetesVersion)
+		}
+
 		logrus.Infof("Upgrading local cluster to: %s", testConfig.KubernetesVersion)
 		updatedCluster, err := initClusterResp.UpdateKubernetesVersion(client, &testConfig.KubernetesVersion)
 		require.NoError(u.T(), err)
 
-		err = waitForLocalClusterUpgrade(client, cluster.Name)
+		err = waitForLocalClusterUpgrade(client, clusterMeta.ID)
 		require.NoError(u.T(), err)
 
 		upgradedCluster, err := client.Management.Cluster.ByID(updatedCluster.Meta.ID)
@@ -106,7 +112,7 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 		clusterResp, err := client.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(clusterID)
 		require.NoError(u.T(), err)
 
-		updatedCluster := new(apisV1.Cluster)
+		updatedCluster := new(provv1.Cluster)
 		err = v1.ConvertToK8sType(clusterResp, &updatedCluster)
 		require.NoError(u.T(), err)
 
@@ -176,7 +182,7 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 
 	updatedCluster := clusters.UpdateK3SRKE2ClusterConfig(clusterResp, clustersConfig)
 
-	updatedClusterObj := new(apisV1.Cluster)
+	updatedClusterObj := new(provv1.Cluster)
 	err = v1.ConvertToK8sType(updatedCluster, &updatedClusterObj)
 	require.NoError(t, err)
 
@@ -184,7 +190,7 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 	require.NoError(t, err)
 
 	updatedClusterSpec := &provv1.ClusterSpec{}
-	err = steveV1.ConvertToK8sType(updatedClusterResp.Spec, updatedClusterSpec)
+	err = v1.ConvertToK8sType(updatedClusterResp.Spec, updatedClusterSpec)
 	require.NoError(t, err)
 	require.Equal(t, clustersConfig.KubernetesVersion, updatedClusterSpec.KubernetesVersion)
 
@@ -195,7 +201,25 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 
 // waitForLocalClusterUpgrade is a function to wait for the local cluster to upgrade.
 func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) error {
-	return kwait.PollUntilContextTimeout(context.TODO(), 1*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+
+	client, err := client.ReLogin()
+	if err != nil {
+		return err
+	}
+
+	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.FiveSecondTimeout, true, func(ctx context.Context) (done bool, err error) {
+		isUpgrading, err := client.Management.Cluster.ByID(clusterName)
+		if err != nil {
+			return false, err
+		}
+
+		return isUpgrading.State == "upgrading" && isUpgrading.Transitioning == "yes", nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		isConnected, err := client.IsConnected()
 		if err != nil {
 			return false, nil
