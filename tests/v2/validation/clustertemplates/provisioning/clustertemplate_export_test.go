@@ -42,9 +42,12 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(ct.T(), err)
 
-	ct.client = client
+	// Disabling configuration here is to avoid interference with other pipeline tests.
+	// Updates to the config are temporarily disabled during the test
+	// and are automatically enabled during cleanup.
+	provisioning.DisableUpdateConfig(client)
 
-	provisioning.DisableUpdateConfig(ct.client)
+	ct.client = client
 
 	if ct.provisioningConfig.RKE1KubernetesVersions == nil {
 		rke1Versions, err := kubernetesversions.ListRKE1AllVersions(ct.client)
