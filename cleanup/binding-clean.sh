@@ -6,7 +6,7 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 # Location of the yaml to use to deploy the cleanup job
-yaml_url=https://raw.githubusercontent.com/rancher/rancher/master/cleanup/binding-clean.yaml
+yaml_url=https://raw.githubusercontent.com/rancher/rancher/release/v2.9/cleanup/binding-clean.yaml
 
 # 120 is equal to a minute as the sleep is half a second
 timeout=120
