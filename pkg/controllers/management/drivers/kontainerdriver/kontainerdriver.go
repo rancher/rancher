@@ -38,6 +38,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		dynamicSchemasLister: management.Management.DynamicSchemas("").Controller().Lister(),
 		namespaces:           management.Core.Namespaces(""),
 		coreV1:               management.Core,
+		clusterClient:        management.Management.Clusters(""),
 	}
 
 	management.Management.KontainerDrivers("").AddLifecycle(ctx, "mgmt-kontainer-driver-lifecycle", lifecycle)
@@ -48,6 +49,7 @@ type Lifecycle struct {
 	dynamicSchemasLister v3.DynamicSchemaLister
 	namespaces           v1.NamespaceInterface
 	coreV1               corev1.Interface
+	clusterClient        v3.ClusterInterface
 }
 
 func (l *Lifecycle) Create(obj *v3.KontainerDriver) (runtime.Object, error) {
@@ -177,7 +179,7 @@ func (l *Lifecycle) updateDynamicSchema(dynamicSchema *v3.DynamicSchema, obj *v3
 
 func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v32.Field, error) {
 	driver := service.NewEngineService(
-		clusterprovisioner.NewPersistentStore(l.namespaces, l.coreV1),
+		clusterprovisioner.NewPersistentStore(l.namespaces, l.coreV1, l.clusterClient),
 	)
 	flags, err := driver.GetDriverCreateOptions(context.Background(), obj.Name, obj, v32.ClusterSpec{
 		GenericEngineConfig: &v32.MapStringInterface{
