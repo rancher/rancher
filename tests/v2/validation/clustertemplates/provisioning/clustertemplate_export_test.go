@@ -49,8 +49,6 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 
 	ct.client = client
 
-	provisioning.DisableUpdateConfig(ct.client)
-
 	if ct.provisioningConfig.RKE1KubernetesVersions == nil {
 		rke1Versions, err := kubernetesversions.ListRKE1AllVersions(ct.client)
 		require.NoError(ct.T(), err)
