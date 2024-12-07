@@ -278,7 +278,7 @@ func GetDrainFlags(node *v3.Node) []string {
 		ignoreDaemonSets = *input.IgnoreDaemonSets
 	}
 	return []string{
-		fmt.Sprintf("--delete-local-data=%v", input.DeleteLocalData),
+		fmt.Sprintf("--delete-emptydir-data=%v", input.DeleteLocalData),
 		fmt.Sprintf("--force=%v", input.Force),
 		fmt.Sprintf("--grace-period=%v", input.GracePeriod),
 		fmt.Sprintf("--ignore-daemonsets=%v", ignoreDaemonSets),
