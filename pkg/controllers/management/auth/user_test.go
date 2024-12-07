@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	fakes "github.com/rancher/rancher/pkg/controllers/management/auth/fakes"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
+	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -196,12 +197,15 @@ func TestUpdated(t *testing.T) {
 
 	ul := &userLifecycle{
 		userManager: mockUserManager,
+		// The ext token store is set per test case. enables per-test mock setups
 	}
 
 	tests := []struct {
-		name          string
-		inputUser     *v3.User
-		mockSetup     func()
+		name      string
+		inputUser *v3.User
+		mockSetup func(
+			secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
+			support *exttokens.MocksupportActionHandler)
 		expectedUser  *v3.User
 		expectedError bool
 	}{
@@ -213,8 +217,12 @@ func TestUpdated(t *testing.T) {
 				},
 				PrincipalIDs: []string{},
 			},
-			mockSetup: func() {
-				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(fmt.Errorf("error updating user"))
+			mockSetup: func(
+				secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
+				support *exttokens.MocksupportActionHandler) {
+				mockUserManager.EXPECT().
+					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
+					Return(fmt.Errorf("error updating user"))
 			},
 			expectedUser:  nil,
 			expectedError: true,
@@ -227,8 +235,150 @@ func TestUpdated(t *testing.T) {
 				},
 				PrincipalIDs: []string{},
 			},
-			mockSetup: func() {
-				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(nil)
+			mockSetup: func(
+				secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
+				support *exttokens.MocksupportActionHandler) {
+				mockUserManager.EXPECT().
+					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
+					Return(nil)
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&v1.SecretList{}, nil).
+					AnyTimes()
+			},
+			expectedUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
+				},
+				PrincipalIDs: []string{"local://testuser"},
+			},
+			expectedError: false,
+		},
+		{
+			name: "user was updated, login ext token will be deleted",
+			inputUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+				},
+				PrincipalIDs: []string{},
+			},
+			mockSetup: func(
+				secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
+				support *exttokens.MocksupportActionHandler) {
+				mockUserManager.EXPECT().
+					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
+					Return(nil)
+				secrets.EXPECT().
+					Delete("cattle-tokens", "testuser-token", gomock.Any()).
+					Return(nil)
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&v1.SecretList{
+						Items: []v1.Secret{
+							v1.Secret{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "testuser-token",
+								},
+								Data: map[string][]byte{
+									"user-id":          []byte("testuser"),
+									"enabled":          []byte("true"),
+									"is-login":         []byte("true"),
+									"ttl":              []byte("4000"),
+									"hash":             []byte("kla9jkdmj"),
+									"auth-provider":    []byte("somebody"),
+									"last-update-time": []byte("13:00:05"),
+									"display-name":     []byte("myself"),
+									"login-name":       []byte("hello"),
+									"principal-id":     []byte("world"),
+									"kube-uid":         []byte("2905498-kafld-lkad"),
+								},
+							},
+						},
+					}, nil).
+					AnyTimes()
+			},
+			expectedUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
+				},
+				PrincipalIDs: []string{"local://testuser"},
+			},
+			expectedError: false,
+		},
+		{
+			name: "user was updated, derived ext token will be disabled",
+			inputUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+				},
+				PrincipalIDs: []string{},
+			},
+			mockSetup: func(
+				secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
+				support *exttokens.MocksupportActionHandler) {
+				mockUserManager.EXPECT().
+					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
+					Return(nil)
+				// Fake current time
+				support.EXPECT().Now().Return("this is a fake now")
+				secrets.EXPECT().
+					Update(gomock.Any()).
+					DoAndReturn(func(s *v1.Secret) (*v1.Secret, error) {
+						// copy data over for the regen done by the token store
+						for k, v := range s.StringData {
+							s.Data[k] = []byte(v)
+						}
+
+						return s, nil
+					})
+				secrets.EXPECT().
+					Get("cattle-tokens", "testuser-token", gomock.Any()).
+					Return(&v1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "testuser-token",
+						},
+						Data: map[string][]byte{
+							"user-id":          []byte("testuser"),
+							"enabled":          []byte("true"),
+							"is-login":         []byte("false"),
+							"ttl":              []byte("4000"),
+							"hash":             []byte("kla9jkdmj"),
+							"auth-provider":    []byte("somebody"),
+							"last-update-time": []byte("13:00:05"),
+							"display-name":     []byte("myself"),
+							"login-name":       []byte("hello"),
+							"principal-id":     []byte("world"),
+							"kube-uid":         []byte("2905498-kafld-lkad"),
+						},
+					}, nil).
+					AnyTimes()
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&v1.SecretList{
+						Items: []v1.Secret{
+							v1.Secret{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "testuser-token",
+								},
+								Data: map[string][]byte{
+									"user-id":          []byte("testuser"),
+									"enabled":          []byte("true"),
+									"is-login":         []byte("false"),
+									"ttl":              []byte("4000"),
+									"hash":             []byte("kla9jkdmj"),
+									"auth-provider":    []byte("somebody"),
+									"last-update-time": []byte("13:00:05"),
+									"display-name":     []byte("myself"),
+									"login-name":       []byte("hello"),
+									"principal-id":     []byte("world"),
+									"kube-uid":         []byte("2905498-kafld-lkad"),
+								},
+							},
+						},
+					}, nil).
+					AnyTimes()
 			},
 			expectedUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
@@ -243,7 +393,12 @@ func TestUpdated(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.mockSetup()
+			secrets := wranglerfake.NewMockControllerInterface[*v1.Secret, *v1.SecretList](ctrl)
+			support := exttokens.NewMocksupportActionHandler(ctrl)
+			store := exttokens.NewSystemTokenStore(secrets, nil, nil, support)
+			ul.extTokenStore = store
+
+			tt.mockSetup(secrets, support)
 
 			_, err := ul.Updated(tt.inputUser)
 
