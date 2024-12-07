@@ -54,8 +54,8 @@ spec:
           servicePort: {{ .Values.ingress.servicePort }}
           {{- end }}
         {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
-        pathType: ImplementationSpecific
-        path: "/"
+        pathType: {{ .Values.ingress.pathType | default "ImplementationSpecific" }}
+        path: {{ .Values.ingress.path | default "/" }}
         {{- end }}
 {{- if eq .Values.tls "ingress" }}
   tls:
