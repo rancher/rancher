@@ -196,6 +196,10 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, fmt.Errorf(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster))
 		}
 
+		if cluster.Status.EKSStatus.UpstreamSpec == nil {
+			return cluster, fmt.Errorf("initial upstreamSpec on cluster [%s] has not been set, unable to continue", cluster.Name)
+		}
+
 		// EKS cluster must have at least one node to run cluster agent. The best way to verify
 		// if a cluster has self-managed node or nodegroup is to check if the cluster agent was deployed.
 		// Issue: https://github.com/rancher/eks-operator/issues/301
@@ -390,6 +394,7 @@ func (e *eksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) 
 	cluster = cluster.DeepCopy()
 	upstreamSpec, err := clusterupstreamrefresher.BuildEKSUpstreamSpec(e.secretClient, cluster)
 	if err != nil {
+		logrus.Warnf("failed to set initial upstreamSpec on cluster [%s]: %v", cluster.Name, err)
 		return cluster, err
 	}
 	cluster.Status.EKSStatus.UpstreamSpec = upstreamSpec

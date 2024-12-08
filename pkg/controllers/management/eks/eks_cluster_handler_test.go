@@ -1,12 +1,14 @@
 package eks
 
 import (
-	"github.com/rancher/rancher/pkg/capr"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/capr"
+
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
 const (
@@ -123,6 +125,23 @@ func Test_onClusterChange_UpdateNodePool(t *testing.T) {
 	}
 	if !capr.Provisioned.IsTrue(cluster) || !capr.Updated.IsUnknown(cluster) {
 		t.Errorf("provisioned status should be True, updated status should be Unknown and cluster returned successfully")
+	}
+}
+
+func Test_onClusterChange_Active_nilUpstreamSpec(t *testing.T) {
+	mockOperatorController = getMockEksOperatorController(t, "active")
+	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
+	if err != nil {
+		t.Errorf("error getting mock v3 cluster: %s", err)
+	}
+	mockCluster.Name = "test"
+	mockCluster.Status.EKSStatus.UpstreamSpec = nil
+
+	_, err = mockOperatorController.onClusterChange("", &mockCluster)
+
+	exp := fmt.Errorf("initial upstreamSpec on cluster [test] has not been set, unable to continue")
+	if err.Error() != exp.Error() {
+		t.Errorf("expected error %q but got %q", exp, err)
 	}
 }
 
