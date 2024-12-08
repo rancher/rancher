@@ -258,3 +258,177 @@ func TestGetRTBLabel(t *testing.T) {
 		})
 	}
 }
+
+func TestAreClusterRolesSame(t *testing.T) {
+	type args struct {
+		current  *rbacv1.ClusterRole
+		modified *rbacv1.ClusterRole
+	}
+	tests := []struct {
+		name        string
+		args        args
+		wantSame    bool
+		wantUpdated *rbacv1.ClusterRole
+	}{
+		{
+			name: "clusterrole is up to date",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+				modified: &rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+			},
+			wantSame: true,
+		},
+		{
+			name: "aggregated clusterrole is up to date",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"otherannotation":          "foobar",
+							clusterRoleOwnerAnnotation: "owner",
+						},
+						Labels: map[string]string{
+							"otherlabel":     "foobar",
+							aggregationLabel: "aggregationlabel",
+						},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{"myselector": "true"}},
+						},
+					},
+				},
+				modified: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{clusterRoleOwnerAnnotation: "owner"},
+						Labels:      map[string]string{aggregationLabel: "aggregationlabel"},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{"myselector": "true"}},
+						},
+					},
+				},
+			},
+			wantSame: true,
+		},
+		{
+			name: "clusterrole needs update",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"otherannotation": "foobar",
+						},
+					},
+					// misses Rules
+				},
+				modified: &rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+			},
+			wantSame: false,
+			wantUpdated: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"otherannotation": "foobar",
+					},
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Verbs:         []string{"get"},
+						APIGroups:     []string{""},
+						Resources:     []string{"configmaps"},
+						ResourceNames: []string{"my-cm"},
+					},
+				},
+			},
+		},
+		{
+			name: "aggregated clusterrole needs update",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						// Missing aggregation annotations and labels
+						Annotations: map[string]string{
+							"otherannotation": "foobar",
+						},
+					},
+					// Rules should be replaced by AggregationRules
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+				modified: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{clusterRoleOwnerAnnotation: "owner"},
+						Labels:      map[string]string{aggregationLabel: "aggregationlabel"},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{"myselector": "true"}},
+						},
+					},
+				},
+			},
+			wantSame: false,
+			wantUpdated: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"otherannotation":          "foobar",
+						clusterRoleOwnerAnnotation: "owner",
+					},
+					Labels: map[string]string{
+						aggregationLabel: "aggregationlabel",
+					},
+				},
+				AggregationRule: &rbacv1.AggregationRule{
+					ClusterRoleSelectors: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"myselector": "true"}},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, updated := AreClusterRolesSame(tt.args.current, tt.args.modified)
+			if got != tt.wantSame {
+				t.Errorf("AreClusterRolesSame() got = %v, wantSame %v", got, tt.wantSame)
+			}
+			if !got && !reflect.DeepEqual(updated, tt.wantUpdated) {
+				t.Errorf("AreClusterRolesSame() got = %+v, want = %+v", updated, tt.wantUpdated)
+			}
+		})
+	}
+}
