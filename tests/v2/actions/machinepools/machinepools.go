@@ -13,7 +13,9 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/providers"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
+	"github.com/rancher/shepherd/pkg/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +37,81 @@ const (
 	windows                  = "windows"
 
 	nodeRoleListLength = 4
+
+	AWSMachineConfigsKey           = "awsMachineConfigs"
+	AzureMachineConfigsKey         = "azureMachineConfigs"
+	DOMachineConfigsKey            = "doMachineConfigs"
+	HarvesterMachineConfigsKey     = "harvesterMachineConfigs"
+	LinodeMachineConfigsKey        = "linodeMachineConfigs"
+	VmwarevsphereMachineConfigsKey = "vmwarevsphereMachineConfigs"
 )
+
+// MachineConfigs is the main struct needed to create a machine pool depending on the outside cloud service provider
+type MachineConfigs struct {
+	AmazonEC2MachineConfigs *AWSMachineConfigs           `json:"amazonEC2MachineConfigs,omitempty" yaml:"amazonEC2MachineConfigs,omitempty"`
+	AzureMachineConfigs     *AzureMachineConfigs         `json:"azureMachineConfigs,omitempty" yaml:"azureMachineConfigs,omitempty"`
+	DOMachineConfigs        *DOMachineConfigs            `json:"digitalOceanMachineConfigs,omitempty" yaml:"digitalOceanMachineConfigs,omitempty"`
+	LinodeMachineConfigs    *LinodeMachineConfigs        `json:"linodeMachineConfigs,omitempty" yaml:"linodeMachineConfigs,omitempty"`
+	HarvesterMachineConfigs *HarvesterMachineConfigs     `json:"harvesterMachineConfigs,omitempty" yaml:"harvesterMachineConfigs,omitempty"`
+	VmwareMachineConfigs    *VmwarevsphereMachineConfigs `json:"vmwareMachineConfigs,omitempty" yaml:"vmwareMachineConfigs,omitempty"`
+}
+
+func LoadMachineConfigs(provider string) MachineConfigs {
+	var machineConfigs MachineConfigs
+	switch {
+
+	case provider == providers.AWS:
+		var awsMachineConfigs AWSMachineConfigs
+
+		config.LoadConfig(AWSMachineConfigsKey, &awsMachineConfigs)
+		machineConfigs.AmazonEC2MachineConfigs = &awsMachineConfigs
+
+		return machineConfigs
+
+	case provider == providers.Azure:
+		var azureMachineConfigs AzureMachineConfigs
+
+		config.LoadConfig(AzureMachineConfigsKey, &azureMachineConfigs)
+		machineConfigs.AzureMachineConfigs = &azureMachineConfigs
+
+		return machineConfigs
+
+	case provider == providers.DigitalOcean:
+		var digitalOceanMachineConfigs DOMachineConfigs
+
+		config.LoadConfig(DOMachineConfigsKey, &digitalOceanMachineConfigs)
+		machineConfigs.DOMachineConfigs = &digitalOceanMachineConfigs
+
+		return machineConfigs
+
+	case provider == providers.Linode:
+		var linodeMachineConfigs LinodeMachineConfigs
+
+		config.LoadConfig(LinodeMachineConfigsKey, &linodeMachineConfigs)
+		machineConfigs.LinodeMachineConfigs = &linodeMachineConfigs
+
+		return machineConfigs
+
+	case provider == providers.Harvester:
+		var harvesterMachineConfigs HarvesterMachineConfigs
+
+		config.LoadConfig(HarvesterMachineConfigsKey, &harvesterMachineConfigs)
+		machineConfigs.HarvesterMachineConfigs = &harvesterMachineConfigs
+
+		return machineConfigs
+
+	case provider == providers.Vsphere:
+		var vsphereMachineConfigs VmwarevsphereMachineConfigs
+
+		config.LoadConfig(VmwarevsphereMachineConfigsKey, &vsphereMachineConfigs)
+		machineConfigs.VmwareMachineConfigs = &vsphereMachineConfigs
+
+		return machineConfigs
+
+	default:
+		panic(fmt.Sprintf("Provider:%v not found", provider))
+	}
+}
 
 // MatchNodeRolesToMachinePool matches the role of machinePools to the nodeRoles.
 func MatchNodeRolesToMachinePool(nodeRoles NodeRoles, machinePools []apisV1.RKEMachinePool) (int, int32) {
