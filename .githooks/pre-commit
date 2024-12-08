@@ -1,0 +1,42 @@
+#!/bin/sh
+RED='\033[0;31m'
+NO_COLOR='\033[0m'
+GO_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep '.go$')
+TESTS_V2_FILES=$(echo "$GO_FILES" | grep -e "tests\/v2\/*")
+
+if [ "$TESTS_V2_FILES" != "" ]; then
+    
+    cd tests
+    LINT_RESULTS=$(golangci-lint run ./v2/...)
+    
+    for FILE in $GO_FILES; do
+        REGEX=$(echo $FILE | sed 's/tests\/v2/v2/')
+        REGEX=$(echo $REGEX | sed 's/\//\\\\/g')
+        REGEX="${REGEX}*"
+        echo "$LINT_RESULTS" | grep -e "$REGEX" --color="Always"
+        
+        REGEX='(_test.go)'
+        TEST_FILE=$(echo "$FILE" | grep -e "$REGEX")
+        if [ "$TEST_FILE" == "" ]; then
+            PREPARE_FILE_TO_GREP=$(cat "../${FILE}" | sed -z 's/\n/,/g')
+            REGEX='(,,)func\s*([A-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*(\([^\)]*\)|[a-zA-Z0-9_*]*)?'
+            MISSING_COMMENTS=$(echo "$PREPARE_FILE_TO_GREP" | grep -o -E "$REGEX")
+            ECHO_MISSING_COMMENTS=$(echo "$MISSING_COMMENTS" | sed -z "s/,,/missing function comment on /g")
+            
+            if [ "$ECHO_MISSING_COMMENTS" != "" ]; then
+                echo -e "${RED}${FILE}${NO_COLOR}"
+                echo "$ECHO_MISSING_COMMENTS"
+            fi
+        fi
+        
+        REGEX='func\s*([a-z0-9_]*)\s*\(([^)]*)\)\s*(\([^\)]*\)|[a-zA-Z0-9_*]*)?'
+        FUNCTION_az=$(cat "../${FILE}" | grep -o -E "$REGEX")
+        REGEX='func\s*([A-Z0-9_]*)\s*\(([^)]*)\)\s*(\([^\)]*\)|[a-zA-Z0-9_*]*)?'
+        FUNCTION_AZ=$(cat "../${FILE}" | grep -o -E "$REGEX")s
+        if [ "$FUNCTION_az" != "" ] || [ "$FUNCTION_AZ" != "" ]; then
+            echo -e "${RED}${FILE}${NO_COLOR} missing camelcase or PascalCase on functions"
+            echo "$FUNCTION_az"
+            echo "$FUNCTION_AZ"
+        fi
+    done
+fi
