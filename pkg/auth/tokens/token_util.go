@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -104,7 +105,7 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 	return tokenData, nil
 }
 
-func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, userPrincipal v3.Principal) (*v3.Token, string, error) {
+func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, userPrincipal v3.Principal) (*ext.Token, string, error) {
 	// create kubeconfig expiring tokens if responseType=kubeconfig in login action vs login tokens for responseType=json
 	clusterID := extractClusterIDFromResponseType(responseType)
 

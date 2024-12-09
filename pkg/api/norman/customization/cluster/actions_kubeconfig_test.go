@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -251,7 +252,7 @@ func (f *fakeUserManager) CreateNewUserClusterRoleBinding(userName string, userU
 func (f *fakeUserManager) GetUserByPrincipalID(principalName string) (*apimgmtv3.User, error) {
 	return nil, nil
 }
-func (f *fakeUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apimgmtv3.Principal) (*apimgmtv3.Token, string, error) {
+func (f *fakeUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apimgmtv3.Principal) (*ext.Token, string, error) {
 	return nil, "", nil
 }
 

@@ -532,7 +532,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 			samlToken := &v3.SamlToken{
 				Token:     encoded,
-				ExpiresAt: token.ExpiresAt,
+				ExpiresAt: token.Status.ExpiresAt,
 				ObjectMeta: v1.ObjectMeta{
 					Name:      requestID,
 					Namespace: namespace.GlobalNamespace,

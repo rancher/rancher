@@ -3,7 +3,6 @@ package tokens
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,21 +13,23 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
-	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -62,6 +63,7 @@ func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager 
 
 	return &Manager{
 		ctx:                 ctx,
+		extTokenStore:       exttokens.NewSystemTokenStoreFromWrangler(apiContext.Wrangler),
 		tokensClient:        apiContext.Management.Tokens(""),
 		userIndexer:         informer.GetIndexer(),
 		tokenIndexer:        tokenInformer.GetIndexer(),
@@ -87,6 +89,7 @@ func OnLogout(logoutFunc LogoutFunc) {
 
 type Manager struct {
 	ctx                 context.Context
+	extTokenStore       *exttokens.SystemTokenStore
 	tokensClient        v3.TokenInterface
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
@@ -152,32 +155,24 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 }
 
 // createToken returns the token object and it's unhashed token key, which is stored hashed
-func (m *Manager) createToken(k8sToken *v3.Token) (v3.Token, string, error) {
-	key, err := randomtoken.Generate()
-	if err != nil {
-		logrus.Errorf("Failed to generate token key: %v", err)
-		return v3.Token{}, "", errors.New("failed to generate token key")
-	}
+func (m *Manager) createToken(k8sToken *ext.Token) (ext.Token, string, error) {
 
 	if k8sToken.ObjectMeta.Labels == nil {
 		k8sToken.ObjectMeta.Labels = make(map[string]string)
 	}
-	k8sToken.APIVersion = "management.cattle.io/v3"
+	k8sToken.APIVersion = "ext.cattle.io/v1alpha1"
 	k8sToken.Kind = "Token"
-	k8sToken.Token = key
-	k8sToken.ObjectMeta.Labels[UserIDLabel] = k8sToken.UserID
+	k8sToken.ObjectMeta.Labels[UserIDLabel] = k8sToken.Spec.UserID
 	k8sToken.ObjectMeta.GenerateName = "token-"
-	err = ConvertTokenKeyToHash(k8sToken)
-	if err != nil {
-		return v3.Token{}, "", err
-	}
-	createdToken, err := m.tokensClient.Create(k8sToken)
+
+	// createdToken, err := m.tokensClient.Create(k8sToken)
+	createdToken, err := m.extTokenStore.Create(schema.GroupResource{}, k8sToken, &metav1.CreateOptions{})
 
 	if err != nil {
-		return v3.Token{}, "", err
+		return ext.Token{}, "", err
 	}
 
-	return *createdToken, key, nil
+	return *createdToken, createdToken.Status.TokenValue, nil
 }
 
 func (m *Manager) updateToken(token *v3.Token) (*v3.Token, error) {
@@ -686,27 +681,31 @@ func (m *Manager) userAttributeChanged(attribs *v32.UserAttribute, provider stri
 // PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
 var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc", "genericoidc"}
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (ext.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
 	if utils.Contains(PerUserCacheProviders, provider) && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
-			return v3.Token{}, "", fmt.Errorf("unable to create secret: %s", err)
+			return ext.Token{}, "", fmt.Errorf("unable to create secret: %s", err)
 		}
 	}
 
-	token := &v3.Token{
-		UserPrincipal: userPrincipal,
-		IsDerived:     false,
-		TTLMillis:     ttl,
-		UserID:        userID,
-		AuthProvider:  provider,
-		Description:   description,
+	// BEWARE `provider` and `userPrincipal` are not used here.
+	// ext tokens pull the information out of the referenced user and its attributes during
+	// their creation.
+
+	token := &ext.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				TokenKindLabel: "session",
 			},
+		},
+		Spec: ext.TokenSpec{
+			IsLogin:     true,
+			TTL:         ttl,
+			UserID:      userID,
+			Description: description,
 		},
 	}
 
