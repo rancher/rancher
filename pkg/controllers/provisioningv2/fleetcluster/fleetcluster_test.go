@@ -200,6 +200,61 @@ func TestClusterCustomization(t *testing.T) {
 	}
 }
 
+func TestAssignWorkspace(t *testing.T) {
+	require := require.New(t)
+
+	h := &handler{}
+
+	tests := []struct {
+		name    string
+		cluster *apimgmtv3.Cluster
+	}{
+		{
+			name: "does not modify cluster without fleet workspace",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+					Annotations: map[string]string{
+						externallyManagedAnn: "true",
+					},
+				},
+				Spec: apimgmtv3.ClusterSpec{},
+			},
+		},
+		{
+			name: "does not modify cluster with fleet workspace set",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-cluster",
+					Namespace: "fleet-local",
+					Annotations: map[string]string{
+						externallyManagedAnn: "true",
+					},
+				},
+				Spec: apimgmtv3.ClusterSpec{
+					FleetWorkspaceName: "specific-name",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster, err := h.assignWorkspace("", tt.cluster)
+
+			if err != nil {
+				t.Errorf("Expected nil err")
+			}
+
+			if cluster == nil {
+				t.Errorf("Expected non-nil cluster: %v", err)
+			}
+
+			require.Equal(cluster, tt.cluster)
+		})
+	}
+}
+
 func TestCreateCluster(t *testing.T) {
 	h := &handler{
 		getPrivateRepoURL: func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
