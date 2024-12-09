@@ -266,6 +266,7 @@ func createPrometheusRule(client *rancher.Client, clusterID string) error {
 	if err != nil {
 		return err
 	}
+	noDuration := monitoringv1.Duration("0s")
 
 	prometheusRule := &monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -281,7 +282,7 @@ func createPrometheusRule(client *rancher.Client, clusterID string) error {
 							Alert:  alertName,
 							Expr:   intstr.IntOrString{Type: intstr.String, StrVal: "vector(0)"},
 							Labels: ruleLabel,
-							For:    "0s",
+							For:    &noDuration,
 						},
 					},
 				},
