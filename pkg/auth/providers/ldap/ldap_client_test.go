@@ -11,6 +11,7 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -317,6 +318,6 @@ func (m mockUserManager) CreateNewUserClusterRoleBinding(userName string, userUI
 func (m mockUserManager) GetUserByPrincipalID(principalName string) (*v3.User, error) {
 	panic("unimplemented")
 }
-func (m mockUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
+func (m mockUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*ext.Token, string, error) {
 	panic("unimplemented")
 }
