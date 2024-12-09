@@ -1084,7 +1084,7 @@ func CreateProvisioningRKE1ClusterWithClusterTemplate(client *rancher.Client, te
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
