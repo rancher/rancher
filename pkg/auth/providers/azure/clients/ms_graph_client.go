@@ -19,6 +19,7 @@ import (
 	msgraphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
 	msgraphgroups "github.com/microsoftgraph/msgraph-sdk-go/groups"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
+	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 	msgraphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -89,6 +90,13 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets normancorev1.SecretInte
 		return nil, fmt.Errorf("creating graph service client: %w", err)
 	}
 
+	graphBaseURL, err := url.JoinPath(config.GraphEndpoint, "v1.0")
+	if err != nil {
+		return nil, fmt.Errorf("making graph base url for %s: %w", config.GraphEndpoint, err)
+	}
+	logrus.Debugf("[%s] graph base url: %s", providerLogPrefix, graphBaseURL)
+	graphClient.GetAdapter().SetBaseUrl(graphBaseURL)
+
 	return &AzureMSGraphClient{
 		Credential:         cred,
 		GraphEndpointURL:   graphEndpoint,
@@ -113,7 +121,7 @@ func (c AzureMSGraphClient) GetUser(userID string) (v3.Principal, error) {
 	logrus.Debugf("[%s] GetUser %s", providerLogPrefix, userID)
 	result, err := c.GraphClient.Users().ByUserId(userID).Get(context.Background(), nil)
 	if err != nil {
-		return v3.Principal{}, fmt.Errorf("getting user by ID: %w", err)
+		return v3.Principal{}, fmt.Errorf("getting user by ID: %w", getMSGraphErrorData(err))
 	}
 
 	return userToPrincipal(result), nil
@@ -127,13 +135,13 @@ func (c AzureMSGraphClient) ListUsers(filter string) ([]v3.Principal, error) {
 			Filter: &filter,
 		}})
 	if err != nil {
-		return nil, fmt.Errorf("listing users: %w", err)
+		return nil, fmt.Errorf("listing users: %w", getMSGraphErrorData(err))
 	}
 
 	pageIterator, err := msgraphcore.NewPageIterator[models.Userable](
 		result, c.GraphClient.GetAdapter(), models.CreateUserCollectionResponseFromDiscriminatorValue)
 	if err != nil {
-		return nil, fmt.Errorf("iterating over user list: %w", err)
+		return nil, fmt.Errorf("iterating over user list: %w", getMSGraphErrorData(err))
 	}
 
 	var users []v3.Principal
@@ -150,7 +158,7 @@ func (c AzureMSGraphClient) GetGroup(groupID string) (v3.Principal, error) {
 	logrus.Debugf("[%s] GetGroup %s", providerLogPrefix, groupID)
 	result, err := c.GraphClient.Groups().ByGroupId(groupID).Get(context.Background(), nil)
 	if err != nil {
-		return v3.Principal{}, fmt.Errorf("getting group by ID: %w", err)
+		return v3.Principal{}, fmt.Errorf("getting group by ID: %w", getMSGraphErrorData(err))
 	}
 
 	return groupToPrincipal(result), nil
@@ -164,13 +172,13 @@ func (c AzureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 			Filter: &filter,
 		}})
 	if err != nil {
-		return nil, fmt.Errorf("listing groups: %w", err)
+		return nil, fmt.Errorf("listing groups: %w", getMSGraphErrorData(err))
 	}
 
 	pageIterator, err := msgraphcore.NewPageIterator[models.Groupable](
 		result, c.GraphClient.GetAdapter(), models.CreateGroupCollectionResponseFromDiscriminatorValue)
 	if err != nil {
-		return nil, fmt.Errorf("iterating over group list: %w", err)
+		return nil, fmt.Errorf("iterating over group list: %w", getMSGraphErrorData(err))
 	}
 
 	var groups []v3.Principal
@@ -216,14 +224,14 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 					Count:  &requestCount,
 				}})
 	if err != nil {
-		return fmt.Errorf("listing group memberships: %w", err)
+		return fmt.Errorf("listing group memberships: %w", getMSGraphErrorData(err))
 	}
 
 	pageIterator, err := msgraphcore.NewPageIterator[models.DirectoryObjectable](
 		result, c.GraphClient.GetAdapter(),
 		models.CreateDirectoryObjectCollectionResponseFromDiscriminatorValue)
 	if err != nil {
-		return fmt.Errorf("iterating over group membership list: %w", err)
+		return fmt.Errorf("iterating over group membership list: %w", getMSGraphErrorData(err))
 	}
 
 	err = pageIterator.Iterate(ctx, func(do models.DirectoryObjectable) bool {
@@ -405,6 +413,16 @@ func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
 	}
 
 	return authResult.IDToken.Oid, nil
+}
+
+func getMSGraphErrorData(err error) error {
+	if odataErr, ok := err.(*odataerrors.ODataError); ok {
+		if oErr := odataErr.GetErrorEscaped(); oErr != nil {
+			return fmt.Errorf("%v: code: %s, msg: %s", odataErr, *oErr.GetCode(), *oErr.GetMessage())
+		}
+		return odataErr
+	}
+	return err
 }
 
 // accessTokenCache is responsible for reading (replacing) the access token from some storage (a secret in the database,
