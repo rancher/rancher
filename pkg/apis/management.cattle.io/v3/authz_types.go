@@ -209,6 +209,9 @@ type GlobalRoleStatus struct {
 // +genclient:nonNamespaced
 // +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.summary"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // GlobalRoleBinding binds a given subject user or group to a GlobalRole.
 type GlobalRoleBinding struct {
@@ -229,6 +232,47 @@ type GlobalRoleBinding struct {
 	// GlobalRoleName is the name of the Global Role that the subject will be bound to. Immutable.
 	// +kubebuilder:validation:Required
 	GlobalRoleName string `json:"globalRoleName" norman:"required,noupdate,type=reference[globalRole]"`
+
+	// Status is the most recently observed status of the GlobalRoleBinding. Note, that this is read from and written to by __two__ controllers.
+	// +optional
+	Status GlobalRoleBindingStatus `json:"status,omitempty"`
+}
+
+// GlobalRoleBindingStatus represents the most recently observed status of the GlobalRoleBinding
+type GlobalRoleBindingStatus struct {
+	// ObservedGenerationLocal is the most recent generation (metadata.generation in GRB)
+	// observed by the local controller operating on this status. Populated by the system.
+	// +optional
+	ObservedGenerationLocal int64 `json:"observedGenerationLocal,omitempty"`
+
+	// ObservedGenerationRemote is the most recent generation (metadata.generation in GRB)
+	// observed by the remote controller operating on this status. Populated by the system.
+	// +optional
+	ObservedGenerationRemote int64 `json:"observedGenerationRemote,omitempty"`
+
+	// LastUpdateTime is a k8s timestamp of the last time the status was updated by any of the two controllers operating on it.
+	// +optional
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	// Summary represents the summary of all resources. One of "Complete" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+
+	// SummaryLocal represents the summary of the resources created in the local cluster. One of "Complete" or "Error".
+	// +optional
+	SummaryLocal string `json:"summaryLocal,omitempty"`
+
+	// SummaryRemote represents the summary of the resources created in the downstream cluster. One of "Complete" or "Error".
+	// +optional
+	SummaryRemote string `json:"summaryRemote,omitempty"`
+
+	// LocalConditions is a slice of Condition, indicating the status of backing RBAC objects created in the local cluster.
+	// +optional
+	LocalConditions []metav1.Condition `json:"localConditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// RemoteConditions is a slice of Condition, indicating the status of backing RBAC objects created in the downstream cluster.
+	// +optional
+	RemoteConditions []metav1.Condition `json:"remoteConditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +genclient
