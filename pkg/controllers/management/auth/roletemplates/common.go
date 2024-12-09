@@ -1,7 +1,8 @@
 package roletemplates
 
 import (
-	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"errors"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -19,8 +20,8 @@ const (
 )
 
 // createOrUpdateMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster or project specified by the CRTB or PRTB.
-func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
-	roleName := getMembershipRoleName(rt)
+func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) (*v1.ClusterRoleBinding, error) {
+	roleName := getMembershipRoleName(rt, rtb)
 	roleRef := v1.RoleRef{
 		Kind: "ClusterRole",
 		Name: roleName,
@@ -28,34 +29,31 @@ func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crb
 
 	wantedCRB, err := buildMembershipBinding(roleRef, rtb)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Create if not found
 	existingCRB, err := crbController.Get(wantedCRB.Name, metav1.GetOptions{})
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			_, err = crbController.Create(wantedCRB)
-			return err
+		if apierrors.IsNotFound(err) {
+			return crbController.Create(wantedCRB)
 		}
-		return err
+		return nil, err
 	}
 
 	// If the role referenced or subjects are wrong, delete and re-create the CRB
 	if !pkgrbac.AreClusterRoleBindingContentsSame(wantedCRB, existingCRB) {
 		if err := crbController.Delete(wantedCRB.Name, &metav1.DeleteOptions{}); err != nil {
-			return err
+			return nil, err
 		}
-		_, err = crbController.Create(wantedCRB)
-		return err
+		return crbController.Create(wantedCRB)
 	}
 	// Update Label
 	rtbLabel := getRTBLabel(rtb)
 	if v, ok := existingCRB.Labels[rtbLabel]; !ok || v != "true" {
 		existingCRB.Labels[rtbLabel] = "true"
-		_, err = crbController.Update(existingCRB)
-		return err
+		return crbController.Update(existingCRB)
 	}
-	return nil
+	return existingCRB, nil
 }
 
 // deleteMembershipBinding checks if the user is still a member of the Project or Cluster specified by PRTB/CRTB. If they are no longer a member, delete the bindings.
@@ -67,16 +65,23 @@ func deleteMembershipBinding(rtb metav1.Object, crbController crbacv1.ClusterRol
 		return err
 	}
 
+	var returnedErr error
 	for _, c := range crbs.Items {
-		delete(c.Labels, label)
-		// If there are no items in Labels, the user is no longer a member/owner
-		if len(c.Labels) == 0 {
-			return crbController.Delete(c.Name, &metav1.DeleteOptions{
-				Preconditions: &metav1.Preconditions{UID: &c.UID, ResourceVersion: &c.ResourceVersion},
-			})
+		if _, ok := c.Labels[label]; ok {
+			delete(c.Labels, label)
+			// If there are no items in Labels, the user is no longer a member/owner
+			if len(c.Labels) == 0 {
+				err = crbController.Delete(c.Name, &metav1.DeleteOptions{
+					Preconditions: &metav1.Preconditions{UID: &c.UID, ResourceVersion: &c.ResourceVersion},
+				})
+				returnedErr = errors.Join(returnedErr, err)
+				continue
+			}
+			_, err := crbController.Update(&c)
+			returnedErr = errors.Join(returnedErr, err)
 		}
 	}
-	return nil
+	return returnedErr
 }
 
 // buildMembershipBinding returns the ClusterRoleBinding needed to give membership to the Cluster or Project.
@@ -91,9 +96,8 @@ func buildMembershipBinding(roleRef v1.RoleRef, rtb metav1.Object) (*v1.ClusterR
 
 	return &v1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        crbName,
-			Annotations: map[string]string{},
-			Labels:      map[string]string{rtbLabel: "true"},
+			Name:   crbName,
+			Labels: map[string]string{rtbLabel: "true"},
 		},
 		Subjects: []v1.Subject{subject},
 		RoleRef:  roleRef,
@@ -101,12 +105,13 @@ func buildMembershipBinding(roleRef v1.RoleRef, rtb metav1.Object) (*v1.ClusterR
 }
 
 // getMembershipRoleName returns the name of the membership role based on the RoleTemplate.
-func getMembershipRoleName(rt *v3.RoleTemplate) string {
+func getMembershipRoleName(rt *v3.RoleTemplate, rtb metav1.Object) string {
 	var resourceName string
-	if rt.Context == clusterContext {
-		resourceName = apisv3.ClusterResourceName
-	} else if rt.Context == projectContext {
-		resourceName = apisv3.ProjectResourceName
+	switch obj := rtb.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		resourceName = obj.ProjectName
+	case *v3.ClusterRoleTemplateBinding:
+		resourceName = obj.ClusterName
 	}
 	if isOwnerRole(rt) {
 		return name.SafeConcatName(resourceName, "owner")

@@ -65,7 +65,7 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	}
 
 	// Create membership binding
-	if err := createOrUpdateMembershipBinding(crtb, rt, c.crbController); err != nil {
+	if _, err := createOrUpdateMembershipBinding(crtb, rt, c.crbController); err != nil {
 		return nil, err
 	}
 
