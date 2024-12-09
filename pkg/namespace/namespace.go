@@ -64,21 +64,22 @@ func (n *NsEnqueuer) RoleTemplateEnqueueNamespace(_, _ string, obj runtime.Objec
 	}
 
 	// Get Namespaces of PRTBs
-	namespaceNames := []string{}
+	var namespaceKeys = []relatedresource.Key{}
+	var namespaceMap = map[string]bool{}
 	for _, prtb := range prtbs {
 		namespaces, err := n.NsIndexer.ByIndex(NsByProjectIndex, prtb.ProjectName)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get namespaces for prtb %s from indexer: %w", prtb.Name, err)
 		}
 		for _, ns := range namespaces {
-			namespace, _ := ns.(*v1.Namespace)
-			namespaceNames = append(namespaceNames, namespace.Name)
+			if namespace, ok := ns.(*v1.Namespace); ok {
+				// Only queue each namespace once
+				if _, ok := namespaceMap[namespace.Name]; !ok {
+					namespaceKeys = append(namespaceKeys, relatedresource.Key{Name: namespace.Name})
+					namespaceMap[namespace.Name] = true
+				}
+			}
 		}
-	}
-
-	namespaceKeys := make([]relatedresource.Key, 0, len(namespaceNames))
-	for _, ns := range namespaceNames {
-		namespaceKeys = append(namespaceKeys, relatedresource.Key{Name: ns})
 	}
 
 	return namespaceKeys, nil

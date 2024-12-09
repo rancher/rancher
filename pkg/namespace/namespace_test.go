@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var defaultErr = fmt.Errorf("error")
+var errDefault = fmt.Errorf("error")
 
 type DummyIndexer struct {
 	cache.Store
@@ -128,7 +128,7 @@ func TestPrtbByRoleTemplateName(t *testing.T) {
 	}
 }
 
-func TestNsEnqueuer_RoleTemplateEnqueueNamespace(t *testing.T) {
+func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 	tests := []struct {
 		name      string
 		obj       runtime.Object
@@ -154,7 +154,7 @@ func TestNsEnqueuer_RoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) { return nil, defaultErr },
+			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) { return nil, errDefault },
 			want:      nil,
 			wantErr:   true,
 		},
@@ -185,7 +185,7 @@ func TestNsEnqueuer_RoleTemplateEnqueueNamespace(t *testing.T) {
 				}, nil
 			},
 			nsIndexer: &DummyIndexer{
-				err: defaultErr,
+				err: errDefault,
 			},
 			want:    nil,
 			wantErr: true,
@@ -251,6 +251,37 @@ func TestNsEnqueuer_RoleTemplateEnqueueNamespace(t *testing.T) {
 			want: []relatedresource.Key{
 				{Name: "test-namespace"},
 				{Name: "test-namespace2"},
+			},
+		},
+		{
+			name: "dedupe namespaces",
+			obj: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
+			},
+			nsIndexer: &DummyIndexer{
+				namespaces: map[string][]*v1.Namespace{
+					"test-project": {{
+						ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
+					}},
+					"test-project2": {{
+						ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
+					}},
+				},
+			},
+			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) {
+				return []*v3.ProjectRoleTemplateBinding{
+					{
+						ProjectName: "test-project",
+					},
+					{
+						ProjectName: "test-project2",
+					},
+				}, nil
+			},
+			want: []relatedresource.Key{
+				{Name: "test-namespace"},
 			},
 		},
 	}
