@@ -113,13 +113,13 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
-	github.com/rancher/aks-operator v1.2.5
+	github.com/rancher/aks-operator v1.2.6-rc.1
 	github.com/rancher/apiserver v0.0.0-20240207153744-69b3c2b56f3f
 	github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da
 	github.com/rancher/dynamiclistener v0.4.0
-	github.com/rancher/eks-operator v1.3.5
+	github.com/rancher/eks-operator v1.3.6-rc.1
 	github.com/rancher/fleet/pkg/apis v0.9.7-0.20241202095611-afa768706d12
-	github.com/rancher/gke-operator v1.2.5
+	github.com/rancher/gke-operator v1.2.6-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240705194423-b2a060d103c1
 	github.com/rancher/machine v0.15.0-rancher118
@@ -132,18 +132,18 @@ require (
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.15
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vmware/govmomi v0.42.0
-	golang.org/x/crypto v0.27.0
-	golang.org/x/mod v0.20.0
-	golang.org/x/net v0.29.0
-	golang.org/x/oauth2 v0.23.0
-	golang.org/x/sync v0.8.0
-	golang.org/x/text v0.18.0
-	golang.org/x/tools v0.24.0 // indirect
+	golang.org/x/crypto v0.30.0
+	golang.org/x/mod v0.21.0
+	golang.org/x/net v0.32.0
+	golang.org/x/oauth2 v0.24.0
+	golang.org/x/sync v0.10.0
+	golang.org/x/text v0.21.0
+	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/api v0.196.0
 	google.golang.org/grpc v1.66.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -160,7 +160,7 @@ require (
 	k8s.io/helm v2.17.0+incompatible
 	k8s.io/kube-aggregator v0.28.6
 	k8s.io/kubectl v0.28.6
-	k8s.io/kubernetes v1.28.8
+	k8s.io/kubernetes v1.28.9
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.5
@@ -337,7 +337,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.34.2 // indirect
+	github.com/onsi/gomega v1.36.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc5 // indirect
 	github.com/opencontainers/runc v1.1.12 // indirect
@@ -378,12 +378,12 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/term v0.24.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
+	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
