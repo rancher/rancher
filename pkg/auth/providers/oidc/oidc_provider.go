@@ -424,6 +424,23 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 		return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
 	}
 
+	if config.GroupsClaim != "" {
+		var claim map[string]interface{}
+		if err := idToken.Claims(&claim); err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
+		}
+		groups := []string{}
+		if _, ok := claim[config.GroupsClaim].([]interface{}); ok {
+			for _, v := range claim[config.GroupsClaim].([]interface{}) {
+				str, ok := v.(string)
+				if ok {
+					groups = append(groups, str)
+				}
+			}
+		}
+		claimInfo.Groups = groups
+	}
+
 	// Valid will return false if access token is expired
 	if !oauth2Token.Valid() {
 		return userInfo, oauth2Token, fmt.Errorf("not valid token: %w", err)
