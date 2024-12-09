@@ -52,7 +52,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, err
 	}
 
-	if err := createOrUpdateMembershipBinding(prtb, rt, p.crbController); err != nil {
+	if _, err := createOrUpdateMembershipBinding(prtb, rt, p.crbController); err != nil {
 		return nil, err
 	}
 
