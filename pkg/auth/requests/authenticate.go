@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -280,6 +279,8 @@ func getUserExtraInfo(token accessor.TokenAccessor, user *v3.User, attribs *v3.U
 
 // TokenFromRequest retrieves and verifies the token from the request.
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
+	// See also `pkg/auth/tokens/manager.go` getToken for near-same ops.
+
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 	if tokenAuthValue == "" {
 		return nil, ErrMustAuthenticate
@@ -304,7 +305,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, errors.Wrapf(ErrMustAuthenticate,
 				"failed to retrieve auth token, error: %#v", err)
 		}
-		if _, err := extVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
+		if _, err := tokens.ExtVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
 			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
 		}
 
@@ -343,32 +344,4 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	}
 
 	return storedToken, nil
-}
-
-// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
-func extVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
-	invalidAuthTokenErr := errors.New("Invalid auth token value")
-
-	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
-	}
-
-	// Ext token always has a hash. Only a hash.
-
-	hasher, err := hashers.GetHasherForHash(storedToken.Status.TokenHash)
-	if err != nil {
-		logrus.Errorf("unable to get a hasher for token with error %v", err)
-		return http.StatusInternalServerError,
-			fmt.Errorf("unable to verify hash '%s'", storedToken.Status.TokenHash)
-	}
-
-	if err := hasher.VerifyHash(storedToken.Status.TokenHash, tokenKey); err != nil {
-		logrus.Errorf("VerifyHash failed with error: %v", err)
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
-	}
-
-	if storedToken.Status.Expired {
-		return http.StatusGone, errors.New("must authenticate")
-	}
-	return http.StatusOK, nil
 }
