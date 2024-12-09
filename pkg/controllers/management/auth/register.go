@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/roletemplates"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "k8s.io/api/rbac/v1"
@@ -86,6 +87,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, "legacy-grb-cleaner", grbLegacy.sync)
 	management.Management.RoleTemplates("").AddHandler(ctx, "legacy-rt-cleaner", rtLegacy.sync)
 	globalroles.Register(ctx, management, clusterManager)
+	roletemplates.Register(ctx, management)
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
