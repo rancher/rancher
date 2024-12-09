@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-11-01/containerservice"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/rancher/norman/api/access"
@@ -401,7 +401,7 @@ func (v *Validator) validateAKSNetworkPolicy(clusterSpec *v32.ClusterSpec, prevC
 	}
 
 	// network policy enabled on the AKS cluster is a prerequisite for PNI
-	if to.Bool(clusterSpec.EnableNetworkPolicy) && networkPolicy != string(containerservice.NetworkPolicyAzure) && networkPolicy != string(containerservice.NetworkPolicyCalico) {
+	if to.Bool(clusterSpec.EnableNetworkPolicy) && networkPolicy != string(armcontainerservice.NetworkPolicyAzure) && networkPolicy != string(armcontainerservice.NetworkPolicyCalico) {
 		return httperror.NewAPIError(
 			httperror.InvalidBodyContent,
 			"Network Policy support must be enabled on AKS cluster in order to enable Project Network Isolation",
