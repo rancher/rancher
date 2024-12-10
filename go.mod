@@ -15,6 +15,8 @@ replace (
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.1.0-rc2 // needed for containers/image/v5
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
 
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20191219222812-2987a591a72c
+
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
@@ -172,9 +174,10 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/google/gnostic-models v0.6.8
+	github.com/harvester/harvester v1.2.0
 	github.com/rancher/cis-operator v1.0.11
-	github.com/rancher/rancher/pkg/apis v0.0.0-20240613212755-3021cf92ff9f
-	github.com/rancher/shepherd v0.0.0-20241025145825-ac788a5e1033
+	github.com/rancher/rancher/pkg/apis v0.0.0
+	github.com/rancher/shepherd v0.0.0-20241205230419-1c687274e6d9
 	github.com/rancher/wrangler v1.1.1
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
@@ -208,6 +211,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
+	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
@@ -226,6 +230,9 @@ require (
 	k8s.io/kms v0.28.9 // indirect
 	k8s.io/kubelet v0.27.4 // indirect
 	k8s.io/pod-security-admission v0.28.6 // indirect
+	kubevirt.io/api v0.54.0 // indirect
+	kubevirt.io/containerized-data-importer-api v1.47.0 // indirect
+	kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 // indirect
 )
 
 require (
