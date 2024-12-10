@@ -37,10 +37,8 @@ func (h *HarvesterTestSuite) SetupSuite() {
 
 	h.client = client
 
-	hClient, err := harvester.NewClient("", h.session)
+	h.harvesterClient, err = harvester.NewClient("", h.session)
 	require.NoError(h.T(), err)
-
-	h.harvesterClient = hClient
 
 	userConfig := new(provisioninginput.Config)
 	config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
