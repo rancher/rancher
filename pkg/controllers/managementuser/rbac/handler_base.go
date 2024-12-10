@@ -13,7 +13,6 @@ import (
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -56,12 +55,18 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	// Add cache informer to project role template bindings
 	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	prtbIndexers := map[string]cache.IndexFunc{
+		nsutils.PrtbByRoleTemplateIndex: nsutils.PrtbByRoleTemplateName,
+	}
+	prtbInformer.AddIndexers(prtbIndexers)
+
+	// Add cache informer to cluster role template bindings
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 
 	// Index for looking up namespaces by projectID annotation
 	nsInformer := workload.Core.Namespaces("").Controller().Informer()
 	nsIndexers := map[string]cache.IndexFunc{
-		namespace.NsByProjectIndex: nsutils.NsByProjectID,
+		nsutils.NsByProjectIndex: nsutils.NsByProjectID,
 	}
 	nsInformer.AddIndexers(nsIndexers)
 
@@ -130,9 +135,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	relatedresource.WatchClusterScoped(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
 		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
 
-	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(namespace.PrtbByRoleTemplateIndex, namespace.PrtbByRoleTemplateName)
-	nsEnqueuer := namespace.NsEnqueuer{
-		PrtbCache: management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
+	nsEnqueuer := nsutils.NsEnqueuer{
+		PrtbCache: prtbInformer.GetIndexer(),
 		NsIndexer: nsInformer.GetIndexer(),
 	}
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())

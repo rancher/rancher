@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
-	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,40 +15,40 @@ import (
 
 var errDefault = fmt.Errorf("error")
 
-type DummyIndexer struct {
+type DummyIndexer[T any] struct {
 	cache.Store
-	namespaces map[string][]*v1.Namespace
-	err        error
+	resources map[string][]T
+	err       error
 }
 
-func (d *DummyIndexer) Index(indexName string, obj interface{}) ([]interface{}, error) {
+func (d *DummyIndexer[T]) Index(indexName string, obj interface{}) ([]interface{}, error) {
 	return nil, nil
 }
 
-func (d *DummyIndexer) IndexKeys(indexName, indexKey string) ([]string, error) {
+func (d *DummyIndexer[T]) IndexKeys(indexName, indexKey string) ([]string, error) {
 	return []string{}, nil
 }
 
-func (d *DummyIndexer) ListIndexFuncValues(indexName string) []string {
+func (d *DummyIndexer[T]) ListIndexFuncValues(indexName string) []string {
 	return []string{}
 }
-func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
+func (d *DummyIndexer[T]) ByIndex(indexName, indexKey string) ([]interface{}, error) {
 	if d.err != nil {
 		return nil, d.err
 	}
-	namespaces := d.namespaces[indexKey]
+	resources := d.resources[indexKey]
 	var interfaces []interface{}
-	for _, ns := range namespaces {
-		interfaces = append(interfaces, ns)
+	for _, r := range resources {
+		interfaces = append(interfaces, r)
 	}
 	return interfaces, nil
 }
 
-func (d *DummyIndexer) GetIndexers() cache.Indexers {
+func (d *DummyIndexer[T]) GetIndexers() cache.Indexers {
 	return nil
 }
 
-func (d *DummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
+func (d *DummyIndexer[T]) AddIndexers(newIndexers cache.Indexers) error {
 	return nil
 }
 
@@ -133,7 +131,7 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 		name      string
 		obj       runtime.Object
 		nsIndexer cache.Indexer
-		prtbCache func() ([]*v3.ProjectRoleTemplateBinding, error)
+		prtbCache cache.Indexer
 		want      []relatedresource.Key
 		wantErr   bool
 	}{
@@ -154,9 +152,11 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) { return nil, errDefault },
-			want:      nil,
-			wantErr:   true,
+			prtbCache: &DummyIndexer[*v3.ProjectRoleTemplateBinding]{
+				err: errDefault,
+			},
+			want:    nil,
+			wantErr: true,
 		},
 		{
 			name: "no PRTBs",
@@ -165,8 +165,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) {
-				return []*v3.ProjectRoleTemplateBinding{}, nil
+			prtbCache: &DummyIndexer[*v3.ProjectRoleTemplateBinding]{
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{},
 			},
 			want: []relatedresource.Key{},
 		},
@@ -177,14 +177,12 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) {
-				return []*v3.ProjectRoleTemplateBinding{
-					{
-						ProjectName: "test-project",
-					},
-				}, nil
+			prtbCache: &DummyIndexer[*v3.ProjectRoleTemplateBinding]{
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{
+					"test-rt": {{ProjectName: "test-project"}},
+				},
 			},
-			nsIndexer: &DummyIndexer{
+			nsIndexer: &DummyIndexer[*v1.Namespace]{
 				err: errDefault,
 			},
 			want:    nil,
@@ -197,8 +195,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			nsIndexer: &DummyIndexer{
-				namespaces: map[string][]*v1.Namespace{
+			nsIndexer: &DummyIndexer[*v1.Namespace]{
+				resources: map[string][]*v1.Namespace{
 					"test-project": {
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
@@ -209,12 +207,10 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					},
 				},
 			},
-			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) {
-				return []*v3.ProjectRoleTemplateBinding{
-					{
-						ProjectName: "test-project",
-					},
-				}, nil
+			prtbCache: &DummyIndexer[*v3.ProjectRoleTemplateBinding]{
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{
+					"test-rt": {{ProjectName: "test-project"}},
+				},
 			},
 			want: []relatedresource.Key{
 				{Name: "test-namespace"},
@@ -228,8 +224,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			nsIndexer: &DummyIndexer{
-				namespaces: map[string][]*v1.Namespace{
+			nsIndexer: &DummyIndexer[*v1.Namespace]{
+				resources: map[string][]*v1.Namespace{
 					"test-project": {{
 						ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
 					}},
@@ -238,15 +234,10 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					}},
 				},
 			},
-			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) {
-				return []*v3.ProjectRoleTemplateBinding{
-					{
-						ProjectName: "test-project",
-					},
-					{
-						ProjectName: "test-project2",
-					},
-				}, nil
+			prtbCache: &DummyIndexer[*v3.ProjectRoleTemplateBinding]{
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{
+					"test-rt": {{ProjectName: "test-project"}, {ProjectName: "test-project2"}},
+				},
 			},
 			want: []relatedresource.Key{
 				{Name: "test-namespace"},
@@ -260,8 +251,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			nsIndexer: &DummyIndexer{
-				namespaces: map[string][]*v1.Namespace{
+			nsIndexer: &DummyIndexer[*v1.Namespace]{
+				resources: map[string][]*v1.Namespace{
 					"test-project": {{
 						ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
 					}},
@@ -270,15 +261,10 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					}},
 				},
 			},
-			prtbCache: func() ([]*v3.ProjectRoleTemplateBinding, error) {
-				return []*v3.ProjectRoleTemplateBinding{
-					{
-						ProjectName: "test-project",
-					},
-					{
-						ProjectName: "test-project2",
-					},
-				}, nil
+			prtbCache: &DummyIndexer[*v3.ProjectRoleTemplateBinding]{
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{
+					"test-rt": {{ProjectName: "test-project"}, {ProjectName: "test-project2"}},
+				},
 			},
 			want: []relatedresource.Key{
 				{Name: "test-namespace"},
@@ -287,14 +273,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			prtbCache := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
-			if tt.prtbCache != nil {
-				prtbCache.EXPECT().GetByIndex(gomock.Any(), gomock.Any()).Return(tt.prtbCache())
-			}
-
 			n := &NsEnqueuer{
-				PrtbCache: prtbCache,
+				PrtbCache: tt.prtbCache,
 				NsIndexer: tt.nsIndexer,
 			}
 

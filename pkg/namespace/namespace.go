@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +32,11 @@ func NsByProjectID(obj interface{}) ([]string, error) {
 }
 
 // PrtbByRoleTemplateName is an index that selects PRTBs by the Role Template name
-func PrtbByRoleTemplateName(prtb *v3.ProjectRoleTemplateBinding) ([]string, error) {
+func PrtbByRoleTemplateName(obj interface{}) ([]string, error) {
+	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	if !ok {
+		return []string{}, nil
+	}
 	if prtb == nil {
 		return []string{}, nil
 	}
@@ -42,7 +45,7 @@ func PrtbByRoleTemplateName(prtb *v3.ProjectRoleTemplateBinding) ([]string, erro
 
 // NsEnqueuer is a helper struct for enqueuing Namespaces
 type NsEnqueuer struct {
-	PrtbCache mgmtv3.ProjectRoleTemplateBindingCache
+	PrtbCache cache.Indexer
 	NsIndexer cache.Indexer
 }
 
@@ -58,7 +61,7 @@ func (n *NsEnqueuer) RoleTemplateEnqueueNamespace(_, _ string, obj runtime.Objec
 	}
 
 	// Get PRTBs by field RoleTemplateName
-	prtbs, err := n.PrtbCache.GetByIndex(PrtbByRoleTemplateIndex, rt.Name)
+	prtbs, err := n.PrtbCache.ByIndex(PrtbByRoleTemplateIndex, rt.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get prtbs for rt %s from indexer: %w", rt.Name, err)
 	}
@@ -66,7 +69,13 @@ func (n *NsEnqueuer) RoleTemplateEnqueueNamespace(_, _ string, obj runtime.Objec
 	// Get Namespaces of PRTBs
 	var namespaceKeys = []relatedresource.Key{}
 	var namespaceMap = map[string]bool{}
-	for _, prtb := range prtbs {
+	for _, obj := range prtbs {
+		prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+		if !ok {
+			logrus.Errorf("unable to convert object: %[1]v, type %[1]T to a cluster", obj)
+			return nil, nil
+		}
+
 		namespaces, err := n.NsIndexer.ByIndex(NsByProjectIndex, prtb.ProjectName)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get namespaces for prtb %s from indexer: %w", prtb.Name, err)
