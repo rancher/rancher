@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -36,12 +37,20 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
 func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
-	r.provisioningConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
+
+	clusterName := client.RancherConfig.ClusterName
+
+	r.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.provisioningConfig)
+
+	client, err = rancher.NewClient("", testSession)
+	require.NoError(r.T(), err)
 	r.client = client
+
+	provisioning.RoolbackClusterName(client, clusterName)
 
 	if r.provisioningConfig.RKE2KubernetesVersions == nil {
 		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(r.client)
@@ -69,6 +78,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	require.NoError(r.T(), err)
 
 	r.standardUserClient = standardUserClient
+
+	// Disabling configuration here is to avoid interference with other pipeline tests.
+	// Updates to the config are temporarily disabled during the test
+	// and are automatically enabled during cleanup.
+	provisioning.DisableUpdateConfig(r.client)
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {

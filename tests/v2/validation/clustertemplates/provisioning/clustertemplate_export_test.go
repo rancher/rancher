@@ -36,13 +36,20 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	ct.session = testSession
 
-	ct.provisioningConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, ct.provisioningConfig)
-
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(ct.T(), err)
 
+	clusterName := client.RancherConfig.ClusterName
+
+	ct.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, ct.provisioningConfig)
+
+	client, err = rancher.NewClient("", testSession)
+	require.NoError(ct.T(), err)
+
 	ct.client = client
+
+	provisioning.RoolbackClusterName(client, clusterName)
 
 	if ct.provisioningConfig.RKE1KubernetesVersions == nil {
 		rke1Versions, err := kubernetesversions.ListRKE1AllVersions(ct.client)
@@ -77,6 +84,11 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 	clusterConfig.CNI = ct.provisioningConfig.CNIs[0]
 	clusterConfig.KubernetesVersion = ct.provisioningConfig.RKE1KubernetesVersions[0]
 
+	// Disabling configuration here is to avoid interference with other pipeline tests.
+	// Updates to the config are temporarily disabled during the test
+	// and are automatically enabled during cleanup.
+	provisioning.DisableUpdateConfig(ct.client)
+
 	cluster, err := provisioning.CreateProvisioningRKE1Cluster(standardClient, rke1Provider, clusterConfig, nodeTemplate)
 	require.NoError(ct.T(), err)
 
@@ -84,7 +96,6 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 	require.NoError(ct.T(), err)
 
 	provisioning.VerifyRKE1Cluster(ct.T(), standardClient, clusterConfig, ct.cluster)
-	provisioning.DisableUpdateConfig(ct.client)
 }
 
 func (ct *ClusterTemplateExportTestSuite) TestExportClusterTemplate() {

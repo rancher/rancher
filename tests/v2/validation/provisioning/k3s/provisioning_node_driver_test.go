@@ -5,6 +5,7 @@ package k3s
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -36,13 +37,20 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	k.session = testSession
 
-	k.provisioningConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, k.provisioningConfig)
-
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(k.T(), err)
 
+	clusterName := client.RancherConfig.ClusterName
+
+	k.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, k.provisioningConfig)
+
+	client, err = rancher.NewClient("", testSession)
+	require.NoError(k.T(), err)
+
 	k.client = client
+
+	provisioning.RoolbackClusterName(client, clusterName)
 
 	if k.provisioningConfig.K3SKubernetesVersions == nil {
 		k3sVersions, err := kubernetesversions.ListK3SAllVersions(k.client)
@@ -70,6 +78,11 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 	require.NoError(k.T(), err)
 
 	k.standardUserClient = standardUserClient
+
+	// Disabling configuration here is to avoid interference with other pipeline tests.
+	// Updates to the config are temporarily disabled during the test
+	// and are automatically enabled during cleanup.
+	provisioning.DisableUpdateConfig(k.client)
 }
 
 func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {

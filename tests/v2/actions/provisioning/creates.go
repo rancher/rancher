@@ -67,7 +67,8 @@ const (
 )
 
 var (
-	updateConfig = true
+	updateConfig        = true
+	roolbackClusterName = ""
 )
 
 // CreateProvisioningCluster provisions a non-rke1 cluster, then runs verify checks
@@ -1084,7 +1085,7 @@ func CreateProvisioningRKE1ClusterWithClusterTemplate(client *rancher.Client, te
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -1099,4 +1100,16 @@ func CreateProvisioningRKE1ClusterWithClusterTemplate(client *rancher.Client, te
 
 	createdCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
 	return createdCluster, err
+}
+
+// RoolbackUpdateConfig is a function that roolback the cluster name to don't affect next tests.
+func RoolbackClusterName(client *rancher.Client, clusterName string) {
+	roolbackClusterName = clusterName
+	client.Session.RegisterCleanupFunc(func() error {
+		if roolbackClusterName != "" {
+			pipeline.UpdateConfigClusterName(roolbackClusterName)
+			roolbackClusterName = ""
+		}
+		return nil
+	})
 }
