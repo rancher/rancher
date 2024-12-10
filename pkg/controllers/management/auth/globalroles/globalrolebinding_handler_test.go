@@ -6,6 +6,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	apisv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	normanv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -94,6 +95,8 @@ type grbTestState struct {
 	rListerMock       *rbacFakes.RoleListerMock
 	rbListerMock      *rbacFakes.RoleBindingListerMock
 	rbClientMock      *rbacFakes.RoleBindingInterfaceMock
+	grbListerMock     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
+	grbClientMock     *fake.MockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
 	fwhMock           *fleetPermissionsHandlerMock
 	stateChanges      *grbTestStateChanges
 }
@@ -138,6 +141,10 @@ func TestCreateUpdate(t *testing.T) {
 			"authz.management.cattle.io/crb-name": "cattle-globalrolebinding-" + grb.Name,
 		}
 		return newGRB
+	}
+
+	mockTime := func() time.Time {
+		return time.Unix(0, 0)
 	}
 
 	tests := []struct {
@@ -186,11 +193,50 @@ func TestCreateUpdate(t *testing.T) {
 				}
 
 				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
 					state.stateChanges.fwhCalled = true
 					return nil
 				}
+
+				// mocks for status field
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					GlobalRoleName: gr.Name,
+					UserName:       userName,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().String(),
+						SummaryLocal:   status.SummaryCompleted,
+						LocalConditions: []metav1.Condition{
+							{
+								Type:               clusterPermissionsReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             clusterPermissionsReconciled,
+							},
+							{
+								Type:               globalRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             globalRoleBindingReconciled,
+							},
+							{
+								Type:               namespacedRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             namespacedRoleBindingReconciled,
+							},
+						},
+					},
+				})
 			},
+
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
 				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
@@ -269,10 +315,48 @@ func TestCreateUpdate(t *testing.T) {
 				}
 
 				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
 					state.stateChanges.fwhCalled = true
 					return nil
 				}
+
+				// mocks for status field
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					GlobalRoleName: gr.Name,
+					UserName:       userName,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().String(),
+						SummaryLocal:   status.SummaryCompleted,
+						LocalConditions: []metav1.Condition{
+							{
+								Type:               clusterPermissionsReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             clusterPermissionsReconciled,
+							},
+							{
+								Type:               globalRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             globalRoleBindingReconciled,
+							},
+							{
+								Type:               namespacedRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             namespacedRoleBindingReconciled,
+							},
+						},
+					},
+				})
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -342,10 +426,50 @@ func TestCreateUpdate(t *testing.T) {
 				}
 
 				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
 					state.stateChanges.fwhCalled = true
 					return nil
 				}
+
+				// mocks for status field
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					GlobalRoleName: gr.Name,
+					UserName:       userName,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().String(),
+						SummaryLocal:   status.SummaryError,
+						Summary:        status.SummaryError,
+						LocalConditions: []metav1.Condition{
+							{
+								Type:               clusterPermissionsReconciled,
+								Status:             metav1.ConditionFalse,
+								Message:            "server not available",
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             failedToListCluster,
+							},
+							{
+								Type:               globalRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             globalRoleBindingReconciled,
+							},
+							{
+								Type:               namespacedRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             namespacedRoleBindingReconciled,
+							},
+						},
+					},
+				})
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -411,10 +535,50 @@ func TestCreateUpdate(t *testing.T) {
 				}
 
 				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
 					state.stateChanges.fwhCalled = true
 					return nil
 				}
+
+				// mocks for status field
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					GlobalRoleName: gr.Name,
+					UserName:       userName,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().String(),
+						SummaryLocal:   status.SummaryError,
+						Summary:        status.SummaryError,
+						LocalConditions: []metav1.Condition{
+							{
+								Type:               clusterPermissionsReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             clusterPermissionsReconciled,
+							},
+							{
+								Type:               globalRoleBindingReconciled,
+								Status:             metav1.ConditionFalse,
+								Message:            "server not available",
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             failedToCreateClusterRoleBinding,
+							},
+							{
+								Type:               namespacedRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             namespacedRoleBindingReconciled,
+							},
+						},
+					},
+				})
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -481,10 +645,52 @@ func TestCreateUpdate(t *testing.T) {
 				}
 
 				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
 					state.stateChanges.fwhCalled = true
 					return nil
 				}
+
+				// mocks for status field
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					GlobalRoleName: gr.Name,
+					UserName:       userName,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().String(),
+						SummaryLocal:   status.SummaryError,
+						Summary:        status.SummaryError,
+						LocalConditions: []metav1.Condition{
+							{
+								Type:               clusterPermissionsReconciled,
+								Status:             metav1.ConditionFalse,
+								Message:            "not found",
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             failedToGetGlobalRole,
+							},
+							{
+								Type:               globalRoleBindingReconciled,
+								Status:             metav1.ConditionFalse,
+								Message:            "server not available",
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             failedToCreateClusterRoleBinding,
+							},
+							{
+								Type:               namespacedRoleBindingReconciled,
+								Status:             metav1.ConditionFalse,
+								Message:            "not found",
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             failedToGetGlobalRole,
+							},
+						},
+					},
+				})
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -501,7 +707,6 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
-
 				// fleet workspace assertions
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
@@ -547,10 +752,48 @@ func TestCreateUpdate(t *testing.T) {
 				}
 
 				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
 					state.stateChanges.fwhCalled = true
 					return fmt.Errorf("unavailable")
 				}
+
+				// mocks for status field
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					GlobalRoleName: gr.Name,
+					UserName:       userName,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().String(),
+						SummaryLocal:   status.SummaryCompleted,
+						LocalConditions: []metav1.Condition{
+							{
+								Type:               clusterPermissionsReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             clusterPermissionsReconciled,
+							},
+							{
+								Type:               globalRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             globalRoleBindingReconciled,
+							},
+							{
+								Type:               namespacedRoleBindingReconciled,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             namespacedRoleBindingReconciled,
+							},
+						},
+					},
+				})
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -594,7 +837,7 @@ func TestCreateUpdate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grbLifecycle := globalRoleBindingLifecycle{}
-			testFuncs := []func(*v3.GlobalRoleBinding) (runtime.Object, error){grbLifecycle.Create, grbLifecycle.Updated}
+			testFuncs := []func(*v3.GlobalRoleBinding) (runtime.Object, error){grbLifecycle.Updated, grbLifecycle.Create}
 			for _, testFunc := range testFuncs {
 				ctrl := gomock.NewController(t)
 				crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
@@ -604,8 +847,10 @@ func TestCreateUpdate(t *testing.T) {
 				crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
 				crbClientMock := rbacFakes.ClusterRoleBindingInterfaceMock{}
 				rbListerMock := rbacFakes.RoleBindingListerMock{}
+				grbListerMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+				grbClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl)
 				fphMock := fleetPermissionsHandlerMock{}
-
+				grbListerMock.EXPECT().Get(test.inputBinding.Name).Return(test.inputBinding.DeepCopy(), nil)
 				stateChanges := grbTestStateChanges{
 					t:                t,
 					createdCRTBs:     []*v3.ClusterRoleTemplateBinding{},
@@ -621,6 +866,8 @@ func TestCreateUpdate(t *testing.T) {
 					crbClientMock:     &crbClientMock,
 					rbListerMock:      &rbListerMock,
 					fwhMock:           &fphMock,
+					grbListerMock:     grbListerMock,
+					grbClientMock:     grbClientMock,
 					stateChanges:      &stateChanges,
 				}
 				if test.stateSetup != nil {
@@ -634,7 +881,11 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.crbClient = &crbClientMock
 				grbLifecycle.roleBindingLister = &rbListerMock
 				grbLifecycle.fleetPermissionsHandler = &fphMock
-				res, resErr := testFunc(test.inputBinding)
+				grbLifecycle.grbLister = grbListerMock
+				grbLifecycle.grbClient = grbClientMock
+				grbLifecycle.status = status.NewStatus()
+				grbLifecycle.status.TimeNow = mockTime
+				res, resErr := testFunc(test.inputBinding.DeepCopy())
 				require.Equal(t, test.wantBinding, res)
 				if test.wantError {
 					require.Error(t, resErr)
@@ -714,6 +965,10 @@ func Test_crtbGrbOwnerIndexer(t *testing.T) {
 	keys, err = crtbGrbOwnerIndexer(standardCRTB)
 	require.NoError(t, err)
 	require.Len(t, keys, 0)
+}
+
+func TestUpdate(t *testing.T) {
+
 }
 
 func Test_reconcileClusterPermissions(t *testing.T) {
@@ -1357,8 +1612,10 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				crtbCache:     crtbCacheMock,
 				clusterLister: &clusterListerMock,
 				crtbClient:    &crtbClientMock,
+				status:        status.NewStatus(),
 			}
-			resErr := grbLifecycle.reconcileClusterPermissions(test.inputObject)
+			var conditions []metav1.Condition
+			resErr := grbLifecycle.reconcileClusterPermissions(test.inputObject, &conditions)
 			if test.wantError {
 				require.Error(t, resErr)
 			} else {
@@ -2002,7 +2259,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 			grbLifecycle.roleLister = &rLister
 			grbLifecycle.roleBindingLister = &rbLister
 			grbLifecycle.roleBindings = &rbClient
-			err := grbLifecycle.reconcileNamespacedRoleBindings(test.globalRoleBinding)
+			grbLifecycle.status = status.NewStatus()
+			var conditions []metav1.Condition
+			err := grbLifecycle.reconcileNamespacedRoleBindings(test.globalRoleBinding, &conditions)
 			if test.wantError {
 				require.Error(t, err)
 			} else {
@@ -2016,9 +2275,9 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 }
 
 type fleetPermissionsHandlerMock struct {
-	reconcileFleetWorkspacePermissionsFunc func(globalRoleBinding *v3.GlobalRoleBinding) error
+	reconcileFleetWorkspacePermissionsFunc func(globalRoleBinding *v3.GlobalRoleBinding, conditions *[]metav1.Condition) error
 }
 
-func (f *fleetPermissionsHandlerMock) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
-	return f.reconcileFleetWorkspacePermissionsFunc(globalRoleBinding)
+func (f *fleetPermissionsHandlerMock) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding, conditions *[]metav1.Condition) error {
+	return f.reconcileFleetWorkspacePermissionsFunc(globalRoleBinding, conditions)
 }

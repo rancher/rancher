@@ -228,6 +228,41 @@ func TestCompareConditions(t *testing.T) {
 			},
 			want: true,
 		},
+		"equals with multiple conditions in different order": {
+			s1: []metav1.Condition{
+				{
+					Type:               clusterRoleBindingsExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Unix(0, 0)},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Now()},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			s2: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Unix(0, 0)},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+				{
+					Type:               clusterRoleBindingsExists,
+					Status:             SummaryCompleted,
+					LastTransitionTime: metav1.Time{Time: time.Unix(0, 0)},
+					Reason:             clusterRolesExists,
+					Message:            "",
+				},
+			},
+			want: true,
+		},
 		"different type": {
 			s1: []metav1.Condition{
 				{
