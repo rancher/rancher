@@ -31,7 +31,7 @@ const (
 // RegisterHarvesterCluster is a function that creates a Virtualization Management object in rancher, and registers
 // the external harvester cluster with said object in rancher. This is required to use harvester as a rancher provider.
 func RegisterHarvesterWithRancher(rancherClient *rancher.Client, harvesterClient *harvester.Client) (string, error) {
-	importCluster := provv1.Cluster{
+	importCluster := &provv1.Cluster{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      namegenerator.AppendRandomString("hvst-import"),
 			Namespace: "fleet-default",
@@ -48,7 +48,7 @@ func RegisterHarvesterWithRancher(rancherClient *rancher.Client, harvesterClient
 		Steps:    40,
 	}
 
-	_, err := clusters.CreateK3SRKE2Cluster(rancherClient, &importCluster)
+	_, err := clusters.CreateK3SRKE2Cluster(rancherClient, importCluster)
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +56,7 @@ func RegisterHarvesterWithRancher(rancherClient *rancher.Client, harvesterClient
 	updatedCluster := new(provv1.Cluster)
 
 	// wait for rancher's import cluster to be in pending state. No registration occurs yet
-	err = wait.ExponentialBackoff(backoff, func() (hinished bool, err error) {
+	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		updatedCluster, _, err = clusters.GetProvisioningClusterByName(rancherClient, importCluster.Name, importCluster.Namespace)
 		if err != nil {
 			return false, err
