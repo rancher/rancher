@@ -238,7 +238,7 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 		group, ok := do.(*models.Group)
 		if !ok {
 			if _, ok := do.(*models.DirectoryRole); !ok {
-				logrus.Errorf("[%s] Page Iterator received incorrect value of type %T: %#v", providerLogPrefix, do, do)
+				logrus.Debugf("[%s] Groups Iterator received unexpected value of type %T: %#v", providerLogPrefix, do, do)
 			}
 			return true
 		}
