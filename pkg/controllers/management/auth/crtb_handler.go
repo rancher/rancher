@@ -17,7 +17,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
@@ -323,7 +322,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, 
 	}
 
 	set = map[string]string{string(binding.UID): CrtbInProjectBindingOwner}
-	rbs, err := c.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+	rbs, err := c.rbLister.List(metav1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToListRB, err)
 		return err
