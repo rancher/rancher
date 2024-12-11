@@ -1,15 +1,13 @@
 package machinepools
 
 import (
-	"github.com/rancher/shepherd/pkg/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	VmwaresphereKind                               = "VmwarevsphereConfig"
-	VmwarevsphereType                              = "rke-machine-config.cattle.io.vmwarevsphereconfig"
-	VmwarevsphereConfig                            = "vmwarevsphereconfigs"
-	VmwarevsphereMachineConfigConfigurationFileKey = "vmwarevsphereMachineConfigs"
+	VmwaresphereKind    = "VmwarevsphereConfig"
+	VmwarevsphereType   = "rke-machine-config.cattle.io.vmwarevsphereconfig"
+	VmwarevsphereConfig = "vmwarevsphereconfigs"
 )
 
 type VmwarevsphereMachineConfigs struct {
@@ -54,12 +52,9 @@ type VmwarevsphereMachineConfig struct {
 
 // NewVSphereMachineConfig is a constructor to set up rke-machine-config.cattle.io.vmwarevsphereconfig. It returns an *unstructured.Unstructured
 // that CreateMachineConfig uses to created the rke-machine-config
-func NewVSphereMachineConfig(generatedPoolName, namespace string) []unstructured.Unstructured {
-	var vmwarevsphereMachineConfigs VmwarevsphereMachineConfigs
-	config.LoadConfig(VmwarevsphereMachineConfigConfigurationFileKey, &vmwarevsphereMachineConfigs)
+func NewVSphereMachineConfig(machineConfigs MachineConfigs, generatedPoolName, namespace string) []unstructured.Unstructured {
 	var multiConfig []unstructured.Unstructured
-
-	for _, vsphereMachineConfig := range vmwarevsphereMachineConfigs.VmwarevsphereMachineConfig {
+	for _, vsphereMachineConfig := range machineConfigs.VmwareMachineConfigs.VmwarevsphereMachineConfig {
 		machineConfig := unstructured.Unstructured{}
 		machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
 		machineConfig.SetKind(VmwaresphereKind)
@@ -75,17 +70,17 @@ func NewVSphereMachineConfig(generatedPoolName, namespace string) []unstructured
 		machineConfig.Object["cpuCount"] = vsphereMachineConfig.CPUCount
 		machineConfig.Object["creationType"] = vsphereMachineConfig.CreationType
 		machineConfig.Object["customAttribute"] = vsphereMachineConfig.CustomAttribute
-		machineConfig.Object["datacenter"] = vmwarevsphereMachineConfigs.Datacenter
-		machineConfig.Object["datastore"] = vmwarevsphereMachineConfigs.Datastore
+		machineConfig.Object["datacenter"] = machineConfigs.VmwareMachineConfigs.Datacenter
+		machineConfig.Object["datastore"] = machineConfigs.VmwareMachineConfigs.Datastore
 		machineConfig.Object["datastoreCluster"] = vsphereMachineConfig.DatastoreCluster
-		machineConfig.Object["datastoreUrl"] = vmwarevsphereMachineConfigs.DatastoreURL
+		machineConfig.Object["datastoreUrl"] = machineConfigs.VmwareMachineConfigs.DatastoreURL
 		machineConfig.Object["diskSize"] = vsphereMachineConfig.DiskSize
-		machineConfig.Object["folder"] = vmwarevsphereMachineConfigs.Folder
-		machineConfig.Object["hostsystem"] = vmwarevsphereMachineConfigs.Hostsystem
+		machineConfig.Object["folder"] = machineConfigs.VmwareMachineConfigs.Folder
+		machineConfig.Object["hostsystem"] = machineConfigs.VmwareMachineConfigs.Hostsystem
 		machineConfig.Object["memorySize"] = vsphereMachineConfig.MemorySize
 		machineConfig.Object["network"] = vsphereMachineConfig.Network
 		machineConfig.Object["os"] = vsphereMachineConfig.OS
-		machineConfig.Object["pool"] = vmwarevsphereMachineConfigs.Pool
+		machineConfig.Object["pool"] = machineConfigs.VmwareMachineConfigs.Pool
 		machineConfig.Object["sshPassword"] = vsphereMachineConfig.SSHPassword
 		machineConfig.Object["sshPort"] = vsphereMachineConfig.SSHPort
 		machineConfig.Object["sshUser"] = vsphereMachineConfig.SSHUser
@@ -103,12 +98,10 @@ func NewVSphereMachineConfig(generatedPoolName, namespace string) []unstructured
 	return multiConfig
 }
 
-func GetVsphereMachineRoles() []Roles {
-	var vmwarevsphereMachineConfigs VmwarevsphereMachineConfigs
-	config.LoadConfig(VmwarevsphereMachineConfigConfigurationFileKey, &vmwarevsphereMachineConfigs)
+func GetVsphereMachineRoles(machineConfigs MachineConfigs) []Roles {
 	var allRoles []Roles
 
-	for _, vsphereMachineConfig := range vmwarevsphereMachineConfigs.VmwarevsphereMachineConfig {
+	for _, vsphereMachineConfig := range machineConfigs.VmwareMachineConfigs.VmwarevsphereMachineConfig {
 		allRoles = append(allRoles, vsphereMachineConfig.Roles)
 	}
 

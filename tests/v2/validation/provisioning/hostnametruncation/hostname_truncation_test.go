@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/rancher/tests/v2/actions/reports"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/cloudcredentials"
 	"github.com/rancher/shepherd/pkg/config"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -104,7 +105,10 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 
 				rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], r.clustersConfig)
 
-				clusterObject, err := provisioning.CreateProvisioningCluster(r.client, *rke2Provider, testConfig, hostnamePools)
+				credentialSpec := cloudcredentials.LoadCloudCredential(string(rke2Provider.Name))
+				machineConfigSpec := machinepools.LoadMachineConfigs(string(rke2Provider.Name))
+
+				clusterObject, err := provisioning.CreateProvisioningCluster(r.client, *rke2Provider, credentialSpec, testConfig, machineConfigSpec, hostnamePools)
 				reports.TimeoutClusterReport(clusterObject, err)
 				require.NoError(r.T(), err)
 
