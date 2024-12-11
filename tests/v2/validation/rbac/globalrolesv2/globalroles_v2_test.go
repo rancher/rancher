@@ -44,11 +44,6 @@ func (gr *GlobalRolesV2TestSuite) SetupSuite() {
 	require.NoError(gr.T(), err)
 
 	gr.client = client
-
-	// Disabling configuration here is to avoid interference with other pipeline tests.
-	// Updates to the config are temporarily disabled during the test
-	// and are automatically enabled during cleanup.
-	provisioning.DisableUpdateConfig(gr.client)
 }
 
 func (gr *GlobalRolesV2TestSuite) validateRBACResources(createdUser *management.User, inheritedRoles []string) (string, int) {
