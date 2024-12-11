@@ -14,9 +14,9 @@ check_go() {
 # Install Go if not already installed
 if ! check_go; then
     echo "Go not found. Installing Go..."
-    curl -L -o go1.22.4.linux-amd64.tar.gz https://go.dev/dl/go1.22.4.linux-amd64.tar.gz --insecure
-    tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
-    rm go1.22.4.linux-amd64.tar.gz
+    curl -L -o go1.23.4.linux-amd64.tar.gz https://go.dev/dl/go1.23.4.linux-amd64.tar.gz --insecure
+    tar -C /usr/local -xzf go1.23.4.linux-amd64.tar.gz
+    rm go1.23.4.linux-amd64.tar.gz
     echo "Go installed successfully."
 else
     echo "Go is already installed."
