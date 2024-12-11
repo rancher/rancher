@@ -45,6 +45,11 @@ func (ct *ClusterTemplateRKE1RBACTestSuite) SetupSuite() {
 	client, err := rancher.NewClient("", testSession) //ct.client
 	require.NoError(ct.T(), err)
 
+	// Disabling configuration here is to avoid interference with other pipeline tests.
+	// Updates to the config are temporarily disabled during the test
+	// and are automatically enabled during cleanup.
+	provisioning.DisableUpdateConfig(client)
+
 	ct.client = client
 
 	if ct.provisioningConfig.RKE1KubernetesVersions == nil {
@@ -57,8 +62,6 @@ func (ct *ClusterTemplateRKE1RBACTestSuite) SetupSuite() {
 	if ct.provisioningConfig.CNIs == nil {
 		ct.provisioningConfig.CNIs = []string{clustertemplates.CniCalico}
 	}
-
-	provisioning.DisableUpdateConfig(ct.client)
 }
 
 func (ct *ClusterTemplateRKE1RBACTestSuite) TestClusterTemplateEnforcementForStandardUser() {
