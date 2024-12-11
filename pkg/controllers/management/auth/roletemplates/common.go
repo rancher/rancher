@@ -19,6 +19,32 @@ const (
 	projectOwner   = "project-owner"
 )
 
+const (
+	// Statuses
+	clusterRoleTemplateBindingDelete = "ClusterRoleTemplateBindingDelete"
+	labelsReconciled                 = "LabelsReconciled"
+	removeClusterRoleBindings        = "RemoveClusterRoleBindings"
+	reconcileSubject                 = "ReconcileSubject"
+	reconcileMembershipBindings      = "ReconcileMembershipBindings"
+	reconcileBindings                = "ReconcileBindings"
+	// Reasons
+	clusterRoleBindingDeleted               = "ClusterRoleBindingDeleted"
+	bindingsExists                          = "BindingsExists"
+	membershipBindingExists                 = "MembershipBindingExists"
+	subjectExists                           = "SubjectExists"
+	crtbHasNoSubject                        = "CRTBHasNoSubject"
+	clusterMembershipBindingDeleted         = "ClusterMembershipBindingDeleted"
+	failedToCreateClusterRoleBinding        = "FailedToCreateClusterRoleBinding"
+	failedToCreateOrUpdateMembershipBinding = "FailedToCreateOrUpdateMembershipBinding"
+	failedToCreateUser                      = "FailedToCreateUser"
+	failedToDeleteClusterRoleBinding        = "FailedToDeleteClusterRoleBinding"
+	failedToGetDesiredClusterRoleBindings   = "FailedToGetDesiredClusterRoleBindings"
+	failedToGetRoleTemplate                 = "FailedToGetRoleTemplate"
+	failedToGetUser                         = "FailedToGetUser"
+	failedToListExistingClusterRoleBindings = "FailedToGetExistingClusterRoleBindings"
+	failedToDeleteClusterMembershipBinding  = "FailedToDeleteClusterMembershipBindings"
+)
+
 // createOrUpdateMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster or project specified by the CRTB or PRTB.
 func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) (*v1.ClusterRoleBinding, error) {
 	roleName := getMembershipRoleName(rt, rtb)

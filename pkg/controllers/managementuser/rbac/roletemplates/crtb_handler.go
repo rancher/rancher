@@ -2,20 +2,26 @@ package roletemplates
 
 import (
 	"errors"
-	"fmt"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
+	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 type crtbHandler struct {
 	impersonationHandler *impersonationHandler
 	crbClient            rbacv1.ClusterRoleBindingController
+	crtbCache            controllersv3.ClusterRoleTemplateBindingCache
+	crtbClient           controllersv3.ClusterRoleTemplateBindingClient
+	s                    *status.Status
 }
 
 func newCRTBHandler(uc *config.UserContext) *crtbHandler {
@@ -26,25 +32,49 @@ func newCRTBHandler(uc *config.UserContext) *crtbHandler {
 			crtbClient:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 			prtbClient:  uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 		},
-		crbClient: uc.RBACw.ClusterRoleBinding(),
+		crbClient:  uc.RBACw.ClusterRoleBinding(),
+		crtbCache:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		crtbClient: uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		s:          status.NewStatus(),
 	}
 }
 
 // OnChange ensures that the correct ClusterRoleBinding exists for the ClusterRoleTemplateBinding
 func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	remoteConditions := []metav1.Condition{}
 	if crtb == nil || crtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
+	if err := c.reconcileBindings(crtb, &remoteConditions); err != nil {
+		return nil, errors.Join(err, c.updateStatus(crtb, remoteConditions))
+	}
+
+	// Ensure a service account impersonator exists on the cluster
+	var err error
+	if crtb.UserName != "" {
+		err = c.impersonationHandler.ensureServiceAccountImpersonator(crtb.UserName)
+		c.s.AddCondition(&remoteConditions, metav1.Condition{Type: ensureServiceAccountImpersonator}, serviceAccountImpersonatorExists, err)
+	}
+
+	return crtb, errors.Join(err, c.updateStatus(crtb, remoteConditions))
+}
+
+// reconcileBindings builds and creates ClusterRoleBinding for CRTB and removes any CRBs that shouldn't exist
+func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: reconcileClusterRoleBindings}
+
 	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
 	crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, ownerLabel, crtb.RoleTemplateName)
 	if err != nil {
-		return nil, err
+		c.s.AddCondition(remoteConditions, condition, failureToBuildClusterRoleBinding, err)
+		return err
 	}
 
 	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: ownerLabel})
 	if err != nil {
-		return nil, err
+		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
+		return err
 	}
 
 	// Find if there is a CRB that already exists and delete all excess CRBs
@@ -55,36 +85,48 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 			continue
 		}
 		if err := c.crbClient.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
-			return nil, err
+			c.s.AddCondition(remoteConditions, condition, failureToDeleteClusterRoleBinding, err)
+			return err
 		}
 	}
 
 	// If we didn't find an existing CRB, create it
 	if matchingCRB == nil {
 		if _, err := c.crbClient.Create(crb); err != nil {
-			return nil, err
+			c.s.AddCondition(remoteConditions, condition, failureToCreateClusterRoleBinding, err)
+			return err
 		}
 	}
-
-	// Ensure a service account impersonator exists on the cluster
-	if crtb.UserName != "" {
-		if err := c.impersonationHandler.ensureServiceAccountImpersonator(crtb.UserName); err != nil {
-			return nil, fmt.Errorf("error deleting service account impersonator: %w", err)
-		}
-	}
-
-	return crtb, nil
+	c.s.AddCondition(remoteConditions, condition, clusterRoleBindingsExists, nil)
+	return nil
 }
 
 // OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding
-func (c *crtbHandler) OnRemove(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
+	if err != nil {
+		return crtb, errors.Join(err, c.updateStatus(crtb, crtb.Status.RemoteConditions))
+	}
+
+	if crtb.UserName != "" {
+		err = c.impersonationHandler.deleteServiceAccountImpersonator(crtb.UserName)
+		c.s.AddCondition(&crtb.Status.RemoteConditions, metav1.Condition{Type: deleteServiceAccountImpersonator}, failureToDeleteServiceAccount, err)
+	}
+	return nil, errors.Join(err, c.updateStatus(crtb, crtb.Status.RemoteConditions))
+}
+
+// deleteBindings removes cluster role bindings owned by CRTB
+func (c *crtbHandler) deleteBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: deleteClusterRoleBindings}
+
 	lo := metav1.ListOptions{
 		LabelSelector: rbac.CreateCRTBOwnerLabel(crtb.Name),
 	}
 
 	crbs, err := c.crbClient.List(lo)
 	if err != nil {
-		return nil, err
+		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
+		return err
 	}
 
 	var returnError error
@@ -95,10 +137,43 @@ func (c *crtbHandler) OnRemove(key string, crtb *v3.ClusterRoleTemplateBinding) 
 		}
 	}
 
-	if crtb.UserName != "" {
-		if err = c.impersonationHandler.deleteServiceAccountImpersonator(crtb.UserName); err != nil {
-			return nil, err
+	c.s.AddCondition(remoteConditions, condition, clusterRoleBindingsDeleted, returnError)
+	return returnError
+}
+
+var timeNow = func() time.Time {
+	return time.Now()
+}
+
+func (c *crtbHandler) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remoteConditions []metav1.Condition) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		crtbFromCluster, err := c.crtbCache.Get(crtb.Namespace, crtb.Name)
+		if err != nil {
+			return err
 		}
-	}
-	return nil, returnError
+		if status.CompareConditions(crtbFromCluster.Status.RemoteConditions, remoteConditions) {
+			return nil
+		}
+
+		crtbFromCluster.Status.SummaryRemote = status.SummaryCompleted
+		if crtbFromCluster.Status.SummaryLocal == status.SummaryCompleted {
+			crtbFromCluster.Status.Summary = status.SummaryCompleted
+		}
+		for _, c := range remoteConditions {
+			if c.Status != metav1.ConditionTrue {
+				crtbFromCluster.Status.Summary = status.SummaryError
+				crtbFromCluster.Status.SummaryRemote = status.SummaryError
+				break
+			}
+		}
+
+		crtbFromCluster.Status.LastUpdateTime = timeNow().String()
+		crtbFromCluster.Status.ObservedGenerationRemote = crtb.ObjectMeta.Generation
+		crtbFromCluster.Status.RemoteConditions = remoteConditions
+		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }

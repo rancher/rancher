@@ -8,8 +8,25 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+)
+
+const (
+	// Statuses
+	reconcileClusterRoleBindings     = "ReconcileClusterRoleBindings"
+	deleteClusterRoleBindings        = "DeleteClusterRoleBindings"
+	ensureServiceAccountImpersonator = "EnsureServiceAccountImpersonator"
+	deleteServiceAccountImpersonator = "DeleteServiceAccountImpersonator"
+	// Reasons
+	clusterRoleBindingsExists         = "ClusterRoleBindingsExists"
+	clusterRoleBindingsDeleted        = "ClusterRoleBindingsDeleted"
+	serviceAccountImpersonatorExists  = "ServiceAccountImpersonatorExists"
+	failureToEnsureServiceAccount     = "FailureToEnsureServiceAccount"
+	failureToDeleteServiceAccount     = "FailureToDeleteServiceAccount"
+	failureToBuildClusterRoleBinding  = "FailureToBuildClusterRoleBinding"
+	failureToListClusterRoleBindings  = "FailureToListClusterRoleBindings"
+	failureToDeleteClusterRoleBinding = "FailureToDeleteClusterRoleBinding"
+	failureToCreateClusterRoleBinding = "FailureToCreateClusterRoleBinding"
 )
 
 type impersonationHandler struct {
@@ -36,7 +53,7 @@ func (ih *impersonationHandler) ensureServiceAccountImpersonator(username string
 
 // deleteServiceAccountImpersonator checks if there are any CRBTs or PRTBs for this user. If there are none, remove their Service Account Impersonator.
 func (ih *impersonationHandler) deleteServiceAccountImpersonator(username string) error {
-	lo := v1.ListOptions{FieldSelector: "userName=" + username}
+	lo := metav1.ListOptions{FieldSelector: "userName=" + username}
 	crtbs, err := ih.crtbClient.List(ih.userContext.ClusterName, lo)
 	if err != nil {
 		return err
