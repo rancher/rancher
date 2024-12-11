@@ -1,3 +1,7 @@
+// Turn off creation of Alias types, which break code generation.
+// This can be removed after migrating to k8s 1.32 code generators that are aware of the new type.
+// For more details see https://github.com/rancher/rancher/issues/47207
+//
 //go:debug gotypesalias=0
 package main
 
