@@ -70,6 +70,13 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
+	if config.SearchUsingServiceAccount {
+		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
+		if err != nil {
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		}
+	}
+
 	searchOpRequest := ldap.NewWholeSubtreeSearchRequest(
 		userDN,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
