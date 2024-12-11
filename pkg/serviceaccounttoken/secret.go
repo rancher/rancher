@@ -175,7 +175,7 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 		if secret != nil {
 			return secret, nil
 		}
-		logrus.Infof("ServiceAccount secret did not exist for ServiceACcount %s falling back to listing mechanism", sa.Name)
+		logrus.Infof("ServiceAccount secret did not exist for ServiceAccount %s falling back to listing mechanism", sa.Name)
 	}
 
 	return findSecretForSA(ctx, sa, secretLister, secretClient)
