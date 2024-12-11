@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	k8sappsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 )
@@ -219,7 +220,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					if errors.IsNotFound(err) {
 						toEnable = true
 					} else {
-						logrus.Warnf("[systemcharts] failed to get the deployment %s/%s: %s", namespace.System, sucDeploymentName, err.Error())
+						logrus.Warnf("[systemcharts] failed to get the deployment %s/%s: %v", namespace.System, sucDeploymentName, err)
 					}
 				}
 				if suc != nil {
@@ -240,50 +241,67 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 // when a specific event occurs on the target deployment. It is currently used to manage
 // the migration from the legacy k3s-based-upgrader app to the system-upgrade-controller app.
 func (h *handler) onDeployment(_ string, d *k8sappsv1.Deployment) (*k8sappsv1.Deployment, error) {
-	var found bool
-	if d != nil && d.Namespace == namespace.System && d.Name == sucDeploymentName {
-		appName, ok := d.Labels[legacyAppLabel]
-		if ok {
-			if appName == k3sbasedupgrade.K3sAppName || appName == k3sbasedupgrade.Rke2AppName {
-				found = true
-			}
-		}
+	if d == nil || d.Namespace != namespace.System || d.Name != sucDeploymentName {
+		return d, nil
 	}
-	if found {
-		index := slices.Index(d.Finalizers, legacyAppFinalizer)
-		logrus.Infof("[systemcharts] found deployment %s/%s with label %s=%s, index of target finalzier = %d",
-			d.Namespace, d.Name, legacyAppLabel, d.Labels[legacyAppLabel], index)
-		d = d.DeepCopy()
+	if appName, ok := d.Labels[legacyAppLabel]; !ok || (appName != k3sbasedupgrade.K3sAppName && appName != k3sbasedupgrade.Rke2AppName) {
+		return d, nil
+	}
+	index := slices.Index(d.Finalizers, legacyAppFinalizer)
+	logrus.Infof("[systemcharts] found deployment %s/%s with label %s=%s, index of target finalzier = %d",
+		d.Namespace, d.Name, legacyAppLabel, d.Labels[legacyAppLabel], index)
+	if (d.DeletionTimestamp != nil && index == -1) || (d.DeletionTimestamp == nil && index >= 0) {
+		return d, nil
+	}
+	var err error
+	switch {
+	case d.DeletionTimestamp != nil && index >= 0:
 		// When the deployment is being deleted, remove the finalizer if it exists, and enqueue the rancher-charts clusterRepo
-		if d.DeletionTimestamp != nil {
-			if index >= 0 {
-				var finalizers []string
-				finalizers = append(finalizers, d.Finalizers[:index]...)
-				finalizers = append(finalizers, d.Finalizers[index+1:]...)
-				d.Finalizers = finalizers
-				err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					_, err := h.deployment.Update(d)
-					return err
-				})
-				if err != nil {
-					return nil, fmt.Errorf("[systemcharts] failed to update deployment %s/%s: %w", d.Namespace, d.Name, err)
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			d, err = h.deployment.Get(d.Namespace, d.Name, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
 				}
+				return err
 			}
-			logrus.Infof("[systemcharts] enqueue %s", repoName)
-			h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
-		} else {
-			// Add the finalizer if it is absent, ensuring Wrangler can detect the deletion event
+			index := slices.Index(d.Finalizers, legacyAppFinalizer)
 			if index == -1 {
-				d.Finalizers = append(d.Finalizers, legacyAppFinalizer)
-				err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					_, err := h.deployment.Update(d)
-					return err
-				})
-				if err != nil {
-					return nil, fmt.Errorf("[systemcharts] failed to update deployment %s/%s: %w", d.Namespace, d.Name, err)
-				}
+				return nil
 			}
+			d = d.DeepCopy()
+			d.Finalizers = append(d.Finalizers[:index], d.Finalizers[index+1:]...)
+			d, err = h.deployment.Update(d)
+			return err
+		}); err != nil {
+			return nil, fmt.Errorf("failed to update deployment %s/%s: %w", d.Namespace, d.Name, err)
 		}
+		logrus.Infof("[systemcharts] enqueue %s", repoName)
+		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
+
+	case d.DeletionTimestamp == nil && index == -1:
+		// If the deployment is not being deleted, add the finalizer if it is absent to ensure Wrangler can detect the deletion event
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			d, err = h.deployment.Get(d.Namespace, d.Name, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			index := slices.Index(d.Finalizers, legacyAppFinalizer)
+			if index >= 0 {
+				return nil
+			}
+			d = d.DeepCopy()
+			d.Finalizers = append(d.Finalizers, legacyAppFinalizer)
+			d, err = h.deployment.Update(d)
+			return err
+		}); err != nil {
+			return nil, fmt.Errorf("failed to update deployment %s/%s: %w", d.Namespace, d.Name, err)
+		}
+	default:
+		return d, nil
 	}
 	return d, nil
 }
