@@ -87,6 +87,30 @@ spec:
                 description: CacheState is the cache status of the plugin.
                 nullable: true
                 type: string
+              error:
+                description: Error is the error message if any.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is used by Rancher controller to track
+                  the latest generation of the resource that it triggered on.
+                format: int64
+                type: integer
+              ready:
+                default: false
+                description: |-
+                  Ready is the readiness of the plugin.
+                  Defaults to false.
+                type: boolean
+              retryAt:
+                description: RetryAt is the time at which the plugin should be retried.
+                format: date-time
+                type: string
+              retryNumber:
+                description: RetryNumber is the number of times the plugin has been
+                  retried.
+                type: integer
+            required:
+            - observedGeneration
             type: object
         required:
         - spec
