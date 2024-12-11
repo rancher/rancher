@@ -1,3 +1,5 @@
+//go:debug gotypesalias=0
+
 // This program generates a Go file containing a set of exported constants that represent
 // configuration variables of Rancher at build-time.
 package main
