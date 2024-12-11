@@ -150,8 +150,17 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	}
 
 	index, err = oci.GenerateIndex(ociClient, clusterRepo.Spec.URL, secret, clusterRepo.Spec, *newStatus, index)
-	// If there is 401 or 403 error code, then we don't reconcile further and wait for 24 hours interval
 	var errResp *errcode.ErrorResponse
+	// If there is 401/403/404 error code, then we don't reconcile further at all and wait for user to fix the issue.
+	if errors.As(err, &errResp) && (errResp.StatusCode == http.StatusUnauthorized ||
+		errResp.StatusCode == http.StatusForbidden ||
+		errResp.StatusCode == http.StatusNotFound) {
+		errorMsg := fmt.Sprintf("error %d: %s", errResp.StatusCode, http.StatusText(errResp.StatusCode))
+		newStatus.NumberOfRetries = 0
+		newStatus.NextRetryAt = metav1.Time{}
+
+		return setCondition(clusterRepo, err, newStatus, ociCondition, errorMsg, o.clusterRepoController)
+	}
 	// If there is 429 error code and max retry is reached, then we don't reconcile further and wait for 24 hours interval,
 	// but we also create the configmap for future usecases.
 	if errors.As(err, &errResp) && errResp.StatusCode == http.StatusTooManyRequests {

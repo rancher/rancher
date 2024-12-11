@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -464,6 +465,35 @@ func setConditionWithInterval(clusterRepo *catalog.ClusterRepo,
 	}
 
 	controller.EnqueueAfter(clusterRepo.Name, backoff)
+
+	return clusterRepo, nil
+}
+
+func setCondition(clusterRepo *catalog.ClusterRepo,
+	err error,
+	newStatus *catalog.RepoStatus,
+	cond catalog.RepoCondition,
+	condMessage string,
+	controller catalogcontrollers.ClusterRepoController,
+) (*catalog.ClusterRepo, error) {
+	newErr := errors.New(condMessage)
+	downloaded := condition.Cond(cond)
+
+	if apierrors.IsConflict(err) {
+		err = nil
+	}
+	downloaded.SetError(newStatus, "", newErr)
+
+	newStatus.ObservedGeneration = clusterRepo.Generation
+	if !equality.Semantic.DeepEqual(newStatus, &clusterRepo.Status) {
+		//Since status has changed, update the lastUpdatedTime
+		downloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
+		clusterRepo.Status = *newStatus
+		_, statusErr := controller.UpdateStatus(clusterRepo)
+		if statusErr != nil {
+			return clusterRepo, statusErr
+		}
+	}
 
 	return clusterRepo, nil
 }
