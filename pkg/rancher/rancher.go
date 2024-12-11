@@ -35,6 +35,7 @@ import (
 	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
@@ -231,6 +232,15 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
+
+	wranglerContext.OnLeader(func(ctx context.Context) error {
+		serviceaccounttoken.StartServiceAccountSecretCleaner(
+			ctx,
+			wranglerContext.Core.Secret().Cache(),
+			wranglerContext.Core.ServiceAccount().Cache(),
+			wranglerContext.K8s.CoreV1())
+		return nil
+	})
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
