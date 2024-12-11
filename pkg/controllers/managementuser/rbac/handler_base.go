@@ -39,7 +39,6 @@ const (
 	prtbByNsAndNameIndex             = "authz.cluster.cattle.io/rtb-owner-updated"
 	rtbByClusterAndRoleTemplateIndex = "authz.cluster.cattle.io/rtb-by-cluster-rt"
 	rtbByClusterAndUserIndex         = "authz.cluster.cattle.io/rtb-by-cluster-user"
-	nsByProjectIndex                 = "authz.cluster.cattle.io/ns-by-project"
 	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"
 	crbByRoleAndSubjectIndex         = "authz.cluster.cattle.io/crb-by-role-and-subject"
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
@@ -56,12 +55,18 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	// Add cache informer to project role template bindings
 	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
+	prtbIndexers := map[string]cache.IndexFunc{
+		nsutils.PrtbByRoleTemplateIndex: nsutils.PrtbByRoleTemplateName,
+	}
+	prtbInformer.AddIndexers(prtbIndexers)
+
+	// Add cache informer to cluster role template bindings
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 
 	// Index for looking up namespaces by projectID annotation
 	nsInformer := workload.Core.Namespaces("").Controller().Informer()
 	nsIndexers := map[string]cache.IndexFunc{
-		nsByProjectIndex: nsutils.NsByProjectID,
+		nsutils.NsByProjectIndex: nsutils.NsByProjectID,
 	}
 	nsInformer.AddIndexers(nsIndexers)
 
@@ -129,6 +134,12 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
 	relatedresource.WatchClusterScoped(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
 		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
+
+	nsEnqueuer := nsutils.NsEnqueuer{
+		PrtbCache: prtbInformer.GetIndexer(),
+		NsIndexer: nsInformer.GetIndexer(),
+	}
+	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
 }
 
 type managerInterface interface {
