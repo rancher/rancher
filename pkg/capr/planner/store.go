@@ -357,7 +357,7 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
 // maxFailures is the number of attempts the system-agent will make to run the plan (in a failed state). failureThreshold is used to determine when the plan has failed.
-func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, joinedTo string, maxFailures, failureThreshold int, overwriteFailureKeys bool) error {
+func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, joinedTo string, maxFailures, failureThreshold int) error {
 	if maxFailures < failureThreshold && failureThreshold != -1 && maxFailures != -1 {
 		return fmt.Errorf("failureThreshold (%d) cannot be greater than maxFailures (%d)", failureThreshold, maxFailures)
 	}
@@ -400,21 +400,15 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, join
 	// If the plan is being updated, then delete the probe-statuses so their healthy status will be reported as healthy only when they pass.
 	delete(secret.Data, "probe-statuses")
 
-	_, maxFailuresHasBeenSet := secret.Data["max-failures"]
 	secret.Data["plan"] = data
 	if maxFailures > 0 || maxFailures == -1 {
-		if !maxFailuresHasBeenSet || maxFailuresHasBeenSet && overwriteFailureKeys {
-			secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))
-		}
+		secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))
 	} else {
 		delete(secret.Data, "max-failures")
 	}
 
-	_, failureThresholdHasBeenSet := secret.Data["failure-threshold"]
 	if failureThreshold > 0 || failureThreshold == -1 {
-		if !failureThresholdHasBeenSet || failureThresholdHasBeenSet && overwriteFailureKeys {
-			secret.Data["failure-threshold"] = []byte(strconv.Itoa(failureThreshold))
-		}
+		secret.Data["failure-threshold"] = []byte(strconv.Itoa(failureThreshold))
 	} else {
 		delete(secret.Data, "failure-threshold")
 	}
@@ -483,7 +477,7 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 // assignAndCheckPlan assigns the given newPlan to the designated server in the planEntry, and will return nil if the plan is assigned and in sync.
 func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan plan.NodePlan, joinedTo string, failureThreshold, maxRetries int) error {
 	if entry.Plan == nil || !equality.Semantic.DeepEqual(entry.Plan.Plan, newPlan) {
-		if err := store.UpdatePlan(entry, newPlan, joinedTo, failureThreshold, maxRetries, true); err != nil {
+		if err := store.UpdatePlan(entry, newPlan, joinedTo, failureThreshold, maxRetries); err != nil {
 			return err
 		}
 		return errWaiting(fmt.Sprintf("starting %s", msg))
