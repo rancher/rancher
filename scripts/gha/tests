@@ -7,13 +7,8 @@ cleanup()
 {
     EXIT=$?
     set +ex
-    echo Stopping rancher server
-    kill $RANCHER_RUN_PID
-    wait $RANCHER_RUN_PID
-    if [ $PID != -1 ]; then
-      kill $PID
-      wait $PID
-    fi
+    echo Stopping and removing rancher server container
+    docker rm -f rancher-server
     return $EXIT
 }
 
@@ -75,58 +70,40 @@ curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYS
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
-run_rancher()
-{
-    RESTART_COUNT=0
-    while sleep 2; do
-        if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
-            echo Rancher died
-            dump_rancher_logs
-            echo K3s logs were:
-            echo -e "-----K3S-LOG-DUMP-START-----"
-            cat build/testdata/k3s.log
-            echo -e "\n-----K3S-LOG-DUMP-END-----"
-            set +e
-            echo Attempting to kill K3s
-            pkill -e k3s
-            set -e
-            PID=-1
-            if [ "$RESTART_COUNT" = "2" ]; then
-                echo Rancher died 3 times, aborting
-                kill -42 $PWRAPPROC
-            fi
-            RESTART_COUNT=$((RESTART_COUNT + 1))
-            sleep 5
-        fi
-        if [ "$PID" = "-1" ]; then
-          echo Starting rancher server using run
-          ./scripts/gha/run >/tmp/rancher.log 2>&1 &
-          PID=$!
-        fi
-        sleep 2
-    done
-}
-
 dump_rancher_logs()
 {
-  echo Rancher logs were
+  echo Dumping Rancher + K3s Container Logs
   echo -e "-----RANCHER-LOG-DUMP-START-----"
-  cat /tmp/rancher.log
+  docker logs rancher-server &> /tmp/rancher.log
+  if [ -s /tmp/rancher.log ]; then
+    cat /tmp/rancher.log | gzip | base64 -w 0
+  else
+    echo "------EMPTY------"
+  fi
   echo -e "\n-----RANCHER-LOG-DUMP-END-----"
+  docker cp rancher-server:/var/lib/rancher/k3s.log /tmp/k3s.log
+  echo -e "-----K3S-LOG-DUMP-START-----"
+  if [ -s /tmp/k3s.log ]; then
+    cat /tmp/k3s.log | gzip | base64 -w 0
+  else
+    echo "------EMPTY------"
+  fi
+  echo -e "\n-----K3S-LOG-DUMP-END-----"
 }
 
-# uncomment to get startup logs. Don't leave them on because it slows drone down too
-# much
-#tail -F /tmp/rancher.log &
-#TPID=$!
+export -f dump_rancher_logs
 
-trap "exit 1" 42
-PWRAPPROC="$$"
-
-PID=-1
-run_rancher &
-RANCHER_RUN_PID=$!
+./scripts/gha/run 2>&1
 trap cleanup exit
+
+echo "Waiting for K3s kubeconfig to be generated"
+./scripts/retry \
+  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --sleep 5 `# Sleep for 2 seconds in between attempts` \
+  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
+  --message "/etc/rancher/k3s/k3s.yaml did not exist after {{elapsed}} seconds" `# Print this progress message` \
+  --exit-command "dump_rancher_logs" `# Dump logs to find out why K3s did not start` \
+  "stat /etc/rancher/k3s/k3s.yaml &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
@@ -134,7 +111,8 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &"
+  --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 ./scripts/retry \
@@ -142,7 +120,8 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &"
+  --exit-command "dump_rancher_logs" `# Dump logs to find out why capi-controller-manager did not start` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager  &>/dev/null"
 
 
 echo Running integrationsetup

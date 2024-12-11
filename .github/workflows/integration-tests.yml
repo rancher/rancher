@@ -16,28 +16,24 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
 jobs:
   test:
-    runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
+    runs-on:
+      - runs-on
+      - spot=capacity-optimized
+      - runner=32cpu-linux-x64
+      - family=c7i-flex+c7i+c7a
+      - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
       K3D_VERSION: v5.7.1
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Configure Docker for cgroupfs
+        run: |
+          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Clean up Docker
-        run: |
-          docker system prune -af
-          docker volume prune -f
-      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
-      - name: Clean runner
-        run: |
-          # removes dotnet
-          sudo rm -rf /usr/share/dotnet
-          # removes haskell
-          sudo rm -rf /opt/ghc
-          # removes android sdk
-          sudo rm -rf /usr/local/lib/android
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -78,22 +74,14 @@ jobs:
           docker image ls
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
-      - name: Uninstall existing Python versions
-        run: |
-          sudo apt-get remove -y python3
-          sudo apt-get autoremove -y
-          sudo apt-get purge -y python3
-          sudo apt-get clean
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Check Python version
         run: |
-          sudo rm -rf /usr/bin/python3
-          sudo cp $(which python3) /usr/bin/python3
-          python3 --version
-          python3 -m ensurepip --upgrade
+          python -V
+          python3 -V
       - name: Install Python and dependencies
         run: |
           sudo apt-get update
