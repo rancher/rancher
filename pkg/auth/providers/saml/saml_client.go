@@ -45,6 +45,8 @@ var appliedVersion string
 var initMu sync.Mutex
 
 const UITranslationKeyForErrorMessage = "invalidSamlAttrs"
+const dashboardAuthPath = "/dashboard/auth"
+const loginPath = "/login?"
 
 // InitializeSamlServiceProvider validates changes to SamlConfig structures and
 // creates or updates the associated in-memory information. It is called from the
@@ -323,13 +325,13 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 			// The redirect url is bad. That is bad for error reporting.
 			// We go with the old string ops, and pray.
 
-			redirectURL += "&errorCode=500&errorMsg=" + url.QueryEscape(err.Error())
+			redirectURL += "&errorCode=500&err=" + url.QueryEscape(err.Error())
 		} else {
 			// Principled extension of a good url with the error information
 
 			params := rURL.Query()
 			params.Add("errorCode", "500")
-			params.Add("errorMsg", err.Error())
+			params.Add("err", err.Error())
 
 			rURL.RawQuery = params.Encode()
 
@@ -363,7 +365,10 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	rancherAction := s.clientState.GetState(r, "Rancher_Action")
 
 	if rancherAction == loginAction {
-		redirectURL += "/login?"
+		if !strings.Contains(redirectURL, dashboardAuthPath) {
+			redirectURL += dashboardAuthPath
+		}
+		redirectURL += loginPath
 	} else if rancherAction == testAndEnableAction {
 		// the first query param is config=saml_provider_name set by UI
 		redirectURL += "&"
@@ -394,7 +399,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if err != nil {
 		log.Error(err)
 		// UI uses this translation key to get the error message
-		http.Redirect(w, r, redirectURL+"errorCode=422&errorMsg="+UITranslationKeyForErrorMessage, http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=422&err="+UITranslationKeyForErrorMessage, http.StatusFound)
 		return
 	}
 	allowedPrincipals := config.AllowedPrincipalIDs
@@ -419,7 +424,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			return
 		} else if err != nil && user != nil {
-			http.Redirect(w, r, redirectURL+"errorCode=422&errorMsg="+err.Error(), http.StatusFound)
+			http.Redirect(w, r, redirectURL+"errorCode=422&err="+err.Error(), http.StatusFound)
 			return
 		}
 
