@@ -11,6 +11,8 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -157,13 +159,17 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	// if roletemplate is not builtin, check if it's inherited/cloned
 	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext, 0)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("ClusterRoleTemplateBinding %s sets a non-existing role template %s. Skipping.", binding.Name, binding.RoleTemplateName)
+			return nil
+		}
 		return err
 	}
 	var clusterRoleName string
 	if isOwnerRole {
-		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clusterowner", clusterName))
+		clusterRoleName = strings.ToLower(fmt.Sprintf("%s-clusterowner", clusterName))
 	} else {
-		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
+		clusterRoleName = strings.ToLower(fmt.Sprintf("%s-clustermember", clusterName))
 	}
 
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
@@ -209,7 +215,7 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 		}
 		for _, rb := range rbs {
 			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, p.Name, binding.Name)
-			if err := c.rbClient.DeleteNamespaced(p.Name, rb.Name, &v1.DeleteOptions{}); err != nil {
+			if err := c.rbClient.DeleteNamespaced(p.Name, rb.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 		}
@@ -234,14 +240,14 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 	}
 
 	set := labels.Set(map[string]string{string(binding.UID): MembershipBindingOwnerLegacy})
-	crbs, err := c.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+	crbs, err := c.crbLister.List(metav1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		return err
 	}
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, crb := range crbs {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			crbToUpdate, updateErr := c.crbClient.Get(crb.Name, v1.GetOptions{})
+			crbToUpdate, updateErr := c.crbClient.Get(crb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
@@ -257,14 +263,14 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 	}
 
 	set = map[string]string{string(binding.UID): CrtbInProjectBindingOwner}
-	rbs, err := c.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
+	rbs, err := c.rbLister.List(metav1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		return err
 	}
 
 	for _, rb := range rbs {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			rbToUpdate, updateErr := c.rbClient.GetNamespaced(rb.Namespace, rb.Name, v1.GetOptions{})
+			rbToUpdate, updateErr := c.rbClient.GetNamespaced(rb.Namespace, rb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
