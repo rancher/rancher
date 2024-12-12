@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 as build
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 as build
 ARG VERSION
 ARG COMMIT
 ARG RKE_VERSION
