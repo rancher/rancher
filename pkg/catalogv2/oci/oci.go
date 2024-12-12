@@ -190,7 +190,10 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 					// fetch the chart.yaml for the latest tag and add it to the index.
 					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
 					if err != nil {
-						return fmt.Errorf("failed to add tag %s in OCI repository %s to helm repo index: %w", maxTag.String(), ociClient.repository, err)
+						// If it fails, skip this repository and continue with the
+						//  next one and also remove it from the indexfile.
+						delete(indexFile.Entries, chartName)
+						logrus.Errorf("failed to add tag %s in OCI repository %s to helm repo index: %v", maxTag.String(), ociClient.repository, err)
 					}
 				}
 			}
