@@ -238,7 +238,11 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 		rt, err := n.m.rtLister.Get("", prtb.RoleTemplateName)
 		if err != nil {
-			return false, errors.Wrapf(err, "couldn't get role template %v", prtb.RoleTemplateName)
+			if apierrors.IsNotFound(err) {
+				logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", prtb.Name, prtb.RoleTemplateName)
+				continue
+			}
+			return false, err
 		}
 
 		roles := map[string]*v3.RoleTemplate{}
