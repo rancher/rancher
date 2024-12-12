@@ -102,6 +102,9 @@ func spinRegistry(layerSize int, chartMediaType, helmManifest bool, testcaseName
 			if _, err := w.Write(manifestJSON); err != nil {
 				assert.NoError(t, err)
 			}
+		case "/v2/testingchart2/manifests/0.1.0":
+			w.WriteHeader(http.StatusForbidden)
+			return
 		}
 	}))
 
