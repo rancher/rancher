@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -35,9 +36,11 @@ import (
 )
 
 const (
-	ConnectClusterInfo    = "/v3/connect/cluster-info"
-	ConnectConfigYamlPath = "/v3/connect/config-yaml"
-	ConnectAgent          = "/v3/connect/agent"
+	ConnectClusterInfo           = "/v3/connect/cluster-info"
+	ConnectConfigYamlPath        = "/v3/connect/config-yaml"
+	ConnectClusterAgentYamlPath  = "/v3/connect/cluster-agent/{token}.yaml"
+	ConnectClusterAgentYamlRegex = `^\/v3\/connect\/cluster-agent\/[bcdfghjklmnpqrstvwxz2456789]{54}\.yaml$` // Per wrangler: pkg/randomtoken
+	ConnectAgent                 = "/v3/connect/agent"
 )
 
 var (
@@ -47,6 +50,8 @@ var (
 type RKE2ConfigServer struct {
 	clusterTokenCache        mgmtcontroller.ClusterRegistrationTokenCache
 	clusterTokens            mgmtcontroller.ClusterRegistrationTokenController
+	mgmtClusterCache         mgmtcontroller.ClusterCache
+	mgmtClusters             mgmtcontroller.ClusterController
 	serviceAccountsCache     corecontrollers.ServiceAccountCache
 	serviceAccounts          corecontrollers.ServiceAccountClient
 	secretsCache             corecontrollers.SecretCache
@@ -56,6 +61,7 @@ type RKE2ConfigServer struct {
 	machines                 capicontrollers.MachineClient
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
+	provisioningClusters     provisioningcontrollers.ClusterController
 	k8s                      kubernetes.Interface
 }
 
@@ -84,21 +90,37 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		machines:                 clients.CAPI.Machine(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
+		provisioningClusters:     clients.Provisioning.Cluster(),
+		mgmtClusterCache:         clients.Mgmt.Cluster().Cache(),
+		mgmtClusters:             clients.Mgmt.Cluster(),
 		k8s:                      clients.K8s,
 	}
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if !r.secrets.Informer().HasSynced() || !r.clusterTokens.Informer().HasSynced() {
+	if !r.secrets.Informer().HasSynced() || !r.clusterTokens.Informer().HasSynced() || !r.provisioningClusters.Informer().HasSynced() || !r.mgmtClusters.Informer().HasSynced() {
 		if err := r.secrets.Informer().GetIndexer().Resync(); err != nil {
 			logrus.Errorf("error re-syncing secrets informer in rke2configserver: %v", err)
 		}
 		if err := r.clusterTokens.Informer().GetIndexer().Resync(); err != nil {
 			logrus.Errorf("error re-syncing clustertokens informer in rke2configserver: %v", err)
 		}
+		if err := r.provisioningClusters.Informer().GetIndexer().Resync(); err != nil {
+			logrus.Errorf("error re-syncing provisioningClusters informer in rke2configserver: %v", err)
+		}
+		if err := r.mgmtClusters.Informer().GetIndexer().Resync(); err != nil {
+			logrus.Errorf("error re-syncing mgmtClusters informer in rke2configserver: %v", err)
+		}
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+
+	reg := regexp.MustCompile(ConnectClusterAgentYamlRegex)
+	// Short circuit if the path is the connect cluster agent yaml path
+	if reg.MatchString(req.URL.Path) {
+		r.connectClusterAgentYAML(rw, req)
+	}
+
 	planSecret, secret, err := r.findSA(req)
 	if apierrors.IsNotFound(err) {
 		rw.WriteHeader(http.StatusUnauthorized)
