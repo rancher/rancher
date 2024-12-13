@@ -259,19 +259,23 @@ func createServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, 
 
 // returns true if the secret has changed.
 func annotateSAWithSecret(ctx context.Context, sa *corev1.ServiceAccount, secret *corev1.Secret, saClient clientv1.ServiceAccountInterface, secretClient clientv1.SecretInterface) (*corev1.ServiceAccount, bool, error) {
-	if sa.Annotations == nil {
-		sa.Annotations = map[string]string{}
+	annotations := sa.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
 	}
 	secretAnnotation := secret.Namespace + "/" + secret.Name
 
 	// If the SA is already annotated with the secret already
-	if ann := sa.Annotations[ServiceAccountSecretRefAnnotation]; ann == secretAnnotation {
+	if ann := annotations[ServiceAccountSecretRefAnnotation]; ann == secretAnnotation {
 		return sa, false, nil
 	}
 
-	sa.Annotations[ServiceAccountSecretRefAnnotation] = secretAnnotation
+	annotations[ServiceAccountSecretRefAnnotation] = secretAnnotation
 
-	updated, err := saClient.Update(ctx, sa, metav1.UpdateOptions{})
+	updated := sa.DeepCopy()
+	updated.ObjectMeta.Annotations = annotations
+
+	updated, err := saClient.Update(ctx, updated, metav1.UpdateOptions{})
 	if err == nil {
 		return updated, false, nil
 	}
