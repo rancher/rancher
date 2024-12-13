@@ -143,6 +143,10 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error)
 		n.machines.Controller().Enqueue(n.clusterNamespace, AllNodeKey)
 	}
 
+	if node == nil || node.DeletionTimestamp != nil {
+		return nil, nil
+	}
+
 	cluster, err := n.nodesSyncer.clusterLister.Get("", n.clusterNamespace)
 	if err != nil {
 		return nil, err
