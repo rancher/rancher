@@ -319,7 +319,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		desiredValue = map[string]interface{}{}
 	}
 	// if tolerations are already present we don't change them
-	if _, ok := desiredValue["tolerations"]; !ok {
+	if v, ok := desiredValue["tolerations"]; !ok || v == nil {
 		var tolerations []v1.Toleration
 		tolerations, err = m.operation.AddCpTaintsToTolerations(tolerations)
 		if err != nil {
