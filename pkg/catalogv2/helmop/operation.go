@@ -1149,6 +1149,12 @@ func (s *Operations) AddCpTaintsToTolerations(tolerations []corev1.Toleration) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to list control plane nodes: %w", err)
 	}
+	if len(cpList.Items) == 0 {
+		cpList, err = s.nodes.List(metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/controlplane=true"})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list control plane nodes: %w", err)
+		}
+	}
 	var allTaints []corev1.Taint
 	for _, cp := range cpList.Items {
 		toAdd, _ := taints.GetToDiffTaints(allTaints, cp.Spec.Taints)
