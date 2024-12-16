@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/shepherd/clients/harvester"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -16,7 +17,6 @@ import (
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -54,7 +54,7 @@ func RegisterHarvesterWithRancher(rancherClient *rancher.Client, harvesterClient
 	}
 
 	updatedCluster := new(provv1.Cluster)
-
+	logrus.Info("creating import cluster in rancher")
 	// wait for rancher's import cluster to be in pending state. No registration occurs yet
 	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		updatedCluster, _, err = clusters.GetProvisioningClusterByName(rancherClient, importCluster.Name, importCluster.Namespace)
@@ -73,9 +73,9 @@ func RegisterHarvesterWithRancher(rancherClient *rancher.Client, harvesterClient
 	}
 
 	var token management.ClusterRegistrationToken
-
+	logrus.Info("waiting on imported cluster")
 	// get the token from rancher's import cluster object once its ready
-	err = kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		res, err := rancherClient.Management.ClusterRegistrationToken.List(&types.ListOpts{Filters: map[string]interface{}{
 			clusterId: updatedCluster.Status.ClusterName,
 		}})
