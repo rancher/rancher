@@ -30,10 +30,10 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.9.5-rc.1
-	github.com/rancher/eks-operator v1.9.5-rc.1
+	github.com/rancher/aks-operator v1.9.5
+	github.com/rancher/eks-operator v1.9.5
 	github.com/rancher/fleet/pkg/apis v0.10.0
-	github.com/rancher/gke-operator v1.9.5-rc.1
+	github.com/rancher/gke-operator v1.9.5
 	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
 	github.com/rancher/rke v1.6.4
 	github.com/rancher/wrangler/v3 v3.0.1-rc.4
