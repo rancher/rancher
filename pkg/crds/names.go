@@ -173,7 +173,7 @@ func UIPluginsCRD() []string {
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
 	"apiservices.management.cattle.io":                                false,
-	"apps.catalog.cattle.io":                                          false,
+	"apps.catalog.cattle.io":                                          true,
 	"authconfigs.management.cattle.io":                                false,
 	"authproviders.management.cattle.io":                              false,
 	"authtokens.management.cattle.io":                                 false,
