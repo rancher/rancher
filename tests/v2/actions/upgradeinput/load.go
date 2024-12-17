@@ -54,6 +54,7 @@ func LoadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Cluster, er
 			cluster.Name = c.Name
 			cluster.ProvisioningInput = c.ProvisioningInput
 			cluster.FeaturesToTest = c.FeaturesToTest
+			cluster.VersionToUpgrade = c.VersionToUpgrade
 
 			clusters = append(clusters, *cluster)
 		}
