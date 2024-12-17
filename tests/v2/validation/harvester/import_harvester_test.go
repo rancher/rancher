@@ -42,6 +42,10 @@ func (h *HarvesterTestSuite) SetupSuite() {
 
 	userConfig := new(provisioninginput.Config)
 	config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
+
+	h.session.RegisterCleanupFunc(func() error {
+		return harvesteraction.ResetHarvesterRegistration(h.harvesterClient)
+	})
 }
 
 func (h *HarvesterTestSuite) TestImport() {

@@ -131,3 +131,23 @@ func RegisterHarvesterWithRancher(rancherClient *rancher.Client, harvesterClient
 		return false, nil
 	})
 }
+
+// ResetHarvesterRegistration sets the clusterRegistrationURL to the default value
+func ResetHarvesterRegistration(harvesterClient *harvester.Client) error {
+
+	clusterSteveUrl, err := harvesterClient.Steve.SteveType(HarvesterSettingType).ByID(clusterRegistrationURL)
+	if err != nil {
+		return err
+	}
+
+	setting := &harvesterv1.Setting{}
+	err = steveV1.ConvertToK8sType(clusterSteveUrl, setting)
+	if err != nil {
+		return err
+	}
+
+	setting.Value = setting.Default
+
+	_, err = harvesterClient.Steve.SteveType(HarvesterSettingType).Update(clusterSteveUrl, setting)
+	return err
+}
