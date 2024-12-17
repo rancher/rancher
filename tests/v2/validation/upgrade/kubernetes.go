@@ -46,16 +46,8 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 		u.T().Skip(u.T(), cluster.VersionToUpgrade, "Kubernetes version to upgrade is not provided, skipping the test")
 	}
 
-	if clusterResp.Labels[provider] == rke {
-		testConfig.KubernetesVersion = cluster.VersionToUpgrade
-		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
-	} else if clusterResp.Labels[provider] == rke2 {
-		testConfig.KubernetesVersion = cluster.VersionToUpgrade
-		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
-	} else {
-		testConfig.KubernetesVersion = cluster.VersionToUpgrade
-		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
-	}
+	testConfig.KubernetesVersion = cluster.VersionToUpgrade
+	testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
 
 	u.Run(testName, func() {
 		clusterMeta, err := extensionscluster.NewClusterMeta(client, cluster.Name)
@@ -207,7 +199,7 @@ func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) erro
 		return err
 	}
 
-	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.FiveSecondTimeout, true, func(ctx context.Context) (done bool, err error) {
+	err = kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.FiveSecondTimeout, true, func(ctx context.Context) (done bool, err error) {
 		isUpgrading, err := client.Management.Cluster.ByID(clusterName)
 		if err != nil {
 			return false, err
