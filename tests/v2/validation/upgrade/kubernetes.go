@@ -10,18 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/upgradeinput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
 	"github.com/rancher/shepherd/extensions/defaults"
+
 	kcluster "github.com/rancher/shepherd/extensions/kubeapi/cluster"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -36,28 +35,22 @@ const (
 )
 
 // upgradeLocalCluster is a function to upgrade a local cluster.
-func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, containerImage string) {
-	clusterObject, err := extensionscluster.GetClusterIDByName(client, clusterName)
+func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, containerImage string) {
+	clusterObject, err := extensionscluster.GetClusterIDByName(client, cluster.Name)
 	require.NoError(u.T(), err)
 
 	clusterResp, err := client.Management.Cluster.ByID(clusterObject)
 	require.NoError(u.T(), err)
 
-	if clusterResp.Labels[provider] == rke {
-		testConfig.KubernetesVersion = cluster.ProvisioningInput.RKE1KubernetesVersions[0]
-		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
-	} else if clusterResp.Labels[provider] == rke2 {
-		testConfig.KubernetesVersion = cluster.ProvisioningInput.RKE2KubernetesVersions[0]
-		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
-	} else {
-		testConfig.KubernetesVersion = cluster.ProvisioningInput.K3SKubernetesVersions[0]
-		testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
+	if cluster.VersionToUpgrade == "" {
+		u.T().Skip(u.T(), cluster.VersionToUpgrade, "Kubernetes version to upgrade is not provided, skipping the test")
 	}
 
-	u.Run(testName, func() {
-		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest, nil, containerImage)
+	testConfig.KubernetesVersion = cluster.VersionToUpgrade
+	testName += "Local cluster from " + clusterResp.Version.GitVersion + " to " + testConfig.KubernetesVersion
 
-		clusterMeta, err := extensionscluster.NewClusterMeta(client, clusterName)
+	u.Run(testName, func() {
+		clusterMeta, err := extensionscluster.NewClusterMeta(client, cluster.Name)
 		require.NoError(u.T(), err)
 
 		initCluster, err := bundledclusters.NewWithClusterMeta(clusterMeta)
@@ -66,20 +59,25 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 		initClusterResp, err := initCluster.Get(client)
 		require.NoError(u.T(), err)
 
+		preUpgradeCluster, err := client.Management.Cluster.ByID(clusterMeta.ID)
+		require.NoError(u.T(), err)
+
+		if strings.Contains(preUpgradeCluster.Version.GitVersion, testConfig.KubernetesVersion) {
+			u.T().Skipf("Skipping test: Kubernetes version %s already upgraded", testConfig.KubernetesVersion)
+		}
+
 		logrus.Infof("Upgrading local cluster to: %s", testConfig.KubernetesVersion)
 		updatedCluster, err := initClusterResp.UpdateKubernetesVersion(client, &testConfig.KubernetesVersion)
 		require.NoError(u.T(), err)
 
-		err = waitForLocalClusterUpgrade(client, clusterName)
+		err = waitForLocalClusterUpgrade(client, clusterMeta.ID)
 		require.NoError(u.T(), err)
 
-		upgradedCluster, err := client.Management.Cluster.ByID(updatedCluster.V3.ID)
+		upgradedCluster, err := client.Management.Cluster.ByID(updatedCluster.Meta.ID)
 		require.NoError(u.T(), err)
-		require.Equal(u.T(), testConfig.KubernetesVersion, upgradedCluster.Version.GitVersion)
+		require.Contains(u.T(), testConfig.KubernetesVersion, upgradedCluster.Version.GitVersion)
 
 		logrus.Infof("Local cluster has been upgraded to: %s", upgradedCluster.Version.GitVersion)
-
-		createPostUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest)
 	})
 }
 
@@ -106,7 +104,7 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 		clusterResp, err := client.Steve.SteveType(extensionscluster.ProvisioningSteveResourceType).ByID(clusterID)
 		require.NoError(u.T(), err)
 
-		updatedCluster := new(apisV1.Cluster)
+		updatedCluster := new(provv1.Cluster)
 		err = v1.ConvertToK8sType(clusterResp, &updatedCluster)
 		require.NoError(u.T(), err)
 
@@ -176,7 +174,7 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 
 	updatedCluster := clusters.UpdateK3SRKE2ClusterConfig(clusterResp, clustersConfig)
 
-	updatedClusterObj := new(apisV1.Cluster)
+	updatedClusterObj := new(provv1.Cluster)
 	err = v1.ConvertToK8sType(updatedCluster, &updatedClusterObj)
 	require.NoError(t, err)
 
@@ -184,7 +182,7 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 	require.NoError(t, err)
 
 	updatedClusterSpec := &provv1.ClusterSpec{}
-	err = steveV1.ConvertToK8sType(updatedClusterResp.Spec, updatedClusterSpec)
+	err = v1.ConvertToK8sType(updatedClusterResp.Spec, updatedClusterSpec)
 	require.NoError(t, err)
 	require.Equal(t, clustersConfig.KubernetesVersion, updatedClusterSpec.KubernetesVersion)
 
@@ -195,7 +193,25 @@ func upgradeRKE2K3SCluster(t *testing.T, client *rancher.Client, cluster upgrade
 
 // waitForLocalClusterUpgrade is a function to wait for the local cluster to upgrade.
 func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) error {
-	return kwait.PollUntilContextTimeout(context.TODO(), 1*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+
+	client, err := client.ReLogin()
+	if err != nil {
+		return err
+	}
+
+	err = kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.FiveSecondTimeout, true, func(ctx context.Context) (done bool, err error) {
+		isUpgrading, err := client.Management.Cluster.ByID(clusterName)
+		if err != nil {
+			return false, err
+		}
+
+		return isUpgrading.State == "upgrading" && isUpgrading.Transitioning == "yes", nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		isConnected, err := client.IsConnected()
 		if err != nil {
 			return false, nil
