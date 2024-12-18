@@ -99,9 +99,8 @@ func (p *PortTestSuite) TestHostPort() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	isHostPortValid, err := validateHostPort(p.client, p.cluster.ID, steveClient, hostPort, daemonsetName)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, daemonsetName, p.namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isHostPortValid)
 }
 
 func (p *PortTestSuite) TestNodePort() {
@@ -147,9 +146,8 @@ func (p *PortTestSuite) TestNodePort() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	isNodePortValid, err := validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, daemonsetName)
+	err = validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, daemonsetName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isNodePortValid)
 }
 
 func (p *PortTestSuite) TestClusterIP() {
@@ -191,9 +189,8 @@ func (p *PortTestSuite) TestClusterIP() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	isClusterIPValid, err := validateClusterIP(p.client, p.cluster.ID, steveClient, serviceResp.ID, port, daemonsetName)
+	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, daemonsetName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isClusterIPValid)
 }
 
 func (p *PortTestSuite) TestLoadBalancer() {
@@ -244,9 +241,8 @@ func (p *PortTestSuite) TestLoadBalancer() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	isLoadBalancerEnabled, err := validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, daemonsetName)
+	err = validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, daemonsetName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isLoadBalancerEnabled)
 }
 
 func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
@@ -302,13 +298,11 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err := validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isClusterIPValid, err := validateClusterIP(p.client, p.cluster.ID, steveClient, serviceResp.ID, port, deploymentName)
+	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isClusterIPValid)
 
 	log.Info("Scaling down deployment")
 	replicas = int32(2)
@@ -316,13 +310,11 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isClusterIPValid, err = validateClusterIP(p.client, p.cluster.ID, steveClient, serviceResp.ID, port, deploymentName)
+	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isClusterIPValid)
 
 	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
@@ -333,13 +325,11 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isClusterIPValid, err = validateClusterIP(p.client, p.cluster.ID, steveClient, serviceResp.ID, port, deploymentName)
+	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isClusterIPValid)
 }
 
 func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
@@ -397,13 +387,11 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err := validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isHostPortEnable, err := validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isHostPortEnable)
 
 	log.Info("Scaling down deployment")
 	replicas = int32(2)
@@ -411,13 +399,11 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isHostPortEnable, err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isHostPortEnable)
 
 	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
@@ -428,13 +414,11 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isHostPortEnable, err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isHostPortEnable)
 }
 
 func (p *PortTestSuite) TestNodePortScaleAndUpgrade() {
@@ -495,13 +479,11 @@ func (p *PortTestSuite) TestNodePortScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err := validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isNodePortValid, err := validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
+	err = validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isNodePortValid)
 
 	log.Info("Scaling down deployment")
 	replicas = int32(2)
@@ -509,13 +491,11 @@ func (p *PortTestSuite) TestNodePortScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isNodePortValid, err = validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
+	err = validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isNodePortValid)
 
 	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
@@ -526,13 +506,11 @@ func (p *PortTestSuite) TestNodePortScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isNodePortValid, err = validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
+	err = validateNodePort(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isNodePortValid)
 }
 
 func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
@@ -598,13 +576,11 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err := validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isLoadBalancerEnabled, err := validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
+	err = validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isLoadBalancerEnabled)
 
 	log.Info("Scaling down deployment")
 	replicas = int32(2)
@@ -612,13 +588,11 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isLoadBalancerEnabled, err = validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
+	err = validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isLoadBalancerEnabled)
 
 	log.Info("Upgrading deployment")
 	for _, c := range deploymentTemplate.Spec.Template.Spec.Containers {
@@ -629,13 +603,11 @@ func (p *PortTestSuite) TestLoadBalanceScaleAndUpgrade() {
 	deploymentTemplate, err = deployment.UpdateDeployment(p.client, p.cluster.ID, namespace.Name, deploymentTemplate, true)
 	require.NoError(p.T(), err)
 
-	isWorkloadValid, err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
+	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isWorkloadValid)
 
-	isLoadBalancerEnabled, err = validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
+	err = validateLoadBalancer(p.client, p.cluster.ID, steveClient, nodePort, deploymentName)
 	require.NoError(p.T(), err)
-	require.True(p.T(), isLoadBalancerEnabled)
 }
 
 func TestPortTestSuite(t *testing.T) {

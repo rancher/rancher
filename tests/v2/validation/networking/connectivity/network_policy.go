@@ -91,7 +91,7 @@ func newTestContainerMinimal() corev1.Container {
 	return workloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil, nil, nil, nil)
 }
 
-// curlCommand is a helper to run a curl command on an SSH shell node
+// curlCommand is a helper to run a curl command on an job service
 func curlCommand(client *rancher.Client, clusterID string, url string) (string, error) {
 	logrus.Infof("Executing the kubectl command curl %s on the node", url)
 	execCmd := []string{"curl", url}
@@ -115,6 +115,7 @@ func getNodePort() int {
 	return rand.IntN(2767) + 30000
 }
 
+// isCloudManagerEnabled is a helper function that verifies whether the cloud manager is enabled
 func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, error) {
 	logrus.Info("Checking cluster version and if the cloud-controller-manager is installed")
 	catalogClient, err := client.GetClusterCatalogClient(clusterID)
@@ -166,6 +167,7 @@ func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, erro
 	return true, nil
 }
 
+// isNodePool is a helper function that checks if the machine pool cluster size is greater than or equal to 3
 func isNodePool(steveClient *steveV1.Client) (bool, error) {
 	logrus.Info("Checking node pool")
 
@@ -183,16 +185,17 @@ func isNodePool(steveClient *steveV1.Client) (bool, error) {
 	return len(nodeList.Data) >= 3, err
 }
 
-func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) (bool, error) {
+// validateLoadBalancer is a helper function that verifies the cluster is able to connect to the load balancer
+func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) error {
 	logrus.Infof("Getting the node using the label [%v]", labelWorker)
 	query, err := url.ParseQuery(labelWorker)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	nodeList, err := steveClient.SteveType("node").List(query)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	for _, machine := range nodeList.Data {
@@ -200,7 +203,7 @@ func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient 
 		newNode := &corev1.Node{}
 		err = steveV1.ConvertToK8sType(machine.JSONResp, newNode)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeExternalIP)
@@ -209,47 +212,45 @@ func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient 
 		}
 
 		log, err := curlCommand(client, clusterID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(nodePort)))
-		if err != nil {
-			return false, err
+		if strings.Contains(log, workloadName) && err == nil {
+			return nil
 		}
-
-		return strings.Contains(log, workloadName), err
 	}
 
-	return false, err
+	return errors.New("Unable to connect to the load balancer")
 }
 
-func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName string, steveClient *steveV1.Client, hostPort int, workloadName string, namespaceName string) (bool, error) {
+// validateHostPortSSH is a helper function that verifies the cluster is able to connect to the node host port by ssh shell
+func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName string, steveClient *steveV1.Client, hostPort int, workloadName string, namespaceName string) error {
 	logrus.Infof("Getting the node using the label [%v]", labelWorker)
 	query, err := url.ParseQuery(labelWorker)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	nodeList, err := steveClient.SteveType("node").List(query)
 	if err != nil {
-		return false, err
+		return err
 	}
-
 	_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	wc, err := client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	pods, err := wc.Core.Pod().List(namespaceName, metav1.ListOptions{})
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	var nodes []string
 	nodes = make([]string, 0)
-	for i := 0; i < len(pods.Items); i++ {
-		nodeName := pods.Items[i].Spec.NodeName
+	for _, podItem := range pods.Items {
+		nodeName := podItem.Spec.NodeName
 		nodes = append(nodes, nodeName)
 	}
 
@@ -258,7 +259,7 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 		newNode := &corev1.Node{}
 		err = steveV1.ConvertToK8sType(machine.JSONResp, newNode)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		_, found := slices.BinarySearch(nodes, newNode.Name)
@@ -267,70 +268,40 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 
 			sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			log, err := sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
 			if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-				return false, err
+				return err
 			}
 
 			logrus.Infof("Log of the curl command {%v}", log)
-			return strings.Contains(log, workloadName), err
+			if strings.Contains(log, workloadName) {
+				return nil
+			}
 		}
 	}
 
-	return false, err
+	return errors.New("Unable to connect to the host port")
 }
 
-func validateHostPort(client *rancher.Client, clusterID string, steveClient *steveV1.Client, hostPort int, workloadName string) (bool, error) {
+// validateNodePort is a helper function that verifies the cluster is able to connect to the node port by job service
+func validateNodePort(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) error {
 	logrus.Infof("Getting the node using the label [%v]", labelWorker)
 	query, err := url.ParseQuery(labelWorker)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	nodeList, err := steveClient.SteveType("node").List(query)
 	if err != nil {
-		return false, err
-	}
-
-	for _, machine := range nodeList.Data {
-		logrus.Info("Getting the node IP")
-		newNode := &corev1.Node{}
-		err = steveV1.ConvertToK8sType(machine.JSONResp, newNode)
-		if err != nil {
-			return false, err
-		}
-
-		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
-
-		log, err := curlCommand(client, clusterID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
-		if err != nil {
-			return false, err
-		}
-
-		return strings.Contains(log, workloadName), err
-	}
-
-	return false, err
-}
-
-func validateNodePort(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) (bool, error) {
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
-	if err != nil {
-		return false, err
-	}
-
-	nodeList, err := steveClient.SteveType("node").List(query)
-	if err != nil {
-		return false, err
+		return err
 	}
 
 	for _, machine := range nodeList.Data {
@@ -345,58 +316,104 @@ func validateNodePort(client *rancher.Client, clusterID string, steveClient *ste
 
 		log, err := curlCommand(client, clusterID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(nodePort)))
 		if err != nil {
-			return false, err
+			return err
 		}
-
-		return strings.Contains(log, workloadName), err
+		if strings.Contains(log, workloadName) {
+			return nil
+		}
 	}
 
-	return false, err
+	return errors.New("Unable to connect to the node port")
 }
 
-func validateClusterIP(client *rancher.Client, clusterID string, steveClient *steveV1.Client, serviceID string, hostPort int, workloadName string) (bool, error) {
+// validateClusterIP is a helper function that verifies the cluster is able to connect to the cluster ip service by ssh shell
+func validateClusterIP(client *rancher.Client, clusterName string, steveClient *steveV1.Client, serviceID string, hostPort int, workloadName string) error {
 	serviceResp, err := steveClient.SteveType(services.ServiceSteveType).ByID(serviceID)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	logrus.Info("Getting the cluster IP")
 	newService := &corev1.Service{}
 	err = steveV1.ConvertToK8sType(serviceResp.JSONResp, newService)
 	if err != nil {
-		return false, err
+		return err
+	}
+
+	_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+	if err != nil {
+		return err
 	}
 
 	clusterIP := newService.Spec.ClusterIP
 
-	log, err := curlCommand(client, clusterID, fmt.Sprintf("%s:%s/name.html", clusterIP, strconv.Itoa(hostPort)))
+	sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return strings.Contains(log, workloadName), err
+	logrus.Infof("Getting the node using the label [%v]", labelWorker)
+	query, err := url.ParseQuery(labelWorker)
+	if err != nil {
+		return err
+	}
+
+	nodeList, err := steveClient.SteveType("node").List(query)
+	if err != nil {
+		return err
+	}
+
+	for _, machine := range nodeList.Data {
+		logrus.Info("Getting the node IP")
+		newNode := &corev1.Node{}
+		err = steveV1.ConvertToK8sType(machine.JSONResp, newNode)
+		if err != nil {
+			return err
+		}
+		sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
+		if err != nil {
+			return err
+		}
+
+		log, err := sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", clusterIP, strconv.Itoa(hostPort)))
+		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+			return err
+		}
+		logrus.Info(log)
+		logrus.Info(err)
+
+		if strings.Contains(log, workloadName) {
+			return nil
+		}
+	}
+	return errors.New("Unable to connect to the cluster")
 }
 
-func validateWorkload(client *rancher.Client, clusterID string, deployment *appv1.Deployment, image string, expectedReplicas int, namespaceName string) (bool, error) {
+// validateWorkload is a helper function that verifies if all pods are running by image
+func validateWorkload(client *rancher.Client, clusterID string, deployment *appv1.Deployment, image string, expectedReplicas int, namespaceName string) error {
 	logrus.Info("Waiting deployment comes up active")
 	err := charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + deployment.Name,
 	})
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	logrus.Info("Waiting for all pods to be running")
 	err = pods.WatchAndWaitPodContainerRunning(client, clusterID, namespaceName, deployment)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	logrus.Infof("Counting all pods running by image %s", image)
 	countPods, err := pods.CountPodContainerRunningByImage(client, clusterID, namespaceName, image)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return expectedReplicas == countPods, err
+	if expectedReplicas == countPods {
+		return nil
+	}
+
+	return errors.New("Unable to run all pods")
 }
