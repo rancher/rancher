@@ -554,3 +554,9 @@ tests:
   asserts:
     - exists:
         path: spec.template.spec.tolerations[1]
+    - equal:
+        path: spec.template.spec.tolerations[1]
+        value:
+          effect: NoSchedule
+          key: node.cloudprovider.kubernetes.io/uninitialized
+          value: "true"
