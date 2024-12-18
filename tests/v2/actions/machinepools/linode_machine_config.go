@@ -1,15 +1,13 @@
 package machinepools
 
 import (
-	"github.com/rancher/shepherd/pkg/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	LinodeKind                              = "LinodeConfig"
-	LinodePoolType                          = "rke-machine-config.cattle.io.linodeconfig"
-	LinodeResourceConfig                    = "linodeconfigs"
-	LinodeMachineConfigConfigurationFileKey = "linodeMachineConfigs"
+	LinodeKind           = "LinodeConfig"
+	LinodePoolType       = "rke-machine-config.cattle.io.linodeconfig"
+	LinodeResourceConfig = "linodeconfigs"
 )
 
 type LinodeMachineConfigs struct {
@@ -37,12 +35,9 @@ type LinodeMachineConfig struct {
 
 // NewLinodeMachineConfig is a constructor to set up rke-machine-config.cattle.io.linodeconfigs. It returns an *unstructured.Unstructured
 // that CreateMachineConfig uses to created the rke-machine-config
-func NewLinodeMachineConfig(generatedPoolName, namespace string) []unstructured.Unstructured {
-	var linodeMachineConfigs LinodeMachineConfigs
-	config.LoadConfig(LinodeMachineConfigConfigurationFileKey, &linodeMachineConfigs)
+func NewLinodeMachineConfig(machineConfigs MachineConfigs, generatedPoolName, namespace string) []unstructured.Unstructured {
 	var multiConfig []unstructured.Unstructured
-
-	for _, linodeMachineConfig := range linodeMachineConfigs.LinodeMachineConfig {
+	for _, linodeMachineConfig := range machineConfigs.LinodeMachineConfigs.LinodeMachineConfig {
 		machineConfig := unstructured.Unstructured{}
 		machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
 		machineConfig.SetKind(LinodeKind)
@@ -54,7 +49,7 @@ func NewLinodeMachineConfig(generatedPoolName, namespace string) []unstructured.
 		machineConfig.Object["dockerPort"] = linodeMachineConfig.DockerPort
 		machineConfig.Object["image"] = linodeMachineConfig.Image
 		machineConfig.Object["instanceType"] = linodeMachineConfig.InstanceType
-		machineConfig.Object["region"] = linodeMachineConfigs.Region
+		machineConfig.Object["region"] = machineConfigs.LinodeMachineConfigs.Region
 		machineConfig.Object["rootPass"] = linodeMachineConfig.RootPass
 		machineConfig.Object["sshPort"] = linodeMachineConfig.SSHPort
 		machineConfig.Object["sshUser"] = linodeMachineConfig.SSHUser
@@ -73,12 +68,10 @@ func NewLinodeMachineConfig(generatedPoolName, namespace string) []unstructured.
 }
 
 // GetLinodeMachineRoles returns a list of roles from the given machineConfigs
-func GetLinodeMachineRoles() []Roles {
-	var linodeMachineConfigs LinodeMachineConfigs
-	config.LoadConfig(LinodeMachineConfigConfigurationFileKey, &linodeMachineConfigs)
+func GetLinodeMachineRoles(machineConfigs MachineConfigs) []Roles {
 	var allRoles []Roles
 
-	for _, linodeMachineConfig := range linodeMachineConfigs.LinodeMachineConfig {
+	for _, linodeMachineConfig := range machineConfigs.LinodeMachineConfigs.LinodeMachineConfig {
 		allRoles = append(allRoles, linodeMachineConfig.Roles)
 	}
 
