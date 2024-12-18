@@ -1,4 +1,4 @@
-webhookVersion: 103.0.13+up0.4.14-rc.1
+webhookVersion: 103.0.13+up0.4.14
 cspAdapterMinVersion: 103.0.1+up3.0.1
 defaultShellVersion: rancher/shell:v0.1.26
 fleetVersion: 103.1.11+up0.9.12
