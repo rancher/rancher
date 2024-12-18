@@ -560,3 +560,135 @@ tests:
           effect: NoSchedule
           key: node.cloudprovider.kubernetes.io/uninitialized
           value: "true"
+- it: sets extraNodeSelectorTerms
+  set:
+    extraNodeSelectorTerms:
+      - key: topology.kubernetes.io/zone
+        operator: In
+        values:
+          - us-north
+  asserts:
+    - exists:
+        path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[1]
+    - equal:
+        path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[1]
+        value:
+          key: topology.kubernetes.io/zone
+          operator: In
+          values:
+            - us-north
+- it: allows `resources` to be defined on Rancher pod
+  set:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 200Mi
+      limits:
+        cpu: 500m
+        memory: 500Mi
+  asserts:
+    - exists:
+        path: spec.template.spec.containers[0].resources
+    - equal:
+        path: spec.template.spec.containers[0].resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+- it: doesn't use Rancher pod `resources` on Audit Log sidecar
+  set:
+    auditLog:
+      level: 3
+    resources:
+      requests:
+        cpu: 9000m
+        memory: 900Mi
+      limits:
+        cpu: 9000m
+        memory: 9000Mi
+  asserts:
+    - exists:
+        path: spec.template.spec.containers[1]
+    - notExists:
+        path: spec.template.spec.containers[1].resources
+    - exists:
+        path: spec.template.spec.containers[0].resources
+    - equal:
+        path: spec.template.spec.containers[0].resources
+        value:
+          requests:
+            cpu: 9000m
+            memory: 900Mi
+          limits:
+            cpu: 9000m
+            memory: 9000Mi
+- it: allows `resources` to be defined on Rancher audit log sidecar pod
+  set:
+    auditLog:
+      level: 3
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+        limits:
+          cpu: 500m
+          memory: 500Mi
+  asserts:
+    - exists:
+        path: spec.template.spec.containers[1].resources
+    - equal:
+        path: spec.template.spec.containers[1].resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+    - notExists:
+        path: spec.template.spec.containers[0].resources
+- it: allows different `resources` for Rancher pod and audit log sidecar pod
+  set:
+    auditLog:
+      level: 3
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+        limits:
+          cpu: 500m
+          memory: 500Mi
+    resources:
+      requests:
+        cpu: 9000m
+        memory: 900Mi
+      limits:
+        cpu: 9000m
+        memory: 9000Mi
+  asserts:
+    - exists:
+        path: spec.template.spec.containers[0].resources
+    - equal:
+        path: spec.template.spec.containers[0].resources
+        value:
+          requests:
+            cpu: 9000m
+            memory: 900Mi
+          limits:
+            cpu: 9000m
+            memory: 9000Mi
+    - exists:
+        path: spec.template.spec.containers[1].resources
+    - equal:
+        path: spec.template.spec.containers[1].resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+
