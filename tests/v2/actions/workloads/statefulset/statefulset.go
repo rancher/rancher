@@ -14,6 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+const (
+	nginxImageName = "nginx"
+)
+
 var StatefulsetGroupVersionResource = schema.GroupVersionResource{
 	Group:    "apps",
 	Version:  "v1",
