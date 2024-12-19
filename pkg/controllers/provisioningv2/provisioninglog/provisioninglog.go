@@ -44,7 +44,7 @@ type handler struct {
 	clusterCache    provisioningcontrollers.ClusterCache
 }
 
-func (h *handler) OnConfigMap(key string, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+func (h *handler) OnConfigMap(_ string, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 	if cm == nil || !cm.DeletionTimestamp.IsZero() {
 		return nil, nil
 	}
@@ -67,32 +67,39 @@ func (h *handler) OnConfigMap(key string, cm *corev1.ConfigMap) (*corev1.ConfigM
 	return h.recordMessage(provCluster[0], cm)
 }
 
-func appendLog(error bool, oldLog, log string) string {
-	if len(oldLog) > maxLen {
-		oldLog = oldLog[:maxLen]
-		oldLog = strings.TrimRightFunc(oldLog, func(r rune) bool {
+// appendLog appends a message to the provisioning log, adding a newline to the new log message, a newline to the
+// previous log message (if it is not present), and trimming previous lines from the log if it exceeds the maximum
+// length.
+func appendLog(log, msg string) string {
+	// Although it is unlikely that the provisioning log does not end with a newline (except for a brand new cluster),
+	// it is better to err on the side of caution since this could cause log messages to become unintentionally combined.
+	if !strings.HasSuffix(log, "\n") && log != "" {
+		log += "\n"
+	}
+	log += msg + "\n"
+
+	// Remove the oldest lines until log is within size limit.
+	for len(log) > maxLen {
+		log = strings.TrimLeftFunc(log, func(r rune) bool {
 			return r != '\n'
 		})
+		log = strings.TrimPrefix(log, "\n")
 	}
-	prefix := " [INFO ] "
-	if error {
-		prefix = " [ERROR] "
-	}
-	return oldLog + time.Now().Format(time.RFC3339) + prefix + log + "\n"
+	return log
 }
 
-func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-	msg := capr.Provisioned.GetMessage(provCluster)
-	error := capr.Provisioned.IsFalse(provCluster)
-	done := capr.Provisioned.IsTrue(provCluster)
+func (h *handler) recordMessage(cluster *provv1.Cluster, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	msg := capr.Provisioned.GetMessage(cluster)
+	failure := capr.Provisioned.IsFalse(cluster)
+	done := capr.Provisioned.IsTrue(cluster)
 
 	if done && msg == "" {
-		done = capr.Updated.IsTrue(provCluster)
-		msg = capr.Updated.GetMessage(provCluster)
-		error = capr.Updated.IsFalse(provCluster)
+		done = capr.Updated.IsTrue(cluster)
+		msg = capr.Updated.GetMessage(cluster)
+		failure = capr.Updated.IsFalse(cluster)
 	}
 
-	if done && msg == "" && provCluster.Status.Ready {
+	if done && msg == "" && cluster.Status.Ready {
 		msg = "provisioning done"
 	}
 
@@ -114,12 +121,17 @@ func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMa
 		cm.Data = map[string]string{}
 	}
 
-	cm.Data["log"] = appendLog(error, cm.Data["log"], msg)
+	prefix := " [INFO ] "
+	if failure {
+		prefix = " [ERROR] "
+	}
+
+	cm.Data["log"] = appendLog(cm.Data["log"], time.Now().Format(time.RFC3339)+prefix+msg)
 	cm.Data["last"] = msg
 	return h.configMaps.Update(cm)
 }
 
-func (h *handler) OnNamespace(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
+func (h *handler) OnNamespace(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil || !ns.DeletionTimestamp.IsZero() {
 		return nil, nil
 	}
