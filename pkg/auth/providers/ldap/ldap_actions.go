@@ -86,7 +86,7 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 	}
 	defer lConn.Close()
 
-	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config, caPool)
+	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config)
 	if err != nil {
 		return err
 	}

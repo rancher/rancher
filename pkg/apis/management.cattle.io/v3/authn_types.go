@@ -355,6 +355,7 @@ type ActiveDirectoryConfig struct {
 	UserObjectClass              string   `json:"userObjectClass,omitempty"             norman:"default=person,required"`
 	UserNameAttribute            string   `json:"userNameAttribute,omitempty"           norman:"default=name,required"`
 	UserEnabledAttribute         string   `json:"userEnabledAttribute,omitempty"        norman:"default=userAccountControl,required"`
+	UserLoginFilter              string   `json:"userLoginFilter,omitempty"`
 	GroupSearchBase              string   `json:"groupSearchBase,omitempty"`
 	GroupSearchAttribute         string   `json:"groupSearchAttribute,omitempty"        norman:"default=sAMAccountName,required"`
 	GroupSearchFilter            string   `json:"groupSearchFilter,omitempty"`
@@ -411,6 +412,7 @@ type LdapFields struct {
 	UserNameAttribute               string   `json:"userNameAttribute,omitempty"               norman:"default=cn,notnullable,required"`
 	UserMemberAttribute             string   `json:"userMemberAttribute,omitempty"             norman:"default=memberOf,notnullable,required"`
 	UserEnabledAttribute            string   `json:"userEnabledAttribute,omitempty"`
+	UserLoginFilter                 string   `json:"userLoginFilter,omitempty"`
 	GroupSearchBase                 string   `json:"groupSearchBase,omitempty"`
 	GroupSearchAttribute            string   `json:"groupSearchAttribute,omitempty"            norman:"default=cn,notnullable,required"`
 	GroupSearchFilter               string   `json:"groupSearchFilter,omitempty"`
