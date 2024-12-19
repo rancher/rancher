@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -104,7 +105,7 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 	return tokenData, nil
 }
 
-func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, userPrincipal v3.Principal) (*v3.Token, string, error) {
+func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, userPrincipal v3.Principal) (*ext.Token, string, error) {
 	// create kubeconfig expiring tokens if responseType=kubeconfig in login action vs login tokens for responseType=json
 	clusterID := extractClusterIDFromResponseType(responseType)
 
@@ -176,4 +177,86 @@ func ConvertTokenKeyToHash(token *v3.Token) error {
 		token.Annotations[TokenHashed] = "true"
 	}
 	return nil
+}
+
+// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
+func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
+	invalidAuthTokenErr := errors.New("Invalid auth token value")
+
+	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	// Ext token always has a hash. Only a hash.
+
+	hasher, err := hashers.GetHasherForHash(storedToken.Status.TokenHash)
+	if err != nil {
+		logrus.Errorf("unable to get a hasher for token with error %v", err)
+		return http.StatusInternalServerError,
+			fmt.Errorf("unable to verify hash '%s'", storedToken.Status.TokenHash)
+	}
+
+	if err := hasher.VerifyHash(storedToken.Status.TokenHash, tokenKey); err != nil {
+		logrus.Errorf("VerifyHash failed with error: %v", err)
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	if storedToken.Status.Expired {
+		return http.StatusGone, errors.New("must authenticate")
+	}
+	return http.StatusOK, nil
+}
+
+// ExtConvertTokenResource converts an ext token into a semblance of what ConvertTokenResource
+// returns for a norman token.
+func ExtConvertTokenResource(token ext.Token) (map[string]interface{}, error) {
+	// The set of fields to create were empirically pulled out of the rancher logs, using a
+	// modified rancher dumping the ConvertTokenResource result.
+
+	// Example
+	// token data [.selfLink] = string ((/apis/management.cattle.io/v3/tokens/token-rv2xw))
+	// token data [authProvider] = string ((local))
+	// token data [created] = string ((2024-12-10T13:22:04Z))
+	// token data [current] = bool ((false))
+	// token data [description] = string ((foo))
+	// token data [expired] = bool ((false))
+	// token data [expiresAt] = string (())
+	// token data [id] = string ((token-rv2xw))
+	// token data [isDerived] = bool ((true))
+	// token data [labels] = map[string]interface {} ((map[authn.management.cattle.io/token-userId:user-cl9vb cattle.io/creator:norman]))
+	// token data [name] = string ((token-rv2xw))
+	// token data [state] = string ((active))
+	// token data [token] = string ((fwrl2p749slsbghmxlpjwhf4wvxlrz8r26wzclhwnknhp4sf9vdjsm))
+	// token data [transitioningMessage] = string (())
+	// token data [transitioning] = string ((no))
+	// token data [ttl] = json.Number ((7776000000))
+	// token data [type] = string ((/v3/schemas/token))
+	// token data [userId] = string ((user-cl9vb))
+	// token data [userPrincipal] = map[string]interface {} ((map[displayName:Default Admin loginName:admin me:true metadata:map[creationTimestamp:<nil> name:local://user-cl9vb] principalType:user provider:local]
+	// token data [uuid] = string ((a5758481-0d54-48f2-b5bd-1347c2f0d946))
+
+	tokenData := map[string]interface{}{}
+
+	// TODO tokenData[".selfLink"] =
+	// TODO tokenData["type"] = ??
+	tokenData["authProvider"] = token.GetAuthProvider()
+	tokenData["created"] = token.ObjectMeta.CreationTimestamp
+	tokenData["current"] = false
+	tokenData["description"] = token.Spec.Description
+	tokenData["expired"] = token.Status.Expired
+	tokenData["expiredAt"] = token.Status.ExpiresAt
+	tokenData["id"] = token.GetName()
+	tokenData["isDerived"] = token.GetIsDerived()
+	tokenData["labels"] = token.ObjectMeta.Labels // FIX ? getting a map[string]interface{}
+	tokenData["name"] = token.GetName()
+	tokenData["state"] = "active" // TODO FIX - use enabled. string for "not active" state is not known
+	tokenData["token"] = ""       // generally not available
+	tokenData["transitioningMessage"] = ""
+	tokenData["transitioning"] = "no"
+	tokenData["ttl"] = token.Spec.TTL
+	tokenData["userId"] = token.GetUserID()
+	tokenData["userPrincipal"] = token.GetUserPrincipal() // FIX ? getting a map[string]interface{}
+	tokenData["uuid"] = token.ObjectMeta.UID
+
+	return tokenData, nil
 }
