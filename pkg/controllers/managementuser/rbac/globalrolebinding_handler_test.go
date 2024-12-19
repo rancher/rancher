@@ -69,7 +69,7 @@ func TestSync(t *testing.T) {
 				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
 					GlobalRoleName: rbac.GlobalAdmin,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryRemote:  status.SummaryCompleted,
 						RemoteConditions: []metav1.Condition{
 							{
@@ -113,7 +113,7 @@ func TestSync(t *testing.T) {
 				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
 					GlobalRoleName: rbac.GlobalAdmin,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryRemote:  status.SummaryCompleted,
 						RemoteConditions: []metav1.Condition{
 							{
@@ -146,7 +146,7 @@ func TestSync(t *testing.T) {
 				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
 					GlobalRoleName: "gr",
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryRemote:  status.SummaryCompleted,
 					},
 				})
