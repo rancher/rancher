@@ -25,8 +25,13 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
-    name: Provisioning tests 
-    runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
+    name: Provisioning tests
+    runs-on:
+      - runs-on
+      - spot=capacity-optimized
+      - runner=32cpu-linux-x64
+      - family=c7i-flex+c7i+c7a
+      - run-id=${{ github.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +41,10 @@ jobs:
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
           chmod +x ./.dapper
+      - name: Configure Docker for cgroupfs
+        run: |
+          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
       - name: Run tests
         run: ./.dapper provisioning-tests
         env:
