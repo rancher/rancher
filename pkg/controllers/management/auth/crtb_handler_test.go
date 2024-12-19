@@ -450,7 +450,7 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbSubjectAndBindingExist := &v3.ClusterRoleTemplateBinding{
@@ -473,7 +473,7 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbSubjectError := &v3.ClusterRoleTemplateBinding{
@@ -488,17 +488,17 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbEmptyStatus := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbEmptyStatusRemoteComplete := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 			SummaryRemote:  status.SummaryCompleted,
 		},
 	}
@@ -524,7 +524,7 @@ func TestUpdateStatus(t *testing.T) {
 								},
 							},
 						},
-						LastUpdateTime: mockTime.String(),
+						LastUpdateTime: mockTime.Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
 					},
 				})
@@ -556,7 +556,7 @@ func TestUpdateStatus(t *testing.T) {
 								},
 							},
 						},
-						LastUpdateTime: mockTime.String(),
+						LastUpdateTime: mockTime.Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
 						SummaryRemote:  status.SummaryCompleted,
 						Summary:        status.SummaryCompleted,
@@ -583,7 +583,7 @@ func TestUpdateStatus(t *testing.T) {
 								},
 							},
 						},
-						LastUpdateTime: mockTime.String(),
+						LastUpdateTime: mockTime.Format(time.RFC3339),
 						SummaryLocal:   status.SummaryError,
 						Summary:        status.SummaryError,
 					},
@@ -609,7 +609,7 @@ func TestUpdateStatus(t *testing.T) {
 								},
 							},
 						},
-						LastUpdateTime: mockTime.String(),
+						LastUpdateTime: mockTime.Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
 					},
 				})
