@@ -188,7 +188,7 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		if envVar.Value == "" {
 			continue
 		}
-		envVarBuf.WriteString(capr.FormatWindowsEnvVar(envVar, false))
+		envVarBuf.WriteString(capr.FormatWindowsEnvVar(envVar, false) + "\n")
 	}
 	server := ""
 	if settings.ServerURL.Get() != "" {
