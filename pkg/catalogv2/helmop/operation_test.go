@@ -182,9 +182,13 @@ func Test_CreatePod(t *testing.T) {
 			Effect:   "NoSchedule",
 		},
 		{
+			Key:      "node-role.kubernetes.io/control-plane",
+			Operator: corev1.TolerationOpExists,
+			Effect:   "NoSchedule",
+		},
+		{
 			Key:      "node-role.kubernetes.io/etcd",
-			Operator: corev1.TolerationOpEqual,
-			Value:    "true",
+			Operator: corev1.TolerationOpExists,
 			Effect:   "NoExecute",
 		},
 		{
