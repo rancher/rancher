@@ -12,6 +12,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
@@ -30,7 +31,6 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
@@ -80,7 +80,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 	if responseType == "cookie" {
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
-			Value:    token.ObjectMeta.Name + ":" + unhashedTokenKey,
+			Value:    "ext/" + token.ObjectMeta.Name + ":" + unhashedTokenKey,
 			Secure:   true,
 			Path:     "/",
 			HttpOnly: true,
@@ -89,11 +89,11 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 	} else if responseType == "saml" {
 		return nil
 	} else {
-		tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
+		tokenData, err := tokens.ExtConvertTokenResource(token)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 		}
-		tokenData["token"] = token.ObjectMeta.Name + ":" + unhashedTokenKey
+		tokenData["token"] = "ext/" + token.ObjectMeta.Name + ":" + unhashedTokenKey
 		request.WriteResponse(http.StatusCreated, tokenData)
 	}
 
@@ -101,7 +101,7 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 }
 
 // createLoginToken returns token, unhashed token key (where applicable), responseType and error
-func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, string, string, error) {
+func (h *loginHandler) createLoginToken(request *types.APIContext) (ext.Token, string, string, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
 	var providerToken string
@@ -110,14 +110,14 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	bytes, err := ioutil.ReadAll(request.Request.Body)
 	if err != nil {
 		logrus.Errorf("login failed with error: %v", err)
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return ext.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
 	generic := &apiv3.GenericLogin{}
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return ext.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 	responseType := generic.ResponseType
 	description := generic.Description
@@ -177,13 +177,13 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		input = &apiv3.OIDCLogin{}
 		providerName = genericoidc.Name
 	default:
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
+		return ext.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
 
 	err = json.Unmarshal(bytes, input)
 	if err != nil {
 		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		return ext.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
 	// Authenticate User
@@ -193,13 +193,13 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	if providerName == saml.PingName || providerName == saml.ADFSName || providerName == saml.KeyCloakName ||
 		providerName == saml.OKTAName || providerName == saml.ShibbolethName {
 		err = saml.PerformSamlLogin(providerName, request, input)
-		return v3.Token{}, "", "saml", err
+		return ext.Token{}, "", "saml", err
 	}
 
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
 	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
-		return v3.Token{}, "", "", err
+		return ext.Token{}, "", "", err
 	}
 
 	displayName := userPrincipal.DisplayName
@@ -244,17 +244,17 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return true, nil
 	})
 	if err != nil {
-		return v3.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", userPrincipal.Name, err)
+		return ext.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", userPrincipal.Name, err)
 	}
 
 	if !enabled {
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
+		return ext.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
 	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
 		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR, userPrincipal)
 		if err != nil {
-			return v3.Token{}, "", "", err
+			return ext.Token{}, "", "", err
 		}
 		return *token, tokenValue, responseType, nil
 	}

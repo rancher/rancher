@@ -3,31 +3,34 @@ package tokens
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
-	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -61,6 +64,7 @@ func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager 
 
 	return &Manager{
 		ctx:                 ctx,
+		extTokenStore:       exttokens.NewSystemFromWrangler(apiContext.Wrangler),
 		tokensClient:        apiContext.Management.Tokens(""),
 		userIndexer:         informer.GetIndexer(),
 		tokenIndexer:        tokenInformer.GetIndexer(),
@@ -86,6 +90,7 @@ func OnLogout(logoutFunc LogoutFunc) {
 
 type Manager struct {
 	ctx                 context.Context
+	extTokenStore       *exttokens.SystemStore
 	tokensClient        v3.TokenInterface
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
@@ -99,11 +104,11 @@ type Manager struct {
 type (
 	// LogoutAllFunc is the signature of the callback function to invoke when
 	// processing the norman action `logoutAll`.
-	LogoutAllFunc func(apiContext *types.APIContext, token *v3.Token) error
+	LogoutAllFunc func(apiContext *types.APIContext, token accessor.TokenAccessor) error
 
 	// LogoutFunc is the signature of the callback function to invoke when
 	// processing the norman action `logout`.
-	LogoutFunc func(apiContext *types.APIContext, token *v3.Token) error
+	LogoutFunc func(apiContext *types.APIContext, token accessor.TokenAccessor) error
 
 	// Note: We use callback functions to link the token manager to the SAML
 	// providers at runtime because a static function call set at compile time
@@ -120,30 +125,47 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 }
 
 // createDerivedToken will create a jwt token for the authenticated user
-func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue string) (v3.Token, string, int, error) {
+func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue string) (ext.Token, string, int, error) {
+	// BEWARE
+	//
+	// clientv3.Token is derived from the norman Token type. it has all the fields from that,
+	// plus kube fields, in a flat structure.
+	//
+	// this is pulled out of the request for the derived token. I assume that it contains the
+	// data for the token to generate, and that it comes directly from the UI dashboard.
+	// whereas `tokenAuthValue` references the token the request is made with, i.e. the user the
+	// new derived token is to be for.
+
 	logrus.Debug("Create Derived Token Invoked")
 
 	token, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
-		return v3.Token{}, "", 401, err
+		return ext.Token{}, "", 401, err
 	}
 
 	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
-		return v3.Token{}, "", 500, fmt.Errorf("error validating max-ttl %v", err)
+		return ext.Token{}, "", 500, fmt.Errorf("error validating max-ttl %v", err)
 	}
 
 	var unhashedTokenKey string
-	derivedToken := v3.Token{
-		UserPrincipal: token.UserPrincipal,
-		IsDerived:     true,
-		TTLMillis:     tokenTTL.Milliseconds(),
-		UserID:        token.UserID,
-		AuthProvider:  token.AuthProvider,
-		ProviderInfo:  token.ProviderInfo,
-		Description:   jsonInput.Description,
-		ClusterName:   jsonInput.ClusterID,
+
+	// BEWARE `provider`(info) and `userPrincipal` are not used here.
+	// ext tokens pull the information out of the referenced user and its attributes during
+	// their creation.
+
+	derivedToken := ext.Token{
+		ObjectMeta: metav1.ObjectMeta{},
+		Spec: ext.TokenSpec{
+			IsLogin:     false,
+			TTL:         tokenTTL.Milliseconds(),
+			UserID:      token.GetUserID(),
+			Description: jsonInput.Description,
+			ClusterName: jsonInput.ClusterID,
+			Enabled:     true,
+		},
 	}
+
 	derivedToken, unhashedTokenKey, err = m.createToken(&derivedToken)
 
 	return derivedToken, unhashedTokenKey, 0, err
@@ -151,40 +173,54 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 }
 
 // createToken returns the token object and it's unhashed token key, which is stored hashed
-func (m *Manager) createToken(k8sToken *v3.Token) (v3.Token, string, error) {
-	key, err := randomtoken.Generate()
-	if err != nil {
-		logrus.Errorf("Failed to generate token key: %v", err)
-		return v3.Token{}, "", errors.New("failed to generate token key")
-	}
+func (m *Manager) createToken(k8sToken *ext.Token) (ext.Token, string, error) {
 
 	if k8sToken.ObjectMeta.Labels == nil {
 		k8sToken.ObjectMeta.Labels = make(map[string]string)
 	}
-	k8sToken.APIVersion = "management.cattle.io/v3"
+	k8sToken.APIVersion = "ext.cattle.io/v1alpha1"
 	k8sToken.Kind = "Token"
-	k8sToken.Token = key
-	k8sToken.ObjectMeta.Labels[UserIDLabel] = k8sToken.UserID
+	k8sToken.ObjectMeta.Labels[UserIDLabel] = k8sToken.Spec.UserID
 	k8sToken.ObjectMeta.GenerateName = "token-"
-	err = ConvertTokenKeyToHash(k8sToken)
-	if err != nil {
-		return v3.Token{}, "", err
-	}
-	createdToken, err := m.tokensClient.Create(k8sToken)
+
+	// createdToken, err := m.tokensClient.Create(k8sToken)
+	createdToken, err := m.extTokenStore.Create(schema.GroupResource{}, k8sToken, &metav1.CreateOptions{})
 
 	if err != nil {
-		return v3.Token{}, "", err
+		return ext.Token{}, "", err
 	}
 
-	return *createdToken, key, nil
+	// Just here, immediately after token creation do we have access to the secret token value
+	return *createdToken, createdToken.Status.TokenValue, nil
 }
 
 func (m *Manager) updateToken(token *v3.Token) (*v3.Token, error) {
 	return m.tokensClient.Update(token)
 }
 
-func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
+// getToken retrieves the token referenced by the auth value. The result can be an ext token or a
+// norman token.
+func (m *Manager) getToken(tokenAuthValue string) (accessor.TokenAccessor, int, error) {
+	// See also `pkg/auth/requests/authenticate.go` TokenFromRequest for ner-same ops.
+
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
+
+	if extTokenName, found := strings.CutPrefix(tokenName, "ext/"); found {
+		// ext token detected.
+
+		storedToken, err := m.extTokenStore.Get(extTokenName, &metav1.GetOptions{})
+		if err != nil {
+			return nil, 404, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
+		}
+
+		if code, err := ExtVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
+			return nil, code, err
+		}
+
+		return storedToken, 0, nil
+	}
+
+	// old norman token
 
 	lookupUsingClient := false
 
@@ -217,32 +253,54 @@ func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 }
 
 // GetTokens will list all (login and derived, and even expired) tokens of the authenticated user
-func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
+// identified by the token auth value.  The result may contain a mix of ext and norman tokens
+func (m *Manager) getTokens(tokenAuthValue string) ([]accessor.TokenAccessor, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
-	tokens := make([]v3.Token, 0)
+	tokens := make([]accessor.TokenAccessor, 0)
 
 	storedToken, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
 		return tokens, 401, err
 	}
 
-	userID := storedToken.UserID
+	userID := storedToken.GetUserID()
 	set := labels.Set(map[string]string{UserIDLabel: userID})
+
+	// Search for norman tokens
+
 	tokenList, err := m.tokensClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
-		return tokens, 0, fmt.Errorf("error getting tokens for user: %v selector: %v  err: %v", userID, set.AsSelector().String(), err)
+		return tokens, 0, fmt.Errorf("error getting tokens for user: %v selector: %v  err: %v",
+			userID, set.AsSelector().String(), err)
 	}
 
 	for _, t := range tokenList.Items {
 		if IsExpired(t) {
 			t.Expired = true
 		}
-		tokens = append(tokens, t)
+		tokens = append(tokens, &t)
 	}
+
+	// Search for ext tokens
+
+	eTokenList, err := m.extTokenStore.List(&metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+
+	if err != nil {
+		return tokens, 0, fmt.Errorf("error getting ext tokens for user: %v selector: %v  err: %v",
+			userID, set.AsSelector().String(), err)
+	}
+
+	for _, t := range eTokenList.Items {
+		tokens = append(tokens, &t)
+	}
+
 	return tokens, 0, nil
 }
 
 func (m *Manager) deleteTokenByName(tokenName string) (int, error) {
+
+	// todo ext deletion as well
+
 	err := m.tokensClient.Delete(tokenName, &metav1.DeleteOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -254,34 +312,46 @@ func (m *Manager) deleteTokenByName(tokenName string) (int, error) {
 	return 0, nil
 }
 
-// getToken will get the token by ID
-func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token, int, error) {
+// getToken will get the token by ID. the result may be an ext or norman token
+func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (accessor.TokenAccessor, int, error) {
 	logrus.Debug("GET Token Invoked")
-	token := &v3.Token{}
 
 	storedToken, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
-		return *token, 401, err
+		return nil, 401, err
 	}
 
-	token, err = m.tokensClient.Get(tokenID, metav1.GetOptions{})
-	if err != nil {
-		return v3.Token{}, 404, err
+	// check for norman token
+
+	token, err := m.tokensClient.Get(tokenID, metav1.GetOptions{})
+	if err == nil {
+		if token.UserID != storedToken.GetUserID() {
+			return nil, 404, fmt.Errorf("%v not found", tokenID)
+		}
+
+		if IsExpired(*token) {
+			token.Expired = true
+		}
+
+		return token, 0, nil
 	}
 
-	if token.UserID != storedToken.UserID {
-		return v3.Token{}, 404, fmt.Errorf("%v not found", tokenID)
+	if apierrors.IsNotFound(err) {
+		// check for ext token
+
+		token, err := m.extTokenStore.Get(tokenID, &metav1.GetOptions{})
+		if err == nil {
+			if token.Spec.UserID != storedToken.GetUserID() {
+				return nil, 404, fmt.Errorf("%v not found", tokenID)
+			}
+			return token, 0, nil
+		}
 	}
 
-	if IsExpired(*token) {
-		token.Expired = true
-	}
-
-	return *token, 0, nil
+	return nil, 404, err
 }
 
 func (m *Manager) deriveToken(request *types.APIContext) error {
-
 	r := request.Request
 
 	tokenAuthValue := GetTokenAuthFromRequest(r)
@@ -311,11 +381,11 @@ func (m *Manager) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	tokenData, err := ConvertTokenResource(request.Schema, token)
+	tokenData, err := ExtConvertTokenResource(token)
 	if err != nil {
 		return err
 	}
-	tokenData["token"] = token.ObjectMeta.Name + ":" + unhashedTokenKey
+	tokenData["token"] = "ext/" + token.ObjectMeta.Name + ":" + unhashedTokenKey
 
 	request.WriteResponse(http.StatusCreated, tokenData)
 
@@ -331,10 +401,11 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 		// no cookie or auth header, cannot authenticate
 		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
 	}
+
 	//getToken
 	tokens, status, err := m.getTokens(tokenAuthValue)
 	if err != nil {
-		logrus.Errorf("GetToken failed with error: %v", err)
+		logrus.Errorf("GetTokens failed with error: %v", err)
 		if status == 0 {
 			status = http.StatusInternalServerError
 		}
@@ -345,16 +416,29 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 	if err != nil {
 		return err
 	}
+	currentName := currentAuthToken.GetName()
+	currentIsDerived := currentAuthToken.GetIsDerived()
 
 	tokensFromStore := make([]map[string]interface{}, len(tokens))
 	for _, token := range tokens {
-		token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
-		tokenData, err := ConvertTokenResource(request.Schema, token)
-		if err != nil {
-			return err
+		switch token.(type) {
+		case *v3.Token:
+			nToken := token.(*v3.Token)
+			nToken.Current = currentName == nToken.Name && !currentIsDerived
+			tokenData, err := ConvertTokenResource(request.Schema, *nToken)
+			if err != nil {
+				return err
+			}
+			tokensFromStore = append(tokensFromStore, tokenData)
+		case *ext.Token:
+			eToken := token.(*ext.Token)
+			tokenData, err := ExtConvertTokenResource(*eToken)
+			if err != nil {
+				return err
+			}
+			tokenData["current"] = currentName == eToken.Name && !currentIsDerived
+			tokensFromStore = append(tokensFromStore, tokenData)
 		}
-
-		tokensFromStore = append(tokensFromStore, tokenData)
 	}
 
 	request.WriteResponse(http.StatusOK, tokensFromStore)
@@ -415,7 +499,8 @@ func (m *Manager) logout(actionName string, action *types.Action, request *types
 		}
 	}
 
-	status, err = m.deleteTokenByName(storedToken.Name)
+	// NOTE separate by ext vs norman ?
+	status, err = m.deleteTokenByName(storedToken.GetName())
 	if err != nil {
 		logrus.Errorf("deleteTokenByName failed with error: %v", err)
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
@@ -439,6 +524,8 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 	if err != nil {
 		return err
 	}
+	currentName := currentAuthToken.GetName()
+	currentIsDerived := currentAuthToken.GetIsDerived()
 
 	//getToken
 	token, status, err := m.getTokenByID(tokenAuthValue, tokenID)
@@ -451,12 +538,25 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 		}
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
-	token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
-	tokenData, err := ConvertTokenResource(request.Schema, token)
-	if err != nil {
-		return err
+
+	switch token.(type) {
+	case *v3.Token:
+		nToken := token.(*v3.Token)
+		nToken.Current = currentName == nToken.Name && !currentIsDerived
+		tokenData, err := ConvertTokenResource(request.Schema, *nToken)
+		if err != nil {
+			return err
+		}
+
+		request.WriteResponse(http.StatusOK, tokenData)
+	case *ext.Token:
+		eToken := token.(*ext.Token)
+		tokenData, err := ExtConvertTokenResource(*eToken)
+		if err != nil {
+			return err
+		}
+		tokenData["current"] = currentName == eToken.Name && !currentIsDerived
 	}
-	request.WriteResponse(http.StatusOK, tokenData)
 	return nil
 }
 
@@ -467,7 +567,9 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 	tokenAuthValue := GetTokenAuthFromRequest(r)
 	if tokenAuthValue == "" {
 		// no cookie or auth header, cannot authenticate
-		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized,
+			util.GetHTTPErrorCode(http.StatusUnauthorized),
+			"No valid token cookie or auth header")
 	}
 	tokenID := request.ID
 
@@ -488,11 +590,13 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 		return err
 	}
 
-	if currentAuthToken.Name == t.Name && !currentAuthToken.IsDerived {
-		return httperror.NewAPIErrorLong(http.StatusBadRequest, util.GetHTTPErrorCode(http.StatusBadRequest), "Cannot delete token for current session. Use logout instead")
+	if currentAuthToken.GetName() == t.GetName() && !currentAuthToken.GetIsDerived() {
+		return httperror.NewAPIErrorLong(http.StatusBadRequest,
+			util.GetHTTPErrorCode(http.StatusBadRequest),
+			"Cannot delete token for current session. Use logout instead")
 	}
-
-	if _, err := m.deleteTokenByName(t.Name); err != nil {
+	// NOTE separate by ext vs norman ?
+	if _, err := m.deleteTokenByName(t.GetName()); err != nil {
 		return err
 	}
 
@@ -528,7 +632,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 	return m.UpdateSecret(userID, provider, secret)
 }
 
-func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error) {
+func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
 	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
@@ -539,7 +643,7 @@ func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3
 	}
 
 	for _, token := range fallbackTokens {
-		secret := token.ProviderInfo["access_token"]
+		secret := token.GetProviderInfo()["access_token"]
 		if secret != "" {
 			return secret, nil
 		}
@@ -685,27 +789,32 @@ func (m *Manager) userAttributeChanged(attribs *v32.UserAttribute, provider stri
 // PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
 var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc", "genericoidc"}
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (ext.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
 	if utils.Contains(PerUserCacheProviders, provider) && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
-			return v3.Token{}, "", fmt.Errorf("unable to create secret: %s", err)
+			return ext.Token{}, "", fmt.Errorf("unable to create secret: %s", err)
 		}
 	}
 
-	token := &v3.Token{
-		UserPrincipal: userPrincipal,
-		IsDerived:     false,
-		TTLMillis:     ttl,
-		UserID:        userID,
-		AuthProvider:  provider,
-		Description:   description,
+	// BEWARE `provider` and `userPrincipal` are not used here.
+	// ext tokens pull the information out of the referenced user and its attributes during
+	// their creation.
+
+	token := &ext.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				TokenKindLabel: "session",
 			},
+		},
+		Spec: ext.TokenSpec{
+			IsLogin:     true,
+			TTL:         ttl,
+			UserID:      userID,
+			Description: description,
+			Enabled:     true,
 		},
 	}
 
@@ -716,19 +825,19 @@ func (m *Manager) UpdateToken(token *v3.Token) (*v3.Token, error) {
 	return m.updateToken(token)
 }
 
-func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal {
+func (m *Manager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []v3.Principal {
 	var groups []v3.Principal
 
-	attribs, err := m.userAttributeLister.Get("", token.UserID)
+	attribs, err := m.userAttributeLister.Get("", token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
-		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.UserID, err)
+		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.GetUserID(), err)
 		// if err is not nil, then attribs will be. So, below code will handle it
 	}
 
 	hitProvider := false
 	if attribs != nil {
 		for provider, y := range attribs.GroupPrincipals {
-			if provider == token.AuthProvider {
+			if provider == token.GetAuthProvider() {
 				hitProvider = true
 				groups = append(groups, y.Items...)
 			}
@@ -737,17 +846,17 @@ func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal 
 
 	// fallback to legacy token groupPrincipals
 	if !hitProvider {
-		groups = append(groups, token.GroupPrincipals...)
+		groups = append(groups, token.GetGroupPrincipals()...)
 	}
 
 	return groups
 }
 
-func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
-	attribs, err := m.userAttributeLister.Get("", token.UserID)
+func (m *Manager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
+	attribs, err := m.userAttributeLister.Get("", token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
-		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v", token.UserID,
-			group.Name, group.DisplayName, err)
+		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v",
+			token.GetUserID(), group.Name, group.DisplayName, err)
 		// if err not nil, then attribs will be nil. So, below code will handle it
 	}
 
@@ -763,8 +872,8 @@ func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
 	}
 
 	// fallback to legacy token groupPrincipals
-	if _, ok := hitProviders[token.AuthProvider]; !ok {
-		for _, principal := range token.GroupPrincipals {
+	if _, ok := hitProviders[token.GetAuthProvider()]; !ok {
+		for _, principal := range token.GetGroupPrincipals() {
 			groups[principal.Name] = true
 		}
 	}
@@ -815,7 +924,7 @@ func (m *Manager) TokenStreamTransformer(
 		return nil, httperror.NewAPIErrorLong(code, http.StatusText(code), fmt.Sprintf("[TokenStreamTransformer] failed: %s", err.Error()))
 	}
 
-	userID := storedToken.UserID
+	userID := storedToken.GetUserID()
 
 	return convert.Chan(data, func(data map[string]interface{}) map[string]interface{} {
 		labels, _ := data["labels"].(map[string]interface{})
