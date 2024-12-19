@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rancher/rancher/tests/v2/actions/auth"
 	"github.com/rancher/shepherd/clients/rancher"
 	users "github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -45,10 +46,10 @@ func (ll *LastLoginTestSuite) TestLastLoginAdmin() {
 	adminUser, err := ll.client.Management.User.ByID(adminId)
 	adminUser.Password = ll.client.RancherConfig.AdminPassword
 
-	adminRelogin, err := getUserAfterLogin(ll.client, *adminUser)
+	adminRelogin, err := auth.GetUserAfterLogin(ll.client, *adminUser)
 	require.NoError(ll.T(), err)
 
-	lastLoginTime, err := getLastLoginTime(adminRelogin.Labels)
+	lastLoginTime, err := auth.GetLastLoginTime(adminRelogin.Labels)
 	require.NoError(ll.T(), err)
 	require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
@@ -61,10 +62,10 @@ func (ll *LastLoginTestSuite) TestLastLoginStandardUser() {
 	require.NoError(ll.T(), err)
 	ll.T().Logf("Created a standard user: %v", newUser.Username)
 
-	userLogin, err := getUserAfterLogin(ll.client, *newUser)
+	userLogin, err := auth.GetUserAfterLogin(ll.client, *newUser)
 	require.NoError(ll.T(), err)
 
-	lastLoginTime, err := getLastLoginTime(userLogin.Labels)
+	lastLoginTime, err := auth.GetLastLoginTime(userLogin.Labels)
 	require.NoError(ll.T(), err)
 	require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
@@ -77,18 +78,18 @@ func (ll *LastLoginTestSuite) TestReLoginUpdatesLastLogin() {
 	require.NoError(ll.T(), err)
 	ll.T().Logf("Created a standard user: %v", newUser.Username)
 
-	userLogin, err := getUserAfterLogin(ll.client, *newUser)
+	userLogin, err := auth.GetUserAfterLogin(ll.client, *newUser)
 	require.NoError(ll.T(), err)
-	lastLoginTime, err := getLastLoginTime(userLogin.Labels)
+	lastLoginTime, err := auth.GetLastLoginTime(userLogin.Labels)
 	require.NoError(ll.T(), err)
 	require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
 	userAttributes, err := ll.client.WranglerContext.Mgmt.UserAttribute().Get(newUser.ID, v1.GetOptions{})
 	assert.Equal(ll.T(), lastLoginTime, userAttributes.LastLogin.Time)
 
-	userLogin, err = getUserAfterLogin(ll.client, *newUser)
+	userLogin, err = auth.GetUserAfterLogin(ll.client, *newUser)
 	require.NoError(ll.T(), err)
-	reLoginLastLoginTime, err := getLastLoginTime(userLogin.Labels)
+	reLoginLastLoginTime, err := auth.GetLastLoginTime(userLogin.Labels)
 	require.NoError(ll.T(), err)
 	require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
@@ -108,7 +109,7 @@ func (ll *LastLoginTestSuite) TestUserLastLoginNotUpdated() {
 
 	user, err := ll.client.WranglerContext.Mgmt.User().Get(newUser.ID, v1.GetOptions{})
 
-	_, exists := user.Labels[lastloginLabel]
+	_, exists := user.Labels[auth.LastloginLabel]
 	if exists {
 		ll.Assert().Fail("Expected the lastlogin to be not present and empty")
 	}
@@ -123,19 +124,19 @@ func (ll *LastLoginTestSuite) TestLastLoginNotUpdatedWhenLoginFails() {
 	require.NoError(ll.T(), err)
 	ll.T().Logf("Created a standard user: %v", newUser.Username)
 
-	userLogin, err := getUserAfterLogin(ll.client, *newUser)
+	userLogin, err := auth.GetUserAfterLogin(ll.client, *newUser)
 	require.NoError(ll.T(), err)
-	lastLoginTimePreFailure, err := getLastLoginTime(userLogin.Labels)
+	lastLoginTimePreFailure, err := auth.GetLastLoginTime(userLogin.Labels)
 	require.NoError(ll.T(), err)
 
 	newUser.Password = password.GenerateUserPassword("testpass-")
-	_, err = getUserAfterLogin(ll.client, *newUser)
+	_, err = auth.GetUserAfterLogin(ll.client, *newUser)
 	require.Error(ll.T(), err)
 	k8sErrors.IsUnauthorized(err)
 
 	userDetails, err := ll.client.WranglerContext.Mgmt.User().Get(newUser.ID, v1.GetOptions{})
 	require.NoError(ll.T(), err)
-	lastLoginTimePostFailure, err := getLastLoginTime(userDetails.Labels)
+	lastLoginTimePostFailure, err := auth.GetLastLoginTime(userDetails.Labels)
 	require.NoError(ll.T(), err)
 	userAttributes, err := ll.client.WranglerContext.Mgmt.UserAttribute().Get(newUser.ID, v1.GetOptions{})
 	require.NoError(ll.T(), err)
@@ -150,16 +151,16 @@ func (ll *LastLoginTestSuite) TestStandardUserCantUpdateLastLogin() {
 	require.NoError(ll.T(), err)
 	ll.T().Logf("Created a standard user: %v", newUser.Username)
 
-	updatedUserLogin, err := getUserAfterLogin(ll.client, *newUser)
+	updatedUserLogin, err := auth.GetUserAfterLogin(ll.client, *newUser)
 	require.NoError(ll.T(), err)
 
-	lastLoginTime, err := getLastLoginTime(updatedUserLogin.Labels)
+	lastLoginTime, err := auth.GetLastLoginTime(updatedUserLogin.Labels)
 	require.NoError(ll.T(), err)
 	require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
 	lastLoginTime = lastLoginTime.Add(48 * time.Hour)
 	newLastLogin := strconv.FormatInt(lastLoginTime.Unix(), 10)
-	updatedUserLogin.Labels[lastloginLabel] = newLastLogin
+	updatedUserLogin.Labels[auth.LastloginLabel] = newLastLogin
 
 	standardClient, err := ll.client.AsUser(newUser)
 	require.NoError(ll.T(), err)
@@ -176,14 +177,14 @@ func (ll *LastLoginTestSuite) TestStandardUserCantDeleteLastLogin() {
 	require.NoError(ll.T(), err)
 	ll.T().Logf("Created a standard user: %v", newUser.Username)
 
-	updatedUserLogin, err := getUserAfterLogin(ll.client, *newUser)
+	updatedUserLogin, err := auth.GetUserAfterLogin(ll.client, *newUser)
 	require.NoError(ll.T(), err)
 
-	_, exists := updatedUserLogin.Labels[lastloginLabel]
+	_, exists := updatedUserLogin.Labels[auth.LastloginLabel]
 	if !exists {
 		ll.Assert().Fail("Expected the lastlogin to be not present and empty")
 	}
-	delete(updatedUserLogin.Labels, lastloginLabel)
+	delete(updatedUserLogin.Labels, auth.LastloginLabel)
 
 	standardClient, err := ll.client.AsUser(newUser)
 	require.NoError(ll.T(), err)
@@ -199,14 +200,14 @@ func (ll *LastLoginTestSuite) TestAdminCanDeleteLastLogin() {
 	require.NoError(ll.T(), err)
 	ll.T().Logf("Created a standard user: %v", newUser.Username)
 
-	updatedUserLogin, err := getUserAfterLogin(ll.client, *newUser)
+	updatedUserLogin, err := auth.GetUserAfterLogin(ll.client, *newUser)
 	require.NoError(ll.T(), err)
 
-	_, exists := updatedUserLogin.Labels[lastloginLabel]
+	_, exists := updatedUserLogin.Labels[auth.LastloginLabel]
 	if !exists {
 		ll.Assert().Fail("Expected the lastlogin to be not present and empty")
 	}
-	delete(updatedUserLogin.Labels, lastloginLabel)
+	delete(updatedUserLogin.Labels, auth.LastloginLabel)
 
 	_, err = ll.client.WranglerContext.Mgmt.User().Update(updatedUserLogin)
 	require.NoError(ll.T(), err)
@@ -223,10 +224,10 @@ func (ll *LastLoginTestSuite) TestConcurrentLoginAsMultipleUsers() {
 	ll.T().Logf("Created a standard user: %v", newUser2.Username)
 
 	go func() {
-		userLogin, err := getUserAfterLogin(ll.client, *newUser1)
+		userLogin, err := auth.GetUserAfterLogin(ll.client, *newUser1)
 		require.NoError(ll.T(), err)
 
-		lastLoginTime, err := getLastLoginTime(userLogin.Labels)
+		lastLoginTime, err := auth.GetLastLoginTime(userLogin.Labels)
 		require.NoError(ll.T(), err)
 		require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
@@ -234,10 +235,10 @@ func (ll *LastLoginTestSuite) TestConcurrentLoginAsMultipleUsers() {
 		assert.Equal(ll.T(), lastLoginTime, userAttributes.LastLogin.Time)
 	}()
 	go func() {
-		userLogin, err := getUserAfterLogin(ll.client, *newUser2)
+		userLogin, err := auth.GetUserAfterLogin(ll.client, *newUser2)
 		require.NoError(ll.T(), err)
 
-		lastLoginTime, err := getLastLoginTime(userLogin.Labels)
+		lastLoginTime, err := auth.GetLastLoginTime(userLogin.Labels)
 		require.NoError(ll.T(), err)
 		require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
@@ -253,10 +254,10 @@ func (ll *LastLoginTestSuite) TestConcurrentRefreshAndLogin() {
 	ll.T().Logf("Created a standard user: %v", newUser.Username)
 
 	go func() {
-		userLogin, err := getUserAfterLogin(ll.client, *newUser)
+		userLogin, err := auth.GetUserAfterLogin(ll.client, *newUser)
 		require.NoError(ll.T(), err)
 
-		lastLoginTime, err := getLastLoginTime(userLogin.Labels)
+		lastLoginTime, err := auth.GetLastLoginTime(userLogin.Labels)
 		require.NoError(ll.T(), err)
 		require.False(ll.T(), lastLoginTime.IsZero(), "Last login is empty")
 
