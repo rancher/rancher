@@ -6,7 +6,7 @@ jobs:
     env:
       GOLANG_CI_LINT_VERSION: v1.54.2
       PYTHON_VERSION: '3.11'
-      GOLANG_VERSION: '1.22'
+      GOLANG_VERSION: '1.23'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
