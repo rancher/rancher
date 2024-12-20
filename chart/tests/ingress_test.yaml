@@ -238,3 +238,22 @@ tests:
                     number: 80
               pathType: ImplementationSpecific
               path: /
+- it: should create http rule with non-default path and pathType
+  set:
+    hostname: host.example.com
+    ingress.pathType: Prefix
+    ingress.path: '/*'
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+        - host: host.example.com
+          http:
+            paths:
+            - backend:
+                service:
+                  name: RELEASE-NAME-rancher
+                  port:
+                    number: 80
+              pathType: Prefix
+              path: "/*"
