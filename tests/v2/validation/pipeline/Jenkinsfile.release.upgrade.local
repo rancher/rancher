@@ -64,6 +64,12 @@ node {
       timeout = "${env.TIMEOUT}" 
     }
 
+
+
+    def date = sh(script: "date +%Y-%m-%d", returnStdout: true).trim()
+      env.TEST_RUN_NAME = "${env.TEST_RUN_NAME ?: ''}${date}"
+      echo "Updated TEST_RUN_NAME: ${env.TEST_RUN_NAME}"
+
     def cleanup = env.RANCHER_CLEANUP.toLowerCase()
 
     def localConfigFileName = ""
@@ -486,8 +492,8 @@ node {
                   try{
                     sh 'echo Cleanup is enabled'
 
-                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
-                      "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
+                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupContainer} -t --env-file ${envFile} " +
+                      "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
 
                     sh "docker stop ${cleanupContainer}"
                     sh "docker rm -v ${cleanupContainer}"
@@ -506,8 +512,8 @@ node {
                 sh "docker rm -v ${configGeneratorContainer}"
 
                 if (cleanup.toBoolean()) {
-                  sh "docker stop ${cleanupTestContainer}"
-                  sh "docker rm -v ${cleanupTestContainer}"
+                  sh "docker stop ${cleanupContainer}"
+                  sh "docker rm -v ${cleanupContainer}"
                 }
 
                 sh "docker rmi -f ${imageName}"
@@ -519,8 +525,8 @@ node {
                   try {
                     sh 'echo Cleanup is enabled'
 
-                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
-                      "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
+                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupContainer} -t --env-file ${envFile} " +
+                      "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
 
                     sh "docker stop ${cleanupContainer}"
                     sh "docker rm -v ${cleanupContainer}"
