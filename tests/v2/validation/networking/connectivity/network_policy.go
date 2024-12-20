@@ -27,6 +27,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -141,31 +142,31 @@ func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, erro
 	}
 
 	if strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
+		// Runs only for k3s clusters.
 		wranglerContext, err := client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
 		if err != nil {
 			return false, err
 		}
-
 		latestDaemonset, err := wranglerContext.Apps.DaemonSet().List("kube-system", metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-
 		for _, item := range latestDaemonset.Items {
 			if strings.Contains(item.Name, "svclb-traefik") {
 				return true, nil
 			}
 		}
-
 		return false, nil
+	} else {
+		// This block runs for non K3s clusters, so that the `catalogClient.Apps(kubeSystemNamespace).Get` doesn't run if the cluster type is K3s
+		app, err := catalogClient.Apps(kubeSystemNamespace).Get(context.TODO(), cloudControllerManager, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+		return app != nil, nil
 	}
-
-	_, err = catalogClient.Apps(kubeSystemNamespace).Get(context.TODO(), cloudControllerManager, metav1.GetOptions{})
-	if !strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") && err != nil && strings.Contains(err.Error(), "not found") {
-		return false, nil
-	}
-
-	return true, nil
 }
 
 // IsNodePoolSizeValid is a helper function that checks if the machine pool cluster size is greater than or equal to 3
