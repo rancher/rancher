@@ -73,7 +73,7 @@ func (p *PortTestSuite) TestHostPort() {
 	require.NoError(p.T(), err)
 
 	if p.cluster.EnableNetworkPolicy == nil || !*p.cluster.EnableNetworkPolicy {
-		p.T().Skip("The Host Port test requires project network enable.")
+		p.T().Skip("The Host Port test requires project network enabled.")
 	}
 
 	hostPort := getHostPort()
@@ -343,7 +343,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
-	isPool, err := isNodePool(steveClient)
+	isPool, err := IsNodePoolSizeValid(steveClient)
 	require.NoError(p.T(), err)
 
 	if !isPool {
