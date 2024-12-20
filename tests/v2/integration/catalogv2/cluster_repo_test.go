@@ -118,6 +118,7 @@ type ClusterRepoParams struct {
 	InsecurePlainHTTP bool
 	StatusCode        int
 	ForceRefresh      bool
+	StatusCodeMessage string
 }
 
 // TestHTTPRepo tests CREATE, UPDATE, and DELETE operations of HTTP ClusterRepo resources
@@ -174,15 +175,20 @@ func StartRegistry() (*httptest.Server, error) {
 	return ts, nil
 }
 
-func StartErrorRegistry(status int) (*url.URL, error) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func StartErrorRegistry(c *ClusterRepoTestSuite, status int) (*url.URL, error) {
+	// Start a new server
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 	}))
+	ip := getOutboundIP()
+	// Bind the server to a specific IP address (your local machine's IP)
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
+	assert.NoError(c.T(), err)
+	ts.Listener = listener
+	ts.Start()
 
 	u, err := url.Parse(ts.URL)
-	if err != nil {
-		return nil, err
-	}
+	assert.NoError(c.T(), err)
 
 	return u, nil
 }
@@ -440,14 +446,16 @@ func (c *ClusterRepoTestSuite) TestOCIRepo2() {
 // TestOCIRepo3 tests 4xx response codes received from the registry
 func (c *ClusterRepoTestSuite) TestOCIRepo3() {
 	statusCodes := [3]int{404, 401, 403}
-	for _, statusCode := range statusCodes {
-		u, err := StartErrorRegistry(statusCode)
+	statusCodeMessages := [3]string{"Not Found", "Unauthorized", "Forbidden"}
+	for index, statusCode := range statusCodes {
+		u, err := StartErrorRegistry(c, statusCode)
 		require.NoError(c.T(), err)
 
 		c.test4xxErrors(ClusterRepoParams{
 			Name:              OCIClusterRepoName,
 			URL1:              fmt.Sprintf("oci://%s/rancher", u.Host),
-			StatusCode:        statusCode,
+			StatusCode:        statusCodes[index],
+			StatusCodeMessage: statusCodeMessages[index],
 			InsecurePlainHTTP: true,
 			Type:              OCI,
 		})
@@ -614,6 +622,12 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 
 	clusterRepo, err := c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 	assert.NoError(c.T(), err)
+	for _, condition := range clusterRepo.Status.Conditions {
+		if v1.RepoCondition(condition.Type) == v1.OCIDownloaded {
+			assert.Equal(c.T(), condition.Message, fmt.Sprintf("error %d: %s", params.StatusCode, params.StatusCodeMessage))
+		}
+	}
+	assert.Zero(c.T(), clusterRepo.Status.NumberOfRetries)
 
 	_, err = c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
 	assert.True(c.T(), apierrors.IsNotFound(err))
