@@ -318,7 +318,7 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbClusterRoleBindingExists := &v3.ClusterRoleTemplateBinding{
@@ -333,7 +333,7 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbSubjectError := &v3.ClusterRoleTemplateBinding{
@@ -348,17 +348,17 @@ func TestUpdateStatus(t *testing.T) {
 					},
 				},
 			},
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbEmptyStatus := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 		},
 	}
 	crtbEmptyStatusLocalComplete := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
-			LastUpdateTime: mockTime.String(),
+			LastUpdateTime: mockTime.Format(time.RFC3339),
 			SummaryLocal:   status.SummaryCompleted,
 		},
 	}
@@ -385,7 +385,7 @@ func TestUpdateStatus(t *testing.T) {
 							},
 						},
 						SummaryRemote:  status.SummaryCompleted,
-						LastUpdateTime: mockTime.String(),
+						LastUpdateTime: mockTime.Format(time.RFC3339),
 					},
 				})
 
@@ -420,7 +420,7 @@ func TestUpdateStatus(t *testing.T) {
 						SummaryRemote:  status.SummaryCompleted,
 						SummaryLocal:   status.SummaryCompleted,
 						Summary:        status.SummaryCompleted,
-						LastUpdateTime: mockTime.String(),
+						LastUpdateTime: mockTime.Format(time.RFC3339),
 					},
 				})
 
@@ -446,7 +446,7 @@ func TestUpdateStatus(t *testing.T) {
 						},
 						SummaryRemote:  status.SummaryError,
 						Summary:        status.SummaryError,
-						LastUpdateTime: mockTime.String(),
+						LastUpdateTime: mockTime.Format(time.RFC3339),
 					},
 				})
 

@@ -211,7 +211,7 @@ func TestCreateUpdate(t *testing.T) {
 					GlobalRoleName: gr.Name,
 					UserName:       userName,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
 						LocalConditions: []metav1.Condition{
 							{
@@ -333,7 +333,7 @@ func TestCreateUpdate(t *testing.T) {
 					GlobalRoleName: gr.Name,
 					UserName:       userName,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
 						LocalConditions: []metav1.Condition{
 							{
@@ -444,7 +444,7 @@ func TestCreateUpdate(t *testing.T) {
 					GlobalRoleName: gr.Name,
 					UserName:       userName,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryError,
 						Summary:        status.SummaryError,
 						LocalConditions: []metav1.Condition{
@@ -553,7 +553,7 @@ func TestCreateUpdate(t *testing.T) {
 					GlobalRoleName: gr.Name,
 					UserName:       userName,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryError,
 						Summary:        status.SummaryError,
 						LocalConditions: []metav1.Condition{
@@ -663,7 +663,7 @@ func TestCreateUpdate(t *testing.T) {
 					GlobalRoleName: gr.Name,
 					UserName:       userName,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryError,
 						Summary:        status.SummaryError,
 						LocalConditions: []metav1.Condition{
@@ -770,7 +770,7 @@ func TestCreateUpdate(t *testing.T) {
 					GlobalRoleName: gr.Name,
 					UserName:       userName,
 					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().String(),
+						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
 						LocalConditions: []metav1.Condition{
 							{

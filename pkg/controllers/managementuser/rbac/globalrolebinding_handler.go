@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rancher/norman/types/slice"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -214,7 +215,7 @@ func (c *grbHandler) updateStatus(grb *apisv3.GlobalRoleBinding, remoteCondition
 				break
 			}
 		}
-		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().String()
+		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
 		grbFromCluster.Status.ObservedGenerationRemote = grb.ObjectMeta.Generation
 		grbFromCluster.Status.RemoteConditions = remoteConditions
 		grbFromCluster, err = c.grbClient.UpdateStatus(grbFromCluster)

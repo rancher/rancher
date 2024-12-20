@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -597,7 +598,7 @@ func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding,
 			}
 		}
 
-		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().String()
+		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
 		grbFromCluster.Status.ObservedGenerationLocal = grb.ObjectMeta.Generation
 		grbFromCluster.Status.LocalConditions = localConditions
 		grbFromCluster, err = c.grbClient.UpdateStatus(grbFromCluster)
