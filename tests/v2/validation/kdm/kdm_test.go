@@ -177,7 +177,7 @@ func findLatestVersion(allVersions []string) (string, error) {
 
 func (k *KDMTestSuite) TestChangeKDMurl() {
 	// change kdm url to release
-	k.updateKDMurl("https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/refs/heads/release-v2.9-2024-07-patches/data/data.json")
+	k.updateKDMurl("https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/refs/heads/dev-v2.9-2024-07-patches/data/data.json")
 
 	// scale Rancher to 3 replicas
 	k.scaleRancherTo(3)
@@ -190,7 +190,7 @@ func (k *KDMTestSuite) TestChangeKDMurl() {
 	log.Infof("current RKE2 version available: %s", currentRKE2Version)
 
 	// change kdm url to dev
-	k.updateKDMurl("https://releases.rancher.com/kontainer-driver-metadata/release-v2.9/data.json")
+	k.updateKDMurl("https://releases.rancher.com/kontainer-driver-metadata/dev-v2.9/data.json")
 
 	var updatedRKE2Version string
 	// check latest Release value
