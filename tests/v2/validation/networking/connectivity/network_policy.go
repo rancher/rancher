@@ -167,8 +167,8 @@ func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, erro
 	return true, nil
 }
 
-// isNodePool is a helper function that checks if the machine pool cluster size is greater than or equal to 3
-func isNodePool(steveClient *steveV1.Client) (bool, error) {
+// IsNodePoolSizeValid is a helper function that checks if the machine pool cluster size is greater than or equal to 3
+func IsNodePoolSizeValid(steveClient *steveV1.Client) (bool, error) {
 	logrus.Info("Checking node pool")
 
 	logrus.Infof("Getting the node using the label [%v]", labelWorker)
