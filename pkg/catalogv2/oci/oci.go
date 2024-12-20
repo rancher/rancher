@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/hashicorp/go-version"
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/registry"
@@ -20,6 +22,7 @@ import (
 	"oras.land/oras-go/v2/content"
 	"oras.land/oras-go/v2/content/memory"
 	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry/remote/errcode"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 )
@@ -186,11 +189,17 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 
 				if maxTag != nil {
 					ociClient.tag = maxTag.Original()
-
-					// fetch the chart.yaml for the latest tag and add it to the index.
 					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
 					if err != nil {
-						return fmt.Errorf("failed to add tag %s in OCI repository %s to helm repo index: %w", maxTag.String(), ociClient.repository, err)
+						// Users can have access to only some repositories and not all.
+						// So, if pulling the chart fails due to Forbiden error, then skip it.
+						var errResp *errcode.ErrorResponse
+						if errors.As(err, &errResp) && errResp.StatusCode == http.StatusForbidden {
+							delete(indexFile.Entries, chartName)
+							logrus.Warnf("failed to add OCI repository %s to helm repo index: %v", ociClient.repository, err)
+						} else {
+							return fmt.Errorf("failed to add tag %s in OCI repository %s to helm repo index: %w", maxTag.String(), ociClient.repository, err)
+						}
 					}
 				}
 			}
