@@ -47,22 +47,41 @@ func newPRTBHandler(uc *config.UserContext) *prtbHandler {
 
 // OnChange ensures a Role Binding exists in every project namespace to the RoleTemplate ClusterRole.
 // If there are promoted rules, it creates a second Role Binding in each namaspace to the promoted ClusterRole
-func (p *prtbHandler) OnChange(key string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if prtb == nil || prtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
+	if err := p.reconcileBindings(prtb); err != nil {
+		return nil, err
+	}
+
+	// Ensure a service account impersonator exists on the cluster
+	if prtb.UserName != "" {
+		if err := p.impersonationHandler.ensureServiceAccountImpersonator(prtb.UserName); err != nil {
+			return nil, fmt.Errorf("error deleting service account impersonator: %w", err)
+		}
+	}
+
+	return prtb, nil
+}
+
+// reconcileBindings lists all existing RoleBindings in each project namespace and ensures they are correct.
+// If not it deletes them and creates the correct RoleBindings.
+func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	hasPromotedRule, err := p.doesRoleTemplateHavePromotedRules(prtb)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	ownerLabel := createPRTBOwnerLabel(prtb.Name)
 
-	// TODO how to select namespaces
-	namespaces, err := p.nsClient.List(metav1.ListOptions{})
+	// Select all namespaces in project
+	namespaces, err := p.nsClient.List(metav1.ListOptions{
+		LabelSelector: projectIDAnnotation + "=" + prtb.ProjectName,
+	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	for _, n := range namespaces.Items {
@@ -72,13 +91,13 @@ func (p *prtbHandler) OnChange(key string, prtb *v3.ProjectRoleTemplateBinding) 
 
 		rb, promotedRB, err := buildRoleBindings(prtb, n.Name, hasPromotedRule)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Check if any Role Bindings exist already
 		currentRBs, err := p.rbClient.List(n.Name, metav1.ListOptions{LabelSelector: ownerLabel})
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		var matchingRB, matchingPromotedRB *v1.RoleBinding
@@ -97,36 +116,31 @@ func (p *prtbHandler) OnChange(key string, prtb *v3.ProjectRoleTemplateBinding) 
 		// Remove excess RBs
 		for _, rbToDelete := range rbsToDelete {
 			if err = p.rbClient.Delete(n.Name, rbToDelete.Name, &metav1.DeleteOptions{}); err != nil {
-				return nil, err
+				return err
 			}
 		}
 
 		if matchingRB == nil {
 			if _, err := p.rbClient.Create(rb); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if hasPromotedRule && matchingPromotedRB == nil {
 			if _, err := p.rbClient.Create(promotedRB); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
 
-	// Ensure a service account impersonator exists on the cluster
-	if prtb.UserName != "" {
-		if err := p.impersonationHandler.ensureServiceAccountImpersonator(prtb.UserName); err != nil {
-			return nil, fmt.Errorf("error deleting service account impersonator: %w", err)
-		}
-	}
-
-	return prtb, nil
+	return nil
 }
 
 // OnRemove removes all Role Bindings in each project namespace made by the PRTB
 func (p *prtbHandler) OnRemove(key string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	// TODO how to select namespaces
-	namespaces, err := p.nsClient.List(metav1.ListOptions{})
+	// Select all namespaces in project
+	namespaces, err := p.nsClient.List(metav1.ListOptions{
+		LabelSelector: projectIDAnnotation + "=" + prtb.ProjectName,
+	})
 	if err != nil {
 		return nil, err
 	}

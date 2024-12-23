@@ -9,6 +9,8 @@ import (
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var promotedRulesForProjects = map[string]string{
@@ -29,12 +31,12 @@ const (
 
 func newRoleTemplateHandler(uc *config.UserContext) *roleTemplateHandler {
 	return &roleTemplateHandler{
-		crClient: uc.RBACw.ClusterRole(),
+		crController: uc.RBACw.ClusterRole(),
 	}
 }
 
 type roleTemplateHandler struct {
-	crClient crbacv1.ClusterRoleController
+	crController crbacv1.ClusterRoleController
 }
 
 // OnChange ensures that the following Cluster Roles exist:
@@ -44,24 +46,26 @@ type roleTemplateHandler struct {
 // For RoleTemplates with the Context == "Project", we also ensure:
 //  1. If the RoleTemplate has any rules for Global Resources, make a ClusterRole with those named "RoleTemplateName-promoted"
 //  2. an Aggregating ClusterRole that aggregates all inherited RoleTemplates' promoted Cluster Roles named "RoleTemplateName-promoted-aggregator"
-func (rtl *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	if rt == nil || rt.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
-	clusterRoles := clusterRolesForRoleTemplate(rt)
+	rules, err := rth.collectRules(rt)
+	if err != nil {
+		return nil, err
+	}
+	clusterRoles := clusterRolesForRoleTemplate(rt, rules)
 	for _, cr := range clusterRoles {
-		if err := rbac.CreateOrUpdateResource(cr, rtl.crClient, rbac.AreClusterRolesSame); err != nil {
+		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
 			return nil, err
 		}
 	}
 	return rt, nil
 }
 
-// clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate
-func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
-	// The rules for the role template includes external rules
-	rules := append(rt.Rules, rt.ExternalRules...)
+// clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate using the given rules.
+func clusterRolesForRoleTemplate(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule) []*rbacv1.ClusterRole {
 	res := []*rbacv1.ClusterRole{
 		// 1. Cluster role with rules
 		rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rt.Name), rt.Name, rules),
@@ -91,23 +95,43 @@ func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
 	return res
 }
 
+// collectRules returns the rules for a RoleTemplate. If the referenced role is external, it gets the referenced cluster role's rules.
+func (rth *roleTemplateHandler) collectRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyRule, error) {
+	if rt.External {
+		if rt.ExternalRules != nil {
+			return rt.ExternalRules, nil
+		} else {
+			externalRole, err := rth.crController.Get(rt.Name, metav1.GetOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return nil, err
+			}
+			if externalRole != nil {
+				return externalRole.Rules, nil
+			}
+		}
+	} else {
+		return rt.Rules, nil
+	}
+	return nil, nil
+}
+
 // OnRemove deletes all ClusterRoles created by the RoleTemplate
-func (rtl *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (rth *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	var returnedErrors error
 
 	crName := rbac.ClusterRoleNameFor(rt.Name)
 	acrName := rbac.AggregatedClusterRoleNameFor(crName)
 	returnedErrors = errors.Join(
-		rbac.DeleteResource(crName, rtl.crClient),
-		rbac.DeleteResource(acrName, rtl.crClient),
+		rbac.DeleteResource(crName, rth.crController),
+		rbac.DeleteResource(acrName, rth.crController),
 	)
 
 	if rt.Context == projectContext {
 		promotedCRName := rbac.PromotedClusterRoleNameFor(crName)
 		promotedACRName := rbac.AggregatedClusterRoleNameFor(promotedCRName)
 		returnedErrors = errors.Join(returnedErrors,
-			rbac.DeleteResource(promotedCRName, rtl.crClient),
-			rbac.DeleteResource(promotedACRName, rtl.crClient),
+			rbac.DeleteResource(promotedCRName, rth.crController),
+			rbac.DeleteResource(promotedACRName, rth.crController),
 		)
 	}
 
