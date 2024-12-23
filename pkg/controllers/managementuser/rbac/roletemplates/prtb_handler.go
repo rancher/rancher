@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -77,8 +78,9 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	ownerLabel := createPRTBOwnerLabel(prtb.Name)
 
 	// Select all namespaces in project
+	_, projectId, _ := strings.Cut(prtb.ProjectName, ":")
 	namespaces, err := p.nsClient.List(metav1.ListOptions{
-		LabelSelector: projectIDAnnotation + "=" + prtb.ProjectName,
+		LabelSelector: projectIDAnnotation + "=" + projectId,
 	})
 	if err != nil {
 		return err
@@ -138,8 +140,9 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 // OnRemove removes all Role Bindings in each project namespace made by the PRTB
 func (p *prtbHandler) OnRemove(key string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	// Select all namespaces in project
+	_, projectId, _ := strings.Cut(prtb.ProjectName, ":")
 	namespaces, err := p.nsClient.List(metav1.ListOptions{
-		LabelSelector: projectIDAnnotation + "=" + prtb.ProjectName,
+		LabelSelector: projectIDAnnotation + "=" + projectId,
 	})
 	if err != nil {
 		return nil, err
