@@ -73,7 +73,7 @@ func (p *PortTestSuite) TestHostPort() {
 	require.NoError(p.T(), err)
 
 	if p.cluster.EnableNetworkPolicy == nil || !*p.cluster.EnableNetworkPolicy {
-		p.T().Skip("The Host Port test requires project network enable.")
+		p.T().Skip("The Host Port test requires project network enabled.")
 	}
 
 	hostPort := getHostPort()
@@ -108,7 +108,7 @@ func (p *PortTestSuite) TestNodePort() {
 	defer subSession.Cleanup()
 
 	if p.cluster.EnableNetworkPolicy == nil || !*p.cluster.EnableNetworkPolicy {
-		p.T().Skip("The Node Port test requires project network enable.")
+		p.T().Skip("The Node Port test requires project network enabled.")
 	}
 
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
@@ -343,7 +343,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
-	isPool, err := isNodePool(steveClient)
+	isPool, err := IsNodePoolSizeValid(steveClient)
 	require.NoError(p.T(), err)
 
 	if !isPool {
@@ -351,7 +351,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	}
 
 	if p.cluster.EnableNetworkPolicy == nil || !*p.cluster.EnableNetworkPolicy {
-		p.T().Skip("The Host Port scale up/down test requires project network enable.")
+		p.T().Skip("The Host Port scale up/down test requires project network enabled.")
 	}
 
 	hostPort := getHostPort()
@@ -430,7 +430,7 @@ func (p *PortTestSuite) TestNodePortScaleAndUpgrade() {
 	require.NoError(p.T(), err)
 
 	if p.cluster.EnableNetworkPolicy == nil || !*p.cluster.EnableNetworkPolicy {
-		p.T().Skip("The Node Port scale and upgrade test requires project network enable.")
+		p.T().Skip("The Node Port scale and upgrade test requires project network enabled.")
 	}
 
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
