@@ -181,6 +181,10 @@ startupProbe:
   timeoutSeconds: 5
   periodSeconds: 10
   failureThreshold: 12
+
+# Additional taints to tolerate
+extraTolerations: {}
+
 livenessProbe:
   timeoutSeconds: 5
   periodSeconds: 30
