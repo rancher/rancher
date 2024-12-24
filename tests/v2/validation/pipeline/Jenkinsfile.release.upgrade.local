@@ -479,13 +479,13 @@ node {
                     } catch(err) {
                       echo "Post upgrade $it had failures: " + err
                     }
-                  sh "./${qaseRun} --startRun=false"
                   }
 
                   parallel jobs
                 } catch(err){
                   echo "Post upgrade tests had failures: " + err
                 }
+                sh "./${qaseRun} --startRun=false"
               }
               stage('Delete Rancher and resources') {
                 if (cleanup.toBoolean()) {
