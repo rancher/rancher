@@ -50,6 +50,8 @@ func main() {
 		}
 
 		err = reportTestQases(client, runID)
+		logrus.Info("Error getting the test case report.")
+
 		if err != nil {
 			logrus.Error("error reporting: ", err)
 		}
@@ -91,6 +93,8 @@ func getAllAutomationTestCases(client *qase.APIClient) (map[string]qase.TestCase
 
 func readTestCase() ([]testcase.GoTestOutput, error) {
 	file, err := os.Open(testResultsJSON)
+
+	logrus.Info("Printing the testResultsJson", file)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +161,8 @@ func parseCorrectTestCases(testCases []testcase.GoTestOutput) map[string]*testca
 
 func reportTestQases(client *qase.APIClient, testRunID int64) error {
 	tempTestCases, err := readTestCase()
+
+	logrus.Info("Printing the tempTestCases", tempTestCases)
 	if err != nil {
 		return nil
 	}
@@ -173,6 +179,8 @@ func reportTestQases(client *qase.APIClient, testRunID int64) error {
 		if testQase, ok := qaseTestCases[goTestCase.Name]; ok {
 			// update test status
 			err = updateTestInRun(client, *goTestCase, testQase.Id, testRunID)
+			logrus.Info("Found test case in test run")
+
 			if err != nil {
 				return err
 			}
@@ -183,11 +191,14 @@ func reportTestQases(client *qase.APIClient, testRunID int64) error {
 		} else {
 			// write test case
 			caseID, err := writeTestCaseToQase(client, *goTestCase)
+			logrus.Info(" Updated test run step1 ")
+
 			if err != nil {
 				return err
 			}
 
 			err = updateTestInRun(client, *goTestCase, caseID.Result.Id, testRunID)
+			logrus.Info(" Updated test run")
 			if err != nil {
 				return err
 			}
