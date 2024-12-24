@@ -50,7 +50,9 @@ func main() {
 		}
 
 		err = reportTestQases(client, runID)
+
 		if err != nil {
+			logrus.Info("Error getting the test case report.")
 			logrus.Error("error reporting: ", err)
 		}
 	}
@@ -91,6 +93,8 @@ func getAllAutomationTestCases(client *qase.APIClient) (map[string]qase.TestCase
 
 func readTestCase() ([]testcase.GoTestOutput, error) {
 	file, err := os.Open(testResultsJSON)
+
+	logrus.Info("Printing the testResultsJson", file)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +161,8 @@ func parseCorrectTestCases(testCases []testcase.GoTestOutput) map[string]*testca
 
 func reportTestQases(client *qase.APIClient, testRunID int64) error {
 	tempTestCases, err := readTestCase()
+
+	logrus.Info("Printing the tempTestCases", tempTestCases)
 	if err != nil {
 		return nil
 	}
@@ -173,21 +179,29 @@ func reportTestQases(client *qase.APIClient, testRunID int64) error {
 		if testQase, ok := qaseTestCases[goTestCase.Name]; ok {
 			// update test status
 			err = updateTestInRun(client, *goTestCase, testQase.Id, testRunID)
+			logrus.Infof("Updating test in run: TestCaseName=%s, TestCaseID=%d, TestRunID=%d", goTestCase.Name, testQase.Id, testRunID)
+
+
 			if err != nil {
+				logrus.Info("Test case not found in test run")
 				return err
 			}
 
 			if goTestCase.Status == failStatus {
 				resultTestMap = append(resultTestMap, goTestCase)
 			}
+			logrus.Info("Updated test in run")
 		} else {
 			// write test case
 			caseID, err := writeTestCaseToQase(client, *goTestCase)
+			logrus.Info(" Updated test run step1 ")
+
 			if err != nil {
 				return err
 			}
 
 			err = updateTestInRun(client, *goTestCase, caseID.Result.Id, testRunID)
+			logrus.Info(" Updated test run")
 			if err != nil {
 				return err
 			}
@@ -195,6 +209,7 @@ func reportTestQases(client *qase.APIClient, testRunID int64) error {
 			if goTestCase.Status == failStatus {
 				resultTestMap = append(resultTestMap, goTestCase)
 			}
+
 		}
 	}
 	resp, _, err := client.RunsApi.GetRun(context.TODO(), qasedefaults.RancherManagerProjectID, int32(testRunID))
@@ -277,6 +292,7 @@ func updateTestInRun(client *qase.APIClient, testCase testcase.GoTestCase, qaseT
 		var err error
 		elapsedTime, err = strconv.ParseFloat(testCase.Elapsed, 64)
 		if err != nil {
+			logrus.Info("elapsedtime error", err)
 			return err
 		}
 	}
@@ -288,8 +304,16 @@ func updateTestInRun(client *qase.APIClient, testCase testcase.GoTestCase, qaseT
 		Time:    int64(elapsedTime),
 	}
 
-	_, _, err := client.ResultsApi.CreateResult(context.TODO(), resultBody, qasedefaults.RancherManagerProjectID, testRunID)
+	logrus.Infof("Updating test in run: qaseTestCaseID=%s, status=%s, Comment=%s", qaseTestCaseID, status, testCase.StackTrace)
+
+
+	inlineResponse, httpResponse, err := client.ResultsApi.CreateResult(context.TODO(), resultBody, qasedefaults.RancherManagerProjectID, testRunID)
+	logrus.Info("This the result body", resultBody)
+	logrus.Info("Inline response", inlineResponse)
+	logrus.Info("http response", httpResponse)
+
 	if err != nil {
+		logrus.Info("Error creating result", err)
 		return err
 	}
 

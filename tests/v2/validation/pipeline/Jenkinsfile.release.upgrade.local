@@ -479,13 +479,13 @@ node {
                     } catch(err) {
                       echo "Post upgrade $it had failures: " + err
                     }
-                  sh "./${qaseRun} --startRun=false"
                   }
 
                   parallel jobs
                 } catch(err){
                   echo "Post upgrade tests had failures: " + err
                 }
+                sh "./${qaseRun} --startRun=false"
               }
               stage('Delete Rancher and resources') {
                 if (cleanup.toBoolean()) {
@@ -505,8 +505,8 @@ node {
                 }
               }
               stage('Test Report') {
-                sh "docker stop ${buildTestContainer}"
-                sh "docker rm -v ${buildTestContainer}"
+                sh "docker stop ${testContainer}"
+                sh "docker rm -v ${testContainer}"
 
                 sh "docker stop ${configGeneratorContainer}"
                 sh "docker rm -v ${configGeneratorContainer}"
