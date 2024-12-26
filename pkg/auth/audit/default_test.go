@@ -191,7 +191,7 @@ func TestDefaultPolicies(t *testing.T) {
 		{
 			Name:     "With malformed input",
 			Body:     []byte(`{"key":"value","response":}`),
-			Expected: []byte(fmt.Sprintf(`{"%s":"failed to unmarshal log body: invalid character '}' looking for beginning of value"}`, auditLogErrorKey)),
+			Expected: []byte(fmt.Sprintf(`{"%s":"failed to unmarshal request body: invalid character '}' looking for beginning of value"}`, auditLogErrorKey)),
 		},
 	}
 
