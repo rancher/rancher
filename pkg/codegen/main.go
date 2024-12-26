@@ -124,6 +124,13 @@ func main() {
 					"k8s.io/apimachinery/pkg/apis/meta/v1",
 				},
 			},
+			"auditlog.cattle.io": {
+				PackageName: "auditlog.cattle.io",
+				Types: []interface{}{
+					"./pkg/apis/auditlog.cattle.io/v1",
+				},
+				GenerateTypes: true,
+			},
 			// This package is not a CRD but types from the extension API server.
 			"ext.cattle.io": {
 				PackageName: "ext.cattle.io",
