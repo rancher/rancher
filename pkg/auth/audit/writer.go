@@ -134,6 +134,11 @@ func (w *Writer) Write(log *log) error {
 
 	log.applyVerbosity(verbosity)
 
+	// if err := log.prepare(); err != nil {
+	// 	return fmt.Errorf("failed to prepare log bodies for redaction: %w", err)
+	// }
+	log.prepare()
+
 	if err := w.decompressResponse(log); err != nil {
 		return fmt.Errorf("failed to decompress response: %w", err)
 	}
@@ -143,6 +148,10 @@ func (w *Writer) Write(log *log) error {
 		if err := r.Redact(log); err != nil {
 			return fmt.Errorf("failed to redact log: %w", err)
 		}
+	}
+
+	if err := log.restore(); err != nil {
+		return fmt.Errorf("failed to prepare log bodies for redaction: %w", err)
 	}
 
 	data, err := json.Marshal(log)
