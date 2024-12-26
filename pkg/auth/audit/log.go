@@ -2,6 +2,7 @@ package audit
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +14,8 @@ import (
 )
 
 const (
-	contentTypeJSON = "application/json"
+	contentTypeJSON  = "application/json"
+	auditLogErrorKey = "auditLogError"
 )
 
 var (
@@ -41,8 +43,8 @@ type log struct {
 	RequestBody  []byte `json:"requestBody,omitempty"`
 	ResponseBody []byte `json:"responseBody,omitempty"`
 
-	unmarsheldRequestBody  map[string]any
-	unmarsheldResponseBody map[string]any
+	unmarshalledRequestBody  map[string]any
+	unmarshalledResponseBody map[string]any
 }
 
 func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp string, respTimestamp string) (*log, error) {
@@ -104,4 +106,44 @@ func (l *log) applyVerbosity(verbosity auditlogv1.LogVerbosity) {
 	if !verbosity.Response.Body {
 		l.ResponseBody = nil
 	}
+}
+
+func (l *log) prepare() {
+	if l.RequestBody != nil {
+		if err := json.Unmarshal(l.RequestBody, &l.unmarshalledRequestBody); err != nil {
+			l.unmarshalledRequestBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
+			}
+		}
+
+		l.RequestBody = nil
+	}
+
+	if l.ResponseBody != nil {
+		if err := json.Unmarshal(l.ResponseBody, &l.unmarshalledResponseBody); err != nil {
+			l.unmarshalledResponseBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", err.Error()),
+			}
+		}
+
+		l.ResponseBody = nil
+	}
+}
+
+func (l *log) restore() error {
+	var err error
+
+	if l.unmarshalledRequestBody != nil {
+		if l.RequestBody, err = json.Marshal(l.unmarshalledRequestBody); err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
+	}
+
+	if l.unmarshalledResponseBody != nil {
+		if l.ResponseBody, err = json.Marshal(l.unmarshalledResponseBody); err != nil {
+			return fmt.Errorf("failed to marshal response body: %w", err)
+		}
+	}
+
+	return nil
 }

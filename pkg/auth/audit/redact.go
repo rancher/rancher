@@ -1,7 +1,6 @@
 package audit
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -13,11 +12,11 @@ import (
 )
 
 const (
-	redacted         = "[redacted]"
-	auditLogErrorKey = "auditLogError"
+	redacted = "[redacted]"
 )
 
 type Redactor interface {
+	// Redact replaces sensitive information within a log with "[redacted]". Expects the log to have been prepared.
 	Redact(*log) error
 }
 
@@ -97,52 +96,13 @@ func (r *redactor) redactMap(path string, body map[string]any) {
 	}
 }
 
-// todo: we should unmarshal the body in to a map[string]any
-// todo: consider adding a [Request|Response]BodyUnmarshaled
-func (r *redactor) redactBody(data []byte) ([]byte, error) {
-	if data == nil {
-		return data, nil
-	}
-
-	var body map[string]any
-	if err := json.Unmarshal(data, &body); err != nil {
-		body := map[string]string{
-			auditLogErrorKey: fmt.Sprintf("failed to unmarshal log body: %s", err),
-		}
-
-		if data, err = json.Marshal(body); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal log body: %w", err)
-		}
-
-		return data, nil
-	}
-
-	r.redactMap("", body)
-
-	redacted, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal log body: %w", err)
-	}
-
-	return redacted, nil
-}
-
 // Redact redacts fields and headers which match the
 func (r *redactor) Redact(log *log) error {
 	r.redactHeaders(log.RequestHeader)
 	r.redactHeaders(log.ResponseHeader)
 
-	var err error
-
-	log.RequestBody, err = r.redactBody(log.RequestBody)
-	if err != nil {
-		return err
-	}
-
-	log.ResponseBody, err = r.redactBody(log.ResponseBody)
-	if err != nil {
-		return err
-	}
+	r.redactMap("", log.unmarshalledRequestBody)
+	r.redactMap("", log.unmarshalledResponseBody)
 
 	return nil
 }
@@ -188,16 +148,11 @@ func redactSingleSecret(secret map[string]any) {
 	}
 }
 
-func redactSecretsFromBody(log *log, data []byte) ([]byte, error) {
+func redactSecretsFromBody(log *log, body map[string]any) error {
 	var err error
 
-	if data == nil {
-		return data, nil
-	}
-
-	body := map[string]any{}
-	if err := json.Unmarshal(data, &body); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal log body: %w", err)
+	if body == nil {
+		return nil
 	}
 
 	isK8sProxyList := strings.HasPrefix(log.RequestURI, "/k8s/") && (body["kind"] != nil && body["kind"] == "SecretList")
@@ -206,11 +161,7 @@ func redactSecretsFromBody(log *log, data []byte) ([]byte, error) {
 	if !(isK8sProxyList || isRegularList) {
 		redactSingleSecret(body)
 
-		if data, err = json.Marshal(body); err != nil {
-			return nil, fmt.Errorf("failed to marshal redacted secret: %w", err)
-		}
-
-		return data, nil
+		return nil
 	}
 
 	secretListItemsKey := "data"
@@ -220,14 +171,14 @@ func redactSecretsFromBody(log *log, data []byte) ([]byte, error) {
 
 	if _, ok := body[secretListItemsKey]; !ok {
 		logrus.Debugf("auditLog: skipping data redaction of secret bodies in secret list: no key [%s] present, no data to redact", secretListItemsKey)
-		return data, nil
+		return nil
 	}
 
 	list, ok := body[secretListItemsKey].([]any)
 	if !ok {
 		logrus.Debugf("auditlog: redacting entire value for key [%s] in resopnse to URI [%s], unable to assert body is of type []any", secretListItemsKey, log.RequestURI)
 		body[secretListItemsKey] = redacted
-		return data, nil
+		return nil
 	}
 
 	for i, s := range list {
@@ -242,24 +193,20 @@ func redactSecretsFromBody(log *log, data []byte) ([]byte, error) {
 		list[i] = secret
 	}
 
-	if data, err = json.Marshal(body); err != nil {
-		return nil, fmt.Errorf("failed to marshal redacted secret list: %w", err)
-	}
-
-	return data, err
+	return err
 }
 
 func redactSecret(log *log) error {
 	var err error
 
 	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.RequestBody) {
-		if log.RequestBody, err = redactSecretsFromBody(log, log.RequestBody); err != nil {
+		if err = redactSecretsFromBody(log, log.unmarshalledRequestBody); err != nil {
 			return err
 		}
 	}
 
 	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.RequestBody) {
-		if log.ResponseBody, err = redactSecretsFromBody(log, log.ResponseBody); err != nil {
+		if err = redactSecretsFromBody(log, log.unmarshalledResponseBody); err != nil {
 			return err
 		}
 	}
