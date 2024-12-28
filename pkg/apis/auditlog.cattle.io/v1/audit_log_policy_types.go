@@ -9,9 +9,9 @@ type FilterAction string
 
 const (
 	AuditLogPolicyStatusConditionUnknown  AuditLogPolicyStatusCondition = ""
-	AuditLogPolicyStatusConditionDisabled AuditLogPolicyStatusCondition = "Disabled"
-	AuditLogPolicyStatusConditionEnabled  AuditLogPolicyStatusCondition = "Enabled"
-	AuditLogPolicyStatusConditionInvalid  AuditLogPolicyStatusCondition = "Invalid"
+	AuditLogPolicyStatusConditionDisabled AuditLogPolicyStatusCondition = "disabled"
+	AuditLogPolicyStatusConditionActive   AuditLogPolicyStatusCondition = "active"
+	AuditLogPolicyStatusConditionInvalid  AuditLogPolicyStatusCondition = "invalid"
 
 	FilterActionUnknown FilterAction = ""
 	FilterActionAllow   FilterAction = "allow"
