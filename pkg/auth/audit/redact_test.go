@@ -20,8 +20,8 @@ var (
 	})
 )
 
-func sampleLog() log {
-	return log{
+func sampleLog() Log {
+	return Log{
 		RequestHeader: map[string][]string{
 			"password": {"password1234"},
 			"foo":      {"bar"},
@@ -39,8 +39,8 @@ func TestRedactor(t *testing.T) {
 	type testCase struct {
 		Name     string
 		Redactor *redactor
-		Input    log
-		Expected log
+		Input    Log
+		Expected Log
 	}
 
 	cases := []testCase{
@@ -48,7 +48,7 @@ func TestRedactor(t *testing.T) {
 			Name:     "Redact Headers",
 			Redactor: headerRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: Log{
 				RequestHeader: map[string][]string{
 					"password": {redacted},
 					"foo":      {"bar"},
@@ -65,7 +65,7 @@ func TestRedactor(t *testing.T) {
 			Name:     "Redact Both With Paths",
 			Redactor: pathRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: Log{
 				RequestHeader: map[string][]string{
 					"password": {"password1234"},
 					"foo":      {"bar"},
@@ -82,7 +82,7 @@ func TestRedactor(t *testing.T) {
 			Name:     "Redact Keys Regex",
 			Redactor: keyRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: Log{
 				RequestHeader: map[string][]string{
 					"password": {"password1234"},
 					"foo":      {"bar"},
