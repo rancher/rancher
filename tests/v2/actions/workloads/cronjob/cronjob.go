@@ -17,6 +17,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+const (
+	nginxImageName = "nginx"
+)
+
 var CronJobGroupVersionResource = schema.GroupVersionResource{
 	Group:    "batch",
 	Version:  "v1",
