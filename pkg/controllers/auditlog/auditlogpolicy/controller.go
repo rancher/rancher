@@ -2,6 +2,7 @@ package auditlogpolicy
 
 import (
 	"context"
+	"fmt"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/audit"
@@ -18,6 +19,16 @@ type handler struct {
 func (h *handler) OnChange(key string, obj *auditlogv1.AuditLogPolicy) (*auditlogv1.AuditLogPolicy, error) {
 	if !obj.Spec.Enabled {
 		h.writer.RemovePolicy(obj)
+
+		obj.Status = auditlogv1.AuditLogPolicyStatus{
+			Condition: auditlogv1.AuditLogPolicyStatusConditionDisabled,
+		}
+
+		if _, err := h.auditlogpolicy.UpdateStatus(obj); err != nil {
+			logrus.Errorf("could not mark audit log policy '%s/%s' as disabled: %s", obj.Namespace, obj.Name, err)
+			return obj, err
+		}
+
 		return obj, nil
 	}
 
@@ -28,15 +39,30 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditLogPolicy) (*auditlo
 		}
 
 		if _, err := h.auditlogpolicy.UpdateStatus(obj); err != nil {
-			logrus.Errorf("could not update status for audit log policy '%s/%s': %s", obj.Namespace, obj.Name, err)
+			logrus.Errorf("could not mark audit log policy '%s/%s' as invalid: %s", obj.Namespace, obj.Name, err)
+			return obj, err
 		}
+
+		return obj, nil
+	}
+
+	obj.Status.Condition = auditlogv1.AuditLogPolicyStatusConditionActive
+	obj.Status.Message = ""
+	if _, err := h.auditlogpolicy.UpdateStatus(obj); err != nil {
+		logrus.Errorf("could not mark audit log policy '%s/%s' as active: %s", obj.Namespace, obj.Name, err)
+		return obj, err
 	}
 
 	return obj, nil
 }
 
 func (h *handler) OnRemove(key string, obj *auditlogv1.AuditLogPolicy) (*auditlogv1.AuditLogPolicy, error) {
-	h.writer.RemovePolicy(obj)
+	if obj.Spec.Enabled {
+		if ok := h.writer.RemovePolicy(obj); !ok {
+			return obj, fmt.Errorf("failed to remove policy '%s/%s' from writer", obj.Namespace, obj.Name)
+		}
+	}
+
 	return obj, nil
 }
 
