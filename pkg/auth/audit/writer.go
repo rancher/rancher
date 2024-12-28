@@ -29,17 +29,55 @@ type Policy struct {
 	Verbosity auditlogv1.LogVerbosity
 }
 
+func PolicyFromAuditLogPolicy(policy *auditlogv1.AuditLogPolicy) (Policy, error) {
+	newPolicy := Policy{
+		Filters:   make([]*Filter, len(policy.Spec.Filters)),
+		Redactors: make([]Redactor, len(policy.Spec.AdditionalRedactions)),
+		Verbosity: policy.Spec.Verbosity,
+	}
+
+	if newPolicy.Verbosity.Level != auditlogv1.LevelNull {
+		newPolicy.Verbosity = verbosityForLevel(newPolicy.Verbosity.Level)
+	}
+
+	for i, f := range policy.Spec.Filters {
+		switch f.Action {
+		case auditlogv1.FilterActionAllow, auditlogv1.FilterActionDeny:
+		default:
+			return Policy{}, fmt.Errorf("failed to create filter: invalid filter action: '%s'", f.Action)
+		}
+
+		filter, err := NewFilter(f)
+		if err != nil {
+			return Policy{}, fmt.Errorf("failed to create filter: %w", err)
+		}
+
+		newPolicy.Filters[i] = filter
+	}
+
+	for i, r := range policy.Spec.AdditionalRedactions {
+		redactor, err := NewRedactor(r)
+		if err != nil {
+			return Policy{}, fmt.Errorf("failed to create redactor: %w", err)
+		}
+
+		newPolicy.Redactors[i] = redactor
+	}
+
+	return newPolicy, nil
+}
+
 type Writer struct {
 	policyMutex sync.RWMutex
-	Policy      map[types.NamespacedName]Policy
+	policy      map[types.NamespacedName]Policy
 
-	Output io.Writer
+	output io.Writer
 }
 
 func NewWriter(output io.Writer, defaultPolicyLevel auditlogv1.Level) (*Writer, error) {
 	w := &Writer{
-		Policy: make(map[types.NamespacedName]Policy),
-		Output: output,
+		policy: make(map[types.NamespacedName]Policy),
+		output: output,
 	}
 
 	for _, v := range DefaultPolicies() {
@@ -91,7 +129,7 @@ func decompress(readCloser io.ReadCloser) ([]byte, error) {
 	return rawData, nil
 }
 
-func (w *Writer) decompressResponse(log *log) error {
+func (w *Writer) decompressResponse(log *Log) error {
 	var err error
 	var compressed []byte
 
@@ -115,14 +153,14 @@ func (w *Writer) decompressResponse(log *log) error {
 	return nil
 }
 
-func (w *Writer) Write(log *log) error {
+func (w *Writer) Write(log *Log) error {
 	redactors := []Redactor{
 		RedactFunc(redactSecret),
 	}
 	var verbosity auditlogv1.LogVerbosity
 
 	w.policyMutex.RLock()
-	for _, p := range w.Policy {
+	for _, p := range w.policy {
 		for _, f := range p.Filters {
 			if f.Allowed(log) {
 				redactors = append(redactors, p.Redactors...)
@@ -164,7 +202,7 @@ func (w *Writer) Write(log *log) error {
 		return fmt.Errorf("failed to compact log: %w", err)
 	}
 
-	if _, err := w.Output.Write(buffer.Bytes()); err != nil {
+	if _, err := w.output.Write(buffer.Bytes()); err != nil {
 		return fmt.Errorf("failed to write log: %w", err)
 	}
 
@@ -172,40 +210,18 @@ func (w *Writer) Write(log *log) error {
 }
 
 func (w *Writer) UpdatePolicy(policy *auditlogv1.AuditLogPolicy) error {
-	newPolicy := Policy{
-		Filters:   make([]*Filter, len(policy.Spec.Filters)),
-		Redactors: make([]Redactor, len(policy.Spec.AdditionalRedactions)),
-		Verbosity: policy.Spec.Verbosity,
-	}
-
-	if newPolicy.Verbosity.Level != auditlogv1.LevelNull {
-		newPolicy.Verbosity = verbosityForLevel(newPolicy.Verbosity.Level)
-	}
-
-	for i, f := range policy.Spec.Filters {
-		filter, err := NewFilter(f)
-		if err != nil {
-			return fmt.Errorf("failed to create filter: %w", err)
-		}
-
-		newPolicy.Filters[i] = filter
-	}
-
-	for i, r := range policy.Spec.AdditionalRedactions {
-		redactor, err := NewRedactor(r)
-		if err != nil {
-			return fmt.Errorf("failed to create redactor: %w", err)
-		}
-
-		newPolicy.Redactors[i] = redactor
+	newPolicy, err := PolicyFromAuditLogPolicy(policy)
+	if err != nil {
+		return fmt.Errorf("failed to create policy: %w", err)
 	}
 
 	name := types.NamespacedName{
 		Name:      policy.Name,
 		Namespace: policy.Namespace,
 	}
+
 	w.policyMutex.Lock()
-	w.Policy[name] = newPolicy
+	w.policy[name] = newPolicy
 	w.policyMutex.Unlock()
 
 	return nil
@@ -220,12 +236,21 @@ func (w *Writer) RemovePolicy(policy *auditlogv1.AuditLogPolicy) bool {
 		Namespace: policy.Namespace,
 	}
 
-	if _, ok := w.Policy[name]; ok {
-		delete(w.Policy, name)
+	if _, ok := w.policy[name]; ok {
+		delete(w.policy, name)
 		return true
 	}
 
 	return false
+}
+
+func (w *Writer) GetPolicy(namespace string, name string) (Policy, bool) {
+	w.policyMutex.RLock()
+	defer w.policyMutex.RUnlock()
+
+	p, ok := w.policy[types.NamespacedName{Name: name, Namespace: namespace}]
+
+	return p, ok
 }
 
 func (l *Writer) Start(ctx context.Context) {
