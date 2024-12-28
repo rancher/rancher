@@ -201,7 +201,7 @@ func TestDefaultPolicies(t *testing.T) {
 				t.Skipf("skipping test '%s'", c.Name)
 			}
 
-			log := &log{
+			log := &Log{
 				RequestURI:  c.Uri,
 				RequestBody: c.Body,
 			}
