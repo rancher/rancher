@@ -112,7 +112,7 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 	case provisioninginput.AWSProviderName.String():
 		if !isCustom {
 			machineConfig := new(machinepools.AWSMachineConfigs)
-			config.LoadAndUpdateConfig(machinepools.AWSMachineConfigConfigurationFileKey, machineConfig, func() {
+			config.LoadAndUpdateConfig(machinepools.AWSMachineConfigsKey, machineConfig, func() {
 				for i := range machineConfig.AWSMachineConfig {
 					machineConfig.AWSMachineConfig[i].AMI = image
 					machineConfig.AWSMachineConfig[i].SSHUser = sshUser
@@ -130,7 +130,7 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 		}
 	case provisioninginput.AzureProviderName.String():
 		machineConfig := new(machinepools.AzureMachineConfigs)
-		config.LoadAndUpdateConfig(machinepools.AzureMachineConfigConfigurationFileKey, machineConfig, func() {
+		config.LoadAndUpdateConfig(machinepools.AzureMachineConfigsKey, machineConfig, func() {
 			for i := range machineConfig.AzureMachineConfig {
 				machineConfig.AzureMachineConfig[i].Image = image
 				machineConfig.AzureMachineConfig[i].SSHUser = sshUser
@@ -138,7 +138,7 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 		})
 	case provisioninginput.DOProviderName.String():
 		machineConfig := new(machinepools.DOMachineConfigs)
-		config.LoadAndUpdateConfig(machinepools.DOMachineConfigConfigurationFileKey, machineConfig, func() {
+		config.LoadAndUpdateConfig(machinepools.DOMachineConfigsKey, machineConfig, func() {
 			for i := range machineConfig.DOMachineConfig {
 				machineConfig.DOMachineConfig[i].Image = image
 				machineConfig.DOMachineConfig[i].SSHUser = sshUser
@@ -146,7 +146,7 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 		})
 	case provisioninginput.HarvesterProviderName.String():
 		machineConfig := new(machinepools.HarvesterMachineConfigs)
-		config.LoadAndUpdateConfig(machinepools.HarvesterMachineConfigConfigurationFileKey, machineConfig, func() {
+		config.LoadAndUpdateConfig(machinepools.HarvesterMachineConfigsKey, machineConfig, func() {
 			for i := range machineConfig.HarvesterMachineConfig {
 				machineConfig.HarvesterMachineConfig[i].ImageName = image
 				machineConfig.HarvesterMachineConfig[i].SSHUser = sshUser
@@ -154,7 +154,7 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 		})
 	case provisioninginput.LinodeProviderName.String():
 		machineConfig := new(machinepools.LinodeMachineConfigs)
-		config.LoadAndUpdateConfig(machinepools.LinodeMachineConfigConfigurationFileKey, machineConfig, func() {
+		config.LoadAndUpdateConfig(machinepools.LinodeMachineConfigsKey, machineConfig, func() {
 			for i := range machineConfig.LinodeMachineConfig {
 				machineConfig.LinodeMachineConfig[i].Image = image
 				machineConfig.LinodeMachineConfig[i].SSHUser = sshUser
