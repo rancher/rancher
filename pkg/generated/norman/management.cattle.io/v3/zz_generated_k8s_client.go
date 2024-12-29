@@ -24,12 +24,6 @@ type Interface interface {
 	ProjectRoleTemplateBindingsGetter
 	ClustersGetter
 	ClusterRegistrationTokensGetter
-	CatalogsGetter
-	TemplatesGetter
-	CatalogTemplatesGetter
-	CatalogTemplateVersionsGetter
-	TemplateVersionsGetter
-	TemplateContentsGetter
 	GroupsGetter
 	GroupMembersGetter
 	SamlTokensGetter
@@ -45,10 +39,6 @@ type Interface interface {
 	SettingsGetter
 	FeaturesGetter
 	ComposeConfigsGetter
-	ProjectCatalogsGetter
-	ClusterCatalogsGetter
-	MultiClusterAppsGetter
-	MultiClusterAppRevisionsGetter
 	KontainerDriversGetter
 	EtcdBackupsGetter
 	CloudCredentialsGetter
@@ -277,90 +267,6 @@ func (c *Client) ClusterRegistrationTokens(namespace string) ClusterRegistration
 	}
 }
 
-type CatalogsGetter interface {
-	Catalogs(namespace string) CatalogInterface
-}
-
-func (c *Client) Catalogs(namespace string) CatalogInterface {
-	sharedClient := c.clientFactory.ForResourceKind(CatalogGroupVersionResource, CatalogGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CatalogResource, CatalogGroupVersionKind, catalogFactory{})
-	return &catalogClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type TemplatesGetter interface {
-	Templates(namespace string) TemplateInterface
-}
-
-func (c *Client) Templates(namespace string) TemplateInterface {
-	sharedClient := c.clientFactory.ForResourceKind(TemplateGroupVersionResource, TemplateGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &TemplateResource, TemplateGroupVersionKind, templateFactory{})
-	return &templateClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type CatalogTemplatesGetter interface {
-	CatalogTemplates(namespace string) CatalogTemplateInterface
-}
-
-func (c *Client) CatalogTemplates(namespace string) CatalogTemplateInterface {
-	sharedClient := c.clientFactory.ForResourceKind(CatalogTemplateGroupVersionResource, CatalogTemplateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CatalogTemplateResource, CatalogTemplateGroupVersionKind, catalogTemplateFactory{})
-	return &catalogTemplateClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type CatalogTemplateVersionsGetter interface {
-	CatalogTemplateVersions(namespace string) CatalogTemplateVersionInterface
-}
-
-func (c *Client) CatalogTemplateVersions(namespace string) CatalogTemplateVersionInterface {
-	sharedClient := c.clientFactory.ForResourceKind(CatalogTemplateVersionGroupVersionResource, CatalogTemplateVersionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CatalogTemplateVersionResource, CatalogTemplateVersionGroupVersionKind, catalogTemplateVersionFactory{})
-	return &catalogTemplateVersionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type TemplateVersionsGetter interface {
-	TemplateVersions(namespace string) TemplateVersionInterface
-}
-
-func (c *Client) TemplateVersions(namespace string) TemplateVersionInterface {
-	sharedClient := c.clientFactory.ForResourceKind(TemplateVersionGroupVersionResource, TemplateVersionGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &TemplateVersionResource, TemplateVersionGroupVersionKind, templateVersionFactory{})
-	return &templateVersionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type TemplateContentsGetter interface {
-	TemplateContents(namespace string) TemplateContentInterface
-}
-
-func (c *Client) TemplateContents(namespace string) TemplateContentInterface {
-	sharedClient := c.clientFactory.ForResourceKind(TemplateContentGroupVersionResource, TemplateContentGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &TemplateContentResource, TemplateContentGroupVersionKind, templateContentFactory{})
-	return &templateContentClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
 type GroupsGetter interface {
 	Groups(namespace string) GroupInterface
 }
@@ -565,62 +471,6 @@ func (c *Client) ComposeConfigs(namespace string) ComposeConfigInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ComposeConfigGroupVersionResource, ComposeConfigGroupVersionKind.Kind, false)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ComposeConfigResource, ComposeConfigGroupVersionKind, composeConfigFactory{})
 	return &composeConfigClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ProjectCatalogsGetter interface {
-	ProjectCatalogs(namespace string) ProjectCatalogInterface
-}
-
-func (c *Client) ProjectCatalogs(namespace string) ProjectCatalogInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ProjectCatalogGroupVersionResource, ProjectCatalogGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectCatalogResource, ProjectCatalogGroupVersionKind, projectCatalogFactory{})
-	return &projectCatalogClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ClusterCatalogsGetter interface {
-	ClusterCatalogs(namespace string) ClusterCatalogInterface
-}
-
-func (c *Client) ClusterCatalogs(namespace string) ClusterCatalogInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ClusterCatalogGroupVersionResource, ClusterCatalogGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
-	return &clusterCatalogClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type MultiClusterAppsGetter interface {
-	MultiClusterApps(namespace string) MultiClusterAppInterface
-}
-
-func (c *Client) MultiClusterApps(namespace string) MultiClusterAppInterface {
-	sharedClient := c.clientFactory.ForResourceKind(MultiClusterAppGroupVersionResource, MultiClusterAppGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &MultiClusterAppResource, MultiClusterAppGroupVersionKind, multiClusterAppFactory{})
-	return &multiClusterAppClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type MultiClusterAppRevisionsGetter interface {
-	MultiClusterAppRevisions(namespace string) MultiClusterAppRevisionInterface
-}
-
-func (c *Client) MultiClusterAppRevisions(namespace string) MultiClusterAppRevisionInterface {
-	sharedClient := c.clientFactory.ForResourceKind(MultiClusterAppRevisionGroupVersionResource, MultiClusterAppRevisionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &MultiClusterAppRevisionResource, MultiClusterAppRevisionGroupVersionKind, multiClusterAppRevisionFactory{})
-	return &multiClusterAppRevisionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

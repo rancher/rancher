@@ -9,7 +9,6 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -23,11 +22,9 @@ type ActionHandler struct {
 	NodepoolGetter                v3.NodePoolsGetter
 	NodeLister                    v3.NodeLister
 	ClusterClient                 v3.ClusterInterface
-	CatalogManager                manager.CatalogManager
 	NodeTemplateGetter            v3.NodeTemplatesGetter
 	UserMgr                       user.Manager
 	ClusterManager                *clustermanager.Manager
-	CatalogTemplateVersionLister  v3.CatalogTemplateVersionLister
 	BackupClient                  v3.EtcdBackupInterface
 	ClusterTemplateClient         v3.ClusterTemplateInterface
 	ClusterTemplateRevisionClient v3.ClusterTemplateRevisionInterface

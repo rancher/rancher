@@ -13,7 +13,7 @@ node {
     def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
-    def branch = "release/v2.8"
+    def branch = "release/v2.10"
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
     }

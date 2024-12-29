@@ -11,15 +11,11 @@ import (
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
-	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,31 +44,31 @@ var (
 )
 
 type clusterLifecycle struct {
-	clusterClient      v3.ClusterInterface
-	crtbLister         v3.ClusterRoleTemplateBindingLister
-	crtbClient         v3.ClusterRoleTemplateBindingInterface
-	nsLister           corev1.NamespaceLister
+	clusterClient      v3.ClusterController
+	crtbLister         v3.ClusterRoleTemplateBindingCache
+	crtbClient         v3.ClusterRoleTemplateBindingController
+	nsLister           corev1.NamespaceCache
 	nsClient           k8scorev1.NamespaceInterface
-	projects           wranglerv3.ProjectClient
-	projectLister      v3.ProjectLister
-	rbLister           rbacv1.RoleBindingLister
-	roleBindings       rbacv1.RoleBindingInterface
-	roleTemplateLister v3.RoleTemplateLister
+	projects           v3.ProjectClient
+	projectLister      v3.ProjectCache
+	rbLister           rbacv1.RoleBindingCache
+	roleBindings       rbacv1.RoleBindingController
+	roleTemplateLister v3.RoleTemplateCache
 }
 
 // NewClusterLifecycle creates and returns a clusterLifecycle from a given ManagementContext
 func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle {
 	return &clusterLifecycle{
-		clusterClient:      management.Management.Clusters(""),
-		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		crtbClient:         management.Management.ClusterRoleTemplateBindings(""),
-		nsLister:           management.Core.Namespaces("").Controller().Lister(),
+		clusterClient:      management.Wrangler.Mgmt.Cluster(),
+		crtbLister:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		crtbClient:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		nsLister:           management.Wrangler.Core.Namespace().Cache(),
 		nsClient:           management.K8sClient.CoreV1().Namespaces(),
 		projects:           management.Wrangler.Mgmt.Project(),
-		projectLister:      management.Management.Projects("").Controller().Lister(),
-		rbLister:           management.RBAC.RoleBindings("").Controller().Lister(),
-		roleBindings:       management.RBAC.RoleBindings(""),
-		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
+		projectLister:      management.Wrangler.Mgmt.Project().Cache(),
+		rbLister:           management.Wrangler.RBAC.RoleBinding().Cache(),
+		roleBindings:       management.Wrangler.RBAC.RoleBinding(),
+		roleTemplateLister: management.Wrangler.Mgmt.RoleTemplate().Cache(),
 	}
 }
 
@@ -106,7 +102,8 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
+		cluster := obj.(*apisv3.Cluster)
+		_, err = l.clusterClient.Update(cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +117,8 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
+		cluster := obj.(*apisv3.Cluster)
+		_, err = l.clusterClient.Update(cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -146,16 +144,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 		return obj, generic.ErrSkip
 	}
 
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminClusterRoleBinding: "true"}
-	rbs, err := l.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	returnErr = errors.Join(returnErr, err)
-
-	for _, rb := range rbs {
-		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
-		returnErr = errors.Join(returnErr, err)
-	}
-	returnErr = errors.Join(
+	returnErr := errors.Join(
 		l.deleteSystemProject(obj, ClusterRemoveController),
 		deleteNamespace(obj, ClusterRemoveController, l.nsClient),
 	)
@@ -205,14 +194,6 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 			if creatorPrincipalName := clusterAnnotations[creatorPrincipalNameAnnotation]; creatorPrincipalName != "" {
 				annotations[creatorPrincipalNameAnnotation] = creatorPrincipalName
 			}
-		}
-
-		if name == project.System {
-			latestSystemVersion, err := systemimage.GetSystemImageVersion()
-			if err != nil {
-				return obj, err
-			}
-			annotations[project.SystemImageVersionAnnotation] = latestSystemVersion
 		}
 
 		project := &apisv3.Project{
@@ -276,17 +257,12 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 		return obj, nil
 	}
 
-	rt, err := l.roleTemplateLister.List("", labels.NewSelector())
+	rt, err := l.roleTemplateLister.List(labels.NewSelector())
 	if err != nil {
 		return obj, err
 	}
 
 	annoMap := make(map[string][]string)
-
-	var restrictedAdmin bool
-	if settings.RestrictedDefaultAdmin.Get() == "true" {
-		restrictedAdmin = true
-	}
 
 	// Created isn't used in this function, but it is required in the annotation data
 	annoMap["created"] = []string{}
@@ -294,27 +270,12 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 
 	switch context {
 	case "project":
-		// If we are in restricted mode, ensure the default projects are not granting
-		// permissions to the restricted-admin
-		if restrictedAdmin {
-			proj := obj.(*apisv3.Project)
-			if proj.Spec.ClusterName == "local" && (proj.Spec.DisplayName == "Default" || proj.Spec.DisplayName == "System") {
-				break
-			}
-		}
-
 		for _, role := range rt {
 			if role.ProjectCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)
 			}
 		}
 	case "cluster":
-		// If we are in restricted mode, ensure we don't give the default restricted-admin
-		// the default permissions in the cluster
-		if restrictedAdmin && accessor.GetName() == "local" {
-			break
-		}
-
 		for _, role := range rt {
 			if role.ClusterCreatorDefault && !role.Locked {
 				annoMap["required"] = append(annoMap["required"], role.Name)

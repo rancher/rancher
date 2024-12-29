@@ -8,39 +8,30 @@ on:
         required: true
 permissions: {}
 env:
-  TAG: v2.10-${{ github.sha }}-head
-  GIT_TAG: v2.10-${{ github.sha }}-head
+  TAG: v2.11-${{ github.sha }}-head
+  GIT_TAG: v2.11-${{ github.sha }}-head
   HOST_ARCH: amd64
   ARCH: amd64
   PYTHON_VERSION: '3.11'
-  GOLANG_VERSION: '1.22'
+  GOLANG_VERSION: '1.23'
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}
 jobs:
   test:
-    runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
       K3D_VERSION: v5.7.1
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Configure Docker for cgroupfs
+        run: |
+          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Clean up Docker
-        run: |
-          docker system prune -af
-          docker volume prune -f
-      # Cleaning the runner is important to free enough space to build rancher, otherwise the build will fail
-      - name: Clean runner
-        run: |
-          # removes dotnet
-          sudo rm -rf /usr/share/dotnet
-          # removes haskell
-          sudo rm -rf /opt/ghc
-          # removes android sdk
-          sudo rm -rf /usr/local/lib/android
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -81,70 +72,20 @@ jobs:
           docker image ls
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
-      - name: Uninstall existing Python versions
-        run: |
-          sudo apt-get remove -y python3
-          sudo apt-get autoremove -y
-          sudo apt-get purge -y python3
-          sudo apt-get clean
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Check Python version
         run: |
-          sudo rm -rf /usr/bin/python3
-          sudo cp $(which python3) /usr/bin/python3
-          python3 --version
-          python3 -m ensurepip --upgrade
+          python -V
+          python3 -V
       - name: Install Python and dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
           sudo pip3 install --upgrade pip
           sudo pip3 install tox flake8
-
-      ## Helm Setup start
-      - name: Uninstall Helm
-        run: |
-          sudo rm -rf /usr/local/bin/helm /usr/bin/rancher-helm /usr/bin/rancher-tiller ~/.helm /usr/local/bin/helm_v3 /usr/local/bin/tiller
-
-      - name: Set Helm 2 URL
-        run: echo "HELM_URL_V2=https://github.com/rancher/helm/releases/download/${{ steps.env.outputs.CATTLE_HELM_VERSION }}/rancher-helm" >> $GITHUB_ENV
-
-      - name: Set Tiller URL
-        run: echo "TILLER_URL=https://github.com/rancher/helm/releases/download/${{ steps.env.outputs.CATTLE_HELM_VERSION }}/rancher-tiller" >> $GITHUB_ENV
-
-      - name: Download Rancher Helm
-        run: sudo curl -sLf ${{ env.HELM_URL_V2 }} -o /usr/bin/rancher-helm-v2
-
-      - name: Download Rancher Tiller
-        run: sudo curl -sLf ${{ env.TILLER_URL }} -o /usr/bin/rancher-tiller
-
-      - name: Set permissions for Helm and Tiller
-        run: sudo chmod +x /usr/bin/rancher-helm-v2 /usr/bin/rancher-tiller
-
-      - name: Create symlink for Helm
-        run: sudo ln -s /usr/bin/rancher-helm-v2 /usr/bin/helm
-
-      - name: Create symlink for Tiller
-        run: sudo ln -s /usr/bin/rancher-tiller /usr/bin/tiller
-
-      - name: Initialize Helm
-        run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
-
-      - name: Set Helm 3 URL
-        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
-
-      - name: Create temporary directory for Helm 3
-        run: sudo mkdir /usr/tmp
-
-      - name: Download and extract Helm 3
-        run: curl ${{ env.HELM_URL_V3 }} | sudo tar xvzf - --strip-components=1 -C /usr/tmp/
-
-      - name: Move Helm 3 binary
-        run: sudo mv /usr/tmp/helm /usr/bin/helm_v3
-
       - name: KDM data
         run: |
           mkdir -p bin

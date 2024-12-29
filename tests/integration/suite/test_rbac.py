@@ -4,7 +4,6 @@ from rancher import ApiError
 import time
 
 from .common import random_str
-from .test_catalog import wait_for_template_to_be_created
 from .conftest import wait_until_available, wait_until, \
     cluster_and_client, user_project_client, \
     kubernetes_api_client, wait_for, ClusterContext, \
@@ -588,122 +587,6 @@ def test_appropriate_users_can_see_kontainer_drivers(user_factory):
 
     kds = user_factory('settings-manage').client.list_kontainer_driver()
     assert len(kds) == 0
-
-
-@pytest.mark.skip
-def test_readonly_cannot_perform_app_action(admin_mc, admin_pc, user_mc,
-                                            remove_resource):
-    """Tests that a user with readonly access is not able to upgrade an app
-    """
-    client = admin_pc.client
-    project = admin_pc.project
-
-    user = user_mc
-    remove_resource(user)
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=project.id)
-    remove_resource(ns)
-
-    wait_for_template_to_be_created(admin_mc.client, "library")
-
-    prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
-        userId=user.user.id,
-        projectId=project.id,
-        roleTemplateId="read-only")
-    remove_resource(prtb)
-
-    wait_until_available(user.client, project)
-
-    app = client.create_app(
-        name="app-" + random_str(),
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
-                   "namespace=cattle-global-data",
-        targetNamespace=ns.name,
-        projectId=project.id
-    )
-
-    with pytest.raises(ApiError) as e:
-        user.client.action(obj=app, action_name="upgrade",
-                           answers={"abc": "123"})
-    assert e.value.error.status == 403
-
-    with pytest.raises(ApiError) as e:
-        user.client.action(obj=app, action_name="rollback",
-                           revisionId="test")
-    assert e.value.error.status == 403
-
-
-@pytest.mark.skip
-def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
-                                       user_mc):
-    """Tests that a user with member access is able to upgrade an app
-    """
-    client = admin_pc.client
-    project = admin_pc.project
-
-    user = user_mc
-    remove_resource(user)
-
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=project.id)
-    remove_resource(ns)
-
-    wait_for_template_to_be_created(admin_mc.client, "library")
-
-    prtb = admin_mc.client.create_project_role_template_binding(
-        name="test-" + random_str(),
-        userId=user.user.id,
-        projectId=project.id,
-        roleTemplateId="project-owner")
-    remove_resource(prtb)
-
-    wait_until_available(user.client, project)
-
-    app = client.create_app(
-        name="test-" + random_str(),
-        externalId="catalog://?catalog=library&template"
-                   "=mysql&version=1.3.1&"
-                   "namespace=cattle-global-data",
-        targetNamespace=ns.name,
-        projectId=project.id
-    )
-
-    # if upgrade is performed prior to installing state,
-    # it may return a modified error
-    def is_installing():
-        current_state = client.reload(app)
-        if current_state.state == "installing":
-            return True
-        return False
-
-    try:
-        wait_for(is_installing)
-    except Exception as e:
-        # a timeout here is okay, the intention of the wait_for is to reach a
-        # steady state, this test is not concerned with whether an app reaches
-        # installing state or not
-        assert "Timeout waiting for condition" in str(e)
-
-    user.client.action(
-        obj=app,
-        action_name="upgrade",
-        answers={"asdf": "asdf"})
-
-    def _app_revisions_exist():
-        a = admin_pc.client.reload(app)
-        return len(a.revision().data) > 0
-    wait_for(_app_revisions_exist, timeout=60,
-             fail_handler=lambda: 'no revisions exist')
-    proj_user_client = user_project_client(user_mc, project)
-    app = proj_user_client.reload(app)
-    revID = app.revision().data[0]['id']
-    revID = revID.split(":")[1] if ":" in revID else revID
-    user.client.action(
-        obj=app,
-        action_name="rollback",
-        revisionId=revID
-    )
 
 
 def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,

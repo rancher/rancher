@@ -17,7 +17,7 @@ if [ -n "${RELEASE_TYPE}" ]; then
 fi
 
 # scripts/package-env
-for PKGENV in SYSTEM_CHART_DEFAULT_BRANCH CHART_DEFAULT_BRANCH; do
+for PKGENV in CHART_DEFAULT_BRANCH; do
    FOUND_VALUE=$(grep ^${PKGENV} scripts/package-env | awk -F':-' '{ print $2 }' | sed 's/.$//' | sed 's/"//g')
    if [ -n "${RELEASE_TYPE}" ]; then
       echo -n "${PKGENV}: ${FOUND_VALUE} in scripts/package-env: "
@@ -32,7 +32,7 @@ for PKGENV in SYSTEM_CHART_DEFAULT_BRANCH CHART_DEFAULT_BRANCH; do
 done
 
 # package/Dockerfile
-for DFARG in SYSTEM_CHART_DEFAULT_BRANCH CHART_DEFAULT_BRANCH CATTLE_KDM_BRANCH; do
+for DFARG in CHART_DEFAULT_BRANCH CATTLE_KDM_BRANCH; do
    FOUND_VALUE=$(grep ^"ARG ${DFARG}" package/Dockerfile | awk -F'=' '{ print $2 }')
    if [ -n "${RELEASE_TYPE}" ]; then
       echo -n "${DFARG}: ${FOUND_VALUE} in package/Dockerfile: "

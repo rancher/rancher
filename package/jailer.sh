@@ -57,21 +57,6 @@ cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/manag
 # Hard link rancher-machine into the jail
 cp -l /usr/bin/rancher-machine /opt/jail/$NAME/usr/bin
 
-# Hard link helm_2 into the jail
-cp -l /usr/bin/rancher-helm /opt/jail/$NAME/usr/bin
-
-# Hard link helm_3 into the jail
-cp -l /usr/bin/helm_v3 /opt/jail/$NAME/usr/bin
-
-# Hard link tiller into the jail
-cp -l /usr/bin/rancher-tiller /opt/jail/$NAME/usr/bin
-
-# Hard link kustomize into the jail
-cp -l /usr/bin/kustomize /opt/jail/$NAME/usr/bin
-
-# Hard link custom kustomize script into jail
-cp -l /usr/bin/kustomize.sh /opt/jail/$NAME
-
 # Hard link ssh into the jail
 cp -l /usr/bin/ssh /opt/jail/$NAME/usr/bin
 

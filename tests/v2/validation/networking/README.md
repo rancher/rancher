@@ -16,4 +16,7 @@ In your config file, set the following:
 }
 ```
 
+to `-run ^TestPortTestSuite/TestNodePort$` the Project Network Isolation should be enable on the cluster.
+to `-run ^TestPortTestSuite/TestHostPort$` the Project Network Isolation should be enable on the cluster.
+
 **NOTE** These tests most run on a server with private networking setup as they rely on being able to SSH into servers

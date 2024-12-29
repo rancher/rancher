@@ -4,6 +4,24 @@ if ./scripts/only-ui-bumps.sh; then
     exit 0
 fi
 
+#########################################################################################################################################
+# DISCLAIMER                                                                                                                            #
+# Copied from https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/hack/dind#L28-L37                              #
+# Permission granted by Akihiro Suda <akihiro.suda.cz@hco.ntt.co.jp> (https://github.com/rancher/k3d/issues/493#issuecomment-827405962) #
+# Moby License Apache 2.0: https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/LICENSE                           #
+#########################################################################################################################################
+# only run this if rancher is not running in kubernetes cluster and if the init cgroup does not already exist
+# we have to run this early on in provisioning-tests otherwise, the moving of processes is likely to fail due to
+# non-existent PIDs from the retry script below to check for Rancher health
+if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; then
+  # move the processes from the root group to the /init group,
+  # otherwise writing subtree_control fails with EBUSY.
+  mkdir -p /sys/fs/cgroup/init
+  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs || :
+  # enable controllers
+  sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
+fi
+
 cleanup()
 {
     EXIT=$?
@@ -40,6 +58,7 @@ export DIST=${V2PROV_TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
 export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
+export CATTLE_FEATURES=${CATTLE_FEATURES}
 
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
@@ -53,6 +72,8 @@ eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export
 eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+
+export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(yq '.provisioningCAPIVersion' < build.yaml)
 
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Only set SOME_K8S_VERSION if it is empty -- for KDM provisioning tests, this value should already be populated
@@ -151,7 +172,7 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 ./scripts/retry \
@@ -160,7 +181,7 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
 
 
 #kill $TPID

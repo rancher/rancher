@@ -1,22 +1,30 @@
 package rbac
 
 import (
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"testing"
+	"time"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestSync(t *testing.T) {
+	ctrl := gomock.NewController(t)
 	err := errors.NewBadRequest("unexpected error")
+	mockTime := func() time.Time {
+		return time.Unix(0, 0)
+	}
 	grb := &v3.GlobalRoleBinding{
 		GlobalRoleName: rbac.GlobalAdmin,
 	}
@@ -28,6 +36,8 @@ func TestSync(t *testing.T) {
 		grListerMock  *fakes.GlobalRoleListerMock
 		crbListerMock *rbacFakes.ClusterRoleBindingListerMock
 		crbClientMock *rbacFakes.ClusterRoleBindingInterfaceMock
+		grbListerMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
+		grbClientMock *fake.MockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
 		stateChanges  *grbTestStateChanges
 	}
 
@@ -55,6 +65,22 @@ func TestSync(t *testing.T) {
 						Builtin: true,
 					}, nil
 				}
+				state.grbListerMock.EXPECT().Get(grb.Name).Return(grb.DeepCopy(), nil)
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					GlobalRoleName: rbac.GlobalAdmin,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().Format(time.RFC3339),
+						SummaryRemote:  status.SummaryCompleted,
+						RemoteConditions: []metav1.Condition{
+							{
+								Type:               clusterAdminRoleExists,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             clusterAdminRoleExists,
+							},
+						},
+					},
+				})
 			},
 			stateAssertions: func(changes grbTestStateChanges) {
 				assert.Equal(changes.t, changes.createdCRB, &rbacv1.ClusterRoleBinding{
@@ -83,6 +109,22 @@ func TestSync(t *testing.T) {
 						Builtin: true,
 					}, nil
 				}
+				state.grbListerMock.EXPECT().Get(grb.Name).Return(grb.DeepCopy(), nil)
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					GlobalRoleName: rbac.GlobalAdmin,
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().Format(time.RFC3339),
+						SummaryRemote:  status.SummaryCompleted,
+						RemoteConditions: []metav1.Condition{
+							{
+								Type:               clusterAdminRoleExists,
+								Status:             metav1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: mockTime()},
+								Reason:             clusterAdminRoleExists,
+							},
+						},
+					},
+				})
 			},
 		},
 		"no admin role": {
@@ -98,6 +140,16 @@ func TestSync(t *testing.T) {
 						Builtin: true,
 					}, nil
 				}
+				state.grbListerMock.EXPECT().Get(grb.Name).Return(&v3.GlobalRoleBinding{
+					GlobalRoleName: "gr",
+				}, nil)
+				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+					GlobalRoleName: "gr",
+					Status: v3.GlobalRoleBindingStatus{
+						LastUpdateTime: mockTime().Format(time.RFC3339),
+						SummaryRemote:  status.SummaryCompleted,
+					},
+				})
 			},
 		},
 		"error getting GlobalRole": {
@@ -157,11 +209,18 @@ func TestSync(t *testing.T) {
 			grListerMock := &fakes.GlobalRoleListerMock{}
 			crbListerMock := &rbacFakes.ClusterRoleBindingListerMock{}
 			crbClientMock := &rbacFakes.ClusterRoleBindingInterfaceMock{}
+			grbListerMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+			grbClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl)
+
+			status := status.NewStatus()
+			status.TimeNow = mockTime
 			stateChanges := &grbTestStateChanges{
 				t: t,
 			}
 			state := &grbTestState{
 				grListerMock:  grListerMock,
+				grbListerMock: grbListerMock,
+				grbClientMock: grbClientMock,
 				crbListerMock: crbListerMock,
 				crbClientMock: crbClientMock,
 				stateChanges:  stateChanges,
@@ -173,9 +232,12 @@ func TestSync(t *testing.T) {
 				clusterRoleBindings: crbClientMock,
 				crbLister:           crbListerMock,
 				grLister:            grListerMock,
+				grbLister:           grbListerMock,
+				grbClient:           grbClientMock,
+				status:              status,
 			}
 
-			_, err := h.sync("", test.grb)
+			_, err := h.sync("", test.grb.DeepCopy())
 
 			if test.stateAssertions != nil {
 				test.stateAssertions(*state.stateChanges)

@@ -21,8 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
-	"github.com/rancher/rancher/pkg/controllers/management/rbac"
-	"github.com/rancher/rancher/pkg/controllers/management/restrictedadminrbac"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/management/settings"
@@ -57,8 +55,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)
 	rkeworkerupgrader.Register(ctx, management, manager.ScaledContext)
-	rbac.Register(ctx, management)
-	restrictedadminrbac.Register(ctx, management, wrangler)
 	secretmigrator.Register(ctx, management)
 	settings.Register(ctx, management)
 	managementlegacy.Register(ctx, management, manager)

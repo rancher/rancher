@@ -6,15 +6,15 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/catalog/utils"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/utils"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CleanupClientSecrets tries to delete common client secrets for each auth provider.
-func CleanupClientSecrets(secretInterface corev1.SecretInterface, config *v3.AuthConfig) error {
+func CleanupClientSecrets(secretInterface wcorev1.SecretController, config *v3.AuthConfig) error {
 	if config == nil {
 		return fmt.Errorf("cannot delete auth provider secrets if its config is nil")
 	}
@@ -61,8 +61,8 @@ func CleanupClientSecrets(secretInterface corev1.SecretInterface, config *v3.Aut
 // It is not possible to filter secrets easily by presence of specific key(s) in the data object. The method fetches all
 // Opaque secrets in the relevant namespace and looks at the target key in the data to find a secret that stores a user's
 // access token to delete.
-func CleanupOAuthTokens(secretInterface corev1.SecretInterface, key string) error {
-	opaqueSecrets, err := secretInterface.ListNamespaced(tokens.SecretNamespace, metav1.ListOptions{FieldSelector: "type=Opaque"})
+func CleanupOAuthTokens(secretInterface wcorev1.SecretController, key string) error {
+	opaqueSecrets, err := secretInterface.List(tokens.SecretNamespace, metav1.ListOptions{FieldSelector: "type=Opaque"})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to fetch secrets to clean up: %w", err)
 	}
@@ -71,7 +71,7 @@ func CleanupOAuthTokens(secretInterface corev1.SecretInterface, key string) erro
 	for i := range opaqueSecrets.Items {
 		secret := &opaqueSecrets.Items[i]
 		if _, keyPresent := secret.Data[key]; keyPresent {
-			err := secretInterface.DeleteNamespaced(tokens.SecretNamespace, secret.Name, &metav1.DeleteOptions{})
+			err := secretInterface.Delete(tokens.SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				result = errors.Join(result, err)
 			}

@@ -2,18 +2,16 @@ package project_cluster
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/rbac"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
+	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,30 +28,30 @@ const (
 )
 
 type projectLifecycle struct {
-	crtbClient           v3.ClusterRoleTemplateBindingInterface
-	crtbLister           v3.ClusterRoleTemplateBindingLister
-	nsLister             corev1.NamespaceLister
+	crtbClient           v3.ClusterRoleTemplateBindingController
+	crtbLister           v3.ClusterRoleTemplateBindingCache
+	nsLister             corev1.NamespaceCache
 	nsClient             k8scorev1.NamespaceInterface
-	projects             v3.ProjectInterface
-	prtbLister           v3.ProjectRoleTemplateBindingLister
-	prtbClient           v3.ProjectRoleTemplateBindingInterface
-	rbLister             rbacv1.RoleBindingLister
-	roleBindings         rbacv1.RoleBindingInterface
+	projects             v3.ProjectController
+	prtbLister           v3.ProjectRoleTemplateBindingCache
+	prtbClient           v3.ProjectRoleTemplateBindingController
+	rbLister             rbacv1.RoleBindingCache
+	roleBindings         rbacv1.RoleBindingController
 	systemAccountManager *systemaccount.Manager
 }
 
 // NewProjectLifecycle creates and returns a projectLifecycle from a given ManagementContext
 func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle {
 	return &projectLifecycle{
-		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
-		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		nsLister:             management.Core.Namespaces("").Controller().Lister(),
+		crtbClient:           management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		crtbLister:           management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		nsLister:             management.Wrangler.Core.Namespace().Cache(),
 		nsClient:             management.K8sClient.CoreV1().Namespaces(),
-		projects:             management.Management.Projects(""),
-		prtbLister:           management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		prtbClient:           management.Management.ProjectRoleTemplateBindings(""),
-		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
-		roleBindings:         management.RBAC.RoleBindings(""),
+		projects:             management.Wrangler.Mgmt.Project(),
+		prtbLister:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
+		prtbClient:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
+		rbLister:             management.Wrangler.RBAC.RoleBinding().Cache(),
+		roleBindings:         management.Wrangler.RBAC.RoleBinding(),
 		systemAccountManager: systemaccount.NewManager(management),
 	}
 }
@@ -90,7 +88,8 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating project %s", ProjectCreateController, orig.Name)
-		obj, err = l.projects.ObjectClient().Update(orig.Name, obj)
+		project := obj.(*apisv3.Project)
+		obj, err = l.projects.Update(project)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +114,7 @@ func (l *projectLifecycle) enqueueCrtbs(project *apisv3.Project) error {
 	}
 	// enqueue them so crtb controller picks them up and lists all projects and generates rolebindings for each crtb in the projects
 	for _, crtb := range crtbs {
-		l.crtbClient.Controller().Enqueue(clusterID, crtb.Name)
+		l.crtbClient.Enqueue(clusterID, crtb.Name)
 	}
 	return nil
 }
@@ -132,20 +131,7 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 
 // Remove deletes all backing resources created by the project
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
-	rbs, err := l.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	returnErr = errors.Join(returnErr, err)
-
-	for _, rb := range rbs {
-		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
-		returnErr = errors.Join(returnErr, err)
-	}
-
-	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
-	returnErr = errors.Join(returnErr, err)
-
-	return obj, returnErr
+	return obj, deleteNamespace(obj, ProjectRemoveController, l.nsClient)
 }
 
 func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runtime.Object, error) {

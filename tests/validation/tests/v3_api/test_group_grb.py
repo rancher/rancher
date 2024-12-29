@@ -12,9 +12,6 @@ Prerequisite:
       to create the cluster when preparing the Rancher setup
 '''
 
-# values used to create a catalog
-BRANCH = "dev"
-URL = "https://git.rancher.io/system-charts"
 # the link to search principals in the auth provider
 
 
@@ -218,16 +215,6 @@ def validate_permission_list_cluster(username, num=0):
     user_client = get_client_for_token(token)
     clusters = user_client.list_cluster().data
     assert len(clusters) == num
-
-
-def validate_permission_create_catalog(username, permission=False):
-    """ check if the user from auth provider has the permission to
-    create new catalog
-    """
-    name = random_name()
-    token = login_as_auth_user(username, AUTH_USER_PASSWORD)['token']
-    return validate_create_catalog(token, catalog_name=name, branch=BRANCH,
-                                   url=URL, permission=permission)
 
 
 def validate_permission_list_ggrb(token, num=0):

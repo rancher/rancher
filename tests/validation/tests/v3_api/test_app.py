@@ -197,46 +197,6 @@ def test_app_upgrade_version():
 
 
 @if_test_rbac
-def test_app_rollback():
-    admin_client = get_user_client()
-    proj_client = get_project_client_for_token(
-        project_detail["cluster1"]["project1"],
-        USER_TOKEN)
-    wait_for_template_to_be_created(admin_client, "library")
-    answer = get_defaut_question_answers(
-            admin_client,
-            MYSQL_EXTERNALID_131)
-    app = proj_client.create_app(
-        name=random_test_name(),
-        externalId=MYSQL_EXTERNALID_131,
-        targetNamespace=project_detail["cluster1"]["namespace1"].name,
-        projectId=project_detail["cluster1"]["project1"].id,
-        answers=answer)
-    print("App is active")
-    app = validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_131)
-    rev_id = app.appRevisionId
-    new_answer = get_defaut_question_answers(
-            admin_client,
-            MYSQL_EXTERNALID_132)
-    app = proj_client.update(
-        obj=app,
-        externalId=MYSQL_EXTERNALID_132,
-        targetNamespace=project_detail["cluster1"]["namespace1"].name,
-        projectId=project_detail["cluster1"]["project1"].id,
-        answers=new_answer)
-    app = proj_client.reload(app)
-    app = validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_132)
-    assert app.externalId == MYSQL_EXTERNALID_132, "incorrect template version"
-    proj_client.action(obj=app,
-                       action_name='rollback',
-                       revisionId=rev_id)
-    app = proj_client.reload(app)
-    validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_131)
-    assert app.externalId == MYSQL_EXTERNALID_131, "incorrect template version"
-    proj_client.delete(app)
-
-
-@if_test_rbac
 def test_app_answer_override():
     admin_client = get_user_client()
     proj_client = get_project_client_for_token(

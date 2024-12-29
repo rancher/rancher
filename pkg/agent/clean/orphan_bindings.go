@@ -14,10 +14,8 @@ import (
 	"os"
 
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
-	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	mgmt "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	rbaccommon "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -35,8 +33,7 @@ import (
 )
 
 const (
-	orphanBindingsOperation        = "clean-orphan-bindings"
-	orphanCatalogBindingsOperation = "clean-catalog-orphan-bindings"
+	orphanBindingsOperation = "clean-orphan-bindings"
 )
 
 type orphanBindingsCleanup struct {
@@ -57,15 +54,6 @@ func OrphanBindings(clientConfig *rest.Config) error {
 
 	logrus.Infof("[%v] cleaning up orphaned bindings", orphanBindingsOperation)
 	return bc.cleanOrphans(dryRun)
-}
-
-func OrphanCatalogBindings(clientConfig *rest.Config) error {
-	bc, err := newOrphanBindingsCleanup(clientConfig)
-	if err != nil {
-		return err
-	}
-	logrus.Infof("[%v] cleaning up orphaned catalog bindings", orphanCatalogBindingsOperation)
-	return bc.cleanOrphanedCatalogRolesAndRolebindings()
 }
 
 func newOrphanBindingsCleanup(restConfig *rest.Config) (*orphanBindingsCleanup, error) {
@@ -192,41 +180,4 @@ func (bc *orphanBindingsCleanup) isOrphanBinding(rb *rbacv1.RoleBinding) bool {
 		isOrphan = !isHashLabel && !isUIDLabel
 	}
 	return isOrphan
-}
-
-// Removes a specific role and bindings to that role, which are no longer valid, from the cattle-global-data namespace
-func (bc *orphanBindingsCleanup) cleanOrphanedCatalogRolesAndRolebindings() error {
-	rbs, err := bc.roleBindings.List(namespace.GlobalNamespace, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	logrus.Infof("[%v] Processing %d rolebindings", orphanCatalogBindingsOperation, len(rbs.Items))
-	for _, rb := range rbs.Items {
-		if rb.RoleRef.Name != globalroles.GlobalCatalogRole {
-			continue
-		}
-
-		if dryRun {
-			logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned binding: %s/%s", orphanCatalogBindingsOperation, rb.Namespace, rb.Name)
-			continue
-		}
-		logrus.Infof("[%v] Deleting orphaned binding %s", orphanCatalogBindingsOperation, rb.Name)
-		err = bc.roleBindings.Delete(namespace.GlobalNamespace, rb.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			logrus.Warnf("[%v] Error when deleting rolebinding %s, %s", orphanCatalogBindingsOperation, rb.Name, err.Error())
-		}
-	}
-
-	if dryRun {
-		logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned role: %s/%s", orphanCatalogBindingsOperation, namespace.GlobalNamespace, globalroles.GlobalCatalogRole)
-	} else {
-		logrus.Infof("[%v] Deleting orphaned role %s", orphanCatalogBindingsOperation, globalroles.GlobalCatalogRole)
-		err = bc.roles.Delete(namespace.GlobalNamespace, globalroles.GlobalCatalogRole, &metav1.DeleteOptions{})
-		if err != nil && !k8serrors.IsNotFound(err) {
-			logrus.Warnf("[%v] Error when deleting role %s, %s", orphanCatalogBindingsOperation, globalroles.GlobalCatalogRole, err.Error())
-			return err
-		}
-	}
-
-	return nil
 }

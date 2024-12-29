@@ -3,12 +3,12 @@ package project_cluster
 import (
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 const clusterID = "test-cluster"
@@ -25,20 +25,17 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 		}},
 	}
 
-	mockedClusterRoleTemplateBindingController := fakes.ClusterRoleTemplateBindingControllerMock{
-		EnqueueFunc: func(namespace string, name string) {},
-	}
+	ctrl := gomock.NewController(t)
+
+	crtbLister := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+	crtbLister.EXPECT().List(gomock.Any(), gomock.Any()).Return(existingCrtbs, nil)
+
+	crtbClient := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+	crtbClient.EXPECT().Enqueue(gomock.Any(), gomock.Any()).Return().AnyTimes()
+
 	c := projectLifecycle{
-		crtbLister: &fakes.ClusterRoleTemplateBindingListerMock{
-			ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterRoleTemplateBinding, error) {
-				return existingCrtbs, nil
-			},
-		},
-		crtbClient: &fakes.ClusterRoleTemplateBindingInterfaceMock{
-			ControllerFunc: func() v3.ClusterRoleTemplateBindingController {
-				return &mockedClusterRoleTemplateBindingController
-			},
-		},
+		crtbLister: crtbLister,
+		crtbClient: crtbClient,
 	}
 
 	newProject := v3.Project{
@@ -48,29 +45,32 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 		},
 	}
 	c.enqueueCrtbs(&newProject)
-	assert.Equal(t, len(existingCrtbs), len(mockedClusterRoleTemplateBindingController.EnqueueCalls()))
+	assert.Equal(t, len(existingCrtbs), 2)
 }
 
 func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	var prtbs []*v3.ProjectRoleTemplateBinding
 
+	ctrl := gomock.NewController(t)
+
+	prtbLister := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+	prtbLister.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	prtbClient := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+	prtbClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+		prtbs = append(prtbs, obj)
+		return obj, nil
+	}).AnyTimes()
+
+	projects := fake.NewMockControllerInterface[*v3.Project, *v3.ProjectList](ctrl)
+	projects.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.Project) (*v3.Project, error) {
+		return obj, nil
+	}).AnyTimes()
+
 	lifecycle := &projectLifecycle{
-		prtbLister: &fakes.ProjectRoleTemplateBindingListerMock{
-			GetFunc: func(namespace string, name string) (*v3.ProjectRoleTemplateBinding, error) {
-				return nil, nil
-			},
-		},
-		prtbClient: &fakes.ProjectRoleTemplateBindingInterfaceMock{
-			CreateFunc: func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-				prtbs = append(prtbs, obj)
-				return obj, nil
-			},
-		},
-		projects: &fakes.ProjectInterfaceMock{
-			UpdateFunc: func(obj *v3.Project) (*v3.Project, error) {
-				return obj, nil
-			},
-		},
+		prtbLister: prtbLister,
+		prtbClient: prtbClient,
+		projects:   projects,
 	}
 
 	userPrincipalName := "keycloak_user@12345"

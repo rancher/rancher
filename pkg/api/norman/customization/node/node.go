@@ -28,7 +28,7 @@ import (
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 )
 
-var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}
+var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-emptydir-data", "--force", "did not complete within"}
 var allowedStates = map[string]bool{"active": true, "cordoned": true, "draining": true, "drained": true}
 
 // Formatter for Node

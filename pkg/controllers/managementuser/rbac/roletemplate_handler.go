@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	v1 "k8s.io/api/core/v1"
@@ -122,7 +123,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		}
 
 		// Get namespaces belonging to project to update the rolebinding in the namespaces of this project for the user
-		namespaces, err := c.m.nsIndexer.ByIndex(nsByProjectIndex, prtb.ProjectName)
+		namespaces, err := c.m.nsIndexer.ByIndex(namespace.NsByProjectIndex, prtb.ProjectName)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't list namespaces with project ID %v", prtb.ProjectName)
 		}

@@ -39,7 +39,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 			Type:        client.KeyCloakOIDCConfigType,
 			CTX:         ctx,
 			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-			Secrets:     mgmtCtx.Core.Secrets(""),
+			Secrets:     mgmtCtx.Wrangler.Core.Secret(),
 			UserMGR:     userMGR,
 			TokenMGR:    tokenMGR,
 		},
@@ -144,7 +144,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 	principalType := parts[1]
 	keyCloakClient, err := k.newClient(config, token)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc] GetPrincipal: error creating new http client: %v", err)
+		logrus.Warnf("[keycloak oidc] GetPrincipal: error creating new http client: %v", err)
 		return v3.Principal{}, err
 	}
 	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, principalType, config)

@@ -70,7 +70,6 @@ func main() {
 			err = errors.Join(
 				clean.DuplicateBindings(nil),
 				clean.OrphanBindings(nil),
-				clean.OrphanCatalogBindings(nil),
 			)
 		} else if os.Getenv("AD_GUID_CLEANUP") == "true" {
 			dryrun := os.Getenv("DRY_RUN") == "true"

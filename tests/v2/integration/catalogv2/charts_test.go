@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
+	corev12 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,37 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/util/taints"
 )
+
+var defaultPodTolerations = []v1.Toleration{
+	{
+		Key:      "cattle.io/os",
+		Operator: corev12.TolerationOpEqual,
+		Value:    "linux",
+		Effect:   "NoSchedule",
+	},
+	{
+		Key:      "node-role.kubernetes.io/controlplane",
+		Operator: corev12.TolerationOpEqual,
+		Value:    "true",
+		Effect:   "NoSchedule",
+	},
+	{
+		Key:      "node-role.kubernetes.io/control-plane",
+		Operator: corev12.TolerationOpExists,
+		Effect:   "NoSchedule",
+	},
+	{
+		Key:      "node-role.kubernetes.io/etcd",
+		Operator: corev12.TolerationOpExists,
+		Effect:   "NoExecute",
+	},
+	{
+		Key:      "node.cloudprovider.kubernetes.io/uninitialized",
+		Operator: corev12.TolerationOpEqual,
+		Value:    "true",
+		Effect:   "NoSchedule",
+	},
+}
 
 type ChartsTest struct {
 	suite.Suite
@@ -404,6 +436,106 @@ func (w *ChartsTest) TestUpgradeChartWithAutomaticTolerationOnTaintedCPNode() {
 	pod, err = w.corev1.Pods(op.Status.PodNamespace).Get(ctx, op.Status.PodName, metav1.GetOptions{})
 	w.Require().NoError(err)
 	found = false
+	for _, t := range pod.Spec.Tolerations {
+		if t.Key == "testTaint" {
+			found = true
+			break
+		}
+	}
+	w.Require().True(found)
+
+	//cleanup
+	w.Require().NoError(w.uninstallApp(namespace.System, "rancher-aks-operator-crd"))
+
+	w.updateTaintOnNode(ctx, taint, taints.RemoveTaint)
+}
+
+// TestUpgradeChartWithAutomaticTolerationOnTaintedCPNode tests the upgrade of a chart that was installed without automatic tolerations
+// with automatic CP toleration on a tainted control plane node enabled for the upgrade
+func (w *ChartsTest) TestUpgradeChartInstalledWithoutTolerationsUsingAutomaticTolerations() {
+	ctx := context.Background()
+
+	//install chart
+	w.Require().NoError(w.catalogClient.InstallChart(&types.ChartInstallAction{
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                namespace.System,
+		DisableOpenAPIValidation: false,
+		AutomaticCPTolerations:   false,
+		Charts: []types.ChartInstall{{
+			ChartName:   "rancher-aks-operator-crd",
+			Version:     "104.0.1+up1.9.0",
+			ReleaseName: "rancher-aks-operator-crd",
+			Description: "rancher aks operator crd",
+		}},
+	}, "charts-small-fork"))
+
+	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "rancher-aks-operator-crd", 0))
+
+	operationList, err := w.catalogClient.Operations(namespace.System).List(context.Background(), metav1.ListOptions{})
+	w.Require().NoError(err)
+	sort.Slice(operationList.Items, func(i, j int) bool {
+		return !operationList.Items[i].CreationTimestamp.Before(&operationList.Items[j].CreationTimestamp)
+	})
+
+	var op rv1.Operation
+	for _, item := range operationList.Items {
+		if item.Status.Release == "rancher-aks-operator-crd" {
+			op = item
+			break
+		}
+	}
+
+	pod, err := w.corev1.Pods(op.Status.PodNamespace).Get(ctx, op.Status.PodName, metav1.GetOptions{})
+	w.Require().NoError(err)
+	for _, toleration := range defaultPodTolerations {
+		w.Require().Contains(pod.Spec.Tolerations, toleration)
+	}
+
+	//add taint to node
+	taint := v1.Taint{
+		Key:    "testTaint",
+		Value:  "testValue",
+		Effect: v1.TaintEffectPreferNoSchedule,
+	}
+
+	w.updateTaintOnNode(ctx, taint, taints.AddOrUpdateTaint)
+
+	//upgrade chart
+	w.Require().NoError(w.catalogClient.UpgradeChart(&types.ChartUpgradeAction{
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                namespace.System,
+		DisableOpenAPIValidation: false,
+		AutomaticCPTolerations:   true,
+		Charts: []types.ChartUpgrade{{
+			ChartName:   "rancher-aks-operator-crd",
+			Version:     "104.0.2+up1.9.0",
+			ReleaseName: "rancher-aks-operator-crd",
+			Description: "rancher aks operator crd",
+		}},
+	}, "charts-small-fork"))
+
+	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "rancher-aks-operator-crd", 1))
+
+	operationList, err = w.catalogClient.Operations(namespace.System).List(context.Background(), metav1.ListOptions{})
+	w.Require().NoError(err)
+	sort.Slice(operationList.Items, func(i, j int) bool {
+		return !operationList.Items[i].CreationTimestamp.Before(&operationList.Items[j].CreationTimestamp)
+	})
+
+	for _, item := range operationList.Items {
+		if item.Status.Release == "rancher-aks-operator-crd" {
+			op = item
+			break
+		}
+	}
+
+	pod, err = w.corev1.Pods(op.Status.PodNamespace).Get(ctx, op.Status.PodName, metav1.GetOptions{})
+	w.Require().NoError(err)
+	found := false
 	for _, t := range pod.Spec.Tolerations {
 		if t.Key == "testTaint" {
 			found = true

@@ -17,17 +17,23 @@ jobs:
       matrix:
         include:
         - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "k3s"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
-    name: Provisioning tests 
-    runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
+          CATTLE_FEATURES: "provisioningprebootstrap=true"
+        - V2PROV_TEST_DIST: "k3s"
+          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
+          CATTLE_FEATURES: "provisioningprebootstrap=true"
+    name: Provisioning tests
+    runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,9 +43,14 @@ jobs:
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
           chmod +x ./.dapper
+      - name: Configure Docker for cgroupfs
+        run: |
+          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
       - name: Run tests
         run: ./.dapper provisioning-tests
         env:
           DRONE_BUILD_EVENT: "${{ github.event_name }}"
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
+          CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"

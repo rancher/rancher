@@ -17,8 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/rancher/pkg/catalog/utils"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/utils"
 )
 
 const (

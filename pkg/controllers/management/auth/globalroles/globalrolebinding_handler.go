@@ -4,13 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -24,6 +27,27 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
+)
+
+const (
+	globalRoleBindingReconciled                = "GlobalRoleBindingReconciled"
+	clusterPermissionsReconciled               = "ClusterPermissionsReconciled"
+	namespacedRoleBindingReconciled            = "NamespacedRoleBindingReconciled"
+	failedToSyncDownstreamClusterPermissions   = "FailedToSyncDownstreamClusterPermissions"
+	failedToUpdateClusterRoleBinding           = "FailedToUpdateClusterRoleBinding"
+	failedToCreateClusterRoleBinding           = "FailedToCreateClusterRoleBinding"
+	failedToGetGlobalRoleBinding               = "FailedToGetGlobalRoleBinding"
+	failedToGetRole                            = "FailedToGetRole"
+	failedToCreateRoleBinding                  = "FailedToCreateRoleBinding"
+	failedToGetRoleBinding                     = "FailedToGetRoleBinding"
+	failedToGetGlobalRole                      = "FailedToGetGlobalRole"
+	failedToListCluster                        = "FailedToListCluster"
+	failedToReconcileCRTBs                     = "FailedToReconcileCRTBs"
+	failedToCreateLabels                       = "FailedToCreateLabels"
+	failedToCreateFleetLabels                  = "FailedToCreateFleetLabels"
+	failedToListRoleBindings                   = "FailedToListRoleBindings"
+	failedToPurgeInvalidNamespacedRoleBindings = "FailedToPurgeInvalidNamespacedRoleBindings"
 )
 
 var (
@@ -31,18 +55,12 @@ var (
 )
 
 const (
-	catalogTemplateResourceRule        = "catalogtemplates"
-	catalogTemplateVersionResourceRule = "catalogtemplateversions"
-	crbNameAnnotation                  = "authz.management.cattle.io/crb-name"
-	crtbGrbOwnerIndex                  = "authz.management.cattle.io/crtb-owner"
-	crbNamePrefix                      = "cattle-globalrolebinding-"
-	GlobalCatalogRole                  = "global-catalog"
-	globalCatalogRoleBinding           = "global-catalog-binding"
-	TemplateResourceRule               = "templates"
-	TemplateVersionResourceRule        = "templateversions"
-	localClusterName                   = "local"
-	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner"
-	fleetWorkspacePermissionLabel      = "authz.management.cattle.io/fleet-workspace-permissions"
+	crbNameAnnotation             = "authz.management.cattle.io/crb-name"
+	crtbGrbOwnerIndex             = "authz.management.cattle.io/crtb-owner"
+	crbNamePrefix                 = "cattle-globalrolebinding-"
+	localClusterName              = "local"
+	grbOwnerLabel                 = "authz.management.cattle.io/grb-owner"
+	fleetWorkspacePermissionLabel = "authz.management.cattle.io/fleet-workspace-permissions"
 )
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
@@ -59,12 +77,15 @@ func newGlobalRoleBindingLifecycle(management *config.ManagementContext, cluster
 		crtbClient:              management.Management.ClusterRoleTemplateBindings(""),
 		crtbCache:               management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		grLister:                management.Management.GlobalRoles("").Controller().Lister(),
+		grbLister:               management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
+		grbClient:               management.Wrangler.Mgmt.GlobalRoleBinding(),
 		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
 		roles:                   management.RBAC.Roles(""),
 		roleLister:              management.RBAC.Roles("").Controller().Lister(),
 		roleBindings:            management.RBAC.RoleBindings(""),
 		roleBindingLister:       management.RBAC.RoleBindings("").Controller().Lister(),
 		fleetPermissionsHandler: newFleetWorkspaceBindingHandler(management),
+		status:                  status.NewStatus(),
 	}
 }
 
@@ -79,7 +100,7 @@ func crtbGrbOwnerIndexer(crtb *v3.ClusterRoleTemplateBinding) ([]string, error) 
 }
 
 type fleetPermissionsHandler interface {
-	reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error
+	reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error
 }
 
 type globalRoleBindingLifecycle struct {
@@ -94,36 +115,43 @@ type globalRoleBindingLifecycle struct {
 	crtbCache               mgmtcontroller.ClusterRoleTemplateBindingCache
 	crtbClient              v3.ClusterRoleTemplateBindingInterface
 	grLister                v3.GlobalRoleLister
+	grbLister               mgmtv3.GlobalRoleBindingCache
+	grbClient               mgmtv3.GlobalRoleBindingController
 	nsCache                 wcorev1.NamespaceCache
 	roles                   rbacv1.RoleInterface
 	roleLister              rbacv1.RoleLister
 	roleBindings            rbacv1.RoleBindingInterface
 	roleBindingLister       rbacv1.RoleBindingLister
 	fleetPermissionsHandler fleetPermissionsHandler
+	status                  *status.Status
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+	localConditions := []metav1.Condition{}
 	returnError := errors.Join(
-		grb.reconcileClusterPermissions(obj),
-		grb.reconcileGlobalRoleBinding(obj),
-		grb.reconcileNamespacedRoleBindings(obj),
-		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj),
+		grb.reconcileClusterPermissions(obj, &localConditions),
+		grb.reconcileGlobalRoleBinding(obj, &localConditions),
+		grb.reconcileNamespacedRoleBindings(obj, &localConditions),
+		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj, &localConditions),
+		grb.updateStatus(obj, localConditions),
 	)
 	return obj, returnError
 }
 
 func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+	localConditions := []metav1.Condition{}
 	returnError := errors.Join(
-		grb.reconcileClusterPermissions(obj),
-		grb.reconcileGlobalRoleBinding(obj),
-		grb.reconcileNamespacedRoleBindings(obj),
-		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj),
+		grb.reconcileClusterPermissions(obj, &localConditions),
+		grb.reconcileGlobalRoleBinding(obj, &localConditions),
+		grb.reconcileNamespacedRoleBindings(obj, &localConditions),
+		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj, &localConditions),
+		grb.updateStatus(obj, localConditions),
 	)
 	return obj, returnError
 }
 
 func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	if obj.GlobalRoleName == rbac.GlobalAdmin || obj.GlobalRoleName == rbac.GlobalRestrictedAdmin {
+	if obj.GlobalRoleName == rbac.GlobalAdmin {
 		return obj, grb.deleteAdminBinding(obj)
 	}
 	// Don't need to delete the created ClusterRole or RoleBindings because owner reference will take care of them
@@ -179,13 +207,16 @@ func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBind
 
 // reconcileClusterPermissions grants permissions for the binding in all downstream (non-local) clusters. Will also
 // remove invalid bindings (bindings not for active RoleTemplates or for invalid subjects).
-func (grb *globalRoleBindingLifecycle) reconcileClusterPermissions(globalRoleBinding *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) reconcileClusterPermissions(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: clusterPermissionsReconciled}
 	globalRole, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
 	if err != nil {
+		grb.status.AddCondition(localConditions, condition, failedToGetGlobalRole, err)
 		return fmt.Errorf("unable to get globalRole %s: %w", globalRoleBinding.Name, err)
 	}
 	clusters, err := grb.clusterLister.List("", labels.Everything())
 	if err != nil {
+		grb.status.AddCondition(localConditions, condition, failedToListCluster, err)
 		return fmt.Errorf("unable to list clusters when reconciling globalRoleBinding %s: %w", globalRoleBinding.Name, err)
 	}
 
@@ -250,8 +281,13 @@ func (grb *globalRoleBindingLifecycle) reconcileClusterPermissions(globalRoleBin
 		}
 	}
 	if missedClusters {
-		return fmt.Errorf("unable to reconcile backing crtbs for globalRoleBinding %s, some permissions may be missing", globalRoleBinding.Name)
+		err = fmt.Errorf("unable to reconcile backing crtbs for globalRoleBinding %s, some permissions may be missing", globalRoleBinding.Name)
+		grb.status.AddCondition(localConditions, condition, failedToReconcileCRTBs, err)
+		return err
 	}
+
+	grb.status.AddCondition(localConditions, condition, clusterPermissionsReconciled, nil)
+
 	return nil
 }
 
@@ -316,18 +352,15 @@ func (grb *globalRoleBindingLifecycle) findMissingRTs(wantRTs []string, cluster 
 
 }
 
-func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBinding *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: globalRoleBindingReconciled}
+
 	crbName, ok := globalRoleBinding.Annotations[crbNameAnnotation]
 	if !ok {
 		crbName = crbNamePrefix + globalRoleBinding.Name
 	}
 
 	subject := rbac.GetGRBSubject(globalRoleBinding)
-	if globalRoleBinding.GlobalRoleName == rbac.GlobalRestrictedAdmin {
-		if err := grb.syncDownstreamClusterPermissions(subject, globalRoleBinding); err != nil {
-			return err
-		}
-	}
 
 	crb, _ := grb.crbLister.Get("", crbName)
 	if crb != nil {
@@ -355,10 +388,13 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 			crb.Subjects = subjects
 			logrus.Infof("[%v] Updating clusterRoleBinding %v for globalRoleBinding %v user %v", grbController, crb.Name, globalRoleBinding.Name, globalRoleBinding.UserName)
 			if _, err := grb.crbClient.Update(crb); err != nil {
+				grb.status.AddCondition(localConditions, condition, failedToUpdateClusterRoleBinding, err)
 				return fmt.Errorf("couldn't update ClusterRoleBinding %v: %w", crb.Name, err)
 			}
 		}
-		return grb.addRulesForTemplateAndTemplateVersions(globalRoleBinding, subject)
+
+		grb.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
+		return nil
 	}
 
 	logrus.Infof("Creating new GlobalRoleBinding for GlobalRoleBinding %v", globalRoleBinding.Name)
@@ -390,6 +426,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 		},
 	})
 	if err != nil {
+		grb.status.AddCondition(localConditions, condition, failedToCreateClusterRoleBinding, err)
 		return err
 	}
 	// Add an annotation to the globalrole indicating the name we used for future updates
@@ -398,205 +435,19 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	}
 	globalRoleBinding.Annotations[crbNameAnnotation] = crbName
 
-	return grb.addRulesForTemplateAndTemplateVersions(globalRoleBinding, subject)
-}
-
-func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(globalRoleBinding *v3.GlobalRoleBinding, subject v1.Subject) error {
-	// Check if the current globalRole has rules for templates and templateversions
-	gr, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	isCatalogRole := false
-	if gr != nil {
-		for _, rule := range gr.Rules {
-			if rbac.RuleGivesResourceAccess(rule, TemplateResourceRule) || rbac.RuleGivesResourceAccess(rule, TemplateVersionResourceRule) {
-				isCatalogRole = true
-				break
-			}
-		}
-	}
-	// Roles that give catalog access (i.e. that give access to template/templateversions in the management api group)
-	// are the only ones that need this special role/rolebinding created for them
-	if isCatalogRole {
-		roleName := gr.Name + "-" + GlobalCatalogRole
-		_, err := grb.roleLister.Get(namespace.GlobalNamespace, roleName)
-		if err != nil {
-			return err
-		}
-		// create a binding to the namespaced role which corresponds to the GlobalRole this grb refers to
-		grbName := globalRoleBinding.Name + "-" + globalCatalogRoleBinding
-		_, err = grb.roleBindingLister.Get(namespace.GlobalNamespace, grbName)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				rb := &v1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      grbName,
-						Namespace: namespace.GlobalNamespace,
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: globalRoleBinding.APIVersion,
-								Kind:       globalRoleBinding.Kind,
-								Name:       globalRoleBinding.Name,
-								UID:        globalRoleBinding.UID,
-							},
-						},
-					},
-					Subjects: []v1.Subject{subject},
-					RoleRef: v1.RoleRef{
-						Kind: "Role",
-						Name: roleName,
-					},
-				}
-				_, err = grb.roleBindings.Create(rb)
-				if err != nil && !apierrors.IsAlreadyExists(err) {
-					return err
-				}
-			} else {
-				return err
-			}
-		}
-	}
+	grb.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
 	return nil
-}
-
-func (grb *globalRoleBindingLifecycle) syncDownstreamClusterPermissions(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
-	if err := grb.createRestrictedAdminCRBsForUserClusters(subject, globalRoleBinding); err != nil {
-		return err
-	}
-
-	return grb.grantRestrictedAdminUserClusterPermissions(subject, globalRoleBinding)
-}
-
-func (grb *globalRoleBindingLifecycle) createRestrictedAdminCRBsForUserClusters(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
-	// Get CR for each downstream cluster, create CRB with this subject for each such CR
-	r, _ := labels.NewRequirement(rbac.RestrictedAdminCRForClusters, selection.Exists, []string{})
-	crs, err := grb.crLister.List("", labels.NewSelector().Add(*r))
-	if err != nil {
-		return err
-	}
-
-	var returnErr error
-	for _, cr := range crs {
-		clusterName := cr.Labels[rbac.RestrictedAdminCRForClusters]
-		crbName := clusterName + rbac.RestrictedAdminCRBForClusters + globalRoleBinding.Name
-		crb, err := grb.crbLister.Get("", crbName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			returnErr = errors.Join(returnErr, err)
-			continue
-		}
-		if crb != nil {
-			continue
-		}
-		_, err = grb.crbClient.Create(&v1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            crbName,
-				OwnerReferences: cr.OwnerReferences,
-			},
-			RoleRef: v1.RoleRef{
-				Kind: "ClusterRole",
-				Name: cr.Name,
-			},
-			Subjects: []v1.Subject{subject},
-		})
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			returnErr = errors.Join(returnErr, err)
-		}
-	}
-	return returnErr
-}
-
-func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermissions(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
-	var returnErr error
-	clusters, err := grb.clusterLister.List("", labels.NewSelector())
-	if err != nil {
-		return err
-	}
-	for _, cluster := range clusters {
-		if cluster.Name == "local" {
-			continue
-		}
-		rbName := fmt.Sprintf("%s-%s", globalRoleBinding.Name, rbac.RestrictedAdminClusterRoleBinding)
-		_, err := grb.roleBindingLister.Get(cluster.Name, rbName)
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				returnErr = errors.Join(returnErr, err)
-				continue
-			}
-			_, err := grb.roleBindings.Create(&v1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      rbName,
-					Namespace: cluster.Name,
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: globalRoleBinding.APIVersion,
-							Kind:       globalRoleBinding.Kind,
-							UID:        globalRoleBinding.UID,
-							Name:       globalRoleBinding.Name,
-						},
-					},
-				},
-				RoleRef: v1.RoleRef{
-					Name: rbac.ClusterCRDsClusterRole,
-					Kind: "ClusterRole",
-				},
-				Subjects: []v1.Subject{subject},
-			})
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				returnErr = errors.Join(returnErr, err)
-				continue
-			}
-		}
-
-		projects, err := grb.projectLister.List(cluster.Name, labels.NewSelector())
-		if err != nil {
-			returnErr = errors.Join(returnErr, err)
-			continue
-		}
-
-		for _, project := range projects {
-			rbName := fmt.Sprintf("%s-%s", globalRoleBinding.Name, rbac.RestrictedAdminProjectRoleBinding)
-			_, err := grb.roleBindingLister.Get(project.Name, rbName)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					_, err := grb.roleBindings.Create(&v1.RoleBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      rbName,
-							Namespace: project.Name,
-							OwnerReferences: []metav1.OwnerReference{
-								{
-									APIVersion: globalRoleBinding.APIVersion,
-									Kind:       globalRoleBinding.Kind,
-									UID:        globalRoleBinding.UID,
-									Name:       globalRoleBinding.Name,
-								},
-							},
-						},
-						RoleRef: v1.RoleRef{
-							Name: rbac.ProjectCRDsClusterRole,
-							Kind: "ClusterRole",
-						},
-						Subjects: []v1.Subject{subject},
-					})
-					if err != nil && !apierrors.IsAlreadyExists(err) {
-						returnErr = errors.Join(returnErr, err)
-					}
-				} else {
-					returnErr = errors.Join(returnErr, err)
-				}
-			}
-		}
-	}
-	return returnErr
 }
 
 // reconcileNamespacedRoleBindings ensures that RoleBindings exist for each namespace listed in NamespacedRules
 // from the associated GlobalRole
-func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: namespacedRoleBindingReconciled}
 	var returnError error
 	grbName := wrangler.SafeConcatName(globalRoleBinding.Name)
 	gr, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
 	if err != nil {
+		grb.status.AddCondition(localConditions, condition, failedToGetGlobalRole, err)
 		return fmt.Errorf("unable to get globalRole %s: %w", globalRoleBinding.GlobalRoleName, err)
 	}
 
@@ -677,16 +528,19 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 	// get all the roleBindings claiming to be owned by this GRB and remove any that shouldn't exist
 	r, err := labels.NewRequirement(grbOwnerLabel, selection.Equals, []string{grbName})
 	if err != nil {
+		grb.status.AddCondition(localConditions, condition, failedToCreateLabels, err)
 		return errors.Join(returnError, fmt.Errorf("couldn't create label: %s: %w", grOwnerLabel, err))
 	}
 	// exclude roleBindings created for granting fleet workspace permissions
 	rFleet, err := labels.NewRequirement(fleetWorkspacePermissionLabel, selection.DoesNotExist, []string{})
 	if err != nil {
+		grb.status.AddCondition(localConditions, condition, failedToCreateFleetLabels, err)
 		return errors.Join(returnError, fmt.Errorf("couldn't create label: %s: %w", grOwnerLabel, err))
 	}
 
 	rbs, err := grb.roleBindingLister.List("", labels.NewSelector().Add(*r).Add(*rFleet))
 	if err != nil {
+		grb.status.AddCondition(localConditions, condition, failedToListRoleBindings, err)
 		return errors.Join(returnError,
 			fmt.Errorf("couldn't list roleBindings with label %s : %s: %w", grbOwnerLabel, grbName, err))
 	}
@@ -696,9 +550,15 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 	if len(rbs) != len(roleBindingUIDs) {
 		err = grb.purgeInvalidNamespacedRBs(rbs, roleBindingUIDs)
 		if err != nil {
+			grb.status.AddCondition(localConditions, condition, failedToPurgeInvalidNamespacedRoleBindings, err)
 			returnError = errors.Join(returnError, err)
 		}
 	}
+
+	if returnError == nil {
+		grb.status.AddCondition(localConditions, condition, namespacedRoleBindingReconciled, nil)
+	}
+
 	return returnError
 }
 
@@ -714,6 +574,39 @@ func (grb *globalRoleBindingLifecycle) purgeInvalidNamespacedRBs(rbs []*v1.RoleB
 		}
 	}
 	return returnError
+}
+
+func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding, localConditions []metav1.Condition) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		grbFromCluster, err := c.grbLister.Get(grb.Name)
+		if err != nil {
+			return err
+		}
+		if len(localConditions) > 0 && status.CompareConditions(grbFromCluster.Status.LocalConditions, localConditions) {
+			return nil
+		}
+
+		grbFromCluster.Status.SummaryLocal = status.SummaryCompleted
+		if grbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
+			grbFromCluster.Status.Summary = status.SummaryCompleted
+		}
+		for _, c := range localConditions {
+			if c.Status != metav1.ConditionTrue {
+				grbFromCluster.Status.Summary = status.SummaryError
+				grbFromCluster.Status.SummaryLocal = status.SummaryError
+				break
+			}
+		}
+
+		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
+		grbFromCluster.Status.ObservedGenerationLocal = grb.ObjectMeta.Generation
+		grbFromCluster.Status.LocalConditions = localConditions
+		grbFromCluster, err = c.grbClient.UpdateStatus(grbFromCluster)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // isCRTBValid determines if a given CRTB is up to date for a given cluster and owning global role binding. Should

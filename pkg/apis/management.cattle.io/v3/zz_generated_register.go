@@ -34,13 +34,8 @@ var (
 	AuthProviderResourceName                              = "authproviders"
 	AuthTokenResourceName                                 = "authtokens"
 	AzureADProviderResourceName                           = "azureadproviders"
-	CatalogResourceName                                   = "catalogs"
-	CatalogTemplateResourceName                           = "catalogtemplates"
-	CatalogTemplateVersionResourceName                    = "catalogtemplateversions"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
-	ClusterCatalogResourceName                            = "clustercatalogs"
-	ClusterLoggingResourceName                            = "clusterloggings"
 	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
@@ -62,8 +57,6 @@ var (
 	KontainerDriverResourceName                           = "kontainerdrivers"
 	LocalProviderResourceName                             = "localproviders"
 	ManagedChartResourceName                              = "managedcharts"
-	MultiClusterAppResourceName                           = "multiclusterapps"
-	MultiClusterAppRevisionResourceName                   = "multiclusterapprevisions"
 	NodeResourceName                                      = "nodes"
 	NodeDriverResourceName                                = "nodedrivers"
 	NodePoolResourceName                                  = "nodepools"
@@ -74,8 +67,6 @@ var (
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
-	ProjectCatalogResourceName                            = "projectcatalogs"
-	ProjectLoggingResourceName                            = "projectloggings"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
@@ -86,9 +77,6 @@ var (
 	SamlProviderResourceName                              = "samlproviders"
 	SamlTokenResourceName                                 = "samltokens"
 	SettingResourceName                                   = "settings"
-	TemplateResourceName                                  = "templates"
-	TemplateContentResourceName                           = "templatecontents"
-	TemplateVersionResourceName                           = "templateversions"
 	TokenResourceName                                     = "tokens"
 	UserResourceName                                      = "users"
 	UserAttributeResourceName                             = "userattributes"
@@ -127,20 +115,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AuthTokenList{},
 		&AzureADProvider{},
 		&AzureADProviderList{},
-		&Catalog{},
-		&CatalogList{},
-		&CatalogTemplate{},
-		&CatalogTemplateList{},
-		&CatalogTemplateVersion{},
-		&CatalogTemplateVersionList{},
 		&CloudCredential{},
 		&CloudCredentialList{},
 		&Cluster{},
 		&ClusterList{},
-		&ClusterCatalog{},
-		&ClusterCatalogList{},
-		&ClusterLogging{},
-		&ClusterLoggingList{},
 		&ClusterProxyConfig{},
 		&ClusterProxyConfigList{},
 		&ClusterRegistrationToken{},
@@ -183,10 +161,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LocalProviderList{},
 		&ManagedChart{},
 		&ManagedChartList{},
-		&MultiClusterApp{},
-		&MultiClusterAppList{},
-		&MultiClusterAppRevision{},
-		&MultiClusterAppRevisionList{},
 		&Node{},
 		&NodeList{},
 		&NodeDriver{},
@@ -207,10 +181,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PrincipalList{},
 		&Project{},
 		&ProjectList{},
-		&ProjectCatalog{},
-		&ProjectCatalogList{},
-		&ProjectLogging{},
-		&ProjectLoggingList{},
 		&ProjectNetworkPolicy{},
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},
@@ -231,12 +201,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&SamlTokenList{},
 		&Setting{},
 		&SettingList{},
-		&Template{},
-		&TemplateList{},
-		&TemplateContent{},
-		&TemplateContentList{},
-		&TemplateVersion{},
-		&TemplateVersionList{},
 		&Token{},
 		&TokenList{},
 		&User{},

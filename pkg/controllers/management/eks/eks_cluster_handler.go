@@ -71,13 +71,9 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 			ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
 			SecretsCache:         wContext.Core.Secret().Cache(),
 			Secrets:              mgmtCtx.Core.Secrets(""),
-			TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
 			ProjectCache:         wContext.Mgmt.Project().Cache(),
-			AppLister:            mgmtCtx.Project.Apps("").Controller().Lister(),
-			AppClient:            mgmtCtx.Project.Apps(""),
 			NsClient:             mgmtCtx.Core.Namespaces(""),
 			ClusterClient:        wContext.Mgmt.Cluster(),
-			CatalogManager:       mgmtCtx.CatalogManager,
 			SystemAccountManager: systemaccount.NewManager(mgmtCtx),
 			DynamicClient:        eksCCDynamicClient,
 			ClientDialer:         mgmtCtx.Dialer,
@@ -194,6 +190,10 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 		if apimgmtv3.ClusterConditionUpdated.IsFalse(cluster) && strings.HasPrefix(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
 			return cluster, fmt.Errorf(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster))
+		}
+
+		if cluster.Status.EKSStatus.UpstreamSpec == nil {
+			return cluster, fmt.Errorf("initial upstreamSpec on cluster [%s] has not been set, unable to continue", cluster.Name)
 		}
 
 		// EKS cluster must have at least one node to run cluster agent. The best way to verify
@@ -390,6 +390,7 @@ func (e *eksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) 
 	cluster = cluster.DeepCopy()
 	upstreamSpec, err := clusterupstreamrefresher.BuildEKSUpstreamSpec(e.secretClient, cluster)
 	if err != nil {
+		logrus.Warnf("failed to set initial upstreamSpec on cluster [%s]: %v", cluster.Name, err)
 		return cluster, err
 	}
 	cluster.Status.EKSStatus.UpstreamSpec = upstreamSpec

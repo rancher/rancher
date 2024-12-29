@@ -46,11 +46,6 @@ var (
 		APIGroups: []string{""},
 		Resources: []string{"nodes"},
 	}
-	editTemplates = rbacv1.PolicyRule{
-		Verbs:     []string{"edit"},
-		APIGroups: []string{"management.cattle.io"},
-		Resources: []string{"templates"},
-	}
 	globalRoleLabel = "authz.management.cattle.io/globalrole"
 	crNameLabel     = "authz.management.cattle.io/cr-name"
 	grOwnerLabel    = "authz.management.cattle.io/gr-owner"
@@ -201,36 +196,6 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 					Name: "cattle-globalrole-generated-name-gr",
 				},
 				Rules: []rbacv1.PolicyRule{getPodRule},
-			},
-		},
-		{
-			name: "global role with catalog role",
-			globalRole: v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "catalog-role-gr",
-				},
-				Rules: []rbacv1.PolicyRule{getPodRule, editTemplates},
-			},
-			clusterRole: rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cattle-globalrole-catalog-role-gr",
-				},
-				Rules: []rbacv1.PolicyRule{getPodRule, editTemplates},
-			},
-			roles: []rbacv1.Role{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "catalog-role-gr-global-catalog",
-						Namespace: "cattle-global-data",
-					},
-					Rules: []rbacv1.PolicyRule{
-						{
-							APIGroups: []string{"management.cattle.io"},
-							Resources: []string{"catalogtemplates"},
-							Verbs:     []string{"edit"},
-						},
-					},
-				},
 			},
 		},
 		{

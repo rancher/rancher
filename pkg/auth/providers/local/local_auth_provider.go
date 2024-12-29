@@ -405,22 +405,23 @@ func userSearchIndexer(obj interface{}) ([]string, error) {
 	}
 	fieldIndexes := sets.New[string]()
 
-	fieldIndexes.Insert(indexField(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
-	fieldIndexes.Insert(indexField(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
-	fieldIndexes.Insert(indexField(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.Username, min(len(user.Username), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.DisplayName, min(len(user.DisplayName), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(indexField(user.ObjectMeta.Name, min(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
 
 	splitToLower := func(s string, limit int) []string {
 		var lowers []string
 		for _, v := range strings.Fields(s) {
-			lowers = append(lowers, strings.ToLower(v)[:minOf(limit, len(v))])
+			lv := strings.ToLower(v)
+			lowers = append(lowers, lv[:min(limit, len(lv))])
 		}
 
 		return lowers
 	}
 
-	fieldIndexes.Insert(splitToLower(user.Username, minOf(len(user.Username), searchIndexDefaultLen))...)
-	fieldIndexes.Insert(splitToLower(user.DisplayName, minOf(len(user.DisplayName), searchIndexDefaultLen))...)
-	fieldIndexes.Insert(splitToLower(user.ObjectMeta.Name, minOf(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(splitToLower(user.Username, min(len(user.Username), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(splitToLower(user.DisplayName, min(len(user.DisplayName), searchIndexDefaultLen))...)
+	fieldIndexes.Insert(splitToLower(user.ObjectMeta.Name, min(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
 
 	return fieldIndexes.UnsortedList(), nil
 }
@@ -432,24 +433,23 @@ func groupSearchIndexer(obj interface{}) ([]string, error) {
 	}
 	var fieldIndexes []string
 
-	fieldIndexes = append(fieldIndexes, indexField(group.DisplayName, minOf(len(group.DisplayName), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(group.ObjectMeta.Name, minOf(len(group.ObjectMeta.Name), searchIndexDefaultLen))...)
+	fieldIndexes = append(fieldIndexes, indexField(group.DisplayName, min(len(group.DisplayName), searchIndexDefaultLen))...)
+	fieldIndexes = append(fieldIndexes, indexField(group.ObjectMeta.Name, min(len(group.ObjectMeta.Name), searchIndexDefaultLen))...)
 
 	return fieldIndexes, nil
-}
-
-func minOf(length int, defaultLen int) int {
-	if length < defaultLen {
-		return length
-	}
-	return defaultLen
 }
 
 func indexField(field string, maxIndex int) []string {
 	var fieldIndexes []string
 	for i := 2; i <= maxIndex; i++ {
-		fieldIndexes = append(fieldIndexes, strings.ToLower(
-			string([]rune(simplifyString(field))[0:i])))
+		simplified := []rune(simplifyString(field))
+
+		// This calculates the string to be indexed after it has been
+		// simplified because it may now be shorter than it was when maxIndex
+		// was calculated for the call to indexField.
+		fi := string(simplified)[0:min(len(simplified), i)]
+
+		fieldIndexes = append(fieldIndexes, strings.ToLower(fi))
 	}
 
 	return fieldIndexes
@@ -498,9 +498,12 @@ func (l *Provider) CleanupResources(*v3.AuthConfig) error {
 }
 
 func userMatchesSearchKey(user *v3.User, searchKey string) bool {
+	normalizedDisplayName := strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName)))
+	normalizedSearchKey := strings.ToLower(normalizeWhitespace(simplifyString(searchKey)))
+
 	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
-		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizeWhitespace(searchKey)) ||
-		strings.Contains(strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName))), normalizeWhitespace(searchKey)))
+		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizedSearchKey) ||
+		strings.Contains(normalizedDisplayName, normalizedSearchKey))
 }
 
 func normalizeWhitespace(s string) string {

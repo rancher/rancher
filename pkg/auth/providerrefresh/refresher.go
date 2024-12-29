@@ -233,7 +233,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 					// we no longer want to disable derived tokens, or remove their login tokens for this provider
 					if err.Error() != "no access" {
 						errorConfirmingLogins = true
-						logrus.Errorf("Error refreshing token principals, skipping: %v", err)
+						logrus.Warnf("Error refreshing token principals, skipping: %v", err)
 						existingPrincipals := attribs.GroupPrincipals[providerName].Items
 						if existingPrincipals != nil {
 							newGroupPrincipals = existingPrincipals

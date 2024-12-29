@@ -14,8 +14,9 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	"github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -276,7 +277,7 @@ func newMockCleanupService(t *testing.T,
 	}).AnyTimes()
 
 	return Service{
-		secretsInterface:                  getSecretInterfaceMock(secretStore),
+		secretsInterface:                  getSecretControllerMock(ctrl, secretStore),
 		globalRoleBindingsCache:           grbCache,
 		globalRoleBindingsClient:          grbClient,
 		projectRoleTemplateBindingsCache:  prtbCache,
@@ -289,19 +290,18 @@ func newMockCleanupService(t *testing.T,
 	}
 }
 
-func getSecretInterfaceMock(store map[string]*corev1.Secret) v1.SecretInterface {
-	secretInterfaceMock := &fakes.SecretInterfaceMock{}
-
-	secretInterfaceMock.CreateFunc = func(secret *corev1.Secret) (*corev1.Secret, error) {
+func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.Secret) wcorev1.SecretController {
+	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 		if secret.Name == "" {
 			uniqueIdentifier := md5.Sum([]byte(time.Now().String()))
 			secret.Name = hex.EncodeToString(uniqueIdentifier[:])
 		}
 		store[fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)] = secret
 		return secret, nil
-	}
+	}).AnyTimes()
 
-	secretInterfaceMock.ListNamespacedFunc = func(namespace string, opts metav1.ListOptions) (*corev1.SecretList, error) {
+	secretController.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace string, opts metav1.ListOptions) (*corev1.SecretList, error) {
 		var secrets []corev1.Secret
 		for _, secret := range store {
 			if secret.Namespace == namespace {
@@ -311,20 +311,20 @@ func getSecretInterfaceMock(store map[string]*corev1.Secret) v1.SecretInterface 
 		return &corev1.SecretList{
 			Items: secrets,
 		}, nil
-	}
+	}).AnyTimes()
 
-	secretInterfaceMock.GetNamespacedFunc = func(namespace string, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
+	secretController.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
 		secret, ok := store[fmt.Sprintf("%s:%s", namespace, name)]
 		if ok {
 			return secret, nil
 		}
 		return nil, errors.New("secret not found")
-	}
+	}).AnyTimes()
 
-	secretInterfaceMock.DeleteNamespacedFunc = func(namespace string, name string, options *metav1.DeleteOptions) error {
+	secretController.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
 		delete(store, fmt.Sprintf("%s:%s", namespace, name))
 		return nil
-	}
+	}).AnyTimes()
 
-	return secretInterfaceMock
+	return secretController
 }

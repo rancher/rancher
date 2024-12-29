@@ -63,15 +63,17 @@ type testMocks struct {
 	manager         *chartfake.MockManager
 	namespaceCtrl   *fake.MockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
 	configCache     *fake.MockCacheInterface[*v1.ConfigMap]
+	deployment      *fake.MockControllerInterface[*appsv1.Deployment, *appsv1.DeploymentList]
 	deploymentCache *fake.MockCacheInterface[*appsv1.Deployment]
 }
 
 func (t *testMocks) Handler() *handler {
 	return &handler{
-		manager:      t.manager,
-		namespaces:   t.namespaceCtrl,
-		chartsConfig: chart.RancherConfigGetter{ConfigCache: t.configCache},
-		deployment:   t.deploymentCache,
+		manager:         t.manager,
+		namespaces:      t.namespaceCtrl,
+		chartsConfig:    chart.RancherConfigGetter{ConfigCache: t.configCache},
+		deployment:      t.deployment,
+		deploymentCache: t.deploymentCache,
 	}
 }
 

@@ -35,8 +35,8 @@ func Test_Fleet_ClusterBootstrap(t *testing.T) {
 			return err == nil && lc != nil && lc.Status.Summary.Ready > 0
 		}, waitFor, tick)
 		require.Contains(lc.Labels, "name")
-		require.Equal(lc.Labels["name"], "local")
-		assert.Equal(lc.Spec.KubeConfigSecret, "local-kubeconfig")
+		require.Equal("local", lc.Labels["name"])
+		assert.Equal("local-kubeconfig", lc.Spec.KubeConfigSecret)
 
 		lcg := &fleetv1api.ClusterGroup{}
 		require.Eventually(func() bool {
@@ -44,7 +44,7 @@ func Test_Fleet_ClusterBootstrap(t *testing.T) {
 			return err == nil && lcg != nil
 		}, waitFor, tick)
 		require.Contains(lcg.Spec.Selector.MatchLabels, "name")
-		assert.Equal(lcg.Spec.Selector.MatchLabels["name"], "local")
+		assert.Equal("local", lcg.Spec.Selector.MatchLabels["name"])
 	})
 
 	c, err := cluster.New(clients, &provv1api.Cluster{
@@ -86,12 +86,12 @@ func Test_Fleet_ClusterBootstrap(t *testing.T) {
 		}, waitFor, tick)
 
 		require.NotNil(fc)
-		assert.Equal(fc.Spec.AgentEnvVars, mgmtCluster.Spec.AgentEnvVars)
+		assert.Equal(mgmtCluster.Spec.AgentEnvVars, fc.Spec.AgentEnvVars)
 		assert.Equal(c.Status.ClientSecretName, fc.Spec.KubeConfigSecret)
 		require.Contains(fc.Labels, "management.cattle.io/cluster-name")
-		assert.Equal(fc.Labels["management.cattle.io/cluster-name"], mgmtCluster.Name)
+		assert.Equal(mgmtCluster.Name, fc.Labels["management.cattle.io/cluster-name"])
 		require.Contains(fc.Labels, "management.cattle.io/cluster-display-name")
-		assert.Equal(fc.Labels["management.cattle.io/cluster-display-name"], mgmtCluster.Spec.DisplayName)
+		assert.Equal(mgmtCluster.Spec.DisplayName, fc.Labels["management.cattle.io/cluster-display-name"])
 	})
 
 	// Delete the cluster and wait for cleanup.

@@ -34,9 +34,6 @@ addLocal: "true"
 # Add debug flag to Rancher server
 debug: false
 
-# When starting Rancher for the first time, bootstrap the admin as restricted-admin
-restrictedAdmin: false
-
 # Control how the Rancher agents validate TLS connections
 # Valid options: strict, or system-store
 # Note, for new installations empty will default to strict on 2.9+, or system-store on 2.8 or older
@@ -65,6 +62,9 @@ ingress:
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
   ingressClassName: ""
+  # Certain ingress controllers will require the pathType or path to be set to a different value.
+  pathType: ImplementationSpecific
+  path: "/"
   # backend port number
   servicePort: 80
 
@@ -93,7 +93,7 @@ letsEncrypt:
     # options: traefik, nginx
     class: ""
 # If you are using certs signed by a private CA set to 'true' and set the 'tls-ca'
-# in the 'rancher-system' namespace. See the README.md for details
+# in the 'cattle-system' namespace. See the README.md for details
 privateCA: false
 
 # http[s] proxy server passed into rancher server.

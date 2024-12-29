@@ -46,26 +46,6 @@ def test_helm_v3_app_upgrade_version():
     proj_client.delete(app)
 
 
-def test_helm_v3_app_rollback():
-    client = get_user_client()
-    answer = get_defaut_question_answers(client, MYSQL_EXTERNALID_131)
-    proj_client, ns, project = get_project_details("cluster1")
-    # deploy app
-    app = create_and_validate_app(
-        proj_client, MYSQL_EXTERNALID_131, ns, project, answer)
-    rev_id = app.appRevisionId
-    new_answer = get_defaut_question_answers(client, MYSQL_EXTERNALID_132)
-    # update app
-    app = update_and_validate_app(
-        app, proj_client, MYSQL_EXTERNALID_132, ns, project, new_answer)
-    proj_client.action(obj=app,
-                       action_name='rollback',
-                       revisionId=rev_id)
-    app = proj_client.reload(app)
-    app = validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_131)
-    proj_client.delete(app)
-
-
 def test_helm_v3_app_answer_override():
     client = get_user_client()
     answer = get_defaut_question_answers(client, MYSQL_EXTERNALID_131)

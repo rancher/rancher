@@ -1,8 +1,8 @@
 module github.com/rancher/rancher
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.22.7
+toolchain go1.23.4
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
@@ -62,7 +62,7 @@ replace (
 
 require (
 	github.com/antihax/optional v1.0.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20241023011518-955534c18d04
+	github.com/rancher/rancher/pkg/apis v0.0.0-20241127174121-c051d99dcded
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -71,7 +71,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.16.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.6.0
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5 v5.0.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.1.1
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/subscription/armsubscription v1.2.0
 	github.com/Azure/go-autorest/autorest v0.11.29
@@ -83,7 +83,6 @@ require (
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/aws/aws-sdk-go-v2 v1.32.2
 	github.com/aws/aws-sdk-go-v2/service/eks v1.50.2
-	github.com/bep/debounce v1.2.1
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0
 	github.com/coreos/go-oidc/v3 v3.9.0
@@ -109,9 +108,9 @@ require (
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
-	github.com/microsoft/kiota-abstractions-go v1.0.0
-	github.com/microsoftgraph/msgraph-sdk-go v1.0.0
-	github.com/microsoftgraph/msgraph-sdk-go-core v1.0.0
+	github.com/microsoft/kiota-abstractions-go v1.7.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.51.0
+	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/locker v1.0.1
@@ -124,25 +123,25 @@ require (
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
-	github.com/rancher/aks-operator v1.10.0-rc.2
+	github.com/rancher/aks-operator v1.10.0
 	github.com/rancher/apiserver v0.0.0-20241009200134-5a4ecca7b988
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1-rc.2
-	github.com/rancher/eks-operator v1.10.0-rc.2
-	github.com/rancher/fleet/pkg/apis v0.11.0-beta.2
-	github.com/rancher/gke-operator v1.10.0-rc.2
+	github.com/rancher/eks-operator v1.10.0
+	github.com/rancher/fleet/pkg/apis v0.12.0-alpha.1
+	github.com/rancher/gke-operator v1.10.0
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813
-	github.com/rancher/machine v0.15.0-rancher120
-	github.com/rancher/norman v0.0.0-20241001183610-78a520c160ab
+	github.com/rancher/machine v0.15.0-rancher124
+	github.com/rancher/norman v0.5.1
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.0-rc.5
-	github.com/rancher/shepherd v0.0.0-20241023152838-da6b36b3b5b4
-	github.com/rancher/steve v0.0.0-20241028205536-b2f2bab3c4b3
+	github.com/rancher/shepherd v0.0.0-20241213222351-98e341c77d0b
+	github.com/rancher/steve v0.0.0-20241206235902-65129458a74a
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.0.1-rc.3
+	github.com/rancher/wrangler/v3 v3.1.0
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
@@ -189,7 +188,6 @@ require (
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5 v5.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
@@ -238,10 +236,11 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/kr/fs v0.1.0 // indirect
-	github.com/microsoft/kiota-authentication-azure-go v1.0.0 // indirect
-	github.com/microsoft/kiota-http-go v1.0.0 // indirect
+	github.com/microsoft/kiota-authentication-azure-go v1.1.0 // indirect
+	github.com/microsoft/kiota-http-go v1.4.4 // indirect
 	github.com/microsoft/kiota-serialization-form-go v1.0.0 // indirect
-	github.com/microsoft/kiota-serialization-json-go v1.0.0 // indirect
+	github.com/microsoft/kiota-serialization-json-go v1.0.8 // indirect
+	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
 	github.com/microsoft/kiota-serialization-text-go v1.0.0 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
@@ -249,10 +248,10 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
+	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0 // indirect

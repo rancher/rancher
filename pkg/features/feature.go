@@ -142,7 +142,13 @@ var (
 		"provisioningprebootstrap",
 		"Support running pre-bootstrap workloads on downstream clusters",
 		false,
+		false,
+		true)
+	CleanStaleSecrets = newFeature(
+		"clean-stale-secrets",
+		"Remove unused impersonation secrets from the cattle-impersonation namespace",
 		true,
+		false,
 		true)
 )
 

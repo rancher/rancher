@@ -193,6 +193,17 @@ func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPl
 }
 
 func (p *Planner) addManifests(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
+	bootstrapManifests, err := p.retrievalFunctions.GetBootstrapManifests(controlPlane)
+	if err != nil {
+		return nodePlan, err
+	}
+
+	if len(bootstrapManifests) > 0 {
+		logrus.Debugf("[planner] adding pre-bootstrap manifests")
+		nodePlan.Files = append(nodePlan.Files, bootstrapManifests...)
+		return nodePlan, err
+	}
+
 	files, err := p.getControlPlaneManifests(controlPlane, entry)
 	if err != nil {
 		return nodePlan, err

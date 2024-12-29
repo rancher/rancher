@@ -1,9 +1,7 @@
 #!/bin/bash
-set -e
+set -ex
 
-echo Starting rancher server
-
-echo "scripts/run"
+echo Starting rancher server in container
 
 source $(dirname $0)/../version
 source $(dirname $0)/../export-config
@@ -27,13 +25,5 @@ export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}')"
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_FEATURES="harvester=false"
 
-echo "docker run -d --name rancher-server --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD="admin" -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE"
-docker run -d --name rancher-server --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD="admin" -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE
-
-sleep 5
-
-echo "docker container ls"
-docker container ls
-
 mkdir -p /etc/rancher/k3s/
-docker cp rancher-server:/etc/rancher/k3s/k3s.yaml /etc/rancher/k3s/k3s.yaml
+docker run -d --name rancher-server -v /etc/rancher/k3s:/etc/rancher/k3s --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD=$CATTLE_BOOTSTRAP_PASSWORD -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE

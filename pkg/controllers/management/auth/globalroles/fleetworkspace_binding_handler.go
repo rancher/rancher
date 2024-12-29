@@ -5,20 +5,25 @@ import (
 	"fmt"
 	"reflect"
 
-	wrangler "github.com/rancher/wrangler/v3/pkg/name"
-
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+const (
+	fleetWorkspacePermissionReconciled      = "FleetWorkspacePermissionReconciled"
+	failedToReconcileResourceRulesBindings  = "FailedToReconcileResourceRulesBindings"
+	failedToReconcileWorkspaceVerbsBindings = "FailedToReconcileWorkspaceVerbsBindings"
 )
 
 var (
@@ -35,6 +40,7 @@ type fleetWorkspaceBindingHandler struct {
 	rbClient  rbacv1.RoleBindingController
 	rbCache   rbacv1.RoleBindingCache
 	fwCache   mgmtcontroller.FleetWorkspaceCache
+	status    *status.Status
 }
 
 func newFleetWorkspaceBindingHandler(management *config.ManagementContext) *fleetWorkspaceBindingHandler {
@@ -46,22 +52,31 @@ func newFleetWorkspaceBindingHandler(management *config.ManagementContext) *flee
 		rbCache:   management.Wrangler.RBAC.RoleBinding().Cache(),
 		fwCache:   management.Wrangler.Mgmt.FleetWorkspace().Cache(),
 		crCache:   management.Wrangler.RBAC.ClusterRole().Cache(),
+		status:    status.NewStatus(),
 	}
 }
 
 // ReconcileFleetWorkspacePermissionsBindings reconciles backing RoleBindings and ClusterRoleBindings created for granting permission
 // to fleet workspaces.
-func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
+func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: fleetWorkspacePermissionReconciled}
 	globalRole, err := h.grCache.Get(globalRoleBinding.GlobalRoleName)
 	if err != nil {
+		h.status.AddCondition(localConditions, condition, failedToGetGlobalRole, err)
 		return fmt.Errorf("couldn't get globalRole: %w", err)
 	}
 	var returnErr error
 	if err = h.reconcileResourceRulesBindings(globalRoleBinding, globalRole); err != nil {
+		h.status.AddCondition(localConditions, condition, failedToReconcileResourceRulesBindings, err)
 		returnErr = errors.Join(returnErr, errReconcileResourceRulesBinding, err)
 	}
 	if err = h.reconcileWorkspaceVerbsBindings(globalRoleBinding, globalRole); err != nil {
+		h.status.AddCondition(localConditions, condition, failedToReconcileWorkspaceVerbsBindings, err)
 		returnErr = errors.Join(returnErr, errReconcileWorkspaceVerbsBinding, err)
+	}
+
+	if returnErr == nil && globalRole.InheritedFleetWorkspacePermissions != nil {
+		h.status.AddCondition(localConditions, condition, fleetWorkspacePermissionReconciled, nil)
 	}
 
 	return returnErr
