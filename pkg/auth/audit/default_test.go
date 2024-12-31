@@ -14,7 +14,9 @@ import (
 )
 
 func TestDefaultPolicies(t *testing.T) {
-	writer, err := NewWriter(io.Discard, auditlogv1.LevelRequest)
+	writer, err := NewWriter(io.Discard, WriterOptions{
+		DefaultPolicyLevel: auditlogv1.LevelMetadata,
+	})
 	require.NoError(t, err)
 
 	machineDataInput, machineDataWant := []byte("{"), []byte("{")
@@ -201,7 +203,7 @@ func TestDefaultPolicies(t *testing.T) {
 				t.Skipf("skipping test '%s'", c.Name)
 			}
 
-			log := &Log{
+			log := &log{
 				RequestURI:  c.Uri,
 				RequestBody: c.Body,
 			}
