@@ -29,6 +29,20 @@ type Policy struct {
 	Verbosity auditlogv1.LogVerbosity
 }
 
+func (p Policy) actionForLog(log *log) auditlogv1.FilterAction {
+	if len(p.Filters) == 0 {
+		return auditlogv1.FilterActionAllow
+	}
+
+	for _, f := range p.Filters {
+		if f.Allowed(log) {
+			return auditlogv1.FilterActionAllow
+		}
+	}
+
+	return auditlogv1.FilterActionDeny
+}
+
 func PolicyFromAuditLogPolicy(policy *auditlogv1.AuditLogPolicy) (Policy, error) {
 	newPolicy := Policy{
 		Filters:   make([]*Filter, len(policy.Spec.Filters)),
@@ -67,24 +81,35 @@ func PolicyFromAuditLogPolicy(policy *auditlogv1.AuditLogPolicy) (Policy, error)
 	return newPolicy, nil
 }
 
+type WriterOptions struct {
+	DefaultPolicyLevel auditlogv1.Level
+
+	DisableDefaultPolicies bool
+}
+
 type Writer struct {
+	WriterOptions
+
+	// todo: rename this to policies
 	policyMutex sync.RWMutex
 	policy      map[types.NamespacedName]Policy
 
 	output io.Writer
 }
 
-func NewWriter(output io.Writer, defaultPolicyLevel auditlogv1.Level) (*Writer, error) {
+func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 	w := &Writer{
 		policy: make(map[types.NamespacedName]Policy),
 		output: output,
 	}
 
-	for _, v := range DefaultPolicies() {
-		v.Spec.Verbosity.Level = defaultPolicyLevel
+	if !opts.DisableDefaultPolicies {
+		for _, v := range DefaultPolicies() {
+			v.Spec.Verbosity.Level = opts.DefaultPolicyLevel
 
-		if err := w.UpdatePolicy(&v); err != nil {
-			return nil, fmt.Errorf("failed to add default policies: %w", err)
+			if err := w.UpdatePolicy(&v); err != nil {
+				return nil, fmt.Errorf("failed to add default policies: %w", err)
+			}
 		}
 	}
 
@@ -129,7 +154,7 @@ func decompress(readCloser io.ReadCloser) ([]byte, error) {
 	return rawData, nil
 }
 
-func (w *Writer) decompressResponse(log *Log) error {
+func (w *Writer) decompressResponse(log *log) error {
 	var err error
 	var compressed []byte
 
@@ -153,28 +178,30 @@ func (w *Writer) decompressResponse(log *Log) error {
 	return nil
 }
 
-func (w *Writer) Write(log *Log) error {
+func (w *Writer) Write(log *log) error {
 	redactors := []Redactor{
 		RedactFunc(redactSecret),
 	}
 	var verbosity auditlogv1.LogVerbosity
 
+	action := auditlogv1.FilterActionAllow
+
 	w.policyMutex.RLock()
-	for _, p := range w.policy {
-		for _, f := range p.Filters {
-			if f.Allowed(log) {
-				redactors = append(redactors, p.Redactors...)
-				verbosity = mergeLogVerbosities(verbosity, p.Verbosity)
-			}
+	for _, policy := range w.policy {
+		action = policy.actionForLog(log)
+
+		if action == auditlogv1.FilterActionAllow {
+			redactors = append(redactors, policy.Redactors...)
+			verbosity = mergeLogVerbosities(verbosity, policy.Verbosity)
 		}
 	}
 	w.policyMutex.RUnlock()
 
-	log.applyVerbosity(verbosity)
+	if action == auditlogv1.FilterActionDeny {
+		return nil
+	}
 
-	// if err := log.prepare(); err != nil {
-	// 	return fmt.Errorf("failed to prepare log bodies for redaction: %w", err)
-	// }
+	log.applyVerbosity(verbosity)
 	log.prepare()
 
 	if err := w.decompressResponse(log); err != nil {
