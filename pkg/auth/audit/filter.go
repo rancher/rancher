@@ -24,7 +24,7 @@ func NewFilter(filter auditlogv1.Filter) (*Filter, error) {
 	}, nil
 }
 
-func (m *Filter) Allowed(log *Log) bool {
+func (m *Filter) Allowed(log *log) bool {
 	if m.uri.MatchString(log.RequestURI) {
 		return m.action == auditlogv1.FilterActionAllow
 	}
