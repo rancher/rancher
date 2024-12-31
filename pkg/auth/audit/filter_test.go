@@ -12,7 +12,7 @@ func TestFilter(t *testing.T) {
 	type testCase struct {
 		Name    string
 		Filter  Filter
-		log     Log
+		log     log
 		Allowed bool
 	}
 
@@ -23,7 +23,7 @@ func TestFilter(t *testing.T) {
 				action: auditlogv1.FilterActionAllow,
 				uri:    regexp.MustCompile(".*"),
 			},
-			log: Log{
+			log: log{
 				RequestURI: "/api/v1/namespaces/default/pods",
 			},
 			Allowed: true,
@@ -34,7 +34,7 @@ func TestFilter(t *testing.T) {
 				action: auditlogv1.FilterActionDeny,
 				uri:    regexp.MustCompile(".*"),
 			},
-			log: Log{
+			log: log{
 				RequestURI: "/api/v1/namespaces/default/pods",
 			},
 			Allowed: false,
@@ -46,7 +46,7 @@ func TestFilter(t *testing.T) {
 				action: auditlogv1.FilterActionDeny,
 				uri:    regexp.MustCompile("/api/v1/namespaces/.*/secrets.*"),
 			},
-			log: Log{
+			log: log{
 				RequestURI: "/api/v1/namespaces/default/secrets/my-secret",
 			},
 			Allowed: false,

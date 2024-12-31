@@ -40,12 +40,7 @@ func DefaultPolicies() []auditlogv1.AuditLogPolicy {
 				Name: "redact-generic-info",
 			},
 			Spec: auditlogv1.AuditLogPolicySpec{
-				Filters: []auditlogv1.Filter{
-					{
-						Action:     auditlogv1.FilterActionAllow,
-						RequestURI: ".*",
-					},
-				},
+				Filters: []auditlogv1.Filter{},
 				AdditionalRedactions: []auditlogv1.Redaction{
 					{
 						Headers: []string{
@@ -58,37 +53,12 @@ func DefaultPolicies() []auditlogv1.AuditLogPolicy {
 				},
 			},
 		},
-		// {
-		// 	ObjectMeta: metav1.ObjectMeta{
-		// 		Name: "redact-secrets",
-		// 	},
-		// 	Spec: auditlogv1.AuditLogPolicySpec{
-		// 		Filters: []auditlogv1.Filter{
-		// 			{
-		// 				Action:     auditlogv1.FilterActionAllow,
-		// 				RequestURI: ".*secrets.*",
-		// 			},
-		// 		},
-		// 		AdditionalRedactions: []auditlogv1.Redaction{
-		// 			{
-		// 				Keys: []string{
-		// 					"^(string)?[dD]ata$",
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// },
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "redact-generate-kubeconfig",
 			},
 			Spec: auditlogv1.AuditLogPolicySpec{
-				Filters: []auditlogv1.Filter{
-					{
-						Action:     auditlogv1.FilterActionAllow,
-						RequestURI: ".*action=generateKubeconfig.*",
-					},
-				},
+				Filters: []auditlogv1.Filter{},
 				AdditionalRedactions: []auditlogv1.Redaction{
 					{
 						Keys: []string{
