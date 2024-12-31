@@ -49,7 +49,9 @@ var (
 )
 
 func setup(t *testing.T, level auditlogv1.Level) handler {
-	writer, err := audit.NewWriter(io.Discard, level)
+	writer, err := audit.NewWriter(io.Discard, audit.WriterOptions{
+		DefaultPolicyLevel: level,
+	})
 	if err != nil {
 		t.Error("failed to create writer for audit log handler: %w", err)
 	}

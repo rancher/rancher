@@ -17,7 +17,7 @@ const (
 
 type Redactor interface {
 	// Redact replaces sensitive information within a log with "[redacted]". Expects the log to have been prepared.
-	Redact(*Log) error
+	Redact(*log) error
 }
 
 // todo: we can probably combine the regex slices into a single regex for better performance
@@ -97,7 +97,7 @@ func (r *redactor) redactMap(path string, body map[string]any) {
 }
 
 // Redact redacts fields and headers which match the
-func (r *redactor) Redact(log *Log) error {
+func (r *redactor) Redact(log *log) error {
 	r.redactHeaders(log.RequestHeader)
 	r.redactHeaders(log.ResponseHeader)
 
@@ -108,9 +108,9 @@ func (r *redactor) Redact(log *Log) error {
 }
 
 // RedactFunc is a function that redacts a log entry in place.
-type RedactFunc func(*Log) error
+type RedactFunc func(*log) error
 
-func (rf RedactFunc) Redact(log *Log) error {
+func (rf RedactFunc) Redact(log *log) error {
 	return rf(log)
 }
 
@@ -148,7 +148,7 @@ func redactSingleSecret(secret map[string]any) {
 	}
 }
 
-func redactSecretsFromBody(log *Log, body map[string]any) error {
+func redactSecretsFromBody(log *log, body map[string]any) error {
 	var err error
 
 	if body == nil {
@@ -196,7 +196,7 @@ func redactSecretsFromBody(log *Log, body map[string]any) error {
 	return err
 }
 
-func redactSecret(log *Log) error {
+func redactSecret(log *log) error {
 	var err error
 
 	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.RequestBody) {

@@ -25,7 +25,7 @@ var (
 	}
 )
 
-type Log struct {
+type log struct {
 	AuditID       k8stypes.UID `json:"auditID,omitempty"`
 	RequestURI    string       `json:"requestURI,omitempty"`
 	User          *User        `json:"user,omitempty"`
@@ -47,8 +47,8 @@ type Log struct {
 	unmarshalledResponseBody map[string]any
 }
 
-func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp string, respTimestamp string) (*Log, error) {
-	log := &Log{
+func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp string, respTimestamp string) (*log, error) {
+	log := &log{
 		AuditID:       k8stypes.UID(uuid.NewRandom().String()),
 		RequestURI:    req.RequestURI,
 		User:          userInfo,
@@ -90,7 +90,7 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 	return log, nil
 }
 
-func (l *Log) applyVerbosity(verbosity auditlogv1.LogVerbosity) {
+func (l *log) applyVerbosity(verbosity auditlogv1.LogVerbosity) {
 	if !verbosity.Request.Headers {
 		l.RequestHeader = nil
 	}
@@ -108,7 +108,7 @@ func (l *Log) applyVerbosity(verbosity auditlogv1.LogVerbosity) {
 	}
 }
 
-func (l *Log) prepare() {
+func (l *log) prepare() {
 	if l.RequestBody != nil {
 		if err := json.Unmarshal(l.RequestBody, &l.unmarshalledRequestBody); err != nil {
 			l.unmarshalledRequestBody = map[string]any{
@@ -130,7 +130,7 @@ func (l *Log) prepare() {
 	}
 }
 
-func (l *Log) restore() error {
+func (l *log) restore() error {
 	var err error
 
 	if l.unmarshalledRequestBody != nil {
