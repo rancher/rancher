@@ -63,7 +63,9 @@ type AuditLogPolicy struct {
 }
 
 type AuditLogPolicySpec struct {
-	Enabled              bool         `json:"enabled"`
+	Enabled bool `json:"enabled"`
+
+	// Filters described what are explicitly allowed and denied. Leave empty if all logs should be allowed.
 	Filters              []Filter     `json:"filters"`
 	AdditionalRedactions []Redaction  `json:"additionalRedactions"`
 	Verbosity            LogVerbosity `json:"verbosity"`
