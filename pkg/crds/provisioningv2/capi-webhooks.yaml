@@ -307,6 +307,28 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
+        path: /validate-cluster-x-k8s-io-v1beta1-machinedrainrule
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: validation.machinedrainrule.cluster.x-k8s.io
+    rules:
+      - apiGroups:
+          - cluster.x-k8s.io
+        apiVersions:
+          - v1beta1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - machinedrainrules
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+      - v1beta1
+    clientConfig:
+      service:
+        name: capi-webhook-service
+        namespace: cattle-provisioning-capi-system
         path: /validate-cluster-x-k8s-io-v1beta1-machinehealthcheck
     failurePolicy: Fail
     matchPolicy: Equivalent
