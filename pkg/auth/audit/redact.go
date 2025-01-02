@@ -77,7 +77,9 @@ func (r *redactor) redactSlice(path string, slice []any) {
 func (r *redactor) redactMap(path string, body map[string]any) {
 	for key, value := range body {
 		nextPath := strings.Join([]string{path, key}, ".")
+
 		if slices.Contains(r.paths, nextPath) {
+			fmt.Printf("=== [redactor redactMap] 000 '%v' has '%s' ===\n", r.paths, nextPath)
 			body[key] = redacted
 			continue
 		}
