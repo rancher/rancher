@@ -1,0 +1,2 @@
+plugin/package.json
+plugin/main.js
