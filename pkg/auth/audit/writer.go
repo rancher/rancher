@@ -186,15 +186,20 @@ func (w *Writer) Write(log *log) error {
 	}
 
 	verbosity := verbosityForLevel(w.DefaultPolicyLevel)
-	action := auditlogv1.FilterActionAllow
+	action := auditlogv1.FilterActionUnknown
 
 	w.policyMutex.RLock()
 	for _, policy := range w.policy {
-		if policy.actionForLog(log) == auditlogv1.FilterActionAllow {
+		switch policy.actionForLog(log) {
+		case auditlogv1.FilterActionAllow:
 			redactors = append(redactors, policy.Redactors...)
 			verbosity = mergeLogVerbosities(verbosity, policy.Verbosity)
 
 			action = auditlogv1.FilterActionAllow
+		case auditlogv1.FilterActionDeny:
+			if action != auditlogv1.FilterActionAllow {
+				action = auditlogv1.FilterActionDeny
+			}
 		}
 	}
 	w.policyMutex.RUnlock()

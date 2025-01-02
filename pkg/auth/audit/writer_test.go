@@ -60,16 +60,10 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{
-		// {
-		// 	RequestURI: "/api/v1/secrets",
-		// 	Method:     http.MethodGet,
-		// },
-	}
+	expected := []log{}
 
 	err = w.Write(&log{
 		RequestURI: "/api/v1/secrets",
-		Method:     http.MethodGet,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
@@ -93,13 +87,11 @@ func TestAllowList(t *testing.T) {
 	expected = []log{
 		{
 			RequestURI: "/api/v1/secrets",
-			Method:     http.MethodGet,
 		},
 	}
 
 	err = w.Write(&log{
 		RequestURI: "/api/v1/secrets",
-		Method:     http.MethodGet,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
