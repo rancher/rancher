@@ -99,7 +99,10 @@ func TestRedactor(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
+			c.Input.prepare()
 			err := c.Redactor.Redact(&c.Input)
+			c.Input.restore()
+
 			actual := c.Input
 			assert.NoError(t, err)
 			assert.Equal(t, c.Expected, actual)

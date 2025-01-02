@@ -137,12 +137,16 @@ func (l *log) restore() error {
 		if l.RequestBody, err = json.Marshal(l.unmarshalledRequestBody); err != nil {
 			return fmt.Errorf("failed to marshal request body: %w", err)
 		}
+
+		l.unmarshalledRequestBody = nil
 	}
 
 	if l.unmarshalledResponseBody != nil {
 		if l.ResponseBody, err = json.Marshal(l.unmarshalledResponseBody); err != nil {
 			return fmt.Errorf("failed to marshal response body: %w", err)
 		}
+
+		l.unmarshalledResponseBody = nil
 	}
 
 	return nil
