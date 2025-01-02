@@ -249,7 +249,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 	defer auditLogOut.Close()
 
-	auditLogWriter, err := audit.NewWriter(auditLogOut, auditlogv1.Level(opts.AuditLevel))
+	auditLogWriter, err := audit.NewWriter(auditLogOut, audit.WriterOptions{
+		DefaultPolicyLevel: auditlogv1.Level(opts.AuditLevel),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit log writer: %w", err)
 	}
