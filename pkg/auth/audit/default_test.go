@@ -15,7 +15,7 @@ import (
 
 func TestDefaultPolicies(t *testing.T) {
 	writer, err := NewWriter(io.Discard, WriterOptions{
-		DefaultPolicyLevel: auditlogv1.LevelMetadata,
+		DefaultPolicyLevel: auditlogv1.LevelRequest,
 	})
 	require.NoError(t, err)
 
@@ -36,6 +36,7 @@ func TestDefaultPolicies(t *testing.T) {
 			}
 		}
 	}
+
 	machineDataInput[len(machineDataInput)-1] = byte('}')
 	machineDataWant[len(machineDataWant)-1] = byte('}')
 

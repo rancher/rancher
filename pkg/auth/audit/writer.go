@@ -99,6 +99,8 @@ type Writer struct {
 
 func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 	w := &Writer{
+		WriterOptions: opts,
+
 		policy: make(map[types.NamespacedName]Policy),
 		output: output,
 	}
@@ -182,8 +184,8 @@ func (w *Writer) Write(log *log) error {
 	redactors := []Redactor{
 		RedactFunc(redactSecret),
 	}
-	var verbosity auditlogv1.LogVerbosity
 
+	verbosity := verbosityForLevel(w.DefaultPolicyLevel)
 	action := auditlogv1.FilterActionAllow
 
 	w.policyMutex.RLock()
@@ -209,7 +211,6 @@ func (w *Writer) Write(log *log) error {
 	}
 
 	for _, r := range redactors {
-		// todo: will cause a lot of unecessary unmarshalling, find a way to avoid unmarshalling for each redactor. Keep a marshlled and unmarshelled version of each log?
 		if err := r.Redact(log); err != nil {
 			return fmt.Errorf("failed to redact log: %w", err)
 		}
