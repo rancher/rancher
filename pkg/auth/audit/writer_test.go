@@ -148,3 +148,78 @@ func TestBlockList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
 }
+
+func TestHigherVerbosityForPolicy(t *testing.T) {
+	bodyContent := []byte(`{"password":"password"}`)
+	headers := map[string][]string{
+		"foo": {"bar"},
+		"baz": {"qux"},
+	}
+	logs, w := setup(t, WriterOptions{
+		DefaultPolicyLevel:     auditlogv1.LevelNull,
+		DisableDefaultPolicies: true,
+	})
+
+	w.UpdatePolicy(&auditlogv1.AuditLogPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "set-higher-default-verbosity",
+		},
+		Spec: auditlogv1.AuditLogPolicySpec{
+			Verbosity: auditlogv1.LogVerbosity{
+				Level: auditlogv1.LevelRequest,
+			},
+		},
+	})
+
+	w.UpdatePolicy(&auditlogv1.AuditLogPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "set-higher-custom-default-verbosity-for-specific-url",
+		},
+		Spec: auditlogv1.AuditLogPolicySpec{
+			Filters: []auditlogv1.Filter{
+				{
+					Action:     auditlogv1.FilterActionAllow,
+					RequestURI: "/my/endopint",
+				},
+			},
+			Verbosity: auditlogv1.LogVerbosity{
+				Level: auditlogv1.LevelRequestResponse,
+			},
+		},
+	})
+
+	err := w.Write(&log{
+		RequestURI:     "/some/endopint",
+		RequestHeader:  headers,
+		ResponseHeader: headers,
+		RequestBody:    bodyContent,
+		ResponseBody:   bodyContent,
+	})
+	assert.NoError(t, err)
+
+	err = w.Write(&log{
+		RequestURI:     "/my/endopint",
+		RequestHeader:  headers,
+		ResponseHeader: headers,
+		RequestBody:    bodyContent,
+		ResponseBody:   bodyContent,
+	})
+	assert.NoError(t, err)
+
+	expected := []log{
+		{
+			RequestURI:     "/some/endopint",
+			RequestHeader:  headers,
+			ResponseHeader: headers,
+			RequestBody:    bodyContent,
+		},
+		{
+			RequestURI:     "/my/endopint",
+			RequestHeader:  headers,
+			ResponseHeader: headers,
+			RequestBody:    bodyContent,
+			ResponseBody:   bodyContent},
+	}
+
+	assert.Equal(t, expected, logs.logs)
+}
