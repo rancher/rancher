@@ -190,11 +190,11 @@ func (w *Writer) Write(log *log) error {
 
 	w.policyMutex.RLock()
 	for _, policy := range w.policy {
-		action = policy.actionForLog(log)
-
-		if action == auditlogv1.FilterActionAllow {
+		if policy.actionForLog(log) == auditlogv1.FilterActionAllow {
 			redactors = append(redactors, policy.Redactors...)
 			verbosity = mergeLogVerbosities(verbosity, policy.Verbosity)
+
+			action = auditlogv1.FilterActionAllow
 		}
 	}
 	w.policyMutex.RUnlock()
