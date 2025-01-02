@@ -107,8 +107,6 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 
 	if !opts.DisableDefaultPolicies {
 		for _, v := range DefaultPolicies() {
-			v.Spec.Verbosity.Level = opts.DefaultPolicyLevel
-
 			if err := w.UpdatePolicy(&v); err != nil {
 				return nil, fmt.Errorf("failed to add default policies: %w", err)
 			}
