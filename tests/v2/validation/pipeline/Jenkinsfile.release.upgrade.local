@@ -12,7 +12,7 @@ node {
     def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
     def buildTestContainer = "${job_name}${env.BUILD_NUMBER}-buildtest"
     def configGeneratorContainer = "${job_name}${env.BUILD_NUMBER}_generator"
-    def cleanupContainer = "${job_name}${env.BUILD_NUMBER}_cleanup"
+    def cleanupTestContainer = "${job_name}${env.BUILD_NUMBER}_cleanup"
 
     def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
 
@@ -63,12 +63,6 @@ node {
     if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
       timeout = "${env.TIMEOUT}" 
     }
-
-
-
-    def date = sh(script: "date +%Y-%m-%d", returnStdout: true).trim()
-      env.TEST_RUN_NAME = "${env.TEST_RUN_NAME ?: ''}${date}"
-      echo "Updated TEST_RUN_NAME: ${env.TEST_RUN_NAME}"
 
     def cleanup = env.RANCHER_CLEANUP.toLowerCase()
 
@@ -173,6 +167,12 @@ node {
                     writeFile file: AWS_SSH_KEY_NAME, text: decoded
                   }
                 }
+
+                def date = sh(script: "date +%Y-%m-%d", returnStdout: true).trim()
+                  if ("${env.TEST_RUN_NAME}" != "null" && "${env.TEST_RUN_NAME}" != ""){
+                    env.TEST_RUN_NAME = "${env.TEST_RUN_NAME ?: ''}${date}"
+                    echo "Updated TEST_RUN_NAME: ${env.TEST_RUN_NAME}"
+                  }
                 
                 scriptPath = "./rancher/tests/v2/validation/pipeline/scripts/rancher_k8s_version.sh"
                 
@@ -240,16 +240,6 @@ node {
                   sh "docker run -v ${validationVolume}:/root --name ${buildTestContainer} -t --env-file ${envFile} " +
                   "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh;${workPath}pipeline/scripts/build_qase_auto_testrun.sh\""
 
-                  sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"                  
-                  sh "./${qaseRun} --startRun=true"
-
-                  if ("${env.QASE_TEST_RUN_ID}" == "null" || "${env.QASE_TEST_RUN_ID}" == "") {
-                      echo "Getting the qase testID"
-                      env.QASE_TEST_RUN_ID = sh (  
-                        script: "./yq '.id'  ./${testRunConfig}",
-                        returnStdout: true
-                        ).trim() 
-                    }
                 } catch(err) {
                    sh "docker stop ${buildTestContainer}"
                    sh "docker rm -v ${buildTestContainer}"
@@ -377,7 +367,16 @@ node {
                       ).trim()
              
                       sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"  
+                      sh "./${qaseRun} --startRun=true"
 
+    
+                      if ("${env.QASE_TEST_RUN_ID}" == "null" || "${env.QASE_TEST_RUN_ID}" == "") {
+                          echo "Getting the qase testID"
+                          env.QASE_TEST_RUN_ID = sh (  
+                            script: "./yq '.id'  ./${testRunConfig}",
+                            returnStdout: true
+                            ).trim() 
+                        }
                       def goValidationParams = [
                         string(name: 'TIMEOUT', value: "30m"),
                         text(name: 'CONFIG', value: configYaml),
@@ -400,7 +399,6 @@ node {
                 } catch(err) {
                   echo "Pre upgrade tests had failures: " + err
                 }
-              sh "./${qaseRun} --startRun=false"
               }
 
               stage('Upgrade local cluster version') {
@@ -418,10 +416,6 @@ node {
                         returnStdout: true
                       ).trim()
 
-                      echo "Getting the test run ID in upgrade local cluster"
-                      
-                      sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"
-
                       def goValidationParams = [
                         string(name: 'TIMEOUT', value: "2h"),
                         text(name: 'CONFIG', value: configYaml),
@@ -438,7 +432,6 @@ node {
                 } catch(err) {
                   echo "Kubernetes upgrade tests had failures: " + err
                 }
-              sh "./${qaseRun} --startRun=false"
               }
               stage('Run postupgrade checks') {
                 try {
@@ -458,10 +451,6 @@ node {
                         script: "./yq '.testCases.upgradeTestCase'  ${configPath}",
                         returnStdout: true
                       ).trim()
-
-                      echo "Getting the test run ID in post upgrade checks"
-
-                      sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"
 
                       def goValidationParams = [
                         string(name: 'TIMEOUT', value: "30m"),
@@ -487,34 +476,37 @@ node {
                 }
                 sh "./${qaseRun} --startRun=false"
               }
-              stage('Delete Rancher and resources') {
+                stage('Delete Rancher and resources') {
                 if (cleanup.toBoolean()) {
                   try{
                     sh 'echo Cleanup is enabled'
 
-                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupContainer} -t --env-file ${envFile} " +
+                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
                       "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
 
-                    sh "docker stop ${cleanupContainer}"
-                    sh "docker rm -v ${cleanupContainer}"
                   } catch(err){
                     echo "Cleanup had failures: " + err
+                    
+                    if (sh(script: "docker inspect ${containerName} > /dev/null 2>&1 && echo 'exists' || echo 'not found'", returnStdout: true).trim() == 'exists') {
+                        sh "docker stop ${cleanupTestContainer}"
+                        sh "docker rm -v ${cleanupTestContainer}"
+                    } else {
+                        echo "Container ${cleanupTestContainer} not found, skipping cleanup."
+                    }
+                    
+                    sh "docker rmi -f ${imageName}"
                   }
                 } else {
                   sh 'echo Cleanup is disabled'
                 }
               }
               stage('Test Report') {
-                sh "docker stop ${testContainer}"
-                sh "docker rm -v ${testContainer}"
+                sh "docker stop ${buildTestContainer}"
+                sh "docker rm -v ${buildTestContainer}"
 
                 sh "docker stop ${configGeneratorContainer}"
                 sh "docker rm -v ${configGeneratorContainer}"
 
-                if (cleanup.toBoolean()) {
-                  sh "docker stop ${cleanupContainer}"
-                  sh "docker rm -v ${cleanupContainer}"
-                }
 
                 sh "docker rmi -f ${imageName}"
               }
@@ -525,13 +517,18 @@ node {
                   try {
                     sh 'echo Cleanup is enabled'
 
-                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupContainer} -t --env-file ${envFile} " +
-                      "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
+                    sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
+                      "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
 
-                    sh "docker stop ${cleanupContainer}"
-                    sh "docker rm -v ${cleanupContainer}"
                   } catch(error) {
                     echo "Cleanup had failures: " + error
+                    
+                    if (sh(script: "docker inspect ${containerName} > /dev/null 2>&1 && echo 'exists' || echo 'not found'", returnStdout: true).trim() == 'exists') {
+                        sh "docker stop ${cleanupTestContainer}"
+                        sh "docker rm -v ${cleanupTestContainer}"
+                    } else {
+                        echo "Container ${cleanupTestContainer} not found, skipping cleanup."
+                    }
                   }
                 } else {
                   sh 'echo Cleanup is disabled'
