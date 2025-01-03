@@ -63,7 +63,7 @@ ENV TINI_VERSION v0.18.0
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.12
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v0.7.0
+ENV DOCKER_MACHINE_HARVESTER_VERSION v0.7.1
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV CATTLE_WINS_AGENT_VERSION v0.4.20
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -119,7 +119,7 @@ RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACH
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-linode_linux-${ARCH}.zip
 
-RUN curl -LO https://releases.rancher.com/harvester-node-driver/${DOCKER_MACHINE_HARVESTER_VERSION}/docker-machine-driver-harvester-${ARCH}.tar.gz && \
+RUN curl -LO https://github.com/harvester/docker-machine-driver-harvester/releases/download/${DOCKER_MACHINE_HARVESTER_VERSION}/docker-machine-driver-harvester-${ARCH}.tar.gz && \
     tar -xf docker-machine-driver-harvester-${ARCH}.tar.gz -C /opt/drivers/management-state/bin && \
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-harvester-${ARCH}.tar.gz
