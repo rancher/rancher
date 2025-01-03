@@ -61,11 +61,15 @@ spec:
 {{- end }}
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
+            nodeSelectorTerms:
+              - matchExpressions: {{ include "linux-node-selector-terms" . | nindent 16 }}
+              {{- if .Values.extraNodeSelectorTerms }}
+              {{- toYaml .Values.extraNodeSelectorTerms | nindent 16 }}
+              {{- end }}
       tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
-{{- if .Values.extraTolerations }}
-{{ toYaml .Values.extraTolerations | indent 8 }}
-{{- end }}
+      {{- if .Values.extraTolerations }}
+      {{- toYaml .Values.extraTolerations | nindent 8 }}
+      {{- end }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
@@ -173,8 +177,9 @@ spec:
           timeoutSeconds: {{.Values.readinessProbe.timeoutSeconds }}
           periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
           failureThreshold: {{.Values.readinessProbe.failureThreshold }}
-        resources:
-{{ toYaml .Values.resources | indent 10 }}
+        {{- if .Values.resources }}
+        resources: {{- toYaml .Values.resources | nindent 10 }}
+        {{- end }}
         volumeMounts:
 {{- if .Values.additionalTrustedCAs }}
         - mountPath: /etc/pki/trust/anchors/ca-additional.pem
@@ -217,6 +222,9 @@ spec:
         volumeMounts:
         - mountPath: /var/log/auditlog
           name: audit-log
+        {{- if .Values.auditLog.resources }}
+        resources: {{- toYaml .Values.auditLog.resources | nindent 10 }}
+        {{- end }}
   {{- end }}
 {{- end }}
       volumes:
