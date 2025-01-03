@@ -64,20 +64,20 @@ tests:
   - equal:
       path: spec.template.spec.containers[0].imagePullPolicy
       value: Always
-- it: should set sidecar image as auditLog.image when auditLog.destination is sidecar and auditLog.level > 0
+- it: should set sidecar image as auditLog.image when auditLog.destination is sidecar and auditLog.enabled == true
   set:
     auditLog:
+      enabled: true
       destination: sidecar
-      level: 1
   asserts:
   - equal:
       path: spec.template.spec.containers[1].image
       value: rancher/mirrored-bci-micro:15.6.24.2
-- it: should override auditLog.image.repository value when auditLog.destination is sidecar and auditLog.level > 0 and both auditLog.image.repository and auditLog.image.tag are set
+- it: should override auditLog.image.repository value when auditLog.destination is sidecar and auditLog.enabled == true and both auditLog.image.repository and auditLog.image.tag are set
   set:
     auditLog:
       destination: sidecar
-      level: 1
+      enabled: true
       image:
         repository: my.private.repo:5000/rancher/busybox
         tag: 1.0.1
@@ -85,11 +85,11 @@ tests:
   - equal:
       path: spec.template.spec.containers[1].image
       value: my.private.repo:5000/rancher/busybox:1.0.1
-- it: deprecated busyboxImage should override auditLog.image.repository image when auditLog.destination is sidecar and auditLog.level > 0 and auditLog.image.repository  and busyboxImage are set
+- it: deprecated busyboxImage should override auditLog.image.repository image when auditLog.destination is sidecar and auditLog.enabled == true and auditLog.image.repository  and busyboxImage are set
   set:
     auditLog:
+      enabled: true
       destination: sidecar
-      level: 1
       image:
         repository: my.private.repo:5000/rancher/busybox
         tag : 1.0.1
@@ -98,22 +98,22 @@ tests:
   - equal:
       path: spec.template.spec.containers[1].image
       value: busybox
-- it: should override sidecar audit log imagePullPolicy when auditLog.destination is sidecar and auditLog.level > 0 and auditLog.imagePullPolicy is set
+- it: should override sidecar audit log imagePullPolicy when auditLog.destination is sidecar and auditLog.enabled == true and auditLog.imagePullPolicy is set
   set:
     auditLog:
       destination: sidecar
-      level: 1
+      enabled: true
       image:
         pullPolicy: Never
   asserts:
   - equal:
       path: spec.template.spec.containers[1].imagePullPolicy
       value: Never
-- it: deprecated busyboxImagePullPolicy should override sidecar audit log imagePullPolicy when auditLog.destination is sidecar, auditLog.level > 0, and busyboxImagePullPolicy and auditLog.imagePullPolicy are set
+- it: deprecated busyboxImagePullPolicy should override sidecar audit log imagePullPolicy when auditLog.destination is sidecar, auditLog.enabled == true, and busyboxImagePullPolicy and auditLog.imagePullPolicy are set
   set:
     auditLog:
       destination: sidecar
-      level: 1
+      enabled: true
       image:
         pullPolicy: Never
     busyboxImagePullPolicy: Always
