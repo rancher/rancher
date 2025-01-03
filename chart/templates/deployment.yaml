@@ -112,7 +112,9 @@ spec:
         - name: CATTLE_NO_DEFAULT_ADMIN
           value: "{{ .Values.noDefaultAdmin }}"
 {{- end}}
-{{- if gt (int .Values.auditLog.level) 0 }}
+{{- if .Values.auditLog.enabled }}
+        - name: AUDIT_LOG_ENABLED
+          value: "true"
         - name: AUDIT_LEVEL
           value: {{ .Values.auditLog.level | quote }}
         - name: AUDIT_LOG_MAXAGE
@@ -217,12 +219,12 @@ spec:
           name: custom-logos
           subPath: {{ .Values.customLogos.volumeSubpaths.vueUi | default "vue" | quote }}
 {{- end }}
-{{- if gt (int .Values.auditLog.level) 0 }}
+{{- if .Values.auditLog.enabled }}
         - mountPath: /var/log/auditlog
           name: audit-log
 {{- end }}
 {{- if eq .Values.auditLog.destination "sidecar" }}
-  {{- if gt (int .Values.auditLog.level) 0 }}
+  {{- if .Values.auditLog.enabled }}
       # Make audit logs available for Rancher log collector tools.
       - image: {{ include "auditLog_image" . }}
         imagePullPolicy: {{ default .Values.auditLog.image.pullPolicy .Values.busyboxImagePullPolicy }}
@@ -250,7 +252,7 @@ spec:
           defaultMode: 0400
           secretName: tls-ca
 {{- end }}
-{{- if gt (int .Values.auditLog.level) 0 }}
+{{- if .Values.auditLog.enabled }}
   {{- if eq .Values.auditLog.destination "hostPath" }}
       - name: audit-log
         hostPath:
