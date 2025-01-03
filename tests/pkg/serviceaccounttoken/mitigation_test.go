@@ -68,9 +68,7 @@ func TestOptimisticLocking(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				// Sends a DeepCopy because this is theoretically being updated
-				// in different processes.
-				secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.TODO(), nil, clientSet, sa.DeepCopy())
+				secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.TODO(), nil, clientSet, sa)
 				assert.NoError(t, err)
 				assert.NotNil(t, secret)
 				createdSecrets <- *secret
