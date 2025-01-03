@@ -26,8 +26,9 @@ func TestRegexp(t *testing.T) {
 
 func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 	tests := []struct {
-		name    string
-		cluster *v3.Cluster
+		name     string
+		cluster  *v3.Cluster
+		expected bool
 	}{
 		{
 			name: "test-default",
@@ -40,6 +41,7 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 					FleetWorkspaceName: "test-fleet-workspace-name",
 				},
 			},
+			expected: true,
 		},
 		{
 			name: "test-cluster-agent-customization",
@@ -55,6 +57,37 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 					FleetWorkspaceName: "test-fleet-workspace-name",
 				},
 			},
+			expected: true,
+		},
+		{
+			name: "test-turtles-owned-cluster-creation",
+			cluster: &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "c-33333",
+					Annotations: map[string]string{
+						externallyManagedAnn: "true",
+					},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{},
+					// Empty fleet workspace, typically prevents provisioningv1 cluster creation
+					FleetWorkspaceName: "",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "no-cluster-for-no-fleet",
+			cluster: &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "c-44444",
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase:    v3.ClusterSpecBase{},
+					FleetWorkspaceName: "",
+				},
+			},
+			expected: false,
 		},
 	}
 
@@ -65,6 +98,12 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 			obj, _, err := h.generateProvisioningClusterFromLegacyCluster(tt.cluster, tt.cluster.Status)
 
 			assert.Nil(t, err)
+
+			if !tt.expected {
+				assert.Nil(t, obj, "Expected no prov cluster objects")
+				return
+			}
+
 			assert.NotNil(t, obj, "Expected non-nil prov cluster obj")
 			provCluster := obj[0].(*v1.Cluster)
 
