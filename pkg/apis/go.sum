@@ -86,8 +86,8 @@ github.com/rancher/aks-operator v1.10.1 h1:h085dMVozIcr7PkGp57VLRGltjpGo18nNIubr
 github.com/rancher/aks-operator v1.10.1/go.mod h1:kw5fm1EmrdQhXrBVjyB8ArzFZl5wmRbibsUkpBQHbs8=
 github.com/rancher/eks-operator v1.10.1 h1:48cwK54pzAXjSrd+5QXMpGNbAjCb1ZgEa2n5stFu+wY=
 github.com/rancher/eks-operator v1.10.1/go.mod h1:t3sq0n2f6CoEX6m/djBaJfJ5koGnKF8ZltRs5auS/AM=
-github.com/rancher/fleet/pkg/apis v0.11.0 h1:4OjUfgGdGMQUOHDI8HWN79N9P4U5g9XiPCCbrkZVOMo=
-github.com/rancher/fleet/pkg/apis v0.11.0/go.mod h1:8nvuO8x0z7ydpW0eZJEEEPHI0Bmb9T5L3igH0t+0dDk=
+github.com/rancher/fleet/pkg/apis v0.11.3-beta.1 h1:ZCi1V2Cu3Gp1iqgg41fiN4h1UHddBOSVWMailKKgLa4=
+github.com/rancher/fleet/pkg/apis v0.11.3-beta.1/go.mod h1:kWdjnTs14K8pinSAFb3votOgoEUHhAZ0onLIw9Tv404=
 github.com/rancher/gke-operator v1.10.1 h1:f6B7gqXmKxA0rMP7jE0r68NsEvmMQTF4dhnG7Ok6sm4=
 github.com/rancher/gke-operator v1.10.1/go.mod h1:sJ0vHrrkDjJZrCOwIKTaaSuPTqrWD1wOr16qlVAM+yQ=
 github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813 h1:V/LY8pUHZG9Kc+xEDWDOryOnCU6/Q+Lsr9QQEQnshpU=
@@ -129,8 +129,8 @@ golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn
 golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20200226121028-0de0cce0169b/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20201021035429-f5854403a974/go.mod h1:sp8m0HH+o8qH0wwXwYZr8TS3Oi6o0r6Gce1SSxlDquU=
-golang.org/x/net v0.32.0 h1:ZqPmj8Kzc+Y6e0+skZsuACbx+wzMgo5MQsJh9Qd6aYI=
-golang.org/x/net v0.32.0/go.mod h1:CwU0IoeOlnQQWJ6ioyFrfRuomB8GKF6KbYXZVyeXNfs=
+golang.org/x/net v0.33.0 h1:74SYHlV8BIgHIFC/LrYkOGIwL19eTYXQ5wc6TBuO36I=
+golang.org/x/net v0.33.0/go.mod h1:HXLR5J+9DxmrqMwG9qjGCxZ+zKXxBru04zlTvWlWuN4=
 golang.org/x/oauth2 v0.24.0 h1:KTBBxWqUa0ykRPLtV69rRto9TLXcqYkeswu48x/gvNE=
 golang.org/x/oauth2 v0.24.0/go.mod h1:XYTD2NtWslqkgxebSiOHnXEap4TF09sJSc7H1sXbhtI=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
