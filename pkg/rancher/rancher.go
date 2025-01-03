@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -85,7 +86,8 @@ type Options struct {
 	AuditLogMaxage    int
 	AuditLogMaxsize   int
 	AuditLogMaxbackup int
-	AuditLevel        int
+	AuditLogLevel     int
+	AuditLogEnabled   bool
 	Features          string
 	ClusterRegistry   string
 }
@@ -241,23 +243,34 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	auditLogOut := &lumberjack.Logger{
-		Filename:   opts.AuditLogPath,
-		MaxAge:     opts.AuditLogMaxage,
-		MaxBackups: opts.AuditLogMaxbackup,
-		MaxSize:    opts.AuditLogMaxsize,
+	var auditLogOut io.Writer
+
+	if opts.AuditLogEnabled {
+		out := &lumberjack.Logger{
+			Filename:   opts.AuditLogPath,
+			MaxAge:     opts.AuditLogMaxage,
+			MaxBackups: opts.AuditLogMaxbackup,
+			MaxSize:    opts.AuditLogMaxsize,
+		}
+		defer out.Close()
+
+		auditLogOut = out
+	} else {
+		auditLogOut = io.Discard
 	}
-	defer auditLogOut.Close()
 
 	auditLogWriter, err := audit.NewWriter(auditLogOut, audit.WriterOptions{
-		DefaultPolicyLevel: auditlogv1.Level(opts.AuditLevel),
+		DefaultPolicyLevel:     auditlogv1.Level(opts.AuditLogLevel),
+		DisableDefaultPolicies: !opts.AuditLogEnabled,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit log writer: %w", err)
 	}
 
-	auditController := auditlog.New(wranglerContext.SharedControllerFactory)
-	auditlogcontroller.Register(ctx, auditLogWriter, auditController)
+	if opts.AuditLogEnabled {
+		auditController := auditlog.New(wranglerContext.SharedControllerFactory)
+		auditlogcontroller.Register(ctx, auditLogWriter, auditController)
+	}
 
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
