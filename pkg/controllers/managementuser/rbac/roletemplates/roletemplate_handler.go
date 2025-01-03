@@ -9,8 +9,7 @@ import (
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var promotedRulesForProjects = map[string]string{
@@ -51,30 +50,32 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 		return nil, nil
 	}
 
-	rules, err := rth.collectRules(rt)
-	if err != nil {
-		return nil, err
-	}
-	clusterRoles := clusterRolesForRoleTemplate(rt, rules)
+	clusterRoles := clusterRolesForRoleTemplate(rt)
 	for _, cr := range clusterRoles {
 		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
 			return nil, err
 		}
 	}
+
+	// add aggregation label to external cluster role
+	if err := rth.addLabelToExternalRole(rt); err != nil {
+		return nil, err
+	}
+
 	return rt, nil
 }
 
 // clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate using the given rules.
-func clusterRolesForRoleTemplate(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule) []*rbacv1.ClusterRole {
-	res := []*rbacv1.ClusterRole{
-		// 1. Cluster role with rules
-		rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rt.Name), rt.Name, rules),
-		// 2. Aggregating cluster role
-		rbac.BuildAggregatingClusterRole(rt, rbac.ClusterRoleNameFor),
+func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
+	res := []*rbacv1.ClusterRole{}
+	if !rt.External {
+		res = append(res, rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rt.Name), rt.Name, rt.Rules))
 	}
+	res = append(res, rbac.BuildAggregatingClusterRole(rt, rbac.ClusterRoleNameFor))
+
 	// Projects can have 2 extra cluster roles for global resources
 	if rt.Context == projectContext {
-		promotedRules := getPromotedRules(rules)
+		promotedRules := getPromotedRules(rt.Rules)
 
 		// If there are no promoted rules and no inherited RoleTemplates, no need for additional cluster roles
 		if len(promotedRules) == 0 && len(rt.RoleTemplateNames) == 0 {
@@ -93,26 +94,6 @@ func clusterRolesForRoleTemplate(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule)
 		res = append(res, rbac.BuildAggregatingClusterRole(rt, rbac.PromotedClusterRoleNameFor))
 	}
 	return res
-}
-
-// collectRules returns the rules for a RoleTemplate. If the referenced role is external, it gets the referenced cluster role's rules.
-func (rth *roleTemplateHandler) collectRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyRule, error) {
-	if rt.External {
-		if rt.ExternalRules != nil {
-			return rt.ExternalRules, nil
-		} else {
-			externalRole, err := rth.crController.Get(rt.Name, metav1.GetOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				return nil, err
-			}
-			if externalRole != nil {
-				return externalRole.Rules, nil
-			}
-		}
-	} else {
-		return rt.Rules, nil
-	}
-	return nil, nil
 }
 
 // OnRemove deletes all ClusterRoles created by the RoleTemplate
@@ -155,4 +136,25 @@ func getPromotedRules(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
 		}
 	}
 	return promotedRules
+}
+
+// addLabelToExternalRole checks if the role template uses an external role and if so, ensure the external role has the right aggregation label
+func (rth *roleTemplateHandler) addLabelToExternalRole(rt *v3.RoleTemplate) error {
+	if !rt.External {
+		return nil
+	}
+
+	externalRole, err := rth.crController.Get(rt.Name, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if val, ok := externalRole.Labels[aggregationLabel]; !ok || val != rbac.ClusterRoleNameFor(rt.Name) {
+		externalRole.Labels[aggregationLabel] = rbac.ClusterRoleNameFor(rt.Name)
+		if _, err := rth.crController.Update(externalRole); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

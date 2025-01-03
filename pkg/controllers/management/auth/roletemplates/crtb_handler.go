@@ -255,7 +255,7 @@ func (c *crtbHandler) updateStatus(crtb *v3.ClusterRoleTemplateBinding, localCon
 			}
 		}
 
-		crtbFromCluster.Status.LastUpdateTime = timeNow().String()
+		crtbFromCluster.Status.LastUpdateTime = timeNow().Format(time.RFC3339)
 		crtbFromCluster.Status.ObservedGenerationLocal = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.LocalConditions = localConditions
 		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
