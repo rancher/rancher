@@ -138,6 +138,12 @@ var (
 		false,
 		false,
 		true)
+	CleanStaleSecrets = newFeature(
+		"clean-stale-secrets",
+		"Remove unused impersonation secrets from the cattle-impersonation namespace",
+		true,
+		false,
+		true)
 )
 
 type Feature struct {
