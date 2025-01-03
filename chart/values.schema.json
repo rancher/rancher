@@ -18,6 +18,10 @@
           "type": "integer",
           "enum": [0, 1, 2, 3],
           "description": "auditLog.level must be a number 0-3; 0 to disable, 3 for most verbose"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "auditLog.enabled must be a boolean"
         }
       }
     },
