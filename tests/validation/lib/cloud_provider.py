@@ -4,7 +4,7 @@ from invoke import run
 
 
 class CloudProviderBase(object, metaclass=abc.ABCMeta):
-    DOCKER_VERSION = os.environ.get("DOCKER_VERSION", '27.2')
+    DOCKER_VERSION = os.environ.get("DOCKER_VERSION", '27.4')
     DOCKER_INSTALLED = os.environ.get("DOCKER_INSTALLED", "false")
 
     @abc.abstractmethod
