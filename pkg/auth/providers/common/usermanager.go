@@ -12,19 +12,20 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
+	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wrangrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -43,11 +44,10 @@ func NewUserManagerNoBindings(scaledContext *config.ScaledContext) (user.Manager
 	userInformer := scaledContext.Wrangler.Mgmt.User().Informer()
 
 	return &userManager{
-		users:       scaledContext.Wrangler.Mgmt.User(),
-		userIndexer: userInformer.GetIndexer(),
-		tokens:      scaledContext.Wrangler.Mgmt.Token(),
-		tokenLister: scaledContext.Wrangler.Mgmt.Token().Cache(),
-		rbacClient:  scaledContext.Wrangler.RBAC,
+		users:         scaledContext.Wrangler.Mgmt.User(),
+		userIndexer:   userInformer.GetIndexer(),
+		rbacClient:    scaledContext.Wrangler.RBAC,
+		extTokenStore: exttokens.NewSystemFromWrangler(scaledContext.Wrangler),
 	}, nil
 }
 
@@ -97,14 +97,13 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		userIndexer:              userInformer.GetIndexer(),
 		crtbIndexer:              crtbInformer.GetIndexer(),
 		prtbIndexer:              prtbInformer.GetIndexer(),
-		tokens:                   scaledContext.Wrangler.Mgmt.Token(),
-		tokenLister:              scaledContext.Wrangler.Mgmt.Token().Cache(),
 		globalRoleBindings:       scaledContext.Wrangler.Mgmt.GlobalRoleBinding(),
 		globalRoleLister:         scaledContext.Wrangler.Mgmt.GlobalRole().Cache(),
 		grbIndexer:               grbInformer.GetIndexer(),
 		clusterRoleLister:        scaledContext.Wrangler.RBAC.ClusterRole().Cache(),
 		clusterRoleBindingLister: scaledContext.Wrangler.RBAC.ClusterRoleBinding().Cache(),
 		rbacClient:               scaledContext.Wrangler.RBAC,
+		extTokenStore:            exttokens.NewSystemFromWrangler(scaledContext.Wrangler),
 	}, nil
 }
 
@@ -118,11 +117,10 @@ type userManager struct {
 	userIndexer              cache.Indexer
 	crtbIndexer              cache.Indexer
 	prtbIndexer              cache.Indexer
-	tokenLister              wrangmgmtv3.TokenCache
-	tokens                   wrangmgmtv3.TokenController
 	clusterRoleLister        wrangrbacv1.ClusterRoleCache
 	clusterRoleBindingLister wrangrbacv1.ClusterRoleBindingCache
 	rbacClient               wrangrbacv1.Interface
+	extTokenStore            *exttokens.SystemStore
 }
 
 func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
@@ -232,25 +230,24 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 	}
 
 	var err error
-	var token *v3.Token
+	var token *ext.Token
 	if !input.Randomize {
-		token, err = m.tokenLister.Get(input.TokenName)
+		token, err = m.extTokenStore.Get(input.TokenName, &v1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return "", err
 		}
 		if err == nil {
-			if err := m.tokens.Delete(token.Name, &v1.DeleteOptions{}); err != nil {
+			if err := m.extTokenStore.Delete(token.Name, &v1.DeleteOptions{}); err != nil {
 				return "", err
 			}
 		}
 	}
 
-	key, err := randomtoken.Generate()
-	if err != nil {
-		return "", errors.New("failed to generate token key")
-	}
+	// BEWARE `input.AuthProvider` and `input.UserPrincipal` are not used here.
+	// ext tokens pull the information out of the referenced user and its
+	// attributes during their creation.
 
-	token = &v3.Token{
+	token = &ext.Token{
 		ObjectMeta: v1.ObjectMeta{
 			Name: input.TokenName,
 			Labels: map[string]string{
@@ -258,32 +255,29 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 				tokens.TokenKindLabel: input.Kind,
 			},
 		},
-		TTLMillis:     0,
-		Description:   input.Description,
-		UserID:        input.UserName,
-		AuthProvider:  input.AuthProvider,
-		UserPrincipal: input.UserPrincipal,
-		IsDerived:     true,
-		Token:         key,
-		ClusterName:   clusterName,
+		Spec: ext.TokenSpec{
+			UserID:      input.UserName,
+			Description: input.Description,
+			ClusterName: clusterName,
+			TTL:         0,
+			Enabled:     true,
+			IsLogin:     false,
+		},
 	}
+
 	if input.TTL != nil {
-		token.TTLMillis = *input.TTL
+		token.Spec.TTL = *input.TTL
 	}
 	if input.Randomize {
 		token.ObjectMeta.Name = ""
 		token.ObjectMeta.GenerateName = input.TokenName
-	}
-	err = tokens.ConvertTokenKeyToHash(token)
-	if err != nil {
-		return "", err
 	}
 
 	logrus.Infof("Creating token for user %v", input.UserName)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		// Backoff was added here because it is possible the token is in the process of deleting.
 		// This should cause the create to retry until the delete is finished.
-		newToken, err := m.tokens.Create(token)
+		newToken, err := m.extTokenStore.Create(schema.GroupResource{}, token, &v1.CreateOptions{})
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				return false, nil
@@ -297,7 +291,8 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		return "", err
 	}
 
-	return token.Name + ":" + key, nil
+	// Just here, immediately after token creation do we have access to the secret token value
+	return "ext/" + token.Name + ":" + token.Status.TokenValue, nil
 }
 
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
@@ -322,60 +317,24 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 }
 
 // GetKubeconfigToken creates a new token for use in a kubeconfig generated through the CLI.
-func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
+func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*ext.Token, string, error) {
 	fullCreatedToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, userPrincipal)
 	if err != nil {
 		return nil, "", err
 	}
 
 	randomizedTokenName, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
-	token, err := m.tokens.Get(randomizedTokenName, v1.GetOptions{})
+	randomizedTokenName = strings.TrimPrefix("ext/", randomizedTokenName)
+	token, err := m.extTokenStore.Get(randomizedTokenName, &v1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, createdTokenValue, err
 	}
 
-	if token.ExpiresAt != "" {
-		return token, createdTokenValue, nil
-	}
+	// BEWARE removed all the code to set ExpiresAt. The ext tokens manage this field
+	// internally, computing it from creation time and current TTL on creation or load into
+	// memory. There is nothing to be set here.
 
-	// SetTokenExpiresAt requires creationTS, so can only be set post create
-	tokenCopy := token.DeepCopy()
-	tokenUtil.SetTokenExpiresAt(tokenCopy)
-
-	token, err = m.tokens.Update(tokenCopy)
-	if err != nil {
-		if !apierrors.IsConflict(err) {
-			return nil, "", fmt.Errorf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
-		}
-
-		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			token, err = m.tokens.Get(randomizedTokenName, v1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			if token.ExpiresAt == "" {
-				tokenCopy := token.DeepCopy()
-				tokenUtil.SetTokenExpiresAt(tokenCopy)
-
-				token, err = m.tokens.Update(tokenCopy)
-				if err != nil {
-					logrus.Debugf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
-					if apierrors.IsConflict(err) {
-						return false, nil
-					}
-					return false, err
-				}
-			}
-			return true, nil
-		})
-
-		if err != nil {
-			return nil, "", fmt.Errorf("getToken: retry updating token [%s] failed [%v]", randomizedTokenName, err)
-		}
-	}
-
-	logrus.Debugf("getToken: token %s expiresAt %s", token.Name, token.ExpiresAt)
+	logrus.Debugf("getToken: token %s expiresAt %s", token.Name, token.Status.ExpiresAt)
 	return token, createdTokenValue, nil
 }
 
@@ -667,7 +626,7 @@ func (m *userManager) GetUserByPrincipalID(principalName string) (*v3.User, erro
 }
 
 func (m *userManager) DeleteToken(tokenName string) error {
-	return m.tokens.Delete(tokenName, &v1.DeleteOptions{})
+	return m.extTokenStore.Delete(tokenName, &v1.DeleteOptions{})
 }
 
 func (m *userManager) checkCache(principalName string) (*v3.User, error) {

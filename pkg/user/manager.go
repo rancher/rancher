@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/rancher/norman/types"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
@@ -28,5 +29,5 @@ type Manager interface {
 	SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error)
 	CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error
 	GetUserByPrincipalID(principalName string) (*v3.User, error)
-	GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error)
+	GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*ext.Token, string, error)
 }
