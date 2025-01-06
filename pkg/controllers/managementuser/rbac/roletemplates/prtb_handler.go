@@ -10,10 +10,11 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
-	v1 "k8s.io/api/rbac/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -25,10 +26,10 @@ const (
 
 type prtbHandler struct {
 	impersonationHandler impersonationHandler
-	crClient             rbacv1.ClusterRoleController
+	crClient             wrbacv1.ClusterRoleController
 	rtClient             mgmtv3.RoleTemplateController
-	nsClient             corev1.NamespaceController
-	rbClient             rbacv1.RoleBindingClient
+	nsClient             wcorev1.NamespaceController
+	rbClient             wrbacv1.RoleBindingClient
 }
 
 func newPRTBHandler(uc *config.UserContext) *prtbHandler {
@@ -76,12 +77,25 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	}
 
 	ownerLabel := createPRTBOwnerLabel(prtb.Name)
+	subject, err := rbac.BuildSubjectFromRTB(prtb)
+	if err != nil {
+		return err
+	}
 
-	// Select all namespaces in project
-	_, projectId, _ := strings.Cut(prtb.ProjectName, ":")
-	namespaces, err := p.nsClient.List(metav1.ListOptions{
-		LabelSelector: projectIDAnnotation + "=" + projectId,
-	})
+	// The desired rolebindings
+	var rb, promotedRB *rbacv1.RoleBinding
+
+	// Build RoleBinding and Promoted RoleBindings needed in each namespace
+	roleName := rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName)
+	rb = buildRoleBinding(prtb, roleName, subject)
+
+	// If there is no promoted rule, leave promotedRB nil
+	if hasPromotedRule {
+		promotedRoleName := rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(prtb.RoleTemplateName))
+		promotedRB = buildRoleBinding(prtb, promotedRoleName, subject)
+	}
+
+	namespaces, err := p.getNamespacesFromProject(prtb)
 	if err != nil {
 		return err
 	}
@@ -91,46 +105,14 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 			continue
 		}
 
-		rb, promotedRB, err := buildRoleBindings(prtb, n.Name, hasPromotedRule)
-		if err != nil {
+		// Set the namespace of the RoleBindings
+		rb.Namespace = n.Name
+		if hasPromotedRule {
+			promotedRB.Namespace = n.Name
+		}
+
+		if err := p.ensureOnlyDesiredRoleBindingsExist(rb, promotedRB, n.Name, ownerLabel); err != nil {
 			return err
-		}
-
-		// Check if any Role Bindings exist already
-		currentRBs, err := p.rbClient.List(n.Name, metav1.ListOptions{LabelSelector: ownerLabel})
-		if err != nil {
-			return err
-		}
-
-		var matchingRB, matchingPromotedRB *v1.RoleBinding
-		var rbsToDelete []*v1.RoleBinding
-		// Search for RoleBindings that are needed, all others should be removed
-		for _, currentRB := range currentRBs.Items {
-			if areRoleBindingsSame(&currentRB, rb) && matchingRB == nil {
-				matchingRB = &currentRB
-			} else if hasPromotedRule && areRoleBindingsSame(&currentRB, promotedRB) && matchingPromotedRB == nil {
-				matchingPromotedRB = &currentRB
-			} else {
-				rbsToDelete = append(rbsToDelete, &currentRB)
-			}
-		}
-
-		// Remove excess RBs
-		for _, rbToDelete := range rbsToDelete {
-			if err = p.rbClient.Delete(n.Name, rbToDelete.Name, &metav1.DeleteOptions{}); err != nil {
-				return err
-			}
-		}
-
-		if matchingRB == nil {
-			if _, err := p.rbClient.Create(rb); err != nil {
-				return err
-			}
-		}
-		if hasPromotedRule && matchingPromotedRB == nil {
-			if _, err := p.rbClient.Create(promotedRB); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -178,7 +160,9 @@ func (p *prtbHandler) OnRemove(key string, prtb *v3.ProjectRoleTemplateBinding) 
 // doesRoleTemplateHavePromotedRules checks if the PRTB's RoleTemplate has a ClusterRole for promoted rules.
 func (p *prtbHandler) doesRoleTemplateHavePromotedRules(prtb *v3.ProjectRoleTemplateBinding) (bool, error) {
 	rt, err := p.rtClient.Get(prtb.RoleTemplateName, metav1.GetOptions{})
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
 		return false, err
 	}
 
@@ -189,48 +173,76 @@ func (p *prtbHandler) doesRoleTemplateHavePromotedRules(prtb *v3.ProjectRoleTemp
 	return !apierrors.IsNotFound(err), nil
 }
 
-// buildRoleBindings returns the Role Binding needed for a prtb in a specific namespace.
-// If createPromotedRoleBindings is true, it also returns a Role Binding for the promoted Cluster Role.
-func buildRoleBindings(prtb *v3.ProjectRoleTemplateBinding, ns string, createPromotedRoleBinding bool) (*v1.RoleBinding, *v1.RoleBinding, error) {
+// getNamespacesFromProject Lists all namespaces within a project
+func (p *prtbHandler) getNamespacesFromProject(prtb *v3.ProjectRoleTemplateBinding) (*corev1.NamespaceList, error) {
+	_, projectId, _ := strings.Cut(prtb.ProjectName, ":")
+	return p.nsClient.List(metav1.ListOptions{
+		LabelSelector: projectIDAnnotation + "=" + projectId,
+	})
+}
+
+// buildRoleBinding creates a role binding owned by the prtb.
+func buildRoleBinding(prtb *v3.ProjectRoleTemplateBinding, roleRefName string, subject rbacv1.Subject) *rbacv1.RoleBinding {
 	ownerLabel := createPRTBOwnerLabel(prtb.Name)
-	roleRef := v1.RoleRef{
+	roleRef := rbacv1.RoleRef{
 		Kind: "Role",
-		Name: rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName),
+		Name: roleRefName,
 	}
-
-	subject, err := rbac.BuildSubjectFromRTB(prtb)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	rb := &v1.RoleBinding{
+	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "rb-",
-			Namespace:    ns,
 			Labels:       map[string]string{ownerLabel: "true"},
 		},
 		RoleRef:  roleRef,
-		Subjects: []v1.Subject{subject},
+		Subjects: []rbacv1.Subject{subject},
+	}
+}
+
+// ensureOnlyDesiredRoleBindingsExist finds any RoleBindings owned by the PRTB, and removes them if they don't match either of our desired RoleBindings.
+// If our desired RoleBindings aren't found, it creates them.
+// If desiredPromotedRB is left nil, only check for desiredRB.
+func (p *prtbHandler) ensureOnlyDesiredRoleBindingsExist(desiredRB, desiredPromotedRB *rbacv1.RoleBinding, namespace, prtbOwnerLabel string) error {
+	// Check if any Role Bindings exist already
+	currentRBs, err := p.rbClient.List(namespace, metav1.ListOptions{LabelSelector: prtbOwnerLabel})
+	if err != nil || currentRBs == nil {
+		return err
 	}
 
-	var promotedRB *v1.RoleBinding
-	if createPromotedRoleBinding {
-		roleRef.Name = rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(prtb.RoleTemplateName))
-		promotedRB = &v1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "rb-",
-				Namespace:    ns,
-				Labels:       map[string]string{ownerLabel: "true"},
-			},
-			RoleRef:  roleRef,
-			Subjects: []v1.Subject{subject},
+	var matchingRB, matchingPromotedRB *rbacv1.RoleBinding
+	var rbsToDelete []*rbacv1.RoleBinding
+	// Search for RoleBindings that are needed, all others should be removed
+	for _, currentRB := range currentRBs.Items {
+		if areRoleBindingsSame(&currentRB, desiredRB) && matchingRB == nil {
+			matchingRB = &currentRB
+		} else if desiredPromotedRB != nil && areRoleBindingsSame(&currentRB, desiredPromotedRB) && matchingPromotedRB == nil {
+			matchingPromotedRB = &currentRB
+		} else {
+			rbsToDelete = append(rbsToDelete, &currentRB)
 		}
 	}
-	return rb, promotedRB, nil
+
+	// Remove excess RBs
+	for _, rbToDelete := range rbsToDelete {
+		if err = p.rbClient.Delete(namespace, rbToDelete.Name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
+
+	if matchingRB == nil {
+		if _, err := p.rbClient.Create(desiredRB); err != nil {
+			return err
+		}
+	}
+	if desiredPromotedRB != nil && matchingPromotedRB == nil {
+		if _, err := p.rbClient.Create(desiredPromotedRB); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // areRoleBindingsSame compares the Subjects and RoleRef fields of two Role Bindings.
-func areRoleBindingsSame(rb1, rb2 *v1.RoleBinding) bool {
+func areRoleBindingsSame(rb1, rb2 *rbacv1.RoleBinding) bool {
 	return reflect.DeepEqual(rb1.Subjects, rb2.Subjects) &&
 		reflect.DeepEqual(rb1.RoleRef, rb2.RoleRef)
 }
