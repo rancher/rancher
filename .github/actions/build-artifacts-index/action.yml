@@ -1,0 +1,48 @@
+name: "Build the prime artifacts index"
+description: "Build and upload the prime artifacts index and invalidate the cloudfront cache"
+runs:
+  using: "composite"
+  steps:
+    - id: vars
+      name: set up variables
+      shell: bash
+      run: |
+        echo "ECM_DISTRO_TOOLS_VERSION=v0.44.0" >> $GITHUB_OUTPUT
+        echo "ARTIFACTS_INDEX=${{ runner.temp }}/artifacts-index" >> $GITHUB_OUTPUT
+    - name: setup ecm-distro-tools
+      uses: rancher/ecm-distro-tools@v0.44.0
+      with:
+        version: ${{ steps.vars.outputs.ECM_DISTRO_TOOLS_VERSION }}
+        install-script-version: ${{ steps.vars.outputs.ECM_DISTRO_TOOLS_VERSION }}
+    - name: Load Secrets from Vault
+      uses: rancher-eio/read-vault-secrets@main
+      with:
+        secrets: |
+          secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
+          secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
+    - name: Build Artifacts Index
+      shell: bash
+      run: |
+        mkdir -p ${{ steps.vars.outputs.ARTIFACTS_INDEX }}
+        # The generate artifacts-index command needs an aws key and secret to perform operations, but all other auth configs are not used
+        # The config is generated using the config gen command to prevent future changes in the config format from breaking this command
+        ECM_AUTH_CONFIG=$(release config gen | jq '.auth | .aws_access_key_id |= "${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }}" | .aws_secret_access_key |= "${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }}" | .aws_session_token |= "" | .aws_default_region |= "${{ env.AWS_DEFAULT_REGION }}"')
+        ECM_CONFIG="{\"auth\": $ECM_AUTH_CONFIG}"
+        # ignore v2.6.4 because it isn't a prime version, but it needs to be in the bucket since it is used by a test
+        release generate rancher artifacts-index --config "$ECM_CONFIG" --write-path ${{ steps.vars.outputs.ARTIFACTS_INDEX }} --ignore-versions v2.6.4
+    - name: Upload Artifacts Index
+      shell: bash
+      run: |
+        AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp ${{ steps.vars.outputs.ARTIFACTS_INDEX }}/index.html s3://prime-artifacts/index.html
+        AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp ${{ steps.vars.outputs.ARTIFACTS_INDEX }}/index-prerelease.html s3://prime-artifacts/index-prerelease.html
+    - name: Load Secrets from Vault
+      uses: rancher-eio/read-vault-secrets@main
+      with:
+        secrets: |
+          secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
+          secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
+    - name: Invalidate Cloudfront cache
+      shell: bash
+      run: |
+        AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }} aws cloudfront create-invalidation --distribution-id ${{ env.ARTIFACTS_DISTRIBUTION_ID }} --paths "/*"
+
