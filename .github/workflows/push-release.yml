@@ -673,4 +673,5 @@ jobs:
           for artifact in "${artifacts[@]}"; do
             AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp "./bin/$artifact" "s3://prime-artifacts/rancher/${{ env.TAG }}/$artifact"
           done
-
+      - name: Build artifacts index
+        uses: ./.github/actions/build-artifacts-index
