@@ -32,6 +32,7 @@ import (
 	wloads "github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
@@ -102,6 +103,8 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 	} else {
 		providers = provisioningConfig.Providers
 	}
+
+	logrus.Infof("UpdateClusterName %s", client.Flags.GetValue(environmentflag.UpdateClusterName))
 
 	for _, nodeProviderName := range providers {
 

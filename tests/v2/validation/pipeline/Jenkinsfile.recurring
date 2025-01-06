@@ -236,10 +236,10 @@ node {
                           returnStdout: true
                         ).trim()
 
-                        def clusterName = sh (  
-                          script: "./yq '.rancher.clusterName' ${configPath}",
-                          returnStdout: true
-                        ).trim()
+                        def clusterName = "TEST"//sh (  
+                          //script: "./yq '.rancher.clusterName' ${configPath}",
+                          //returnStdout: true
+                        //).trim()
 
                         sh "./yq e '.rancher.clusterName = \"${clusterName}\"' -i ${mainRancherConfigPath}"
 
