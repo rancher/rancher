@@ -66,10 +66,6 @@ const (
 	rke1NodeCorralName                   = "rke1registerNode"
 )
 
-var (
-	updateConfig = true
-)
-
 // CreateProvisioningCluster provisions a non-rke1 cluster, then runs verify checks
 func CreateProvisioningCluster(client *rancher.Client, provider Provider, clustersConfig *clusters.ClusterConfig, hostnameTruncation []machinepools.HostnameTruncation) (*v1.SteveAPIObject, error) {
 	credentialSpec := cloudcredentials.LoadCloudCredential(string(provider.Name))
@@ -183,7 +179,7 @@ func CreateProvisioningCluster(client *rancher.Client, provider Provider, cluste
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -260,7 +256,7 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -400,7 +396,7 @@ func CreateProvisioningRKE1Cluster(client *rancher.Client, provider RKE1Provider
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -468,7 +464,7 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 		return nil, nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -736,7 +732,7 @@ func CreateProvisioningAKSHostedCluster(client *rancher.Client, aksClusterConfig
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -762,7 +758,7 @@ func CreateProvisioningEKSHostedCluster(client *rancher.Client, eksClusterConfig
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -788,7 +784,7 @@ func CreateProvisioningGKEHostedCluster(client *rancher.Client, gkeClusterConfig
 		return nil, err
 	}
 
-	if client.Flags.GetValue(environmentflag.UpdateClusterName) && updateConfig {
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
@@ -1056,15 +1052,6 @@ func DeleteRKE1CustomClusterNodes(client *rancher.Client, cluster *management.Cl
 	}
 
 	return nil
-}
-
-// DisableUpdateConfig is a function that disable cattle config update and clean updateConfig for true to don't affect next tests.
-func DisableUpdateConfig(client *rancher.Client) {
-	updateConfig = false
-	client.Session.RegisterCleanupFunc(func() error {
-		updateConfig = true
-		return nil
-	})
 }
 
 // CreateProvisioningRKE1ClusterWithClusterTemplate provisions an rke1 cluster by using the rke1 template and revision ID and other values from the template.
