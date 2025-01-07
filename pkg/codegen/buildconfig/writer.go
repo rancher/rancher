@@ -16,11 +16,11 @@ import (
 )
 
 type buildConstantsConfig struct {
-	CspAdapterMinVersion    string `yaml:"cspAdapterMinVersion"`
-	DefaultShellVersion     string `yaml:"defaultShellVersion"`
-	FleetVersion            string `yaml:"fleetVersion"`
-	ProvisioningCAPIVersion string `yaml:"provisioningCAPIVersion"`
-	WebhookVersion          string `yaml:"webhookVersion"`
+	CspAdapterMinVersion    *string `yaml:"cspAdapterMinVersion,omitempty"`
+	DefaultShellVersion     *string `yaml:"defaultShellVersion,omitempty"`
+	FleetVersion            *string `yaml:"fleetVersion,omitempty"`
+	ProvisioningCAPIVersion *string `yaml:"provisioningCAPIVersion,omitempty"`
+	WebhookVersion          *string `yaml:"webhookVersion,omitempty"`
 }
 
 type GoConstantsWriter struct {
@@ -72,9 +72,21 @@ func (f *GoConstantsWriter) process() error {
 	var builder strings.Builder
 	v := reflect.ValueOf(f.cfg)
 	for i := 0; i < v.NumField(); i++ {
-		fieldName := v.Type().Field(i).Name
-		fieldValue := v.Field(i).Interface()
+		field := v.Field(i)
+
+		// Dereference pointers to real values and skip nil pointers
+		fieldValue := field.Interface()
+		if field.Kind() == reflect.Ptr {
+			if field.IsNil() {
+				continue
+			}
+
+			// Dereference the pointer to get the underlying value
+			fieldValue = field.Elem().Interface()
+		}
+
 		// Capitalize the key to make the constant exported in the generated Go file.
+		fieldName := v.Type().Field(i).Name
 		fieldName = capitalize.String(fieldName)
 		s := fmt.Sprintf("\t%s = %q\n", fieldName, fieldValue)
 		builder.WriteString(s)
