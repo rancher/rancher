@@ -281,6 +281,12 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 				},
 			},
 			ServiceAccountName: systemAgentUpgraderServiceAccountName,
+			// envFrom is still the source of CATTLE_ vars in plan, however secrets will trigger an update when changed.
+			Secrets: []upgradev1.SecretSpec{
+				{
+					Name: "stv-aggregation",
+				},
+			},
 			Upgrade: &upgradev1.ContainerSpec{
 				Image: image.ResolveWithCluster(upgradeImage[0], cluster),
 				Env:   env,
@@ -340,6 +346,9 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 		},
 	}
 
+	// The stv-aggregation secret is managed separately, and SUC will trigger a plan upgrade automatically when the
+	// secret is updated. This prevents us from having to manually update the plan every time the secret changes
+	// (which is not often, and usually never).
 	if cluster.Spec.RedeploySystemAgentGeneration != 0 {
 		plan.Spec.Secrets = append(plan.Spec.Secrets, upgradev1.SecretSpec{
 			Name: generationSecretName,
