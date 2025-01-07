@@ -13,6 +13,7 @@ import (
 func TestGoConstantsWriterRun(t *testing.T) {
 	t.Parallel()
 	const contents = `b: 3
+defaultShellVersion: rancher/shell:v42.4.2
 a: foo
 c: 3.14`
 	in := bytes.NewBufferString(contents)
@@ -37,9 +38,7 @@ c: 3.14`
 		`package buildconfig
 
 const (
-	A = "foo"
-	B = "3"
-	C = "3.14"
+	DefaultShellVersion = "rancher/shell:v42.4.2"
 )
 `
 	got := out.String()
