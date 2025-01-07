@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
@@ -298,7 +299,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err = setInitialConditions(data); err != nil {
 		return nil, err
 	}
-	if err = validateS3Credentials(data, nil); err != nil {
+	if err = validateS3Credentials(apiContext.Request.Context(), data, nil); err != nil {
 		return nil, err
 	}
 	if err = validateKeyRotation(data); err != nil {
@@ -775,7 +776,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting dialer")
 	}
-	if err := validateUpdatedS3Credentials(existingCluster, data, dialer); err != nil {
+	if err := validateUpdatedS3Credentials(apiContext.Request.Context(), existingCluster, data, dialer); err != nil {
 		return nil, err
 	}
 	if err := validateKeyRotation(data); err != nil {
@@ -1395,7 +1396,7 @@ func enableCRIDockerd(data map[string]interface{}) {
 	}
 }
 
-func validateUpdatedS3Credentials(oldData, newData map[string]interface{}, dialer dialer.Dialer) error {
+func validateUpdatedS3Credentials(ctx context.Context, oldData, newData map[string]interface{}, dialer dialer.Dialer) error {
 	newConfig := convert.ToMapInterface(values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
 	if newConfig == nil {
 		return nil
@@ -1403,17 +1404,17 @@ func validateUpdatedS3Credentials(oldData, newData map[string]interface{}, diale
 
 	oldConfig := convert.ToMapInterface(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
 	if oldConfig == nil {
-		return validateS3Credentials(newData, dialer)
+		return validateS3Credentials(ctx, newData, dialer)
 	}
 	// remove "type" since it's added to the object by API, and it's not present in newConfig yet.
 	delete(oldConfig, "type")
 	if !reflect.DeepEqual(newConfig, oldConfig) {
-		return validateS3Credentials(newData, dialer)
+		return validateS3Credentials(ctx, newData, dialer)
 	}
 	return nil
 }
 
-func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) error {
+func validateS3Credentials(ctx context.Context, data map[string]interface{}, dialer dialer.Dialer) error {
 	s3BackupConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
 	if s3BackupConfig == nil {
 		return nil
@@ -1438,7 +1439,17 @@ func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) er
 	if err != nil {
 		return err
 	}
-	exists, err := s3Client.BucketExists(context.TODO(), bucket)
+
+	timeout, err := time.ParseDuration(settings.S3BucketCheckTimeout.Get())
+	if err != nil {
+		timeout = 30 * time.Second
+		logrus.Errorf("cluster store: could not parse S3 bucket check timeout, using 30s: %v", err)
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	exists, err := s3Client.BucketExists(timeoutCtx, bucket)
 	if err != nil {
 		return fmt.Errorf("Unable to validate S3 backup target configuration: %v", err)
 	}
