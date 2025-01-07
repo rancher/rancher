@@ -18,12 +18,18 @@ type upgradeStatus struct {
 		prepare: pre-process for upgrade: cordon/drain
 		process: update node plan, state: upgrading
 	*/
+	// toPrepare node are active and can be cordoned or drained
 	// active => cordon/drain
 	toPrepare []*v3.Node
+	// toProcess nodes contain two types:
+	// - not ready and have NodeConditionUpgraded status Unknown
+	// - ready and has been cordoned or drained
 	// cordon/drain => upgrading
 	toProcess []*v3.Node
+	// upgraded nodes have the expected node plan version, but has NodeConditionUpgraded status Unknown
 	// upgrading => upgraded => uncordon
 	upgraded []*v3.Node
+	// toUncordon nodes are active, have the expected node plan version, but are unschedulable
 	// notReady => stuck in cordoned (unavailable nodes get new plan without NodeConditionUpgraded)
 	toUncordon []*v3.Node
 	// unavailable nodes
@@ -33,6 +39,10 @@ type upgradeStatus struct {
 	// nodes qualified to upgrade
 	filtered int
 	// nodes in upgrading state
+	// - underlying machine is not ready, and has NodeConditionUpgraded status Unknown
+	// - underlying machine is ready, has the expected node plan version, but is unschedulable
+	// - underlying machine is ready, does not have the expected node plan version, is being cordoned or drained
+	// - underlying machine is ready, does not have the expected node plan version, has been cordoned or drained
 	upgrading int
 }
 
@@ -146,26 +156,30 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int, dra
 			if v32.NodeConditionUpgraded.IsUnknown(node) {
 				status.upgrading++
 				status.toProcess = append(status.toProcess, node)
+				logrus.Tracef("cluster [%s] worker-upgrade: node [%s] is not ready and the node condition Upgraded status is unknown", node.Namespace, node.Name)
 			} else {
 				status.notReady = append(status.notReady, node)
+				logrus.Tracef("cluster [%s] worker-upgrade: node [%s] is not ready", node.Namespace, node.Name)
 			}
-			logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is not ready", node.Namespace, node.Name)
 			continue
 		}
 
 		if node.Status.AppliedNodeVersion == expectedVersion {
 			if v32.NodeConditionUpgraded.IsUnknown(node) {
 				status.upgraded = append(status.upgraded, node)
+				logrus.Tracef("cluster [%s] worker-upgrade: node [%s] is upgraded but the node condition Upgraded status is unknown", node.Namespace, node.Name)
 			}
+
 			if !node.Spec.InternalNodeSpec.Unschedulable {
-				logrus.Debugf("cluster [%s] worker-upgrade: node [%s] is done", node.Namespace, node.Name)
+				logrus.Tracef("cluster [%s] worker-upgrade: node [%s] is done", node.Namespace, node.Name)
 				status.done++
 			} else {
-				// node hasn't un-cordoned, so consider it upgrading in terms of maxUnavailable count
+				// node hasn't been un-cordoned, so consider it upgrading in terms of maxUnavailable count
 				status.upgrading++
 				// node has already upgraded, but condition is not unknown, so uncordon it
 				if !v32.NodeConditionUpgraded.IsUnknown(node) && node.Spec.DesiredNodeUnschedulable != "false" {
 					status.toUncordon = append(status.toUncordon, node)
+					logrus.Tracef("cluster [%s] worker-upgrade: node [%s] is upgraded and the node condition Upgraded status is not unknown", node.Namespace, node.Name)
 				}
 			}
 			continue
@@ -181,10 +195,12 @@ func (uh *upgradeHandler) filterNodes(nodes []*v3.Node, expectedVersion int, dra
 			// node ready to upgrade
 			status.upgrading++
 			status.toProcess = append(status.toProcess, node)
+			logrus.Tracef("cluster [%s] worker-upgrade: node [%s] has been cordoned or drained", node.Namespace, node.Name)
 			continue
 		}
 
 		status.toPrepare = append(status.toPrepare, node)
+		logrus.Tracef("cluster [%s] worker-upgrade: node [%s] can be prepared", node.Namespace, node.Name)
 	}
 
 	sortByNodeName(status.toPrepare)
