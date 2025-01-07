@@ -3,3 +3,4 @@ provisioningCAPIVersion: 105.1.0+up0.6.0
 cspAdapterMinVersion: 105.0.0+up5.0.1
 defaultShellVersion: rancher/shell:v0.3.0
 fleetVersion: 105.0.3+up0.11.3-beta.1
+kubernetesVersions: [v1.28, v1.29, v1.30, v1.31]
