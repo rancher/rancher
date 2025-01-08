@@ -38,9 +38,8 @@ const (
 
 var (
 	primaryImages = map[string]string{
-		chart.WebhookChartName:                 "rancher/rancher-webhook",
-		chart.ProvisioningCAPIChartName:        "rancher/mirrored-cluster-api-controller",
-		chart.SystemUpgradeControllerChartName: "rancher/system-upgrade-controller",
+		chart.WebhookChartName:          "rancher/rancher-webhook",
+		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
 	}
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookVersion.Name:               {},
@@ -130,8 +129,8 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 			}
 			if image, ok := primaryImages[chartDef.ChartName]; ok {
 				imageSettings["repository"] = h.registryOverride + "/" + image
+				values["image"] = imageSettings
 			}
-			values["image"] = imageSettings
 			installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
 		}
 		if chartDef.Values != nil {
@@ -206,6 +205,19 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				values := map[string]interface{}{}
 				// add priority class value
 				h.setPriorityClass(values, chart.SystemUpgradeControllerChartName)
+				// override the image registries because the structure of the values in this chart differs from the expected structure
+				if h.registryOverride != "" {
+					values["systemUpgradeController"] = map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": fmt.Sprintf("%s/%s", h.registryOverride, "rancher/system-upgrade-controller"),
+						},
+					}
+					values["kubectl"] = map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": fmt.Sprintf("%s/%s", h.registryOverride, "rancher/kubectl"),
+						},
+					}
+				}
 				// get custom values for system-upgrade-controller
 				configMapValues := h.getChartValues(chart.SystemUpgradeControllerChartName)
 				return data.MergeMaps(values, configMapValues)

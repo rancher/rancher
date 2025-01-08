@@ -291,10 +291,16 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": "",
+						}},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher-test.io/rancher/system-upgrade-controller",
 						},
 					},
-					"image": map[string]interface{}{
-						"repository": "rancher-test.io/rancher/system-upgrade-controller",
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher-test.io/rancher/kubectl",
+						},
 					},
 				}
 
