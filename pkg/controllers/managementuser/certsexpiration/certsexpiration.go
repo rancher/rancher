@@ -57,7 +57,7 @@ func registerDeferred(ctx context.Context, userContext *config.UserContext) {
 		ClusterName:   userContext.ClusterName,
 		ClusterLister: userContext.Management.Management.Clusters("").Controller().Lister(),
 		ClusterClient: userContext.Management.Management.Clusters(""),
-		ClusterStore:  clusterprovisioner.NewPersistentStore(userContext.Management.Core.Namespaces(""), userContext.Management.Core),
+		ClusterStore:  clusterprovisioner.NewPersistentStore(userContext.Management.Core.Namespaces(""), userContext.Management.Core, userContext.Management.Management.Clusters("")),
 		SecretLister:  userContext.Core.Secrets("").Controller().Lister(),
 	}
 

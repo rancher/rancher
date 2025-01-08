@@ -69,7 +69,7 @@ type Provisioner struct {
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Provisioner{
-		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
+		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core, management.Management.Clusters(""))),
 		Clusters:              management.Management.Clusters(""),
 		ConfigMaps:            management.Core.ConfigMaps(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
