@@ -287,8 +287,14 @@ func listKubernetesVersions(ctx context.Context, cap *Capabilities) ([]byte, int
 
 	var kubernetesVersions []string
 	for _, v := range res.Values {
-		for version := range v.PatchVersions {
-			kubernetesVersions = append(kubernetesVersions, version)
+		if v.Capabilities.SupportPlan != nil {
+			for _, supportPlan := range v.Capabilities.SupportPlan {
+				if *supportPlan == armcontainerservice.KubernetesSupportPlanKubernetesOfficial {
+					for version := range v.PatchVersions {
+						kubernetesVersions = append(kubernetesVersions, version)
+					}
+				}
+			}
 		}
 	}
 
