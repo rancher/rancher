@@ -21,6 +21,9 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			Namespace: "default",
+			Annotations: map[string]string{
+				"rancher.io/service-account.secret-ref": "default/test-token-abcde",
+			},
 		},
 	}
 	defaultWantSecret := &corev1.Secret{
@@ -66,7 +69,13 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Namespace: "default",
 				},
 			},
-			wantSA: defaultWantSA,
+			wantSA: &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "default",
+					// Has no secret annotation.
+				},
+			},
 			existingSecret: &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-token-abcde",
@@ -180,16 +189,15 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					return true, ret, nil
 				},
 			)
-			got, gotErr := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient, tt.sa)
+			got, gotErr := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient, tt.sa.DeepCopy())
 			if tt.wantErr {
 				assert.Error(t, gotErr)
 				return
 			}
 			assert.NoError(t, gotErr)
 			assert.Equal(t, tt.wantSecret.Name, got.Name)
-			gotSA, _ := k8sClient.CoreV1().ServiceAccounts("default").Get(context.Background(), "test", metav1.GetOptions{})
-			assert.Equal(t, tt.wantSA.Secrets, gotSA.Secrets)
-			assert.Equal(t, tt.sa, gotSA)
+			gotSA, _ := k8sClient.CoreV1().ServiceAccounts(tt.sa.Namespace).Get(context.Background(), tt.sa.Name, metav1.GetOptions{})
+			assert.Equal(t, tt.wantSA, gotSA)
 		})
 	}
 }
