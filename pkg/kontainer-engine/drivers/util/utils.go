@@ -32,13 +32,22 @@ func UserAgentForCluster(cluster *managementv3.Cluster) string {
 
 // GenerateServiceAccountToken generate a serviceAccountToken for clusterAdmin given a rest clientset
 func GenerateServiceAccountToken(clientset kubernetes.Interface, clusterName string) (string, error) {
-	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: cattleNamespace,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		return "", err
+	// intentionally first did a get call to check if the namespace already exist
+	// since in case of etcd-restore operation apiserver tries to verify the create namespace call (due to ValidatingWebhookConfiguration)
+	// and the request can fail based on rancher-webhook pod's running status during restore.
+	_, err := clientset.CoreV1().Namespaces().Get(context.TODO(), cattleNamespace, metav1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return "", err
+		}
+		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: cattleNamespace,
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			return "", fmt.Errorf("error creating namespace: %v", err)
+		}
 	}
 
 	serviceAccount := &v1.ServiceAccount{
