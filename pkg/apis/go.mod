@@ -30,10 +30,10 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.2.6
-	github.com/rancher/eks-operator v1.3.6
+	github.com/rancher/aks-operator v1.2.7-rc.1
+	github.com/rancher/eks-operator v1.3.7-rc.1
 	github.com/rancher/fleet/pkg/apis v0.9.13-beta.1
-	github.com/rancher/gke-operator v1.2.6
+	github.com/rancher/gke-operator v1.2.7-rc.1
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rke v1.5.15
 	github.com/rancher/wrangler/v2 v2.1.4
@@ -80,14 +80,14 @@ require (
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/net v0.32.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/oauth2 v0.25.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/protobuf v1.35.1 // indirect
+	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
