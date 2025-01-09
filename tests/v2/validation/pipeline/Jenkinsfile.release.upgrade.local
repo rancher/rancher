@@ -217,6 +217,7 @@ node {
                   }
                 } catch (err) {
                   echo "Unable to get the versions of Rancher and Kubernetes: ${err}"
+                  error "Rancher and k8s versions cannot be retrieved."
                 }
                 
                 dir("./rancher/tests/v2/validation") {

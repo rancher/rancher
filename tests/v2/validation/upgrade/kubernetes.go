@@ -73,15 +73,6 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 		err = waitForLocalClusterUpgrade(client, clusterMeta.ID)
 		require.NoError(u.T(), err)
 
-		err = kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.FiveSecondTimeout, true, func(ctx context.Context) (done bool, err error) {
-			isConnected, err := client.IsConnected()
-			if err != nil {
-				return false, err
-			}
-			return isConnected, nil
-		})
-		require.NoError(u.T(), err)
-
 		upgradedCluster, err := client.Management.Cluster.ByID(updatedCluster.Meta.ID)
 		require.NoError(u.T(), err)
 		require.Contains(u.T(), testConfig.KubernetesVersion, upgradedCluster.Version.GitVersion)
@@ -220,7 +211,7 @@ func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) erro
 		return err
 	}
 
-	return kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+	err = kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		isConnected, err := client.IsConnected()
 		if err != nil {
 			return false, nil
@@ -236,5 +227,17 @@ func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) erro
 		}
 
 		return false, nil
+	})
+
+	if err != nil{
+		return err
+	}
+
+	return kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.FiveSecondTimeout, true, func(ctx context.Context) (done bool, err error) {
+		isConnected, err := client.IsConnected()
+		if err != nil {
+			return false, err
+		}
+		return isConnected, nil
 	})
 }

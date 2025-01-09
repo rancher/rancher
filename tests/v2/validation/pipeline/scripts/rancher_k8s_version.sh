@@ -17,7 +17,6 @@ k3s_k8s_versions=$(curl -s "https://prime.ribs.rancher.io/rancher/${latest_ranch
 
 rke1_k8s_versions=$(curl -s "https://prime.ribs.rancher.io/rancher/${latest_rancher_version}/rancher-rke-k8s-versions.txt"  | sort -V | tail -n 2)
 
-# Output the results
 echo "Latest Kubernetes Versions: "
 echo -e "$rke2_k8s_versions\n$k3s_k8s_versions\n$rke1_k8s_versions"
 
