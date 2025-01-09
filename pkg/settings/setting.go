@@ -229,6 +229,10 @@ var (
 	// debug purposes.
 	RKE2ChartDefaultURL = NewSetting("rke2-chart-default-url", "https://git.rancher.io/")
 
+	// S3BucketCheckTimeout is the timeout for checking if an s3 bucket for etcd backups exists,
+	// in the go duration string format.
+	S3BucketCheckTimeout = NewSetting("s3-bucket-check-timeout", "30s")
+
 	// SystemDefaultRegistry is the default container registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
 	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
