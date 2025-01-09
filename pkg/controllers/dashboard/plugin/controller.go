@@ -100,54 +100,56 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 		maxFileSize = settings.DefaultMaxUIPluginFileSizeInBytes
 	}
 
-	for _, p := range cachedPlugins {
-		err2 := FsCache.SyncWithControllersCache(p, forceUpdate)
-		if errors.Is(err2, errMaxFileSizeError) {
-			logrus.Errorf("one of the files is more than the defaultUIPluginFileByteSize limit %s", strconv.FormatInt(maxFileSize, 10))
-			// update CRD to remove cache
-			p.Spec.Plugin.NoCache = true
-			_, err2 := h.plugin.Update(p)
-			if err2 != nil {
-				p.Spec.Plugin.NoCache = false
-				logrus.Errorf("failed to update plugin [%s] noCache flag: %s", p.Spec.Plugin.Name, err2.Error())
-				p.Status.Ready = false
-				p.Status.Error = "Failed to cache plugin due to max file size limit"
-				continue
-			}
-			// delete files that were written
-			err2 = FsCache.Delete(p.Spec.Plugin.Name, p.Spec.Plugin.Version)
-			if err2 != nil {
-				p.Spec.Plugin.NoCache = false
-				logrus.Error(err2)
-				continue
-			}
-			p.Status.CacheState = Disabled
-		} else if err2 != nil {
-			p.Status.Ready = false
-			p.Status.Error = "Failed to cache plugin"
-			err = err2
-		} else {
-			p.Status.Ready = true
-			p.Status.Error = ""
-		}
-	}
 	plugin.Status.ObservedGeneration = plugin.Generation
-	if err != nil {
-		logrus.WithError(err).Error("failed to sync filesystem cache with controller cache")
-		backoff := calculateBackoff(plugin.Status.RetryNumber).Round(time.Second)
-		plugin.Status.RetryNumber++
-		plugin.Status.RetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
-		h.plugin.EnqueueAfter(plugin.Namespace, plugin.Name, backoff)
+	//for _, p := range cachedPlugins {
+	err = FsCache.SyncWithControllersCache(plugin, forceUpdate)
+	if errors.Is(err, errMaxFileSizeError) {
+		logrus.Errorf("one of the files is more than the defaultUIPluginFileByteSize limit %s", strconv.FormatInt(maxFileSize, 10))
+		// update CRD to remove cache
+		plugin.Spec.Plugin.NoCache = true
+		_, err2 := h.plugin.Update(plugin)
+		if err2 != nil {
+			plugin.Spec.Plugin.NoCache = false
+			logrus.Errorf("failed to update plugin [%s] noCache flag: %s", plugin.Spec.Plugin.Name, err2.Error())
+			plugin.Status.Ready = false
+			plugin.Status.Error = "Failed to cache plugin due to max file size limit"
+			return h.retry(plugin, err2)
+		}
+		// delete files that were written
+		err2 = FsCache.Delete(plugin.Spec.Plugin.Name, plugin.Spec.Plugin.Version)
+		if err2 != nil {
+			plugin.Spec.Plugin.NoCache = false
+			logrus.Error(err2)
+			return h.retry(plugin, err2)
+		}
+		plugin.Status.CacheState = Disabled
+		plugin.Status.Ready = true
 		return plugin, nil
+	} else if err != nil {
+		plugin.Status.Ready = false
+		plugin.Status.Error = "Failed to cache plugin"
+		return h.retry(plugin, err)
 	}
+
+	plugin.Status.Ready = true
+	plugin.Status.Error = ""
+
 	if !plugin.Spec.Plugin.NoCache {
 		plugin.Status.CacheState = Cached
 	}
 	if plugin.Status.Ready {
-		plugin.Status.Error = ""
 		plugin.Status.RetryNumber = 0
 		plugin.Status.RetryAt = metav1.Time{}
 	}
+	return plugin, nil
+}
+
+func (h *handler) retry(plugin *v1.UIPlugin, err error) (*v1.UIPlugin, error) {
+	logrus.WithError(err).Error("failed to sync filesystem cache with controller cache")
+	backoff := calculateBackoff(plugin.Status.RetryNumber).Round(time.Second)
+	plugin.Status.RetryNumber++
+	plugin.Status.RetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
+	h.plugin.EnqueueAfter(plugin.Namespace, plugin.Name, backoff)
 	return plugin, nil
 }
 
