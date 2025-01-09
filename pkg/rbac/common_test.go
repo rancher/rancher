@@ -8,7 +8,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,41 +40,41 @@ func Test_BuildSubjectFromRTB(t *testing.T) {
 	}
 
 	testCases := []testCase{
-		testCase{
+		{
 			from:  nil,
 			iserr: true,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				UserName: userSubject.Name,
 			},
 			to: userSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				GroupName: groupSubject.Name,
 			},
 			to: groupSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				ServiceAccount: fmt.Sprintf("%s:%s", saSubject.Namespace, saSubject.Name),
 			},
 			to: saSubject,
 		},
-		testCase{
+		{
 			from: &v3.ClusterRoleTemplateBinding{
 				UserName: userSubject.Name,
 			},
 			to: userSubject,
 		},
-		testCase{
+		{
 			from: &v3.ClusterRoleTemplateBinding{
 				GroupName: groupSubject.Name,
 			},
 			to: groupSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				ServiceAccount: "wrong-format",
 			},
@@ -89,6 +89,56 @@ func Test_BuildSubjectFromRTB(t *testing.T) {
 		} else if !tcase.iserr && !reflect.DeepEqual(tcase.to, output) {
 			t.Errorf("the subject %v from roletemplatebinding %v is mismatched, expect %v", output, tcase.from, tcase.to)
 		}
+	}
+}
+
+func TestGetGRBSubject(t *testing.T) {
+	tests := []struct {
+		name string
+		grb  *v3.GlobalRoleBinding
+		want rbacv1.Subject
+	}{
+		{
+			name: "get based on username",
+			grb: &v3.GlobalRoleBinding{
+				UserName: "test-user",
+			},
+			want: rbacv1.Subject{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+		{
+			name: "get based on group principal name",
+			grb: &v3.GlobalRoleBinding{
+				GroupPrincipalName: "test-group",
+			},
+			want: rbacv1.Subject{
+				Kind:     "Group",
+				Name:     "test-group",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+		{
+			name: "get prioritizes username over group principal name",
+			grb: &v3.GlobalRoleBinding{
+				UserName:           "test-user",
+				GroupPrincipalName: "test-group",
+			},
+			want: rbacv1.Subject{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetGRBSubject(tt.grb); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetGRBSubject() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

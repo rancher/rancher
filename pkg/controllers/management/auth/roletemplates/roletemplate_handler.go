@@ -64,13 +64,13 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 	var clusterRoles []*v1.ClusterRole
 	rtName := rbac.ClusterRoleNameFor(rt.Name)
 
-	if clusterScopedPrivileges != nil {
+	if len(clusterScopedPrivileges) != 0 {
 		clusterRoles = append(clusterRoles,
 			rbac.BuildClusterRole(rbac.ClusterManagementPlaneClusterRoleNameFor(rtName), rtName, clusterScopedPrivileges),
 			rbac.BuildAggregatingClusterRole(rt, rbac.ClusterManagementPlaneClusterRoleNameFor))
 	}
 
-	if projectScopedPrivileges != nil {
+	if len(projectScopedPrivileges) != 0 {
 		clusterRoles = append(clusterRoles,
 			rbac.BuildClusterRole(rbac.ProjectManagementPlaneClusterRoleNameFor(rtName), rtName, projectScopedPrivileges),
 			rbac.BuildAggregatingClusterRole(rt, rbac.ProjectManagementPlaneClusterRoleNameFor))
@@ -124,7 +124,7 @@ func (r *roleTemplateHandler) getAllRules(rt *v3.RoleTemplate) ([]v1.PolicyRule,
 
 // getManagementPlaneRules filters a set of rules based on the map passed in. Used to provide special resources that have cluster/project scope.
 func getManagementPlaneRules(rules []v1.PolicyRule, managementResources map[string]string) []v1.PolicyRule {
-	var managementRules []v1.PolicyRule
+	managementRules := []v1.PolicyRule{}
 	for _, rule := range rules {
 		for resource, apiGroup := range managementResources {
 			if ruleContainsManagementPlaneRule(resource, apiGroup, rule) {

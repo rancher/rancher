@@ -21,7 +21,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -308,7 +307,7 @@ func isRuleInTargetAPIGroup(rule rbacv1.PolicyRule) bool {
 //   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same where T is an updated resource
 func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
 	// attempt to get the resource
-	resource, err := client.Get(obj.GetName(), v1.GetOptions{})
+	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil
@@ -371,7 +370,7 @@ func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1
 
 // DeleteResource deletes a non namespaced resource
 func DeleteResource[T generic.RuntimeMetaObject, TList runtime.Object](name string, client generic.NonNamespacedClientInterface[T, TList]) error {
-	err := client.Delete(name, &v1.DeleteOptions{})
+	err := client.Delete(name, &metav1.DeleteOptions{})
 	// If the resource is already gone, don't treat it as an error
 	if apierrors.IsNotFound(err) {
 		return nil

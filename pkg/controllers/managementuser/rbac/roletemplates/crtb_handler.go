@@ -9,8 +9,8 @@ import (
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	v1 "k8s.io/api/rbac/v1"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -18,7 +18,7 @@ import (
 
 type crtbHandler struct {
 	impersonationHandler *impersonationHandler
-	crbClient            rbacv1.ClusterRoleBindingController
+	crbClient            wrbacv1.ClusterRoleBindingController
 	crtbCache            controllersv3.ClusterRoleTemplateBindingCache
 	crtbClient           controllersv3.ClusterRoleTemplateBindingClient
 	s                    *status.Status
@@ -72,13 +72,13 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 	}
 
 	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: ownerLabel})
-	if err != nil {
+	if err != nil || currentCRBs == nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err
 	}
 
 	// Find if there is a CRB that already exists and delete all excess CRBs
-	var matchingCRB *v1.ClusterRoleBinding
+	var matchingCRB *rbacv1.ClusterRoleBinding
 	for _, currentCRB := range currentCRBs.Items {
 		if rbac.AreClusterRoleBindingContentsSame(crb, &currentCRB) && matchingCRB == nil {
 			matchingCRB = &currentCRB
@@ -97,7 +97,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 			return err
 		}
 	}
-	c.s.AddCondition(remoteConditions, condition, clusterRoleBindingsExists, nil)
+	c.s.AddCondition(remoteConditions, condition, clusterRoleBindingExists, nil)
 	return nil
 }
 

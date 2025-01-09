@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
-	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,8 +24,8 @@ type crtbHandler struct {
 	userMGR        user.Manager
 	userController mgmtv3.UserController
 	rtController   mgmtv3.RoleTemplateController
-	crController   crbacv1.ClusterRoleController
-	crbController  crbacv1.ClusterRoleBindingController
+	crController   wrbacv1.ClusterRoleController
+	crbController  wrbacv1.ClusterRoleBindingController
 	crtbCache      mgmtv3.ClusterRoleTemplateBindingCache
 	crtbClient     mgmtv3.ClusterRoleTemplateBindingController
 }
@@ -50,10 +50,15 @@ func newCRTBHandler(management *config.ManagementContext) *crtbHandler {
 func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	var localConditions []metav1.Condition
 	crtb, err := c.reconcileSubject(crtb, &localConditions)
-	return crtb, errors.Join(err,
-		c.reconcileMembershipBindings(crtb, &localConditions),
-		c.reconcileBindings(crtb, &localConditions),
-		c.updateStatus(crtb, localConditions))
+	if err != nil {
+		return crtb, errors.Join(c.updateStatus(crtb, localConditions))
+	}
+
+	if err := c.reconcileMembershipBindings(crtb, &localConditions); err != nil {
+		return crtb, errors.Join(c.updateStatus(crtb, localConditions))
+	}
+
+	return crtb, errors.Join(c.reconcileBindings(crtb, &localConditions), c.updateStatus(crtb, localConditions))
 }
 
 // reconcileSubject ensures that the user referenced by the role template binding exists
@@ -218,7 +223,7 @@ func (c *crtbHandler) removeClusterRoleBindings(crtb *v3.ClusterRoleTemplateBind
 
 	var returnErr error
 	for _, crb := range currentCRBs.Items {
-		err = c.crbController.Delete(crb.Name, &metav1.DeleteOptions{})
+		err = rbac.DeleteResource(crb.Name, c.crbController)
 		if err != nil {
 			c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToDeleteClusterRoleBinding, err)
 			returnErr = errors.Join(returnErr, err)

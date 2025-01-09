@@ -18,7 +18,7 @@ const (
 	ensureServiceAccountImpersonator = "EnsureServiceAccountImpersonator"
 	deleteServiceAccountImpersonator = "DeleteServiceAccountImpersonator"
 	// Reasons
-	clusterRoleBindingsExists         = "ClusterRoleBindingsExists"
+	clusterRoleBindingExists          = "ClusterRoleBindingExists"
 	clusterRoleBindingsDeleted        = "ClusterRoleBindingsDeleted"
 	serviceAccountImpersonatorExists  = "ServiceAccountImpersonatorExists"
 	failureToEnsureServiceAccount     = "FailureToEnsureServiceAccount"
