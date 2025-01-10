@@ -10,6 +10,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Update packages
+        shell: bash
+        run: DEBIAN_FRONTEND=noninteractive sudo apt update
       - name: Uninstall existing Python versions
         run: |
           sudo apt-get remove -y python3
