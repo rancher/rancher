@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -103,20 +104,23 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 
 func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	if binding.RoleTemplateName == "" {
-		logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
+		logrus.Warnf("ProjectRoleTemplateBinding %s has no role template set. Skipping.", binding.Name)
 		return nil
 	}
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
 	}
-
 	rt, err := p.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		return fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("ProjectRoleTemplateBinding %s sets a non-existing role template %s. Skipping.", binding.Name, binding.RoleTemplateName)
+			return nil
+		}
+		return err
 	}
 
 	// Get namespaces belonging to project
-	namespaces, err := p.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
+	namespaces, err := p.nsIndexer.ByIndex(namespace.NsByProjectIndex, binding.ProjectName)
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces with project ID %v: %w", binding.ProjectName, err)
 	}
@@ -150,7 +154,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding) error {
 	// Get namespaces belonging to project
-	namespaces, err := p.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
+	namespaces, err := p.nsIndexer.ByIndex(namespace.NsByProjectIndex, binding.ProjectName)
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces with project ID %v: %w", binding.ProjectName, err)
 	}
