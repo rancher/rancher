@@ -556,44 +556,8 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	desiredRBs := map[string]*v1.RoleBinding{}
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, role := range roles {
-		resourceToVerbs := map[string]map[string]string{}
-		for resource, apiGroup := range resources {
-			// Adding this check, because we want cluster-owners to have access to catalogtemplates/versions of all projects, but no other cluster roles
-			// need to access catalogtemplates of projects they do not belong to
-			if !role.Administrative && commonClusterAndProjectMgmtPlaneResources[resource] {
-				continue
-
-			}
-			verbs, err := m.checkForManagementPlaneRules(role, resource, apiGroup)
-			if err != nil {
-				return err
-			}
-			if len(verbs) > 0 {
-				resourceToVerbs[resource] = verbs
-
-				bindingName := binding.Name + "-" + role.Name
-				if _, ok := desiredRBs[bindingName]; !ok {
-					desiredRBs[bindingName] = &v1.RoleBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      bindingName,
-							Namespace: projectNamespace,
-							Labels: map[string]string{
-								bindingKey: CrtbInProjectBindingOwner,
-							},
-						},
-						Subjects: []v1.Subject{subject},
-						RoleRef: v1.RoleRef{
-							Kind: "Role",
-							Name: role.Name,
-						},
-					}
-				}
-			}
-		}
-		if len(resourceToVerbs) > 0 {
-			if err := m.reconcileManagementPlaneRole(projectNamespace, resourceToVerbs, role); err != nil {
-				return err
-			}
+		if role.Administrative {
+			logrus.Warnf("RoleTemplate %s:%s administrative is deprecated and is no longer used", role.GetNamespace(), role.GetName())
 		}
 	}
 
