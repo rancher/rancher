@@ -13,32 +13,36 @@ import (
 func TestSyncWithIndex(t *testing.T) {
 	testCases := []struct {
 		Name            string
-		CurrentEntries  map[string]*v1.UIPluginEntry
-		ExpectedEntries map[string]*v1.UIPluginEntry
+		CurrentEntries  map[string]*UIPlugin
+		ExpectedEntries map[string]*UIPlugin
 		FsCacheFiles    []string
 		ShouldDelete    bool
 	}{
 		{
 			Name: "Sync index with FS cache no new entries",
-			CurrentEntries: map[string]*v1.UIPluginEntry{
+			CurrentEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					Name:     "test-plugin",
-					Version:  "0.1.0",
-					Endpoint: "https://test.endpoint.svc",
-					NoCache:  false,
-					Metadata: map[string]string{
-						"test": "data",
+					UIPluginEntry: &v1.UIPluginEntry{
+						Name:     "test-plugin",
+						Version:  "0.1.0",
+						Endpoint: "https://test.endpoint.svc",
+						NoCache:  false,
+						Metadata: map[string]string{
+							"test": "data",
+						},
 					},
 				},
 			},
-			ExpectedEntries: map[string]*v1.UIPluginEntry{
+			ExpectedEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					Name:     "test-plugin",
-					Version:  "0.1.0",
-					Endpoint: "https://test.endpoint.svc",
-					NoCache:  false,
-					Metadata: map[string]string{
-						"test": "data",
+					UIPluginEntry: &v1.UIPluginEntry{
+						Name:     "test-plugin",
+						Version:  "0.1.0",
+						Endpoint: "https://test.endpoint.svc",
+						NoCache:  false,
+						Metadata: map[string]string{
+							"test": "data",
+						},
 					},
 				},
 			},
@@ -48,25 +52,29 @@ func TestSyncWithIndex(t *testing.T) {
 		},
 		{
 			Name: "Sync index with FS cache delete old test-plugin-2 entry",
-			CurrentEntries: map[string]*v1.UIPluginEntry{
+			CurrentEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					Name:     "test-plugin",
-					Version:  "0.1.0",
-					Endpoint: "https://test.endpoint.svc",
-					NoCache:  false,
-					Metadata: map[string]string{
-						"test": "data",
+					UIPluginEntry: &v1.UIPluginEntry{
+						Name:     "test-plugin",
+						Version:  "0.1.0",
+						Endpoint: "https://test.endpoint.svc",
+						NoCache:  false,
+						Metadata: map[string]string{
+							"test": "data",
+						},
 					},
 				},
 			},
-			ExpectedEntries: map[string]*v1.UIPluginEntry{
+			ExpectedEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					Name:     "test-plugin",
-					Version:  "0.1.0",
-					Endpoint: "https://test.endpoint.svc",
-					NoCache:  false,
-					Metadata: map[string]string{
-						"test": "data",
+					UIPluginEntry: &v1.UIPluginEntry{
+						Name:     "test-plugin",
+						Version:  "0.1.0",
+						Endpoint: "https://test.endpoint.svc",
+						NoCache:  false,
+						Metadata: map[string]string{
+							"test": "data",
+						},
 					},
 				},
 			},
