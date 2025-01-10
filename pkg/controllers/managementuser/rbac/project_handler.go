@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
@@ -64,7 +65,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	}
 
 	projectID := project.Namespace + ":" + project.Name
-	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, projectID)
+	namespaces, err := p.m.nsIndexer.ByIndex(namespace.NsByProjectIndex, projectID)
 	if err != nil {
 		return project, err
 	}
