@@ -17,7 +17,7 @@ RUN go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent.exe ./cmd/agent
 FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 # download wins
-RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.4.19/wins.exe'; \
+RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.4.21-rc.2/wins.exe'; \
     \
     Write-Host ('Downloading Wins from {0} ...' -f $URL); \
     curl.exe -sfL $URL -o c:\wins.exe; \
