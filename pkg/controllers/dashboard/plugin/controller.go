@@ -93,6 +93,8 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	} else {
 		plugin.Status.CacheState = Pending
 	}
+	Index.CacheState(plugin)
+	AnonymousIndex.CacheState(plugin)
 
 	maxFileSize, err := strconv.ParseInt(settings.MaxUIPluginFileByteSize.Get(), 10, 64)
 	if err != nil {
@@ -101,7 +103,12 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	}
 
 	plugin.Status.ObservedGeneration = plugin.Generation
-	//for _, p := range cachedPlugins {
+
+	defer Index.Ready(plugin)
+	defer Index.CacheState(plugin)
+	defer AnonymousIndex.Ready(plugin)
+	defer AnonymousIndex.CacheState(plugin)
+
 	err = FsCache.SyncWithControllersCache(plugin, forceUpdate)
 	if errors.Is(err, errMaxFileSizeError) {
 		logrus.Errorf("one of the files is more than the defaultUIPluginFileByteSize limit %s", strconv.FormatInt(maxFileSize, 10))
