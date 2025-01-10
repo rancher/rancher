@@ -51,7 +51,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 		logrus.Debug(msg)
 		return
 	}
-	if entry.NoCache {
+	if entry.NoCache || entry.CacheState == plugin.Pending {
 		logrus.Debugf("[noCache: %v] proxying request to [endpoint: %v]\n", entry.NoCache, entry.Endpoint)
 		proxyRequest(entry.Endpoint, vars["rest"], w, r, denylist)
 	} else {
