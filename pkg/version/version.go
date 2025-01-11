@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/rancher/rancher/pkg/buildconfig"
 )
 
 var (
@@ -18,9 +20,11 @@ const primeEnv = "RANCHER_PRIME"
 
 // Info encapsulates version metadata.
 type Info struct {
-	Version      string
-	GitCommit    string
-	RancherPrime string
+	Version              string
+	GitCommit            string
+	RancherPrime         string
+	MinKubernetesVersion string
+	MaxKubernetesVersion string
 }
 
 // FriendlyVersion returns a human-readable string that can be included in log output.
@@ -39,7 +43,13 @@ func NewVersionHandler() http.Handler {
 	if isPrime, ok := os.LookupEnv(primeEnv); ok && isPrime == "true" {
 		rancherPrime = "true"
 	}
-	return &versionHandler{info: Info{Version, GitCommit, rancherPrime}}
+	return &versionHandler{info: Info{
+		Version,
+		GitCommit,
+		rancherPrime,
+		buildconfig.MinKubernetesVersion,
+		buildconfig.MaxKubernetesVersion,
+	}}
 }
 
 // ServeHTTP handles GET requests for version information.
