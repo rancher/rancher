@@ -76,14 +76,16 @@ jobs:
       #   uses: actions/setup-python@v5
       #   with:
       #     python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Install Python and dependencies
+      - name: Update dependencies
+        run: sudo apt-get update
+      - name: Insatll python dependencies
+        run: sudo apt-get insatll -y python3.11 python3-dev python3-pip libffi-dev libssl-dev
+      - name: Upgrade pip
+        run: sudo python3 -m ensurepip --upgrade
+      - name: Insatll tox
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3 python3-dev python3-pip libffi-dev libssl-dev
           sudo pip3 install --upgrade pip
           sudo pip3 install tox flake8
-          sudo python3 --version
-          sudo python3 -m ensurepip --upgrade
       - name: Check Python version
         run: |
           python -V
