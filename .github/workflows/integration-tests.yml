@@ -82,7 +82,7 @@ jobs:
           sudo cp $(which python3) /usr/bin/python3
 
           sudo apt-get update
-          sudo apt-get install -y python3-pip libffi-dev libssl-dev
+          sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
           sudo pip3 install --upgrade pip
           sudo pip3 install tox flake8
           sudo python3 --version
