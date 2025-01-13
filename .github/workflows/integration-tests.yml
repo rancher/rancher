@@ -78,10 +78,15 @@ jobs:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Install Python and dependencies
         run: |
+          sudo rm -rf /usr/bin/python3
+          sudo cp $(which python3) /usr/bin/python3
+
           sudo apt-get update
           sudo apt-get install -y python3-pip libffi-dev libssl-dev
           sudo pip3 install --upgrade pip
           sudo pip3 install tox flake8
+          sudo python3 --version
+          sudo python3 -m ensurepip --upgrade
       - name: Check Python version
         run: |
           python -V
