@@ -18,6 +18,7 @@ const (
 	GlobalRoleBindingFieldStatus           = "status"
 	GlobalRoleBindingFieldUUID             = "uuid"
 	GlobalRoleBindingFieldUserID           = "userId"
+	GlobalRoleBindingFieldUserPrincipalID  = "userPrincipalId"
 )
 
 type GlobalRoleBinding struct {
@@ -34,6 +35,7 @@ type GlobalRoleBinding struct {
 	Status           *GlobalRoleBindingStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	UUID             string                   `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserID           string                   `json:"userId,omitempty" yaml:"userId,omitempty"`
+	UserPrincipalID  string                   `json:"userPrincipalId,omitempty" yaml:"userPrincipalId,omitempty"`
 }
 
 type GlobalRoleBindingCollection struct {
