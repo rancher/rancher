@@ -76,16 +76,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
+      - name: Install Python and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip libffi-dev libssl-dev
+          sudo pip3 install --upgrade pip
+          sudo pip3 install tox flake8
       - name: Check Python version
         run: |
           python -V
           python3 -V
-      - name: Install Python and dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
-          sudo pip3 install --upgrade pip
-          sudo pip3 install tox flake8
       - name: KDM data
         run: |
           mkdir -p bin
