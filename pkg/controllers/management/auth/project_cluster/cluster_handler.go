@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -54,6 +55,7 @@ type clusterLifecycle struct {
 	rbLister           rbacv1.RoleBindingCache
 	roleBindings       rbacv1.RoleBindingController
 	roleTemplateLister v3.RoleTemplateCache
+	crClient           rbacv1.ClusterRoleController
 }
 
 // NewClusterLifecycle creates and returns a clusterLifecycle from a given ManagementContext
@@ -69,6 +71,7 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 		rbLister:           management.Wrangler.RBAC.RoleBinding().Cache(),
 		roleBindings:       management.Wrangler.RBAC.RoleBinding(),
 		roleTemplateLister: management.Wrangler.Mgmt.RoleTemplate().Cache(),
+		crClient:           management.Wrangler.RBAC.ClusterRole(),
 	}
 }
 
@@ -105,6 +108,12 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		cluster := obj.(*apisv3.Cluster)
 		_, err = l.clusterClient.Update(cluster)
 		if err != nil {
+			return nil, err
+		}
+	}
+
+	if features.AggregatedRoleTemplates.Enabled() {
+		if err := createMembershipRoles(obj, l.crClient); err != nil {
 			return nil, err
 		}
 	}
