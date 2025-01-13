@@ -55,14 +55,13 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	returnErr := deleteMembershipBinding(prtb, p.crbController)
 
-	ownerLabel := rbac.CreatePRTBOwnerLabel(prtb.Name)
-	currentCRBs, err := p.crbController.List(metav1.ListOptions{LabelSelector: ownerLabel})
+	currentCRBs, err := p.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
 	if err != nil {
 		return nil, errors.Join(returnErr, err)
 	}
 
 	for _, crb := range currentCRBs.Items {
-		errors.Join(returnErr, rbac.DeleteResource(crb.Name, p.crbController))
+		returnErr = errors.Join(returnErr, rbac.DeleteResource(crb.Name, p.crbController))
 	}
 
 	return prtb, returnErr
@@ -130,13 +129,12 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		return err
 	}
 
-	ownerLabel := rbac.CreatePRTBOwnerLabel(prtb.Name)
-	crb, err = rbac.BuildClusterRoleBindingFromRTB(prtb, ownerLabel, projectManagementRoleName)
+	crb, err = rbac.BuildClusterRoleBindingFromRTB(prtb, projectManagementRoleName)
 	if err != nil {
 		return err
 	}
 
-	currentCRBs, err := p.crbController.List(metav1.ListOptions{LabelSelector: ownerLabel})
+	currentCRBs, err := p.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
 	if err != nil {
 		return err
 	}

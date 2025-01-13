@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -82,8 +83,10 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 		return nil, err
 	}
 
-	if err := createMembershipRoles(obj, l.crClient); err != nil {
-		return nil, err
+	if features.AggregatedRoleTemplates.Enabled() {
+		if err := createMembershipRoles(obj, l.crClient); err != nil {
+			return nil, err
+		}
 	}
 
 	obj, err = l.reconcileProjectCreatorRTB(obj)

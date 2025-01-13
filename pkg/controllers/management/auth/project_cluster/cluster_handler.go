@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -111,8 +112,10 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		}
 	}
 
-	if err := createMembershipRoles(obj, l.crClient); err != nil {
-		return nil, err
+	if features.AggregatedRoleTemplates.Enabled() {
+		if err := createMembershipRoles(obj, l.crClient); err != nil {
+			return nil, err
+		}
 	}
 
 	obj, err = l.reconcileClusterCreatorRTB(obj)

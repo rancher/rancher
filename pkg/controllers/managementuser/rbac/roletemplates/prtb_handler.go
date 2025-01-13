@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -76,7 +75,6 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		return err
 	}
 
-	ownerLabel := createPRTBOwnerLabel(prtb.Name)
 	subject, err := rbac.BuildSubjectFromRTB(prtb)
 	if err != nil {
 		return err
@@ -111,7 +109,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 			promotedRB.Namespace = n.Name
 		}
 
-		if err := p.ensureOnlyDesiredRoleBindingsExist(rb, promotedRB, n.Name, ownerLabel); err != nil {
+		if err := p.ensureOnlyDesiredRoleBindingsExist(rb, promotedRB, n.Name, rbac.GetPRTBOwnerLabel(prtb.Name)); err != nil {
 			return err
 		}
 	}
@@ -130,9 +128,7 @@ func (p *prtbHandler) OnRemove(key string, prtb *v3.ProjectRoleTemplateBinding) 
 		return nil, err
 	}
 
-	lo := metav1.ListOptions{
-		LabelSelector: createPRTBOwnerLabel(prtb.Name),
-	}
+	lo := metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)}
 
 	var returnError error
 	for _, n := range namespaces.Items {
@@ -183,7 +179,6 @@ func (p *prtbHandler) getNamespacesFromProject(prtb *v3.ProjectRoleTemplateBindi
 
 // buildRoleBinding creates a role binding owned by the prtb.
 func buildRoleBinding(prtb *v3.ProjectRoleTemplateBinding, roleRefName string, subject rbacv1.Subject) *rbacv1.RoleBinding {
-	ownerLabel := createPRTBOwnerLabel(prtb.Name)
 	roleRef := rbacv1.RoleRef{
 		Kind: "Role",
 		Name: roleRefName,
@@ -191,7 +186,7 @@ func buildRoleBinding(prtb *v3.ProjectRoleTemplateBinding, roleRefName string, s
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "rb-",
-			Labels:       map[string]string{ownerLabel: "true"},
+			Labels:       map[string]string{rbac.PrtbOwnerLabel: prtb.Name},
 		},
 		RoleRef:  roleRef,
 		Subjects: []rbacv1.Subject{subject},
@@ -245,9 +240,4 @@ func (p *prtbHandler) ensureOnlyDesiredRoleBindingsExist(desiredRB, desiredPromo
 func areRoleBindingsSame(rb1, rb2 *rbacv1.RoleBinding) bool {
 	return reflect.DeepEqual(rb1.Subjects, rb2.Subjects) &&
 		reflect.DeepEqual(rb1.RoleRef, rb2.RoleRef)
-}
-
-// createPRTBOwnerLabel creates an owner label given a PRTB name.
-func createPRTBOwnerLabel(prtbName string) string {
-	return name.SafeConcatName(prtbOwnerLabel, prtbName)
 }

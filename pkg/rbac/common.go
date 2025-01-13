@@ -3,6 +3,7 @@ package rbac
 import (
 	"crypto/sha256"
 	"encoding/base32"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -36,8 +37,8 @@ const (
 	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
 	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
 	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
-	crtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
-	prtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
+	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
+	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
 	aggregationLabel                  = "management.cattle.io/aggregates"
 	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
@@ -429,7 +430,7 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 }
 
 // BuildClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the ClusterRole specified by roleRefName.
-func BuildClusterRoleBindingFromRTB(rtb metav1.Object, ownerLabel, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
+func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
 	roleRef := rbacv1.RoleRef{
 		Kind: "ClusterRole",
 		Name: AggregatedClusterRoleNameFor(roleRefName),
@@ -440,17 +441,27 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, ownerLabel, roleRefName s
 		return nil, err
 	}
 
+	var ownerLabel string
+	switch rtb.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		ownerLabel = PrtbOwnerLabel
+	case *v3.ClusterRoleTemplateBinding:
+		ownerLabel = CrtbOwnerLabel
+	default:
+		return nil, fmt.Errorf("unrecognized roleTemplateBinding type: %T", rtb)
+	}
+
 	return &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "crb-",
-			Labels:       map[string]string{ownerLabel: "true"},
+			Labels:       map[string]string{ownerLabel: rtb.GetName()},
 		},
 		RoleRef:  roleRef,
 		Subjects: []rbacv1.Subject{subject},
 	}, nil
 }
 
-// AreRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
+// AreClusterRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
 func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
 	return reflect.DeepEqual(crb1.Subjects, crb2.Subjects) &&
 		reflect.DeepEqual(crb1.RoleRef, crb2.RoleRef)
@@ -481,12 +492,10 @@ func ProjectManagementPlaneClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, projectManagementPlaneSuffix)
 }
 
-// CreateCRTBOwnerLabel creates an owner label given a CRTB name
-func CreateCRTBOwnerLabel(crtbName string) string {
-	return name.SafeConcatName(crtbOwnerLabel, crtbName)
+func GetPRTBOwnerLabel(s string) string {
+	return PrtbOwnerLabel + "=" + s
 }
 
-// CreatePRTBOwnerLabel creates an owner label given a PRTB name
-func CreatePRTBOwnerLabel(prtbName string) string {
-	return name.SafeConcatName(prtbOwnerLabel, prtbName)
+func GetCRTBOwnerLabel(s string) string {
+	return CrtbOwnerLabel + "=" + s
 }

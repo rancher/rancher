@@ -2,11 +2,11 @@ package roletemplates
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -448,9 +448,8 @@ func Test_getPromotedRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := getPromotedRules(tt.rules); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getPromotedRules() = %v, want %v", got, tt.want)
-			}
+			got := getPromotedRules(tt.rules)
+			assert.ElementsMatch(t, got, tt.want)
 		})
 	}
 }

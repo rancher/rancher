@@ -9,6 +9,7 @@ import (
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -156,6 +157,9 @@ func (rth *roleTemplateHandler) addLabelToExternalRole(rt *v3.RoleTemplate) erro
 
 	externalRole, err := rth.crController.Get(rt.Name, v1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 

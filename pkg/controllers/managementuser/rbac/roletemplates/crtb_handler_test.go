@@ -20,7 +20,7 @@ type reducedCondition struct {
 }
 
 var (
-	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb"}
+	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner=test-crtb"}
 	defaultCRTB       = v3.ClusterRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-crtb",
@@ -31,7 +31,7 @@ var (
 	defaultCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "crb-",
-			Labels:       map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
+			Labels:       map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind: "ClusterRole",
@@ -205,7 +205,7 @@ func Test_reconcileBindings(t *testing.T) {
 	}
 }
 
-func Test_crtbHandler_deleteBindings(t *testing.T) {
+func Test_deleteBindings(t *testing.T) {
 	tests := []struct {
 		name               string
 		setupCRBController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])

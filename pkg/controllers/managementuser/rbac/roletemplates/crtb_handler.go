@@ -64,14 +64,13 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: reconcileClusterRoleBindings}
 
-	ownerLabel := rbac.CreateCRTBOwnerLabel(crtb.Name)
-	crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, ownerLabel, crtb.RoleTemplateName)
+	crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, crtb.RoleTemplateName)
 	if err != nil {
 		c.s.AddCondition(remoteConditions, condition, failureToBuildClusterRoleBinding, err)
 		return err
 	}
 
-	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: ownerLabel})
+	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
 	if err != nil || currentCRBs == nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err
@@ -119,9 +118,7 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 func (c *crtbHandler) deleteBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: deleteClusterRoleBindings}
 
-	lo := metav1.ListOptions{
-		LabelSelector: rbac.CreateCRTBOwnerLabel(crtb.Name),
-	}
+	lo := metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)}
 
 	crbs, err := c.crbClient.List(lo)
 	if err != nil {
