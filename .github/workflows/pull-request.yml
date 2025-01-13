@@ -207,7 +207,7 @@ jobs:
   #         retention-days: 4
   #         overwrite: false
   integration-tests:
-    needs: [build-agent]
+    # needs: [build-agent]
     uses: ./.github/workflows/integration-tests.yml
     with:
       parent_run_id: 12757046586
