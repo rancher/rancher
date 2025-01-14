@@ -2,28 +2,21 @@ name: Validate
 on: [pull_request, push]
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/python:3.11
     env:
       GOLANG_CI_LINT_VERSION: v1.54.2
-      PYTHON_VERSION: '3.11'
-      GOLANG_VERSION: '1.22'
+      GOLANG_VERSION: '1.23'
     steps:
+      - name: Install dependencies
+        shell: bash
+        run: zypper install -y git awk
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Uninstall existing Python versions
-        run: |
-          sudo apt-get remove -y python3
-          sudo apt-get autoremove -y
-          sudo apt-get purge -y python3
-          sudo apt-get clean
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "${{ env.PYTHON_VERSION }}"
       - name: Check Python version
         run: |
-          sudo rm -rf /usr/bin/python3
-          sudo cp $(which python3) /usr/bin/python3
           python3 --version
           python3 -m ensurepip --upgrade
       - name: Set up Go
@@ -32,9 +25,7 @@ jobs:
           go-version: "${{ env.GOLANG_VERSION }}"
       - name: Install Python and dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
-          sudo pip3 install --upgrade pip
-          sudo pip3 install tox flake8
+          pip3 install --upgrade pip
+          pip3 install tox flake8
       - name: Validate
         run: ./scripts/validate
