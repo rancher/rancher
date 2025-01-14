@@ -48,7 +48,7 @@ CMD for i in `ls *.yaml`; \
     echo $USER_KEYS; \
     for i in `ls *.yaml`; \
     do cat $i | sed -e 's/DONOTDELETEKEYS/'"${DONOTDELETE_KEYS}"'/g' -i $i; done; \
-    if [ "$CUSTODIAN_YAML" = "aws.yaml" || "$CUSTODIAN_YAML" = "untag-to-delete.yaml"] ; then \
+    if [ "$CUSTODIAN_YAML" = "aws.yaml" || "$CUSTODIAN_YAML" = "untag-to-delete.yaml" ] ; then \
     custodian run --output-dir=. --region="us-east-2" ${CUSTODIAN_YAML}; \
     custodian run --output-dir=. --region="us-east-1" ${CUSTODIAN_YAML}; \
     custodian run --output-dir=. --region="us-west-1" ${CUSTODIAN_YAML}; \

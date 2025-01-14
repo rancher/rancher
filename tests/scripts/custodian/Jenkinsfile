@@ -65,27 +65,35 @@ node("vsphere-vpn-1") {
           ])
         }
         dir("./tests/scripts/custodian/") {
-          stage('Build Docker Image') {
-            try {
-              def decoded = new String(RANCHER_GKE_CREDENTIAL.decodeBase64())
-              writeFile file: 'google_credentials.json', text: decoded
-              sh "docker build -t ${imageName} -f Dockerfile . --build-arg AWS_ACCESS_KEY_ID=\"${AWS_ACCESS_KEY_ID}\" --build-arg AWS_SECRET_ACCESS_KEY=\"${AWS_SECRET_ACCESS_KEY}\" --build-arg AZURE_AKS_SUBSCRIPTION_ID=\"${AZURE_AKS_SUBSCRIPTION_ID}\" --build-arg AZURE_TENANT_ID=\"${AZURE_TENANT_ID}\" --build-arg AZURE_CLIENT_ID=\"${AZURE_CLIENT_ID}\" --build-arg AZURE_CLIENT_SECRET=\"${AZURE_CLIENT_SECRET}\" --build-arg RANCHER_LINODE_ACCESSKEY=\"${RANCHER_LINODE_ACCESSKEY}\""
-            } catch (err) {
-              echo 'Docker Build had partial failures...'
-              echo "${err}"
+          try {
+            stage('Build Docker Image') {
+              try {
+                def decoded = new String(RANCHER_GKE_CREDENTIAL.decodeBase64())
+                writeFile file: 'google_credentials.json', text: decoded
+                sh "docker build -t ${imageName} -f Dockerfile . --build-arg AWS_ACCESS_KEY_ID=\"${AWS_ACCESS_KEY_ID}\" --build-arg AWS_SECRET_ACCESS_KEY=\"${AWS_SECRET_ACCESS_KEY}\" --build-arg AZURE_AKS_SUBSCRIPTION_ID=\"${AZURE_AKS_SUBSCRIPTION_ID}\" --build-arg AZURE_TENANT_ID=\"${AZURE_TENANT_ID}\" --build-arg AZURE_CLIENT_ID=\"${AZURE_CLIENT_ID}\" --build-arg AZURE_CLIENT_SECRET=\"${AZURE_CLIENT_SECRET}\" --build-arg RANCHER_LINODE_ACCESSKEY=\"${RANCHER_LINODE_ACCESSKEY}\""
+              } catch (err) {
+                echo 'Docker Build had partial failures...'
+                echo "${err}"
+              }
             }
-          }
-          stage('Run Docker Image for Adding Tags') {
-            // if a user only wants to run the test using a subset of keys, they can pass in OVERRIDE_REGION
-            if ("${env.OVERRIDE_REGION}" != "null" && "${env.OVERRIDE_REGION}" != "") {
-              sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"add-friday-tags.yaml\" -e OVERRIDE_REGION=\"${env.OVERRIDE_REGION}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${USER_KEYS}\" ${imageName} "
-            } else {
-              echo "No OVERRIDE_REGION passed in, running all tests"
+            stage('Run Docker Image for Adding Tags') {
+              // if a user only wants to run the test using a subset of keys, they can pass in OVERRIDE_REGION
+              if ("${env.OVERRIDE_REGION}" != "null" && "${env.OVERRIDE_REGION}" != "") {
+                sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"tag-to-save.yaml\" -e OVERRIDE_REGION=\"${env.OVERRIDE_REGION}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${USER_KEYS}\" ${imageName} "
+              } else {
+                echo "No OVERRIDE_REGION passed in, running all tests"
+              }
             }
+            stage('Run Docker Image for AWS,Azure, and GCP') {
+              sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${CUSTODIAN_YAML}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${USER_KEYS}\" ${imageName}"
+            }
+          } catch (err) {
+            echo "error during custodian run"
           }
-          stage('Run Docker Image for AWS,Azure, and GCP') {
-            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${CUSTODIAN_YAML}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${USER_KEYS}\" ${imageName}"
-          }
+
+          sh "docker stop ${testContainer}"
+          sh "docker rm -v ${testContainer}"
+          sh "docker rmi -f ${imageName}"
         } // dir 
       } // creds
     } // folder properties
