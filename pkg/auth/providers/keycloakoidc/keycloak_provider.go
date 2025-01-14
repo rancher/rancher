@@ -144,7 +144,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) 
 	principalType := parts[1]
 	keyCloakClient, err := k.newClient(config, token)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc] GetPrincipal: error creating new http client: %v", err)
+		logrus.Warnf("[keycloak oidc] GetPrincipal: error creating new http client: %v", err)
 		return v3.Principal{}, err
 	}
 	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, principalType, config)
