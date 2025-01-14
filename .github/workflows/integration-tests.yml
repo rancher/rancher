@@ -78,26 +78,16 @@ jobs:
           docker image ls
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
-      - name: Uninstall existing Python versions
-        run: |
-          sudo apt-get remove -y python3
-          sudo apt-get autoremove -y
-          sudo apt-get purge -y python3
-          sudo apt-get clean
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "${{ env.PYTHON_VERSION }}"
       - name: Check Python version
         run: |
-          sudo rm -rf /usr/bin/python3
-          sudo cp $(which python3) /usr/bin/python3
-          python3 --version
-          python3 -m ensurepip --upgrade
-      - name: Install Python and dependencies
+          python -V
+          python3 -V
+      - name: Update dependencies
+        run: sudo apt-get update
+      - name: Install python and dependencies
+        run: sudo apt-get install -y python${{ env.PYTHON_VERSION }} python3-pip python3-dev libffi-dev libssl-dev
+      - name: Install tox and flake8
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
           sudo pip3 install --upgrade pip
           sudo pip3 install tox flake8
 
