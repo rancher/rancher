@@ -43,7 +43,8 @@ func (u *UpgradeWorkloadTestSuite) SetupSuite() {
 func (u *UpgradeWorkloadTestSuite) TestWorkloadPreUpgrade() {
 	for _, cluster := range u.clusters {
 		cluster := cluster
-		u.Run(cluster.Name, func() {
+		testName := "Pre Upgrade checks for the cluster " + cluster.Name
+		u.Run(testName, func() {
 			cluster.FeaturesToTest.Ingress = &verifyIngress
 			createPreUpgradeWorkloads(u.T(), u.client, cluster.Name, cluster.FeaturesToTest, nil, containerImage)
 		})
@@ -53,7 +54,8 @@ func (u *UpgradeWorkloadTestSuite) TestWorkloadPreUpgrade() {
 func (u *UpgradeWorkloadTestSuite) TestWorkloadPostUpgrade() {
 	for _, cluster := range u.clusters {
 		cluster := cluster
-		u.Run(cluster.Name, func() {
+		testName := "Post Upgrade checks for the cluster " + cluster.Name
+		u.Run(testName, func() {
 			cluster.FeaturesToTest.Ingress = &verifyIngress
 			createPostUpgradeWorkloads(u.T(), u.client, cluster.Name, cluster.FeaturesToTest)
 		})

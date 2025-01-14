@@ -211,7 +211,7 @@ func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) erro
 		return err
 	}
 
-	return kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
+	err = kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		isConnected, err := client.IsConnected()
 		if err != nil {
 			return false, nil
@@ -227,5 +227,17 @@ func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) erro
 		}
 
 		return false, nil
+	})
+
+	if err != nil{
+		return err
+	}
+
+	return kwait.PollUntilContextTimeout(context.TODO(), 2*time.Second, defaults.FiveSecondTimeout, true, func(ctx context.Context) (done bool, err error) {
+		isConnected, err := client.IsConnected()
+		if err != nil {
+			return false, err
+		}
+		return isConnected, nil
 	})
 }
