@@ -12,7 +12,7 @@ node {
     def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
     def buildTestContainer = "${job_name}${env.BUILD_NUMBER}-buildtest"
     def configGeneratorContainer = "${job_name}${env.BUILD_NUMBER}_generator"
-    def cleanupContainer = "${job_name}${env.BUILD_NUMBER}_cleanup"
+    def cleanupTestContainer = "${job_name}${env.BUILD_NUMBER}_cleanup"
 
     def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
 
@@ -27,8 +27,15 @@ node {
     def patchedConfigsDir = "patched-cattle-configs"
 
     def testResultsOut = "results.xml"
+    def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
+    def qaseRun = "testrun"
+    def testRunConfig = "testrunconfig.yaml"
+
+    def config = env.CONFIG
+    def filename = "config.yaml"
+    def testRunID
 
     // rancher
     def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
@@ -69,10 +76,15 @@ node {
       withFolderProperties {
         paramsMap = []
         params.each {
-          if (it.value && it.value.trim() != "") {
-              paramsMap << "$it.key=$it.value"
-          }
+            if (it.key == "TEST_RUN_NAME") {
+                def date = sh(script: "date +%Y-%m-%d", returnStdout: true).trim()
+                def updatedTestRunName = "${it.value.trim()}-${date}"
+                paramsMap << "$it.key=$updatedTestRunName"
+            } else {
+                paramsMap << "$it.key=$it.value"
+            }
         }
+        
         withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                           string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                           string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
@@ -118,7 +130,8 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
-                          string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
+                          string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: 'RANCHER_LINODE_ACCESSKEY')]) {
         withEnv(paramsMap) {
           stage('Checkout') {
             deleteDir()
@@ -146,19 +159,73 @@ node {
           dir ("./") {
             try {
               stage('Configure and Build') {
+                config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+                config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+                config = config.replace('${AWS_IAM_PROFILE}', env.AWS_IAM_PROFILE)
+                config = config.replace('${AWS_REGION}', env.AWS_REGION)
+                config = config.replace('${AWS_VPC}', env.AWS_VPC)
+                config = config.replace('${AWS_SECURITY_GROUPS}', env.AWS_SECURITY_GROUPS)
+                config = config.replace('${ADMIN_PASSWORD}', env.ADMIN_PASSWORD)
+            
                 if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
                   dir("./rancher/tests/v2/validation/.ssh") {
                     def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
                     writeFile file: AWS_SSH_KEY_NAME, text: decoded
                   }
                 }
-                dir("./rancher/tests/v2/validation") {
-                  def filename = "config.yaml"
-                  def configContents = env.CONFIG
 
-                  writeFile file: filename, text: configContents
-                  env.CATTLE_TEST_CONFIG = workPath+filename
+                scriptPath = "./rancher/tests/v2/validation/pipeline/scripts/rancher_k8s_version.sh"
+                
+                def rancherK8sVersions = ""
+                try {
+                  rancherK8sVersions = sh(
+                    script: """
+                      if [ -f ${scriptPath} ]; then
+                      chmod +x ${scriptPath}
+                      ${scriptPath}
+                      else
+                        echo "Script not found!"
+                        exit 1
+                    fi
+                    """,
+                    returnStdout: true
+                  ).trim()
+
+                  def lines = []
+                  if (rancherK8sVersions != "") {
+                    lines = rancherK8sVersions.split('\n')
+                  }
+
+                  if (lines.size() >= 8) {
+                    def rancherImageTag = lines[0].replace("Latest Rancher Version: ", "").trim()
+                    def rancherVersion = rancherImageTag.replace("v", "")
+                    def preUpgradeRKE2K8s = lines[2]?.trim()
+                    def postUpgradeRKE2K8s = lines[3]?.trim()
+                    def preUpgradeK3sK8s = lines[4]?.trim()
+                    def postUpgradeK3sK8s = lines[5]?.trim()
+                    def preUpgradeRKE1K8s = lines[6]?.trim()
+                    def postUpgradeRKE1K8s = lines[7]?.trim()
+
+                    config = config.replace('${RANCHER_VERSION}', rancherVersion)
+                    config = config.replace('${RANCHER_IMAGE_TAG}', rancherImageTag)
+                    config = config.replace('${RANCHER_RKE2_VERSION}', preUpgradeRKE2K8s)
+                    config = config.replace('${RANCHER_RKE2_VERSION_TO_UPGRADE}', postUpgradeRKE2K8s)
+                    config = config.replace('${RANCHER_K3S_VERSION}', preUpgradeK3sK8s)
+                    config = config.replace('${RANCHER_K3S_VERSION_TO_UPGRADE}', postUpgradeK3sK8s)
+                    config = config.replace('${RANCHER_RKE1_VERSION}', preUpgradeRKE1K8s)
+                    config = config.replace('${RANCHER_RKE1_VERSION_TO_UPGRADE}', postUpgradeRKE1K8s)
+                  }
+                } catch (err) {
+                  echo "Unable to get the versions of Rancher and Kubernetes: ${err}"
+                  error "Rancher and k8s versions cannot be retrieved."
                 }
+                
+                dir("./rancher/tests/v2/validation") {
+                  writeFile file: filename, text: config
+                  
+                  env.CATTLE_TEST_CONFIG = workPath + filename
+                }
+
                 dir ("./") {
                   sh "./rancher/tests/v2/validation/configure.sh"
                   sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e --build-arg CORRAL_VERSION=${env.CORRAL_VERSION} --build-arg RKE_VERSION=${env.RKE_VERSION} -t ${imageName}"
@@ -172,7 +239,22 @@ node {
               stage("Build Environment") {
                 try {
                   sh "docker run -v ${validationVolume}:/root --name ${buildTestContainer} -t --env-file ${envFile} " +
-                  "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh\""
+                  "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh;${workPath}pipeline/scripts/build_qase_auto_testrun.sh\""
+
+                  sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"
+                  sh "./${qaseRun} --startRun=true"
+
+                  testRunID = sh(
+                      script: "./yq '.id'  ./${testRunConfig}",
+                      returnStdout: true
+                    ).trim()
+
+                  if (testRunID != "null" && testRunID != "") {
+                      echo "Extracted Test Run ID: '${testRunID}'"
+                  } else {
+                      echo "Failed to extract Test Run ID"
+                  }
+
                 } catch(err) {
                    sh "docker stop ${buildTestContainer}"
                    sh "docker rm -v ${buildTestContainer}"
@@ -227,12 +309,16 @@ node {
                        returnStdout: true
                      ).trim()
 
+
                      jobs["$it-provisioning"] = { 
                        stage("Parallel Provisioning: $it"){
                          def containerName = "${job_name}${env.BUILD_NUMBER}_$it-provisioning"
                          try {
+                             echo "Starting provisioning tests." 
                             sh "docker run --volumes-from ${buildTestContainer} --name ${containerName} -t -e CATTLE_TEST_CONFIG=\"${absoluteConfigPath}\" " +
-                          "${imageName} sh -c \"gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsOut} -- -tags=validation ${testCase} -timeout=\"60m\" -v\""
+                          "${imageName} sh -c \"gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsJSON} -- -tags=validation ${testCase} -timeout=\"60m\" -v\""
+
+
 
                           dir("./${patchedConfigsDir}") {
                             sh "docker cp ${containerName}:${rootPath}${configsDir}/$it ."
@@ -280,7 +366,6 @@ node {
               stage('Run preupgrade checks') {
                 try {
                   jobs = [:]
-
                   configFiles.each {
                     try {
                       def configPath = "./${configsDir}/$it"
@@ -304,6 +389,7 @@ node {
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
                         string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
+                        string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
                         string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
                       ]
 
@@ -318,6 +404,7 @@ node {
                   echo "Pre upgrade tests had failures: " + err
                 }
               }
+
               stage('Upgrade local cluster version') {
                 try {
                       def configPath = "./${configsDir}/${localConfigFileName}"
@@ -341,6 +428,7 @@ node {
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
                         string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}" ),
+                        string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
                         string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
                       ]
 
@@ -376,6 +464,7 @@ node {
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
                         string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
+                        string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
                         string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
                       ]
 
@@ -384,24 +473,31 @@ node {
                       echo "Post upgrade $it had failures: " + err
                     }
                   }
-
                   parallel jobs
                 } catch(err){
                   echo "Post upgrade tests had failures: " + err
                 }
+                sh "./${qaseRun} --startRun=false"
               }
-              stage('Delete Rancher and resources') {
+                stage('Delete Rancher and resources') {
                 if (cleanup.toBoolean()) {
                   try{
                     sh 'echo Cleanup is enabled'
 
                     sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
-                      "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
+                      "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
 
-                    sh "docker stop ${cleanupContainer}"
-                    sh "docker rm -v ${cleanupContainer}"
                   } catch(err){
                     echo "Cleanup had failures: " + err
+                    
+                    if (sh(script: "docker inspect ${cleanupTestContainer} > /dev/null 2>&1 && echo 'exists' || echo 'not found'", returnStdout: true).trim() == 'exists') {
+                        sh "docker stop ${cleanupTestContainer}"
+                        sh "docker rm -v ${cleanupTestContainer}"
+                    } else {
+                        echo "Container ${cleanupTestContainer} not found, skipping cleanup."
+                    }
+                    
+                    sh "docker rmi -f ${imageName}"
                   }
                 } else {
                   sh 'echo Cleanup is disabled'
@@ -414,10 +510,6 @@ node {
                 sh "docker stop ${configGeneratorContainer}"
                 sh "docker rm -v ${configGeneratorContainer}"
 
-                if (cleanup.toBoolean()) {
-                  sh "docker stop ${cleanupTestContainer}"
-                  sh "docker rm -v ${cleanupTestContainer}"
-                }
 
                 sh "docker rmi -f ${imageName}"
               }
@@ -429,12 +521,17 @@ node {
                     sh 'echo Cleanup is enabled'
 
                     sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
-                      "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
+                      "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
 
-                    sh "docker stop ${cleanupContainer}"
-                    sh "docker rm -v ${cleanupContainer}"
                   } catch(error) {
                     echo "Cleanup had failures: " + error
+                    
+                    if (sh(script: "docker inspect ${cleanupTestContainer} > /dev/null 2>&1 && echo 'exists' || echo 'not found'", returnStdout: true).trim() == 'exists') {
+                        sh "docker stop ${cleanupTestContainer}"
+                        sh "docker rm -v ${cleanupTestContainer}"
+                    } else {
+                        echo "Container ${cleanupTestContainer} not found, skipping cleanup."
+                    }
                   }
                 } else {
                   sh 'echo Cleanup is disabled'
