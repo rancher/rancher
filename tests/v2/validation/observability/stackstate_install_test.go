@@ -179,6 +179,20 @@ func (ssi *StackStateInstallTestSuite) TestStackStateAgentChart() {
 	})
 }
 
+func (ssi *StackStateInstallTestSuite) TestStackStateInstall() {
+	subsession := ssi.session.NewSession()
+	defer subsession.Cleanup()
+	//client, err := ssi.client.WithSession(subsession)
+	//require.NoError(ssi.T(), err)
+
+	ssi.Run("Install Stackstate", func() {
+
+		err := charts.InstallStackStateWithHelm()
+		require.NoError(ssi.T(), err)
+	})
+
+}
+
 func TestStackStateInstallTestSuite(t *testing.T) {
 	suite.Run(t, new(StackStateInstallTestSuite))
 }
