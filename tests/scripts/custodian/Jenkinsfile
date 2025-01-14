@@ -79,7 +79,7 @@ node("vsphere-vpn-1") {
             stage('Run Docker Image for Adding Tags') {
               // if a user only wants to run the test using a subset of keys, they can pass in OVERRIDE_REGION
               if ("${env.OVERRIDE_REGION}" != "null" && "${env.OVERRIDE_REGION}" != "") {
-                sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"tag-to-save.yaml\" -e OVERRIDE_REGION=\"${env.OVERRIDE_REGION}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${USER_KEYS}\" ${imageName} "
+                sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"tag-to-save.yaml\" -e OVERRIDE_REGION=\"${env.OVERRIDE_REGION}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${TAG_USER_KEYS}\" ${imageName} "
               } else {
                 echo "No OVERRIDE_REGION passed in, running all tests"
               }
