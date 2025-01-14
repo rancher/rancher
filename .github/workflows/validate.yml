@@ -15,9 +15,6 @@ jobs:
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Update packages
-        shell: bash
-        run: DEBIAN_FRONTEND=noninteractive sudo apt update
       - name: Check Python version
         run: |
           python3 --version
