@@ -21,11 +21,11 @@ import (
 )
 
 const (
-	grName  = "gr"
-	grUID   = "9cf141b8-54ab-4711-8e43-eb1fc0a189a8"
-	grbName = "grb"
-	grbUID  = "3267582b-96eb-4752-81de-cb33e7d8f3e7"
-	user    = "user"
+	grName       = "gr"
+	grUID        = "9cf141b8-54ab-4711-8e43-eb1fc0a189a8"
+	grbName      = "grb"
+	grbUID       = "3267582b-96eb-4752-81de-cb33e7d8f3e7"
+	testUsername = "user"
 )
 
 var (
@@ -56,7 +56,7 @@ var (
 			Name: grbName,
 			UID:  grbUID,
 		},
-		UserName:       user,
+		UserName:       testUsername,
 		GlobalRoleName: grName,
 	}
 )
@@ -608,7 +608,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 					Name: grbName,
 					UID:  grbUID,
 				},
-				UserName:       user,
+				UserName:       testUsername,
 				GlobalRoleName: grName,
 			}, &conditions)
 
