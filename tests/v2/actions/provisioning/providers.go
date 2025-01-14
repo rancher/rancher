@@ -25,14 +25,15 @@ import (
 )
 
 type CloudCredFunc func(rancherClient *rancher.Client, credentials cloudcredentials.CloudCredential) (*v1.SteveAPIObject, error)
-type MachinePoolFunc func(generatedPoolName, namespace string) []unstructured.Unstructured
+type MachinePoolFunc func(machineConfig machinepools.MachineConfigs, generatedPoolName, namespace string) []unstructured.Unstructured
+type MachineRolesFunc func(machineConfig machinepools.MachineConfigs) []machinepools.Roles
 
 type Provider struct {
 	Name                               provisioninginput.ProviderName
 	MachineConfigPoolResourceSteveType string
 	MachinePoolFunc                    MachinePoolFunc
 	CloudCredFunc                      CloudCredFunc
-	Roles                              []machinepools.Roles
+	GetMachineRolesFunc                MachineRolesFunc
 }
 
 // CreateProvider returns all machine and cloud credential
@@ -46,7 +47,7 @@ func CreateProvider(name string) Provider {
 			MachineConfigPoolResourceSteveType: machinepools.AWSPoolType,
 			MachinePoolFunc:                    machinepools.NewAWSMachineConfig,
 			CloudCredFunc:                      aws.CreateAWSCloudCredentials,
-			Roles:                              machinepools.GetAWSMachineRoles(),
+			GetMachineRolesFunc:                machinepools.GetAWSMachineRoles,
 		}
 		return provider
 	case name == provisioninginput.AzureProviderName.String():
@@ -55,7 +56,7 @@ func CreateProvider(name string) Provider {
 			MachineConfigPoolResourceSteveType: machinepools.AzurePoolType,
 			MachinePoolFunc:                    machinepools.NewAzureMachineConfig,
 			CloudCredFunc:                      azure.CreateAzureCloudCredentials,
-			Roles:                              machinepools.GetAzureMachineRoles(),
+			GetMachineRolesFunc:                machinepools.GetAzureMachineRoles,
 		}
 		return provider
 	case name == provisioninginput.DOProviderName.String():
@@ -64,7 +65,7 @@ func CreateProvider(name string) Provider {
 			MachineConfigPoolResourceSteveType: machinepools.DOPoolType,
 			MachinePoolFunc:                    machinepools.NewDigitalOceanMachineConfig,
 			CloudCredFunc:                      digitalocean.CreateDigitalOceanCloudCredentials,
-			Roles:                              machinepools.GetDOMachineRoles(),
+			GetMachineRolesFunc:                machinepools.GetDOMachineRoles,
 		}
 		return provider
 	case name == provisioninginput.LinodeProviderName.String():
@@ -73,7 +74,7 @@ func CreateProvider(name string) Provider {
 			MachineConfigPoolResourceSteveType: machinepools.LinodePoolType,
 			MachinePoolFunc:                    machinepools.NewLinodeMachineConfig,
 			CloudCredFunc:                      linode.CreateLinodeCloudCredentials,
-			Roles:                              machinepools.GetLinodeMachineRoles(),
+			GetMachineRolesFunc:                machinepools.GetLinodeMachineRoles,
 		}
 		return provider
 	case name == provisioninginput.HarvesterProviderName.String():
@@ -82,7 +83,7 @@ func CreateProvider(name string) Provider {
 			MachineConfigPoolResourceSteveType: machinepools.HarvesterPoolType,
 			MachinePoolFunc:                    machinepools.NewHarvesterMachineConfig,
 			CloudCredFunc:                      harvester.CreateHarvesterCloudCredentials,
-			Roles:                              machinepools.GetHarvesterMachineRoles(),
+			GetMachineRolesFunc:                machinepools.GetHarvesterMachineRoles,
 		}
 		return provider
 	case name == provisioninginput.VsphereProviderName.String():
@@ -91,7 +92,7 @@ func CreateProvider(name string) Provider {
 			MachineConfigPoolResourceSteveType: machinepools.VmwarevsphereType,
 			MachinePoolFunc:                    machinepools.NewVSphereMachineConfig,
 			CloudCredFunc:                      vsphere.CreateVsphereCloudCredentials,
-			Roles:                              machinepools.GetVsphereMachineRoles(),
+			GetMachineRolesFunc:                machinepools.GetVsphereMachineRoles,
 		}
 		return provider
 	default:

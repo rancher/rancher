@@ -1,15 +1,13 @@
 package machinepools
 
 import (
-	"github.com/rancher/shepherd/pkg/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	HarvesterKind                              = "HarvesterConfig"
-	HarvesterPoolType                          = "rke-machine-config.cattle.io.harvesterconfig"
-	HarvesterResourceConfig                    = "harvesterconfigs"
-	HarvesterMachineConfigConfigurationFileKey = "harvesterMachineConfigs"
+	HarvesterKind           = "HarvesterConfig"
+	HarvesterPoolType       = "rke-machine-config.cattle.io.harvesterconfig"
+	HarvesterResourceConfig = "harvesterconfigs"
 )
 
 type HarvesterMachineConfigs struct {
@@ -31,12 +29,9 @@ type HarvesterMachineConfig struct {
 
 // NewHarvesterMachineConfig is a constructor to set up rke-machine-config.cattle.io.harvesterconfig.
 // It returns an *unstructured.Unstructured that CreateMachineConfig uses to created the rke-machine-config
-func NewHarvesterMachineConfig(generatedPoolName, namespace string) []unstructured.Unstructured {
-	var harvesterMachineConfigs HarvesterMachineConfigs
-	config.LoadConfig(HarvesterMachineConfigConfigurationFileKey, &harvesterMachineConfigs)
+func NewHarvesterMachineConfig(machineConfigs MachineConfigs, generatedPoolName, namespace string) []unstructured.Unstructured {
 	var multiConfig []unstructured.Unstructured
-
-	for _, harvesterMachineConfig := range harvesterMachineConfigs.HarvesterMachineConfig {
+	for _, harvesterMachineConfig := range machineConfigs.HarvesterMachineConfigs.HarvesterMachineConfig {
 		machineConfig := unstructured.Unstructured{}
 		machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
 		machineConfig.SetKind(HarvesterKind)
@@ -49,7 +44,7 @@ func NewHarvesterMachineConfig(generatedPoolName, namespace string) []unstructur
 		machineConfig.Object["memorySize"] = harvesterMachineConfig.MemorySize
 		machineConfig.Object["networkName"] = harvesterMachineConfig.NetworkName
 		machineConfig.Object["imageName"] = harvesterMachineConfig.ImageName
-		machineConfig.Object["vmNamespace"] = harvesterMachineConfigs.VMNamespace
+		machineConfig.Object["vmNamespace"] = machineConfigs.HarvesterMachineConfigs.VMNamespace
 		machineConfig.Object["sshUser"] = harvesterMachineConfig.SSHUser
 
 		multiConfig = append(multiConfig, machineConfig)
@@ -59,12 +54,10 @@ func NewHarvesterMachineConfig(generatedPoolName, namespace string) []unstructur
 }
 
 // GetHarvesterMachineRoles returns a list of roles from the given machineConfigs
-func GetHarvesterMachineRoles() []Roles {
-	var harvesterMachineConfigs HarvesterMachineConfigs
-	config.LoadConfig(HarvesterMachineConfigConfigurationFileKey, &harvesterMachineConfigs)
+func GetHarvesterMachineRoles(machineConfigs MachineConfigs) []Roles {
 	var allRoles []Roles
 
-	for _, harvesterMachineConfig := range harvesterMachineConfigs.HarvesterMachineConfig {
+	for _, harvesterMachineConfig := range machineConfigs.HarvesterMachineConfigs.HarvesterMachineConfig {
 		allRoles = append(allRoles, harvesterMachineConfig.Roles)
 	}
 
