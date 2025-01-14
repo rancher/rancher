@@ -247,6 +247,10 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Equal(t, userID, userRefresher.userID)
 		assert.False(t, userRefresher.force)
 		require.NotEmpty(t, patchData)
+		require.Len(t, resp.Extras[ExtraRequestTokenID], 1)
+		assert.Equal(t, token.Name, resp.Extras[ExtraRequestTokenID][0])
+		require.Len(t, resp.Extras[ExtraRequestHost], 1)
+		require.Equal(t, req.Host, resp.Extras[ExtraRequestHost][0])
 	})
 
 	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
