@@ -3,6 +3,7 @@ package charts
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/shepherd/clients/helm"
 
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	kubenamespaces "github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
@@ -284,4 +285,14 @@ func newStackstateAgentChartUpgradeAction(p *payloadOpts, stackstateConfigs *obs
 	chartUpgradeAction := newChartUpgradeAction(p.Namespace, chartUpgrades)
 
 	return chartUpgradeAction
+}
+
+func InstallStackStateWithHelm() error {
+
+	// Add StackState helm repo
+	err := helm.AddHelmRepo("suse-observability", "https://charts.rancher.com/server-charts/prime/suse-observability")
+	if err != nil {
+		return err
+	}
+	return nil
 }
