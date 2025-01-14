@@ -27,6 +27,11 @@ import (
 
 const tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 
+const (
+	ExtraRequestTokenID = "requesttokenid"
+	ExtraRequestHost    = "requesthost"
+)
+
 var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 
 // Authenticator authenticates a request.
@@ -79,7 +84,8 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 // NewAuthenticator creates a new token authenticator instance.
 func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx *config.ScaledContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
-	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+	// Deliberately ignore the error if the indexer was already added.
+	_ = tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
 	return &tokenAuthenticator{
@@ -108,9 +114,6 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 
 // Authenticate authenticates a request using a request's token.
 func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResponse, error) {
-	authResp := &AuthenticatorResponse{
-		Extras: make(map[string][]string),
-	}
 	token, err := a.TokenFromRequest(req)
 	if err != nil {
 		return nil, err
@@ -176,11 +179,23 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		a.refreshUser(token.UserID, false)
 	}
 
-	authResp.IsAuthed = true
-	authResp.User = token.UserID
-	authResp.UserPrincipal = token.UserPrincipal.Name
-	authResp.Groups = groups
-	authResp.Extras = getUserExtraInfo(token, authUser, attribs)
+	extras := make(map[string][]string)
+	if userExtra := getUserExtraInfo(token, authUser, attribs); userExtra != nil {
+		extras = userExtra
+	}
+
+	// Add request-specific extra information.
+	extras[ExtraRequestTokenID] = []string{token.Name}
+	extras[ExtraRequestHost] = []string{req.Host}
+
+	authResp := &AuthenticatorResponse{
+		IsAuthed:      true,
+		User:          token.UserID,
+		UserPrincipal: token.UserPrincipal.Name,
+		Groups:        groups,
+		Extras:        extras,
+	}
+
 	logrus.Debugf("Extras returned %v", authResp.Extras)
 
 	now := a.now().Truncate(time.Second) // Use the second precision.
