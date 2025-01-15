@@ -188,6 +188,13 @@ func createOrGetPod(clients *clients.Clients, podName string, pullThrough bool) 
 						ReadOnly:  true,
 						MountPath: "/etc/auth",
 					}},
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 5000,
+							HostPort:      5000,
+						},
+					},
 				},
 			},
 		},
