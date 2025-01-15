@@ -129,6 +129,9 @@ type TokenStatus struct {
 
 	// LastUsedAt provides the last time the token was used in a request, at second granularity.
 	LastUsedAt *metav1.Time `json:"lastUsedAt,omitempty"`
+
+	// FUTURE ((USER ACTIVITY)) IdleTimeout provides the timeout used by the user activity monitoring.
+	// IdleTimeout ... `json:"idleTimeout,omitempty"`
 }
 
 // Implement the TokenAccessor interface
