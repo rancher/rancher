@@ -2,8 +2,6 @@ package observability
 
 import (
 	"context"
-	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"time"
 
 	"github.com/rancher/shepherd/clients/rancher"
@@ -156,21 +154,4 @@ func InstallStackstateCRD(client *rancher.Client) error {
 
 	return err
 
-}
-
-// CreateClusterRepo creates a new ClusterRepo resource in the Kubernetes cluster using the provided catalog client.
-// It takes the client, repository name, and repository URL as arguments and returns an error if the operation fails.
-func CreateClusterRepo(client *catalog.Client, name, url string) error {
-	ctx := context.Background()
-	repo := buildClusterRepo(name, url)
-	_, err := client.ClusterRepos().Create(ctx, repo, metav1.CreateOptions{})
-	return err
-}
-
-// buildClusterRepo creates and returns a new ClusterRepo object with the provided name and URL.
-func buildClusterRepo(name, url string) *rv1.ClusterRepo {
-	return &rv1.ClusterRepo{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       rv1.RepoSpec{URL: url},
-	}
 }

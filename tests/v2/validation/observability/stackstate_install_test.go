@@ -3,11 +3,9 @@
 package observability
 
 import (
-	"context"
 	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
-	"github.com/rancher/rancher/tests/v2/actions/observability"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"github.com/rancher/shepherd/extensions/clusters"
@@ -15,10 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"testing"
-	"time"
 )
 
 type StackStateInstallTestSuite struct {
@@ -30,18 +25,12 @@ type StackStateInstallTestSuite struct {
 	catalogClient *catalog.Client
 }
 
-var (
-	PollInterval = time.Duration(500 * time.Millisecond)
-	propagation  = metav1.DeletePropagationForeground
-)
-
 const (
 	observabilityChartURL  = "https://charts.rancher.com/server-charts/prime/suse-observability"
 	observabilityChartName = "suse-observability"
 )
 
 func (ssi *StackStateInstallTestSuite) TearDownSuite() {
-	ssi.Require().NoError(ssi.catalogClient.ClusterRepos().Delete(context.Background(), "suse-observability", metav1.DeleteOptions{PropagationPolicy: &propagation}))
 	ssi.session.Cleanup()
 }
 
@@ -85,23 +74,9 @@ func (ssi *StackStateInstallTestSuite) TestStackStateInstall() {
 	//require.NoError(ssi.T(), err)
 
 	ssi.Run("Install Stackstate", func() {
-		err := observability.CreateClusterRepo(ssi.catalogClient, observabilityChartName, observabilityChartURL)
+		err := charts.CreateClusterRepo(ssi.client, ssi.catalogClient, observabilityChartName, observabilityChartURL)
 		require.NoError(ssi.T(), err)
 	})
-}
-
-// pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
-func (ssi *StackStateInstallTestSuite) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) error {
-	err := kwait.Poll(PollInterval, time.Minute, func() (done bool, err error) {
-		clusterRepo, err := ssi.catalogClient.ClusterRepos().Get(context.TODO(), ClusterRepoName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		ssi.Require().NoError(err)
-
-		return clusterRepo.Status.DownloadTime != prevDownloadTime, nil
-	})
-	return err
 }
 
 func TestStackStateInstallTestSuite(t *testing.T) {
