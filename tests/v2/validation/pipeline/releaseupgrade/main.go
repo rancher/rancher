@@ -86,9 +86,6 @@ func main() {
 	environmentFlags := new(environmentflag.Config)
 	config.LoadConfig(environmentflag.ConfigurationFileKey, environmentFlags)
 
-	//Overwrite/update flag to grab cluster names that are provisioned
-	environmentFlags.DesiredFlags += "|" + environmentflag.UpdateClusterName.String()
-
 	config.UpdateConfig(environmentflag.ConfigurationFileKey, environmentFlags)
 
 	//make cattle-configs dir
