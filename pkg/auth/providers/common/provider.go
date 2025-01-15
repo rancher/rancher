@@ -14,7 +14,7 @@ const (
 	UserAttributeUserName = "username"
 	// ExtraRequestTokenID is the key for the request token ID in the UserInfo's extra attributes.
 	ExtraRequestTokenID = "cattle.io/requesttokenid"
-	// ExtraRequestTokenID is the key for the request host name in the UserInfo's extra attributes.
+	// ExtraRequestHost is the key for the request host name in the UserInfo's extra attributes.
 	ExtraRequestHost = "cattle.io/requesthost"
 
 	// UserPrincipalType is the user principal type across all providers.
