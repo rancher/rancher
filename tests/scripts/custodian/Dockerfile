@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 WORKDIR /usr/app/src
 
 ARG AWS_ACCESS_KEY_ID
@@ -38,7 +38,7 @@ RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
 RUN python3 -m venv custodian-venv
 RUN . custodian-venv/bin/activate
-RUN pip3 install c7n c7n_azure c7n_gcp c7n_mailer
+RUN pip3 install c7n c7n_azure c7n_gcp c7n_mailer --break-system-packages
 
 RUN az login -u ${AZURE_CLIENT_ID} --service-principal -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID} > /dev/null
 RUN gcloud auth activate-service-account --key-file $GOOGLE_APPLICATION_CREDENTIALS > /dev/null
@@ -48,11 +48,11 @@ CMD for i in `ls *.yaml`; \
     echo $USER_KEYS; \
     for i in `ls *.yaml`; \
     do cat $i | sed -e 's/DONOTDELETEKEYS/'"${DONOTDELETE_KEYS}"'/g' -i $i; done; \
-    if [ "$CUSTODIAN_YAML" = "aws.yaml" ] ; then \
-    custodian run --output-dir=. --region="us-east-2" --dry-run ${CUSTODIAN_YAML}; \
-    custodian run --output-dir=. --region="us-east-1" --dry-run ${CUSTODIAN_YAML}; \
-    custodian run --output-dir=. --region="us-west-1" --dry-run ${CUSTODIAN_YAML}; \
-    custodian run --output-dir=. --region="us-west-2" --dry-run ${CUSTODIAN_YAML}; \
+    if [ "$CUSTODIAN_YAML" = "aws.yaml" || "$CUSTODIAN_YAML" = "untag-to-delete.yaml" ] ; then \
+    custodian run --output-dir=. --region="us-east-2" ${CUSTODIAN_YAML}; \
+    custodian run --output-dir=. --region="us-east-1" ${CUSTODIAN_YAML}; \
+    custodian run --output-dir=. --region="us-west-1" ${CUSTODIAN_YAML}; \
+    custodian run --output-dir=. --region="us-west-2" ${CUSTODIAN_YAML}; \
     elif [ "$CUSTODIAN_YAML" = "tag-to-save.yaml" ] ; then \
-    custodian run --output-dir=. --region=$OVERRIDE_REGION --dry-run ${CUSTODIAN_YAML};  \
-    else custodian run --output-dir=. --dry-run ${CUSTODIAN_YAML}; fi; 
+    custodian run --output-dir=. --region=$OVERRIDE_REGION ${CUSTODIAN_YAML};  \
+    else custodian run --output-dir=. ${CUSTODIAN_YAML}; fi; 
