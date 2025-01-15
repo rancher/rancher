@@ -2661,6 +2661,43 @@ func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error
 	return nil
 }
 
+func (s *steveAPITestSuite) TestLinks() {
+	subSession := s.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := s.client.Steve.ProxyDownstream(s.clusterID)
+	require.NoError(s.T(), err)
+
+	secretClient := client.SteveType(stevesecrets.SecretSteveType)
+
+	secretObj, err := secretClient.Create(corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namegenerator.AppendRandomString("steve-secret"),
+			Namespace: namespaceMap["test-ns-1"],
+		},
+		Data: map[string][]byte{"foo": []byte("bar")},
+	})
+	require.NoError(s.T(), err)
+
+	readObj, err := secretClient.ByID(secretObj.ID)
+	require.NoError(s.T(), err)
+
+	host := s.client.RancherConfig.Host
+
+	id := readObj.JSONResp["id"].(string)
+	expectedID := secretObj.Namespace + "/" + secretObj.Name
+	links := readObj.JSONResp["links"].(map[string]any)
+	expectedLinks := map[string]any{
+		"remove": fmt.Sprintf("https://%s/v1/secrets/%s", host, expectedID),
+		"update": fmt.Sprintf("https://%s/v1/secrets/%s", host, expectedID),
+		"self":   fmt.Sprintf("https://%s/v1/secrets/%s", host, expectedID),
+		"view":   fmt.Sprintf("https://%s/api/v1/namespaces/%s/secrets/%s", host, secretObj.Namespace, secretObj.Name),
+	}
+
+	assert.Equal(s.T(), expectedID, id)
+	assert.Equal(s.T(), expectedLinks, links)
+}
+
 func (s *steveAPITestSuite) TestCRUD() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
