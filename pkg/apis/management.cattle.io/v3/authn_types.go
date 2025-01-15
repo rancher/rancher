@@ -421,6 +421,7 @@ type LdapFields struct {
 	GroupMemberMappingAttribute     string   `json:"groupMemberMappingAttribute,omitempty"     norman:"default=member,notnullable,required"`
 	ConnectionTimeout               int64    `json:"connectionTimeout,omitempty"               norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled"              norman:"default=false"`
+	SearchUsingServiceAccount       bool     `json:"searchUsingServiceAccount"       norman:"default=false"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
