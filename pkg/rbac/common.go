@@ -3,27 +3,48 @@ package rbac
 import (
 	"crypto/sha256"
 	"encoding/base32"
+	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/wrangler/pkg/name"
 	k8srbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	wranglerName "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
-	NamespaceID = "namespaceId"
-	ProjectID   = "projectId"
-	ClusterID   = "clusterId"
-	GlobalAdmin = "admin"
+	NamespaceID                       = "namespaceId"
+	ProjectID                         = "projectId"
+	ClusterID                         = "clusterId"
+	GlobalAdmin                       = "admin"
+	GlobalRestrictedAdmin             = "restricted-admin"
+	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
+	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
+	ProjectCRDsClusterRole            = "project-crd-clusterRole"
+	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
+	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
+	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
+	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
+	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
+	aggregationLabel                  = "management.cattle.io/aggregates"
+	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
+	aggregatorSuffix                  = "aggregator"
+	promotedSuffix                    = "promoted"
+	clusterManagementPlaneSuffix      = "cluster-mgmt"
+	projectManagementPlaneSuffix      = "project-mgmt"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -278,4 +299,203 @@ func isRuleInTargetAPIGroup(rule rbacv1.PolicyRule) bool {
 		}
 	}
 	return false
+}
+
+// CreateOrUpdateResource creates or updates the given resource
+//   - getResource is a func that returns a single object and an error
+//   - obj is the resource to create or update
+//   - client is the Wrangler client to use to get/create/update resource
+//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same where T is an updated resource
+func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
+	// attempt to get the resource
+	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil
+		}
+		// resource doesn't exist, create it
+		_, err = client.Create(obj)
+		return err
+	}
+
+	// check that the existing resource is the same as the one we want
+	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
+		// if it has changed, update it to the correct version
+		_, err := client.Update(updatedResource)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AreClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.
+// If not, it also updates the current ClusterRole fields to match the desired ClusterRole.
+// The fields it checks are:
+//
+//   - Rules or AggregationRule
+//   - Cluster role owner annotation
+//   - Aggregation label
+func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1.ClusterRole) {
+	same := true
+
+	if wantedCR.AggregationRule == nil {
+		if currentCR.AggregationRule != nil {
+			same = false
+			currentCR.AggregationRule = nil
+		}
+		if !reflect.DeepEqual(currentCR.Rules, wantedCR.Rules) {
+			same = false
+			currentCR.Rules = wantedCR.Rules
+		}
+	} else {
+		if !reflect.DeepEqual(currentCR.AggregationRule, wantedCR.AggregationRule) {
+			same = false
+			currentCR.AggregationRule = wantedCR.AggregationRule
+		}
+		if len(currentCR.Rules) > 0 {
+			same = false
+			currentCR.Rules = nil
+		}
+	}
+	if got, want := currentCR.Annotations[clusterRoleOwnerAnnotation], wantedCR.Annotations[clusterRoleOwnerAnnotation]; got != want {
+		same = false
+		metav1.SetMetaDataAnnotation(&currentCR.ObjectMeta, clusterRoleOwnerAnnotation, want)
+	}
+	if got, want := currentCR.Labels[aggregationLabel], wantedCR.Labels[aggregationLabel]; got != want {
+		same = false
+		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, aggregationLabel, want)
+	}
+	return same, currentCR
+}
+
+// DeleteResource deletes a non namespaced resource
+func DeleteResource[T generic.RuntimeMetaObject, TList runtime.Object](name string, client generic.NonNamespacedClientInterface[T, TList]) error {
+	err := client.Delete(name, &metav1.DeleteOptions{})
+	// If the resource is already gone, don't treat it as an error
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+// BuildClusterRole creates a cluster role with an aggregation label
+//   - name: name of the cluster role
+//   - ownerName: name of the creator of this cluster role
+//   - rules: list of policy rules for the cluster role
+func BuildClusterRole(name, ownerName string, rules []rbacv1.PolicyRule) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Labels:      map[string]string{aggregationLabel: name},
+			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},
+		},
+		Rules: rules,
+	}
+}
+
+// BuildAggregatingClusterRole returns a ClusterRole with AggregationRules
+//   - rt the role template to base it off of. Most importantly, it adds an aggregation label for each role template in RoleTemplateNames
+//   - nameTransformer a function that takes a string and returns one that represents the cluster role name. It also applies to all inherited role templates.
+func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(string) string) *rbacv1.ClusterRole {
+	crName := nameTransformer(rt.Name)
+	ownerName := rt.Name
+
+	// aggregate our own cluster role
+	roleTemplateLabels := []metav1.LabelSelector{{MatchLabels: map[string]string{aggregationLabel: crName}}}
+
+	// aggregate every inherited role template
+	for _, roleTemplateName := range rt.RoleTemplateNames {
+		labelSelector := metav1.LabelSelector{
+			MatchLabels: map[string]string{aggregationLabel: nameTransformer(roleTemplateName)},
+		}
+		roleTemplateLabels = append(roleTemplateLabels, labelSelector)
+	}
+
+	aggregatingCRName := AggregatedClusterRoleNameFor(crName)
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: aggregatingCRName,
+			// Label so other cluster roles can aggregate this one
+			Labels: map[string]string{
+				aggregationLabel: aggregatingCRName,
+			},
+			// Annotation to identify which role template owns the cluster role
+			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},
+		},
+		AggregationRule: &rbacv1.AggregationRule{
+			ClusterRoleSelectors: roleTemplateLabels,
+		},
+	}
+}
+
+// BuildClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the ClusterRole specified by roleRefName.
+func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
+	roleRef := rbacv1.RoleRef{
+		Kind: "ClusterRole",
+		Name: AggregatedClusterRoleNameFor(roleRefName),
+	}
+
+	subject, err := BuildSubjectFromRTB(rtb)
+	if err != nil {
+		return nil, err
+	}
+
+	var ownerLabel string
+	switch rtb.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		ownerLabel = PrtbOwnerLabel
+	case *v3.ClusterRoleTemplateBinding:
+		ownerLabel = CrtbOwnerLabel
+	default:
+		return nil, fmt.Errorf("unrecognized roleTemplateBinding type: %T", rtb)
+	}
+
+	return &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "crb-",
+			Labels:       map[string]string{ownerLabel: rtb.GetName()},
+		},
+		RoleRef:  roleRef,
+		Subjects: []rbacv1.Subject{subject},
+	}, nil
+}
+
+// AreClusterRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
+func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
+	return reflect.DeepEqual(crb1.Subjects, crb2.Subjects) &&
+		reflect.DeepEqual(crb1.RoleRef, crb2.RoleRef)
+}
+
+// ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName
+func ClusterRoleNameFor(s string) string {
+	return name.SafeConcatName(s)
+}
+
+// PromotedClusterRoleNameFor appends the promoted suffix to a string safely (ie <= 63 characters)
+func PromotedClusterRoleNameFor(s string) string {
+	return name.SafeConcatName(s, promotedSuffix)
+}
+
+// AggregatedClusterRoleNameFor appends the aggregation suffix to a string safely (ie <= 63 characters)
+func AggregatedClusterRoleNameFor(s string) string {
+	return name.SafeConcatName(s, aggregatorSuffix)
+}
+
+// ClusterManagementPlaneClusterRoleNameFor appends the cluster management plane suffix to a string safely (ie <= 63 characters)
+func ClusterManagementPlaneClusterRoleNameFor(s string) string {
+	return name.SafeConcatName(s, clusterManagementPlaneSuffix)
+}
+
+// ProjectManagementPlaneClusterRoleNameFor appends the project management plane suffix to a string safely (ie <= 63 characters)
+func ProjectManagementPlaneClusterRoleNameFor(s string) string {
+	return name.SafeConcatName(s, projectManagementPlaneSuffix)
+}
+
+func GetPRTBOwnerLabel(s string) string {
+	return PrtbOwnerLabel + "=" + s
+}
+
+func GetCRTBOwnerLabel(s string) string {
+	return CrtbOwnerLabel + "=" + s
 }

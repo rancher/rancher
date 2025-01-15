@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -38,6 +39,7 @@ type projectLifecycle struct {
 	rbLister             rbacv1.RoleBindingCache
 	roleBindings         rbacv1.RoleBindingController
 	systemAccountManager *systemaccount.Manager
+	crClient             rbacv1.ClusterRoleController
 }
 
 // NewProjectLifecycle creates and returns a projectLifecycle from a given ManagementContext
@@ -53,6 +55,7 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		rbLister:             management.Wrangler.RBAC.RoleBinding().Cache(),
 		roleBindings:         management.Wrangler.RBAC.RoleBinding(),
 		systemAccountManager: systemaccount.NewManager(management),
+		crClient:             management.Wrangler.RBAC.ClusterRole(),
 	}
 }
 
@@ -78,6 +81,12 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
+	}
+
+	if features.AggregatedRoleTemplates.Enabled() {
+		if err := createMembershipRoles(obj, l.crClient); err != nil {
+			return nil, err
+		}
 	}
 
 	obj, err = l.reconcileProjectCreatorRTB(obj)

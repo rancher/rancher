@@ -8,7 +8,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,41 +40,41 @@ func Test_BuildSubjectFromRTB(t *testing.T) {
 	}
 
 	testCases := []testCase{
-		testCase{
+		{
 			from:  nil,
 			iserr: true,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				UserName: userSubject.Name,
 			},
 			to: userSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				GroupName: groupSubject.Name,
 			},
 			to: groupSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				ServiceAccount: fmt.Sprintf("%s:%s", saSubject.Namespace, saSubject.Name),
 			},
 			to: saSubject,
 		},
-		testCase{
+		{
 			from: &v3.ClusterRoleTemplateBinding{
 				UserName: userSubject.Name,
 			},
 			to: userSubject,
 		},
-		testCase{
+		{
 			from: &v3.ClusterRoleTemplateBinding{
 				GroupName: groupSubject.Name,
 			},
 			to: groupSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				ServiceAccount: "wrong-format",
 			},
@@ -89,6 +89,56 @@ func Test_BuildSubjectFromRTB(t *testing.T) {
 		} else if !tcase.iserr && !reflect.DeepEqual(tcase.to, output) {
 			t.Errorf("the subject %v from roletemplatebinding %v is mismatched, expect %v", output, tcase.from, tcase.to)
 		}
+	}
+}
+
+func TestGetGRBSubject(t *testing.T) {
+	tests := []struct {
+		name string
+		grb  *v3.GlobalRoleBinding
+		want rbacv1.Subject
+	}{
+		{
+			name: "get based on username",
+			grb: &v3.GlobalRoleBinding{
+				UserName: "test-user",
+			},
+			want: rbacv1.Subject{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+		{
+			name: "get based on group principal name",
+			grb: &v3.GlobalRoleBinding{
+				GroupPrincipalName: "test-group",
+			},
+			want: rbacv1.Subject{
+				Kind:     "Group",
+				Name:     "test-group",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+		{
+			name: "get prioritizes username over group principal name",
+			grb: &v3.GlobalRoleBinding{
+				UserName:           "test-user",
+				GroupPrincipalName: "test-group",
+			},
+			want: rbacv1.Subject{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetGRBSubject(tt.grb); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetGRBSubject() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -254,6 +304,180 @@ func TestGetRTBLabel(t *testing.T) {
 			t.Parallel()
 			if got := GetRTBLabel(test.metadata); got != test.output {
 				t.Errorf("expected %s, but got %s", test.output, got)
+			}
+		})
+	}
+}
+
+func TestAreClusterRolesSame(t *testing.T) {
+	type args struct {
+		current  *rbacv1.ClusterRole
+		modified *rbacv1.ClusterRole
+	}
+	tests := []struct {
+		name        string
+		args        args
+		wantSame    bool
+		wantUpdated *rbacv1.ClusterRole
+	}{
+		{
+			name: "clusterrole is up to date",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+				modified: &rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+			},
+			wantSame: true,
+		},
+		{
+			name: "aggregated clusterrole is up to date",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"otherannotation":          "foobar",
+							clusterRoleOwnerAnnotation: "owner",
+						},
+						Labels: map[string]string{
+							"otherlabel":     "foobar",
+							aggregationLabel: "aggregationlabel",
+						},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{"myselector": "true"}},
+						},
+					},
+				},
+				modified: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{clusterRoleOwnerAnnotation: "owner"},
+						Labels:      map[string]string{aggregationLabel: "aggregationlabel"},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{"myselector": "true"}},
+						},
+					},
+				},
+			},
+			wantSame: true,
+		},
+		{
+			name: "clusterrole needs update",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"otherannotation": "foobar",
+						},
+					},
+					// misses Rules
+				},
+				modified: &rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+			},
+			wantSame: false,
+			wantUpdated: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"otherannotation": "foobar",
+					},
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Verbs:         []string{"get"},
+						APIGroups:     []string{""},
+						Resources:     []string{"configmaps"},
+						ResourceNames: []string{"my-cm"},
+					},
+				},
+			},
+		},
+		{
+			name: "aggregated clusterrole needs update",
+			args: args{
+				current: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						// Missing aggregation annotations and labels
+						Annotations: map[string]string{
+							"otherannotation": "foobar",
+						},
+					},
+					// Rules should be replaced by AggregationRules
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:         []string{"get"},
+							APIGroups:     []string{""},
+							Resources:     []string{"configmaps"},
+							ResourceNames: []string{"my-cm"},
+						},
+					},
+				},
+				modified: &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{clusterRoleOwnerAnnotation: "owner"},
+						Labels:      map[string]string{aggregationLabel: "aggregationlabel"},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{MatchLabels: map[string]string{"myselector": "true"}},
+						},
+					},
+				},
+			},
+			wantSame: false,
+			wantUpdated: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"otherannotation":          "foobar",
+						clusterRoleOwnerAnnotation: "owner",
+					},
+					Labels: map[string]string{
+						aggregationLabel: "aggregationlabel",
+					},
+				},
+				AggregationRule: &rbacv1.AggregationRule{
+					ClusterRoleSelectors: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"myselector": "true"}},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, updated := AreClusterRolesSame(tt.args.current, tt.args.modified)
+			if got != tt.wantSame {
+				t.Errorf("AreClusterRolesSame() got = %v, wantSame %v", got, tt.wantSame)
+			}
+			if !got && !reflect.DeepEqual(updated, tt.wantUpdated) {
+				t.Errorf("AreClusterRolesSame() got = %+v, want = %+v", updated, tt.wantUpdated)
 			}
 		})
 	}
