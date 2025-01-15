@@ -3,13 +3,13 @@ package charts
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/shepherd/clients/helm"
-
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	kubenamespaces "github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/actions/namespaces"
 	"github.com/rancher/rancher/tests/v2/actions/observability"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/wait"
@@ -287,12 +287,30 @@ func newStackstateAgentChartUpgradeAction(p *payloadOpts, stackstateConfigs *obs
 	return chartUpgradeAction
 }
 
-func InstallStackStateWithHelm() error {
+// CreateClusterRepo creates a new ClusterRepo resource in the Kubernetes cluster using the provided catalog client.
+// It takes the client, repository name, and repository URL as arguments and returns an error if the operation fails.
+func CreateClusterRepo(client *rancher.Client, catalogClient *catalog.Client, name, url string) error {
+	ctx := context.Background()
+	repo := buildClusterRepo(name, url)
+	_, err := catalogClient.ClusterRepos().Create(ctx, repo, metav1.CreateOptions{})
 
-	// Add StackState helm repo
-	err := helm.AddHelmRepo("suse-observability", "https://charts.rancher.com/server-charts/prime/suse-observability")
-	if err != nil {
+	client.Session.RegisterCleanupFunc(func() error {
+
+		var propagation = metav1.DeletePropagationForeground
+		err := catalogClient.ClusterRepos().Delete(context.Background(), "suse-observability", metav1.DeleteOptions{PropagationPolicy: &propagation})
+		if err != nil {
+			return err
+		}
+
 		return err
+	})
+	return err
+}
+
+// buildClusterRepo creates and returns a new ClusterRepo object with the provided name and URL.
+func buildClusterRepo(name, url string) *rv1.ClusterRepo {
+	return &rv1.ClusterRepo{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       rv1.RepoSpec{URL: url},
 	}
-	return nil
 }
