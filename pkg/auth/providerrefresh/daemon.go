@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/robfig/cron"
@@ -20,6 +21,9 @@ var (
 )
 
 func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
+
+	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
+
 	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
 	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
 	ref = &refresher{
@@ -29,6 +33,7 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 		tokenMGR:            tokens.NewManager(ctx, scaledContext),
 		userAttributes:      mgmtContext.Management.UserAttributes(""),
 		userAttributeLister: mgmtContext.Management.UserAttributes("").Controller().Lister(),
+		extTokenStore:       extTokenStore,
 	}
 
 	UpdateRefreshMaxAge(maxAge)
@@ -44,6 +49,7 @@ func UpdateRefreshCronTime(refreshCronTime string) {
 	parsed, err := ParseCron(refreshCronTime)
 	if err != nil {
 		logrus.Errorf("%v", err)
+		return
 	}
 
 	c.Stop()
@@ -93,7 +99,7 @@ func ParseMaxAge(setting string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vs", setting)
 	dur, err := time.ParseDuration(durString)
 	if err != nil {
-		return 0, fmt.Errorf("error parsing auth refresh max age: %v", err)
+		return 0, fmt.Errorf("Error parsing auth refresh max age: %v", err)
 	}
 	return dur, nil
 }
@@ -104,7 +110,7 @@ func ParseCron(setting string) (cron.Schedule, error) {
 	}
 	schedule, err := cron.ParseStandard(setting)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing auth refresh cron: %v", err)
+		return nil, fmt.Errorf("Error parsing auth refresh cron: %v", err)
 	}
 	return schedule, nil
 }
