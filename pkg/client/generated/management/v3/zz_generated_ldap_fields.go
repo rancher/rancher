@@ -22,6 +22,7 @@ const (
 	LdapFieldsFieldUserDisabledBitMask             = "userDisabledBitMask"
 	LdapFieldsFieldUserEnabledAttribute            = "userEnabledAttribute"
 	LdapFieldsFieldUserLoginAttribute              = "userLoginAttribute"
+	LdapFieldsFieldUserLoginFilter                 = "userLoginFilter"
 	LdapFieldsFieldUserMemberAttribute             = "userMemberAttribute"
 	LdapFieldsFieldUserNameAttribute               = "userNameAttribute"
 	LdapFieldsFieldUserObjectClass                 = "userObjectClass"
@@ -51,6 +52,7 @@ type LdapFields struct {
 	UserDisabledBitMask             int64    `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute            string   `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
 	UserLoginAttribute              string   `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
+	UserLoginFilter                 string   `json:"userLoginFilter,omitempty" yaml:"userLoginFilter,omitempty"`
 	UserMemberAttribute             string   `json:"userMemberAttribute,omitempty" yaml:"userMemberAttribute,omitempty"`
 	UserNameAttribute               string   `json:"userNameAttribute,omitempty" yaml:"userNameAttribute,omitempty"`
 	UserObjectClass                 string   `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`

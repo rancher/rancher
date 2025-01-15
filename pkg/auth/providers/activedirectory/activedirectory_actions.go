@@ -75,7 +75,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must supply a server")
 	}
 
-	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool, true)
+	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
 	if err != nil {
 		return err
 	}

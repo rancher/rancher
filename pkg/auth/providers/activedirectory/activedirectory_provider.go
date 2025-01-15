@@ -109,7 +109,7 @@ func (p *adProvider) AuthenticateUser(ctx context.Context, input interface{}) (v
 		return v3.Principal{}, nil, "", httperror.WrapAPIError(err, httperror.ClusterUnavailable, StatusLoginDisabled)
 	}
 
-	principal, groupPrincipal, err := p.loginUser(login, config, caPool, false)
+	principal, groupPrincipal, err := p.loginUser(login, config, caPool)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
