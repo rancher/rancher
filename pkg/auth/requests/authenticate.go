@@ -27,11 +27,6 @@ import (
 
 const tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 
-const (
-	ExtraRequestTokenID = "requesttokenid"
-	ExtraRequestHost    = "requesthost"
-)
-
 var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 
 // Authenticator authenticates a request.
@@ -185,8 +180,8 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	// Add request-specific extra information.
-	extras[ExtraRequestTokenID] = []string{token.Name}
-	extras[ExtraRequestHost] = []string{req.Host}
+	extras[common.ExtraRequestTokenID] = []string{token.Name}
+	extras[common.ExtraRequestHost] = []string{req.Host}
 
 	authResp := &AuthenticatorResponse{
 		IsAuthed:      true,
