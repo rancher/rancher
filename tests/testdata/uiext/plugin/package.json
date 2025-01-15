@@ -1,0 +1,6 @@
+{
+  "name": "uiext",
+  "description": "test extension",
+  "version": "0.4.1",
+  "main": "main.js"
+}

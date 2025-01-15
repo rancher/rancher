@@ -5,11 +5,13 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"mime"
-	"path/filepath"
-
+	"github.com/stretchr/testify/assert"
 	"io"
+	"mime"
+	"net"
 	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -45,6 +47,8 @@ type UIPluginTest struct {
 func (w *UIPluginTest) TearDownSuite() {
 	w.Require().NoError(w.uninstallApp(namespace.UIPluginNamespace, "uk-locale"))
 	w.Require().NoError(w.uninstallApp(namespace.UIPluginNamespace, "clock"))
+	w.Require().NoError(w.uninstallApp(namespace.UIPluginNamespace, "top-level-product"))
+	w.Require().NoError(w.uninstallApp(namespace.UIPluginNamespace, "homepage"))
 	w.Require().NoError(w.catalogClient.ClusterRepos().Delete(context.Background(), "extensions-examples", metav1.DeleteOptions{PropagationPolicy: &propagation}))
 	w.session.Cleanup()
 
@@ -128,6 +132,21 @@ func (w *UIPluginTest) SetupSuite() {
 	}, "extensions-examples"))
 	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "top-level-product", 0))
 
+	w.Require().NoError(w.catalogClient.InstallChart(&types.ChartInstallAction{
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                namespace.UIPluginNamespace,
+		DisableOpenAPIValidation: false,
+		Charts: []types.ChartInstall{{
+			ChartName:   "homepage",
+			Version:     "0.4.1",
+			ReleaseName: "homepage",
+			Description: "homepage",
+		}},
+	}, "extensions-examples"))
+	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "homepage", 0))
+
 	//Waiting for controller cache to update
 	time.Sleep(10 * time.Second)
 }
@@ -141,7 +160,8 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-	req, err := http.NewRequest(http.MethodGet, "https://localhost:443/v1/uiplugins", nil)
+	host := fmt.Sprintf("https://%s", w.client.RancherConfig.Host)
+	req, err := http.NewRequest(http.MethodGet, host+"/v1/uiplugins", nil)
 	require.NoError(w.T(), err)
 	req.AddCookie(&http.Cookie{
 		Name:  "R_SESS",
@@ -155,7 +175,7 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 	res.Body.Close()
 	var index plugin.SafeIndex
 	w.Require().NoError(json.Unmarshal(body, &index))
-	w.Require().Equal(len(index.Entries), 3)
+	w.Require().Equal(len(index.Entries), 4)
 }
 
 // TestGetIndexUnauthenticated Tests if the unauthenticated extensions (and only them) are present
@@ -164,8 +184,8 @@ func (w *UIPluginTest) TestGetIndexUnauthenticated() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-
-	res, err := client.Get("https://localhost:443/v1/uiplugins")
+	host := fmt.Sprintf("https://%s", w.client.RancherConfig.Host)
+	res, err := client.Get(host + "/v1/uiplugins")
 	w.Require().NoError(err)
 	body, err := io.ReadAll(res.Body)
 	require.NoError(w.T(), err)
@@ -182,8 +202,9 @@ func (w *UIPluginTest) TestCorrectContentType() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
+	host := fmt.Sprintf("https://%s", w.client.RancherConfig.Host)
 	file := "/top-level-product-0.1.0.umd.min.1.js"
-	req, _ := http.NewRequest(http.MethodGet, "https://localhost:443/v1/uiplugins/top-level-product/0.1.0/plugin"+file, nil)
+	req, _ := http.NewRequest(http.MethodGet, host+"/v1/uiplugins/top-level-product/0.1.0/plugin"+file, nil)
 	req.AddCookie(&http.Cookie{
 		Name:  "R_SESS",
 		Value: w.client.RancherConfig.AdminToken,
@@ -199,7 +220,8 @@ func (w *UIPluginTest) TestGetSingleExtensionAuthenticated() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-	req, _ := http.NewRequest(http.MethodGet, "https://localhost:443/v1/uiplugins/clock/0.2.0/plugin/clock-0.2.0.umd.min.js", nil)
+	host := fmt.Sprintf("https://%s", w.client.RancherConfig.Host)
+	req, _ := http.NewRequest(http.MethodGet, host+"/v1/uiplugins/clock/0.2.0/plugin/clock-0.2.0.umd.min.js", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  "R_SESS",
 		Value: w.client.RancherConfig.AdminToken,
@@ -215,7 +237,8 @@ func (w *UIPluginTest) TestGetSingleExtensionUnauthenticated() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-	res, _ := client.Get("https://localhost:443/v1/uiplugins/uk-locale/0.1.1/plugin/uk-locale-0.1.1.umd.min.js")
+	host := fmt.Sprintf("https://%s", w.client.RancherConfig.Host)
+	res, _ := client.Get(host + "/v1/uiplugins/uk-locale/0.1.1/plugin/uk-locale-0.1.1.umd.min.js")
 
 	w.Require().Equal(res.StatusCode, http.StatusOK)
 }
@@ -226,8 +249,80 @@ func (w *UIPluginTest) TestGetSingleUnauthorizedExtension() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-	res, _ := client.Get("https://localhost:443/v1/uiplugins/clock/0.2.0/plugin/clock-0.2.0.umd.min.js")
+	host := fmt.Sprintf("https://%s", w.client.RancherConfig.Host)
+	res, _ := client.Get(host + "/v1/uiplugins/clock/0.2.0/plugin/clock-0.2.0.umd.min.js")
 	w.Require().Equal(res.StatusCode, http.StatusNotFound)
+}
+
+func (w *UIPluginTest) TestExponentialBackoff() {
+	ts, err := StartUIPluginServer(w.T())
+	if err != nil {
+		w.T().Fatal(err)
+	}
+	url := ts.URL
+
+	uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(context.TODO(), "homepage", metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+	uiplugin.Spec.Plugin.Endpoint = url
+	_, err = w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Update(context.TODO(), uiplugin, metav1.UpdateOptions{})
+	if err != nil {
+		return
+	}
+
+	t := 360
+	retries := 0
+	err = kwait.PollUntilContextTimeout(context.Background(), 200*time.Millisecond, time.Duration(t)*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(ctx, "homepage", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if uiplugin.Spec.Plugin.Endpoint != url {
+			return false, nil
+		}
+		if uiplugin.Status.RetryNumber == 1 {
+			retries = 1
+			w.Require().False(uiplugin.Status.Ready)
+			return false, nil
+		}
+		if uiplugin.Status.RetryNumber == 2 {
+			retries = 2
+			w.Require().False(uiplugin.Status.Ready)
+			return false, nil
+		}
+		if uiplugin.Status.RetryNumber == 0 {
+			w.Require().Equal(retries, 2)
+			w.Require().True(uiplugin.Status.Ready)
+			return true, nil
+		}
+		return false, nil
+	})
+	w.Require().NoError(err)
+}
+
+func StartUIPluginServer(t assert.TestingT) (*httptest.Server, error) {
+	reqCount := 1
+
+	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if reqCount <= 2 {
+			reqCount++
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
+	})
+
+	ts := httptest.NewUnstartedServer(customHandler)
+
+	ip := getOutboundIP()
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
+	if err != nil {
+		return nil, err
+	}
+	ts.Listener = listener
+	ts.Start()
+
+	return ts, nil
 }
 
 func (w *UIPluginTest) waitForChart(status rv1.Status, name string, previousVersion int) error {
