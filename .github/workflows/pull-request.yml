@@ -35,11 +35,11 @@ jobs:
         uses: ./.github/actions/install-yq
         with:
           arch: ${{ env.ARCH }}
-      - id: env 
+      - id: env
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
       - name: Install dependencies
-        env: 
+        env:
           HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
         run: |
           curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
@@ -74,7 +74,7 @@ jobs:
       - name: install yq
         shell: bash
         run: sudo snap install yq
-      - id: env 
+      - id: env
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
       - name: Docker meta
@@ -149,7 +149,7 @@ jobs:
       - name: install yq
         shell: bash
         run: sudo snap install yq
-      - id: env 
+      - id: env
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
       - name: Docker meta
@@ -209,6 +209,11 @@ jobs:
   integration-tests:
     needs: [build-agent]
     uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
+  provisioning-tests:
+    needs: [build-agent]
+    uses: ./.github/workflows/provisioning-tests.yml
     with:
       parent_run_id: ${{ github.run_id }}
   build-agent-windows:

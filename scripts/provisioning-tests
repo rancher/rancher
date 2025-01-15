@@ -63,9 +63,7 @@ export CATTLE_FEATURES=${CATTLE_FEATURES}
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
-# export CATTLE_AGENT_IMAGE="rancher/rancher-agent:${AGENT_TAG}"
-# using :head for now while figuring out why loading from the docker cache isn't working
-export CATTLE_AGENT_IMAGE="rancher/rancher-agent:head"
+export CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/rancher-agent:${TAG}}
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
@@ -143,11 +141,40 @@ dump_rancher_logs()
 }
 export -f dump_rancher_logs
 
+push_cattle_agent_image()
+{
+  echo "pushing local cattle-agent image - waiting for registry-cache to be available"
+
+  ./scripts/retry \
+    --timeout 300 \
+    --sleep 2 \
+    --message "registry-cache was not available after {{elapsed}} seconds" \
+    --message-interval 30 \
+    --exit-command "echo registry-cache never came up. RIP" \
+    "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pod registry-cache -n default &>/dev/null"
+
+  echo "registry-cache pod found! waiting for pod to be running"
+  kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=ready pod/registry-cache -n default
+
+  # we're referring to the docker IP of the current pod...but since the docker socket is from the host localhost
+  # won't work. so we refer to it by the internal docker IP of the container to make it all work.
+  echo "setting up credentials"
+  docker login -u admin -p admin https://172.17.0.2:5000
+  echo "pushing ${CATTLE_AGENT_IMAGE}"
+  docker push 172.17.0.2:5000/$CATTLE_AGENT_IMAGE
+  echo "successfully pushed $CATTLE_AGENT_IMAGE to registry-cache"
+}
+
 # Compile Rancher
 # This needs to happen before build_and_run_rancher is executed in the background.
 # Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
 # time before Rancher is ready and therefore causing flakiness of the health check below.
-./scripts/build-server
+# ./scripts/build-server
+
+# now we can just copy it from the artifacts that are already there. neat!
+container_id=$(docker create rancher/rancher:$TAG)
+docker cp $container_id:/usr/bin/rancher bin/rancher
+docker rm $container_id
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
@@ -183,6 +210,7 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
 
+( push_cattle_agent_image & )
 
 #kill $TPID
 
