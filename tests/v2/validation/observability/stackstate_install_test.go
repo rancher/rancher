@@ -4,10 +4,10 @@ package observability
 
 import (
 	"context"
-	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
+	"github.com/rancher/rancher/tests/v2/actions/observability"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"github.com/rancher/shepherd/extensions/clusters"
@@ -35,6 +35,11 @@ var (
 	propagation  = metav1.DeletePropagationForeground
 )
 
+const (
+	observabilityChartURL  = "https://charts.rancher.com/server-charts/prime/suse-observability"
+	observabilityChartName = "suse-observability"
+)
+
 func (ssi *StackStateInstallTestSuite) TearDownSuite() {
 	ssi.Require().NoError(ssi.catalogClient.ClusterRepos().Delete(context.Background(), "suse-observability", metav1.DeleteOptions{PropagationPolicy: &propagation}))
 	ssi.session.Cleanup()
@@ -58,10 +63,6 @@ func (ssi *StackStateInstallTestSuite) SetupSuite() {
 	ssi.catalogClient, err = ssi.client.GetClusterCatalogClient(ssi.cluster.ID)
 	require.NoError(ssi.T(), err)
 
-	_, err = ssi.catalogClient.ClusterRepos().Create(context.Background(), &rv1.ClusterRepo{
-		ObjectMeta: metav1.ObjectMeta{Name: "suse-observability"},
-		Spec:       rv1.RepoSpec{URL: "https://charts.rancher.com/server-charts/prime/suse-observability"}}, metav1.CreateOptions{})
-	ssi.Require().NoError(err)
 	//ssi.Require().NoError(ssi.pollUntilDownloaded("suse-observability", metav1.Time{}))
 
 	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
@@ -84,11 +85,9 @@ func (ssi *StackStateInstallTestSuite) TestStackStateInstall() {
 	//require.NoError(ssi.T(), err)
 
 	ssi.Run("Install Stackstate", func() {
-
-		err := charts.InstallStackStateWithHelm()
+		err := observability.CreateClusterRepo(ssi.catalogClient, observabilityChartName, observabilityChartURL)
 		require.NoError(ssi.T(), err)
 	})
-
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
