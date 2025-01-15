@@ -98,7 +98,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             fleetWorkspacePermissionReconciled,
 				},
 			},
@@ -127,7 +127,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             fleetWorkspacePermissionReconciled,
 				},
 			},
@@ -254,7 +254,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToGetGlobalRole,
 					Message:            "GlobalRole.management.cattle.io \"gr\" not found",
 				},
@@ -273,7 +273,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileResourceRulesBindings,
 					Message:            "couldn't list fleetWorkspaces: unexpected error",
 				},
@@ -295,7 +295,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileResourceRulesBindings,
 					Message:            "couldn't create RoleBinding: unexpected error",
 				},
@@ -322,7 +322,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileResourceRulesBindings,
 					Message:            "couldn't delete RoleBinding: unexpected error",
 				},
@@ -350,7 +350,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileResourceRulesBindings,
 					Message:            "couldn't create RoleBinding: unexpected error",
 				},
@@ -372,7 +372,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "couldn't create ClusterRoleBinding: unexpected error",
 				},
@@ -397,7 +397,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "couldn't delete ClusterRoleBinding: unexpected error",
 				},
@@ -422,7 +422,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "unexpected error",
 				},
@@ -448,7 +448,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "unexpected error",
 				},
@@ -471,7 +471,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "couldn't delete ClusterRoleBinding: unexpected error",
 				},
@@ -492,7 +492,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "couldn't get ClusterRoleBinding: unexpected error",
 				},
@@ -513,7 +513,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "couldn't create ClusterRoleBinding: unexpected error",
 				},
@@ -534,7 +534,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "couldn't get ClusterRole: unexpected error",
 				},
@@ -563,7 +563,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				{
 					Type:               fleetWorkspacePermissionReconciled,
 					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Time{mockTime()},
+					LastTransitionTime: metav1.NewTime(mockTime()),
 					Reason:             failedToReconcileWorkspaceVerbsBindings,
 					Message:            "couldn't clean up ClusterRoleBinding: unexpected error",
 				},

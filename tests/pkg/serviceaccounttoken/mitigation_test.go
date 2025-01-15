@@ -107,7 +107,8 @@ func fakePopulateSecret(ctx context.Context, t *testing.T, k8sClient typedcorev1
 		LabelSelector: labels.Set(map[string]string{serviceaccounttoken.ServiceAccountSecretLabel: sa.GetName()}).String(),
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 	defer watcher.Stop()
 
@@ -141,7 +142,6 @@ func fakePopulateSecret(ctx context.Context, t *testing.T, k8sClient typedcorev1
 			t.Log("shutting down fake secret populator")
 			return
 		}
-
 	}
 }
 
