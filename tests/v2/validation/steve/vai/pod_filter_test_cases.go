@@ -115,7 +115,7 @@ var podFilterTestCases = []podFilterTestCase{
 			pods[1].Spec.NodeName = "node2"
 			pods[2].Spec.NodeName = "node1"
 
-			expectedNames := []string{}
+			var expectedNames []string
 			allNamespaces := []string{ns1, ns2}
 			expectedNamespaces := []string{ns1, ns2}
 

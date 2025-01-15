@@ -19,12 +19,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
 
-const scriptURL = "https://raw.githubusercontent.com/rancher/rancher/main/tests/v2/validation/steve/vai/scripts/script.sh"
+// TODO: update
+const scriptURL = "https://raw.githubusercontent.com/brudnak/rancher/refs/heads/brudnak-vai/tests/v2/validation/steve/vai/scripts/script.sh"
 
 type VaiTestSuite struct {
 	suite.Suite
@@ -33,7 +33,6 @@ type VaiTestSuite struct {
 	session     *session.Session
 	cluster     management.Cluster
 	vaiEnabled  bool
-	once        sync.Once
 }
 
 func (v *VaiTestSuite) SetupSuite() {
@@ -46,8 +45,8 @@ func (v *VaiTestSuite) SetupSuite() {
 	v.client = client
 	v.steveClient = client.Steve
 
+	// Check initial VAI state
 	enabled, err := isVaiEnabled(v.client)
-
 	require.NoError(v.T(), err)
 	v.vaiEnabled = enabled
 }
@@ -56,30 +55,96 @@ func (v *VaiTestSuite) TearDownSuite() {
 	v.session.Cleanup()
 }
 
-func (v *VaiTestSuite) enableVai() error {
-	logrus.Info("Enabling VAI caching")
-	startTime := time.Now()
-	err := enableVAI(v.client, &v.vaiEnabled, &v.once)
-	if err != nil {
-		return err
+func (v *VaiTestSuite) ensureVaiEnabled() {
+	if !v.vaiEnabled {
+		logrus.Info("VAI is disabled, enabling it for test...")
+		err := vai.EnableVaiCaching(v.client)
+		require.NoError(v.T(), err)
+
+		// Verify VAI is now enabled
+		enabled, err := isVaiEnabled(v.client)
+		require.NoError(v.T(), err)
+		require.True(v.T(), enabled, "VAI should be enabled")
+		v.vaiEnabled = true
 	}
-	duration := time.Since(startTime)
-	logrus.Infof("Enabling VAI took %s", formatDuration(duration))
-	v.vaiEnabled = true
-	return nil
 }
 
-func (v *VaiTestSuite) disableVai() error {
-	logrus.Info("Disabling VAI caching")
-	startTime := time.Now()
-	err := vai.DisableVaiCaching(v.client)
-	if err != nil {
-		return err
+func (v *VaiTestSuite) ensureVaiDisabled() {
+	if v.vaiEnabled {
+		logrus.Info("VAI is enabled, disabling it for test...")
+		err := vai.DisableVaiCaching(v.client)
+		require.NoError(v.T(), err)
+
+		// Verify VAI is now disabled
+		enabled, err := isVaiEnabled(v.client)
+		require.NoError(v.T(), err)
+		require.False(v.T(), enabled, "VAI should be disabled")
+		v.vaiEnabled = false
 	}
-	duration := time.Since(startTime)
-	logrus.Infof("Disabling VAI took %s", formatDuration(duration))
-	v.vaiEnabled = false
-	return nil
+}
+
+// TestVaiEnabled runs all tests with VAI enabled
+func (v *VaiTestSuite) TestVaiEnabled() {
+	v.ensureVaiEnabled()
+
+	v.Run("SecretFilters", func() {
+		supportedWithVai := filterTestCases(secretFilterTestCases, true)
+		v.runSecretFilterTestCases(supportedWithVai)
+	})
+
+	v.Run("PodFilters", func() {
+		supportedWithVai := filterTestCases(podFilterTestCases, true)
+		v.runPodFilterTestCases(supportedWithVai)
+	})
+
+	v.Run("SecretSorting", func() {
+		supportedWithVai := filterTestCases(secretSortTestCases, true)
+		v.runSecretSortTestCases(supportedWithVai)
+	})
+
+	v.Run("SecretLimit", func() {
+		supportedWithVai := filterTestCases(secretLimitTestCases, true)
+		v.runSecretLimitTestCases(supportedWithVai)
+	})
+
+	v.Run("CheckDBFilesInPods", v.checkDBFilesInPods)
+	v.Run("CheckSecretInDB", v.checkSecretInVAIDatabase)
+	v.Run("CheckNamespaceInAllVAIDatabases", v.checkNamespaceInAllVAIDatabases)
+}
+
+// TestVaiDisabled runs all tests with VAI disabled
+func (v *VaiTestSuite) TestVaiDisabled() {
+	v.ensureVaiDisabled()
+
+	v.Run("SecretFilters", func() {
+		unsupportedWithVai := filterTestCases(secretFilterTestCases, false)
+		v.runSecretFilterTestCases(unsupportedWithVai)
+	})
+
+	v.Run("PodFilters", func() {
+		unsupportedWithVai := filterTestCases(podFilterTestCases, false)
+		v.runPodFilterTestCases(unsupportedWithVai)
+	})
+
+	v.Run("SecretSorting", func() {
+		unsupportedWithVai := filterTestCases(secretSortTestCases, false)
+		v.runSecretSortTestCases(unsupportedWithVai)
+	})
+
+	v.Run("SecretLimit", func() {
+		unsupportedWithVai := filterTestCases(secretLimitTestCases, false)
+		v.runSecretLimitTestCases(unsupportedWithVai)
+	})
+
+	v.Run("NormalOperations", func() {
+		pods, err := v.client.Steve.SteveType("pod").List(nil)
+		require.NoError(v.T(), err)
+		require.NotEmpty(v.T(), pods.Data, "Should be able to list pods even with VAI disabled")
+	})
+}
+
+func TestVaiTestSuite(t *testing.T) {
+	suite.Run(t, new(VaiTestSuite))
 }
 
 func formatDuration(d time.Duration) string {
@@ -96,79 +161,6 @@ func formatDuration(d time.Duration) string {
 	} else {
 		return fmt.Sprintf("%d seconds", s)
 	}
-}
-
-func (v *VaiTestSuite) TestVAI() {
-	v.Run("InitialState", func() {
-		if v.vaiEnabled {
-			v.Run("TestWithVaiInitiallyEnabled", v.testWithVaiEnabled)
-		} else {
-			v.Run("TestWithVaiInitiallyDisabled", v.testWithVaiDisabled)
-		}
-	})
-
-	v.Run("ToggleVaiAndRetest", func() {
-		initialState := v.vaiEnabled
-		if initialState {
-			err := v.disableVai()
-			require.NoError(v.T(), err)
-			v.testWithVaiDisabled()
-		} else {
-			err := v.enableVai()
-			require.NoError(v.T(), err)
-			v.testWithVaiEnabled()
-		}
-	})
-}
-
-func (v *VaiTestSuite) testWithVaiEnabled() {
-	v.Run("SecretFilters", func() {
-		supportedWithVai := filterTestCases(secretFilterTestCases, v.vaiEnabled)
-		v.runSecretFilterTestCases(supportedWithVai)
-	})
-
-	v.Run("PodFilters", func() {
-		supportedWithVai := filterTestCases(podFilterTestCases, v.vaiEnabled)
-		v.runPodFilterTestCases(supportedWithVai)
-	})
-
-	v.Run("SecretSorting", func() {
-		supportedWithVai := filterTestCases(secretSortTestCases, v.vaiEnabled)
-		v.runSecretSortTestCases(supportedWithVai)
-	})
-
-	v.Run("SecretLimit", func() {
-		supportedWithVai := filterTestCases(secretLimitTestCases, v.vaiEnabled)
-		v.runSecretLimitTestCases(supportedWithVai)
-	})
-
-	v.Run("CheckDBFilesInPods", v.checkDBFilesInPods)
-	v.Run("CheckSecretInDB", v.checkSecretInVAIDatabase)
-	v.Run("CheckNamespaceInAllVAIDatabases", v.checkNamespaceInAllVAIDatabases)
-}
-
-func (v *VaiTestSuite) testWithVaiDisabled() {
-	v.Run("SecretFilters", func() {
-		unsupportedWithVai := filterTestCases(secretFilterTestCases, v.vaiEnabled)
-		v.runSecretFilterTestCases(unsupportedWithVai)
-	})
-
-	v.Run("PodFilters", func() {
-		unsupportedWithVai := filterTestCases(podFilterTestCases, v.vaiEnabled)
-		v.runPodFilterTestCases(unsupportedWithVai)
-	})
-
-	v.Run("SecretSorting", func() {
-		unsupportedWithVai := filterTestCases(secretSortTestCases, v.vaiEnabled)
-		v.runSecretSortTestCases(unsupportedWithVai)
-	})
-
-	v.Run("SecretLimit", func() {
-		unsupportedWithVai := filterTestCases(secretLimitTestCases, v.vaiEnabled)
-		v.runSecretLimitTestCases(unsupportedWithVai)
-	})
-
-	v.Run("NormalOperations", v.testNormalOperationsWithVaiDisabled)
 }
 
 func (v *VaiTestSuite) testNormalOperationsWithVaiDisabled() {
@@ -387,7 +379,7 @@ func (v *VaiTestSuite) runSecretLimitTestCases(testCases []secretLimitTestCase) 
 }
 
 func (v *VaiTestSuite) checkDBFilesInPods() {
-	expectedDBFiles := []string{"informer_object_cache.db", "informer_object_fields.db"}
+	expectedDBFiles := []string{"informer_object_cache.db", "informer_object_cache.db-wal", "informer_object_cache.db-shm"}
 
 	rancherPods, err := listRancherPods(v.client)
 	require.NoError(v.T(), err)
@@ -405,6 +397,12 @@ func (v *VaiTestSuite) checkDBFilesInPods() {
 			var dbFiles []string
 			for _, file := range files {
 				if strings.HasSuffix(file, ".db") {
+					dbFiles = append(dbFiles, file)
+				}
+				if strings.HasSuffix(file, ".db-wal") {
+					dbFiles = append(dbFiles, file)
+				}
+				if strings.HasSuffix(file, ".db-shm") {
 					dbFiles = append(dbFiles, file)
 				}
 			}
@@ -558,8 +556,4 @@ func (v *VaiTestSuite) checkNamespaceInAllVAIDatabases() {
 		fmt.Sprintf("Namespace %s not found in all Rancher pods' databases. Found in %d out of %d pods.",
 			namespaceName, namespaceFoundCount, len(rancherPods)))
 	v.T().Log("TestCheckNamespaceInAllVAIDatabases test completed")
-}
-
-func TestVaiTestSuite(t *testing.T) {
-	suite.Run(t, new(VaiTestSuite))
 }
