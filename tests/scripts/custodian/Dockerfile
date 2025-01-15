@@ -15,6 +15,7 @@ ARG AZURE_CLIENT_SECRET
 ENV AZURE_CLIENT_SECRET=$AZURE_CLIENT_SECRET
 ARG RANCHER_LINODE_ACCESSKEY
 ENV RANCHER_LINODE_CREDENTIAL=$RANCHER_LINODE_ACCESSKEY
+ENV TZ="America/New_York date"
 
 ARG OVERRIDE_REGION
 ENV OVERRIDE_REGION=$OVERRIDE_REGION
@@ -48,7 +49,7 @@ CMD for i in `ls *.yaml`; \
     echo $USER_KEYS; \
     for i in `ls *.yaml`; \
     do cat $i | sed -e 's/DONOTDELETEKEYS/'"${DONOTDELETE_KEYS}"'/g' -i $i; done; \
-    if [ "$CUSTODIAN_YAML" = "aws.yaml" || "$CUSTODIAN_YAML" = "untag-to-delete.yaml" ] ; then \
+    if [ "$CUSTODIAN_YAML" = "aws.yaml" ] || [ "$CUSTODIAN_YAML" = "untag-to-delete.yaml" ] ; then \
     custodian run --output-dir=. --region="us-east-2" ${CUSTODIAN_YAML}; \
     custodian run --output-dir=. --region="us-east-1" ${CUSTODIAN_YAML}; \
     custodian run --output-dir=. --region="us-west-1" ${CUSTODIAN_YAML}; \
