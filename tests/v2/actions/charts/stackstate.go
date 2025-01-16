@@ -29,7 +29,6 @@ const (
 	StackstateCRD                = "observability.rancher.io.configuration"
 	RancherPartnerChartRepo      = "rancher-partner-charts"
 	StackStateChartRepo          = "suse-observability"
-	StackStateChartURL           = "https://charts.rancher.com/server-charts/prime/suse-observability"
 )
 
 var (
@@ -61,8 +60,6 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 		return err
 	}
 
-	//TODO: Create cleanup function
-
 	err = catalogClient.InstallChart(chartInstallAction, StackStateChartRepo)
 	if err != nil {
 		log.Info("Error installing the StackState chart")
@@ -70,9 +67,8 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 	}
 
 	watchAppInterface, err := catalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector: "metadata.name=" + "suse-observability",
-		//TODO: Change to WatchTimeoutSeconds
-		TimeoutSeconds: &timeoutSeconds,
+		FieldSelector:  "metadata.name=" + "suse-observability",
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
 		log.Info("StackState App failed to install")
