@@ -59,7 +59,7 @@ type ImageTargetsAndSources struct {
 // GatherTargetImagesAndSources queries KDM, charts and system-charts to gather all the images used by Rancher and their source.
 // It returns an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
 // as the source of each image.
-func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
+func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
 	rancherVersion, ok := os.LookupEnv("TAG")
 	if !ok {
 		return ImageTargetsAndSources{}, fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
@@ -121,7 +121,6 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	rke2LinuxImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, k8sVersion1_21_0, img.Linux)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
-
 	}
 	if rke2LinuxImages != nil {
 		externalLinuxImages["rke2All"] = rke2LinuxImages
@@ -137,11 +136,10 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	linuxImagesFromArgs := append(imagesFromArgs[:winsIndex], imagesFromArgs[winsIndex+1:]...)
 
 	exportConfig := img.ExportConfig{
-		SystemChartsPath: systemChartsPath,
-		ChartsPath:       chartsPath,
-		OsType:           img.Linux,
-		RancherVersion:   rancherVersion,
-		GithubEndpoints:  img.ExtensionEndpoints,
+		ChartsPath:      chartsPath,
+		OsType:          img.Linux,
+		RancherVersion:  rancherVersion,
+		GithubEndpoints: img.ExtensionEndpoints,
 	}
 	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
@@ -255,7 +253,7 @@ func MirrorScript(arch string, targetImages []string) error {
 	mirror.Chmod(0755)
 
 	scriptStarter := getScript(arch, "mirror")
-	fmt.Fprintf(mirror, scriptStarter)
+	fmt.Fprint(mirror, scriptStarter)
 
 	var saveImages []string
 	for _, targetImage := range targetImages {

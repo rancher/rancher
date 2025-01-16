@@ -21,15 +21,15 @@ import (
 // This tool can be run with the command `dapper check-origins`.
 
 func main() {
-	if err := inner(os.Args[1], os.Args[2], os.Args[3:]); err != nil {
+	if err := inner(os.Args[1], os.Args[2:]); err != nil {
 		panic(err)
 	}
 }
 
 const imageNotFound = "image not found"
 
-func inner(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
-	targetsAndSources, err := utilities.GatherTargetImagesAndSources(systemChartsPath, chartsPath, imagesFromArgs)
+func inner(chartsPath string, imagesFromArgs []string) error {
+	targetsAndSources, err := utilities.GatherTargetImagesAndSources(chartsPath, imagesFromArgs)
 	if err != nil {
 		return err
 	}

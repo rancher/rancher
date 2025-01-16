@@ -63,9 +63,10 @@ func TestResolveWithCluster(t *testing.T) {
 			Spec: apimgmtv3.ClusterSpec{
 				ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 					RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
-						PrivateRegistries: []rketypes.PrivateRegistry{{
-							URL: s,
-						},
+						PrivateRegistries: []rketypes.PrivateRegistry{
+							{
+								URL: s,
+							},
 						},
 					},
 				},
@@ -215,11 +216,10 @@ func TestGetImages(t *testing.T) {
 		{
 			name: "exportConfig is completely empty",
 			exportConfig: ExportConfig{
-				SystemChartsPath: "",
-				ChartsPath:       "",
-				OsType:           Linux,
-				RancherVersion:   "",
-				GithubEndpoints:  []GithubEndpoint{},
+				ChartsPath:      "",
+				OsType:          Linux,
+				RancherVersion:  "",
+				GithubEndpoints: []GithubEndpoint{},
 			},
 			expected:    []string{},
 			notExpected: []string{"rancher/ui-plugin-catalog"},
@@ -227,10 +227,9 @@ func TestGetImages(t *testing.T) {
 		{
 			name: "only extensions is set in exportConfig",
 			exportConfig: ExportConfig{
-				SystemChartsPath: "",
-				ChartsPath:       "",
-				OsType:           Linux,
-				RancherVersion:   "",
+				ChartsPath:     "",
+				OsType:         Linux,
+				RancherVersion: "",
 				GithubEndpoints: []GithubEndpoint{
 					{URL: server.URL},
 				},
@@ -267,7 +266,6 @@ func TestGetImages(t *testing.T) {
 
 				assertlib.False(t, found)
 			}
-
 		})
 	}
 }
@@ -329,5 +327,4 @@ func TestResolve(t *testing.T) {
 	if err := settings.SystemDefaultRegistry.Set(""); err != nil {
 		t.Errorf("Failed to clean up TestResolve(), unable to clean SystemDefaultRegistry. Err: %v", err)
 	}
-
 }

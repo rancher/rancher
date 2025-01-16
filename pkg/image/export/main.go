@@ -10,16 +10,16 @@ import (
 
 func main() {
 	if len(os.Args) < 3 {
-		log.Fatal("\"main.go\" requires 2 arguments. Usage: go run main.go [SYSTEM_CHART_PATH] [CHART_PATH] [OPTIONAL]...")
+		log.Fatal("\"main.go\" requires 2 arguments. Usage: go run main.go [CHART_PATH] [OPTIONAL]...")
 	}
 
-	if err := run(os.Args[1], os.Args[2], os.Args[3:]); err != nil {
+	if err := run(os.Args[1], os.Args[2:]); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
-	targetsAndSources, err := utilities.GatherTargetImagesAndSources(systemChartsPath, chartsPath, imagesFromArgs)
+func run(chartsPath string, imagesFromArgs []string) error {
+	targetsAndSources, err := utilities.GatherTargetImagesAndSources(chartsPath, imagesFromArgs)
 	if err != nil {
 		return err
 	}
