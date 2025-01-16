@@ -71,7 +71,7 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 		}
 		// Append the remaining versions of the chart if the chart exists in the chartsToCheckConstraints map
 		// and the given Rancher version satisfies the chart's Rancher version constraint annotation.
-		chartName := versions[0].Metadata.Name
+		chartName := versions[0].Name
 		if _, ok := chartsToCheckConstraints[chartName]; ok {
 			for _, version := range versions[1:] {
 				if isConstraintSatisfied, err := c.checkChartVersionConstraint(*version); err != nil {

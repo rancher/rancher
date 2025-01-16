@@ -19,9 +19,9 @@ import (
 // ExportConfig provides parameters you can define to configure image exporting for Rancher components
 type ExportConfig struct {
 	RancherVersion  string
-	OsType          OSType
 	ChartsPath      string
 	GithubEndpoints []GithubEndpoint
+	OsType          OSType
 }
 
 type OSType int

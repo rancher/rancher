@@ -128,7 +128,7 @@ func PrintUpdatedImageOrigins(targetsAndSources utilities.ImageTargetsAndSources
 	// warn about unresolved images
 	// so that they may be manually resolved
 	if len(unknownImages) > 0 {
-		fmt.Println(fmt.Sprintf("[WARN] Some images do not have an origin defined, please provide origins within rancher/pkg/image/origins.go for the following images: %s", unknownImages))
+		fmt.Printf("[WARN] Some images do not have an origin defined, please provide origins within rancher/pkg/image/origins.go for the following images: %s\n", unknownImages)
 	}
 
 	return nil

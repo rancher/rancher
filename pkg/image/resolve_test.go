@@ -16,9 +16,9 @@ import (
 
 func TestConvertMirroredImages(t *testing.T) {
 	testCases := []struct {
-		caseName                string
 		inputRawImages          map[string]map[string]struct{}
 		outputImagesShouldEqual map[string]map[string]struct{}
+		caseName                string
 	}{
 		{
 			caseName: "normalize images",
@@ -74,9 +74,9 @@ func TestResolveWithCluster(t *testing.T) {
 		}
 	}
 	type input struct {
+		cluster            *v3.Cluster
 		image              string
 		CattleBaseRegistry string
-		cluster            *v3.Cluster
 	}
 	tests := []struct {
 		name     string
@@ -209,9 +209,9 @@ func TestGetImages(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		exportConfig ExportConfig
 		expected     []string
 		notExpected  []string
+		exportConfig ExportConfig
 	}{
 		{
 			name: "exportConfig is completely empty",
