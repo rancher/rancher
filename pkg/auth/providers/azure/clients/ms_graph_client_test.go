@@ -76,7 +76,8 @@ func TestMSGraphClient_ListUsers(t *testing.T) {
 		displayNames = append(displayNames, v.DisplayName)
 	}
 
-	assert.Len(t, users, 91)
+	// Note these can change because of changes in the remote service
+	assert.Len(t, users, 191)
 }
 
 func TestMSGraphClient_ListUsers_with_filter(t *testing.T) {
