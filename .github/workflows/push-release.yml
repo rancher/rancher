@@ -681,4 +681,6 @@ jobs:
         run: |
           AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./dist s3://prime-artifacts/rancher/${{ env.TAG }}
       - name: Build artifacts index
+        env:
+          ARTIFACTS_DISTRIBUTION_ID: EUK3RJTBZG1QG
         uses: ./.github/actions/build-artifacts-index
