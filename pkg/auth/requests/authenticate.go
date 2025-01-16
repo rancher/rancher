@@ -174,14 +174,13 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		a.refreshUser(token.UserID, false)
 	}
 
-	extras := make(map[string][]string)
-	if userExtra := getUserExtraInfo(token, authUser, attribs); userExtra != nil {
-		extras = userExtra
+	extras := map[string][]string{
+		common.ExtraRequestTokenID: {token.Name},
+		common.ExtraRequestHost:    {req.Host},
 	}
-
-	// Add request-specific extra information.
-	extras[common.ExtraRequestTokenID] = []string{token.Name}
-	extras[common.ExtraRequestHost] = []string{req.Host}
+	for key, value := range getUserExtraInfo(token, authUser, attribs) {
+		extras[key] = value
+	}
 
 	authResp := &AuthenticatorResponse{
 		IsAuthed:      true,
