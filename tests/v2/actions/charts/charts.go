@@ -11,6 +11,7 @@ const (
 	serverURLSettingID   = "server-url"
 	rancherChartsName    = "rancher-charts"
 	rancherPartnerCharts = "rancher-partner-charts"
+	stackStateChart      = "suse-observability"
 	active               = "active"
 	metadataName         = "metadata.name="
 )
