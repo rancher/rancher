@@ -27,11 +27,79 @@ const (
 	StackstateNamespace          = "stackstate"
 	StackstateCRD                = "observability.rancher.io.configuration"
 	RancherPartnerChartRepo      = "rancher-partner-charts"
+	StackStateChartRepo          = "suse-observability"
+	StackStateChartURL           = "https://charts.rancher.com/server-charts/prime/suse-observability"
 )
 
 var (
 	timeoutSeconds = int64(defaults.TwoMinuteTimeout)
 )
+
+func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string) error {
+
+	// Get server URL for chart configuration
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		log.Info("Error getting server setting.")
+		return err
+	}
+
+	// Create payload options
+	stackstateChartInstallActionPayload := &payloadOpts{
+		InstallOptions: *installOptions,
+		Name:           StackStateChartRepo,
+		Namespace:      StackstateNamespace,
+		Host:           serverSetting.Value,
+	}
+
+	chartInstallAction := newStackStateChartInstallAction(stackstateChartInstallActionPayload, stackstateConfigs, systemProjectID)
+
+	catalogClient, err := client.GetClusterCatalogClient(installOptions.Cluster.ID)
+	if err != nil {
+		log.Info("Error getting catalogClient")
+		return err
+	}
+
+	// Create suse-observability chart repo
+	//err = CreateClusterRepo(client, catalogClient, StackStateChartRepo, StackStateChartURL)
+	//if err != nil {
+	//	log.Info("Error adding StackState Chart Repo")
+	//	return err
+	//}
+	//TODO: Create cleanup function
+
+	err = catalogClient.InstallChart(chartInstallAction, StackStateChartRepo)
+	if err != nil {
+		log.Info("Error installing the StackState chart")
+		return err
+	}
+
+	watchAppInterface, err := catalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector: "metadata.name=" + "suse-observability",
+		//TODO: Change to WatchTimeoutSeconds
+		TimeoutSeconds: (*int64)(&defaults.TwoMinuteTimeout),
+	})
+	if err != nil {
+		log.Info("StackState App failed to install")
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusDeployed) {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	if err != nil {
+		log.Info("Unable to obtain the status of the installed app ")
+		return err
+	}
+	return nil
+}
 
 // InstallStackstateAgentChart is a private helper function that returns chart install action with stack state agent and payload options.
 func InstallStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string) error {
@@ -178,6 +246,25 @@ func newStackstateAgentChartInstallAction(p *payloadOpts, stackstateConfigs *obs
 	}
 
 	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, rancherPartnerCharts, systemProjectID, p.DefaultRegistry, stackstateValues)
+
+	chartInstalls := []types.ChartInstall{*chartInstall}
+	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
+
+	return chartInstallAction
+}
+
+func newStackStateChartInstallAction(p *payloadOpts, stackstateConfigs *observability.StackStateConfig, systemProjectID string) *types.ChartInstallAction {
+	stackstatechartValues := map[string]interface{}{
+		"stackstate": map[string]interface{}{
+			"cluster": map[string]interface{}{
+				"name": p.Cluster.Name,
+			},
+			"apiKey": stackstateConfigs.ClusterApiKey,
+			"url":    stackstateConfigs.Url,
+		},
+	}
+
+	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, stackStateChart, systemProjectID, p.DefaultRegistry, stackstatechartValues)
 
 	chartInstalls := []types.ChartInstall{*chartInstall}
 	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
