@@ -3,15 +3,22 @@
 package observability
 
 import (
-	"github.com/rancher/rancher/tests/v2/actions/observability"
-	"github.com/rancher/rancher/tests/v2/actions/projects"
-	"github.com/rancher/shepherd/pkg/config"
+	"context"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
+	"github.com/rancher/rancher/tests/v2/actions/observability"
+	"github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/shepherd/pkg/config"
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"github.com/rancher/shepherd/extensions/clusters"
@@ -59,8 +66,6 @@ func (ssi *StackStateInstallTestSuite) SetupSuite() {
 	ssi.catalogClient, err = ssi.client.GetClusterCatalogClient(ssi.cluster.ID)
 	require.NoError(ssi.T(), err)
 
-	//ssi.Require().NoError(ssi.pollUntilDownloaded("suse-observability", metav1.Time{}))
-
 	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
 	projectTemplate.Name = charts.StackstateNamespace
 	project, err := client.Steve.SteveType(project).Create(projectTemplate)
@@ -78,10 +83,14 @@ func (ssi *StackStateInstallTestSuite) SetupSuite() {
 	ssi.stackstateConfigs = &stackstateConfigs
 
 	// Install StackState Chart Repo
-	err = charts.CreateClusterRepo(ssi.client, ssi.catalogClient, observabilityChartName, observabilityChartURL)
+	_, err = ssi.catalogClient.ClusterRepos().Get(context.TODO(), observabilityChartName, meta.GetOptions{})
+	if k8sErrors.IsNotFound(err) {
+		err = charts.CreateClusterRepo(ssi.client, ssi.catalogClient, observabilityChartName, observabilityChartURL)
+		log.Info("Created suse-observability repo StackState install.")
+	}
 	require.NoError(ssi.T(), err)
 
-	latestSSVersion, err := ssi.client.Catalog.GetLatestChartVersion(charts.StackStateChartRepo, observabilityChartName)
+	latestSSVersion, err := ssi.catalogClient.GetLatestChartVersion(charts.StackStateChartRepo, observabilityChartName)
 
 	ssi.stackstateChartInstallOptions = &charts.InstallOptions{
 		Cluster:   cluster,
@@ -90,25 +99,37 @@ func (ssi *StackStateInstallTestSuite) SetupSuite() {
 	}
 }
 
-func (ssi *StackStateInstallTestSuite) TestInstallStackstate() {
+func (ssi *StackStateInstallTestSuite) TestInstallStackState() {
 	subsession := ssi.session.NewSession()
 	defer subsession.Cleanup()
 
 	ssi.Run("Install SUSE Observability Chart", func() {
-		// First create the cluster repo
-		////err := charts.CreateClusterRepo(ssi.client, ssi.catalogClient, observabilityChartName, observabilityChartURL)
-		////require.NoError(ssi.T(), err)
-		//
-		//// Get the latest version of the chart
-		//latestVersion, err := ssi.client.Catalog.GetLatestChartVersion(observabilityChartName, observabilityChartName)
-		//require.NoError(ssi.T(), err)
-		//
-		//// Create install options
-		//installOptions := &charts.InstallOptions{
-		//	Cluster:   ssi.cluster,
-		//	Version:   latestVersion,
-		//	ProjectID: ssi.projectID,
-		//}
+
+		// Read base config
+		baseConfigData, err := os.ReadFile("resources/baseConfig_values.yaml")
+		require.NoError(ssi.T(), err)
+
+		var baseConfig BaseConfig
+		err = yaml.Unmarshal(baseConfigData, &baseConfig)
+		require.NoError(ssi.T(), err)
+
+		// Read sizing config
+		sizingConfigData, err := os.ReadFile("resources/sizing_values.yaml")
+		require.NoError(ssi.T(), err)
+
+		var sizingConfig SizingConfig
+		err = yaml.Unmarshal(sizingConfigData, &sizingConfig)
+		require.NoError(ssi.T(), err)
+
+		// Convert structs back to map[string]interface{} for chart values
+		baseConfigMap, err := structToMap(baseConfig)
+		require.NoError(ssi.T(), err)
+
+		sizingConfigMap, err := structToMap(sizingConfig)
+		require.NoError(ssi.T(), err)
+
+		// Merge the values
+		mergedValues := mergeValues(baseConfigMap, sizingConfigMap)
 
 		systemProject, err := projects.GetProjectByName(ssi.client, ssi.cluster.ID, systemProject)
 		require.NoError(ssi.T(), err)
@@ -116,15 +137,73 @@ func (ssi *StackStateInstallTestSuite) TestInstallStackstate() {
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
 		// Install the chart
-		err = charts.InstallStackStateChart(ssi.client, ssi.stackstateChartInstallOptions, ssi.stackstateConfigs, systemProjectID)
+		err = charts.InstallStackStateChart(ssi.client, ssi.stackstateChartInstallOptions, ssi.stackstateConfigs, systemProjectID, mergedValues)
 		require.NoError(ssi.T(), err)
-
-		// Register cleanup to uninstall the chart after test
-		//ssi.session.RegisterCleanupFunc(func() error {
-		//	uninstallAction := charts.NewChartUninstallAction()
-		//	return ssi.catalogClient.UninstallChart(uninstallAction)
-		//})
 	})
+}
+
+// Helper function to convert struct to map[string]interface{}
+func structToMap(obj interface{}) (map[string]interface{}, error) {
+	data, err := yaml.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	// First unmarshal into a map[interface{}]interface{}
+	var m map[interface{}]interface{}
+	err = yaml.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to map[string]interface{}
+	result := make(map[string]interface{})
+	for k, v := range m {
+		strKey := fmt.Sprintf("%v", k)
+		result[strKey] = convertToStringKeysRecursive(v)
+	}
+
+	return result, nil
+}
+
+// convertToStringKeysRecursive recursively converts all map[interface{}]interface{} to map[string]interface{}
+func convertToStringKeysRecursive(val interface{}) interface{} {
+	switch v := val.(type) {
+	case map[interface{}]interface{}:
+		strMap := make(map[string]interface{})
+		for k, v2 := range v {
+			strKey := fmt.Sprintf("%v", k)
+			strMap[strKey] = convertToStringKeysRecursive(v2)
+		}
+		return strMap
+	case []interface{}:
+		for i, v2 := range v {
+			v[i] = convertToStringKeysRecursive(v2)
+		}
+		return v
+	default:
+		return v
+	}
+}
+
+// mergeValues merges multiple YAML values maps into a single map
+func mergeValues(values ...map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, v := range values {
+		for key, value := range v {
+			if existingValue, ok := result[key]; ok {
+				if existingMap, ok := existingValue.(map[string]interface{}); ok {
+					if newMap, ok := value.(map[string]interface{}); ok {
+						// Recursively merge maps
+						result[key] = mergeValues(existingMap, newMap)
+						continue
+					}
+				}
+			}
+			result[key] = value
+		}
+	}
+	return result
 }
 
 func TestStackStateInstallTestSuite(t *testing.T) {

@@ -3,6 +3,7 @@ package charts
 import (
 	"context"
 	"fmt"
+
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	kubenamespaces "github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
@@ -35,7 +36,7 @@ var (
 	timeoutSeconds = int64(defaults.TwoMinuteTimeout)
 )
 
-func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string) error {
+func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string, additionalValues map[string]interface{}) error {
 
 	// Get server URL for chart configuration
 	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
@@ -52,7 +53,7 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 		Host:           serverSetting.Value,
 	}
 
-	chartInstallAction := newStackStateChartInstallAction(stackstateChartInstallActionPayload, stackstateConfigs, systemProjectID)
+	chartInstallAction := newStackStateChartInstallAction(stackstateChartInstallActionPayload, stackstateConfigs, systemProjectID, additionalValues)
 
 	catalogClient, err := client.GetClusterCatalogClient(installOptions.Cluster.ID)
 	if err != nil {
@@ -60,12 +61,6 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 		return err
 	}
 
-	// Create suse-observability chart repo
-	//err = CreateClusterRepo(client, catalogClient, StackStateChartRepo, StackStateChartURL)
-	//if err != nil {
-	//	log.Info("Error adding StackState Chart Repo")
-	//	return err
-	//}
 	//TODO: Create cleanup function
 
 	err = catalogClient.InstallChart(chartInstallAction, StackStateChartRepo)
@@ -77,7 +72,7 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 	watchAppInterface, err := catalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector: "metadata.name=" + "suse-observability",
 		//TODO: Change to WatchTimeoutSeconds
-		TimeoutSeconds: (*int64)(&defaults.TwoMinuteTimeout),
+		TimeoutSeconds: &timeoutSeconds,
 	})
 	if err != nil {
 		log.Info("StackState App failed to install")
@@ -253,7 +248,7 @@ func newStackstateAgentChartInstallAction(p *payloadOpts, stackstateConfigs *obs
 	return chartInstallAction
 }
 
-func newStackStateChartInstallAction(p *payloadOpts, stackstateConfigs *observability.StackStateConfig, systemProjectID string) *types.ChartInstallAction {
+func newStackStateChartInstallAction(p *payloadOpts, stackstateConfigs *observability.StackStateConfig, systemProjectID string, additionalValues map[string]interface{}) *types.ChartInstallAction {
 	stackstatechartValues := map[string]interface{}{
 		"stackstate": map[string]interface{}{
 			"cluster": map[string]interface{}{
@@ -264,7 +259,10 @@ func newStackStateChartInstallAction(p *payloadOpts, stackstateConfigs *observab
 		},
 	}
 
-	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, stackStateChart, systemProjectID, p.DefaultRegistry, stackstatechartValues)
+	// Merge with additional values
+	mergedValues := mergeValues(stackstatechartValues, additionalValues)
+
+	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, stackStateChart, systemProjectID, p.DefaultRegistry, mergedValues)
 
 	chartInstalls := []types.ChartInstall{*chartInstall}
 	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
@@ -400,4 +398,24 @@ func buildClusterRepo(name, url string) *rv1.ClusterRepo {
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       rv1.RepoSpec{URL: url},
 	}
+}
+
+// mergeValues merges multiple YAML values maps into a single map
+func mergeValues(values ...map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, v := range values {
+		for key, value := range v {
+			if existingValue, ok := result[key]; ok {
+				if existingMap, ok := existingValue.(map[string]interface{}); ok {
+					if newMap, ok := value.(map[string]interface{}); ok {
+						// Recursively merge maps
+						result[key] = mergeValues(existingMap, newMap)
+						continue
+					}
+				}
+			}
+			result[key] = value
+		}
+	}
+	return result
 }
