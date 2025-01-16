@@ -1,6 +1,26 @@
 # Azure Policies
 policies:
 # VMs
+- name: azure-terminate-stopped-vms
+  resource: azure.vm
+  filters:
+    - type: instance-view
+      key: statuses[].code
+      op: in
+      value_type: swap
+      value: PowerState/failed
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:known_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: delete
+
 - name: az-mark-unknown-vms-for-deletion
   resource: azure.vm
   description: |
