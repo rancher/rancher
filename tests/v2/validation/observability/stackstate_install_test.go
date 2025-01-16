@@ -105,14 +105,6 @@ func (ssi *StackStateInstallTestSuite) TestInstallStackState() {
 
 	ssi.Run("Install SUSE Observability Chart", func() {
 
-		//// Read base config
-		//baseConfigData, err := os.ReadFile("resources/baseConfig_values.yaml")
-		//require.NoError(ssi.T(), err)
-		//
-		//var baseConfig BaseConfig
-		//err = yaml.Unmarshal(baseConfigData, &baseConfig)
-		//require.NoError(ssi.T(), err)
-
 		// Read sizing config
 		sizingConfigData, err := os.ReadFile("resources/stackstatevalues.yaml")
 		require.NoError(ssi.T(), err)
