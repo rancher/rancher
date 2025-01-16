@@ -105,16 +105,31 @@ func (ssi *StackStateInstallTestSuite) TestInstallStackState() {
 
 	ssi.Run("Install SUSE Observability Chart", func() {
 
+		// Read base config
+		baseConfigData, err := os.ReadFile("resources/baseConfig_values.yaml")
+		require.NoError(ssi.T(), err)
+
+		var baseConfig observability.BaseConfig
+		err = yaml.Unmarshal(baseConfigData, &baseConfig)
+		require.NoError(ssi.T(), err)
+
 		// Read sizing config
-		sizingConfigData, err := os.ReadFile("resources/stackstatevalues.yaml")
+		sizingConfigData, err := os.ReadFile("resources/sizing_values.yaml")
 		require.NoError(ssi.T(), err)
 
-		var stackStateServerValuesConfig observability.StackStateServerValuesConfig
-		err = yaml.Unmarshal(sizingConfigData, &stackStateServerValuesConfig)
+		var sizingConfig observability.SizingConfig
+		err = yaml.Unmarshal(sizingConfigData, &sizingConfig)
 		require.NoError(ssi.T(), err)
 
-		stackStateServerValuesConfigMap, err := structToMap(stackStateServerValuesConfig)
+		// Convert structs back to map[string]interface{} for chart values
+		baseConfigMap, err := structToMap(baseConfig)
 		require.NoError(ssi.T(), err)
+
+		sizingConfigMap, err := structToMap(sizingConfig)
+		require.NoError(ssi.T(), err)
+
+		// Merge the values
+		mergedValues := mergeValues(baseConfigMap, sizingConfigMap)
 
 		systemProject, err := projects.GetProjectByName(ssi.client, ssi.cluster.ID, systemProject)
 		require.NoError(ssi.T(), err)
@@ -122,7 +137,7 @@ func (ssi *StackStateInstallTestSuite) TestInstallStackState() {
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
 		// Install the chart
-		err = charts.InstallStackStateChart(ssi.client, ssi.stackstateChartInstallOptions, ssi.stackstateConfigs, systemProjectID, stackStateServerValuesConfigMap)
+		err = charts.InstallStackStateChart(ssi.client, ssi.stackstateChartInstallOptions, ssi.stackstateConfigs, systemProjectID, mergedValues)
 		require.NoError(ssi.T(), err)
 	})
 }
