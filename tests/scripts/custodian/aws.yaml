@@ -16,6 +16,7 @@ policies:
     - 'tag:DoNotDelete': absent
     - 'tag:ec2_known_user': absent
     - "tag:DeletesOnFriday": absent
+    - "tag:ec2_unknown_user": absent
     - not: 
       - type: value
         key: tag:Name
@@ -41,6 +42,7 @@ policies:
     - 'tag:DoNotDelete': absent
     - 'tag:ec2_unknown_user': absent
     - "tag:DeletesOnFriday": absent
+    - "tag:ec2_known_user": absent
     - not: 
       - type: value
         key: tag:Name
@@ -104,6 +106,7 @@ policies:
     - 'tag:doNotDelete': absent
     - 'tag:DoNotDelete': absent
     - 'tag:ec2_known_user': absent
+    - "tag:ec2_unknown_user": absent
     - "tag:DeletesOnFriday": absent
     - not: 
       - type: value
@@ -128,6 +131,7 @@ policies:
     - 'tag:doNotDelete': absent
     - 'tag:DoNotDelete': absent
     - 'tag:ec2_unknown_user': absent
+    - "tag:ec2_known_user": absent
     - "tag:DeletesOnFriday": absent
     - not: 
       - type: value
@@ -184,6 +188,7 @@ policies:
     - 'tag:doNotDelete': absent
     - 'tag:DoNotDelete': absent
     - 'tag:ec2_known_user': absent
+    - "tag:ec2_unknown_user": absent
     - "tag:DeletesOnFriday": absent
     - not: 
       - type: value
@@ -218,7 +223,8 @@ policies:
     # nlb is not doNotDelete
     - 'tag:doNotDelete': absent
     - 'tag:DoNotDelete': absent
-    - 'tag:ec2_unknown_user': absent
+    - "tag:ec2_unknown_user": absent
+    - "tag:ec2_known_user": absent
     - "tag:DeletesOnFriday": absent
     - not: 
       - type: value
