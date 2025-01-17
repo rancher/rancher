@@ -248,5 +248,20 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, fmt.Errorf("install stores: %w", err)
 	}
 
+	service := Service()
+	if _, err := wranglerContext.Core.Service().Create(&service); client.IgnoreAlreadyExists(err) != nil {
+		return nil, fmt.Errorf("failed to create a new proxy service: %w", err)
+	}
+
+	caBundle, _ := sniProvider.CurrentCertKeyContent()
+	apiService, err := APIService(caBundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct a new APIService: %w", err)
+	}
+
+	if _, err := wranglerContext.API.APIService().Create(apiService); client.IgnoreAlreadyExists(err) != nil {
+		return nil, fmt.Errorf("failed to create a new APIService: %w", err)
+	}
+
 	return extensionAPIServer, nil
 }
