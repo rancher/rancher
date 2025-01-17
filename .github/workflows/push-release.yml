@@ -707,9 +707,9 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
           STATUS: "Success"
-          COMMIT_URL: ${{ env.GITHUB_SERVER_URL }}/${{ env.GITHUB_REPOSITORY }}/commit/${{ env.GITHUB_SHA }}
-          WORKFLOW_URL: ${{ env.GITHUB_SERVER_URL }}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         shell: bash
         run: |
-          curl -X POST ${{ env.WORKFLOW_URL }} -d '{"tag": "$TAG","status": "$STATUS","commit_url": "$COMMIT_URL","workflow_url": "$WORKFLOW_URL"}'
+          curl -X POST ${{ env.WEBHOOK_URL }} -d '{"tag": "${{ env.TAG }}","status": "${{ env.STATUS }}","commit_url": "${{ env.COMMIT_URL }}","workflow_url": "${{ env.WORKFLOW_URL }}"}'
