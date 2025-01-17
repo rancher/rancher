@@ -696,12 +696,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      TAG: ${{ github.ref_name }}
-      STATUS: "Success"
-      COMMIT_URL: ${{ env.GITHUB_SERVER_URL }}/${{ env.GITHUB_REPOSITORY }}/commit/${{ env.GITHUB_SHA }}
-      WORKFLOW_URL: ${{ env.GITHUB_SERVER_URL }}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
-      WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
     steps:
       # - name: Read App Secrets
       #   uses: rancher-eio/read-vault-secrets@main
@@ -709,6 +703,12 @@ jobs:
       #     secrets: |
       #       secret/data/github/repo/${{ github.repository }}/TODO UPDATE | WEBHOOK_URL
       - name: Send notification
+        env:
+          TAG: ${{ github.ref_name }}
+          STATUS: "Success"
+          COMMIT_URL: ${{ env.GITHUB_SERVER_URL }}/${{ env.GITHUB_REPOSITORY }}/commit/${{ env.GITHUB_SHA }}
+          WORKFLOW_URL: ${{ env.GITHUB_SERVER_URL }}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         shell: bash
         run: |
           curl -X POST ${{ env.WORKFLOW_URL }} -d '{"tag": "$TAG","status": "$STATUS","commit_url": "$COMMIT_URL","workflow_url": "$WORKFLOW_URL"}'
