@@ -538,7 +538,7 @@ jobs:
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}
   create-images-files:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
