@@ -12,6 +12,7 @@ const (
 	rancherChartsName    = "rancher-charts"
 	rancherPartnerCharts = "rancher-partner-charts"
 	active               = "active"
+	metadataName         = "metadata.name="
 )
 
 // InstallOptions is a struct of the required options to install a chart.
@@ -60,6 +61,18 @@ type RancherLoggingOpts struct {
 type RancherAlertingOpts struct {
 	SMS   bool
 	Teams bool
+}
+
+// RancherBackupOpts is a struct of the required options to install Rancher Backups with desired chart values.
+type RancherBackupOpts struct {
+	VolumeName                string
+	BucketName                string
+	CredentialSecretName      string
+	CredentialSecretNamespace string
+	Enabled                   bool
+	Endpoint                  string
+	Folder                    string
+	Region                    string
 }
 
 // GetChartCaseEndpointResult is a struct that GetChartCaseEndpoint helper function returns.
