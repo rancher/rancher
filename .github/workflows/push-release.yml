@@ -706,7 +706,7 @@ jobs:
       - name: Send notification
         env:
           TAG: ${{ github.ref_name }}
-          STATUS: "Success"
+          STATUS: "Completed ✅"
           COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
