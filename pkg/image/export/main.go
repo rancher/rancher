@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 3 {
+	if len(os.Args) < 2 {
 		log.Fatal("\"main.go\" requires 1 argument. Usage: go run main.go [CHART_PATH] [OPTIONAL]...")
 	}
 
