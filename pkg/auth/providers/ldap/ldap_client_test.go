@@ -160,6 +160,84 @@ func Test_ldapProvider_loginUser(t *testing.T) {
 			wantGroupPrincipals: nil,
 			wantErr:             true,
 		},
+		{
+			name: "successful user login with SearchUsingServiceAccount true",
+			fields: fields{
+				userMGR: mockUserManager{
+					hasAccess: true,
+				},
+				tokenMGR:   &tokens.Manager{},
+				caPool:     &x509.CertPool{},
+				userScope:  "providername_user",
+				groupScope: "providername_group",
+			},
+			args: args{
+				lConn: newMockLdapConnClient(),
+				credential: &v32.BasicLogin{
+					Username: DummyUsername,
+					Password: DummyPassword,
+				},
+				config: &v3.LdapConfig{
+					LdapFields: v32.LdapFields{
+						ServiceAccountDistinguishedName: DummySAUsername,
+						ServiceAccountPassword:          DummySAUPassword,
+						UserObjectClass:                 UserObjectClassName,
+						SearchUsingServiceAccount:       true,
+					},
+				},
+				caPool: &x509.CertPool{},
+			},
+			wantUserPrincipal: v3.Principal{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "providername_user://ldap.test.domain",
+				},
+				PrincipalType: "user",
+				Me:            true,
+			},
+			wantGroupPrincipals: []v3.Principal{
+				{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "providername_group://ldap.test.domain",
+					},
+					PrincipalType: "user",
+					Me:            true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "user login with invalid credentials with SearchUsingServiceAccount true",
+			fields: fields{
+				userMGR: mockUserManager{
+					hasAccess: false,
+				},
+				tokenMGR:   &tokens.Manager{},
+				caPool:     &x509.CertPool{},
+				userScope:  "providername_user",
+				groupScope: "providername_group",
+			},
+			args: args{
+				lConn: &mockLdapConn{
+					canAuthenticate: false,
+				},
+				credential: &v32.BasicLogin{
+					Username: DummyUsername,
+					Password: DummyPassword,
+				},
+				config: &v3.LdapConfig{
+					LdapFields: v32.LdapFields{
+						ServiceAccountDistinguishedName: DummySAUsername,
+						ServiceAccountPassword:          DummySAUPassword,
+						UserObjectClass:                 UserObjectClassName,
+						SearchUsingServiceAccount:       true,
+					},
+				},
+				caPool: &x509.CertPool{},
+			},
+			wantUserPrincipal:   v3.Principal{},
+			wantGroupPrincipals: nil,
+			wantErr:             true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

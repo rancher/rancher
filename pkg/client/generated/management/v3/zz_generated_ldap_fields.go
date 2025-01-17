@@ -14,6 +14,7 @@ const (
 	LdapFieldsFieldGroupSearchFilter               = "groupSearchFilter"
 	LdapFieldsFieldNestedGroupMembershipEnabled    = "nestedGroupMembershipEnabled"
 	LdapFieldsFieldPort                            = "port"
+	LdapFieldsFieldSearchUsingServiceAccount       = "searchUsingServiceAccount"
 	LdapFieldsFieldServers                         = "servers"
 	LdapFieldsFieldServiceAccountDistinguishedName = "serviceAccountDistinguishedName"
 	LdapFieldsFieldServiceAccountPassword          = "serviceAccountPassword"
@@ -43,6 +44,7 @@ type LdapFields struct {
 	GroupSearchFilter               string   `json:"groupSearchFilter,omitempty" yaml:"groupSearchFilter,omitempty"`
 	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled,omitempty" yaml:"nestedGroupMembershipEnabled,omitempty"`
 	Port                            int64    `json:"port,omitempty" yaml:"port,omitempty"`
+	SearchUsingServiceAccount       bool     `json:"searchUsingServiceAccount,omitempty" yaml:"searchUsingServiceAccount,omitempty"`
 	Servers                         []string `json:"servers,omitempty" yaml:"servers,omitempty"`
 	ServiceAccountDistinguishedName string   `json:"serviceAccountDistinguishedName,omitempty" yaml:"serviceAccountDistinguishedName,omitempty"`
 	ServiceAccountPassword          string   `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
