@@ -690,7 +690,8 @@ jobs:
   #         gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
   notify-release:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    # runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    runs-on: ubuntu-latest
     container: registry.suse.com/bci/bci-base:latest
     # needs: [merge-installer-manifest]
     permissions:
