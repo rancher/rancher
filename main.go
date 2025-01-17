@@ -153,6 +153,12 @@ func main() {
 			Usage:       "Declare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
 			Destination: &config.Features,
 		},
+		cli.BoolFlag{
+			Name:        "imperative-extension-api",
+			EnvVar:      "IMPERATIVE_EXTENSION_API",
+			Usage:       "Enable the rancher imperative api",
+			Destination: &config.EnableImperativeAPIExtension,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {

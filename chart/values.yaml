@@ -209,3 +209,6 @@ webhook: ""
 # helm values to use when installing the fleet chart.
 # helm values set here will override all other global values used when installing the fleet chart.
 fleet: ""
+
+imperativeExtensionApi:
+  enabled: true

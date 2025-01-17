@@ -67,23 +67,24 @@ import (
 const encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
 
 type Options struct {
-	ACMEDomains       cli.StringSlice
-	AddLocal          string
-	Embedded          bool
-	BindHost          string
-	HTTPListenPort    int
-	HTTPSListenPort   int
-	K8sMode           string
-	Debug             bool
-	Trace             bool
-	NoCACerts         bool
-	AuditLogPath      string
-	AuditLogMaxage    int
-	AuditLogMaxsize   int
-	AuditLogMaxbackup int
-	AuditLevel        int
-	Features          string
-	ClusterRegistry   string
+	ACMEDomains                  cli.StringSlice
+	AddLocal                     string
+	Embedded                     bool
+	BindHost                     string
+	HTTPListenPort               int
+	HTTPSListenPort              int
+	K8sMode                      string
+	Debug                        bool
+	Trace                        bool
+	NoCACerts                    bool
+	AuditLogPath                 string
+	AuditLogMaxage               int
+	AuditLogMaxsize              int
+	AuditLogMaxbackup            int
+	AuditLevel                   int
+	Features                     string
+	ClusterRegistry              string
+	EnableImperativeAPIExtension bool
 }
 
 type Rancher struct {
@@ -198,9 +199,23 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	extensionAPIServer, err := ext.NewExtensionAPIServer(wranglerContext)
-	if err != nil {
-		return nil, fmt.Errorf("extension api server: %w", err)
+	// temporary workaround to enable the imperative api extensionfor testing
+	if opts.EnableImperativeAPIExtension {
+		settings.ImperativeApiExtension.Set("true")
+	}
+
+	var extensionAPIServer steveserver.ExtensionAPIServer
+	if strings.EqualFold(settings.ImperativeApiExtension.Get(), "true") {
+		logrus.Info("starting extension api server")
+		extensionAPIServer, err = ext.NewExtensionAPIServer(ctx, wranglerContext)
+		if err != nil {
+			return nil, fmt.Errorf("extension api server: %w", err)
+		}
+	} else {
+		logrus.Debug("not starting extension api server, cleaning up resources")
+		if err := ext.CleanupExtensionAPIServer(wranglerContext); err != nil {
+			return nil, fmt.Errorf("failed to cleanup extension api server: %w", err)
+		}
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{

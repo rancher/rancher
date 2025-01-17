@@ -82,6 +82,11 @@ spec:
           hostPort: {{ int .Values.hostPort }}
           protocol: TCP
 {{- end}}
+{{- if .Values.imperativeExtensionApi.enabled }}
+        - containerPort: 6666
+          hostPort: 6666
+          protocol: TCP
+{{- end}}
         args:
 {{- if .Values.debug }}
         - "--debug"
@@ -146,6 +151,10 @@ spec:
 {{- if .Values.agentTLSMode }}
         - name: CATTLE_AGENT_TLS_MODE
           value: "{{ .Values.agentTLSMode }}"
+{{- end }}
+{{- if .Values.imperativeExtensionApi.enabled }}
+        - name: IMPERATIVE_EXTENSION_API
+          value: "true"
 {{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
