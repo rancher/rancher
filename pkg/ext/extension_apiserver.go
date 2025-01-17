@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
@@ -13,10 +12,15 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	apiregv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -24,10 +28,55 @@ const (
 	// defined in the Imperative API RFC.
 	//
 	// The main kube-apiserver will connect to that port (through a tunnel).
-	Port = 6666
+	Port              = 6666
+	APIServiceName    = "v1.ext.cattle.io"
+	CACertSecretName  = "imperative-api-extension-ca"
+	TargetServiceName = "imperative-api-extension"
+	Namespace         = "cattle-system"
 )
 
-func NewExtensionAPIServer(wranglerContext *wrangler.Context) (steveserver.ExtensionAPIServer, error) {
+func APIService(caBundle []byte) (*apiregv1.APIService, error) {
+	port := int32(Port)
+
+	return &apiregv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: APIServiceName,
+		},
+		Spec: apiregv1.APIServiceSpec{
+			Group:                "ext.cattle.io",
+			GroupPriorityMinimum: 100,
+			CABundle:             caBundle,
+			Service: &apiregv1.ServiceReference{
+				Namespace: "cattle-system",
+				Name:      "imperative-api-extension",
+				Port:      &port,
+			},
+			Version:         "v1",
+			VersionPriority: 100,
+		},
+	}, nil
+}
+
+func Service() corev1.Service {
+	return corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      TargetServiceName,
+			Namespace: Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port: Port,
+				},
+			},
+			Selector: map[string]string{
+				"app": "rancher",
+			},
+		},
+	}
+}
+
+func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Context) (steveserver.ExtensionAPIServer, error) {
 	// Only the local cluster runs an extension API server
 	if features.MCMAgent.Enabled() {
 		return nil, nil
@@ -36,12 +85,36 @@ func NewExtensionAPIServer(wranglerContext *wrangler.Context) (steveserver.Exten
 	scheme := wrangler.Scheme
 	// Only need to listen on localhost because that port will be reached
 	// from a remotedialer tunnel on localhost
-	ln, err := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(Port)))
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
+	}
+
+	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
+	}
+
+	authenticator := steveext.NewUnionAuthenticator(
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			reqUser, ok := request.UserFrom(req.Context())
+			if !ok {
+				return nil, false, nil
+			}
+			return &authenticator.Response{
+				User: reqUser,
+			}, true, nil
+		}),
+		defaultAuthenticator,
+	)
+
+	sniProvider, err := certForCommonName(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
 	}
 
 	aslAuthorizer := steveext.NewAccessSetAuthorizer(wranglerContext.ASL)
+	codecs := serializer.NewCodecFactory(scheme)
 	extOpts := steveext.ExtensionAPIServerOptions{
 		Listener:              ln,
 		GetOpenAPIDefinitions: getOpenAPIDefinitions,
@@ -55,15 +128,7 @@ func NewExtensionAPIServer(wranglerContext *wrangler.Context) (steveserver.Exten
 			// and that's what this replacement map is doing.
 			"com.github.rancher.rancher.pkg.apis.ext.cattle.io.v1": "io.cattle.ext.v1",
 		},
-		Authenticator: authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-			reqUser, ok := request.UserFrom(req.Context())
-			if !ok {
-				return nil, false, nil
-			}
-			return &authenticator.Response{
-				User: reqUser,
-			}, true, nil
-		}),
+		Authenticator: authenticator,
 		Authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 			if a.IsResourceRequest() {
 				return aslAuthorizer.Authorize(ctx, a)
@@ -96,16 +161,44 @@ func NewExtensionAPIServer(wranglerContext *wrangler.Context) (steveserver.Exten
 			}
 			return aslAuthorizer.Authorize(ctx, attrs)
 		}),
+		SNICerts: []dynamiccertificates.SNICertKeyContentProvider{sniProvider},
 	}
-	codecs := serializer.NewCodecFactory(scheme)
+
 	extensionAPIServer, err := steveext.NewExtensionAPIServer(scheme, codecs, extOpts)
 	if err != nil {
 		return nil, fmt.Errorf("new extension API server: %w", err)
 	}
 
 	if err = extstores.InstallStores(extensionAPIServer, scheme); err != nil {
-		return nil, fmt.Errorf("install stores: %w", err)
+		return nil, fmt.Errorf("failed to install install stores: %w", err)
+	}
+
+	service := Service()
+	if _, err := wranglerContext.Core.Service().Create(&service); client.IgnoreAlreadyExists(err) != nil {
+		return nil, fmt.Errorf("failed to create a new proxy service: %w", err)
+	}
+
+	caBundle, _ := sniProvider.CurrentCertKeyContent()
+	apiService, err := APIService(caBundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct a new APIService: %w", err)
+	}
+
+	if _, err := wranglerContext.API.APIService().Create(apiService); client.IgnoreAlreadyExists(err) != nil {
+		return nil, fmt.Errorf("failed to create a new APIService: %w", err)
 	}
 
 	return extensionAPIServer, nil
+}
+
+func CleanupExtensionAPIServer(wranglerContext *wrangler.Context) error {
+	if err := wranglerContext.Core.Service().Delete(Namespace, APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("failed to create a new proxy service: %w", err)
+	}
+
+	if err := wranglerContext.API.APIService().Delete(Service().Name, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("failed to delete APIService: %w", err)
+	}
+
+	return nil
 }
