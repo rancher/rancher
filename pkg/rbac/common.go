@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -22,6 +21,7 @@ import (
 	wranglerName "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -345,7 +345,7 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil
+			return err
 		}
 		// resource doesn't exist, create it
 		_, err = client.Create(obj)
@@ -378,12 +378,12 @@ func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1
 			same = false
 			currentCR.AggregationRule = nil
 		}
-		if !reflect.DeepEqual(currentCR.Rules, wantedCR.Rules) {
+		if !equality.Semantic.DeepEqual(currentCR.Rules, wantedCR.Rules) {
 			same = false
 			currentCR.Rules = wantedCR.Rules
 		}
 	} else {
-		if !reflect.DeepEqual(currentCR.AggregationRule, wantedCR.AggregationRule) {
+		if !equality.Semantic.DeepEqual(currentCR.AggregationRule, wantedCR.AggregationRule) {
 			same = false
 			currentCR.AggregationRule = wantedCR.AggregationRule
 		}
@@ -497,8 +497,8 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 
 // AreClusterRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
 func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
-	return reflect.DeepEqual(crb1.Subjects, crb2.Subjects) &&
-		reflect.DeepEqual(crb1.RoleRef, crb2.RoleRef)
+	return equality.Semantic.DeepEqual(crb1.Subjects, crb2.Subjects) &&
+		equality.Semantic.DeepEqual(crb1.RoleRef, crb2.RoleRef)
 }
 
 // ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName

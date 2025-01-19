@@ -84,6 +84,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.RoleTemplates("").AddHandler(ctx, "legacy-rt-cleaner", rtLegacy.sync)
 	globalroles.Register(ctx, management, clusterManager)
 
+	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {
 		roletemplates.Register(ctx, management)
 	} else {

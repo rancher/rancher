@@ -152,7 +152,7 @@ var (
 		true)
 	AggregatedRoleTemplates = newFeature(
 		"aggregated-roletemplates",
-		"Make RoleTemplates use aggregation for generated RBAC roles",
+		"[Experimental] Make RoleTemplates use aggregation for generated RBAC roles",
 		false,
 		false,
 		true)

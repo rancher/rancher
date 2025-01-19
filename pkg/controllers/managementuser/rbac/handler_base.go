@@ -140,6 +140,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	}
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
 
+	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {
 		roletemplates.Register(ctx, workload)
 	} else {

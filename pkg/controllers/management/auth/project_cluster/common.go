@@ -153,11 +153,11 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 func newOwnerReference(obj runtime.Object) (metav1.OwnerReference, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return metav1.OwnerReference{}, fmt.Errorf("error accessing object type %v: %w", obj, err)
+		return metav1.OwnerReference{}, fmt.Errorf("error accessing object %v: %w", obj, err)
 	}
 	typeInfo, err := meta.TypeAccessor(obj)
 	if err != nil {
-		return metav1.OwnerReference{}, fmt.Errorf("error accessing object type %v: %w", obj, err)
+		return metav1.OwnerReference{}, fmt.Errorf("error accessing object %v type %T: %w", obj, obj, err)
 	}
 	return metav1.OwnerReference{
 		APIVersion: typeInfo.GetAPIVersion(),

@@ -32,9 +32,7 @@ const (
 
 type impersonationHandler struct {
 	userContext *config.UserContext
-	crtbClient  mgmtv3.ClusterRoleTemplateBindingController
 	crtbCache   mgmtv3.ClusterRoleTemplateBindingCache
-	prtbClient  mgmtv3.ProjectRoleTemplateBindingController
 	prtbCache   mgmtv3.ProjectRoleTemplateBindingCache
 	crClient    rbacv1.ClusterRoleController
 }

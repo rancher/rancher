@@ -160,7 +160,7 @@ func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplate
 	return desiredCRBs, nil
 }
 
-// reconcileBindings takes a map of desired ClusterRoleBindings and a slice of already existing ClusterRoleBindings and ensures that all the desired CRBs exist.
+// reconcileBindings Ensures that all bindings required to provide access to the CRTB either exist or get created.
 // It deletes any of the existing CRBs that are not needed.
 func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, localConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: reconcileBindings}

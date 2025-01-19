@@ -36,9 +36,7 @@ func newPRTBHandler(uc *config.UserContext) *prtbHandler {
 		impersonationHandler: impersonationHandler{
 			userContext: uc,
 			crClient:    uc.RBACw.ClusterRole(),
-			crtbClient:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 			crtbCache:   uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-			prtbClient:  uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 			prtbCache:   uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		},
 		crClient: uc.RBACw.ClusterRole(),
@@ -138,8 +136,8 @@ func (p *prtbHandler) OnRemove(key string, prtb *v3.ProjectRoleTemplateBinding) 
 		if err != nil {
 			return nil, err
 		}
-		for _, crb := range rbs.Items {
-			err = p.rbClient.Delete(n.Name, crb.Name, &metav1.DeleteOptions{})
+		for _, rb := range rbs.Items {
+			err = p.rbClient.Delete(n.Name, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				returnError = errors.Join(returnError, err)
 			}

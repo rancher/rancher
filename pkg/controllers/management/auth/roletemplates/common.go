@@ -82,7 +82,7 @@ func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crb
 	return existingCRB, nil
 }
 
-// deleteMembershipBinding checks if the user is still a member of the Project or Cluster specified by PRTB/CRTB. If they are no longer a member, delete the bindings.
+// deleteMembershipBinding checks if the user is still a member of the Project or Cluster specified by PRTB/CRTB. If the user is no longer a member, delete the bindings.
 func deleteMembershipBinding(rtb metav1.Object, crbController crbacv1.ClusterRoleBindingController) error {
 	label := getRTBLabel(rtb)
 	listOption := metav1.ListOptions{LabelSelector: label}

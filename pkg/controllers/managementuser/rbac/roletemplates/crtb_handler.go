@@ -29,9 +29,7 @@ func newCRTBHandler(uc *config.UserContext) *crtbHandler {
 		impersonationHandler: &impersonationHandler{
 			userContext: uc,
 			crClient:    uc.RBACw.ClusterRole(),
-			crtbClient:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 			crtbCache:   uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-			prtbClient:  uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 			prtbCache:   uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		},
 		crbClient:  uc.RBACw.ClusterRoleBinding(),
@@ -62,7 +60,7 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 	return crtb, errors.Join(err, c.updateStatus(crtb, remoteConditions))
 }
 
-// reconcileBindings builds and creates ClusterRoleBinding for CRTB and removes any CRBs that shouldn't exist
+// reconcileBindings builds and creates ClusterRoleBinding for CRTB and removes any CRBs that shouldn't exist.
 func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: reconcileClusterRoleBindings}
 
@@ -78,7 +76,8 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		return err
 	}
 
-	// Find if there is a CRB that already exists and delete all excess CRBs
+	// Find if the required CRB that already exists and delete all excess CRBs.
+	// There should only ever be 1 cluster role binding per CRTB.
 	var matchingCRB *rbacv1.ClusterRoleBinding
 	for _, currentCRB := range currentCRBs.Items {
 		if rbac.AreClusterRoleBindingContentsSame(crb, &currentCRB) && matchingCRB == nil {
@@ -91,7 +90,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		}
 	}
 
-	// If we didn't find an existing CRB, create it
+	// If we didn't find an existing CRB, create it.
 	if matchingCRB == nil {
 		if _, err := c.crbClient.Create(crb); err != nil {
 			c.s.AddCondition(remoteConditions, condition, failureToCreateClusterRoleBinding, err)
@@ -102,7 +101,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 	return nil
 }
 
-// OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding
+// OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
 	if err != nil {
@@ -116,7 +115,7 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	return nil, errors.Join(err, c.updateStatus(crtb, crtb.Status.RemoteConditions))
 }
 
-// deleteBindings removes cluster role bindings owned by CRTB
+// deleteBindings removes cluster role bindings owned by CRTB.
 func (c *crtbHandler) deleteBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: deleteClusterRoleBindings}
 
