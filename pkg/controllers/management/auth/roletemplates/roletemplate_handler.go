@@ -1,15 +1,12 @@
 package roletemplates
 
 import (
-	"errors"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/wrangler"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	v1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,10 +45,8 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return nil, nil
 	}
 
-	rules, err := r.getAllRules(rt)
-	if err != nil {
-		return nil, err
-	}
+	// ExternalRules are not considered because external roles can't provide access to management plane resources.
+	rules := rt.Rules
 
 	var clusterScopedPrivileges, projectScopedPrivileges []v1.PolicyRule
 	if rt.Context == "project" {
@@ -76,50 +71,22 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 			rbac.BuildAggregatingClusterRole(rt, rbac.ProjectManagementPlaneClusterRoleNameFor))
 	}
 
+	// Add an owner reference so the cluster role deletion gets handled automatically.
+	ownerReferences := []metav1.OwnerReference{{
+		Name:       rt.Name,
+		APIVersion: rt.APIVersion,
+		Kind:       rt.Kind,
+		UID:        rt.UID,
+	}}
+
 	for _, cr := range clusterRoles {
+		cr.OwnerReferences = ownerReferences
 		if err := rbac.CreateOrUpdateResource(cr, r.crClient, rbac.AreClusterRolesSame); err != nil {
 			return nil, err
 		}
 	}
 
 	return rt, nil
-}
-
-// OnRemove deletes all Cluster Roles in the local cluster created by the RoleTemplate
-func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-	rtName := rbac.ClusterRoleNameFor(rt.Name)
-	clusterScopedCRName := rbac.ClusterManagementPlaneClusterRoleNameFor(rtName)
-	clusterScopedACRName := rbac.AggregatedClusterRoleNameFor(clusterScopedCRName)
-	projectScopedCRName := rbac.ProjectManagementPlaneClusterRoleNameFor(rtName)
-	projectScopedACRName := rbac.AggregatedClusterRoleNameFor(projectScopedCRName)
-
-	return nil, errors.Join(
-		rbac.DeleteResource(clusterScopedCRName, r.crClient),
-		rbac.DeleteResource(clusterScopedACRName, r.crClient),
-		rbac.DeleteResource(projectScopedCRName, r.crClient),
-		rbac.DeleteResource(projectScopedACRName, r.crClient),
-	)
-}
-
-// getAllRules collects all policy rules that the RoleTemplate applies. Specifically it searches for external rules.
-func (r *roleTemplateHandler) getAllRules(rt *v3.RoleTemplate) ([]v1.PolicyRule, error) {
-	if !rt.External {
-		return rt.Rules, nil
-	}
-	if rt.ExternalRules != nil {
-		return rt.ExternalRules, nil
-	}
-
-	externalRole, err := r.crClient.Get(rt.Name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Don't error if it doesn't exist
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return externalRole.Rules, nil
 }
 
 // getManagementPlaneRules filters a set of rules based on the map passed in. Used to provide special resources that have cluster/project scope.
