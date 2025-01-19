@@ -57,11 +57,11 @@ func (ih *impersonationHandler) ensureServiceAccountImpersonator(username string
 // the indexers can be replaced by crd selectable fields https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#crd-selectable-fields
 func (ih *impersonationHandler) deleteServiceAccountImpersonator(username string) error {
 	indexKey := name.SafeConcatName(ih.userContext.ClusterName, username)
-	crtbs, err := ih.crtbCache.GetByIndex(crtbUsernameIndexer, indexKey)
+	crtbs, err := ih.crtbCache.GetByIndex(crtbByUsernameIndex, indexKey)
 	if err != nil {
 		return err
 	}
-	prtbs, err := ih.prtbCache.GetByIndex(prtbUsernameIndexer, indexKey)
+	prtbs, err := ih.prtbCache.GetByIndex(prtbByUsernameIndex, indexKey)
 	if err != nil {
 		return err
 	}

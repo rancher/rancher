@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	v3cluster "github.com/rancher/rancher/pkg/controllers/management/cluster"
+	"github.com/rancher/rancher/pkg/features"
 
 	"github.com/rancher/rancher/pkg/controllers/managementapi/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/samlconfig"
@@ -16,6 +17,7 @@ import (
 	whitelistproxyNodeDriver "github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -44,6 +46,11 @@ func registerIndexers(scaledContext *config.ScaledContext) error {
 	}
 	if err := tokens.RegisterIndexer(scaledContext); err != nil {
 		return err
+	}
+
+	// Using aggregated cluster roles is currently experimental and only available via feature flags.
+	if features.AggregatedRoleTemplates.Enabled() {
+		roletemplates.RegisterIndexers(scaledContext.Wrangler)
 	}
 
 	v3cluster.RegisterIndexers(scaledContext)
