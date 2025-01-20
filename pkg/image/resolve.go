@@ -18,11 +18,10 @@ import (
 
 // ExportConfig provides parameters you can define to configure image exporting for Rancher components
 type ExportConfig struct {
-	RancherVersion   string
-	OsType           OSType
-	ChartsPath       string
-	SystemChartsPath string
-	GithubEndpoints  []GithubEndpoint
+	RancherVersion  string
+	ChartsPath      string
+	GithubEndpoints []GithubEndpoint
+	OsType          OSType
 }
 
 type OSType int
@@ -103,11 +102,10 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	return imagesList, imagesAndSourcesList, nil
 }
 
-func AddImagesToImageListConfigMap(cm *v1.ConfigMap, rancherVersion, systemChartsPath string) error {
+func AddImagesToImageListConfigMap(cm *v1.ConfigMap, rancherVersion string) error {
 	exportConfig := ExportConfig{
-		SystemChartsPath: systemChartsPath,
-		OsType:           Windows,
-		RancherVersion:   rancherVersion,
+		OsType:         Windows,
+		RancherVersion: rancherVersion,
 	}
 	windowsImages, _, err := GetImages(exportConfig, nil, []string{}, nil)
 	if err != nil {
