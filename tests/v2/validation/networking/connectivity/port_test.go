@@ -5,6 +5,7 @@ package connectivity
 import (
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/services"
 	"github.com/rancher/rancher/tests/v2/actions/workloads"
@@ -12,7 +13,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionClusters "github.com/rancher/shepherd/extensions/clusters"
 	shepworkloads "github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -53,7 +54,7 @@ func (p *PortTestSuite) SetupSuite() {
 	clusterName := client.RancherConfig.ClusterName
 	require.NotEmptyf(p.T(), clusterName, "Cluster name to install should be set")
 
-	clusterID, err := clusters.GetClusterIDByName(p.client, clusterName)
+	clusterID, err := extensionClusters.GetClusterIDByName(p.client, clusterName)
 	require.NoError(p.T(), err, "Error getting cluster ID")
 
 	p.cluster, err = p.client.Management.Cluster.ByID(clusterID)
@@ -343,7 +344,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
-	isPool, err := IsNodePoolSizeValid(steveClient)
+	isPool, err := clusters.VerifyNodePoolSize(steveClient)
 	require.NoError(p.T(), err)
 
 	if !isPool {
