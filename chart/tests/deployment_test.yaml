@@ -691,4 +691,13 @@ tests:
           limits:
             cpu: 500m
             memory: 500Mi
-
+- it: supports enabling the imperative extensions api
+  set:
+    imperativeExtensionApi:
+      enabled: true
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_IMPERATIVE_API_EXTENSION
+        value: "true"
