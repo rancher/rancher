@@ -190,49 +190,6 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 
 			err = fleet.VerifyGitRepo(adminClient, gitRepoObject.ID, status.ClusterName, clusterObject.ID)
 			require.NoError(f.T(), err)
-			bundles, err := tt.client.Steve.SteveType("fleet.cattle.io.bundles").ByID(clusterObject.ID)
-
-			bundleStatus := &v1alpha1.BundleStatus{}
-			err = steveV1.ConvertToK8sType(bundles.Status, bundleStatus)
-
-			fleetPodNames, err := pods.GetPodNamesFromDeployment(tt.client, clusterObject.ID, bundleStatus.ResourceKey[0].Namespace, bundleStatus.ResourceKey[0].Name)
-			require.NoError(f.T(), err)
-
-			firstPodObject, err := pods.GetPodByName(tt.client, clusterObject.ID, bundleStatus.ResourceKey[0].Namespace, fleetPodNames[0])
-			require.NoError(f.T(), err)
-
-			corePod := &corev1.Pod{}
-			err = steveV1.ConvertToK8sType(firstPodObject, corePod)
-
-			// create a new workload / pod to ping
-			container := corev1.Container{
-				Name:            "test-pni-1",
-				Image:           "registry.suse.com/bci/bci-busybox:15.6",
-				ImagePullPolicy: corev1.PullAlways,
-				VolumeMounts:    nil,
-				EnvFrom:         []corev1.EnvFromSource{},
-				Command:         []string{"ping", "-c", "1", corePod.Status.PodIP},
-				Args:            nil,
-				SecurityContext: nil,
-			}
-			podTemplate := corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: make(map[string]string),
-				},
-				Spec: corev1.PodSpec{
-					Containers:       []corev1.Container{container},
-					Volumes:          nil,
-					ImagePullSecrets: []corev1.LocalObjectReference{},
-					NodeSelector:     nil,
-				},
-			}
-			createdDeployment, err := deployments.CreateDeployment(tt.client, clusterObject.ID, "test-pni-d", "default", podTemplate, 1)
-			require.NoError(f.T(), err)
-
-			err = charts.WatchAndWaitDeployments(tt.client, clusterObject.ID, "default", metav1.ListOptions{
-				FieldSelector: "metadata.name=" + createdDeployment.Name,
-			})
-			require.NoError(f.T(), err)
 
 			// steveclient, err := tt.client.Steve.ProxyDownstream(clusterObject.ID)
 
@@ -245,6 +202,60 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 		})
 	}
 
+}
+
+func (f *FleetWithProvisioningTestSuite) TestFleetPNI() {
+	tt := struct {
+		name   string
+		client *rancher.Client
+	}{"testingctw", f.client}
+	clusterObjectID := "fleet-default/auto-ec2-husk"
+	f.Run(tt.name, func() {
+		bundles, err := tt.client.Steve.SteveType("fleet.cattle.io.bundle").ByID(clusterObjectID)
+		require.NoError(f.T(), err)
+
+		bundleStatus := &v1alpha1.BundleStatus{}
+		err = steveV1.ConvertToK8sType(bundles.Status, bundleStatus)
+
+		fleetPodNames, err := pods.GetPodNamesFromDeployment(tt.client, clusterObjectID, bundleStatus.ResourceKey[0].Namespace, bundleStatus.ResourceKey[0].Name)
+		require.NoError(f.T(), err)
+
+		firstPodObject, err := pods.GetPodByName(tt.client, clusterObjectID, bundleStatus.ResourceKey[0].Namespace, fleetPodNames[0])
+		require.NoError(f.T(), err)
+
+		corePod := &corev1.Pod{}
+		err = steveV1.ConvertToK8sType(firstPodObject, corePod)
+
+		// create a new workload / pod to ping
+		container := corev1.Container{
+			Name:            "test-pni-1",
+			Image:           "registry.suse.com/bci/bci-busybox:15.6",
+			ImagePullPolicy: corev1.PullAlways,
+			VolumeMounts:    nil,
+			EnvFrom:         []corev1.EnvFromSource{},
+			Command:         []string{"ping", "-c", "1", corePod.Status.PodIP},
+			Args:            nil,
+			SecurityContext: nil,
+		}
+		podTemplate := corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: make(map[string]string),
+			},
+			Spec: corev1.PodSpec{
+				Containers:       []corev1.Container{container},
+				Volumes:          nil,
+				ImagePullSecrets: []corev1.LocalObjectReference{},
+				NodeSelector:     nil,
+			},
+		}
+		createdDeployment, err := deployments.CreateDeployment(tt.client, clusterObjectID, "test-pni-d", "default", podTemplate, 1)
+		require.NoError(f.T(), err)
+
+		err = charts.WatchAndWaitDeployments(tt.client, clusterObjectID, "default", metav1.ListOptions{
+			FieldSelector: "metadata.name=" + createdDeployment.Name,
+		})
+		require.NoError(f.T(), err)
+	})
 }
 
 func (f *FleetWithProvisioningTestSuite) TestWindowsAfterAddedGitRepo() {
