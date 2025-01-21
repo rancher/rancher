@@ -47,7 +47,7 @@ RUN pushd c:\; \
     Write-Host 'Complete.'; \
     popd;
 
-ENV DAPPER_ENV REPO TAG DRONE_TAG FOSSA_API_KEY
+ENV DAPPER_ENV REPO TAG DRONE_TAG
 ENV DAPPER_SOURCE /gopath/src/github.com/rancher/rancher
 ENV DAPPER_OUTPUT ./bin
 ENV DAPPER_DOCKER_SOCKET true
