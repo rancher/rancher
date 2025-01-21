@@ -63,7 +63,8 @@ export CATTLE_FEATURES=${CATTLE_FEATURES}
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
-export CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/rancher-agent:${TAG}}
+# defaulting to :head (matching the hardcoded value within rancher) if CATTLE_AGENT_IMAGE or TAG is not specified
+export CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/rancher-agent:${TAG:-head}}
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
@@ -165,16 +166,22 @@ push_cattle_agent_image()
   echo "successfully pushed $CATTLE_AGENT_IMAGE to registry-cache"
 }
 
-# Compile Rancher
+# Get the rancher binary ready
+#
 # This needs to happen before build_and_run_rancher is executed in the background.
 # Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
 # time before Rancher is ready and therefore causing flakiness of the health check below.
-# ./scripts/build-server
 
-# now we can just copy it from the artifacts that are already there. neat!
 container_id=$(docker create rancher/rancher:$TAG)
-docker cp $container_id:/usr/bin/rancher bin/rancher
-docker rm $container_id
+if [ -z $container_id ]; then
+  echo "building rancher from source - no preloaded container image available"
+  ./scripts/build-server
+else
+  # otherwise just copy it from the artifacts that are already there. neat!
+  echo "pulling bin/rancher from preloaded container image"
+  docker cp $container_id:/usr/bin/rancher bin/rancher
+  docker rm $container_id
+fi
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
@@ -210,7 +217,10 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
 
-( push_cattle_agent_image & )
+# only push the image if we're not using the default image:tag
+if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then
+  ( push_cattle_agent_image & )
+fi
 
 #kill $TPID
 
