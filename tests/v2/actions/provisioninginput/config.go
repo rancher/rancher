@@ -204,6 +204,7 @@ type Config struct {
 	NodePools                      []NodePools                              `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	MachinePools                   []MachinePools                           `json:"machinePools,omitempty" yaml:"machinePools,omitempty"`
 	CloudProvider                  string                                   `json:"cloudProvider,omitempty" yaml:"cloudProvider,omitempty"`
+	EnableNetworkPolicy            bool                                     `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	Providers                      []string                                 `json:"providers,omitempty" yaml:"providers,omitempty"`
 	NodeProviders                  []string                                 `json:"nodeProviders,omitempty" yaml:"nodeProviders,omitempty"`
 	Hardened                       bool                                     `json:"hardened,omitempty" yaml:"hardened,omitempty"`

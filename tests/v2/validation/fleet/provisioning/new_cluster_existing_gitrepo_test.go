@@ -9,13 +9,16 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/fleet"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/rancher/tests/v2/actions/reports"
+	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	extensionsfleet "github.com/rancher/shepherd/extensions/fleet"
 	"github.com/rancher/shepherd/extensions/users"
@@ -28,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -170,6 +174,7 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 
 			testClusterConfig.KubernetesVersion = f.provisioningConfig.RKE2KubernetesVersions[0]
 			testClusterConfig.CNI = f.provisioningConfig.CNIs[0]
+			testClusterConfig.EnableNetworkPolicy = true
 
 			clusterObject, err := provisioning.CreateProvisioningCustomCluster(tt.client, customProvider, testClusterConfig)
 			require.NoError(f.T(), err)
@@ -185,6 +190,58 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 
 			err = fleet.VerifyGitRepo(adminClient, gitRepoObject.ID, status.ClusterName, clusterObject.ID)
 			require.NoError(f.T(), err)
+			bundles, err := tt.client.Steve.SteveType("fleet.cattle.io.bundles").ByID(clusterObject.ID)
+
+			bundleStatus := &v1alpha1.BundleStatus{}
+			err = steveV1.ConvertToK8sType(bundles.Status, bundleStatus)
+
+			fleetPodNames, err := pods.GetPodNamesFromDeployment(tt.client, clusterObject.ID, bundleStatus.ResourceKey[0].Namespace, bundleStatus.ResourceKey[0].Name)
+			require.NoError(f.T(), err)
+
+			firstPodObject, err := pods.GetPodByName(tt.client, clusterObject.ID, bundleStatus.ResourceKey[0].Namespace, fleetPodNames[0])
+			require.NoError(f.T(), err)
+
+			corePod := &corev1.Pod{}
+			err = steveV1.ConvertToK8sType(firstPodObject, corePod)
+
+			// create a new workload / pod to ping
+			container := corev1.Container{
+				Name:            "test-pni-1",
+				Image:           "registry.suse.com/bci/bci-busybox:15.6",
+				ImagePullPolicy: corev1.PullAlways,
+				VolumeMounts:    nil,
+				EnvFrom:         []corev1.EnvFromSource{},
+				Command:         []string{"ping", "-c", "1", corePod.Status.PodIP},
+				Args:            nil,
+				SecurityContext: nil,
+			}
+			podTemplate := corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: make(map[string]string),
+				},
+				Spec: corev1.PodSpec{
+					Containers:       []corev1.Container{container},
+					Volumes:          nil,
+					ImagePullSecrets: []corev1.LocalObjectReference{},
+					NodeSelector:     nil,
+				},
+			}
+			createdDeployment, err := deployments.CreateDeployment(tt.client, clusterObject.ID, "test-pni-d", "default", podTemplate, 1)
+			require.NoError(f.T(), err)
+
+			err = charts.WatchAndWaitDeployments(tt.client, clusterObject.ID, "default", metav1.ListOptions{
+				FieldSelector: "metadata.name=" + createdDeployment.Name,
+			})
+			require.NoError(f.T(), err)
+
+			// steveclient, err := tt.client.Steve.ProxyDownstream(clusterObject.ID)
+
+			// deploymentResp, err := steveclient.SteveType("apps.deployment").ByID("default" + "/" + "test-pni-d")
+			// require.NoError(f.T(), err)
+
+			// podNames, err := pods.GetPodNamesFromDeployment(tt.client, clusterObject.ID, "default", createdDeployment.Name)
+			// require.NoError(f.T(), err)
+
 		})
 	}
 
@@ -240,6 +297,7 @@ func (f *FleetWithProvisioningTestSuite) TestWindowsAfterAddedGitRepo() {
 
 			testClusterConfig.KubernetesVersion = f.provisioningConfig.RKE2KubernetesVersions[0]
 			testClusterConfig.CNI = f.provisioningConfig.CNIs[0]
+			testClusterConfig.EnableNetworkPolicy = true
 
 			clusterObject, err := provisioning.CreateProvisioningCustomCluster(tt.client, customProvider, testClusterConfig)
 			require.NoError(f.T(), err)
