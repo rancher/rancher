@@ -1,6 +1,8 @@
 package roletemplates
 
 import (
+	"fmt"
+
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -28,6 +30,7 @@ const (
 	failureToListClusterRoleBindings  = "FailureToListClusterRoleBindings"
 	failureToDeleteClusterRoleBinding = "FailureToDeleteClusterRoleBinding"
 	failureToCreateClusterRoleBinding = "FailureToCreateClusterRoleBinding"
+	failureToGetRoleTemplate          = "FailureToGetRoleTemplate"
 )
 
 type impersonationHandler struct {
@@ -75,4 +78,18 @@ func (ih *impersonationHandler) deleteServiceAccountImpersonator(username string
 		return nil
 	}
 	return err
+}
+
+// isRoleTemplateExternal returns the value of RoleTemplate.External
+func isRoleTemplateExternal(rtName string, rtClient mgmtv3.RoleTemplateController) (bool, error) {
+	rt, err := rtClient.Get(rtName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	if rt == nil {
+		return false, fmt.Errorf("error getting roletemplate")
+	}
+	return rt.External, nil
 }

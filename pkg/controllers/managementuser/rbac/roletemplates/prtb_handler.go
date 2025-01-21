@@ -85,8 +85,19 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	// The desired rolebindings.
 	var rb *rbacv1.RoleBinding
 
-	// Build RoleBinding and Promoted RoleBindings needed in each namespace.
-	roleName := rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName)
+	isExternal, err := isRoleTemplateExternal(prtb.RoleTemplateName, p.rtClient)
+	if err != nil {
+		return err
+	}
+
+	// External Role Templates don't support aggregation, bind to the external cluster role directly.
+	var roleName string
+	if isExternal {
+		roleName = prtb.RoleTemplateName
+	} else {
+		roleName = rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName)
+	}
+
 	rb = buildRoleBinding(prtb, roleName, subject)
 
 	namespaces, err := p.getNamespacesFromProject(prtb)
@@ -162,7 +173,7 @@ func (p *prtbHandler) reconcilePromotedRole(prtb *v3.ProjectRoleTemplateBinding)
 	}
 
 	promotedRuleName := rbac.PromotedClusterRoleNameFor(prtb.RoleTemplateName)
-	crb, err := rbac.BuildClusterRoleBindingFromRTB(prtb, promotedRuleName)
+	crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(prtb, promotedRuleName)
 	if err != nil {
 		return err
 	}

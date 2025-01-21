@@ -136,7 +136,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		return err
 	}
 
-	crb, err = rbac.BuildClusterRoleBindingFromRTB(prtb, projectManagementRoleName)
+	crb, err = rbac.BuildAggregatingClusterRoleBindingFromRTB(prtb, projectManagementRoleName)
 	if err != nil {
 		return err
 	}
