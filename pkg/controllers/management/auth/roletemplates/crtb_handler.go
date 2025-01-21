@@ -135,7 +135,7 @@ func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplate
 	projectMagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err := c.crController.Get(projectMagementRoleName, metav1.GetOptions{})
 	if err == nil && cr != nil {
-		crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, projectMagementRoleName)
+		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, projectMagementRoleName)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +148,7 @@ func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplate
 	clusterManagementRoleName := rbac.ClusterManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err = c.crController.Get(clusterManagementRoleName, metav1.GetOptions{})
 	if err != nil && cr != nil {
-		crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, clusterManagementRoleName)
+		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, clusterManagementRoleName)
 		if err != nil {
 			return nil, err
 		}

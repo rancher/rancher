@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/slice"
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,10 +45,12 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return nil, nil
 	}
 
-	// ExternalRules are not considered because external roles can't provide access to management plane resources.
-	rules := rt.Rules
+	rules, err := r.gatherRules(rt)
+	if err != nil {
+		return nil, err
+	}
 
-	var clusterScopedPrivileges, projectScopedPrivileges []v1.PolicyRule
+	var clusterScopedPrivileges, projectScopedPrivileges []rbacv1.PolicyRule
 	if rt.Context == "project" {
 		projectScopedPrivileges = getManagementPlaneRules(rules, projectManagementPlaneResources)
 	} else if rt.Context == "cluster" {
@@ -56,7 +58,7 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		projectScopedPrivileges = getManagementPlaneRules(rules, projectManagementPlaneResources)
 	}
 
-	var clusterRoles []*v1.ClusterRole
+	var clusterRoles []*rbacv1.ClusterRole
 	rtName := rbac.ClusterRoleNameFor(rt.Name)
 
 	if len(clusterScopedPrivileges) != 0 {
@@ -90,12 +92,12 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 }
 
 // getManagementPlaneRules filters a set of rules based on the map passed in. Used to provide special resources that have cluster/project scope.
-func getManagementPlaneRules(rules []v1.PolicyRule, managementResources map[string]string) []v1.PolicyRule {
-	managementRules := []v1.PolicyRule{}
+func getManagementPlaneRules(rules []rbacv1.PolicyRule, managementResources map[string]string) []rbacv1.PolicyRule {
+	managementRules := []rbacv1.PolicyRule{}
 	for _, rule := range rules {
 		for resource, apiGroup := range managementResources {
 			if ruleContainsManagementPlaneRule(resource, apiGroup, rule) {
-				managementRules = append(managementRules, v1.PolicyRule{
+				managementRules = append(managementRules, rbacv1.PolicyRule{
 					Resources: []string{resource},
 					APIGroups: []string{apiGroup},
 					Verbs:     rule.Verbs,
@@ -108,8 +110,24 @@ func getManagementPlaneRules(rules []v1.PolicyRule, managementResources map[stri
 
 // ruleContainsManagementPlaneRule takes a rule and checks if it has the resource and apigroup from the management plane rules.
 // If there are ResourceNames specified in the rule, it only applies to specific resources and doesn't count as a management plane rule.
-func ruleContainsManagementPlaneRule(resource, apiGroup string, rule v1.PolicyRule) bool {
+func ruleContainsManagementPlaneRule(resource, apiGroup string, rule rbacv1.PolicyRule) bool {
 	return len(rule.ResourceNames) == 0 &&
-		(slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, v1.ResourceAll)) &&
-		(slice.ContainsString(rule.APIGroups, apiGroup) || slice.ContainsString(rule.APIGroups, v1.APIGroupAll))
+		(slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, rbacv1.ResourceAll)) &&
+		(slice.ContainsString(rule.APIGroups, apiGroup) || slice.ContainsString(rule.APIGroups, rbacv1.APIGroupAll))
+}
+
+// gatherRules returns the Rules used by the RoleTemplate. If external, it prioritizes the external rules. Otherwise use the RoleTemplate.Rules field.
+func (r *roleTemplateHandler) gatherRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyRule, error) {
+	if rt.External {
+		if rt.ExternalRules != nil {
+			return rt.ExternalRules, nil
+		}
+		cr, err := r.crClient.Get(rt.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return cr.Rules, nil
+	} else {
+		return rt.Rules, nil
+	}
 }

@@ -463,11 +463,16 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	}
 }
 
+// BuildAggregatingClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the Aggregating ClusterRole.
+func BuildAggregatingClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
+	return BuildClusterRoleBindingFromRTB(rtb, AggregatedClusterRoleNameFor(roleRefName))
+}
+
 // BuildClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the ClusterRole specified by roleRefName.
 func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
 	roleRef := rbacv1.RoleRef{
 		Kind: "ClusterRole",
-		Name: AggregatedClusterRoleNameFor(roleRefName),
+		Name: roleRefName,
 	}
 
 	subject, err := BuildSubjectFromRTB(rtb)

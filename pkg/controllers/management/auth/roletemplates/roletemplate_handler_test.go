@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -10,6 +11,24 @@ import (
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	getRoleTemplates = rbacv1.PolicyRule{
+		APIGroups: []string{"management.cattle.io"},
+		Verbs:     []string{"get"},
+		Resources: []string{"roletemplates"},
+	}
+	getPRTBS = rbacv1.PolicyRule{
+		APIGroups: []string{"management.cattle.io"},
+		Verbs:     []string{"get"},
+		Resources: []string{"projectroletemplatebindings"},
+	}
+	getCRTBs = rbacv1.PolicyRule{
+		APIGroups: []string{"management.cattle.io"},
+		Verbs:     []string{"get"},
+		Resources: []string{"clusterroletemplatebindings"},
+	}
 )
 
 func Test_OnChange(t *testing.T) {
@@ -37,13 +56,7 @@ func Test_OnChange(t *testing.T) {
 			name: "project RT with no management plane privileges doesn't create CRs",
 			rt: &v3.RoleTemplate{
 				Context: "project",
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{"management.cattle.io"},
-						Verbs:     []string{"get"},
-						Resources: []string{"roletemplates"},
-					},
-				},
+				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
 			},
 		},
 		{
@@ -58,13 +71,7 @@ func Test_OnChange(t *testing.T) {
 					Name: "test-rt",
 					UID:  "UID123",
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{"management.cattle.io"},
-						Verbs:     []string{"get"},
-						Resources: []string{"projectroletemplatebindings"},
-					},
-				},
+				Rules: []rbacv1.PolicyRule{getPRTBS},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound)
@@ -82,13 +89,7 @@ func Test_OnChange(t *testing.T) {
 						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
 						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
 					},
-					Rules: []rbacv1.PolicyRule{
-						{
-							APIGroups: []string{"management.cattle.io"},
-							Verbs:     []string{"get"},
-							Resources: []string{"projectroletemplatebindings"},
-						},
-					},
+					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}).Return(nil, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
@@ -119,13 +120,7 @@ func Test_OnChange(t *testing.T) {
 			name: "cluster RT with no management plane privileges doesn't create CRs",
 			rt: &v3.RoleTemplate{
 				Context: "cluster",
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{"management.cattle.io"},
-						Verbs:     []string{"get"},
-						Resources: []string{"roletemplates"},
-					},
-				},
+				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
 			},
 		},
 		{
@@ -140,18 +135,7 @@ func Test_OnChange(t *testing.T) {
 					Name: "test-rt",
 					UID:  "UID123",
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{"management.cattle.io"},
-						Verbs:     []string{"get"},
-						Resources: []string{"clusterroletemplatebindings"},
-					},
-					{
-						APIGroups: []string{"management.cattle.io"},
-						Verbs:     []string{"get"},
-						Resources: []string{"projectroletemplatebindings"},
-					},
-				},
+				Rules: []rbacv1.PolicyRule{getCRTBs, getPRTBS},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-cluster-mgmt", gomock.Any()).Return(nil, errNotFound)
@@ -169,13 +153,7 @@ func Test_OnChange(t *testing.T) {
 						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-cluster-mgmt"},
 						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
 					},
-					Rules: []rbacv1.PolicyRule{
-						{
-							APIGroups: []string{"management.cattle.io"},
-							Verbs:     []string{"get"},
-							Resources: []string{"clusterroletemplatebindings"},
-						},
-					},
+					Rules: []rbacv1.PolicyRule{getCRTBs},
 				}).Return(nil, nil)
 				m.EXPECT().Get("test-rt-cluster-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
@@ -215,13 +193,133 @@ func Test_OnChange(t *testing.T) {
 						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
 						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
 					},
-					Rules: []rbacv1.PolicyRule{
-						{
-							APIGroups: []string{"management.cattle.io"},
-							Verbs:     []string{"get"},
-							Resources: []string{"projectroletemplatebindings"},
+					Rules: []rbacv1.PolicyRule{getPRTBS},
+				}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Create(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-rt-project-mgmt-aggregator",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "test-rt",
+								Kind:       "roletemplate",
+								APIVersion: "management.cattle.io",
+								UID:        "UID123",
+							},
+						},
+						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
+						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
+							},
 						},
 					},
+				}).Return(nil, nil)
+			},
+		},
+		{
+			name: "use external rules over rules",
+			rt: &v3.RoleTemplate{
+				Context: "project",
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "roletemplate",
+					APIVersion: "management.cattle.io",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+					UID:  "UID123",
+				},
+				External:      true,
+				ExternalRules: []rbacv1.PolicyRule{getPRTBS},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{"management.cattle.io"},
+						Verbs:     []string{"get"},
+						Resources: []string{"roletemplates"},
+					},
+				},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Create(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-rt-project-mgmt",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "test-rt",
+								Kind:       "roletemplate",
+								APIVersion: "management.cattle.io",
+								UID:        "UID123",
+							},
+						},
+						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
+						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+					},
+					Rules: []rbacv1.PolicyRule{getPRTBS},
+				}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Create(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-rt-project-mgmt-aggregator",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "test-rt",
+								Kind:       "roletemplate",
+								APIVersion: "management.cattle.io",
+								UID:        "UID123",
+							},
+						},
+						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
+						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+					},
+					AggregationRule: &rbacv1.AggregationRule{
+						ClusterRoleSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
+							},
+						},
+					},
+				}).Return(nil, nil)
+			},
+		},
+		{
+			name: "use external cluster role rules over rules",
+			rt: &v3.RoleTemplate{
+				Context: "project",
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "roletemplate",
+					APIVersion: "management.cattle.io",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+					UID:  "UID123",
+				},
+				External: true,
+				Rules:    []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt", gomock.Any()).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{getPRTBS},
+				}, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Create(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-rt-project-mgmt",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "test-rt",
+								Kind:       "roletemplate",
+								APIVersion: "management.cattle.io",
+								UID:        "UID123",
+							},
+						},
+						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
+						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+					},
+					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}).Return(nil, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
@@ -473,6 +571,78 @@ func Test_getManagementPlaneRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.ElementsMatch(t, getManagementPlaneRules(tt.rules, tt.managementResources), tt.want)
+		})
+	}
+}
+
+func Test_gatherRules(t *testing.T) {
+	tests := []struct {
+		name    string
+		rt      *v3.RoleTemplate
+		getFunc func() (*rbacv1.ClusterRole, error)
+		want    []rbacv1.PolicyRule
+		wantErr bool
+	}{
+		{
+			name: "not external role template",
+			rt: &v3.RoleTemplate{
+				External: false,
+				Rules:    []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			want: []rbacv1.PolicyRule{getRoleTemplates},
+		},
+		{
+			name: "external rules has priority over rules and external cluster role",
+			rt: &v3.RoleTemplate{
+				External:      true,
+				ExternalRules: []rbacv1.PolicyRule{getRoleTemplates},
+				Rules:         []rbacv1.PolicyRule{getPRTBS},
+			},
+			want: []rbacv1.PolicyRule{getRoleTemplates},
+		},
+		{
+			name: "external cluster role has priority over rules",
+			rt: &v3.RoleTemplate{
+				External: true,
+				Rules:    []rbacv1.PolicyRule{getPRTBS},
+			},
+			getFunc: func() (*rbacv1.ClusterRole, error) {
+				return &rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{getRoleTemplates},
+				}, nil
+			},
+			want: []rbacv1.PolicyRule{getRoleTemplates},
+		},
+		{
+			name: "error getting external cluster role",
+			rt: &v3.RoleTemplate{
+				External: true,
+				Rules:    []rbacv1.PolicyRule{getPRTBS},
+			},
+			getFunc: func() (*rbacv1.ClusterRole, error) {
+				return nil, errDefault
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			crClient := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			if tt.getFunc != nil {
+				crClient.EXPECT().Get(tt.rt.Name, gomock.Any()).Return(tt.getFunc())
+			}
+			r := &roleTemplateHandler{
+				crClient: crClient,
+			}
+			got, err := r.gatherRules(tt.rt)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("roleTemplateHandler.gatherRules() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("roleTemplateHandler.gatherRules() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

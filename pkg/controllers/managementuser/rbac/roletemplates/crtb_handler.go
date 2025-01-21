@@ -7,6 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -21,6 +22,7 @@ type crtbHandler struct {
 	crbClient            wrbacv1.ClusterRoleBindingController
 	crtbCache            controllersv3.ClusterRoleTemplateBindingCache
 	crtbClient           controllersv3.ClusterRoleTemplateBindingClient
+	rtClient             mgmtv3.RoleTemplateController
 	s                    *status.Status
 }
 
@@ -35,6 +37,7 @@ func newCRTBHandler(uc *config.UserContext) *crtbHandler {
 		crbClient:  uc.RBACw.ClusterRoleBinding(),
 		crtbCache:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		crtbClient: uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		rtClient:   uc.Management.Wrangler.Mgmt.RoleTemplate(),
 		s:          status.NewStatus(),
 	}
 }
@@ -64,7 +67,20 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: reconcileClusterRoleBindings}
 
-	crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, crtb.RoleTemplateName)
+	isExternal, err := isRoleTemplateExternal(crtb.RoleTemplateName, c.rtClient)
+	if err != nil {
+		c.s.AddCondition(remoteConditions, condition, failureToGetRoleTemplate, err)
+		return err
+	}
+
+	var roleName string
+	if isExternal {
+		roleName = crtb.RoleTemplateName
+	} else {
+		roleName = rbac.AggregatedClusterRoleNameFor(crtb.RoleTemplateName)
+	}
+
+	crb, err := rbac.BuildClusterRoleBindingFromRTB(crtb, roleName)
 	if err != nil {
 		c.s.AddCondition(remoteConditions, condition, failureToBuildClusterRoleBinding, err)
 		return err
