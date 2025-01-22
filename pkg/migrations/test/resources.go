@@ -1,8 +1,13 @@
 package test
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -33,4 +38,14 @@ func NewService(opts ...func(*corev1.Service)) *corev1.Service {
 	}
 
 	return svc
+}
+
+// ToUnstructured converts runtime.Objects using the default unstructured
+// converter.
+func ToUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
+	t.Helper()
+	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	assert.NoError(t, err)
+
+	return &unstructured.Unstructured{Object: raw}
 }

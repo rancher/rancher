@@ -11,35 +11,38 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
+	"github.com/rancher/rancher/pkg/migrations"
 	"github.com/rancher/rancher/pkg/migrations/descriptive"
 )
 
 func TestMigrationChanges(t *testing.T) {
 	m := exampleMigration{}
 
-	result, err := m.Changes(context.TODO(), descriptive.ClientFrom(newFakeClient(t)))
+	result, err := m.Changes(context.TODO(), descriptive.ClientFrom(newFakeClient(t)), migrations.MigrationOptions{})
 	require.NoError(t, err)
 
-	want := []descriptive.ResourceChange{
-		{
-			Operation: descriptive.OperationPatch,
-			Patch: &descriptive.PatchChange{
-				ResourceRef: descriptive.ResourceReference{
-					ObjectRef: types.NamespacedName{
-						Name:      "test-svc",
-						Namespace: "default",
+	want := &migrations.MigrationChanges{
+		Changes: []descriptive.ResourceChange{
+			{
+				Operation: descriptive.OperationPatch,
+				Patch: &descriptive.PatchChange{
+					ResourceRef: descriptive.ResourceReference{
+						ObjectRef: types.NamespacedName{
+							Name:      "test-svc",
+							Namespace: "default",
+						},
+						Resource: "services",
+						Version:  "v1",
 					},
-					Resource: "services",
-					Version:  "v1",
-				},
-				Operations: []descriptive.PatchOperation{
-					{
-						Operation: "replace",
-						Path:      "/spec/ports/0/targetPort",
-						Value:     9371,
+					Operations: []descriptive.PatchOperation{
+						{
+							Operation: "replace",
+							Path:      "/spec/ports/0/targetPort",
+							Value:     9371,
+						},
 					},
+					Type: descriptive.PatchApplicationJSON,
 				},
-				Type: descriptive.PatchApplicationJSON,
 			},
 		},
 	}

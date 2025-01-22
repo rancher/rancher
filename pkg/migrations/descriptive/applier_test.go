@@ -124,7 +124,7 @@ func TestApplyChanges(t *testing.T) {
 			{
 				Operation: OperationCreate,
 				Create: &CreateChange{
-					Resource: toUnstructured(t,
+					Resource: test.ToUnstructured(t,
 						newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, map[string][]byte{"testing": []byte("TESTSECRET")})),
 				},
 			},
@@ -336,7 +336,7 @@ func TestApplyChanges(t *testing.T) {
 			{
 				Operation: OperationCreate,
 				Create: &CreateChange{
-					Resource: toUnstructured(t, secret),
+					Resource: test.ToUnstructured(t, secret),
 				},
 			},
 		}
@@ -441,14 +441,6 @@ func newSecret(name types.NamespacedName, data map[string][]byte, opts ...func(s
 	}
 
 	return s
-}
-
-func toUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
-	t.Helper()
-	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	assert.NoError(t, err)
-
-	return &unstructured.Unstructured{Object: raw}
 }
 
 func newAuthConfig() *unstructured.Unstructured {

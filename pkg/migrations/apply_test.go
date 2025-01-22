@@ -214,27 +214,29 @@ func (t testMigration) Name() string {
 	return "test-migration"
 }
 
-func (t testMigration) Changes(ctx context.Context, _ descriptive.Interface) ([]descriptive.ResourceChange, error) {
-	return []descriptive.ResourceChange{
-		{
-			Operation: descriptive.OperationPatch,
-			Patch: &descriptive.PatchChange{
-				ResourceRef: descriptive.ResourceReference{
-					ObjectRef: types.NamespacedName{
-						Name:      "test-svc",
-						Namespace: "default",
+func (t testMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+	return &MigrationChanges{
+		Changes: []descriptive.ResourceChange{
+			{
+				Operation: descriptive.OperationPatch,
+				Patch: &descriptive.PatchChange{
+					ResourceRef: descriptive.ResourceReference{
+						ObjectRef: types.NamespacedName{
+							Name:      "test-svc",
+							Namespace: "default",
+						},
+						Resource: "services",
+						Version:  "v1",
 					},
-					Resource: "services",
-					Version:  "v1",
-				},
-				Operations: []descriptive.PatchOperation{
-					{
-						Operation: "replace",
-						Path:      "/spec/ports/0/targetPort",
-						Value:     9371,
+					Operations: []descriptive.PatchOperation{
+						{
+							Operation: "replace",
+							Path:      "/spec/ports/0/targetPort",
+							Value:     9371,
+						},
 					},
+					Type: descriptive.PatchApplicationJSON,
 				},
-				Type: descriptive.PatchApplicationJSON,
 			},
 		},
 	}, nil
@@ -247,7 +249,7 @@ func (t testDeleteMigration) Name() string {
 	return "test-delete-migration"
 }
 
-func (t testDeleteMigration) Changes(ctx context.Context, _ descriptive.Interface) ([]descriptive.ResourceChange, error) {
+func (t testDeleteMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
 	secretRef := descriptive.ResourceReference{
 		ObjectRef: types.NamespacedName{
 			Name:      "test-secret",
@@ -258,11 +260,13 @@ func (t testDeleteMigration) Changes(ctx context.Context, _ descriptive.Interfac
 		Version:  "v1",
 	}
 
-	return []descriptive.ResourceChange{
-		{
-			Operation: descriptive.OperationDelete,
-			Delete: &descriptive.DeleteChange{
-				ResourceRef: secretRef,
+	return &MigrationChanges{
+		Changes: []descriptive.ResourceChange{
+			{
+				Operation: descriptive.OperationDelete,
+				Delete: &descriptive.DeleteChange{
+					ResourceRef: secretRef,
+				},
 			},
 		},
 	}, nil

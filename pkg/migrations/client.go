@@ -82,6 +82,9 @@ func (c *ConfigMapStatusClient) SetStatusFor(ctx context.Context, name string, s
 		})
 
 	_, err = c.client.Apply(ctx, configMapApplyConfig, metav1.ApplyOptions{FieldManager: fieldMgr})
+	if err != nil {
+		return fmt.Errorf("updating migration status: %w", err)
+	}
 
-	return fmt.Errorf("updating migration status config: %w", err)
+	return nil
 }

@@ -16,13 +16,26 @@ const (
 // TODO: This could be a map or a struct with a sync.Mutex?
 var knownMigrations []Migration
 
+// For passing in additional information to the migration.
+type MigrationOptions struct {
+	// Continue is a token returned by the migration that allows for batching of
+	// changes. The token is opaque and used only by the migration.
+	Continue string
+}
+
+// MigrationChanges represents the calculated changes to apply to the cluster.
+type MigrationChanges struct {
+	Continue string
+	Changes  []descriptive.ResourceChange
+}
+
 // Migration implementations can be registered with the system.
 type Migration interface {
 	Name() string
 
 	// Changes should return the set of changes that this migration wants to
 	// apply to the cluster.
-	Changes(ctx context.Context, client descriptive.Interface) ([]descriptive.ResourceChange, error)
+	Changes(ctx context.Context, client descriptive.Interface, opts MigrationOptions) (*MigrationChanges, error)
 }
 
 // Register registers a migration with the migration mechanism.

@@ -40,12 +40,13 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 		return nil, err
 	}
 
-	changes, err := migration.Changes(ctx, descriptive.ClientFrom(client))
+	// TODO
+	migrationChanges, err := migration.Changes(ctx, descriptive.ClientFrom(client), MigrationOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("calculating changes for migration %q: %w", name, err)
 	}
 
-	metrics, applyErr := descriptive.ApplyChanges(ctx, client, changes, options, mapper)
+	metrics, applyErr := descriptive.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
 	status := MigrationStatus{
 		AppliedAt: time.Now(),
 	}
