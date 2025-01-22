@@ -190,7 +190,7 @@ func (k *KDMTestSuite) TestChangeKDMurl() {
 	log.Infof("current RKE2 version available: %s", currentRKE2Version)
 
 	// change kdm url to dev
-	k.updateKDMurl("https://releases.rancher.com/kontainer-driver-metadata/dev-v2.9/data.json")
+	k.updateKDMurl("https://releases.rancher.com/kontainer-driver-metadata/release-v2.9/data.json")
 
 	var updatedRKE2Version string
 	// check latest Release value
