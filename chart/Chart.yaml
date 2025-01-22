@@ -10,7 +10,6 @@ keywords:
   - rancher
 sources:
   - https://github.com/rancher/rancher
-  - https://github.com/rancher/server-chart
 maintainers:
   - name: Rancher Labs
     email: charts@rancher.com
