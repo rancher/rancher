@@ -116,9 +116,7 @@ func (p *prtbHandler) reconcileMembershipBindings(prtb *v3.ProjectRoleTemplateBi
 	if err != nil {
 		return err
 	}
-
-	_, err = createOrUpdateMembershipBinding(prtb, rt, p.crbController)
-	return err
+	return createOrUpdateMembershipBinding(prtb, rt, p.crbController)
 }
 
 // reconcileBindings ensures the right CRB exists for the project management plane role. It deletes any additional unwanted CRBs.

@@ -46,7 +46,7 @@ const (
 )
 
 // createOrUpdateMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster or project specified by the CRTB or PRTB.
-func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) (*v1.ClusterRoleBinding, error) {
+func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
 	roleName := getMembershipRoleName(rt, rtb)
 	roleRef := v1.RoleRef{
 		Kind: "ClusterRole",
@@ -55,31 +55,34 @@ func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crb
 
 	wantedCRB, err := buildMembershipBinding(roleRef, rtb)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Create if not found
 	existingCRB, err := crbController.Get(wantedCRB.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return crbController.Create(wantedCRB)
+			_, err := crbController.Create(wantedCRB)
+			return err
 		}
-		return nil, err
+		return err
 	}
 
 	// If the role referenced or subjects are wrong, delete and re-create the CRB
 	if !pkgrbac.AreClusterRoleBindingContentsSame(wantedCRB, existingCRB) {
 		if err := crbController.Delete(wantedCRB.Name, &metav1.DeleteOptions{}); err != nil {
-			return nil, err
+			return err
 		}
-		return crbController.Create(wantedCRB)
+		_, err := crbController.Create(wantedCRB)
+		return err
 	}
 	// Update Label
 	rtbLabel := getRTBLabel(rtb)
 	if v, ok := existingCRB.Labels[rtbLabel]; !ok || v != "true" {
 		existingCRB.Labels[rtbLabel] = "true"
-		return crbController.Update(existingCRB)
+		_, err := crbController.Update(existingCRB)
+		return err
 	}
-	return existingCRB, nil
+	return nil
 }
 
 // deleteMembershipBinding checks if the user is still a member of the Project or Cluster specified by PRTB/CRTB. If the user is no longer a member, delete the bindings.

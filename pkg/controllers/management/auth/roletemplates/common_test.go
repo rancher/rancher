@@ -12,6 +12,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -66,16 +67,13 @@ var (
 )
 
 func TestCreateOrUpdateMembershipBinding(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		name       string
-		rtb        metav1.Object
-		rt         *v3.RoleTemplate
-		getFunc    func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error)
-		createFunc func(*rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error)
-		deleteFunc func(string, *metav1.DeleteOptions) error
-		updateFunc func(*rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error)
-		wantedCRB  *rbacv1.ClusterRoleBinding
-		wantErr    bool
+		name               string
+		rtb                metav1.Object
+		rt                 *v3.RoleTemplate
+		setupCRBController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])
+		wantErr            bool
 	}{
 		{
 			name: "create new binding from prtb",
@@ -83,13 +81,10 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
-				return nil, errNotFound
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().Get(defaultProjectCRB.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Create(defaultProjectCRB.DeepCopy()).Return(defaultProjectCRB.DeepCopy(), nil)
 			},
-			createFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			wantedCRB: defaultProjectCRB.DeepCopy(),
 		},
 		{
 			name: "binding from prtb has wrong subject",
@@ -97,19 +92,13 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultProjectCRB.DeepCopy()
 				crb.Subjects = nil
-				return crb, nil
+				m.EXPECT().Get(defaultProjectCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Create(defaultProjectCRB.DeepCopy()).Return(defaultProjectCRB.DeepCopy(), nil)
+				m.EXPECT().Delete(defaultProjectCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 			},
-			createFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			deleteFunc: func(s string, _ *metav1.DeleteOptions) error {
-				assert.Equal(t, defaultProjectCRB.Name, s)
-				return nil
-			},
-			wantedCRB: defaultProjectCRB.DeepCopy(),
 		},
 		{
 			name: "binding from prtb has wrong RoleRef",
@@ -117,19 +106,13 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultProjectCRB.DeepCopy()
 				crb.RoleRef = rbacv1.RoleRef{}
-				return crb, nil
+				m.EXPECT().Get(defaultProjectCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Create(defaultProjectCRB.DeepCopy()).Return(defaultProjectCRB.DeepCopy(), nil)
+				m.EXPECT().Delete(defaultProjectCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 			},
-			createFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			deleteFunc: func(s string, _ *metav1.DeleteOptions) error {
-				assert.Equal(t, defaultProjectCRB.Name, s)
-				return nil
-			},
-			wantedCRB: defaultProjectCRB.DeepCopy(),
 		},
 		{
 			name: "binding from prtb missing label",
@@ -137,15 +120,12 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultProjectCRB.DeepCopy()
 				crb.Labels = map[string]string{}
-				return crb, nil
+				m.EXPECT().Get(defaultProjectCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Update(crb).Return(defaultProjectCRB.DeepCopy(), nil)
 			},
-			updateFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			wantedCRB: defaultProjectCRB.DeepCopy(),
 		},
 		{
 			name: "binding from prtb correct",
@@ -153,10 +133,9 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
-				return defaultProjectCRB.DeepCopy(), nil
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().Get(defaultProjectCRB.Name, metav1.GetOptions{}).Return(defaultProjectCRB.DeepCopy(), nil)
 			},
-			wantedCRB: defaultProjectCRB.DeepCopy(),
 		},
 		{
 			name: "create new binding from crtb",
@@ -164,13 +143,10 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
-				return nil, errNotFound
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Create(defaultClusterCRB.DeepCopy()).Return(defaultClusterCRB.DeepCopy(), nil)
 			},
-			createFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			wantedCRB: defaultClusterCRB.DeepCopy(),
 		},
 		{
 			name: "binding from crtb has wrong subject",
@@ -178,19 +154,13 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultClusterCRB.DeepCopy()
 				crb.Subjects = nil
-				return crb, nil
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Create(defaultClusterCRB.DeepCopy()).Return(defaultClusterCRB.DeepCopy(), nil)
+				m.EXPECT().Delete(defaultClusterCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 			},
-			createFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			deleteFunc: func(s string, _ *metav1.DeleteOptions) error {
-				assert.Equal(t, defaultClusterCRB.Name, s)
-				return nil
-			},
-			wantedCRB: defaultClusterCRB.DeepCopy(),
 		},
 		{
 			name: "binding from crtb has wrong RoleRef",
@@ -198,19 +168,13 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultClusterCRB.DeepCopy()
 				crb.RoleRef = rbacv1.RoleRef{}
-				return crb, nil
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Create(defaultClusterCRB.DeepCopy()).Return(defaultClusterCRB.DeepCopy(), nil)
+				m.EXPECT().Delete(defaultClusterCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 			},
-			createFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			deleteFunc: func(s string, _ *metav1.DeleteOptions) error {
-				assert.Equal(t, defaultClusterCRB.Name, s)
-				return nil
-			},
-			wantedCRB: defaultClusterCRB.DeepCopy(),
 		},
 		{
 			name: "binding from crtb missing label",
@@ -218,15 +182,12 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultClusterCRB.DeepCopy()
 				crb.Labels = map[string]string{}
-				return crb, nil
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Update(crb).Return(defaultClusterCRB.DeepCopy(), nil)
 			},
-			updateFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return crb, nil
-			},
-			wantedCRB: defaultClusterCRB.DeepCopy(),
 		},
 		{
 			name: "binding from crtb correct",
@@ -234,10 +195,9 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
-				return defaultClusterCRB.DeepCopy(), nil
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(defaultClusterCRB.DeepCopy(), nil)
 			},
-			wantedCRB: defaultClusterCRB.DeepCopy(),
 		},
 		{
 			name: "error getting CRB",
@@ -245,8 +205,8 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
-				return nil, fmt.Errorf("error")
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			wantErr: true,
 		},
@@ -256,11 +216,9 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
-				return nil, errNotFound
-			},
-			createFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return nil, fmt.Errorf("error")
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Create(defaultClusterCRB.DeepCopy()).Return(nil, errDefault)
 			},
 			wantErr: true,
 		},
@@ -270,13 +228,11 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultClusterCRB.DeepCopy()
-				crb.RoleRef = rbacv1.RoleRef{}
-				return crb, nil
-			},
-			deleteFunc: func(string, *metav1.DeleteOptions) error {
-				return fmt.Errorf("error")
+				crb.Subjects = nil
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Delete(defaultClusterCRB.Name, &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			wantErr: true,
 		},
@@ -286,17 +242,12 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultClusterCRB.DeepCopy()
-				crb.RoleRef = rbacv1.RoleRef{}
-				return crb, nil
-			},
-			createFunc: func(*rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return nil, fmt.Errorf("error")
-			},
-			deleteFunc: func(s string, _ *metav1.DeleteOptions) error {
-				assert.Equal(t, defaultClusterCRB.Name, s)
-				return nil
+				crb.Subjects = nil
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Delete(defaultClusterCRB.Name, &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Create(defaultClusterCRB.DeepCopy()).Return(nil, errDefault)
 			},
 			wantErr: true,
 		},
@@ -306,47 +257,49 @@ func TestCreateOrUpdateMembershipBinding(t *testing.T) {
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-roletemplate"},
 			},
-			getFunc: func(string, metav1.GetOptions) (*rbacv1.ClusterRoleBinding, error) {
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				crb := defaultClusterCRB.DeepCopy()
 				crb.Labels = map[string]string{}
-				return crb, nil
-			},
-			updateFunc: func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-				return nil, fmt.Errorf("error")
+				m.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(crb, nil)
+				m.EXPECT().Update(crb).Return(nil, errDefault)
 			},
 			wantErr: true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
-			if tt.getFunc != nil {
-				crbController.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(tt.getFunc)
-			}
-			if tt.createFunc != nil {
-				crbController.EXPECT().Create(gomock.Any()).DoAndReturn(tt.createFunc)
-			}
-			if tt.deleteFunc != nil {
-				crbController.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(tt.deleteFunc)
-			}
-			if tt.updateFunc != nil {
-				crbController.EXPECT().Update(gomock.Any()).DoAndReturn(tt.updateFunc)
+			if tt.setupCRBController != nil {
+				tt.setupCRBController(crbController)
 			}
 
-			crb, err := createOrUpdateMembershipBinding(tt.rtb, tt.rt, crbController)
+			err := createOrUpdateMembershipBinding(tt.rtb, tt.rt, crbController)
 
 			if tt.wantErr {
-				assert.NotNil(t, err)
-			}
-			if tt.wantedCRB != nil {
-				assert.Equal(t, tt.wantedCRB, crb)
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
 }
 
+var (
+	listOption      = metav1.ListOptions{LabelSelector: "test-namespace_test-prtb"}
+	uid             = types.UID("abc123")
+	resourceVersion = "1"
+	deleteOption    = metav1.DeleteOptions{
+		Preconditions: &metav1.Preconditions{
+			UID:             &uid,
+			ResourceVersion: &resourceVersion,
+		},
+	}
+)
+
 func TestDeleteMembershipBinding(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		crbMock func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])
@@ -362,24 +315,21 @@ func TestDeleteMembershipBinding(t *testing.T) {
 				},
 			},
 			crbMock: func(mock *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				crbList := &rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Labels: map[string]string{
-									"test-namespace_test-prtb":  "true",
-									"test-namespace_test-prtb2": "true",
-								},
-							},
+				crb := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"test-namespace_test-prtb":  "true",
+							"test-namespace_test-prtb2": "true",
 						},
 					},
 				}
-				mock.EXPECT().List(gomock.Any()).Return(crbList, nil)
+				crbList := &rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb},
+				}
+				mock.EXPECT().List(listOption).Return(crbList, nil)
 
-				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					assert.Equal(t, map[string]string{"test-namespace_test-prtb2": "true"}, crb.Labels)
-					return nil, nil
-				})
+				crb.Labels = map[string]string{"test-namespace_test-prtb2": "true"}
+				mock.EXPECT().Update(&crb).Return(nil, nil)
 			},
 		},
 		{
@@ -391,24 +341,22 @@ func TestDeleteMembershipBinding(t *testing.T) {
 				},
 			},
 			crbMock: func(mock *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				crbList := &rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "test-crb",
-								Labels: map[string]string{
-									"test-namespace_test-prtb": "true",
-								},
-							},
+				crb := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-crb",
+						Labels: map[string]string{
+							"test-namespace_test-prtb": "true",
 						},
+						UID:             uid,
+						ResourceVersion: resourceVersion,
 					},
 				}
-				mock.EXPECT().List(gomock.Any()).Return(crbList, nil)
+				crbList := &rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb},
+				}
+				mock.EXPECT().List(listOption).Return(crbList, nil)
 
-				mock.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(s string, _ *metav1.DeleteOptions) error {
-					assert.Equal(t, "test-crb", s)
-					return nil
-				})
+				mock.EXPECT().Delete("test-crb", &deleteOption).Return(nil)
 			},
 		},
 		{
@@ -420,36 +368,32 @@ func TestDeleteMembershipBinding(t *testing.T) {
 				},
 			},
 			crbMock: func(mock *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				crbList := &rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "test-crb",
-								Labels: map[string]string{
-									"test-namespace_test-prtb": "true",
-								},
-							},
+				crb1 := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-crb",
+						Labels: map[string]string{
+							"test-namespace_test-prtb": "true",
 						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "test-crb2",
-								Labels: map[string]string{
-									"test-namespace_test-prtb":  "true",
-									"test-namespace_test-prtb2": "true",
-								},
-							},
+						UID:             uid,
+						ResourceVersion: resourceVersion,
+					},
+				}
+				crb2 := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-crb2",
+						Labels: map[string]string{
+							"test-namespace_test-prtb":  "true",
+							"test-namespace_test-prtb2": "true",
 						},
 					},
 				}
-				mock.EXPECT().List(gomock.Any()).Return(crbList, nil)
-				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					assert.Equal(t, map[string]string{"test-namespace_test-prtb2": "true"}, crb.Labels)
-					return nil, nil
-				})
-				mock.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(s string, _ *metav1.DeleteOptions) error {
-					assert.Equal(t, "test-crb", s)
-					return nil
-				})
+				crbList := &rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1, crb2},
+				}
+				mock.EXPECT().List(listOption).Return(crbList, nil)
+				crb2.Labels = map[string]string{"test-namespace_test-prtb2": "true"}
+				mock.EXPECT().Update(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().Delete("test-crb", &deleteOption).Return(nil)
 			},
 		},
 		{
@@ -461,7 +405,7 @@ func TestDeleteMembershipBinding(t *testing.T) {
 				},
 			},
 			crbMock: func(mock *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				mock.EXPECT().List(gomock.Any()).Return(nil, fmt.Errorf("error"))
+				mock.EXPECT().List(listOption).Return(nil, fmt.Errorf("error"))
 			},
 			wantErr: true,
 		},
@@ -474,33 +418,32 @@ func TestDeleteMembershipBinding(t *testing.T) {
 				},
 			},
 			crbMock: func(mock *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				crbList := &rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "test-crb2",
-								Labels: map[string]string{
-									"test-namespace_test-prtb":  "true",
-									"test-namespace_test-prtb2": "true",
-								},
-							},
+				crb1 := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-crb",
+						Labels: map[string]string{
+							"test-namespace_test-prtb": "true",
 						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "test-crb",
-								Labels: map[string]string{
-									"test-namespace_test-prtb": "true",
-								},
-							},
+						UID:             uid,
+						ResourceVersion: resourceVersion,
+					},
+				}
+				crb2 := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-crb2",
+						Labels: map[string]string{
+							"test-namespace_test-prtb":  "true",
+							"test-namespace_test-prtb2": "true",
 						},
 					},
 				}
-				mock.EXPECT().List(gomock.Any()).Return(crbList, nil)
-				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					assert.Equal(t, map[string]string{"test-namespace_test-prtb2": "true"}, crb.Labels)
-					return nil, nil
-				})
-				mock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
+				crbList := &rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1, crb2},
+				}
+				mock.EXPECT().List(listOption).Return(crbList, nil)
+				crb2.Labels = map[string]string{"test-namespace_test-prtb2": "true"}
+				mock.EXPECT().Update(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().Delete("test-crb", &deleteOption).Return(errDefault)
 			},
 			wantErr: true,
 		},
@@ -513,40 +456,40 @@ func TestDeleteMembershipBinding(t *testing.T) {
 				},
 			},
 			crbMock: func(mock *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				crbList := &rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "test-crb",
-								Labels: map[string]string{
-									"test-namespace_test-prtb": "true",
-								},
-							},
+				crb1 := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-crb",
+						Labels: map[string]string{
+							"test-namespace_test-prtb": "true",
 						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "test-crb2",
-								Labels: map[string]string{
-									"test-namespace_test-prtb":  "true",
-									"test-namespace_test-prtb2": "true",
-								},
-							},
+						UID:             uid,
+						ResourceVersion: resourceVersion,
+					},
+				}
+				crb2 := rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-crb2",
+						Labels: map[string]string{
+							"test-namespace_test-prtb":  "true",
+							"test-namespace_test-prtb2": "true",
 						},
 					},
 				}
-				mock.EXPECT().List(gomock.Any()).Return(crbList, nil)
-				mock.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("error"))
-				mock.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(s string, _ *metav1.DeleteOptions) error {
-					assert.Equal(t, "test-crb", s)
-					return nil
-				})
+				crbList := &rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1, crb2},
+				}
+				mock.EXPECT().List(listOption).Return(crbList, nil)
+				crb2.Labels = map[string]string{"test-namespace_test-prtb2": "true"}
+				mock.EXPECT().Update(gomock.Any()).Return(nil, errDefault)
+				mock.EXPECT().Delete("test-crb", &deleteOption).Return(nil)
 			},
 			wantErr: true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
 
 			tt.crbMock(crbController)

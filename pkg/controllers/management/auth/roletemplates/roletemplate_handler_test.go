@@ -32,6 +32,7 @@ var (
 )
 
 func Test_OnChange(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                       string
 		setupClusterRoleController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList])
@@ -74,7 +75,7 @@ func Test_OnChange(t *testing.T) {
 				Rules: []rbacv1.PolicyRule{getPRTBS},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt",
@@ -91,7 +92,7 @@ func Test_OnChange(t *testing.T) {
 					},
 					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}).Return(nil, nil)
-				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt-aggregator",
@@ -138,7 +139,7 @@ func Test_OnChange(t *testing.T) {
 				Rules: []rbacv1.PolicyRule{getCRTBs, getPRTBS},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-cluster-mgmt", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-cluster-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-cluster-mgmt",
@@ -155,7 +156,7 @@ func Test_OnChange(t *testing.T) {
 					},
 					Rules: []rbacv1.PolicyRule{getCRTBs},
 				}).Return(nil, nil)
-				m.EXPECT().Get("test-rt-cluster-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-cluster-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-cluster-mgmt-aggregator",
@@ -178,7 +179,7 @@ func Test_OnChange(t *testing.T) {
 						},
 					},
 				}).Return(nil, nil)
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound).AnyTimes()
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound).AnyTimes()
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt",
@@ -195,7 +196,7 @@ func Test_OnChange(t *testing.T) {
 					},
 					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}).Return(nil, nil)
-				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt-aggregator",
@@ -243,7 +244,7 @@ func Test_OnChange(t *testing.T) {
 				},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt",
@@ -260,7 +261,7 @@ func Test_OnChange(t *testing.T) {
 					},
 					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}).Return(nil, nil)
-				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt-aggregator",
@@ -301,10 +302,10 @@ func Test_OnChange(t *testing.T) {
 				Rules:    []rbacv1.PolicyRule{getRoleTemplates},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(&rbacv1.ClusterRole{
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
 					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}, nil)
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt",
@@ -321,7 +322,7 @@ func Test_OnChange(t *testing.T) {
 					},
 					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}).Return(nil, nil)
-				m.EXPECT().Get("test-rt-project-mgmt-aggregator", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rt-project-mgmt-aggregator",
@@ -347,9 +348,10 @@ func Test_OnChange(t *testing.T) {
 			},
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			crClient := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.setupClusterRoleController != nil {
 				tt.setupClusterRoleController(crClient)
@@ -369,6 +371,7 @@ func Test_OnChange(t *testing.T) {
 }
 
 func Test_getManagementPlaneRules(t *testing.T) {
+	t.Parallel()
 	sampleResources := map[string]string{
 		"nodes": "management.cattle.io",
 	}
@@ -570,12 +573,14 @@ func Test_getManagementPlaneRules(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			assert.ElementsMatch(t, getManagementPlaneRules(tt.rules, tt.managementResources), tt.want)
 		})
 	}
 }
 
 func Test_gatherRules(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		rt      *v3.RoleTemplate
@@ -625,12 +630,13 @@ func Test_gatherRules(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			crClient := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.getFunc != nil {
-				crClient.EXPECT().Get(tt.rt.Name, gomock.Any()).Return(tt.getFunc())
+				crClient.EXPECT().Get(tt.rt.Name, metav1.GetOptions{}).Return(tt.getFunc())
 			}
 			r := &roleTemplateHandler{
 				crClient: crClient,

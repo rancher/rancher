@@ -6,9 +6,11 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Test_isRoleTemplateExternal(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		rtName  string
@@ -62,11 +64,12 @@ func Test_isRoleTemplateExternal(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			rtClient := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
-			rtClient.EXPECT().Get(tt.rtName, gomock.Any()).Return(tt.getFunc())
+			rtClient.EXPECT().Get(tt.rtName, metav1.GetOptions{}).Return(tt.getFunc())
 			got, err := isRoleTemplateExternal(tt.rtName, rtClient)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("isRoleTemplateExternal() error = %v, wantErr %v", err, tt.wantErr)
