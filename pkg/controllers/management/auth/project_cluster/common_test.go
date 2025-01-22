@@ -5,7 +5,6 @@ import (
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,6 +16,7 @@ import (
 var errNotFound = apierrors.NewNotFound(schema.GroupResource{}, "")
 
 func TestCreateMembershipRoles(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		obj       runtime.Object
@@ -149,21 +149,17 @@ func TestCreateMembershipRoles(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			crClient := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 
 			if tt.wantedCRs != nil {
-				crClient.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errNotFound).AnyTimes()
-				crClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(c *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-					assert.Equal(t, tt.wantedCRs[0], c)
-					return nil, nil
-				})
-				crClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(c *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-					assert.Equal(t, tt.wantedCRs[1], c)
-					return nil, nil
-				})
+				crClient.EXPECT().Get(tt.wantedCRs[0].Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				crClient.EXPECT().Get(tt.wantedCRs[1].Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				crClient.EXPECT().Create(tt.wantedCRs[0]).Return(nil, nil)
+				crClient.EXPECT().Create(tt.wantedCRs[1]).Return(nil, nil)
 			}
 
 			if err := createMembershipRoles(tt.obj, crClient); (err != nil) != tt.wantErr {

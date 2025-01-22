@@ -18,6 +18,7 @@ var (
 )
 
 func Test_reconcileSubject(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                string
 		setupUserManager    func(*user.MockManager)
@@ -121,7 +122,7 @@ func Test_reconcileSubject(t *testing.T) {
 				UserPrincipalName: "",
 			},
 			setupUserController: func(m *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
-				m.EXPECT().Get("test-user", gomock.Any()).Return(&v3.User{
+				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(&v3.User{
 					PrincipalIDs: []string{"principal-test-user"},
 				}, nil)
 			},
@@ -137,7 +138,7 @@ func Test_reconcileSubject(t *testing.T) {
 				UserPrincipalName: "",
 			},
 			setupUserController: func(m *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
-				m.EXPECT().Get("test-user", gomock.Any()).Return(nil, fmt.Errorf("error"))
+				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				UserName:          "test-user",
@@ -146,9 +147,10 @@ func Test_reconcileSubject(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			mockUserManager := user.NewMockManager(ctrl)
 			mockUserController := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 			if tt.setupUserManager != nil {
@@ -198,6 +200,7 @@ var (
 )
 
 func Test_reconcileBindings(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name               string
 		setupCRController  func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList])
@@ -208,7 +211,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error getting cluster role",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, fmt.Errorf("error"))
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				RoleTemplateName: "test-rt",
@@ -218,7 +221,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "no error when cluster role doesn't exist",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				RoleTemplateName: "test-rt",
@@ -228,7 +231,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error building clusterrolebinding",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				RoleTemplateName: "test-rt",
@@ -238,7 +241,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error listing clusterrolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
@@ -253,7 +256,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error listing clusterrolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
@@ -268,7 +271,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error deleting unwanted clusterrolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -278,7 +281,7 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
-				m.EXPECT().Delete("bad-crb", gomock.Any()).Return(errDefault)
+				m.EXPECT().Delete("bad-crb", &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
@@ -290,7 +293,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "CRB already exists",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -306,7 +309,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "CRB already exists with extra bad CRBs",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -317,7 +320,7 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
-				m.EXPECT().Delete("bad-crb", gomock.Any()).Return(nil)
+				m.EXPECT().Delete("bad-crb", &metav1.DeleteOptions{}).Return(nil)
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
@@ -328,7 +331,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "CRB needs to be created",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -345,7 +348,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error creating CRB",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", gomock.Any()).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -361,9 +364,10 @@ func Test_reconcileBindings(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			t.Parallel()
 			crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
 			if tt.setupCRBController != nil {
 				tt.setupCRBController(crbController)

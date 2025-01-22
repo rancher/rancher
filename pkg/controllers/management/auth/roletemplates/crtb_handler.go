@@ -119,7 +119,7 @@ func (c *crtbHandler) reconcileMembershipBindings(crtb *v3.ClusterRoleTemplateBi
 	}
 
 	// Create membership binding
-	if _, err := createOrUpdateMembershipBinding(crtb, rt, c.crbController); err != nil {
+	if err := createOrUpdateMembershipBinding(crtb, rt, c.crbController); err != nil {
 		c.s.AddCondition(localCondition, condition, failedToCreateOrUpdateMembershipBinding, err)
 		return err
 	}
