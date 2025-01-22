@@ -49,8 +49,9 @@ const (
 func createOrUpdateMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
 	roleName := getMembershipRoleName(rt, rtb)
 	roleRef := v1.RoleRef{
-		Kind: "ClusterRole",
-		Name: roleName,
+		APIGroup: "rbac.authorization.k8s.io",
+		Kind:     "ClusterRole",
+		Name:     roleName,
 	}
 
 	wantedCRB, err := buildMembershipBinding(roleRef, rtb)

@@ -471,8 +471,9 @@ func BuildAggregatingClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName st
 // BuildClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the ClusterRole specified by roleRefName.
 func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
 	roleRef := rbacv1.RoleRef{
-		Kind: "ClusterRole",
-		Name: roleRefName,
+		APIGroup: "rbac.authorization.k8s.io",
+		Kind:     "ClusterRole",
+		Name:     roleRefName,
 	}
 
 	subject, err := BuildSubjectFromRTB(rtb)

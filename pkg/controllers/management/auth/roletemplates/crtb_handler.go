@@ -48,12 +48,13 @@ func newCRTBHandler(management *config.ManagementContext) *crtbHandler {
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project and cluster management role if it exists.
 func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil {
+	if crtb == nil || crtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
 	var localConditions []metav1.Condition
-	crtb, err := c.reconcileSubject(crtb, &localConditions)
+	var err error
+	crtb, err = c.reconcileSubject(crtb, &localConditions)
 	if err != nil {
 		return crtb, errors.Join(err, c.updateStatus(crtb, localConditions))
 	}
