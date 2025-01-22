@@ -67,24 +67,23 @@ import (
 const encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
 
 type Options struct {
-	ACMEDomains                  cli.StringSlice
-	AddLocal                     string
-	Embedded                     bool
-	BindHost                     string
-	HTTPListenPort               int
-	HTTPSListenPort              int
-	K8sMode                      string
-	Debug                        bool
-	Trace                        bool
-	NoCACerts                    bool
-	AuditLogPath                 string
-	AuditLogMaxage               int
-	AuditLogMaxsize              int
-	AuditLogMaxbackup            int
-	AuditLevel                   int
-	Features                     string
-	ClusterRegistry              string
-	EnableImperativeAPIExtension bool
+	ACMEDomains       cli.StringSlice
+	AddLocal          string
+	Embedded          bool
+	BindHost          string
+	HTTPListenPort    int
+	HTTPSListenPort   int
+	K8sMode           string
+	Debug             bool
+	Trace             bool
+	NoCACerts         bool
+	AuditLogPath      string
+	AuditLogMaxage    int
+	AuditLogMaxsize   int
+	AuditLogMaxbackup int
+	AuditLevel        int
+	Features          string
+	ClusterRegistry   string
 }
 
 type Rancher struct {
@@ -199,9 +198,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	// temporary workaround to enable the imperative api extensionfor testing
-	if opts.EnableImperativeAPIExtension {
-		settings.ImperativeApiExtension.Set("true")
+	if err := dashboardapi.Register(ctx, wranglerContext); err != nil {
+		return nil, err
 	}
 
 	var extensionAPIServer steveserver.ExtensionAPIServer
@@ -290,10 +288,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
-	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
-		return err
-	}
-
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
 	}

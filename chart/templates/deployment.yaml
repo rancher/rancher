@@ -153,7 +153,7 @@ spec:
           value: "{{ .Values.agentTLSMode }}"
 {{- end }}
 {{- if .Values.imperativeExtensionApi.enabled }}
-        - name: IMPERATIVE_EXTENSION_API
+        - name: CATTLE_IMPERATIVE_API_EXTENSION
           value: "true"
 {{- end }}
 {{- if .Values.extraEnv }}
