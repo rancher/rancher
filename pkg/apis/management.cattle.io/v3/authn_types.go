@@ -2,6 +2,7 @@ package v3
 
 import (
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
@@ -37,7 +38,7 @@ type Token struct {
 	AuthProvider      string            `json:"authProvider"`
 	TTLMillis         int64             `json:"ttl"`
 	LastUsedAt        *metav1.Time      `json:"lastUsedAt,omitempty"`
-	LastIdleTimeout   string            `json:"lastIdleTimeout,omitempty"`
+	LastIdleTimeout   time.Time         `json:"lastIdleTimeout,omitempty"`
 	IsDerived         bool              `json:"isDerived"`
 	Description       string            `json:"description"`
 	Expired           bool              `json:"expired"`

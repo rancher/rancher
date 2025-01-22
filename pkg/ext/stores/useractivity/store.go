@@ -52,6 +52,7 @@ func NewUserActivityStore(token v3.TokenController, cmclient v1.ConfigMapClient)
 	return &Store{
 		tokenController: token,
 		configMapClient: cmclient,
+		checker:         &tokenChecker{},
 	}
 }
 
@@ -105,7 +106,7 @@ func (uas *Store) Create(ctx context.Context,
 	// verifies the token has label with user which made the request.
 	if token.Labels[tokenUserId] == user {
 		// once validated the request, we can define the lastActivity time.
-		lastActivity := metav1.Now()
+		lastActivity := time.Now()
 		// TODO: replace '10' with the value of auth-user-session-ttl-minutes
 		newIdleTimeout := lastActivity.Local().Add(time.Minute * time.Duration(10))
 
