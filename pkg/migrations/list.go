@@ -43,7 +43,8 @@ type MigrationInfo struct {
 
 // MigrationStatus records the state of a Migration.
 type MigrationStatus struct {
-	AppliedAt time.Time `json:"appliedAt"`
+	AppliedAt time.Time                 `json:"appliedAt"`
+	Metrics   *descriptive.ApplyMetrics `json:"metrics,omitempty"`
 }
 
 // MigrationStatusGetter implementations get the status of a named Migration.
@@ -55,9 +56,8 @@ type MigrationStatusGetter interface {
 func List(ctx context.Context, migrationStatus MigrationStatusGetter) ([]*MigrationInfo, error) {
 	var result []*MigrationInfo
 	for i := range knownMigrations {
-		info, err := migrationStatusFromConfigMap(ctx, knownMigrations[i].Name(), migrationStatus)
+		info, err := statusForMigration(ctx, knownMigrations[i].Name(), migrationStatus)
 		if err != nil {
-			// TODO: Improve error
 			return nil, err
 		}
 		result = append(result, info)
@@ -66,10 +66,9 @@ func List(ctx context.Context, migrationStatus MigrationStatusGetter) ([]*Migrat
 	return result, nil
 }
 
-func migrationStatusFromConfigMap(ctx context.Context, name string, migrationStatus MigrationStatusGetter) (*MigrationInfo, error) {
+func statusForMigration(ctx context.Context, name string, migrationStatus MigrationStatusGetter) (*MigrationInfo, error) {
 	status, err := migrationStatus.StatusFor(ctx, name)
 	if err != nil {
-		// TODO: Improve error
 		return nil, err
 	}
 	if status == nil {

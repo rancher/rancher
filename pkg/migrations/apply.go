@@ -62,7 +62,7 @@ func ApplyUnappliedMigrations(ctx context.Context, migrationStatus MigrationStat
 	for i := range knownMigrations {
 		migrationName := knownMigrations[i].Name()
 
-		info, statusErr := migrationStatusFromConfigMap(ctx, migrationName, migrationStatus)
+		info, statusErr := statusForMigration(ctx, migrationName, migrationStatus)
 		if statusErr != nil {
 			err = errors.Join(err, statusErr)
 			// TODO: log!

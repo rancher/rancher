@@ -26,9 +26,10 @@ func TestApply(t *testing.T) {
 	t.Run("unknown migration", func(t *testing.T) {
 		clientset := fake.NewClientset()
 
-		// TODO metrics
-		_, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), descriptive.ApplyOptions{}, nil)
+		metrics, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), descriptive.ApplyOptions{}, nil)
 		require.ErrorContains(t, err, `unknown migration "test-migration"`)
+
+		require.Nil(t, metrics)
 	})
 
 	t.Run("with registered migration", func(t *testing.T) {
@@ -41,14 +42,13 @@ func TestApply(t *testing.T) {
 			s.Spec.Ports[0].TargetPort = intstr.FromInt(8000)
 		})
 
-		t.Run("the migration is applied and resources are created", func(t *testing.T) {
+		t.Run("the migration is applied and resources are patched", func(t *testing.T) {
 			clientset := fake.NewClientset()
 			dynamicset := newFakeDynamicClient(t, svc)
 
 			// This passes nil as a mapper because we are not creating new
 			// resources in this test migration.
-			// TODO metrics
-			_, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
+			metrics, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
 			require.NoError(t, err)
 
 			wantSpec := corev1.ServiceSpec{
@@ -62,7 +62,12 @@ func TestApply(t *testing.T) {
 			}
 
 			updatedSvc := loadService(t, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, dynamicset)
-			assert.Equal(t, wantSpec, updatedSvc.Spec)
+			require.Equal(t, wantSpec, updatedSvc.Spec)
+
+			wantMetrics := &descriptive.ApplyMetrics{Patch: 1}
+			if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+				t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+			}
 		})
 
 		t.Run("the migration is applied and is recorded", func(t *testing.T) {
@@ -72,18 +77,18 @@ func TestApply(t *testing.T) {
 
 			// This passes nil as a mapper because we are not creating new
 			// resources in this test migration.
-			// TODO metrics
-			_, err := Apply(context.TODO(), "test-migration", statusClient, dynamicset, descriptive.ApplyOptions{}, nil)
+			metrics, err := Apply(context.TODO(), "test-migration", statusClient, dynamicset, descriptive.ApplyOptions{}, nil)
 			require.NoError(t, err)
 
 			wantStatus := &MigrationStatus{AppliedAt: time.Now()}
 			status, err := statusClient.StatusFor(context.TODO(), "test-migration")
 			assert.EqualExportedValues(t, wantStatus, status)
-		})
-	})
 
-	t.Run("when the status ConfigMap does not exist", func(t *testing.T) {
-		t.Skip("TODO")
+			wantMetrics := &descriptive.ApplyMetrics{Patch: 1}
+			if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+				t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+			}
+		})
 	})
 }
 
@@ -132,7 +137,30 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 	})
 
 	t.Run("with multiple registered migrations", func(t *testing.T) {
-		t.Skip("TODO")
+		Register(testMigration{})
+		Register(testDeleteMigration{})
+		t.Cleanup(func() {
+			knownMigrations = nil
+		})
+		svc := test.NewService(func(s *corev1.Service) {
+			s.Spec.Ports[0].TargetPort = intstr.FromInt(8000)
+		})
+		secret := newSecret(
+			types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"},
+			map[string][]byte{"testing": []byte("TESTSECRET")})
+		clientset := fake.NewClientset()
+		dynamicset := newFakeDynamicClient(t, svc, secret)
+
+		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
+		require.NoError(t, err)
+
+		wantMetrics := map[string]*descriptive.ApplyMetrics{
+			"test-delete-migration": {Delete: 1},
+			"test-migration":        {Patch: 1},
+		}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
 	})
 
 	t.Run("with previously applied migration", func(t *testing.T) {
@@ -143,6 +171,7 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 		svc := test.NewService(func(s *corev1.Service) {
 			s.Spec.Ports[0].TargetPort = intstr.FromInt(8000)
 		})
+
 		clientset := fake.NewClientset()
 		dynamicset := newFakeDynamicClient(t, svc)
 		// Apply once
@@ -158,7 +187,6 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 		}
-
 	})
 }
 
@@ -212,6 +240,34 @@ func (t testMigration) Changes(ctx context.Context, _ descriptive.Interface) ([]
 	}, nil
 }
 
+type testDeleteMigration struct {
+}
+
+func (t testDeleteMigration) Name() string {
+	return "test-delete-migration"
+}
+
+func (t testDeleteMigration) Changes(ctx context.Context, _ descriptive.Interface) ([]descriptive.ResourceChange, error) {
+	secretRef := descriptive.ResourceReference{
+		ObjectRef: types.NamespacedName{
+			Name:      "test-secret",
+			Namespace: "cattle-secrets",
+		},
+		Group:    "",
+		Resource: "secrets",
+		Version:  "v1",
+	}
+
+	return []descriptive.ResourceChange{
+		{
+			Operation: descriptive.OperationDelete,
+			Delete: &descriptive.DeleteChange{
+				ResourceRef: secretRef,
+			},
+		},
+	}, nil
+}
+
 // TODO: Move this to the test package
 func newFakeDynamicClient(t *testing.T, objs ...runtime.Object) *dynamicfake.FakeDynamicClient {
 	testScheme := runtime.NewScheme()
@@ -240,4 +296,26 @@ func loadStatusConfigMap(t *testing.T, clientset *fake.Clientset) *corev1.Config
 	require.NoError(t, err)
 
 	return cm
+}
+
+func newSecret(name types.NamespacedName, data map[string][]byte, opts ...func(s *corev1.Secret)) *corev1.Secret {
+	// TODO: convert data map[string]string to map[string][]byte
+	s := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name.Name,
+			Namespace: name.Namespace,
+		},
+		Data: data,
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }

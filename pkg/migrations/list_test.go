@@ -78,7 +78,17 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("when the status ConfigMap is corrupt", func(t *testing.T) {
-		t.Skip("TODO")
+		Register(testMigration{})
+		defer func() {
+			knownMigrations = nil
+		}()
+
+		clientset := fake.NewClientset(newConfigMap("rancher-migrations", map[string]string{
+			"test-migration": "testing",
+		}))
+
+		_, err := List(context.TODO(), NewStatusClient(clientset.CoreV1()))
+		require.ErrorContains(t, err, `parsing migration status for "test-migration"`)
 	})
 }
 

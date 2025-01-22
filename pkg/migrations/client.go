@@ -40,8 +40,7 @@ func NewStatusClient(c typedcorev1.CoreV1Interface) *ConfigMapStatusClient {
 func (c *ConfigMapStatusClient) StatusFor(ctx context.Context, name string) (*MigrationStatus, error) {
 	cm, err := c.client.Get(ctx, migrationsCMName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		// TODO: Improve error
-		return nil, err
+		return nil, fmt.Errorf("getting migration status information: %w", err)
 	}
 
 	data := cm.Data[name]
@@ -67,16 +66,14 @@ func (c *ConfigMapStatusClient) SetStatusFor(ctx context.Context, name string, s
 	configMap, err := c.client.Get(ctx, migrationsCMName, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			// TODO: improve this error?
-			return err
+			return fmt.Errorf("updating migration status information: %w", err)
 		}
 		configMap = &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: migrationsCMName, Namespace: migrationsNamespace}}
 	}
 
 	configMapApplyConfig, err := applycorev1.ExtractConfigMap(configMap, fieldMgr)
 	if err != nil {
-		// TODO: improve this error?
-		return err
+		return fmt.Errorf("updating migration status config: %w", err)
 	}
 
 	configMapApplyConfig.
@@ -86,5 +83,5 @@ func (c *ConfigMapStatusClient) SetStatusFor(ctx context.Context, name string, s
 
 	_, err = c.client.Apply(ctx, configMapApplyConfig, metav1.ApplyOptions{FieldManager: fieldMgr})
 
-	return err
+	return fmt.Errorf("updating migration status config: %w", err)
 }

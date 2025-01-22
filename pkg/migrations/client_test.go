@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rancher/rancher/pkg/migrations/descriptive"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes/fake"
@@ -48,6 +49,9 @@ func TestStatusFor(t *testing.T) {
 		clientset := fake.NewClientset(newConfigMap("rancher-migrations", map[string]string{
 			"test-migration": testMarshalJSON(t, MigrationStatus{
 				AppliedAt: now,
+				Metrics: &descriptive.ApplyMetrics{
+					Patch: 2,
+				},
 			}),
 		}))
 		client := NewStatusClient(clientset.CoreV1())
@@ -55,7 +59,13 @@ func TestStatusFor(t *testing.T) {
 		result, err := client.StatusFor(context.TODO(), "test-migration")
 		require.NoError(t, err)
 
-		assert.EqualExportedValues(t, &MigrationStatus{AppliedAt: now}, result)
+		want := &MigrationStatus{
+			AppliedAt: now,
+			Metrics: &descriptive.ApplyMetrics{
+				Patch: 2,
+			},
+		}
+		assert.EqualExportedValues(t, want, result)
 	})
 }
 
@@ -63,7 +73,12 @@ func TestSetStatusFor(t *testing.T) {
 	t.Run("when no config map exists", func(t *testing.T) {
 		clientset := fake.NewClientset()
 		client := NewStatusClient(clientset.CoreV1())
-		appliedStatus := MigrationStatus{AppliedAt: time.Now()}
+		appliedStatus := MigrationStatus{
+			AppliedAt: time.Now(),
+			Metrics: &descriptive.ApplyMetrics{
+				Patch: 2,
+			},
+		}
 		err := client.SetStatusFor(context.TODO(), "test-migration", appliedStatus)
 		require.NoError(t, err)
 
@@ -76,8 +91,10 @@ func TestSetStatusFor(t *testing.T) {
 		client := NewStatusClient(clientset.CoreV1())
 		now := time.Now()
 
-		firstMigration := MigrationStatus{AppliedAt: now}
-		secondMigration := MigrationStatus{AppliedAt: now.Add(time.Minute * -30)}
+		firstMigration := MigrationStatus{
+			AppliedAt: now, Metrics: &descriptive.ApplyMetrics{Create: 1}}
+		secondMigration := MigrationStatus{
+			AppliedAt: now.Add(time.Minute * -30), Metrics: &descriptive.ApplyMetrics{Delete: 1}}
 
 		err := client.SetStatusFor(context.TODO(), "test-migration", firstMigration)
 		assert.NoError(t, err)
