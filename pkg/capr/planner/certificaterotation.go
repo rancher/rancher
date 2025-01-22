@@ -97,11 +97,17 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 	}
 
 	if isOnlyWorker(entry) {
-		rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions(
-			controlPlane,
-			"certificate-rotation/restart",
-			strconv.FormatInt(rotation.Generation, 10),
-			capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion))...)
+		if isOnlyWindowsWorker(entry) {
+			rotatePlan.Instructions = append(rotatePlan.Instructions, windowsIdempotentRestartInstructions(
+				"certificate-rotation/restart",
+				strconv.FormatInt(rotation.Generation, 10), "rke2")...)
+		} else {
+			rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions(
+				controlPlane,
+				"certificate-rotation/restart",
+				strconv.FormatInt(rotation.Generation, 10),
+				capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion))...)
+		}
 		return rotatePlan, joinedServer, nil
 	}
 

@@ -146,6 +146,10 @@ func windows(entry *planEntry) bool {
 	return false
 }
 
+func isOnlyWindowsWorker(entry *planEntry) bool {
+	return isOnlyWorker(entry) && windows(entry)
+}
+
 func anyPlanDataExists(entry *planEntry) bool {
 	if entry.Plan != nil {
 		return entry.Plan.PlanDataExists
