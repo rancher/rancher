@@ -202,18 +202,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	var extensionAPIServer steveserver.ExtensionAPIServer
-	if strings.EqualFold(settings.ImperativeApiExtension.Get(), "true") {
-		logrus.Info("starting extension api server")
-		extensionAPIServer, err = ext.NewExtensionAPIServer(ctx, wranglerContext)
-		if err != nil {
-			return nil, fmt.Errorf("extension api server: %w", err)
-		}
-	} else {
-		logrus.Debug("not starting extension api server, cleaning up resources")
-		if err := ext.CleanupExtensionAPIServer(wranglerContext); err != nil {
-			return nil, fmt.Errorf("failed to cleanup extension api server: %w", err)
-		}
+	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext)
+	if err != nil {
+		return nil, fmt.Errorf("extension api server: %w", err)
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
