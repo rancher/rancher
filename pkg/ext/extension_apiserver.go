@@ -12,7 +12,10 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
+	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -35,10 +38,9 @@ const (
 	Namespace         = "cattle-system"
 )
 
-func APIService(caBundle []byte) (*apiregv1.APIService, error) {
+func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceController, caBundle []byte) error {
 	port := int32(Port)
-
-	return &apiregv1.APIService{
+	desired := &apiregv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: APIServiceName,
 		},
@@ -54,11 +56,28 @@ func APIService(caBundle []byte) (*apiregv1.APIService, error) {
 			Version:         "v1",
 			VersionPriority: 100,
 		},
-	}, nil
+	}
+
+	current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		if _, err := apiservice.Create(desired); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	} else {
+		current.Spec = desired.Spec
+
+		if _, err := apiservice.Update(current); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func Service() corev1.Service {
-	return corev1.Service{
+func CreateOrUpdateService(service wranglercorev1.ServiceController) error {
+	desired := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TargetServiceName,
 			Namespace: Namespace,
@@ -74,6 +93,35 @@ func Service() corev1.Service {
 			},
 		},
 	}
+
+	current, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		if _, err := service.Create(desired); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	} else {
+		current.Spec = desired.Spec
+
+		if _, err := service.Update(current); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CleanupExtensionAPIServer(wranglerContext *wrangler.Context) error {
+	if err := wranglerContext.Core.Service().Delete(Namespace, APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("failed to delete service: %w", err)
+	}
+
+	if err := wranglerContext.API.APIService().Delete(TargetServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("failed to delete APIService: %w", err)
+	}
+
+	return nil
 }
 
 func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Context) (steveserver.ExtensionAPIServer, error) {
@@ -173,32 +221,14 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, fmt.Errorf("failed to install install stores: %w", err)
 	}
 
-	service := Service()
-	if _, err := wranglerContext.Core.Service().Create(&service); client.IgnoreAlreadyExists(err) != nil {
-		return nil, fmt.Errorf("failed to create a new proxy service: %w", err)
+	if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
+		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 	}
 
 	caBundle, _ := sniProvider.CurrentCertKeyContent()
-	apiService, err := APIService(caBundle)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct a new APIService: %w", err)
-	}
-
-	if _, err := wranglerContext.API.APIService().Create(apiService); client.IgnoreAlreadyExists(err) != nil {
-		return nil, fmt.Errorf("failed to create a new APIService: %w", err)
+	if err := CreateOrUpdateAPIService(wranglerContext.API.APIService(), caBundle); err != nil {
+		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 	}
 
 	return extensionAPIServer, nil
-}
-
-func CleanupExtensionAPIServer(wranglerContext *wrangler.Context) error {
-	if err := wranglerContext.Core.Service().Delete(Namespace, APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-		return fmt.Errorf("failed to create a new proxy service: %w", err)
-	}
-
-	if err := wranglerContext.API.APIService().Delete(Service().Name, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-		return fmt.Errorf("failed to delete APIService: %w", err)
-	}
-
-	return nil
 }
