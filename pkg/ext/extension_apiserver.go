@@ -9,11 +9,13 @@ import (
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,11 +115,11 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController) error {
 }
 
 func CleanupExtensionAPIServer(wranglerContext *wrangler.Context) error {
-	if err := wranglerContext.Core.Service().Delete(Namespace, APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+	if err := wranglerContext.Core.Service().Delete(Namespace, TargetServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 		return fmt.Errorf("failed to delete service: %w", err)
 	}
 
-	if err := wranglerContext.API.APIService().Delete(TargetServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+	if err := wranglerContext.API.APIService().Delete(APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 		return fmt.Errorf("failed to delete APIService: %w", err)
 	}
 
@@ -156,9 +158,32 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		defaultAuthenticator,
 	)
 
-	sniProvider, err := certForCommonName(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace))
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
+	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
+	switch settings.ImperativeApiExtension.Get() {
+	case "true":
+		logrus.Info("creating imperative extension apiserver resources")
+
+		sniProvider, err := certForCommonName(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace))
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
+		}
+
+		additionalSniProviders = append(additionalSniProviders, sniProvider)
+
+		if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
+			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
+		}
+
+		caBundle, _ := sniProvider.CurrentCertKeyContent()
+		if err := CreateOrUpdateAPIService(wranglerContext.API.APIService(), caBundle); err != nil {
+			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
+		}
+	default:
+		logrus.Info("deleting imperative extension apiserver resources")
+
+		if err := CleanupExtensionAPIServer(wranglerContext); err != nil {
+			return nil, fmt.Errorf("failed to clean up extension api resources: %w", err)
+		}
 	}
 
 	aslAuthorizer := steveext.NewAccessSetAuthorizer(wranglerContext.ASL)
@@ -209,7 +234,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			}
 			return aslAuthorizer.Authorize(ctx, attrs)
 		}),
-		SNICerts: []dynamiccertificates.SNICertKeyContentProvider{sniProvider},
+		SNICerts: additionalSniProviders,
 	}
 
 	extensionAPIServer, err := steveext.NewExtensionAPIServer(scheme, codecs, extOpts)
@@ -219,15 +244,6 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	if err = extstores.InstallStores(extensionAPIServer, scheme); err != nil {
 		return nil, fmt.Errorf("failed to install install stores: %w", err)
-	}
-
-	if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
-		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-	}
-
-	caBundle, _ := sniProvider.CurrentCertKeyContent()
-	if err := CreateOrUpdateAPIService(wranglerContext.API.APIService(), caBundle); err != nil {
-		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 	}
 
 	return extensionAPIServer, nil
