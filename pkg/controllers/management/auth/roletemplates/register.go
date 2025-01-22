@@ -16,5 +16,5 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 
 	p := newPRTBHandler(management)
 	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, "mgmt-prtb-change-handler", p.OnChange)
-	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, "mgmt-prtb-remove-handler", p.OnRemove)
+	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().OnRemove(ctx, "mgmt-prtb-remove-handler", p.OnRemove)
 }

@@ -39,10 +39,11 @@ func newPRTBHandler(management *config.ManagementContext) *prtbHandler {
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project management role if it exists.
 func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil {
+	if prtb == nil || prtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
-	prtb, err := p.reconcileSubject(prtb)
+	var err error
+	prtb, err = p.reconcileSubject(prtb)
 	if err != nil {
 		return nil, err
 	}
