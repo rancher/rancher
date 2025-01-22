@@ -118,13 +118,13 @@ func ApplyChanges(ctx context.Context, client dynamic.Interface, changes []Resou
 		switch change.Operation {
 		case OperationPatch:
 			metrics.Patch += 1
-			if patchErr := applyPatchChangesToResource(ctx, client, *change.Patch); patchErr != nil {
+			if patchErr := applyPatchChangesToResource(ctx, client, *change.Patch, options); patchErr != nil {
 				err = errors.Join(err, patchErr)
 				metrics.Errors += 1
 			}
 		case OperationCreate:
 			metrics.Create += 1
-			if createErr := applyCreateChange(ctx, client, *change.Create, mapper); createErr != nil {
+			if createErr := applyCreateChange(ctx, client, *change.Create, mapper, options); createErr != nil {
 				err = errors.Join(err, createErr)
 				metrics.Errors += 1
 			}
@@ -154,7 +154,7 @@ func resourceName(u *unstructured.Unstructured) string {
 	return strings.Join(elements, "/")
 }
 
-func applyCreateChange(ctx context.Context, client dynamic.Interface, patch CreateChange, mapper meta.RESTMapper) error {
+func applyCreateChange(ctx context.Context, client dynamic.Interface, patch CreateChange, mapper meta.RESTMapper, options ApplyOptions) error {
 	createKind := patch.Resource.GetObjectKind().GroupVersionKind()
 	if createKind.Empty() {
 		return fmt.Errorf("GVK missing from resource: %s", resourceName(patch.Resource))
@@ -165,8 +165,13 @@ func applyCreateChange(ctx context.Context, client dynamic.Interface, patch Crea
 		return fmt.Errorf("unable to get resource mapping for %s", createKind.GroupKind().WithVersion(createKind.Version))
 	}
 
+	createOptions := metav1.CreateOptions{}
+	if options.DryRun {
+		createOptions.DryRun = []string{metav1.DryRunAll}
+	}
+
 	// TODO: What to do about non-namespaced resources?
-	if _, err := client.Resource(mapping.Resource).Namespace(patch.Resource.GetNamespace()).Create(ctx, patch.Resource, metav1.CreateOptions{}); err != nil {
+	if _, err := client.Resource(mapping.Resource).Namespace(patch.Resource.GetNamespace()).Create(ctx, patch.Resource, createOptions); err != nil {
 		return fmt.Errorf("failed to apply Create change - creating resource: %w", err)
 	}
 
@@ -191,7 +196,7 @@ func applyDeleteChange(ctx context.Context, client dynamic.Interface, change Del
 	return nil
 }
 
-func applyPatchChangesToResource(ctx context.Context, client dynamic.Interface, patch PatchChange) error {
+func applyPatchChangesToResource(ctx context.Context, client dynamic.Interface, patch PatchChange, options ApplyOptions) error {
 	resources := client.Resource(patch.ResourceRef.GVR()).Namespace(
 		patch.ResourceRef.ObjectRef.Namespace)
 
@@ -206,8 +211,13 @@ func applyPatchChangesToResource(ctx context.Context, client dynamic.Interface, 
 		return fmt.Errorf("failed to apply Patch change - applying patch: %w", err)
 	}
 
+	updateOptions := metav1.UpdateOptions{}
+	if options.DryRun {
+		updateOptions.DryRun = []string{metav1.DryRunAll}
+	}
+
 	// TODO: PATCH!
-	if _, err := resources.Update(ctx, res, metav1.UpdateOptions{}); err != nil {
+	if _, err := resources.Update(ctx, res, updateOptions); err != nil {
 		// TODO: Improve error
 		return err
 	}
