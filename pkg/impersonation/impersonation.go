@@ -250,12 +250,24 @@ func (i *Impersonator) createRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRol
 }
 
 func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
-	rules := []rbacv1.PolicyRule{{
-		Verbs:         []string{"impersonate"},
-		APIGroups:     []string{""},
-		Resources:     []string{"users"},
-		ResourceNames: []string{i.user.GetUID()},
-	}}
+	rules := []rbacv1.PolicyRule{
+		{
+			Verbs:         []string{"impersonate"},
+			APIGroups:     []string{""},
+			Resources:     []string{"users"},
+			ResourceNames: []string{i.user.GetUID()},
+		},
+		{
+			Verbs:     []string{"impersonate"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"userextras/" + authcommon.ExtraRequestTokenID},
+		},
+		{
+			Verbs:     []string{"impersonate"},
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"userextras/" + authcommon.ExtraRequestHost},
+		},
+	}
 
 	if groups := i.user.GetGroups(); len(groups) > 0 {
 		rules = append(rules, rbacv1.PolicyRule{
@@ -265,12 +277,13 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 			ResourceNames: groups,
 		})
 	}
+
 	extras := i.user.GetExtra()
 	if principalids, ok := extras[authcommon.UserAttributePrincipalID]; ok {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
-			Resources:     []string{"userextras/principalid"},
+			Resources:     []string{"userextras/" + authcommon.UserAttributePrincipalID},
 			ResourceNames: principalids,
 		})
 	}
@@ -278,10 +291,11 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
-			Resources:     []string{"userextras/username"},
+			Resources:     []string{"userextras/" + authcommon.UserAttributeUserName},
 			ResourceNames: usernames,
 		})
 	}
+
 	return rules
 }
 
