@@ -42,6 +42,9 @@ app: {{ template "rancher.fullname" . }}
 chart: {{ template "rancher.chartname" . }}
 heritage: {{ .Release.Service }}
 release: {{ .Release.Name }}
+{{- if .Values.customLabels }}
+{{ toYaml .Values.customLabels }}
+{{- end }}
 {{- end }}
 
 # Windows Support
