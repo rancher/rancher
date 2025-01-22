@@ -36,12 +36,3 @@ rbacInput:
   username: "<userID>"
   password: "<password>"
 ```
-
-# Provisioning new clusters
-If the RBAC test needs to provision a new cluster and you don't want to affect other pipeline tests, you should add provisioning.Disable Update Config function on your SetupSuite test, follow the example bellow:
-```go
-func (pr *ProjectRolesTestSuite) SetupSuite() {
-//previous code
-provisioning.DisableUpdateConfig(pr.client)
-}
-```
