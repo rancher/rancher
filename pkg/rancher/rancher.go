@@ -198,6 +198,13 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+<<<<<<< HEAD
+=======
+	if err := dashboardapi.Register(ctx, wranglerContext); err != nil {
+		return nil, err
+	}
+
+>>>>>>> cddf71590 (update setting handling to always create api and conditionaly create resources)
 	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext)
 	if err != nil {
 		return nil, fmt.Errorf("extension api server: %w", err)

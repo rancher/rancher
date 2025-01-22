@@ -248,14 +248,5 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, fmt.Errorf("install stores: %w", err)
 	}
 
-	if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
-		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-	}
-
-	caBundle, _ := sniProvider.CurrentCertKeyContent()
-	if err := CreateOrUpdateAPIService(wranglerContext.API.APIService(), caBundle); err != nil {
-		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-	}
-
 	return extensionAPIServer, nil
 }
