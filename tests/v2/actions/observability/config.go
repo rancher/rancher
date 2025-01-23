@@ -9,23 +9,38 @@ type StackStateConfig struct {
 	AdminPassword  string `json:"adminPassword" yaml:"adminPassword"`
 }
 
+// GlobalConfig represents global configuration values
+type GlobalConfig struct {
+	ImageRegistry string `json:"imageRegistry" yaml:"imageRegistry"`
+}
+
+// AuthenticationConfig represents the authentication configuration
+type AuthenticationConfig struct {
+	AdminPassword string `json:"adminPassword" yaml:"adminPassword"`
+}
+
+// ApiKeyConfig represents API key configuration
+type ApiKeyConfig struct {
+	Key string `json:"key" yaml:"key"`
+}
+
+// LicenseConfig represents the license configuration
+type LicenseConfig struct {
+	Key string `json:"key" yaml:"key"`
+}
+
+// StackstateServerConfig groups the various StackState configuration options
+type StackstateServerConfig struct {
+	BaseUrl        string               `json:"baseUrl" yaml:"baseUrl"`
+	Authentication AuthenticationConfig `json:"authentication" yaml:"authentication"`
+	ApiKey         ApiKeyConfig         `json:"apiKey" yaml:"apiKey"`
+	License        LicenseConfig        `json:"license" yaml:"license"`
+}
+
 // BaseConfig represents the base configuration values
 type BaseConfig struct {
-	Global struct {
-		ImageRegistry string `json:"imageRegistry" yaml:"imageRegistry"`
-	} `json:"global" yaml:"global"`
-	Stackstate struct {
-		BaseUrl        string `json:"baseUrl" yaml:"baseUrl"`
-		Authentication struct {
-			AdminPassword string `json:"adminPassword" yaml:"adminPassword"`
-		} `json:"authentication" yaml:"authentication"`
-		ApiKey struct {
-			Key string `json:"key" yaml:"key"`
-		} `json:"apiKey" yaml:"apiKey"`
-		License struct {
-			Key string `json:"key" yaml:"key"`
-		} `json:"license" yaml:"license"`
-	} `json:"stackstate" yaml:"stackstate"`
+	Global     GlobalConfig           `json:"global" yaml:"global"`
+	Stackstate StackstateServerConfig `json:"stackstate" yaml:"stackstate"`
 }
 
 // SizingConfig represents the sizing configuration values
