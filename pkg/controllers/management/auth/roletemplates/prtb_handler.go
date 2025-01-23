@@ -55,7 +55,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	return prtb, p.reconcileBindings(prtb)
 }
 
-// OnRemove deletes Cluster Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
+// OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if prtb == nil {
 		return nil, nil

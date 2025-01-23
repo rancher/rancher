@@ -8,6 +8,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/fleet"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -24,6 +25,7 @@ type crtbHandler struct {
 	userMGR        user.Manager
 	userController mgmtv3.UserController
 	rtController   mgmtv3.RoleTemplateController
+	rbController   wrbacv1.RoleBindingController
 	crController   wrbacv1.ClusterRoleController
 	crbController  wrbacv1.ClusterRoleBindingController
 	crtbCache      mgmtv3.ClusterRoleTemplateBindingCache
@@ -36,6 +38,7 @@ func newCRTBHandler(management *config.ManagementContext) *crtbHandler {
 		userMGR:        management.UserManager,
 		userController: management.Wrangler.Mgmt.User(),
 		rtController:   management.Wrangler.Mgmt.RoleTemplate(),
+		rbController:   management.Wrangler.RBAC.RoleBinding(),
 		crController:   management.Wrangler.RBAC.ClusterRole(),
 		crbController:  management.Wrangler.RBAC.ClusterRoleBinding(),
 		crtbCache:      management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
@@ -215,10 +218,13 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	err := deleteMembershipBinding(crtb, c.crbController)
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, clusterMembershipBindingDeleted, err)
 
+	err = c.removeAuthV2Permissions(crtb)
+	c.s.AddCondition(&crtb.Status.LocalConditions, condition, authv2ProvisioningBindingDeleted, err)
+
 	return crtb, errors.Join(err, c.removeClusterRoleBindings(crtb))
 }
 
-// removeClusterRoleBindings removes all cluster role bindings owned by the CRTB
+// removeClusterRoleBindings removes all bindings owned by the CRTB
 func (c *crtbHandler) removeClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding) error {
 	condition := metav1.Condition{Type: removeClusterRoleBindings}
 	currentCRBs, err := c.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
@@ -238,6 +244,24 @@ func (c *crtbHandler) removeClusterRoleBindings(crtb *v3.ClusterRoleTemplateBind
 
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, clusterRoleBindingDeleted, returnErr)
 	return returnErr
+}
+
+// removeAuthV2Permissions removes all Role Bindings with the CRTB owner label.
+// The only intentionally created RoleBindings are created by auth provisioning v2 to provide access to the fleet cluster.
+// The creation of those is handled in pkg/controllers/management/authprovisioningv2/crtb.go:20.
+func (c *crtbHandler) removeAuthV2Permissions(crtb *v3.ClusterRoleTemplateBinding) error {
+	listOptions := metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)}
+
+	roleBindings, err := c.rbController.List(fleet.ClustersDefaultNamespace, listOptions)
+	if err != nil {
+		return err
+	}
+	for _, roleBinding := range roleBindings.Items {
+		if err := c.rbController.Delete(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var timeNow = func() time.Time {

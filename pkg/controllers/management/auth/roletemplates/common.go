@@ -34,6 +34,7 @@ const (
 	subjectExists                           = "SubjectExists"
 	crtbHasNoSubject                        = "CRTBHasNoSubject"
 	clusterMembershipBindingDeleted         = "ClusterMembershipBindingDeleted"
+	authv2ProvisioningBindingDeleted        = "AuthV2ProvisioningBindingDeleted"
 	failedToCreateClusterRoleBinding        = "FailedToCreateClusterRoleBinding"
 	failedToCreateOrUpdateMembershipBinding = "FailedToCreateOrUpdateMembershipBinding"
 	failedToCreateUser                      = "FailedToCreateUser"
