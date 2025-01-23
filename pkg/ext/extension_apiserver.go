@@ -103,7 +103,7 @@ func NewExtensionAPIServer(wranglerContext *wrangler.Context) (steveserver.Exten
 		return nil, fmt.Errorf("new extension API server: %w", err)
 	}
 
-	if err = extstores.InstallStores(extensionAPIServer, scheme); err != nil {
+	if err = extstores.InstallStores(extensionAPIServer, wranglerContext, scheme); err != nil {
 		return nil, fmt.Errorf("install stores: %w", err)
 	}
 

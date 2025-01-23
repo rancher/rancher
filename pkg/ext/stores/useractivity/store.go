@@ -7,8 +7,8 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/wrangler"
 	extcore "github.com/rancher/steve/pkg/ext"
-	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,13 +22,13 @@ const (
 	UserActivityNamespace = "cattle-useractivity-data"
 	tokenUserId           = "authn.management.cattle.io/token-userId"
 	SingularName          = "useractivity"
+	PluralName            = SingularName + "s"
 )
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 type Store struct {
 	tokenController v3.TokenController
-	configMapClient v1.ConfigMapClient
 	checker         userHandler
 }
 
@@ -48,10 +48,9 @@ var GVR = schema.GroupVersionResource{
 	Resource: SingularName,
 }
 
-func NewUserActivityStore(token v3.TokenController, cmclient v1.ConfigMapClient) *Store {
+func NewFromWrangler(wranglerCtx *wrangler.Context) *Store {
 	return &Store{
-		tokenController: token,
-		configMapClient: cmclient,
+		tokenController: wranglerCtx.Mgmt.Token(),
 		checker:         &tokenChecker{},
 	}
 }
@@ -106,9 +105,11 @@ func (uas *Store) Create(ctx context.Context,
 	// verifies the token has label with user which made the request.
 	if token.Labels[tokenUserId] == user {
 		// once validated the request, we can define the lastActivity time.
-		lastActivity := time.Now()
+		lastActivity := metav1.Now()
 		// TODO: replace '10' with the value of auth-user-session-ttl-minutes
-		newIdleTimeout := lastActivity.Local().Add(time.Minute * time.Duration(10))
+		newIdleTimeout := metav1.Time{
+			Time: lastActivity.Local().Add(time.Minute * time.Duration(10)),
+		}
 
 		token.LastIdleTimeout = newIdleTimeout
 		uas.tokenController.Update(token)
