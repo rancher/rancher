@@ -49,6 +49,11 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 	metrics, applyErr := descriptive.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
 	status := MigrationStatus{
 		AppliedAt: time.Now(),
+		Metrics:   metrics,
+	}
+
+	if applyErr != nil {
+		status.Errors = applyErr.Error()
 	}
 
 	return metrics, errors.Join(applyErr, migrationStatus.SetStatusFor(ctx, name, status))

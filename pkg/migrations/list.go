@@ -52,12 +52,16 @@ type MigrationInfo struct {
 	// Applied is true if the Migration has been applied to the connected
 	// cluster.
 	Applied bool
+
+	// Errors records the error messages generated during apply.
+	Errors string
 }
 
 // MigrationStatus records the state of a Migration.
 type MigrationStatus struct {
 	AppliedAt time.Time                 `json:"appliedAt"`
 	Metrics   *descriptive.ApplyMetrics `json:"metrics,omitempty"`
+	Errors    string                    `json:"errors"`
 }
 
 // MigrationStatusGetter implementations get the status of a named Migration.

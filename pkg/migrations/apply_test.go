@@ -22,6 +22,8 @@ import (
 	"github.com/rancher/rancher/pkg/migrations/test"
 )
 
+var testSecretData = map[string][]byte{"testing": []byte("TESTSECRET")}
+
 func TestApply(t *testing.T) {
 	t.Run("unknown migration", func(t *testing.T) {
 		clientset := fake.NewClientset()
@@ -80,7 +82,12 @@ func TestApply(t *testing.T) {
 			metrics, err := Apply(context.TODO(), "test-migration", statusClient, dynamicset, descriptive.ApplyOptions{}, nil)
 			require.NoError(t, err)
 
-			wantStatus := &MigrationStatus{AppliedAt: time.Now()}
+			wantStatus := &MigrationStatus{
+				AppliedAt: time.Now(),
+				Metrics: &descriptive.ApplyMetrics{
+					Patch: 1,
+				},
+			}
 			status, err := statusClient.StatusFor(context.TODO(), "test-migration")
 			assert.EqualExportedValues(t, wantStatus, status)
 
@@ -89,6 +96,38 @@ func TestApply(t *testing.T) {
 				t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 			}
 		})
+	})
+
+	t.Run("errors applying migrations are recorded", func(t *testing.T) {
+		Register(testCreateMigration{t: t})
+		t.Cleanup(func() {
+			knownMigrations = nil
+		})
+
+		clientset := fake.NewClientset()
+		existingSecret := newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, testSecretData)
+		dynamicset := newFakeDynamicClient(t, existingSecret)
+		statusClient := NewStatusClient(clientset.CoreV1())
+		mapper := test.NewFakeMapper()
+
+		metrics, err := Apply(context.TODO(), "test-create-migration", statusClient, dynamicset, descriptive.ApplyOptions{}, mapper)
+		require.ErrorContains(t, err, `secrets "test-secret" already exists`)
+
+		wantMetrics := &descriptive.ApplyMetrics{Create: 1, Errors: 1}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
+
+		wantStatus := &MigrationStatus{
+			AppliedAt: time.Now(),
+			Metrics: &descriptive.ApplyMetrics{
+				Create: 1,
+				Errors: 1,
+			},
+			Errors: `failed to apply Create change - creating resource: secrets "test-secret" already exists`,
+		}
+		status, err := statusClient.StatusFor(context.TODO(), "test-create-migration")
+		assert.EqualExportedValues(t, wantStatus, status)
 	})
 }
 
@@ -117,7 +156,7 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 		require.NoError(t, err)
 
 		wantMetrics := map[string]*descriptive.ApplyMetrics{
-			testMigration{}.Name(): {Patch: 1, Errors: 0},
+			testMigration{}.Name(): {Patch: 1},
 		}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
@@ -147,7 +186,7 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 		})
 		secret := newSecret(
 			types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"},
-			map[string][]byte{"testing": []byte("TESTSECRET")})
+			testSecretData)
 		clientset := fake.NewClientset()
 		dynamicset := newFakeDynamicClient(t, svc, secret)
 
@@ -266,6 +305,28 @@ func (t testDeleteMigration) Changes(ctx context.Context, _ descriptive.Interfac
 				Operation: descriptive.OperationDelete,
 				Delete: &descriptive.DeleteChange{
 					ResourceRef: secretRef,
+				},
+			},
+		},
+	}, nil
+}
+
+type testCreateMigration struct {
+	t *testing.T
+}
+
+func (m testCreateMigration) Name() string {
+	return "test-create-migration"
+}
+
+func (m testCreateMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+	return &MigrationChanges{
+		Changes: []descriptive.ResourceChange{
+			{
+				Operation: descriptive.OperationCreate,
+				Create: &descriptive.CreateChange{
+					Resource: test.ToUnstructured(m.t,
+						newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, testSecretData)),
 				},
 			},
 		},

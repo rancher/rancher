@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +56,7 @@ func TestApplyChanges(t *testing.T) {
 
 		k8sClient := newFakeClient(testScheme, svc)
 
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
 		require.NoError(t, err)
 
 		updated, err := k8sClient.Resource(change.Patch.ResourceRef.GVR()).Namespace(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
@@ -128,7 +127,7 @@ func TestApplyChanges(t *testing.T) {
 
 		k8sClient := newFakeClient(testScheme, svc)
 
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{DryRun: true}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{DryRun: true}, test.NewFakeMapper())
 		require.NoError(t, err)
 
 		updated, err := k8sClient.Resource(change.Patch.ResourceRef.GVR()).Namespace(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
@@ -269,7 +268,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme, ac)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
 		require.NoError(t, err)
 
 		want := &unstructured.Unstructured{
@@ -330,7 +329,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{DryRun: true}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{DryRun: true}, test.NewFakeMapper())
 		require.NoError(t, err)
 
 		created, err := k8sClient.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}).Namespace("cattle-secrets").Get(context.TODO(), "test-secret", metav1.GetOptions{})
@@ -427,7 +426,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme, secret)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
 		require.NoError(t, err)
 
 		_, err = k8sClient.Resource(secretRef.GVR()).Namespace(secret.Namespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
@@ -464,7 +463,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme, secret)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{DryRun: true}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{DryRun: true}, test.NewFakeMapper())
 		require.NoError(t, err)
 
 		actions := k8sClient.Fake.Actions()
@@ -513,7 +512,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
 		require.ErrorContains(t, err, "GVK missing from resource: shibboleth")
 		wantMetrics := &ApplyMetrics{Create: 1, Errors: 1}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
@@ -545,7 +544,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
 		require.ErrorContains(t, err, "unable to get resource mapping for management.cattle.io/v3, Kind=AuthConfig")
 		wantMetrics := &ApplyMetrics{Create: 1, Errors: 1}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
@@ -565,7 +564,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme, secret)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
 		require.ErrorContains(t, err, `failed to apply Create change - creating resource: secrets "test-secret" already exists`)
 		wantMetrics := &ApplyMetrics{Create: 1, Errors: 1}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
@@ -600,7 +599,7 @@ func TestApplyChanges(t *testing.T) {
 		}
 
 		k8sClient := newFakeClient(testScheme, svc)
-		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, testMapper())
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
 		require.ErrorContains(t, err, `failed to apply Patch change - applying patch: Unexpected kind: modify`)
 		wantMetrics := &ApplyMetrics{Patch: 1, Errors: 1}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
@@ -681,18 +680,6 @@ func newAuthConfig() *unstructured.Unstructured {
 			},
 		},
 	}
-}
-
-// This would normally be dynamically created from the API Server.
-func testMapper() *meta.DefaultRESTMapper {
-	mapper := meta.NewDefaultRESTMapper(nil)
-	mapper.AddSpecific(
-		schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"},
-		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"},
-		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secret"},
-		meta.RESTScopeNamespace)
-
-	return mapper
 }
 
 var unstructuredIgnore = cmpopts.IgnoreMapEntries(func(k string, _ any) bool {
