@@ -165,61 +165,79 @@ func structToMap(obj interface{}) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	// First unmarshal into a map[interface{}]interface{}
-	var m map[interface{}]interface{}
-	err = yaml.Unmarshal(data, &m)
-	if err != nil {
+	var intermediate map[interface{}]interface{}
+	if err = yaml.Unmarshal(data, &intermediate); err != nil {
 		return nil, err
 	}
 
-	// Convert to map[string]interface{}
-	result := make(map[string]interface{})
-	for k, v := range m {
-		strKey := fmt.Sprintf("%v", k)
-		result[strKey] = convertToStringKeysRecursive(v)
-	}
-
-	return result, nil
+	return convertMapInterfaceToMapString(intermediate), nil
 }
 
-// convertToStringKeysRecursive recursively converts all map[interface{}]interface{} to map[string]interface{}
-func convertToStringKeysRecursive(val interface{}) interface{} {
+// Converts map[interface{}]interface{} to map[string]interface{}
+func convertMapInterfaceToMapString(obj map[interface{}]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for k, v := range obj {
+		key := fmt.Sprintf("%v", k)
+		result[key] = convertToStringKeys(v)
+	}
+	return result
+}
+
+// convertToStringKeys converts any map[interface{}]interface{} to map[string]interface{} recursively
+func convertToStringKeys(val interface{}) interface{} {
 	switch v := val.(type) {
 	case map[interface{}]interface{}:
-		strMap := make(map[string]interface{})
-		for k, v2 := range v {
-			strKey := fmt.Sprintf("%v", k)
-			strMap[strKey] = convertToStringKeysRecursive(v2)
-		}
-		return strMap
+		return convertMapToStringKeys(v)
 	case []interface{}:
+		convertedSlice := make([]interface{}, len(v))
 		for i, v2 := range v {
-			v[i] = convertToStringKeysRecursive(v2)
+			convertedSlice[i] = convertToStringKeys(v2)
 		}
-		return v
+		return convertedSlice
 	default:
 		return v
 	}
 }
 
+// convertMapToStringKeys converts a map[interface{}]interface{} to a map[string]interface{}
+func convertMapToStringKeys(input map[interface{}]interface{}) map[string]interface{} {
+	strMap := make(map[string]interface{})
+	for k, v := range input {
+		strKey := fmt.Sprintf("%v", k)
+		strMap[strKey] = convertToStringKeys(v)
+	}
+	return strMap
+}
+
 // mergeValues merges multiple YAML values maps into a single map
 func mergeValues(values ...map[string]interface{}) map[string]interface{} {
 	result := make(map[string]interface{})
-	for _, v := range values {
-		for key, value := range v {
-			if existingValue, ok := result[key]; ok {
-				if existingMap, ok := existingValue.(map[string]interface{}); ok {
-					if newMap, ok := value.(map[string]interface{}); ok {
-						// Recursively merge maps
-						result[key] = mergeValues(existingMap, newMap)
-						continue
-					}
+	for _, currentMap := range values {
+		for key, currentValue := range currentMap {
+			if existingValue, exists := result[key]; exists {
+				// Check if both existing and current values are maps,
+				// if so, recursively merge them
+				mergedMap := mergeMaps(existingValue, currentValue)
+				if mergedMap != nil {
+					result[key] = mergedMap
+					continue
 				}
 			}
-			result[key] = value
+			// Otherwise, overwrite with the current value
+			result[key] = currentValue
 		}
 	}
 	return result
+}
+
+// mergeMaps recursively merges two maps if both are maps, else returns nil
+func mergeMaps(existingValue, currentValue interface{}) map[string]interface{} {
+	existingMap, ok1 := existingValue.(map[string]interface{})
+	currentMap, ok2 := currentValue.(map[string]interface{})
+	if ok1 && ok2 {
+		return mergeValues(existingMap, currentMap)
+	}
+	return nil
 }
 
 func TestStackStateServerTestSuite(t *testing.T) {
