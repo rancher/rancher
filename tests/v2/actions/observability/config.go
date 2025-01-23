@@ -5,6 +5,8 @@ type StackStateConfig struct {
 	Url            string `json:"url" yaml:"url"`
 	ClusterApiKey  string `json:"clusterApiKey" yaml:"clusterApiKey"`
 	UpgradeVersion string `json:"upgradeVersion" yaml:"upgradeVersion"`
+	License        string `json:"license" yaml:"license"`
+	AdminPassword  string `json:"adminPassword" yaml:"adminPassword"`
 }
 
 // BaseConfig represents the base configuration values

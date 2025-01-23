@@ -9,26 +9,26 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/charts"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	"github.com/rancher/rancher/tests/v2/actions/observability"
 	"github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/rancher/rancher/tests/v2/actions/charts"
-	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/clients/rancher/catalog"
-	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-type StackStateInstallTestSuite struct {
+type StackStateServerTestSuite struct {
 	suite.Suite
 	client                        *rancher.Client
 	session                       *session.Session
@@ -44,101 +44,134 @@ const (
 	observabilityChartName = "suse-observability"
 )
 
-func (ssi *StackStateInstallTestSuite) TearDownSuite() {
-	ssi.session.Cleanup()
+func (sss *StackStateServerTestSuite) TearDownSuite() {
+	sss.session.Cleanup()
 }
 
-func (ssi *StackStateInstallTestSuite) SetupSuite() {
+func (sss *StackStateServerTestSuite) SetupSuite() {
 	testSession := session.NewSession()
-	ssi.session = testSession
+	sss.session = testSession
 
 	client, err := rancher.NewClient("", testSession)
-	require.NoError(ssi.T(), err)
+	require.NoError(sss.T(), err)
 
-	ssi.client = client
+	sss.client = client
 
 	clusterName := client.RancherConfig.ClusterName
-	require.NotEmptyf(ssi.T(), clusterName, "Cluster name to install should be set")
-	cluster, err := clusters.NewClusterMeta(ssi.client, clusterName)
-	require.NoError(ssi.T(), err)
-	ssi.cluster = cluster
+	require.NotEmptyf(sss.T(), clusterName, "Cluster name to install should be set")
+	cluster, err := clusters.NewClusterMeta(sss.client, clusterName)
+	require.NoError(sss.T(), err)
+	sss.cluster = cluster
 
-	ssi.catalogClient, err = ssi.client.GetClusterCatalogClient(ssi.cluster.ID)
-	require.NoError(ssi.T(), err)
+	sss.catalogClient, err = sss.client.GetClusterCatalogClient(sss.cluster.ID)
+	require.NoError(sss.T(), err)
 
 	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
 	projectTemplate.Name = charts.StackstateNamespace
 	project, err := client.Steve.SteveType(project).Create(projectTemplate)
-	require.NoError(ssi.T(), err)
-	ssi.projectID = project.ID
+	require.NoError(sss.T(), err)
+	sss.projectID = project.ID
 
 	ssNamespaceExists, err := namespaces.GetNamespaceByName(client, cluster.ID, charts.StackstateNamespace)
 	if ssNamespaceExists == nil && k8sErrors.IsNotFound(err) {
 		_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
 	}
-	require.NoError(ssi.T(), err)
+	require.NoError(sss.T(), err)
 
 	var stackstateConfigs observability.StackStateConfig
 	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
-	ssi.stackstateConfigs = &stackstateConfigs
+	sss.stackstateConfigs = &stackstateConfigs
 
 	// Install StackState Chart Repo
-	_, err = ssi.catalogClient.ClusterRepos().Get(context.TODO(), observabilityChartName, meta.GetOptions{})
+	_, err = sss.catalogClient.ClusterRepos().Get(context.TODO(), observabilityChartName, meta.GetOptions{})
 	if k8sErrors.IsNotFound(err) {
-		err = charts.CreateClusterRepo(ssi.client, ssi.catalogClient, observabilityChartName, observabilityChartURL)
+		err = charts.CreateClusterRepo(sss.client, sss.catalogClient, observabilityChartName, observabilityChartURL)
 		log.Info("Created suse-observability repo StackState install.")
 	}
-	require.NoError(ssi.T(), err)
+	require.NoError(sss.T(), err)
 
-	latestSSVersion, err := ssi.catalogClient.GetLatestChartVersion(charts.StackStateChartRepo, observabilityChartName)
+	latestSSVersion, err := sss.catalogClient.GetLatestChartVersion(charts.StackStateChartRepo, observabilityChartName)
 
-	ssi.stackstateChartInstallOptions = &charts.InstallOptions{
+	sss.stackstateChartInstallOptions = &charts.InstallOptions{
 		Cluster:   cluster,
 		Version:   latestSSVersion,
-		ProjectID: ssi.projectID,
+		ProjectID: sss.projectID,
 	}
 }
 
-func (ssi *StackStateInstallTestSuite) TestInstallStackState() {
-	subsession := ssi.session.NewSession()
+func (sss *StackStateServerTestSuite) TestInstallStackState() {
+	subsession := sss.session.NewSession()
 	defer subsession.Cleanup()
 
-	ssi.Run("Install SUSE Observability Chart", func() {
+	sss.Run("Install SUSE Observability Chart", func() {
+		// Read cattle config
+		var stackstateConfigs observability.StackStateConfig
+		config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
 
-		// Read base config
-		baseConfigData, err := os.ReadFile("resources/baseConfig_values.yaml")
-		require.NoError(ssi.T(), err)
-
-		var baseConfig observability.BaseConfig
-		err = yaml.Unmarshal(baseConfigData, &baseConfig)
-		require.NoError(ssi.T(), err)
+		// Set base config values
+		baseConfig := observability.BaseConfig{
+			Global: struct {
+				ImageRegistry string `json:"imageRegistry" yaml:"imageRegistry"`
+			}{
+				ImageRegistry: "registry.rancher.com",
+			},
+			Stackstate: struct {
+				BaseUrl        string `json:"baseUrl" yaml:"baseUrl"`
+				Authentication struct {
+					AdminPassword string `json:"adminPassword" yaml:"adminPassword"`
+				} `json:"authentication" yaml:"authentication"`
+				ApiKey struct {
+					Key string `json:"key" yaml:"key"`
+				} `json:"apiKey" yaml:"apiKey"`
+				License struct {
+					Key string `json:"key" yaml:"key"`
+				} `json:"license" yaml:"license"`
+			}{
+				BaseUrl: stackstateConfigs.Url,
+				Authentication: struct {
+					AdminPassword string `json:"adminPassword" yaml:"adminPassword"`
+				}{
+					AdminPassword: stackstateConfigs.AdminPassword,
+				},
+				ApiKey: struct {
+					Key string `json:"key" yaml:"key"`
+				}{
+					Key: stackstateConfigs.ClusterApiKey,
+				},
+				License: struct {
+					Key string `json:"key" yaml:"key"`
+				}{
+					Key: stackstateConfigs.License,
+				},
+			},
+		}
 
 		// Read sizing config
-		sizingConfigData, err := os.ReadFile("resources/sizing_values.yaml")
-		require.NoError(ssi.T(), err)
+		sizingConfigData, err := os.ReadFile("resources/10-nonha_sizing_values.yaml")
+		require.NoError(sss.T(), err)
 
 		var sizingConfig observability.SizingConfig
 		err = yaml.Unmarshal(sizingConfigData, &sizingConfig)
-		require.NoError(ssi.T(), err)
+		require.NoError(sss.T(), err)
 
 		// Convert structs back to map[string]interface{} for chart values
 		baseConfigMap, err := structToMap(baseConfig)
-		require.NoError(ssi.T(), err)
+		require.NoError(sss.T(), err)
 
 		sizingConfigMap, err := structToMap(sizingConfig)
-		require.NoError(ssi.T(), err)
+		require.NoError(sss.T(), err)
 
 		// Merge the values
 		mergedValues := mergeValues(baseConfigMap, sizingConfigMap)
 
-		systemProject, err := projects.GetProjectByName(ssi.client, ssi.cluster.ID, systemProject)
-		require.NoError(ssi.T(), err)
-		require.NotNil(ssi.T(), systemProject.ID, "System project is nil.")
+		systemProject, err := projects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
+		require.NoError(sss.T(), err)
+		require.NotNil(sss.T(), systemProject.ID, "System project is nil.")
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
 		// Install the chart
-		err = charts.InstallStackStateChart(ssi.client, ssi.stackstateChartInstallOptions, ssi.stackstateConfigs, systemProjectID, mergedValues)
-		require.NoError(ssi.T(), err)
+		err = charts.InstallStackStateChart(sss.client, sss.stackstateChartInstallOptions, sss.stackstateConfigs, systemProjectID, mergedValues)
+		require.NoError(sss.T(), err)
 	})
 }
 
@@ -206,6 +239,6 @@ func mergeValues(values ...map[string]interface{}) map[string]interface{} {
 	return result
 }
 
-func TestStackStateInstallTestSuite(t *testing.T) {
-	suite.Run(t, new(StackStateInstallTestSuite))
+func TestStackStateServerTestSuite(t *testing.T) {
+	suite.Run(t, new(StackStateServerTestSuite))
 }

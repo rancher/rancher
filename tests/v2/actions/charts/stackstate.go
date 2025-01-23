@@ -67,7 +67,7 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 	}
 
 	watchAppInterface, err := catalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + "suse-observability",
+		FieldSelector:  "metadata.name=" + StackStateChartRepo,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
