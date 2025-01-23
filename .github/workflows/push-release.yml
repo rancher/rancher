@@ -117,8 +117,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: install yq
-        shell: bash
-        run: sudo snap install yq
+        uses: ./.github/actions/install-yq
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -209,8 +208,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: install yq
-        shell: bash
-        run: sudo snap install yq
+        uses: ./.github/actions/install-yq
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
