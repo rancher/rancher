@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	// importing to setup migrations
+	_ "github.com/rancher/rancher/pkg/migrations/sample"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -34,6 +38,8 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/migrations"
+	"github.com/rancher/rancher/pkg/migrations/descriptive"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -57,9 +63,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 )
@@ -243,6 +252,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
+
+	wranglerContext.OnLeader(func(ctx context.Context) error {
+		// TODO: This is just a simple hook-in
+		return applyAllMigrations(ctx, restConfig)
+	})
 
 	wranglerContext.OnLeader(func(ctx context.Context) error {
 		serviceaccounttoken.StartServiceAccountSecretCleaner(
@@ -617,4 +631,31 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 		allErrors = errors.Join(err, allErrors)
 	}
 	return allErrors
+}
+
+func applyAllMigrations(ctx context.Context, cfg *rest.Config) error {
+
+	clientset, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	dynClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	cache := memory.NewMemCacheClient(clientset.Discovery())
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
+	applied, err := migrations.ApplyUnappliedMigrations(ctx, migrations.NewStatusClient(clientset.CoreV1()), dynClient, descriptive.ApplyOptions{}, mapper)
+	if err != nil {
+		return fmt.Errorf("applying all migrations on startup: %w", err)
+	}
+
+	// TODO: Fix this
+	for migration, metrics := range applied {
+		log.Printf("Migration %s applied %#v", migration, metrics)
+	}
+
+	return nil
 }
