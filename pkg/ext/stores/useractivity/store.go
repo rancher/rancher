@@ -21,8 +21,8 @@ import (
 const (
 	UserActivityNamespace = "cattle-useractivity-data"
 	tokenUserId           = "authn.management.cattle.io/token-userId"
-	SingularName          = "useractivity"
-	PluralName            = SingularName + "s"
+	SingularName          = "UserActivity"
+	PluralName            = "UserActivities"
 )
 
 // +k8s:openapi-gen=false
@@ -40,12 +40,12 @@ var GV = schema.GroupVersion{
 var GVK = schema.GroupVersionKind{
 	Group:   GV.Group,
 	Version: GV.Version,
-	Kind:    SingularName,
+	Kind:    "UserActivity",
 }
 var GVR = schema.GroupVersionResource{
 	Group:    GV.Group,
 	Version:  GV.Version,
-	Resource: SingularName,
+	Resource: "useractivities",
 }
 
 func NewFromWrangler(wranglerCtx *wrangler.Context) *Store {
