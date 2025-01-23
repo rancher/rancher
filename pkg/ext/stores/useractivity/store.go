@@ -22,7 +22,7 @@ const (
 	UserActivityNamespace = "cattle-useractivity-data"
 	tokenUserId           = "authn.management.cattle.io/token-userId"
 	SingularName          = "UserActivity"
-	PluralName            = "UserActivities"
+	PluralName            = "useractivities"
 )
 
 // +k8s:openapi-gen=false
