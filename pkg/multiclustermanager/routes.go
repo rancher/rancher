@@ -90,7 +90,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
 	// Authenticated routes
-	impersonatingAuth := requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager))
+	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))
 	saAuth := auth.ToMiddleware(requests.NewServiceAccountAuth(scaledContext, clustermanager.ToRESTConfig))
 	accessControlHandler := rbac.NewAccessControlHandler()
 
