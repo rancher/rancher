@@ -7,10 +7,14 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
+
+	"github.com/rancher/rancher/pkg/migrations/descriptive"
 )
+
+var logger = logrus.WithFields(logrus.Fields{"process": "migrations"})
 
 // UnknownMigrationError is returned for requests to operate on a migration that
 // is not known to the system
@@ -39,24 +43,39 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 	if err != nil {
 		return nil, err
 	}
+	logger := logger.WithFields(logrus.Fields{"apply": name, "dryrun": options.DryRun})
+	logger.Info("migration started")
 
-	// TODO
+	// TODO Loop while migrationChanges.Continue != ""
 	migrationChanges, err := migration.Changes(ctx, descriptive.ClientFrom(client), MigrationOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("calculating changes for migration %q: %w", name, err)
 	}
 
+	start := time.Now()
 	metrics, applyErr := descriptive.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
 	status := MigrationStatus{
 		AppliedAt: time.Now(),
 		Metrics:   metrics,
 	}
+	logger.WithFields(metricsToFields(metrics)).
+		WithFields(logrus.Fields{"duration": time.Since(start)}).
+		Info("migration ended")
 
 	if applyErr != nil {
 		status.Errors = applyErr.Error()
 	}
 
 	return metrics, errors.Join(applyErr, migrationStatus.SetStatusFor(ctx, name, status))
+}
+
+func metricsToFields(m *descriptive.ApplyMetrics) logrus.Fields {
+	return logrus.Fields{
+		"create": m.Create,
+		"delete": m.Delete,
+		"patch":  m.Patch,
+		"errors": m.Errors,
+	}
 }
 
 // ApplyUnappliedMigrations applies all migrations that are not currently known
