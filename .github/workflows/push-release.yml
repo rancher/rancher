@@ -118,6 +118,8 @@ jobs:
         uses: actions/checkout@v4
       - name: install yq
         uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -209,6 +211,8 @@ jobs:
         uses: actions/checkout@v4
       - name: install yq
         uses: ./.github/actions/install-yq
+        with:
+          arch: ${{ env.ARCH }}
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
