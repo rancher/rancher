@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -30,6 +31,19 @@ func TestApply(t *testing.T) {
 
 		metrics, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), descriptive.ApplyOptions{}, nil)
 		require.ErrorContains(t, err, `unknown migration "test-migration"`)
+
+		require.Nil(t, metrics)
+	})
+
+	t.Run("failing migration", func(t *testing.T) {
+		Register(testFailingMigration{})
+		t.Cleanup(func() {
+			knownMigrations = nil
+		})
+		clientset := fake.NewClientset()
+
+		metrics, err := Apply(context.TODO(), "test-failing-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), descriptive.ApplyOptions{}, nil)
+		require.ErrorContains(t, err, `calculating changes for migration "test-failing-migration": this is a failing migration`)
 
 		require.Nil(t, metrics)
 	})
@@ -279,6 +293,17 @@ func (t testMigration) Changes(ctx context.Context, _ descriptive.Interface, _ M
 			},
 		},
 	}, nil
+}
+
+type testFailingMigration struct {
+}
+
+func (t testFailingMigration) Name() string {
+	return "test-failing-migration"
+}
+
+func (t testFailingMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+	return nil, errors.New("this is a failing migration")
 }
 
 type testDeleteMigration struct {

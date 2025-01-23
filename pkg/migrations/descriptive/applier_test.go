@@ -291,7 +291,10 @@ func TestApplyChanges(t *testing.T) {
 			t.Errorf("failed to apply update existing AuthConfig: diff -want +got\n%s", diff)
 		}
 
-		created, err := k8sClient.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}).Namespace("cattle-secrets").Get(context.TODO(), "test-secret", metav1.GetOptions{})
+		created, err := k8sClient.Resource(schema.GroupVersionResource{
+			Version: "v1", Resource: "secrets"}).
+			Namespace("cattle-secrets").
+			Get(context.TODO(), "test-secret", metav1.GetOptions{})
 		assert.NoError(t, err)
 		wantSecret := &unstructured.Unstructured{
 			Object: map[string]any{
@@ -490,6 +493,10 @@ func TestApplyChanges(t *testing.T) {
 		}
 	})
 
+	t.Run("ApplyChanges deleting unknown resource", func(t *testing.T) {
+		t.Skip("Deleting unknown resource - fake client doesn't seem to error no matter what")
+	})
+
 	t.Run("ApplyChanges creating a resource with no GVK", func(t *testing.T) {
 		changes := []ResourceChange{
 			{
@@ -607,6 +614,23 @@ func TestApplyChanges(t *testing.T) {
 		}
 	})
 
+	t.Run("ApplyChanges with unknown operation", func(t *testing.T) {
+		changes := []ResourceChange{
+			ResourceChange{
+				Operation: "unknown",
+			},
+		}
+
+		k8sClient := newFakeClient(testScheme)
+
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
+		require.ErrorContains(t, err, `unknown operation: "unknown"`)
+
+		wantMetrics := &ApplyMetrics{Errors: 1}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
+	})
 }
 
 func TestResourceChangeValidation(t *testing.T) {
@@ -663,6 +687,17 @@ func newSecret(name types.NamespacedName, data map[string][]byte, opts ...func(s
 	}
 
 	return s
+}
+
+func newNamespace(name string) *corev1.Namespace {
+	return &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"example.com/testing": "testing",
+			},
+		},
+	}
 }
 
 func newAuthConfig() *unstructured.Unstructured {
