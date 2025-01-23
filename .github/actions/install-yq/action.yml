@@ -18,8 +18,5 @@ runs:
       run: |
         curl -fsL https://github.com/mikefarah/yq/releases/download/${{ inputs.version }}/yq_linux_${{ inputs.arch }}.tar.gz | tar xz
         mv_cmd="mv"
-        if ${{ inputs.use_sudo }}; then
-          mv_cmd="sudo mv"
-        fi
-        $mv_cmd yq_linux_${{ inputs.arch }} /usr/bin/yq
+        ${{ inputs.use-sudo && 'sudo' || '' }} mv yq_linux_${{ inputs.arch }} /usr/bin/yq
 
