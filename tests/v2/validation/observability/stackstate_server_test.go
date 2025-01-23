@@ -115,32 +115,15 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 			}{
 				ImageRegistry: "registry.rancher.com",
 			},
-			Stackstate: struct {
-				BaseUrl        string `json:"baseUrl" yaml:"baseUrl"`
-				Authentication struct {
-					AdminPassword string `json:"adminPassword" yaml:"adminPassword"`
-				} `json:"authentication" yaml:"authentication"`
-				ApiKey struct {
-					Key string `json:"key" yaml:"key"`
-				} `json:"apiKey" yaml:"apiKey"`
-				License struct {
-					Key string `json:"key" yaml:"key"`
-				} `json:"license" yaml:"license"`
-			}{
+			Stackstate: observability.StackstateServerConfig{
 				BaseUrl: stackstateConfigs.Url,
-				Authentication: struct {
-					AdminPassword string `json:"adminPassword" yaml:"adminPassword"`
-				}{
+				Authentication: observability.AuthenticationConfig{
 					AdminPassword: stackstateConfigs.AdminPassword,
 				},
-				ApiKey: struct {
-					Key string `json:"key" yaml:"key"`
-				}{
+				ApiKey: observability.ApiKeyConfig{
 					Key: stackstateConfigs.ClusterApiKey,
 				},
-				License: struct {
-					Key string `json:"key" yaml:"key"`
-				}{
+				License: observability.LicenseConfig{
 					Key: stackstateConfigs.License,
 				},
 			},
