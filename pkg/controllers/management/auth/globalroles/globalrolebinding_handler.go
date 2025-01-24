@@ -586,15 +586,23 @@ func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding,
 			return nil
 		}
 
-		grbFromCluster.Status.SummaryLocal = status.SummaryCompleted
-		if grbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
-			grbFromCluster.Status.Summary = status.SummaryCompleted
-		}
+		foundError := false
 		for _, c := range localConditions {
 			if c.Status != metav1.ConditionTrue {
 				grbFromCluster.Status.Summary = status.SummaryError
 				grbFromCluster.Status.SummaryLocal = status.SummaryError
+				foundError = true
 				break
+			}
+		}
+		if !foundError {
+			grbFromCluster.Status.SummaryLocal = status.SummaryCompleted
+			isAdminGlobalRole, err := rbac.IsAdminGlobalRole(grb.GlobalRoleName, c.grLister)
+			if err != nil {
+				return err
+			}
+			if !isAdminGlobalRole || grbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
+				grbFromCluster.Status.Summary = status.SummaryCompleted
 			}
 		}
 
