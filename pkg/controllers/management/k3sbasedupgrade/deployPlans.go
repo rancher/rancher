@@ -94,6 +94,16 @@ func (h *handler) deployPlans(cluster *mgmtv3.Cluster) error {
 			}
 		}
 	}
+
+	// only upgrade linux nodes
+	linuxNodeSelector := metav1.LabelSelectorRequirement{
+		Key:      "kubernetes.io/os",
+		Operator: metav1.LabelSelectorOpExists,
+		Values:   []string{"linux"},
+	}
+	masterPlan.Spec.NodeSelector.MatchExpressions = append(masterPlan.Spec.NodeSelector.MatchExpressions, linuxNodeSelector)
+	workerPlan.Spec.NodeSelector.MatchExpressions = append(workerPlan.Spec.NodeSelector.MatchExpressions, linuxNodeSelector)
+
 	// if rancher plans exist, do we need to update?
 	if masterPlan.Name != "" || workerPlan.Name != "" {
 		if masterPlan.Name != "" {
