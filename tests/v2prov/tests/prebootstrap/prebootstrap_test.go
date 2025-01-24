@@ -87,7 +87,7 @@ func prebootstrapSetupAndCheck(t *testing.T, c *provisioningv1.Cluster) {
 		t.Fatalf("provisioningprebootstrap flag needs to be enabled for this test to run")
 	}
 
-	// Create a secret with sync annotations and data
+	// Create a couple secrets with sync annotations and data
 	_, err = client.Core.Secret().Create(&v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sync-me",
@@ -105,11 +105,32 @@ func prebootstrapSetupAndCheck(t *testing.T, c *provisioningv1.Cluster) {
 			"clusterId": "{{clusterId}}",
 		},
 	})
-	defer client.Core.Secret().Delete(c.Namespace, "sync-me", &metav1.DeleteOptions{})
-
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = client.Core.Secret().Create(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sync-me-basic-auth",
+			Namespace: c.Namespace,
+			Annotations: map[string]string{
+				"provisioning.cattle.io/sync-bootstrap":        "true",
+				"provisioning.cattle.io/sync-target-namespace": "kube-system",
+				"provisioning.cattle.io/sync-target-name":      "hello-ive-been-synced-basic-auth",
+				"rke.cattle.io/object-authorized-for-clusters": c.Name,
+			},
+		},
+		Type: v1.SecretTypeBasicAuth,
+		StringData: map[string]string{
+			"username": "admin",
+			"password": "admin",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer client.Core.Secret().Delete(c.Namespace, "sync-me", &metav1.DeleteOptions{})
+	defer client.Core.Secret().Delete(c.Namespace, "sync-me-basic-auth", &metav1.DeleteOptions{})
 
 	command, err := cluster.CustomCommand(client, c)
 	if err != nil {
@@ -170,7 +191,7 @@ func prebootstrapSetupAndCheck(t *testing.T, c *provisioningv1.Cluster) {
 		t.Fatalf("failed to create downstream cluster client")
 	}
 
-	// Retrieve the synchronized secret from the downstream cluster.
+	// Retrieve the synchronized basic secret from the downstream cluster.
 	synced, err := downstreamClient.Core.Secret().Get("kube-system", "hello-ive-been-synced", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get synchronized downstream secret: %v", err)
@@ -180,8 +201,18 @@ func prebootstrapSetupAndCheck(t *testing.T, c *provisioningv1.Cluster) {
 	c, err = client.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 
-	// ..and finally, assert the synchronized secret has the expected data
+	// ...and finally, assert the synchronized secret has the expected data
 	assert.Equal(t, 2, len(synced.Data))
 	assert.Equal(t, string(synced.Data["hello"]), "world")
 	assert.Equal(t, string(synced.Data["clusterId"]), c.Status.ClusterName)
+	assert.Equal(t, synced.Type, v1.SecretTypeOpaque)
+
+	// largely the same as ^ but just checking that the secret `type` field gets synchronized
+	basicAuthSecret, err := downstreamClient.Core.Secret().Get("kube-system", "hello-ive-been-synced-basic-auth", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get synchronized downstream secret: %v", err)
+	}
+
+	assert.Equal(t, 2, len(basicAuthSecret.Data))
+	assert.Equal(t, basicAuthSecret.Type, v1.SecretTypeBasicAuth)
 }
