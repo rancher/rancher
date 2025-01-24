@@ -3,29 +3,32 @@
 package observability
 
 import (
+	// Standard library imports
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
+	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	"os"
 	"strings"
 	"testing"
 
+	// Third-party library imports
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"gopkg.in/yaml.v2"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	// Local/internal imports
 	"github.com/rancher/rancher/tests/v2/actions/charts"
-	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
-	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	"github.com/rancher/rancher/tests/v2/actions/observability"
-	"github.com/rancher/rancher/tests/v2/actions/projects"
+	rancherProjects "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
-	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 type StackStateServerTestSuite struct {
@@ -147,7 +150,7 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		// Merge the values
 		mergedValues := mergeValues(baseConfigMap, sizingConfigMap)
 
-		systemProject, err := projects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
+		systemProject, err := rancherProjects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
 		require.NoError(sss.T(), err)
 		require.NotNil(sss.T(), systemProject.ID, "System project is nil.")
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
