@@ -1,0 +1,65 @@
+name: PR Review Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Get the list of changed files and lines
+      - name: Get changed files and lines
+        id: file-changes
+        run: |
+          git fetch origin main
+          > structured_changes.txt
+
+          while IFS= read -r file; do
+            echo "Processing $file..."
+            # Get the diff content
+            diff_content=$(git diff origin/main -- "$file")
+            echo "$file: $diff_content" >> structured_changes.txt
+  
+            # Check if the file is a Go file
+            if [[ "$file" == *.go ]]; then
+                # Check formatting with gofmt
+                format_issues=$(gofmt -l "$file")
+                if [[ -n "$format_issues" ]]; then
+                echo "$file: NOT FORMATTED" >> structured_changes.txt
+                else
+                echo "$file: FORMATTED" >> structured_changes.txt
+                fi
+            fi
+          done < <(git diff --name-only origin/main)
+      # Step 3: Run the PR review script
+      - name: Run PR Review Script
+        run: |
+          python3 scripts/pr_review_script.py
+
+      # Step 4: Post inline comments
+      - name: Post inline review comments
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const fs = require('fs');
+            const diffContent = process.env.DIFF_CONTENT;
+            const reviewNotes = fs.readFileSync('review_notes.json', 'utf8');
+            const issues = JSON.parse(reviewNotes);
+
+            issues.forEach(issue => {
+              github.pulls.createReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                body: issue.comment,
+                path: issue.file,
+                line: issue.line,
+                side: 'RIGHT' // Comment on the right side of the diff
+              });
+            });
