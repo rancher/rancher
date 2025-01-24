@@ -245,20 +245,8 @@ func newStackstateAgentChartInstallAction(p *payloadOpts, stackstateConfigs *obs
 }
 
 func newStackStateChartInstallAction(p *payloadOpts, stackstateConfigs *observability.StackStateConfig, systemProjectID string, additionalValues map[string]interface{}) *types.ChartInstallAction {
-	stackstatechartValues := map[string]interface{}{
-		"stackstate": map[string]interface{}{
-			"cluster": map[string]interface{}{
-				"name": p.Cluster.Name,
-			},
-			"apiKey": stackstateConfigs.ClusterApiKey,
-			"url":    stackstateConfigs.Url,
-		},
-	}
 
-	// Merge with additional values
-	mergedValues := mergeValues(stackstatechartValues, additionalValues)
-
-	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, stackStateChart, systemProjectID, p.DefaultRegistry, mergedValues)
+	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, stackStateChart, systemProjectID, p.DefaultRegistry, additionalValues)
 
 	chartInstalls := []types.ChartInstall{*chartInstall}
 	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
@@ -394,24 +382,4 @@ func buildClusterRepo(name, url string) *rv1.ClusterRepo {
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       rv1.RepoSpec{URL: url},
 	}
-}
-
-// mergeValues merges multiple YAML values maps into a single map
-func mergeValues(values ...map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-	for _, v := range values {
-		for key, value := range v {
-			if existingValue, ok := result[key]; ok {
-				if existingMap, ok := existingValue.(map[string]interface{}); ok {
-					if newMap, ok := value.(map[string]interface{}); ok {
-						// Recursively merge maps
-						result[key] = mergeValues(existingMap, newMap)
-						continue
-					}
-				}
-			}
-			result[key] = value
-		}
-	}
-	return result
 }
