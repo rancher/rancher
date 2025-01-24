@@ -18,7 +18,7 @@ type BundleLookup struct {
 
 func NewLookup(namespaces v1.NamespaceInterface, secrets v1.SecretsGetter) *BundleLookup {
 	return &BundleLookup{
-		engineStore: clusterprovisioner.NewPersistentStore(namespaces, secrets),
+		engineStore: clusterprovisioner.NewPersistentStore(namespaces, secrets, nil),
 	}
 }
 
