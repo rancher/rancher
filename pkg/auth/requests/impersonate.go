@@ -104,7 +104,9 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 						return
 					}
 
-					if requestTokenID := reqExtras[common.ExtraRequestTokenID]; len(requestTokenID) > 0 {
+					switch requestTokenID := reqExtras[common.ExtraRequestTokenID]; len(requestTokenID) {
+					case 0: // Nothing to do.
+					case 1:
 						token, err := i.tokenCache.Get(requestTokenID[0])
 						if err != nil {
 							util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error getting request token: %w", err))
@@ -114,6 +116,9 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 							util.WriteError(rw, http.StatusForbidden, fmt.Errorf("request token user does not match impersonation user"))
 							return
 						}
+					default:
+						util.WriteError(rw, http.StatusForbidden, fmt.Errorf("multiple requesttokenid values"))
+						return
 					}
 				}
 				reqGroup = append(reqGroup, k8sUser.AllAuthenticated)

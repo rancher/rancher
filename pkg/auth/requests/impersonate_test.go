@@ -302,6 +302,37 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			status:  http.StatusForbidden,
 		},
 		{
+			desc: "multiple requesttokenid values",
+			req: func() *http.Request {
+				ctx := request.WithUser(context.Background(), userInfo)
+				req := &http.Request{
+					Header: map[string][]string{
+						"Impersonate-User":                 {"impUser"},
+						"Impersonate-Extra-requesttokenid": {"kubeconfig-u-user5zfww", "kubeconfig-u-otherxyzab"},
+					},
+				}
+				req = req.WithContext(ctx)
+
+				return req
+			},
+			sar: func(req *http.Request) sar.SubjectAccessReview {
+				mock := mocks.NewMockSubjectAccessReview(ctrl)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+					"requesttokenid": {"kubeconfig-u-user5zfww", "kubeconfig-u-otherxyzab"},
+				}).Return(true, nil)
+
+				return mock
+			},
+			tokenCache: func() mgmtv3.TokenCache {
+				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+				cache.EXPECT().Get(gomock.Any()).Times(0)
+				return cache
+			},
+			wantErr: "multiple requesttokenid values",
+			status:  http.StatusForbidden,
+		},
+		{
 			desc: "impersonate serviceaccount not allowed",
 			req: func() *http.Request {
 				ctx := request.WithUser(context.Background(), userInfo)
