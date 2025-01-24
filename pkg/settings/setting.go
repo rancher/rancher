@@ -345,6 +345,8 @@ var (
 	// UnprivilegedJailUser controls whether jailed commands execute under a separate (unprivileged/non-root) user
 	// account. Setting it to false is only recommended for testing and development environments.
 	UnprivilegedJailUser = NewSetting("unprivileged-jail-user", "true")
+
+	ImperativeApiExtension = NewSetting("imperative-api-extension", "false")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
