@@ -13,12 +13,15 @@ node {
     def setupContainer = "${job_name}${env.BUILD_NUMBER}_setup"
     def configGeneratorContainer = "${job_name}${env.BUILD_NUMBER}_generator"
     def cleanupContainer = "${job_name}${env.BUILD_NUMBER}_cleanup"
-
+    def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
+    def initConfigPath = "./tests/v2/validation/config.yaml"
+  
     def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
 
     def testsDir = "github.com/rancher/rancher/tests/v2/validation/"
     def upgradeTestsDir = "${testsDir}upgrade"
     def provisioningTestsDir = "${testsDir}provisioning"
+    def testRancherVersions = "testrancherk8s.yaml"
 
     def groovyEnvironments = "environments.groovy" 
     def configsDir = "cattle-configs"
@@ -52,6 +55,7 @@ node {
               paramsMap << "$it.key=$it.value"
           }
         }
+        
         withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                           string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                           string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
@@ -111,6 +115,7 @@ node {
           dir ("./") {
             try {
               stage('Configure and Build') {
+                sh "docker volume create --name ${validationVolume}"
                 if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
                   dir("./tests/v2/validation/.ssh") {
                     def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
@@ -118,22 +123,23 @@ node {
                   }
                 }
 
-                dir("./tests/v2/validation") {
-                  def filename = "config.yaml"
-                  def configContents = env.CONFIG
+              dir("./tests/v2/validation") {
+                def filename = "config.yaml"
+                def configContents = env.CONFIG
 
-                  writeFile file: filename, text: configContents
-                  env.CATTLE_TEST_CONFIG = workPath+filename
-                }
+                writeFile file: filename, text: configContents
+                env.CATTLE_TEST_CONFIG = workPath+filename
+              }
 
                 sh "./tests/v2/validation/configure.sh"
                 sh "./tests/v2/validation/build.sh"
+              println "Contents of config yaml ${env.CATTLE_TEST_CONFIG}"
               }
               stage('Setup') {
+
                 sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
                 sh returnStdout:true, script: 'chmod a+x ./yq'
 
-                def initConfigPath = "./tests/v2/validation/config.yaml"
 
                 env.HA_HOST= sh (
                   script: "./yq '.ha.host' ${initConfigPath}",
@@ -237,6 +243,80 @@ node {
                     env.HA_CLEANUP=true
                 }
                 println "HA cleanup: ${env.HA_CLEANUP}"
+
+                try{
+                
+                  sh "docker run -v ${validationVolume}:/root --name ${setupContainer} -t -e HA_IMAGE_TAG=\$HA_IMAGE_TAG -e HA_IMAGE_TAG_TO_UPGRADE=\$HA_IMAGE_TAG_TO_UPGRADE " +
+                    "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_k8s_version.sh\""
+
+                  sh "docker cp ${setupContainer}:/root/go/src/github.com/rancher/rancher/testrancherk8s.yaml ./"
+
+                  println "contents of test rancher versions: ./${testRancherVersions}"
+                  
+                  rancherRke2Version = sh(
+                      script: "./yq '.rancherRKE2Version' ./${testRancherVersions}",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher RKE2 version ${rancherRke2Version}"
+
+                  rancherRke2VersionToUpgrade = sh(
+                      script: "./yq '.rancherRKE2VersionToUpgrade' ./${testRancherVersions}",                     
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher RKE2 version to upgrade ${rancherRKE2VersionToUpgrade}"
+
+                  rancherK3sVersion = sh(
+                      script: "./yq '.rancherK3sVersion' ./${testRancherVersions}",                     
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher k3s version ${rancherK3sVersion}"
+
+                  rancherK3sVersionToUpgrade = sh(
+                      script: "./yq '.rancherK3sVersionToUpgrade' ./${testRancherVersions}",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher k3s version to upgrade ${rancherK3sVersionToUpgrade}"
+
+                  rancherRke1Version = sh(
+                      script: "./yq '.rancherRKEVersion' ./${testRancherVersions}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher rke version ${rancherRke1Version}"
+
+                  rancherRke1VersionToUpgrade = sh(
+                      script: "./yq '.rancherRKEVersion' ./${testRancherVersions}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher rke version to upgrade ${rancherRke1VersionToUpgrade}"
+
+                  dir("./rancher/tests/v2/validation") {
+                    config = config.replace('${RANCHER_RKE2_VERSION}', rancherRke2Version)
+                    config = config.replace('${RANCHER_RKE2_VERSION_TO_UPGRADE}', rancherRke2VersionToUpgrade)
+                    config = config.replace('${RANCHER_K3S_VERSION}', rancherK3sVersion)
+                    config = config.replace('${RANCHER_K3S_VERSION_TO_UPGRADE}', rancherK3sVersionToUpgrade)
+                    config = config.replace('${RANCHER_RKE1_VERSION}', rancherRke1Version)
+                    config = config.replace('${RANCHER_RKE1_VERSION_TO_UPGRADE}', rancherRke1VersionToUpgrade)
+
+                    echo "Updated Configuration Content:"
+
+                    echo "${config}"
+
+                    writeFile file: filename, text: config
+                    echo "Updated CATTLE_TEST_CONFIG to: ${env.CATTLE_TEST_CONFIG}"
+
+                    sh "cat ${filename}"
+
+                  }
+                }catch (err){
+                    sh "docker stop ${setupContainer}"
+                    sh "docker rm -v ${setupContainer}"
+                    sh "docker volume rm -f ${validationVolume}"
+                  }
+
+                sh "docker stop ${setupContainer}"
+                sh "docker rm -v ${setupContainer}"
+                sh "docker volume rm -f ${validationVolume}"
+
               }
               stage('Deploys Rancher on a specified version') {
                 deployParams = [
