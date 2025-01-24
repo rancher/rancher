@@ -55,14 +55,20 @@ import (
 )
 
 func main() {
-    tableName := strings.ReplaceAll(os.Getenv("TABLE_NAME"), "\"", "")
-    resourceName := os.Getenv("RESOURCE_NAME")
-
-    db, err := sql.Open("sqlite", "/var/lib/rancher/informer_object_fields.db")
+    db, err := sql.Open("sqlite", "/var/lib/rancher/informer_object_cache.db")
     if err != nil {
         log.Fatal(err)
     }
     defer db.Close()
+
+    fmt.Println("Creating database snapshot...")
+    _, err = db.Exec("VACUUM INTO '/tmp/snapshot.db'")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    tableName := strings.ReplaceAll(os.Getenv("TABLE_NAME"), "\"", "")
+    resourceName := os.Getenv("RESOURCE_NAME")
 
     query := fmt.Sprintf("SELECT \"metadata.name\" FROM \"%s\" WHERE \"metadata.name\" = ?", tableName)
     stmt, err := db.Prepare(query)
