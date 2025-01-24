@@ -192,7 +192,6 @@ func createOrGetPod(clients *clients.Clients, podName string, pullThrough bool) 
 						{
 							Name:          "http",
 							ContainerPort: 5000,
-							HostPort:      5000,
 						},
 					},
 				},
