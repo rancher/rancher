@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/migrations"
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/rancher/rancher/pkg/migrations/changes"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -23,14 +23,14 @@ func (t exampleMigration) Name() string {
 }
 
 // Changes implements the Migration interface.
-func (t exampleMigration) Changes(ctx context.Context, client descriptive.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
+func (t exampleMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
 	// TODO: Only return a change if the Service needs to be changed
 	return &migrations.MigrationChanges{
-		Changes: []descriptive.ResourceChange{
+		Changes: []changes.ResourceChange{
 			{
-				Operation: descriptive.OperationPatch,
-				Patch: &descriptive.PatchChange{
-					ResourceRef: descriptive.ResourceReference{
+				Operation: changes.OperationPatch,
+				Patch: &changes.PatchChange{
+					ResourceRef: changes.ResourceReference{
 						ObjectRef: types.NamespacedName{
 							Name:      "test-svc",
 							Namespace: "default",
@@ -38,14 +38,14 @@ func (t exampleMigration) Changes(ctx context.Context, client descriptive.Interf
 						Resource: "services",
 						Version:  "v1",
 					},
-					Operations: []descriptive.PatchOperation{
+					Operations: []changes.PatchOperation{
 						{
 							Operation: "replace",
 							Path:      "/spec/ports/0/targetPort",
 							Value:     9371,
 						},
 					},
-					Type: descriptive.PatchApplicationJSON,
+					Type: changes.PatchApplicationJSON,
 				},
 			},
 		},

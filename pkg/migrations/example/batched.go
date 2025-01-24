@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/migrations"
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/rancher/rancher/pkg/migrations/changes"
 	"github.com/rancher/rancher/pkg/migrations/test"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,7 +28,7 @@ func (t batchedMigration) Name() string {
 }
 
 // Changes implements the Migration interface.
-func (t batchedMigration) Changes(ctx context.Context, client descriptive.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
+func (t batchedMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
 	var migrationContinue struct {
 		Start int64 `json:"start"`
 	}
@@ -57,10 +57,10 @@ func (t batchedMigration) Changes(ctx context.Context, client descriptive.Interf
 		return nil, err
 	}
 
-	changes := []descriptive.ResourceChange{
+	changes := []changes.ResourceChange{
 		{
-			Operation: descriptive.OperationCreate,
-			Create: &descriptive.CreateChange{
+			Operation: changes.OperationCreate,
+			Create: &changes.CreateChange{
 				Resource: uns,
 			},
 		},

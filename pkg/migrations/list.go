@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/rancher/rancher/pkg/migrations/changes"
 )
 
 const (
@@ -26,7 +26,7 @@ type MigrationOptions struct {
 // MigrationChanges represents the calculated changes to apply to the cluster.
 type MigrationChanges struct {
 	Continue string
-	Changes  []descriptive.ResourceChange
+	Changes  []changes.ResourceChange
 }
 
 // Migration implementations can be registered with the system.
@@ -35,7 +35,7 @@ type Migration interface {
 
 	// Changes should return the set of changes that this migration wants to
 	// apply to the cluster.
-	Changes(ctx context.Context, client descriptive.Interface, opts MigrationOptions) (*MigrationChanges, error)
+	Changes(ctx context.Context, client changes.Interface, opts MigrationOptions) (*MigrationChanges, error)
 }
 
 // Register registers a migration with the migration mechanism.
@@ -59,9 +59,9 @@ type MigrationInfo struct {
 
 // MigrationStatus records the state of a Migration.
 type MigrationStatus struct {
-	AppliedAt time.Time                 `json:"appliedAt"`
-	Metrics   *descriptive.ApplyMetrics `json:"metrics,omitempty"`
-	Errors    string                    `json:"errors"`
+	AppliedAt time.Time             `json:"appliedAt"`
+	Metrics   *changes.ApplyMetrics `json:"metrics,omitempty"`
+	Errors    string                `json:"errors"`
 }
 
 // MigrationStatusGetter implementations get the status of a named Migration.

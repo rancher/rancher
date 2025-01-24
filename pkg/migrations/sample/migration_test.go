@@ -15,32 +15,32 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/rancher/rancher/pkg/migrations"
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/rancher/rancher/pkg/migrations/changes"
 	"github.com/rancher/rancher/pkg/migrations/test"
 )
 
 func TestMigrationChange(t *testing.T) {
 	ns := test.ToUnstructured(t, newNamespace("test-ns",
 		withLabels(map[string]string{"kubernetes.io/metadata.name": "p-5djc7"})))
-	change := descriptive.PatchChange{
-		ResourceRef: descriptive.ResourceReference{
+	change := changes.PatchChange{
+		ResourceRef: changes.ResourceReference{
 			ObjectRef: types.NamespacedName{
 				Name: "test-ns",
 			},
 			Resource: "namespaces",
 			Version:  "v1",
 		},
-		Operations: []descriptive.PatchOperation{
+		Operations: []changes.PatchOperation{
 			{
 				Operation: "add",
 				Path:      "/metadata/labels/example.com~1migration",
 				Value:     "migrated",
 			},
 		},
-		Type: descriptive.PatchApplicationJSON,
+		Type: changes.PatchApplicationJSON,
 	}
 
-	result, err := descriptive.ApplyPatchChanges(ns, change)
+	result, err := changes.ApplyPatchChanges(ns, change)
 	require.NoError(t, err)
 
 	want := test.ToUnstructured(t, newNamespace("test-ns",
@@ -61,29 +61,29 @@ func TestMigrationChanges(t *testing.T) {
 		newNamespace("p-q5gbl"),
 	)
 
-	result, err := m.Changes(context.TODO(), descriptive.ClientFrom(client), migrations.MigrationOptions{})
+	result, err := m.Changes(context.TODO(), changes.ClientFrom(client), migrations.MigrationOptions{})
 	require.NoError(t, err)
 
 	want := &migrations.MigrationChanges{
-		Changes: []descriptive.ResourceChange{
+		Changes: []changes.ResourceChange{
 			{
-				Operation: descriptive.OperationPatch,
-				Patch: &descriptive.PatchChange{
-					ResourceRef: descriptive.ResourceReference{
+				Operation: changes.OperationPatch,
+				Patch: &changes.PatchChange{
+					ResourceRef: changes.ResourceReference{
 						ObjectRef: types.NamespacedName{
 							Name: "p-5djc7",
 						},
 						Resource: "namespaces",
 						Version:  "v1",
 					},
-					Operations: []descriptive.PatchOperation{
+					Operations: []changes.PatchOperation{
 						{
 							Operation: "add",
 							Path:      "/metadata/labels/example.com~1migration",
 							Value:     "migrated",
 						},
 					},
-					Type: descriptive.PatchApplicationJSON,
+					Type: changes.PatchApplicationJSON,
 				},
 			},
 		},

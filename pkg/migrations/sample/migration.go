@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/rancher/rancher/pkg/migrations"
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/rancher/rancher/pkg/migrations/changes"
 )
 
 func init() {
@@ -27,7 +27,7 @@ func (t namespaceMigration) Name() string {
 }
 
 // Changes implements the Migration interface.
-func (t namespaceMigration) Changes(ctx context.Context, client descriptive.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
+func (t namespaceMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
 	namespaces, err := client.Resource(schema.GroupVersionResource{
 		Resource: "namespaces",
 		Version:  "v1",
@@ -36,7 +36,7 @@ func (t namespaceMigration) Changes(ctx context.Context, client descriptive.Inte
 		return nil, fmt.Errorf("listing namespaces to calculate migration: %s", err)
 	}
 
-	var changes []descriptive.ResourceChange
+	var changes []changes.ResourceChange
 	for _, uns := range namespaces.Items {
 		var ns corev1.Namespace
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(uns.UnstructuredContent(), &ns)
@@ -52,25 +52,25 @@ func (t namespaceMigration) Changes(ctx context.Context, client descriptive.Inte
 	return &migrations.MigrationChanges{Changes: changes}, nil
 }
 
-func patchForNS(ns corev1.Namespace) descriptive.ResourceChange {
-	return descriptive.ResourceChange{
-		Operation: descriptive.OperationPatch,
-		Patch: &descriptive.PatchChange{
-			ResourceRef: descriptive.ResourceReference{
+func patchForNS(ns corev1.Namespace) changes.ResourceChange {
+	return changes.ResourceChange{
+		Operation: changes.OperationPatch,
+		Patch: &changes.PatchChange{
+			ResourceRef: changes.ResourceReference{
 				ObjectRef: types.NamespacedName{
 					Name: ns.Name,
 				},
 				Resource: "namespaces",
 				Version:  "v1",
 			},
-			Operations: []descriptive.PatchOperation{
+			Operations: []changes.PatchOperation{
 				{
 					Operation: "add",
 					Path:      "/metadata/labels/example.com~1migration",
 					Value:     "migrated",
 				},
 			},
-			Type: descriptive.PatchApplicationJSON,
+			Type: changes.PatchApplicationJSON,
 		},
 	}
 }

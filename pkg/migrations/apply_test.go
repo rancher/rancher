@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/rancher/rancher/pkg/migrations/changes"
 	"github.com/rancher/rancher/pkg/migrations/test"
 )
 
@@ -29,7 +29,7 @@ func TestApply(t *testing.T) {
 	t.Run("unknown migration", func(t *testing.T) {
 		clientset := fake.NewClientset()
 
-		metrics, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), descriptive.ApplyOptions{}, nil)
+		metrics, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), changes.ApplyOptions{}, nil)
 		require.ErrorContains(t, err, `unknown migration "test-migration"`)
 
 		require.Nil(t, metrics)
@@ -42,7 +42,8 @@ func TestApply(t *testing.T) {
 		})
 		clientset := fake.NewClientset()
 
-		metrics, err := Apply(context.TODO(), "test-failing-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), descriptive.ApplyOptions{}, nil)
+		metrics, err := Apply(context.TODO(), "test-failing-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), changes.ApplyOptions{}, nil)
+
 		require.ErrorContains(t, err, `calculating changes for migration "test-failing-migration": this is a failing migration`)
 
 		require.Nil(t, metrics)
@@ -64,7 +65,7 @@ func TestApply(t *testing.T) {
 
 			// This passes nil as a mapper because we are not creating new
 			// resources in this test migration.
-			metrics, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
+			metrics, err := Apply(context.TODO(), "test-migration", NewStatusClient(clientset.CoreV1()), dynamicset, changes.ApplyOptions{}, nil)
 			require.NoError(t, err)
 
 			wantSpec := corev1.ServiceSpec{
@@ -80,7 +81,7 @@ func TestApply(t *testing.T) {
 			updatedSvc := loadService(t, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, dynamicset)
 			require.Equal(t, wantSpec, updatedSvc.Spec)
 
-			wantMetrics := &descriptive.ApplyMetrics{Patch: 1}
+			wantMetrics := &changes.ApplyMetrics{Patch: 1}
 			if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 				t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 			}
@@ -93,19 +94,19 @@ func TestApply(t *testing.T) {
 
 			// This passes nil as a mapper because we are not creating new
 			// resources in this test migration.
-			metrics, err := Apply(context.TODO(), "test-migration", statusClient, dynamicset, descriptive.ApplyOptions{}, nil)
+			metrics, err := Apply(context.TODO(), "test-migration", statusClient, dynamicset, changes.ApplyOptions{}, nil)
 			require.NoError(t, err)
 
 			wantStatus := &MigrationStatus{
 				AppliedAt: time.Now(),
-				Metrics: &descriptive.ApplyMetrics{
+				Metrics: &changes.ApplyMetrics{
 					Patch: 1,
 				},
 			}
 			status, err := statusClient.StatusFor(context.TODO(), "test-migration")
 			assert.EqualExportedValues(t, wantStatus, status)
 
-			wantMetrics := &descriptive.ApplyMetrics{Patch: 1}
+			wantMetrics := &changes.ApplyMetrics{Patch: 1}
 			if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 				t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 			}
@@ -124,17 +125,17 @@ func TestApply(t *testing.T) {
 		statusClient := NewStatusClient(clientset.CoreV1())
 		mapper := test.NewFakeMapper()
 
-		metrics, err := Apply(context.TODO(), "test-create-migration", statusClient, dynamicset, descriptive.ApplyOptions{}, mapper)
+		metrics, err := Apply(context.TODO(), "test-create-migration", statusClient, dynamicset, changes.ApplyOptions{}, mapper)
 		require.ErrorContains(t, err, `secrets "test-secret" already exists`)
 
-		wantMetrics := &descriptive.ApplyMetrics{Create: 1, Errors: 1}
+		wantMetrics := &changes.ApplyMetrics{Create: 1, Errors: 1}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 		}
 
 		wantStatus := &MigrationStatus{
 			AppliedAt: time.Now(),
-			Metrics: &descriptive.ApplyMetrics{
+			Metrics: &changes.ApplyMetrics{
 				Create: 1,
 				Errors: 1,
 			},
@@ -143,16 +144,32 @@ func TestApply(t *testing.T) {
 		status, err := statusClient.StatusFor(context.TODO(), "test-create-migration")
 		assert.EqualExportedValues(t, wantStatus, status)
 	})
+
+	t.Run("with failing migration calculation", func(t *testing.T) {
+		Register(testFailingMigration{})
+		t.Cleanup(func() {
+			knownMigrations = nil
+		})
+		clientset := fake.NewClientset()
+		dynamicset := newFakeDynamicClient(t)
+		statusClient := NewStatusClient(clientset.CoreV1())
+
+		_, err := Apply(context.TODO(), "test-failing-migration", statusClient, dynamicset, changes.ApplyOptions{}, test.NewFakeMapper())
+		require.ErrorContains(t, err, "this is a failing migration")
+
+		status, err := statusClient.StatusFor(context.TODO(), "test-failing-migration")
+		assert.EqualExportedValues(t, &MigrationStatus{Errors: "this is a failing migration"}, status)
+	})
 }
 
 func TestApplyUnappliedMigrations(t *testing.T) {
 	t.Run("no migrations registered", func(t *testing.T) {
 		clientset := fake.NewClientset()
 
-		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), descriptive.ApplyOptions{}, nil)
+		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), changes.ApplyOptions{}, nil)
 		require.NoError(t, err)
 
-		require.Equal(t, map[string]*descriptive.ApplyMetrics{}, metrics)
+		require.Equal(t, map[string]*changes.ApplyMetrics{}, metrics)
 	})
 
 	t.Run("with registered migration", func(t *testing.T) {
@@ -166,10 +183,10 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 		clientset := fake.NewClientset()
 		dynamicset := newFakeDynamicClient(t, svc)
 
-		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
+		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, changes.ApplyOptions{}, nil)
 		require.NoError(t, err)
 
-		wantMetrics := map[string]*descriptive.ApplyMetrics{
+		wantMetrics := map[string]*changes.ApplyMetrics{
 			testMigration{}.Name(): {Patch: 1},
 		}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
@@ -204,10 +221,10 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 		clientset := fake.NewClientset()
 		dynamicset := newFakeDynamicClient(t, svc, secret)
 
-		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
+		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, changes.ApplyOptions{}, nil)
 		require.NoError(t, err)
 
-		wantMetrics := map[string]*descriptive.ApplyMetrics{
+		wantMetrics := map[string]*changes.ApplyMetrics{
 			"test-delete-migration": {Delete: 1},
 			"test-migration":        {Patch: 1},
 		}
@@ -228,15 +245,15 @@ func TestApplyUnappliedMigrations(t *testing.T) {
 		clientset := fake.NewClientset()
 		dynamicset := newFakeDynamicClient(t, svc)
 		// Apply once
-		_, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
+		_, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, changes.ApplyOptions{}, nil)
 		require.NoError(t, err)
 
 		// Apply twice
-		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, descriptive.ApplyOptions{}, nil)
+		metrics, err := ApplyUnappliedMigrations(context.TODO(), NewStatusClient(clientset.CoreV1()), dynamicset, changes.ApplyOptions{}, nil)
 		require.NoError(t, err)
 
 		// No metrics because no migrations applied
-		wantMetrics := map[string]*descriptive.ApplyMetrics{}
+		wantMetrics := map[string]*changes.ApplyMetrics{}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 		}
@@ -267,13 +284,13 @@ func (t testMigration) Name() string {
 	return "test-migration"
 }
 
-func (t testMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+func (t testMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
 	return &MigrationChanges{
-		Changes: []descriptive.ResourceChange{
+		Changes: []changes.ResourceChange{
 			{
-				Operation: descriptive.OperationPatch,
-				Patch: &descriptive.PatchChange{
-					ResourceRef: descriptive.ResourceReference{
+				Operation: changes.OperationPatch,
+				Patch: &changes.PatchChange{
+					ResourceRef: changes.ResourceReference{
 						ObjectRef: types.NamespacedName{
 							Name:      "test-svc",
 							Namespace: "default",
@@ -281,14 +298,14 @@ func (t testMigration) Changes(ctx context.Context, _ descriptive.Interface, _ M
 						Resource: "services",
 						Version:  "v1",
 					},
-					Operations: []descriptive.PatchOperation{
+					Operations: []changes.PatchOperation{
 						{
 							Operation: "replace",
 							Path:      "/spec/ports/0/targetPort",
 							Value:     9371,
 						},
 					},
-					Type: descriptive.PatchApplicationJSON,
+					Type: changes.PatchApplicationJSON,
 				},
 			},
 		},
@@ -302,7 +319,7 @@ func (t testFailingMigration) Name() string {
 	return "test-failing-migration"
 }
 
-func (t testFailingMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+func (t testFailingMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
 	return nil, errors.New("this is a failing migration")
 }
 
@@ -313,8 +330,8 @@ func (t testDeleteMigration) Name() string {
 	return "test-delete-migration"
 }
 
-func (t testDeleteMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
-	secretRef := descriptive.ResourceReference{
+func (t testDeleteMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+	secretRef := changes.ResourceReference{
 		ObjectRef: types.NamespacedName{
 			Name:      "test-secret",
 			Namespace: "cattle-secrets",
@@ -325,10 +342,10 @@ func (t testDeleteMigration) Changes(ctx context.Context, _ descriptive.Interfac
 	}
 
 	return &MigrationChanges{
-		Changes: []descriptive.ResourceChange{
+		Changes: []changes.ResourceChange{
 			{
-				Operation: descriptive.OperationDelete,
-				Delete: &descriptive.DeleteChange{
+				Operation: changes.OperationDelete,
+				Delete: &changes.DeleteChange{
 					ResourceRef: secretRef,
 				},
 			},
@@ -344,12 +361,12 @@ func (m testCreateMigration) Name() string {
 	return "test-create-migration"
 }
 
-func (m testCreateMigration) Changes(ctx context.Context, _ descriptive.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+func (m testCreateMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
 	return &MigrationChanges{
-		Changes: []descriptive.ResourceChange{
+		Changes: []changes.ResourceChange{
 			{
-				Operation: descriptive.OperationCreate,
-				Create: &descriptive.CreateChange{
+				Operation: changes.OperationCreate,
+				Create: &changes.CreateChange{
 					Resource: test.ToUnstructured(m.t,
 						newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, testSecretData)),
 				},

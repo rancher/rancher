@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
 
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
+	"github.com/rancher/rancher/pkg/migrations/changes"
 )
 
 var logger = logrus.WithFields(logrus.Fields{"process": "migrations"})
@@ -38,7 +38,7 @@ type MigrationStatusClient interface {
 // client.
 //
 // The status of the migration is recorded in the migrations client.
-func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClient, client dynamic.Interface, options descriptive.ApplyOptions, mapper meta.RESTMapper) (*descriptive.ApplyMetrics, error) {
+func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClient, client dynamic.Interface, options changes.ApplyOptions, mapper meta.RESTMapper) (*changes.ApplyMetrics, error) {
 	migration, err := migrationByName(name)
 	if err != nil {
 		return nil, err
@@ -47,13 +47,19 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 	logger.Info("migration started")
 
 	// TODO Loop while migrationChanges.Continue != ""
-	migrationChanges, err := migration.Changes(ctx, descriptive.ClientFrom(client), MigrationOptions{})
+	// TODO Introduce some sort of delay - can be configured by the migration?
+	migrationChanges, err := migration.Changes(ctx, changes.ClientFrom(client), MigrationOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("calculating changes for migration %q: %w", name, err)
+		status := MigrationStatus{
+			Errors: err.Error(),
+		}
+		// TODO Log the error?
+		return nil, errors.Join(fmt.Errorf("calculating changes for migration %q: %w", name, err), migrationStatus.SetStatusFor(ctx, name, status))
 	}
 
+	// TODO Should this retry?
 	start := time.Now()
-	metrics, applyErr := descriptive.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
+	metrics, applyErr := changes.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
 	status := MigrationStatus{
 		AppliedAt: time.Now(),
 		Metrics:   metrics,
@@ -69,7 +75,7 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 	return metrics, errors.Join(applyErr, migrationStatus.SetStatusFor(ctx, name, status))
 }
 
-func metricsToFields(m *descriptive.ApplyMetrics) logrus.Fields {
+func metricsToFields(m *changes.ApplyMetrics) logrus.Fields {
 	return logrus.Fields{
 		"create": m.Create,
 		"delete": m.Delete,
@@ -80,8 +86,11 @@ func metricsToFields(m *descriptive.ApplyMetrics) logrus.Fields {
 
 // ApplyUnappliedMigrations applies all migrations that are not currently known
 // to be applied.
-func ApplyUnappliedMigrations(ctx context.Context, migrationStatus MigrationStatusClient, client dynamic.Interface, options descriptive.ApplyOptions, mapper meta.RESTMapper) (map[string]*descriptive.ApplyMetrics, error) {
-	result := map[string]*descriptive.ApplyMetrics{}
+//
+// The state of the applied migrations is recorded, and metrics per-migration
+// for each of the applied migrations is applied.
+func ApplyUnappliedMigrations(ctx context.Context, migrationStatus MigrationStatusClient, client dynamic.Interface, options changes.ApplyOptions, mapper meta.RESTMapper) (map[string]*changes.ApplyMetrics, error) {
+	result := map[string]*changes.ApplyMetrics{}
 	var err error
 
 	for i := range knownMigrations {
@@ -95,7 +104,8 @@ func ApplyUnappliedMigrations(ctx context.Context, migrationStatus MigrationStat
 		}
 
 		if info.Applied {
-			// TODO: log!
+			logger.WithFields(logrus.Fields{"dryrun": options.DryRun, "migration": migrationName}).
+				Debug("Migration skipped - already applied")
 			continue
 		}
 
@@ -107,6 +117,9 @@ func ApplyUnappliedMigrations(ctx context.Context, migrationStatus MigrationStat
 
 		result[knownMigrations[i].Name()] = metrics
 	}
+
+	// TODO Should a migration be able to indicate that failure-to-apply is
+	// terminal?
 
 	return result, err
 }
@@ -127,7 +140,7 @@ func migrationByName(name string) (Migration, error) {
 	return migration, nil
 }
 
-// NameForMigration returns a DNS1035 compatible name for the import path for
+// NameForMigration returns a name for the import path for
 // this migration.
 func NameForMigration(v Migration) string {
 	vt := reflect.TypeOf(v)
