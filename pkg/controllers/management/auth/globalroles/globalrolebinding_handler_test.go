@@ -213,6 +213,7 @@ func TestCreateUpdate(t *testing.T) {
 					Status: v3.GlobalRoleBindingStatus{
 						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
+						Summary:        status.SummaryCompleted,
 						LocalConditions: []metav1.Condition{
 							{
 								Type:               clusterPermissionsReconciled,
@@ -334,6 +335,7 @@ func TestCreateUpdate(t *testing.T) {
 					UserName:       userName,
 					Status: v3.GlobalRoleBindingStatus{
 						LastUpdateTime: mockTime().Format(time.RFC3339),
+						Summary:        status.SummaryCompleted,
 						SummaryLocal:   status.SummaryCompleted,
 						LocalConditions: []metav1.Condition{
 							{
@@ -772,6 +774,7 @@ func TestCreateUpdate(t *testing.T) {
 					Status: v3.GlobalRoleBindingStatus{
 						LastUpdateTime: mockTime().Format(time.RFC3339),
 						SummaryLocal:   status.SummaryCompleted,
+						Summary:        status.SummaryCompleted,
 						LocalConditions: []metav1.Condition{
 							{
 								Type:               clusterPermissionsReconciled,
