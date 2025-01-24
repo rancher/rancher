@@ -261,6 +261,8 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 			Verbs:     []string{"impersonate"},
 			APIGroups: []string{"authentication.k8s.io"},
 			Resources: []string{"userextras/" + authcommon.ExtraRequestTokenID},
+			// Note that to avoid constantly updating the ClusterRole we allow all values here.
+			// The check for the token ownership is done by the impersonation authenticator.
 		},
 		{
 			Verbs:     []string{"impersonate"},
