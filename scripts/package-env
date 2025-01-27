@@ -2,11 +2,11 @@
 
 ARCH=${ARCH:-"amd64"}
 SYSTEM_CHART_REPO_DIR=build/system-charts
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.8"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"release-v2.8"}
 CHART_REPO_DIR=build/charts
 SMALL_FORK_REPO_DIR=../build/rancher-data/local-catalogs/v2/rancher-charts-small-fork/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52
 
-CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.8"}
+CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"release-v2.8"}
 
 REGISTRY=${REGISTRY/:-""}
 IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
@@ -19,13 +19,13 @@ WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
 # Query KDM data for RKE2 released versions where server args are defined.
 RKE2_RELEASE_VERSIONS=$(jq -r '[.rke2.releases[] | select(.serverArgs) | .version] | join(" ")' ../bin/data.json)
 # Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
-RKE2_RELEASE_TAGS=( $(echo $RKE2_RELEASE_VERSIONS | tr + -) )
+RKE2_RELEASE_TAGS=($(echo $RKE2_RELEASE_VERSIONS | tr + -))
 # Prefix image repo and name to tags.
-SYSTEM_AGENT_INSTALLER_RKE2_IMAGES=( "${RKE2_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-rke2:}" )
+SYSTEM_AGENT_INSTALLER_RKE2_IMAGES=("${RKE2_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-rke2:}")
 
 # Query KDM data for K3S released versions where server args are defined.
 K3S_RELEASE_VERSIONS=$(jq -r '[.k3s.releases[] | select(.serverArgs) | .version] | join(" ")' ../bin/data.json)
 # Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
-K3S_RELEASE_TAGS=( $(echo $K3S_RELEASE_VERSIONS | tr + -) )
+K3S_RELEASE_TAGS=($(echo $K3S_RELEASE_VERSIONS | tr + -))
 # Prefix image repo and name to tags.
-SYSTEM_AGENT_INSTALLER_K3S_IMAGES=( "${K3S_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-k3s:}" )
+SYSTEM_AGENT_INSTALLER_K3S_IMAGES=("${K3S_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-k3s:}")
