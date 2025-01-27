@@ -132,6 +132,26 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 			},
 		}
 
+		ingressConfig := observability.IngressConfig{
+			Ingress: observability.Ingress{
+				Enabled: true,
+				Annotations: map[string]string{
+					"nginx.ingress.kubernetes.io/proxy-body-size": "50m",
+				},
+				Hosts: []observability.Host{
+					{
+						Host: stackstateConfigs.Url,
+					},
+				},
+				TLS: []observability.TLSConfig{
+					{
+						Hosts:      []string{stackstateConfigs.Url},
+						SecretName: "tls-secret",
+					},
+				},
+			},
+		}
+
 		// Read sizing config
 		sizingConfigData, err := os.ReadFile("resources/10-nonha_sizing_values.yaml")
 		require.NoError(sss.T(), err)
@@ -141,6 +161,9 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		require.NoError(sss.T(), err)
 
 		// Convert structs back to map[string]interface{} for chart values
+		ingressConfigMap, err := structToMap(ingressConfig)
+		require.NoError(sss.T(), err)
+
 		baseConfigMap, err := structToMap(baseConfig)
 		require.NoError(sss.T(), err)
 
@@ -148,7 +171,7 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		require.NoError(sss.T(), err)
 
 		// Merge the values
-		mergedValues := mergeValues(baseConfigMap, sizingConfigMap)
+		mergedValues := mergeValues(ingressConfigMap, baseConfigMap, sizingConfigMap)
 
 		systemProject, err := rancherProjects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
 		require.NoError(sss.T(), err)

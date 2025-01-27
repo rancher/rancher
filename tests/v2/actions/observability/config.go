@@ -134,3 +134,23 @@ type SizingConfig struct {
 		} `json:"components" yaml:"components"`
 	} `json:"stackstate" yaml:"stackstate"`
 }
+
+type IngressConfig struct {
+	Ingress Ingress `yaml:"ingress"`
+}
+
+type Ingress struct {
+	Enabled     bool              `yaml:"enabled"`
+	Annotations map[string]string `yaml:"annotations"`
+	Hosts       []Host            `yaml:"hosts"`
+	TLS         []TLSConfig       `yaml:"tls"`
+}
+
+type Host struct {
+	Host string `yaml:"host"`
+}
+
+type TLSConfig struct {
+	Hosts      []string `yaml:"hosts"`
+	SecretName string   `yaml:"secretName"`
+}
