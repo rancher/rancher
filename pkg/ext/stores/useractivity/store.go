@@ -40,12 +40,12 @@ var GV = schema.GroupVersion{
 var GVK = schema.GroupVersionKind{
 	Group:   GV.Group,
 	Version: GV.Version,
-	Kind:    "UserActivity",
+	Kind:    SingularName,
 }
 var GVR = schema.GroupVersionResource{
 	Group:    GV.Group,
 	Version:  GV.Version,
-	Resource: "useractivities",
+	Resource: PluralName,
 }
 
 func NewFromWrangler(wranglerCtx *wrangler.Context) *Store {
