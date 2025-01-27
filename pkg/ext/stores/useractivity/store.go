@@ -21,7 +21,7 @@ import (
 const (
 	UserActivityNamespace = "cattle-useractivity-data"
 	tokenUserId           = "authn.management.cattle.io/token-userId"
-	SingularName          = "UserActivity"
+	SingularName          = "useractivity"
 	PluralName            = "useractivities"
 )
 
