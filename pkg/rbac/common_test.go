@@ -330,6 +330,42 @@ func TestIsAdminGlobalRole(t *testing.T) {
 			},
 			wantResult: false,
 		},
+		"is not admin role- has admin for NonResourceURLs, but not for Resources": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return &apimgmtv3.GlobalRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr",
+						},
+						Rules: []rbacv1.PolicyRule{
+							{
+								Verbs:           []string{"*"},
+								NonResourceURLs: []string{"*"},
+							},
+						},
+					}, nil
+				}
+			},
+			wantResult: false,
+		},
+		"is not admin role- has admin for Resources, but not for NonResourceURLs": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return &apimgmtv3.GlobalRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr",
+						},
+						Rules: []rbacv1.PolicyRule{
+							{
+								Verbs:     []string{"*"},
+								APIGroups: []string{"*"},
+								Resources: []string{"*"},
+							},
+						},
+					}, nil
+				}
+			},
+		},
 		"error getting GlobalRole": {
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
