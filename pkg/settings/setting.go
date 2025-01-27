@@ -31,7 +31,7 @@ var (
 	InjectDefaults string
 
 	systemNamespaces = []string{
-		"kube-system",
+		// "kube-system",
 		"kube-public",
 		"cattle-system",
 		"cattle-alerting",
