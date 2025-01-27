@@ -212,7 +212,7 @@ func convertMapToStringKeys(input map[interface{}]interface{}) map[string]interf
 	return strMap
 }
 
-// mergeValues merges multiple YAML values maps into a single map
+// mergeValues merges multiple map[string]interface{} values into one, recursively merging nested maps if keys overlap.
 func mergeValues(values ...map[string]interface{}) map[string]interface{} {
 	result := make(map[string]interface{})
 	for _, currentMap := range values {
