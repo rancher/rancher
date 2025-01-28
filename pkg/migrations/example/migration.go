@@ -8,10 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var example exampleMigration
-
 func init() {
-	migrations.Register(example)
+	migrations.Register(exampleMigration{})
 }
 
 type exampleMigration struct {

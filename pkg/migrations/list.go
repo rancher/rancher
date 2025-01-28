@@ -21,6 +21,13 @@ type MigrationOptions struct {
 	// Continue is a token returned by the migration that allows for batching of
 	// changes. The token is opaque and used only by the migration.
 	Continue string
+
+	// Limit tells the server to limit the number of returned changes.
+	//
+	// The migration should only consider this number of resources for
+	// determining the limit on changes. For example, Limit: 1 might result in
+	// two changes for a single resource.
+	Limit int64
 }
 
 // MigrationChanges represents the calculated changes to apply to the cluster.

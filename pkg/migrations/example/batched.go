@@ -13,10 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var batched batchedMigration
-
 func init() {
-	migrations.Register(batched)
+	migrations.Register(batchedMigration{})
 }
 
 type batchedMigration struct {
@@ -69,6 +67,14 @@ func (t batchedMigration) Changes(ctx context.Context, client changes.Interface,
 	return &migrations.MigrationChanges{Continue: string(newContinue), Changes: changes}, nil
 }
 
+func toUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
+	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: raw}, nil
+}
 func toUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
 	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
