@@ -148,10 +148,16 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	case "true":
 		logrus.Info("creating imperative extension apiserver resources")
 
-		sniProvider, err := certForCommonName(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace))
+		sniProvider, err := NewSNIProviderForCname("imperative-api-sni-provider", []string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)})
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
 		}
+
+		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
+
+		go func() {
+			sniProvider.Run(ctx)
+		}()
 
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
 
