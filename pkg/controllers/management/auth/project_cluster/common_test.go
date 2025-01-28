@@ -38,7 +38,7 @@ func TestCreateMembershipRoles(t *testing.T) {
 			wantedCRs: []*rbacv1.ClusterRole{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-project-member",
+						Name: "test-project-project-member",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "v3",
@@ -59,7 +59,7 @@ func TestCreateMembershipRoles(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-project-owner",
+						Name: "test-project-project-owner",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "v3",
@@ -95,7 +95,7 @@ func TestCreateMembershipRoles(t *testing.T) {
 			wantedCRs: []*rbacv1.ClusterRole{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-cluster-member",
+						Name: "test-cluster-cluster-member",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "v3",
@@ -119,7 +119,7 @@ func TestCreateMembershipRoles(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-cluster-owner",
+						Name: "test-cluster-cluster-owner",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "v3",

@@ -181,12 +181,13 @@ var (
 	ownerLabel = "authz.cluster.cattle.io/prtb-owner=test-prtb"
 	defaultCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "crb-",
-			Labels:       map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
+			Name:   "crb-5x2rfzlbvz",
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
 		},
 		RoleRef: rbacv1.RoleRef{
-			Kind: "ClusterRole",
-			Name: "test-rt-project-mgmt-aggregator",
+			Kind:     "ClusterRole",
+			Name:     "test-rt-project-mgmt-aggregator",
+			APIGroup: "rbac.authorization.k8s.io",
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -383,6 +384,67 @@ func Test_reconcileBindings(t *testing.T) {
 			}
 			if err := p.reconcileBindings(tt.prtb); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
+	type controllers struct {
+		rbController  *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
+		crbController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
+		rtController  *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
+	}
+	tests := []struct {
+		name             string
+		prtb             *v3.ProjectRoleTemplateBinding
+		setupControllers func(controllers)
+		wantErr          bool
+	}{
+		{
+			name: "error getting roletemplate",
+			setupControllers: func(c controllers) {
+				c.rtController.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, errDefault)
+			},
+			prtb:    defaultPRTB.DeepCopy(),
+			wantErr: true,
+		},
+		// Cluster and Project Membership are more thoroughly tested in common_test.go.
+		// This test is to ensure that a project gets both cluster and project membership.
+		{
+			name: "create cluster and project membership bindings",
+			setupControllers: func(c controllers) {
+				c.rtController.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
+				}, nil)
+
+				c.crbController.EXPECT().Get(defaultProjectCRB.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				c.crbController.EXPECT().Create(defaultProjectCRB.DeepCopy()).Return(nil, nil)
+
+				c.rbController.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				c.rbController.EXPECT().Create(defaultRoleBinding.DeepCopy()).Return(nil, nil)
+			},
+			prtb: defaultPRTB.DeepCopy(),
+		},
+	}
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := controllers{
+				rbController:  fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
+				crbController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
+				rtController:  fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl),
+			}
+			if tt.setupControllers != nil {
+				tt.setupControllers(c)
+			}
+			p := &prtbHandler{
+				rbController:  c.rbController,
+				crbController: c.crbController,
+				rtController:  c.rtController,
+			}
+			if err := p.reconcileMembershipBindings(tt.prtb); (err != nil) != tt.wantErr {
+				t.Errorf("prtbHandler.reconcileMembershipBindings() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

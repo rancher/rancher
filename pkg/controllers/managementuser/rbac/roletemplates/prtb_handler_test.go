@@ -23,12 +23,13 @@ var (
 	}
 	promotedCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "crb-",
-			Labels:       map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
+			Name:   "crb-422tiqvlec",
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
 		},
 		RoleRef: rbacv1.RoleRef{
-			Kind: "ClusterRole",
-			Name: "test-rt-promoted-aggregator",
+			Kind:     "ClusterRole",
+			Name:     "test-rt-promoted-aggregator",
+			APIGroup: "rbac.authorization.k8s.io",
 		},
 		Subjects: []rbacv1.Subject{{
 			Name:     "test-user",

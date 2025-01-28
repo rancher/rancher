@@ -26,6 +26,8 @@ const (
 	creatorOwnerBindingAnnotation   = "authz.management.cattle.io/creator-owner-binding"
 	roleTemplatesRequiredAnnotation = "authz.management.cattle.io/creator-role-bindings"
 	clusterNameLabel                = "cluster.cattle.io/name"
+	projectContext                  = "project"
+	clusterContext                  = "cluster"
 )
 
 var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
@@ -83,15 +85,17 @@ func reconcileResourceToNamespace(obj runtime.Object, controller string, nsListe
 
 // createMembershipRoles creates 2 cluster roles: an owner role and a member role. To be used to create project/cluster membership roles.
 func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleController) error {
-	var resourceName, resourceType string
-	var isCluster bool
+	var resourceName, resourceType, context string
+	var annotations map[string]string
 
 	switch v := obj.(type) {
 	case *apisv3.Project:
+		context = projectContext
 		resourceType = apisv3.ProjectResourceName
 		resourceName = v.GetName()
 	case *apisv3.Cluster:
-		isCluster = true
+		annotations = map[string]string{clusterNameLabel: v.GetName()}
+		context = clusterContext
 		resourceType = apisv3.ClusterResourceName
 		resourceName = v.GetName()
 	default:
@@ -103,14 +107,9 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 		return err
 	}
 
-	var annotations map[string]string
-	if isCluster {
-		annotations = map[string]string{clusterNameLabel: resourceName}
-	}
-
 	memberRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name.SafeConcatName(resourceName, "member"),
+			Name:            name.SafeConcatName(resourceName, context, "member"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Annotations:     annotations,
 		},
@@ -126,7 +125,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 
 	ownerRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name.SafeConcatName(resourceName, "owner"),
+			Name:            name.SafeConcatName(resourceName, context, "owner"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 			Annotations:     annotations,
 		},

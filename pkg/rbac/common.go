@@ -493,8 +493,8 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 
 	return &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "crb-",
-			Labels:       map[string]string{ownerLabel: rtb.GetName()},
+			Name:   NameForClusterRoleBinding(roleRef, subject),
+			Labels: map[string]string{ownerLabel: rtb.GetName()},
 		},
 		RoleRef:  roleRef,
 		Subjects: []rbacv1.Subject{subject},
@@ -505,6 +505,12 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
 	return equality.Semantic.DeepEqual(crb1.Subjects, crb2.Subjects) &&
 		equality.Semantic.DeepEqual(crb1.RoleRef, crb2.RoleRef)
+}
+
+// AreRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
+func AreRoleBindingContentsSame(rb1, rb2 *rbacv1.RoleBinding) bool {
+	return equality.Semantic.DeepEqual(rb1.Subjects, rb2.Subjects) &&
+		equality.Semantic.DeepEqual(rb1.RoleRef, rb2.RoleRef)
 }
 
 // ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName
@@ -532,10 +538,27 @@ func ProjectManagementPlaneClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, projectManagementPlaneSuffix)
 }
 
+func GetRTBOwnerLabel(rtb metav1.Object) string {
+	switch obj := rtb.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		return GetPRTBOwnerLabel(obj.Name)
+	case *v3.ClusterRoleTemplateBinding:
+		return GetCRTBOwnerLabel(obj.Name)
+	}
+	return ""
+}
+
 func GetPRTBOwnerLabel(s string) string {
 	return PrtbOwnerLabel + "=" + s
 }
 
 func GetCRTBOwnerLabel(s string) string {
 	return CrtbOwnerLabel + "=" + s
+}
+
+// GetClusterAndProjectNameFromPRTB gets the cluster and project belonging to a ProjectRoleTemplateBinding.
+// The ProjectName field is of the form <cluster-name>:<project-name>
+func GetClusterAndProjectNameFromPRTB(prtb *v3.ProjectRoleTemplateBinding) (string, string) {
+	cluster, project, _ := strings.Cut(prtb.ProjectName, ":")
+	return cluster, project
 }

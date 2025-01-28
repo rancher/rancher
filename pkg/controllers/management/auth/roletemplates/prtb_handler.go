@@ -20,6 +20,7 @@ type prtbHandler struct {
 	userMGR        user.Manager
 	userController mgmtv3.UserController
 	rtController   mgmtv3.RoleTemplateController
+	rbController   crbacv1.RoleBindingController
 	crController   crbacv1.ClusterRoleController
 	crbController  crbacv1.ClusterRoleBindingController
 }
@@ -29,6 +30,7 @@ func newPRTBHandler(management *config.ManagementContext) *prtbHandler {
 		userMGR:        management.UserManager,
 		userController: management.Wrangler.Mgmt.User(),
 		rtController:   management.Wrangler.Mgmt.RoleTemplate(),
+		rbController:   management.Wrangler.RBAC.RoleBinding(),
 		crController:   management.Wrangler.RBAC.ClusterRole(),
 		crbController:  management.Wrangler.RBAC.ClusterRoleBinding(),
 	}
@@ -61,7 +63,9 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	returnErr := deleteMembershipBinding(prtb, p.crbController)
+	returnErr := errors.Join(deleteClusterMembershipBinding(prtb, p.crbController),
+		deleteProjectMembershipBinding(prtb, p.rbController),
+		removeAuthV2Permissions(prtb, p.rbController))
 
 	currentCRBs, err := p.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
 	if err != nil {
@@ -111,13 +115,15 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 	return binding, nil
 }
 
-// reconcileMembershipBindings ensures that the user is given the right membership binding to the project.
+// reconcileMembershipBindings ensures that the user is given the right membership binding to the project and cluster.
 func (p *prtbHandler) reconcileMembershipBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	rt, err := p.rtController.Get(prtb.RoleTemplateName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	return createOrUpdateMembershipBinding(prtb, rt, p.crbController)
+
+	return errors.Join(createOrUpdateClusterMembershipBinding(prtb, rt, p.crbController),
+		createOrUpdateProjectMembershipBinding(prtb, rt, p.rbController))
 }
 
 // reconcileBindings ensures the right CRB exists for the project management plane role. It deletes any additional unwanted CRBs.

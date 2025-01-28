@@ -30,12 +30,13 @@ var (
 	}
 	defaultCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "crb-",
-			Labels:       map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+			Name:   "crb-mggi3adyhn",
+			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
 		},
 		RoleRef: rbacv1.RoleRef{
-			Kind: "ClusterRole",
-			Name: "test-rt-aggregator",
+			Kind:     "ClusterRole",
+			Name:     "test-rt-aggregator",
+			APIGroup: "rbac.authorization.k8s.io",
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -48,12 +49,13 @@ var (
 	}
 	externalCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "crb-",
-			Labels:       map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+			Name:   "crb-panishv6ga",
+			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
 		},
 		RoleRef: rbacv1.RoleRef{
-			Kind: "ClusterRole",
-			Name: "test-rt",
+			Kind:     "ClusterRole",
+			Name:     "test-rt",
+			APIGroup: "rbac.authorization.k8s.io",
 		},
 		Subjects: []rbacv1.Subject{
 			{

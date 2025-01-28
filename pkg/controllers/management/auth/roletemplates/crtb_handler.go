@@ -8,7 +8,6 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
-	"github.com/rancher/rancher/pkg/fleet"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -79,7 +78,7 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 
 	if binding.UserPrincipalName == "" && binding.UserName == "" {
 		c.s.AddCondition(localConditions, condition, crtbHasNoSubject, fmt.Errorf("CRTB has no subject"))
-		return nil, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
+		return binding, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
 	}
 
 	if binding.UserName == "" {
@@ -123,45 +122,13 @@ func (c *crtbHandler) reconcileMembershipBindings(crtb *v3.ClusterRoleTemplateBi
 	}
 
 	// Create membership binding
-	if err := createOrUpdateMembershipBinding(crtb, rt, c.crbController); err != nil {
+	if err := createOrUpdateClusterMembershipBinding(crtb, rt, c.crbController); err != nil {
 		c.s.AddCondition(localCondition, condition, failedToCreateOrUpdateMembershipBinding, err)
 		return err
 	}
 
 	c.s.AddCondition(localCondition, condition, membershipBindingExists, nil)
 	return nil
-}
-
-// getDesiredClusterRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed ClusterRoleBindings
-func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding) (map[string]*rbacv1.ClusterRoleBinding, error) {
-	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
-	// Check if there is a project management role to bind to
-	projectMagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
-	cr, err := c.crController.Get(projectMagementRoleName, metav1.GetOptions{})
-	if err == nil && cr != nil {
-		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, projectMagementRoleName)
-		if err != nil {
-			return nil, err
-		}
-		desiredCRBs[crb.Name] = crb
-	} else if !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	// Check if there is a cluster management role to bind to
-	clusterManagementRoleName := rbac.ClusterManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
-	cr, err = c.crController.Get(clusterManagementRoleName, metav1.GetOptions{})
-	if err != nil && cr != nil {
-		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, clusterManagementRoleName)
-		if err != nil {
-			return nil, err
-		}
-		desiredCRBs[crb.Name] = crb
-	} else if !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	return desiredCRBs, nil
 }
 
 // reconcileBindings Ensures that all bindings required to provide access to the CRTB either exist or get created.
@@ -207,6 +174,38 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 	return nil
 }
 
+// getDesiredClusterRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed ClusterRoleBindings
+func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding) (map[string]*rbacv1.ClusterRoleBinding, error) {
+	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
+	// Check if there is a project management role to bind to
+	projectMagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
+	cr, err := c.crController.Get(projectMagementRoleName, metav1.GetOptions{})
+	if err == nil && cr != nil {
+		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, projectMagementRoleName)
+		if err != nil {
+			return nil, err
+		}
+		desiredCRBs[crb.Name] = crb
+	} else if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// Check if there is a cluster management role to bind to
+	clusterManagementRoleName := rbac.ClusterManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
+	cr, err = c.crController.Get(clusterManagementRoleName, metav1.GetOptions{})
+	if err == nil && cr != nil {
+		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, clusterManagementRoleName)
+		if err != nil {
+			return nil, err
+		}
+		desiredCRBs[crb.Name] = crb
+	} else if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	return desiredCRBs, nil
+}
+
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil {
@@ -215,10 +214,10 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
 
-	err := deleteMembershipBinding(crtb, c.crbController)
+	err := deleteClusterMembershipBinding(crtb, c.crbController)
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, clusterMembershipBindingDeleted, err)
 
-	err = c.removeAuthV2Permissions(crtb)
+	err = removeAuthV2Permissions(crtb, c.rbController)
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, authv2ProvisioningBindingDeleted, err)
 
 	return crtb, errors.Join(err, c.removeClusterRoleBindings(crtb))
@@ -244,24 +243,6 @@ func (c *crtbHandler) removeClusterRoleBindings(crtb *v3.ClusterRoleTemplateBind
 
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, clusterRoleBindingDeleted, returnErr)
 	return returnErr
-}
-
-// removeAuthV2Permissions removes all Role Bindings with the CRTB owner label.
-// The only intentionally created RoleBindings are created by auth provisioning v2 to provide access to the fleet cluster.
-// The creation of those is handled in pkg/controllers/management/authprovisioningv2/crtb.go:20.
-func (c *crtbHandler) removeAuthV2Permissions(crtb *v3.ClusterRoleTemplateBinding) error {
-	listOptions := metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)}
-
-	roleBindings, err := c.rbController.List(fleet.ClustersDefaultNamespace, listOptions)
-	if err != nil {
-		return err
-	}
-	for _, roleBinding := range roleBindings.Items {
-		if err := c.rbController.Delete(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 var timeNow = func() time.Time {
