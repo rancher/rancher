@@ -198,10 +198,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	if err := dashboardapi.Register(ctx, wranglerContext); err != nil {
-		return nil, err
-	}
-
 	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext)
 	if err != nil {
 		return nil, fmt.Errorf("extension api server: %w", err)
@@ -279,6 +275,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
+		return err
+	}
+
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
 	}

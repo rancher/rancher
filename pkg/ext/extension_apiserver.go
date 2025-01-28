@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
@@ -158,7 +158,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	)
 
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
-	switch settings.ImperativeApiExtension.Get() {
+	switch os.Getenv("CATTLE_IMPERATIVE_API_EXTENSION") {
 	case "true":
 		logrus.Info("creating imperative extension apiserver resources")
 
