@@ -131,20 +131,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, nil
 	}
 
-	scheme := wrangler.Scheme
-	// Only need to listen on localhost because that port will be reached
-	// from a remotedialer tunnel on localhost
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
-	}
-
-	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
-	}
-
-	authenticator := steveext.NewUnionAuthenticator(
+	authenticators := []authenticator.Request{
 		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 			reqUser, ok := request.UserFrom(req.Context())
 			if !ok {
@@ -154,8 +141,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 				User: reqUser,
 			}, true, nil
 		}),
-		defaultAuthenticator,
-	)
+	}
 
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
 	switch os.Getenv("CATTLE_IMPERATIVE_API_EXTENSION") {
@@ -177,6 +163,13 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		if err := CreateOrUpdateAPIService(wranglerContext.API.APIService(), caBundle); err != nil {
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 		}
+
+		defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
+		}
+
+		authenticators = append(authenticators, defaultAuthenticator)
 	default:
 		logrus.Info("deleting imperative extension apiserver resources")
 
@@ -184,6 +177,16 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			return nil, fmt.Errorf("failed to clean up extension api resources: %w", err)
 		}
 	}
+
+	scheme := wrangler.Scheme
+	// Only need to listen on localhost because that port will be reached
+	// from a remotedialer tunnel on localhost
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
+	}
+
+	authenticator := steveext.NewUnionAuthenticator(authenticators...)
 
 	aslAuthorizer := steveext.NewAccessSetAuthorizer(wranglerContext.ASL)
 	codecs := serializer.NewCodecFactory(scheme)
