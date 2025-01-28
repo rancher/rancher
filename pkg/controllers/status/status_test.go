@@ -347,3 +347,83 @@ func TestCompareConditions(t *testing.T) {
 		})
 	}
 }
+
+func TestKeepLastTransitionTimeIfConditionIsPresent(t *testing.T) {
+	timeZero := metav1.NewTime(time.Unix(0, 0))
+	timeOne := metav1.NewTime(time.Unix(1, 1))
+	tests := map[string]struct {
+		conditions            []metav1.Condition
+		conditionsFromCluster []metav1.Condition
+		wantConditions        []metav1.Condition
+	}{
+		"conditions present in both are updated": {
+			conditions: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             clusterRolesExists,
+					LastTransitionTime: timeZero,
+					Reason:             "reason",
+					Message:            "message",
+				},
+			},
+			conditionsFromCluster: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             clusterRolesExists,
+					LastTransitionTime: timeOne,
+					Reason:             "reason",
+					Message:            "message",
+				},
+			},
+			wantConditions: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             clusterRolesExists,
+					LastTransitionTime: timeOne,
+					Reason:             "reason",
+					Message:            "message",
+				},
+			},
+		},
+		"conditions not present in both are not updated": {
+			conditions: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             clusterRolesExists,
+					LastTransitionTime: timeZero,
+					Reason:             "reason",
+					Message:            "message",
+				},
+			},
+			conditionsFromCluster: []metav1.Condition{
+				{
+					Type:               clusterRoleBindingsExists,
+					Status:             clusterRoleBindingsExists,
+					LastTransitionTime: timeOne,
+					Reason:             "reason",
+					Message:            "message",
+				},
+			},
+			wantConditions: []metav1.Condition{
+				{
+					Type:               clusterRolesExists,
+					Status:             clusterRolesExists,
+					LastTransitionTime: timeZero,
+					Reason:             "reason",
+					Message:            "message",
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			KeepLastTransitionTimeIfConditionHasNotChanged(test.conditions, test.conditionsFromCluster)
+
+			assert.Equal(t, test.wantConditions, test.conditions)
+		})
+	}
+
+}

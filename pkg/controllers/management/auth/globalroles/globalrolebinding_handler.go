@@ -576,6 +576,8 @@ func (grb *globalRoleBindingLifecycle) purgeInvalidNamespacedRBs(rbs []*v1.RoleB
 	return returnError
 }
 
+// updateStatus updates the Status field of the GRB. localConditions are created in each reconciliation loop.
+// Status is only update if any condition has changed.
 func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding, localConditions []metav1.Condition) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grbFromCluster, err := c.grbLister.Get(grb.Name)
@@ -606,6 +608,7 @@ func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding,
 			}
 		}
 
+		status.KeepLastTransitionTimeIfConditionHasNotChanged(localConditions, grbFromCluster.Status.LocalConditions)
 		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
 		grbFromCluster.Status.ObservedGenerationLocal = grb.ObjectMeta.Generation
 		grbFromCluster.Status.LocalConditions = localConditions
