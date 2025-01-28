@@ -21,7 +21,6 @@ var defaultUserAttributes = []string{MemberOfAttribute, ObjectClass, ObjectGUIDA
 func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, config *v3.ActiveDirectoryConfig) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
-	// username :=
 	password := credentials.Password
 	if password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
