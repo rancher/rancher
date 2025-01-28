@@ -35,7 +35,6 @@ const (
 	// The main kube-apiserver will connect to that port (through a tunnel).
 	Port              = 6666
 	APIServiceName    = "v1.ext.cattle.io"
-	CACertSecretName  = "imperative-api-extension-ca"
 	TargetServiceName = "imperative-api-extension"
 	Namespace         = "cattle-system"
 )
@@ -51,8 +50,8 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 			GroupPriorityMinimum: 100,
 			CABundle:             caBundle,
 			Service: &apiregv1.ServiceReference{
-				Namespace: "cattle-system",
-				Name:      "imperative-api-extension",
+				Namespace: Namespace,
+				Name:      TargetServiceName,
 				Port:      &port,
 			},
 			Version:         "v1",
