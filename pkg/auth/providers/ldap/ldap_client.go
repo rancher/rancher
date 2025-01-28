@@ -9,22 +9,18 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var operationalAttrList = []string{"1.1", "+", "*"}
 
-func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin, config *v3.LdapConfig) (v3.Principal, []v3.Principal, error) {
+func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, config *v3.LdapConfig) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
-	username := credential.Username
-	password := credential.Password
-
-	if password == "" {
+	if credentials.Password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
 
@@ -36,7 +32,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 	filter := fmt.Sprintf(
 		"(&(%s=%s)(%s=%s)%s)",
 		ObjectClass, config.UserObjectClass,
-		config.UserLoginAttribute, ldapv3.EscapeFilter(username),
+		config.UserLoginAttribute, ldapv3.EscapeFilter(credentials.Username),
 		strings.TrimSpace(config.UserLoginFilter),
 	)
 
@@ -60,7 +56,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 
 	logrus.Debug("Binding username password")
 	userDN := result.Entries[0].DN // userDN is externalID
-	err = lConn.Bind(userDN, password)
+	err = lConn.Bind(userDN, credentials.Password)
 	if err != nil {
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
 			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
