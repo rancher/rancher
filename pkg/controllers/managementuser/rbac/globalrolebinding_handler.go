@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rancher/norman/types/slice"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -94,15 +93,11 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 		return obj, nil
 	}
 	var remoteConditions []metav1.Condition
-	isAdmin, err := c.isAdminRole(obj.GlobalRoleName)
+	isAdmin, err := rbac.IsAdminGlobalRole(obj.GlobalRoleName, c.grLister)
 	if err != nil {
 		return nil, err
 	}
 	if !isAdmin {
-		err := c.updateStatus(obj, remoteConditions)
-		if err != nil {
-			return nil, err
-		}
 		return obj, nil
 	}
 
@@ -148,38 +143,6 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding, co
 
 	c.status.AddCondition(conditions, condition, clusterAdminRoleExists, nil)
 	return nil
-}
-
-// isAdminRole detects whether a GlobalRole has admin permissions or not.
-func (c *grbHandler) isAdminRole(rtName string) (bool, error) {
-	gr, err := c.grLister.Get("", rtName)
-	if err != nil {
-		return false, err
-	}
-
-	// global role is builtin admin role
-	if gr.Builtin && gr.Name == rbac.GlobalAdmin {
-		return true, nil
-	}
-
-	var hasResourceRule, hasNonResourceRule bool
-	for _, rule := range gr.Rules {
-		if slice.ContainsString(rule.Resources, "*") && slice.ContainsString(rule.APIGroups, "*") && slice.ContainsString(rule.Verbs, "*") {
-			hasResourceRule = true
-			continue
-		}
-		if slice.ContainsString(rule.NonResourceURLs, "*") && slice.ContainsString(rule.Verbs, "*") {
-			hasNonResourceRule = true
-			continue
-		}
-	}
-
-	// global role has an admin resource rule, and admin nonResourceURLs rule
-	if hasResourceRule && hasNonResourceRule {
-		return true, nil
-	}
-
-	return false, nil
 }
 
 func grbByUserAndRole(obj interface{}) ([]string, error) {

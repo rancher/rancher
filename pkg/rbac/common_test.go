@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -8,7 +9,10 @@ import (
 
 	"github.com/rancher/norman/types"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -257,4 +261,138 @@ func TestGetRTBLabel(t *testing.T) {
 			}
 		})
 	}
+}
+
+type grbTestState struct {
+	grListerMock *fakes.GlobalRoleListerMock
+}
+
+func TestIsAdminGlobalRole(t *testing.T) {
+	err := errors.New("unexpected error")
+	tests := map[string]struct {
+		stateSetup  func(state grbTestState)
+		inputObject *v3.GlobalRoleBinding
+		wantResult  bool
+		wantError   error
+	}{
+		"is builtin admin role": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return &apimgmtv3.GlobalRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: GlobalAdmin,
+						},
+						Builtin: true,
+					}, nil
+				}
+			},
+			wantResult: true,
+		},
+		"is admin role": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return &apimgmtv3.GlobalRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr",
+						},
+						Rules: []rbacv1.PolicyRule{
+							{
+								Verbs:     []string{"*"},
+								APIGroups: []string{"*"},
+								Resources: []string{"*"},
+							},
+							{
+								Verbs:           []string{"*"},
+								NonResourceURLs: []string{"*"},
+							},
+						},
+					}, nil
+				}
+			},
+			wantResult: true,
+		},
+		"is not admin role": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return &apimgmtv3.GlobalRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr",
+						},
+						Rules: []rbacv1.PolicyRule{
+							{
+								Verbs:     []string{"get"},
+								APIGroups: []string{""},
+								Resources: []string{"pods"},
+							},
+						},
+					}, nil
+				}
+			},
+			wantResult: false,
+		},
+		"is not admin role- has admin for NonResourceURLs, but not for Resources": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return &apimgmtv3.GlobalRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr",
+						},
+						Rules: []rbacv1.PolicyRule{
+							{
+								Verbs:           []string{"*"},
+								NonResourceURLs: []string{"*"},
+							},
+						},
+					}, nil
+				}
+			},
+			wantResult: false,
+		},
+		"is not admin role- has admin for Resources, but not for NonResourceURLs": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return &apimgmtv3.GlobalRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr",
+						},
+						Rules: []rbacv1.PolicyRule{
+							{
+								Verbs:     []string{"*"},
+								APIGroups: []string{"*"},
+								Resources: []string{"*"},
+							},
+						},
+					}, nil
+				}
+			},
+		},
+		"error getting GlobalRole": {
+			stateSetup: func(state grbTestState) {
+				state.grListerMock.GetFunc = func(namespace string, name string) (*apimgmtv3.GlobalRole, error) {
+					return nil, err
+				}
+			},
+			wantResult: false,
+			wantError:  err,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			grListerMock := fakes.GlobalRoleListerMock{}
+			state := grbTestState{
+				grListerMock: &grListerMock,
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+
+			isAdmin, err := IsAdminGlobalRole("", state.grListerMock)
+
+			assert.Equal(t, test.wantResult, isAdmin)
+			assert.Equal(t, test.wantError, err)
+		})
+	}
+
 }

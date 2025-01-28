@@ -140,16 +140,6 @@ func TestSync(t *testing.T) {
 						Builtin: true,
 					}, nil
 				}
-				state.grbListerMock.EXPECT().Get(grb.Name).Return(&v3.GlobalRoleBinding{
-					GlobalRoleName: "gr",
-				}, nil)
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					GlobalRoleName: "gr",
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryRemote:  status.SummaryCompleted,
-					},
-				})
 			},
 		},
 		"error getting GlobalRole": {
