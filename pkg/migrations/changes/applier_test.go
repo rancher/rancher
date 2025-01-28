@@ -261,7 +261,9 @@ func TestApplyChanges(t *testing.T) {
 				Operation: OperationCreate,
 				Create: &CreateChange{
 					Resource: test.ToUnstructured(t,
-						newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, map[string][]byte{"testing": []byte("TESTSECRET")})),
+						newSecret(
+							types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"},
+							map[string][]byte{"testing": []byte("TESTSECRET")})),
 				},
 			},
 			patchChange,
@@ -560,7 +562,9 @@ func TestApplyChanges(t *testing.T) {
 	})
 
 	t.Run("ApplyChanges creating a resource that already exists", func(t *testing.T) {
-		secret := newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, map[string][]byte{"testing": []byte("TESTSECRET")})
+		secret := newSecret(
+			types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"},
+			map[string][]byte{"testing": []byte("TESTSECRET")})
 		changes := []ResourceChange{
 			{
 				Operation: OperationCreate,

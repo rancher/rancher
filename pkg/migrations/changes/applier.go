@@ -108,8 +108,12 @@ func (r *ResourceChange) Validate() error {
 	return nil
 }
 
+type restMapper interface {
+	RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error)
+}
+
 // ApplyChanges applies a set of ResourceChanges to the cluster.
-func ApplyChanges(ctx context.Context, client dynamic.Interface, changes []ResourceChange, options ApplyOptions, mapper meta.RESTMapper) (*ApplyMetrics, error) {
+func ApplyChanges(ctx context.Context, client dynamic.Interface, changes []ResourceChange, options ApplyOptions, mapper restMapper) (*ApplyMetrics, error) {
 	var err error
 	var metrics ApplyMetrics
 	for _, change := range changes {
@@ -152,7 +156,7 @@ func resourceName(u *unstructured.Unstructured) string {
 	return strings.Join(elements, "/")
 }
 
-func applyCreateChange(ctx context.Context, client dynamic.Interface, patch CreateChange, mapper meta.RESTMapper, options ApplyOptions) error {
+func applyCreateChange(ctx context.Context, client dynamic.Interface, patch CreateChange, mapper restMapper, options ApplyOptions) error {
 	createKind := patch.Resource.GetObjectKind().GroupVersionKind()
 	if createKind.Empty() {
 		return fmt.Errorf("GVK missing from resource: %s", resourceName(patch.Resource))
