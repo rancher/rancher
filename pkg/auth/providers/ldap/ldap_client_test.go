@@ -1,22 +1,18 @@
 package ldap
 
 import (
-	"crypto/tls"
 	"fmt"
 	"testing"
-	"time"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+	ldapFakes "github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -32,7 +28,7 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Parallel()
 
 	config := v3.LdapConfig{
-		LdapFields: v32.LdapFields{
+		LdapFields: v3.LdapFields{
 			ServiceAccountDistinguishedName: saDN,
 			ServiceAccountPassword:          saPassword,
 			UserObjectClass:                 userObjectClassName,
@@ -50,13 +46,13 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 	provider := ldapProvider{
 		providerName: "openldap",
-		userMGR:      mockUserManager{hasAccess: true},
+		userMGR:      common.FakeUserManager{HasAccess: true},
 		tokenMGR:     &tokens.Manager{},
 		userScope:    "openldap_user",
 		groupScope:   "openldap_group",
 	}
 
-	credentials := v32.BasicLogin{
+	credentials := v3.BasicLogin{
 		Username: userName,
 		Password: userPassword,
 	}
@@ -102,10 +98,10 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("successful user login with login filter", func(t *testing.T) {
 		t.Parallel()
 
-		var boundCredentials []v32.BasicLogin
+		var boundCredentials []v3.BasicLogin
 
-		ldapConn := &mockLdapConn{
-			searchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user)(!(status=inactive)))" &&
 					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
 					return userSearchResult, nil
@@ -118,15 +114,15 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 				return &ldapv3.SearchResult{}, nil
 			},
-			searchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+			SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(member=cn=user,ou=users,dc=foo,dc=bar)(objectClass=groupOfNames))" {
 					return groupSearchResult, nil
 				}
 
 				return &ldapv3.SearchResult{}, nil
 			},
-			bindFunc: func(username, password string) error {
-				boundCredentials = append(boundCredentials, v32.BasicLogin{Username: username, Password: password})
+			BindFunc: func(username, password string) error {
+				boundCredentials = append(boundCredentials, v3.BasicLogin{Username: username, Password: password})
 				return nil
 			},
 		}
@@ -163,9 +159,12 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, boundCredentials, 3)
-		assert.Equal(t, v32.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
-		assert.Equal(t, v32.BasicLogin{Username: userDN, Password: userPassword}, boundCredentials[1])
-		assert.Equal(t, v32.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+		// Bind as SA to See if the user exists and is unique.
+		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+		// Bind as a user to authenticate the user.
+		assert.Equal(t, v3.BasicLogin{Username: userDN, Password: userPassword}, boundCredentials[1])
+		// Bind back as SA to get principals from the search results via (ldapSearch).
+		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
 
 		assert.Equal(t, wantUserPrincipal, userPrincipal)
 		assert.Equal(t, wantGroupPrincipals, groupPrincipals)
@@ -174,10 +173,10 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("invalid user credentials", func(t *testing.T) {
 		t.Parallel()
 
-		var boundCredentials []v32.BasicLogin
+		var boundCredentials []v3.BasicLogin
 
-		ldapConn := &mockLdapConn{
-			searchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
 					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
 					return userSearchResult, nil
@@ -185,17 +184,20 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 				return &ldapv3.SearchResult{}, nil
 			},
-			searchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+			SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
 				return &ldapv3.SearchResult{}, nil
 			},
-			bindFunc: func(username, password string) error {
-				boundCredentials = append(boundCredentials, v32.BasicLogin{Username: username, Password: password})
-				if username == userDN && password == userPassword {
+			BindFunc: func(username, password string) error {
+				if username == userDN && password != userPassword {
 					return ldapv3.NewError(ldapv3.LDAPResultInvalidCredentials, fmt.Errorf("ldap: invalid credentials"))
 				}
+				boundCredentials = append(boundCredentials, v3.BasicLogin{Username: username, Password: password})
 				return nil
 			},
 		}
+
+		credentials := credentials
+		credentials.Password = "invalid"
 
 		provider := provider
 
@@ -206,17 +208,17 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, httperror.Unauthorized, herr.Code)
 
-		require.Len(t, boundCredentials, 2)
-		assert.Equal(t, v32.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+		require.Len(t, boundCredentials, 1)
+		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
 	})
 
 	t.Run("user has no access", func(t *testing.T) {
 		t.Parallel()
 
-		var boundCredentials []v32.BasicLogin
+		var boundCredentials []v3.BasicLogin
 
-		ldapConn := &mockLdapConn{
-			searchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
 					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
 					return userSearchResult, nil
@@ -229,20 +231,20 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 				return &ldapv3.SearchResult{}, nil
 			},
-			searchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+			SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(member=cn=user,ou=users,dc=foo,dc=bar)(objectClass=groupOfNames))" {
 					return groupSearchResult, nil
 				}
 				return &ldapv3.SearchResult{}, nil
 			},
-			bindFunc: func(username, password string) error {
-				boundCredentials = append(boundCredentials, v32.BasicLogin{Username: username, Password: password})
+			BindFunc: func(username, password string) error {
+				boundCredentials = append(boundCredentials, v3.BasicLogin{Username: username, Password: password})
 				return nil
 			},
 		}
 
 		provider := provider
-		provider.userMGR = mockUserManager{hasAccess: false}
+		provider.userMGR = common.FakeUserManager{HasAccess: false}
 
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
@@ -254,10 +256,141 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		require.Len(t, boundCredentials, 3)
 	})
 
+	t.Run("successful user login with SearchUsingServiceAccount true", func(t *testing.T) {
+		t.Parallel()
+
+		var boundCredentials []v3.BasicLogin
+
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
+					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
+					return userSearchResult, nil
+				}
+
+				if searchRequest.Filter == "(objectClass=inetOrgPerson)" &&
+					searchRequest.BaseDN == userDN {
+					return userDetailsResult, nil
+				}
+
+				return &ldapv3.SearchResult{}, nil
+			},
+			SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+				if searchRequest.Filter == "(&(member=cn=user,ou=users,dc=foo,dc=bar)(objectClass=groupOfNames))" {
+					return groupSearchResult, nil
+				}
+
+				return &ldapv3.SearchResult{}, nil
+			},
+			BindFunc: func(username, password string) error {
+				boundCredentials = append(boundCredentials, v3.BasicLogin{Username: username, Password: password})
+				return nil
+			},
+		}
+
+		config := config
+		config.SearchUsingServiceAccount = true
+
+		wantUserPrincipal := v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "openldap_user://cn=user,ou=users,dc=foo,dc=bar",
+			},
+			DisplayName:   "user",
+			LoginName:     "user",
+			PrincipalType: "user",
+			Provider:      "openldap",
+			Me:            true,
+		}
+		wantGroupPrincipals := []v3.Principal{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "openldap_group://cn=group,ou=groups,dc=foo,dc=bar",
+				},
+				DisplayName:   "group",
+				LoginName:     "group",
+				PrincipalType: "group",
+				Provider:      "openldap",
+				Me:            true,
+			},
+		}
+
+		provider := provider
+
+		userPrincipal, groupPrincipals, err := provider.loginUser(ldapConn, &credentials, &config)
+		require.NoError(t, err)
+
+		require.Len(t, boundCredentials, 4)
+		// See if user exists and is unique.
+		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+		// Authenticate as a user.
+		assert.Equal(t, v3.BasicLogin{Username: userDN, Password: userPassword}, boundCredentials[1])
+		// Rebind as a service account before retrieve the user record by searching using user's DN.
+		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+		// Get principals from the search results via p.ldapSearch.
+		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+
+		assert.Equal(t, wantUserPrincipal, userPrincipal)
+		assert.Equal(t, wantGroupPrincipals, groupPrincipals)
+	})
+
+	t.Run("user login with invalid credentials with SearchUsingServiceAccount true", func(t *testing.T) {
+		t.Parallel()
+
+		var boundCredentials []v3.BasicLogin
+
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
+					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
+					return userSearchResult, nil
+				}
+
+				if searchRequest.Filter == "(objectClass=inetOrgPerson)" &&
+					searchRequest.BaseDN == userDN {
+					return userDetailsResult, nil
+				}
+
+				return &ldapv3.SearchResult{}, nil
+			},
+			SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+				if searchRequest.Filter == "(&(member=cn=user,ou=users,dc=foo,dc=bar)(objectClass=groupOfNames))" {
+					return groupSearchResult, nil
+				}
+
+				return &ldapv3.SearchResult{}, nil
+			},
+			BindFunc: func(username, password string) error {
+				if username == userDN && password != userPassword {
+					return ldapv3.NewError(ldapv3.LDAPResultInvalidCredentials, fmt.Errorf("ldap: invalid credentials"))
+				}
+				boundCredentials = append(boundCredentials, v3.BasicLogin{Username: username, Password: password})
+				return nil
+			},
+		}
+
+		config := config
+		config.SearchUsingServiceAccount = true
+
+		credentials := credentials
+		credentials.Password = "invalid"
+
+		provider := provider
+
+		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
+		require.Error(t, err)
+
+		herr, ok := err.(*httperror.APIError)
+		require.True(t, ok)
+		require.Equal(t, httperror.Unauthorized, herr.Code)
+
+		require.Len(t, boundCredentials, 1)
+		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+	})
+
 	t.Run("missing password", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{}
+		ldapConn := &ldapFakes.FakeLdapConn{}
 		provider := provider
 
 		credentials := credentials
@@ -274,8 +407,8 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("invalid service account credentials", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{
-			bindFunc: func(username, password string) error {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			BindFunc: func(username, password string) error {
 				return ldapv3.NewError(ldapv3.LDAPResultInvalidCredentials, fmt.Errorf("ldap: invalid credentials"))
 			},
 		}
@@ -293,8 +426,8 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("error authenticating service account", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{
-			bindFunc: func(username, password string) error {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			BindFunc: func(username, password string) error {
 				return ldapv3.NewError(ldapv3.LDAPResultServerDown, fmt.Errorf("ldap: server down"))
 			},
 		}
@@ -312,7 +445,7 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("no user found", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{}
+		ldapConn := &ldapFakes.FakeLdapConn{}
 		provider := provider
 
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
@@ -326,8 +459,8 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("multiple users found", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{
-			searchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
 				return &ldapv3.SearchResult{
 					Entries: []*ldapv3.Entry{{}, {}}, // Return multiple entries.
 				}, nil
@@ -346,8 +479,8 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("error authenticating user", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{
-			searchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
 					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
 					return userSearchResult, nil
@@ -355,7 +488,7 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 				return &ldapv3.SearchResult{}, nil
 			},
-			bindFunc: func(username, password string) error {
+			BindFunc: func(username, password string) error {
 				if username == userDN && password == userPassword {
 					return ldapv3.NewError(ldapv3.LDAPResultServerDown, fmt.Errorf("ldap: server down"))
 				}
@@ -376,8 +509,8 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("error getting user details", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{
-			searchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
 					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
 					return userSearchResult, nil
@@ -405,8 +538,8 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 	t.Run("empty user details results", func(t *testing.T) {
 		t.Parallel()
 
-		ldapConn := &mockLdapConn{
-			searchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+		ldapConn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
 				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
 					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
 					return userSearchResult, nil
@@ -425,112 +558,4 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, httperror.Unauthorized, herr.Code)
 	})
-}
-
-type mockLdapConn struct {
-	bindFunc             func(username, password string) error
-	searchFunc           func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error)
-	searchWithPagingFunc func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error)
-}
-
-func (m *mockLdapConn) Start() {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) StartTLS(*tls.Config) error {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) Close() {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) IsClosing() bool {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) SetTimeout(time.Duration) {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) Bind(username, password string) error {
-	if m.bindFunc != nil {
-		return m.bindFunc(username, password)
-	}
-	return nil
-}
-func (m *mockLdapConn) UnauthenticatedBind(username string) error {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) SimpleBind(*ldapv3.SimpleBindRequest) (*ldapv3.SimpleBindResult, error) {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) ExternalBind() error {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) Add(*ldapv3.AddRequest) error {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) Del(*ldapv3.DelRequest) error {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) Modify(*ldapv3.ModifyRequest) error {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) ModifyDN(*ldapv3.ModifyDNRequest) error {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) ModifyWithResult(*ldapv3.ModifyRequest) (*ldapv3.ModifyResult, error) {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) Compare(dn, attribute, value string) (bool, error) {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) PasswordModify(*ldapv3.PasswordModifyRequest) (*ldapv3.PasswordModifyResult, error) {
-	panic("unimplemented")
-}
-func (m *mockLdapConn) Search(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-	if m.searchFunc != nil {
-		return m.searchFunc(searchRequest)
-	}
-	return &ldapv3.SearchResult{}, nil
-}
-func (m *mockLdapConn) SearchWithPaging(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
-	if m.searchWithPagingFunc != nil {
-		return m.searchWithPagingFunc(searchRequest, pagingSize)
-	}
-	return &ldapv3.SearchResult{}, nil
-}
-
-type mockUserManager struct {
-	hasAccess bool
-}
-
-func (m mockUserManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
-	panic("unimplemented")
-}
-func (m mockUserManager) GetUser(apiContext *types.APIContext) string {
-	panic("unimplemented")
-}
-func (m mockUserManager) EnsureToken(input user.TokenInput) (string, error) {
-	panic("unimplemented")
-}
-func (m mockUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, error) {
-	panic("unimplemented")
-}
-func (m mockUserManager) DeleteToken(tokenName string) error {
-	panic("unimplemented")
-}
-func (m mockUserManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
-	panic("unimplemented")
-}
-func (m mockUserManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error) {
-	return m.hasAccess, nil
-}
-func (m mockUserManager) SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error) {
-	panic("unimplemented")
-}
-func (m mockUserManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
-	panic("unimplemented")
-}
-func (m mockUserManager) GetUserByPrincipalID(principalName string) (*v3.User, error) {
-	panic("unimplemented")
-}
-func (m mockUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
-	panic("unimplemented")
 }

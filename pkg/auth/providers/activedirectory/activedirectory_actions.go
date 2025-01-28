@@ -75,7 +75,13 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must supply a server")
 	}
 
-	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
+	lConn, err := p.ldapConnection(config, caPool)
+	if err != nil {
+		return err
+	}
+	defer lConn.Close()
+
+	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config)
 	if err != nil {
 		return err
 	}
