@@ -55,7 +55,7 @@ func (ih *impersonationHandler) ensureServiceAccountImpersonator(username string
 	return err
 }
 
-// deleteServiceAccountImpersonator checks if there are any CRBTs or PRTBs for this user. If there are none, remove their Service Account Impersonator.
+// deleteServiceAccountImpersonator checks if there are any CRTBs or PRTBs for this user. If there are none, remove their Service Account Impersonator.
 // Currently uses custom indexers to get CRTBs and PRTBs. Once Rancher's minimum support is >1.31,
 // the indexers can be replaced by crd selectable fields https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#crd-selectable-fields
 func (ih *impersonationHandler) deleteServiceAccountImpersonator(username string) error {
