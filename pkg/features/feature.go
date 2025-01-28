@@ -155,7 +155,7 @@ var (
 		"[Experimental] Make RoleTemplates use aggregation for generated RBAC roles",
 		false,
 		false,
-		true)
+		true).lockOnInstall()
 )
 
 type Feature struct {
@@ -170,6 +170,8 @@ type Feature struct {
 	dynamic bool
 	// Whether we should install this feature or assume something else will install and manage the Feature CR
 	install bool
+	// If a feature is locked on install, it can't be modified after install. A new Rancher instance is required to change the value.
+	lockedOnInstall bool
 }
 
 // InitializeFeatures updates feature default if given valid --features flag and creates/updates necessary features in k8s
@@ -211,6 +213,9 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 						Dynamic:     f.dynamic,
 						Description: f.description,
 					},
+				}
+				if f.lockedOnInstall {
+					newFeature.Status.LockedValue = &f.def
 				}
 
 				if _, err := featuresClient.Create(newFeature); err != nil {
@@ -340,6 +345,11 @@ func (f *Feature) Set(val bool) {
 
 func (f *Feature) Name() string {
 	return f.name
+}
+
+func (f *Feature) lockOnInstall() *Feature {
+	f.lockedOnInstall = true
+	return f
 }
 
 func GetFeatureByName(name string) *Feature {
