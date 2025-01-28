@@ -40,8 +40,14 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Debugf("SAML [ServeHTTP]: assertion validation failed: %q", err)
 
 			if parseErr, ok := err.(*saml.InvalidResponseError); ok {
-				log.Debugf("SAML RESPONSE: ===\n%s\n===\nSAML NOW: %s\nSAML ERROR: %s",
-					parseErr.Response, parseErr.Now, parseErr.PrivateErr)
+				// Note: If access to the response itself is needed (debugging)
+				// just add `parseErr.Response` to the log statement, like:
+				//
+				// log.Debugf("SAML RESPONSE: ===\n%s\n===\nSAML NOW: %s\nSAML ERROR: %s",
+				//	parseErr.Response, parseErr.Now, parseErr.PrivateErr)
+
+				log.Debugf("SAML NOW: %s\nSAML ERROR: %s",
+					parseErr.Now, parseErr.PrivateErr)
 			}
 
 			redirectURL := r.URL.Host + "/login?errorCode=403"
