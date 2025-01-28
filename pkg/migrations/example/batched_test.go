@@ -51,5 +51,24 @@ func TestMigrationBatches(t *testing.T) {
 		},
 	}
 	assert.Equal(t, want, result2)
+}
 
+func TestMigrationBatchesCompletes(t *testing.T) {
+	m := batchedMigration{}
+	var batchCount int
+
+	var continueString string
+
+	for {
+		result, err := m.Changes(context.TODO(), changes.ClientFrom(newFakeClient(t)), migrations.MigrationOptions{Continue: continueString})
+		require.NoError(t, err)
+		batchCount += 1
+
+		if result.Continue == "" {
+			break
+		}
+		continueString = result.Continue
+	}
+
+	assert.Equal(t, 2, batchCount)
 }
