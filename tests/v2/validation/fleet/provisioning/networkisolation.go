@@ -3,6 +3,7 @@ package provisioning
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -46,6 +47,9 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 
 	corePod := &corev1.Pod{}
 	err = steveV1.ConvertToK8sType(firstPodObject, corePod)
+	if err != nil {
+		return err
+	}
 
 	// create a new workload / pod to ping that's hardened-compliant
 	falseP := false
@@ -79,7 +83,7 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 		},
 		Spec: corev1.PodSpec{
 			Containers:       []corev1.Container{container},
-			RestartPolicy:    corev1.RestartPolicyNever,
+			RestartPolicy:    corev1.RestartPolicyAlways,
 			Volumes:          nil,
 			ImagePullSecrets: []corev1.LocalObjectReference{},
 			NodeSelector:     nil,
@@ -100,7 +104,7 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 	}
 
 	errList := extensionpods.StatusPods(client, clusterName)
-	if len(errList) < 0 {
+	if len(errList) > 0 {
 		return errors.New("error in pod(s) after created hardened deployment")
 	}
 
@@ -119,6 +123,8 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 		return err
 	}
 
+	var podLogs string
+
 	// pod will come to an active state breifly when healthy. i.e. when sending the ping, before receiving the failure
 	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.OneMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		podObject, err := downstreamClient.SteveType(extensionpods.PodResourceSteveType).ByID(defaultNamespace + "/" + jobPodObject.Name)
@@ -127,42 +133,69 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 		}
 
 		return extensionpods.IsPodReady(podObject)
-
 	})
 	if err != nil {
 		return err
 	}
 
-	// wait for pod to error out from ping
+	// wait for pod to error out from ping. sometimes the correct error logs don't show up on time, so we have to wait for the pod to officially fail
 	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.OneMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
 		podObject, err := downstreamClient.SteveType(extensionpods.PodResourceSteveType).ByID(defaultNamespace + "/" + jobPodObject.Name)
 		if err != nil {
 			return false, err
 		}
 
-		done, err = extensionpods.IsPodReady(podObject)
+		done, err = areContainersReady(podObject)
 		if err != nil {
-			return done, err
+			return
 		}
 		return false, nil
 
 	})
 	if err == nil {
-		return err // fix this
+		return errors.New("pod did not error out, PNI is not working correctly")
 	}
 
-	errorRgx := regexp.MustCompile(regexp.QuoteMeta("100% packet loss"))
-	podLogs, err := kubeconfig.GetPodLogs(client, clusterName, jobPodObject.Name, defaultNamespace, "")
-	if err != nil {
-		return err
-	}
+	errorRgx := regexp.MustCompile(regexp.QuoteMeta("received, 100"))
+	podLogs, _ = kubeconfig.GetPodLogs(client, clusterName, jobPodObject.Name, defaultNamespace, "")
 
 	if matches := errorRgx.FindStringSubmatch(podLogs); len(matches) > 0 {
 		return nil
 	}
 
-	return errors.New("Pod logs appear to be able to ping another project")
+	return errors.New("pod logs appear to be able to ping another project" + podLogs)
 
+}
+
+func areContainersReady(pod *steveV1.SteveAPIObject) (bool, error) {
+	podStatus := &corev1.PodStatus{}
+	err := steveV1.ConvertToK8sType(pod.Status, podStatus)
+	if err != nil {
+		return false, err
+	}
+
+	if podStatus.ContainerStatuses == nil || len(podStatus.ContainerStatuses) == 0 {
+		return false, nil
+	}
+
+	phase := podStatus.Phase
+
+	if phase == corev1.PodPending {
+		return false, nil
+	}
+	var errorMessage string
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		// Rancher deploys multiple hlem-operation jobs to do the same task. If one job succeeds, the others end in a terminated status.
+		if containerStatus.State.Terminated != nil {
+			errorMessage += fmt.Sprintf("Container Terminated:\n%s: %s: pod is %s\n", containerStatus.State.Terminated.Reason, pod.Name, phase)
+		}
+	}
+
+	if errorMessage != "" {
+		return true, fmt.Errorf(errorMessage)
+	}
+
+	return true, nil
 }
 
 // updateNamespaceWithNewProject is a helper which moves a fleet repo's deployment in a downstream cluster to a project
