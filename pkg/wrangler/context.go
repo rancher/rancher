@@ -403,7 +403,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	leadership := leader.NewManager("", "cattle-controllers", k8s)
+	leadership := leader.NewManager("cattle-system", "cattle-controllers", k8s)
 	leadership.OnLeader(func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()
