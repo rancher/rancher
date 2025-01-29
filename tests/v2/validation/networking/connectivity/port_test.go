@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
@@ -27,7 +28,8 @@ import (
 )
 
 const (
-	defaultPort = 80
+	nodePoolsize = 3
+	defaultPort  = 80
 )
 
 type PortTestSuite struct {
@@ -344,11 +346,11 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
-	isPool, err := clusters.VerifyNodePoolSize(steveClient)
-	require.NoError(p.T(), err)
-
-	if !isPool {
-		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes.")
+	err = clusters.VerifyNodePoolSize(steveClient, nodePoolsize)
+	if errors.Is(err, clusters.SmallerPoolClusterSize) {
+		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes")
+	} else {
+		require.NoError(p.T(), err)
 	}
 
 	if p.cluster.EnableNetworkPolicy == nil || !*p.cluster.EnableNetworkPolicy {

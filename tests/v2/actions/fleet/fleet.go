@@ -88,11 +88,11 @@ func VerifyGitRepo(client *rancher.Client, gitRepoID, k8sClusterID, steveCluster
 			return true, errors.New(gitRepo.State.Message)
 		}
 
-		if gitStatus.Summary.NotReady == 0 && gitStatus.ReadyClusters == gitStatus.Summary.DesiredReady {
-			return true, nil
+		if gitStatus.Summary.NotReady > 0 || gitStatus.Summary.DesiredReady == 0 || gitStatus.ReadyClusters == 0 {
+			return false, nil
 		}
 
-		return false, nil
+		return true, nil
 	})
 	if err != nil {
 		return err

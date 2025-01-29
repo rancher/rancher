@@ -362,6 +362,7 @@ func validateClusterIP(client *rancher.Client, clusterName string, steveClient *
 		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
 			return err
 		}
+
 		logrus.Info(log)
 		logrus.Info(err)
 
