@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/unstructured"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/wrangler"
@@ -24,7 +25,7 @@ const (
 )
 
 // CreateDaemonset is a helper to create a daemonset
-func CreateDaemonset(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes bool) (*appv1.DaemonSet, error) {
+func CreateDaemonset(client *rancher.Client, clusterID, namespaceName string, replicaCount int, secretName, configMapName string, useEnvVars, useVolumes, watchDaemonset bool) (*appv1.DaemonSet, error) {
 	deploymentTemplate, err := deployment.CreateDeployment(client, clusterID, namespaceName, replicaCount, secretName, configMapName, useEnvVars, useVolumes, false, true)
 	if err != nil {
 		return nil, err
@@ -44,11 +45,20 @@ func CreateDaemonset(client *rancher.Client, clusterID, namespaceName string, re
 		return nil, err
 	}
 
+	if watchDaemonset {
+		err = charts.WatchAndWaitDaemonSets(client, clusterID, namespaceName, metav1.ListOptions{
+			FieldSelector: "metadata.name=" + createdDaemonset.Name,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return createdDaemonset, nil
 }
 
 // UpdateDaemonset is a helper to update daemonsets
-func UpdateDaemonset(client *rancher.Client, clusterID, namespaceName string, daemonset *appv1.DaemonSet) (*appv1.DaemonSet, error) {
+func UpdateDaemonset(client *rancher.Client, clusterID, namespaceName string, daemonset *appv1.DaemonSet, watchDaemonset bool) (*appv1.DaemonSet, error) {
 	var wranglerContext *wrangler.Context
 	var err error
 
@@ -72,7 +82,16 @@ func UpdateDaemonset(client *rancher.Client, clusterID, namespaceName string, da
 		return nil, err
 	}
 
-	return updatedDaemonset, err
+	if watchDaemonset {
+		err = charts.WatchAndWaitDaemonSets(client, clusterID, namespaceName, metav1.ListOptions{
+			FieldSelector: "metadata.name=" + updatedDaemonset.Name,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return updatedDaemonset, nil
 }
 
 // DeleteDaemonset is a helper to delete a daemonset
