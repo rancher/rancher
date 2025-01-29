@@ -2,16 +2,19 @@ package update
 
 import (
 	"net/url"
+	"os/exec"
 	"testing"
 
 	"errors"
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/git"
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/fleet"
 	"github.com/rancher/rancher/tests/v2/actions/services"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	extensionClusters "github.com/rancher/shepherd/extensions/clusters"
 	extensionsfleet "github.com/rancher/shepherd/extensions/fleet"
 	"github.com/rancher/shepherd/pkg/namegenerator"
@@ -58,6 +61,7 @@ func (u *UpgradeTestSuite) SetupSuite() {
 }
 
 func (u *UpgradeTestSuite) TestDeployFleetRepoUpgrade() {
+	u.session = session.NewSession()
 
 	steveClient, err := u.client.Steve.ProxyDownstream(u.cluster.ID)
 	require.NoError(u.T(), err)
@@ -105,7 +109,38 @@ func (u *UpgradeTestSuite) TestDeployFleetRepoUpgrade() {
 		require.NoError(u.T(), err)
 	}
 
-	err = u.client.Steve.SteveType("fleet.cattle.io.gitrepo").Delete(repoObject)
+	gitRepo, err := u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(repoObject.ID)
+	require.NoError(u.T(), err)
+
+	gitStatus := &v1alpha1.GitRepoStatus{}
+	err = steveV1.ConvertToK8sType(gitRepo.Status, gitStatus)
+	require.NoError(u.T(), err)
+
+	repoName := namegenerator.AppendRandomString("repo-name")
+
+	err = git.Clone(repoName, fleet.ExampleRepo, fleet.BranchName)
+	require.NoError(u.T(), err)
+
+	cmd := exec.Command("git", "commit", "--allow-empty", "-m", "Trigger fleet update")
+	err = cmd.Run()
+	require.NoError(u.T(), err)
+
+	cmd = exec.Command("git", "push", "--force")
+	err = cmd.Run()
+	require.NoError(u.T(), err)
+
+	err = fleet.VerifyGitRepo(u.client, repoObject.ID, u.cluster.ID, fleet.Namespace+"/"+u.cluster.Name)
+	require.NoError(u.T(), err)
+
+	gitRepoUpdated, err := u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(repoObject.ID)
+	require.NoError(u.T(), err)
+
+	newGitStatus := &v1alpha1.GitRepoStatus{}
+	err = steveV1.ConvertToK8sType(gitRepoUpdated.Status, newGitStatus)
+	require.NoError(u.T(), err)
+	require.NotEqual(u.T(), gitStatus.Commit, newGitStatus.Commit)
+
+	err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).Delete(repoObject)
 	require.NoError(u.T(), err)
 }
 
