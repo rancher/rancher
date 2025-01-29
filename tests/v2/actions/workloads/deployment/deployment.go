@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
+	"github.com/rancher/rancher/tests/v2/actions/rbac"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/charts"
@@ -189,4 +190,73 @@ func RollbackDeployment(client *rancher.Client, clusterID, namespaceName string,
 	})
 
 	return logCmd, err
+}
+
+// UpdateOrRemoveEnvVarForDeployment is a helper to add, update or remove an environment variable in a deployment
+func UpdateOrRemoveEnvVarForDeployment(client *rancher.Client, namespaceName, deploymentName, envVarName, envVarValue string) error {
+	deploymentObj, err := client.WranglerContext.Apps.Deployment().Get(namespaceName, deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("error fetching deployment %s in namespace %s: %w", deploymentName, namespaceName, err)
+	}
+
+	modifiedDeployment := deploymentObj.DeepCopy()
+	for i := range modifiedDeployment.Spec.Template.Spec.Containers {
+		container := &modifiedDeployment.Spec.Template.Spec.Containers[i]
+		var envVarExists bool
+
+		for j := 0; j < len(container.Env); j++ {
+			if container.Env[j].Name == envVarName {
+				envVarExists = true
+				if envVarValue == "" {
+					container.Env = append(container.Env[:j], container.Env[j+1:]...)
+					j--
+				} else {
+					container.Env[j].Value = envVarValue
+				}
+				break
+			}
+		}
+
+		if !envVarExists && envVarValue != "" {
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:  envVarName,
+				Value: envVarValue,
+			})
+		}
+	}
+
+	_, err = UpdateDeployment(client, rbac.LocalCluster, namespaceName, modifiedDeployment, true)
+	if err != nil {
+		return fmt.Errorf("error updating deployment %s in namespace %s: %w", deploymentName, namespaceName, err)
+	}
+
+	updatedDeployment, err := client.WranglerContext.Apps.Deployment().Get(namespaceName, deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("error fetching updated deployment %s in namespace %s: %w", deploymentName, namespaceName, err)
+	}
+
+	for _, container := range updatedDeployment.Spec.Template.Spec.Containers {
+		var envVarFound bool
+		for _, env := range container.Env {
+			if env.Name == envVarName {
+				envVarFound = true
+				if envVarValue == "" {
+					return fmt.Errorf("environment variable %s was not removed", envVarName)
+				} else if env.Value != envVarValue {
+					return fmt.Errorf("environment variable %s has incorrect value; expected: %s, got: %s", envVarName, envVarValue, env.Value)
+				}
+				break
+			}
+		}
+
+		if envVarValue == "" && envVarFound {
+			return fmt.Errorf("environment variable %s should have been removed but is still present", envVarName)
+		}
+
+		if envVarValue != "" && !envVarFound {
+			return fmt.Errorf("environment variable %s should have been added or updated but was not found", envVarName)
+		}
+	}
+
+	return nil
 }
