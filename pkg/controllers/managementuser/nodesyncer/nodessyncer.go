@@ -879,6 +879,15 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *apimgmtv
 	cleanStatus(machine)
 	apimgmtv3.NodeConditionRegistered.True(machine)
 	apimgmtv3.NodeConditionRegistered.Message(machine, "registered with kubernetes")
+
+	// remove the "Drained" condition from the machine's status conditions
+	// only if the machine is schedulable (i.e., not unschedulable)
+	// and set DesiredNodeUnschedulable to empty string
+	if !machine.Spec.InternalNodeSpec.Unschedulable {
+		removeDrainCondition(machine)
+		machine.Spec.DesiredNodeUnschedulable = ""
+	}
+
 	return machine, nil
 }
 
