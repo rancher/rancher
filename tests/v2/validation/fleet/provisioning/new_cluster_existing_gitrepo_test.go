@@ -153,7 +153,7 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 
 		provisioningConfig := *f.provisioningConfig
 
-		provisioningConfig.Hardened = false
+		provisioningConfig.Hardened = true
 		provisioningConfig.MachinePools = tt.machinePools
 		provisioningConfig.PSACT = string(provisioninginput.RancherRestricted)
 

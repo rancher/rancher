@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/extensions/unstructured"
@@ -39,6 +38,9 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 	if err != nil {
 		return err
 	}
+	if len(fleetPodNames) <= 0 {
+		return errors.New("unable to find pod(s) in deployment")
+	}
 
 	firstPodObject, err := pods.GetPodByName(client, clusterName, deploymentNamespace, fleetPodNames[0])
 	if err != nil {
@@ -52,8 +54,8 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 	}
 
 	// create a new workload / pod to ping that's hardened-compliant
-	falseP := false
-	trueP := true
+	allowPrivilegeEscalation := false
+	runAsNonRoot := true
 	userID := int64(1000)
 	container := corev1.Container{
 		Name:            "test-pni" + namegenerator.RandStringLower(3),
@@ -64,8 +66,8 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 		Command:         []string{"ping", "-c", "1", corePod.Status.PodIP},
 		Args:            nil,
 		SecurityContext: &corev1.SecurityContext{
-			AllowPrivilegeEscalation: &falseP,
-			RunAsNonRoot:             &trueP,
+			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			RunAsNonRoot:             &runAsNonRoot,
 			RunAsUser:                &userID,
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeRuntimeDefault,
@@ -94,9 +96,9 @@ func testPNI(client *rancher.Client, clusterName, deploymentNamespace, deploymen
 	if err != nil {
 		return err
 	}
-	// Validation:
+	// Begin Validation
 
-	err = charts.WatchAndWaitDeployments(client, clusterName, defaultNamespace, metav1.ListOptions{
+	err = deployments.WatchAndWaitDeployments(client, clusterName, defaultNamespace, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + createdDeployment.Name,
 	})
 	if err != nil {
