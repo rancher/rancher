@@ -177,7 +177,7 @@ func (rbrs *RbacRegistrySecretTestSuite) TestUpdateRegistrySecret() {
 		subSession := rbrs.session.NewSession()
 		defer subSession.Cleanup()
 
-		rbrs.Run("Validate updating secret as user with role "+tt.role.String(), func() {
+		rbrs.Run("Validate updating registry secret as user with role "+tt.role.String(), func() {
 			log.Info("Create a project and a namespace in the projects.")
 			adminProject, namespace, err := projects.CreateProjectAndNamespace(rbrs.client, rbrs.cluster.ID)
 			assert.NoError(rbrs.T(), err)
