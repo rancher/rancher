@@ -1,6 +1,7 @@
 package update
 
 import (
+	"fmt"
 	"net/url"
 	"os/exec"
 	"testing"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -35,6 +37,7 @@ type UpgradeTestSuite struct {
 	client  *rancher.Client
 	session *session.Session
 	cluster *management.Cluster
+	gitRepo *v1alpha1.GitRepo
 }
 
 func (u *UpgradeTestSuite) TearDownSuite() {
@@ -58,6 +61,8 @@ func (u *UpgradeTestSuite) SetupSuite() {
 
 	u.cluster, err = u.client.Management.Cluster.ByID(clusterID)
 	require.NoError(u.T(), err)
+
+	u.gitRepo = fleet.GitRepoConfig()
 }
 
 func (u *UpgradeTestSuite) TestDeployFleetRepoUpgrade() {
@@ -73,6 +78,21 @@ func (u *UpgradeTestSuite) TestDeployFleetRepoUpgrade() {
 		require.NoError(u.T(), err)
 	}
 
+	if u.gitRepo.Spec.ClientSecretName == "" {
+		u.T().Skip("The deploy fleet repo and upgrade test require the gitRepo ClientSecretName field to be configured.")
+	}
+
+	secret, err := u.client.WranglerContext.Core.Secret().Get(fleet.Namespace, u.gitRepo.Spec.ClientSecretName, v1.GetOptions{})
+	require.NoError(u.T(), err)
+
+	username := string(secret.Data["username"])
+	require.NotEmpty(u.T(), username)
+
+	password := string(secret.Data["password"])
+	require.NotEmpty(u.T(), password)
+
+	repo := fmt.Sprintf("https://github.com/%s/fleet-examples", username)
+
 	u.T().Log("Creating a fleet git repo")
 	fleetGitRepo := &v1alpha1.GitRepo{
 		ObjectMeta: metav1.ObjectMeta{
@@ -80,7 +100,7 @@ func (u *UpgradeTestSuite) TestDeployFleetRepoUpgrade() {
 			Namespace: fleet.Namespace,
 		},
 		Spec: v1alpha1.GitRepoSpec{
-			Repo:   fleet.ExampleRepo,
+			Repo:   repo,
 			Branch: fleet.BranchName,
 			Paths:  []string{fleet.GitRepoPathLinux},
 			Targets: []v1alpha1.GitTarget{
@@ -118,14 +138,24 @@ func (u *UpgradeTestSuite) TestDeployFleetRepoUpgrade() {
 
 	repoName := namegenerator.AppendRandomString("repo-name")
 
-	err = git.Clone(repoName, fleet.ExampleRepo, fleet.BranchName)
+	repoWithToken := fmt.Sprintf("https://%s@github.com/%s/fleet-examples", password, username)
+
+	err = git.Clone(repoName, repoWithToken, fleet.BranchName)
 	require.NoError(u.T(), err)
 
-	cmd := exec.Command("git", "commit", "--allow-empty", "-m", "Trigger fleet update")
+	cmd := exec.Command("git", "-C", repoName, "config", "user.name", username)
 	err = cmd.Run()
 	require.NoError(u.T(), err)
 
-	cmd = exec.Command("git", "push", "--force")
+	cmd = exec.Command("git", "-C", repoName, "config", "user.password", password)
+	err = cmd.Run()
+	require.NoError(u.T(), err)
+
+	cmd = exec.Command("git", "-C", repoName, "commit", "--allow-empty", "-m", "Trigger fleet update")
+	err = cmd.Run()
+	require.NoError(u.T(), err)
+
+	cmd = exec.Command("git", "-C", repoName, "push", "--force")
 	err = cmd.Run()
 	require.NoError(u.T(), err)
 
