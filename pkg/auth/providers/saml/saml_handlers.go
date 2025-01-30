@@ -41,10 +41,7 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			if parseErr, ok := err.(*saml.InvalidResponseError); ok {
 				// Note: If access to the response itself is needed (debugging)
-				// just add `parseErr.Response` to the log statement, like:
-				//
-				// log.Debugf("SAML RESPONSE: ===\n%s\n===\nSAML NOW: %s\nSAML ERROR: %s",
-				//	parseErr.Response, parseErr.Now, parseErr.PrivateErr)
+				// just add `parseErr.Response` to the log statement.
 
 				log.Debugf("SAML NOW: %s\nSAML ERROR: %s",
 					parseErr.Now, parseErr.PrivateErr)
