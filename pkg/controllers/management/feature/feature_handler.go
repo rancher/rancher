@@ -114,7 +114,7 @@ func (h *handler) toggleHarvesterNodeDriver(harvester string) error {
 // baremetal container workload feature is disabled when the Harvester feature
 // is disabled.
 func (h *handler) syncHarvesterBaremetalContainerWorkloadFeature(feat *v3.Feature) error {
-	if !*feat.Spec.Value {
+	if feat.Spec.Value != nil && !*feat.Spec.Value {
 		baremetal, err := h.featuresClient.Get(features.HarvesterBaremetalContainerWorkload.Name(), metav1.GetOptions{})
 		if err != nil {
 			return err
