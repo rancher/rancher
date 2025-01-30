@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/norman/lifecycle"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
@@ -23,6 +24,23 @@ const (
 	AgentTLSModeStrict                = "strict"
 	AgentTLSModeSystemStore           = "system-store"
 )
+
+func init() {
+	lifecycle.DisallowedEntries = []lifecycle.DisallowEntry{
+		{
+			Kind: "Namespace",
+			Name: "gke-",
+		},
+		{
+			Kind: "Namespace",
+			Name: "kube-system",
+		},
+		{
+			Kind: "DaemonSet",
+			Name: "kube-system",
+		},
+	}
+}
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
