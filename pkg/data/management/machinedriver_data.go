@@ -8,11 +8,11 @@ import (
 	"runtime"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -61,17 +61,6 @@ var driverDefaults = map[string]map[string]string{
 	Vmwaredriver:    {"vcenterPort": "443"},
 }
 
-type machineDriverCompare struct {
-	builtin            bool
-	addCloudCredential bool
-	url                string
-	uiURL              string
-	checksum           string
-	name               string
-	whitelist          []string
-	annotations        map[string]string
-}
-
 func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("pinganyunecs", "https://drivers.rancher.cn/node-driver-pinganyun/0.3.0/docker-machine-driver-pinganyunecs-linux.tgz", "https://drivers.rancher.cn/node-driver-pinganyun/0.3.0/component.js", "f84ccec11c2c1970d76d30150916933efe8ca49fe4c422c8954fc37f71273bb5", []string{"drivers.rancher.cn"}, false, false, false, management); err != nil {
 		return err
@@ -102,16 +91,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(GoogleDriver, "local://", "", "", nil, false, true, true, management); err != nil {
 		return err
 	}
-	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
-	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	harvesterDriverVersion := "v1.0.1"
-	harvesterDriverURL := fmt.Sprintf("https://github.com/harvester/docker-machine-driver-harvester/releases/download/%s/docker-machine-driver-harvester-%s.tar.gz", harvesterDriverVersion, runtime.GOARCH)
-	harvesterDriverCheckSum := "d5b3439b936e311655e5eba940fc76e95afa4d401aeed7aafee67a0e59763901"
-	if runtime.GOARCH == "arm64" {
-		//overwrite arm driver version here
-		harvesterDriverCheckSum = "d0be35f80af31cebe6a7b36c632afa0359eddf153c6d66c790b3618e0f0c29fe"
-	}
-	if err := addMachineDriver(HarvesterDriver, harvesterDriverURL, "", harvesterDriverCheckSum, []string{"github.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
+	if err := AddHarvesterMachineDriver(management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
@@ -157,10 +137,47 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	return addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, management)
 }
 
+func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
+	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
+	harvesterDriverVersion := "v1.0.1"
+	harvesterDriverChecksums := map[string]string{
+		"amd64": "d5b3439b936e311655e5eba940fc76e95afa4d401aeed7aafee67a0e59763901",
+		"arm64": "d0be35f80af31cebe6a7b36c632afa0359eddf153c6d66c790b3618e0f0c29fe",
+	}
+
+	harvesterDriverURL := fmt.Sprintf("https://github.com/harvester/docker-machine-driver-harvester/releases/download/%s/docker-machine-driver-harvester-%s.tar.gz",
+		harvesterDriverVersion,
+		runtime.GOARCH,
+	)
+
+	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
+
+	harvesterDriverChecksum, ok := harvesterDriverChecksums[runtime.GOARCH]
+	if !ok {
+		logrus.Warnf("machine driver %v does not support GOARCH %v", HarvesterDriver, runtime.GOARCH)
+		harvesterEnabled = false
+	}
+
+	return addMachineDriver(
+		HarvesterDriver,
+		harvesterDriverURL,
+		"",
+		harvesterDriverChecksum,
+		[]string{"github.com"},
+		harvesterEnabled,
+		harvesterEnabled,
+		false,
+		mgmt,
+	)
+}
+
 func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, active, builtin, addCloudCredential bool, management *config.ManagementContext) error {
-	lister := management.Management.NodeDrivers("").Controller().Lister()
 	cli := management.Management.NodeDrivers("")
-	m, _ := lister.Get("", name)
+	lister := cli.Controller().Lister()
+	m, err := lister.Get("", name)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
 	// annotations can have keys cred and password, values []string to be considered as a part of cloud credential
 	annotations := map[string]string{}
 	if m != nil {
@@ -178,50 +195,33 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, act
 	if len(defaults) > 0 {
 		annotations["defaults"] = strings.Join(defaults, ",")
 	}
+
 	if m != nil {
-		old := machineDriverCompare{
-			builtin:            m.Spec.Builtin,
-			addCloudCredential: m.Spec.AddCloudCredential,
-			url:                m.Spec.URL,
-			uiURL:              m.Spec.UIURL,
-			checksum:           m.Spec.Checksum,
-			name:               m.Spec.DisplayName,
-			whitelist:          m.Spec.WhitelistDomains,
-			annotations:        m.Annotations,
-		}
-		new := machineDriverCompare{
-			builtin:            builtin,
-			addCloudCredential: addCloudCredential,
-			url:                url,
-			uiURL:              uiURL,
-			checksum:           checksum,
-			name:               name,
-			whitelist:          whitelist,
-			annotations:        annotations,
-		}
-		if !reflect.DeepEqual(new, old) {
+		n := m.DeepCopy()
+		n.Annotations = annotations
+		n.Spec.Active = active
+		n.Spec.Builtin = builtin
+		n.Spec.AddCloudCredential = addCloudCredential
+		n.Spec.URL = url
+		n.Spec.UIURL = uiURL
+		n.Spec.Checksum = checksum
+		n.Spec.DisplayName = name
+		n.Spec.WhitelistDomains = whitelist
+		if !reflect.DeepEqual(m, n) {
 			logrus.Infof("Updating node driver %v", name)
-			m.Spec.Builtin = builtin
-			m.Spec.AddCloudCredential = addCloudCredential
-			m.Spec.URL = url
-			m.Spec.UIURL = uiURL
-			m.Spec.Checksum = checksum
-			m.Spec.DisplayName = name
-			m.Spec.WhitelistDomains = whitelist
-			m.Annotations = annotations
-			_, err := cli.Update(m)
+			_, err := cli.Update(n)
 			return err
 		}
 		return nil
 	}
 
 	logrus.Infof("Creating node driver %v", name)
-	_, err := cli.Create(&v3.NodeDriver{
+	_, err = cli.Create(&v3.NodeDriver{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
 		},
-		Spec: v32.NodeDriverSpec{
+		Spec: v3.NodeDriverSpec{
 			Active:             active,
 			Builtin:            builtin,
 			AddCloudCredential: addCloudCredential,
