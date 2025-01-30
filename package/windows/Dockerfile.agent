@@ -2,7 +2,7 @@ ARG SERVERCORE_VERSION
 ARG ARCH=amd64
 ARG VERSION=dev
 
-FROM library/golang:1.23 as build
+FROM registry.suse.com/bci/golang:1.23 as build
 
 WORKDIR C:/app
 COPY . .
