@@ -59,7 +59,6 @@ const (
 
 // CreateAndValidateSnapshotRestore is an e2e helper that determines the engine type of the cluster, then takes a snapshot, and finally restores the cluster to the original snapshot
 func CreateAndValidateSnapshotRestore(client *rancher.Client, clusterName string, etcdRestore *Config, containerImage string) error {
-
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	if err != nil {
 		return err
@@ -145,6 +144,7 @@ func CreateAndValidateSnapshotRestore(client *rancher.Client, clusterName string
 	if err != nil {
 		return err
 	}
+
 	return err
 }
 
