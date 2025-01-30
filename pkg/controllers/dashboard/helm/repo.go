@@ -259,16 +259,7 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 	downloadTime := metav1.Now()
 	backoff := calculateBackoff(repository, retryPolicy)
 	retriable := false
-	if repoSpec.GitRepo != "" && newStatus.IndexConfigMapName == "" {
-		commit, err = git.Head(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
-		if err != nil {
-			retriable = true
-		} else {
-			newStatus.URL = repoSpec.GitRepo
-			newStatus.Branch = repoSpec.GitBranch
-			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
-		}
-	} else if repoSpec.GitRepo != "" {
+	if repoSpec.GitRepo != "" {
 		commit, err = git.Update(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
 		if err != nil {
 			retriable = true
