@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -44,6 +45,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.client = client
 
 	if r.provisioningConfig.RKE2KubernetesVersions == nil {
+		rke2Versions, err := kubernetesversions.Default(r.client, clusters.RKE2ClusterType.String(), nil)
+		require.NoError(r.T(), err)
+
+		r.provisioningConfig.RKE2KubernetesVersions = rke2Versions
+	} else if r.provisioningConfig.RKE2KubernetesVersions[0] == "all" {
 		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(r.client)
 		require.NoError(r.T(), err)
 
