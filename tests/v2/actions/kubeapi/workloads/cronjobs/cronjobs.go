@@ -8,6 +8,6 @@ import (
 // using the dynamic client.
 var CronJobGroupVersionResource = schema.GroupVersionResource{
 	Group:    "batch",
-	Version:  "v1beta1",
+	Version:  "v1",
 	Resource: "cronjobs",
 }
