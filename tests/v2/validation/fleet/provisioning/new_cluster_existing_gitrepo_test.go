@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/rancher/shepherd/pkg/namegenerator"
-	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -101,7 +100,7 @@ func (f *FleetWithProvisioningTestSuite) SetupSuite() {
 	}
 
 	enabled := true
-	var testuser = namegen.AppendRandomString("testuser-")
+	var testuser = namegenerator.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
@@ -137,7 +136,7 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 		machinePools []provisioninginput.MachinePools
 		runFlag      bool
 	}{
-		{fleet.FleetName + " " + fleetVersion, f.standardUserClient, nodeRolesDedicated, f.client.Flags.GetValue(environmentflag.Long)},
+		{"PNI " + fleet.FleetName + " " + fleetVersion, f.standardUserClient, nodeRolesDedicated, f.client.Flags.GetValue(environmentflag.Long)},
 	}
 
 	for _, tt := range tests {
@@ -170,6 +169,7 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 
 			testClusterConfig.KubernetesVersion = f.provisioningConfig.RKE2KubernetesVersions[0]
 			testClusterConfig.CNI = f.provisioningConfig.CNIs[0]
+			testClusterConfig.EnableNetworkPolicy = true
 
 			clusterObject, err := provisioning.CreateProvisioningCustomCluster(tt.client, customProvider, testClusterConfig)
 			require.NoError(f.T(), err)
@@ -185,9 +185,22 @@ func (f *FleetWithProvisioningTestSuite) TestHardenedAfterAddedGitRepo() {
 
 			err = fleet.VerifyGitRepo(adminClient, gitRepoObject.ID, status.ClusterName, clusterObject.ID)
 			require.NoError(f.T(), err)
+
+			// get the updated repo object
+			gitRepoObject, err = adminClient.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(gitRepoObject.ID)
+			require.NoError(f.T(), err)
+
+			repoStatus := &v1alpha1.GitRepoStatus{}
+			err = steveV1.ConvertToK8sType(gitRepoObject.Status, repoStatus)
+			require.NoError(f.T(), err)
+
+			err = updateNamespaceWithNewProject(tt.client, status.ClusterName, repoStatus)
+			require.NoError(f.T(), err)
+
+			err = testPNI(tt.client, status.ClusterName, repoStatus.Resources[0].Namespace, repoStatus.Resources[0].Name)
+			require.NoError(f.T(), err)
 		})
 	}
-
 }
 
 func (f *FleetWithProvisioningTestSuite) TestWindowsAfterAddedGitRepo() {
@@ -240,6 +253,7 @@ func (f *FleetWithProvisioningTestSuite) TestWindowsAfterAddedGitRepo() {
 
 			testClusterConfig.KubernetesVersion = f.provisioningConfig.RKE2KubernetesVersions[0]
 			testClusterConfig.CNI = f.provisioningConfig.CNIs[0]
+			testClusterConfig.EnableNetworkPolicy = true
 
 			clusterObject, err := provisioning.CreateProvisioningCustomCluster(tt.client, customProvider, testClusterConfig)
 			require.NoError(f.T(), err)
