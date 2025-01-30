@@ -109,6 +109,11 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 // when the Harvester feature is enabled - provided that the node driver
 // exists. If it doesn't exist, the node driver is created.
 func (h *handler) syncHarvesterNodeDriver(feat *v3.Feature) error {
+	if feat.Spec.Value == nil {
+		logrus.Debugf("feature %v contains nil value", feat.Name)
+		return nil
+	}
+
 	m, err := h.nodeDriverController.Controller().Lister().Get("", feat.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -121,7 +126,7 @@ func (h *handler) syncHarvesterNodeDriver(feat *v3.Feature) error {
 	n.Spec.Active = *feat.Spec.Value
 
 	if !reflect.DeepEqual(m, n) {
-		logrus.Infof("updaeting node driver %v", n.Name)
+		logrus.Infof("updating node driver %v", n.Name)
 		_, err = h.nodeDriverController.Update(n)
 		return err
 	}
