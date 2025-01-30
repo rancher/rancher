@@ -54,6 +54,11 @@ func (c *HardenedRKE2ClusterProvisioningTestSuite) SetupSuite() {
 	c.client = client
 
 	if c.provisioningConfig.RKE2KubernetesVersions == nil {
+		rke2Versions, err := kubernetesversions.Default(c.client, extensionscluster.RKE2ClusterType.String(), nil)
+		require.NoError(c.T(), err)
+
+		c.provisioningConfig.RKE2KubernetesVersions = rke2Versions
+	} else if c.provisioningConfig.RKE2KubernetesVersions[0] == "all" {
 		rke2Versions, err := kubernetesversions.ListRKE2AllVersions(c.client)
 		require.NoError(c.T(), err)
 

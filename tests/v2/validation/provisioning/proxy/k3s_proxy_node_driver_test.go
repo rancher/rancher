@@ -123,5 +123,6 @@ func (k *ProxyK3SProvisioningTestSuite) TestProxyK3SClusterProvisioning() {
 }
 
 func TestProxyK3SProvisioningTestSuite(t *testing.T) {
+	t.Skip("This test has been deprecated; check https://github.com/rancher/tfp-automation for updated tests")
 	suite.Run(t, new(ProxyK3SProvisioningTestSuite))
 }
