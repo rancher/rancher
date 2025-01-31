@@ -168,24 +168,6 @@ func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, erro
 	}
 }
 
-// IsNodePoolSizeValid is a helper function that checks if the machine pool cluster size is greater than or equal to 3
-func IsNodePoolSizeValid(steveClient *steveV1.Client) (bool, error) {
-	logrus.Info("Checking node pool")
-
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
-	if err != nil {
-		return false, err
-	}
-
-	nodeList, err := steveClient.SteveType("node").List(query)
-	if err != nil {
-		return false, err
-	}
-
-	return len(nodeList.Data) >= 3, err
-}
-
 // validateLoadBalancer is a helper function that verifies the cluster is able to connect to the load balancer
 func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) error {
 	logrus.Infof("Getting the node using the label [%v]", labelWorker)
