@@ -122,5 +122,6 @@ func (r *ProxyRKE2ProvisioningTestSuite) TestProxyRKE2ClusterProvisioning() {
 }
 
 func TestProxyRKE2ProvisioningTestSuite(t *testing.T) {
+	t.Skip("This test has been deprecated; check https://github.com/rancher/tfp-automation for updated tests")
 	suite.Run(t, new(ProxyRKE2ProvisioningTestSuite))
 }
