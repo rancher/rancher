@@ -147,7 +147,7 @@ func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) 
 	}
 	defer lConn.Close()
 
-	principal, groupPrincipal, err := p.loginUser(lConn, login, config, caPool)
+	principal, groupPrincipal, err := p.loginUser(lConn, login, config)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -331,7 +331,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	externalID string, scope string, config *v3.LdapConfig, caPool *x509.CertPool) (*v3.Principal, error) {
 
 	if scope != p.userScope && scope != p.groupScope {
-		return nil, fmt.Errorf("Invalid scope")
+		return nil, fmt.Errorf("invalid scope")
 	}
 
 	lConn, err := ldap.Connect(config, caPool)
@@ -380,9 +380,9 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	}
 
 	if len(result.Entries) < 1 {
-		return nil, fmt.Errorf("No identities can be retrieved")
+		return nil, fmt.Errorf("no identities can be retrieved")
 	} else if len(result.Entries) > 1 {
-		return nil, fmt.Errorf("More than one result found")
+		return nil, fmt.Errorf("more than one result found")
 	}
 
 	entry := result.Entries[0]
