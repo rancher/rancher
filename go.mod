@@ -127,7 +127,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
 	github.com/rancher/aks-operator v1.10.0
-	github.com/rancher/apiserver v0.0.0-20241009200134-5a4ecca7b988
+	github.com/rancher/apiserver v0.5.1
 	github.com/rancher/backup-restore-operator v1.2.1
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1-rc.2
@@ -135,7 +135,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.12.0-alpha.2
 	github.com/rancher/gke-operator v1.10.0
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20250123080302-9325fed68518
+	github.com/rancher/lasso v0.2.0
 	github.com/rancher/machine v0.15.0-rancher125
 	github.com/rancher/norman v0.5.1
 	github.com/rancher/rancher/pkg/client v0.0.0
