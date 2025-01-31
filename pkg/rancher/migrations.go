@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mcuadros/go-version"
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -47,6 +48,7 @@ const (
 	migrateRKEClusterState                          = "migraterkeclusterstate"
 	migrateSystemAgentVarDirToDataDirectory         = "migratesystemagentvardirtodatadirectory"
 	migrateHarvesterCloudCredentialExpirationConfig = "migrateharvestercloudcredentialexpiration"
+	rancherVersionTombstoneConfig                   = "rancherversion"
 	rancherVersionKey                               = "rancherVersion"
 	projectsCreatedKey                              = "projectsCreated"
 	namespacesAssignedKey                           = "namespacesAssigned"
@@ -57,6 +59,8 @@ const (
 	systemAgentVarDirMigratedKey                    = "systemAgentVarDirMigrated"
 	harvesterCloudCredentialExpirationMigratedKey   = "harvesterCloudCredentialExpirationMigrated"
 )
+
+var ErrTombstoneValidation = errors.New("version tombstone validation failed")
 
 func runMigrations(wranglerContext *wrangler.Context) error {
 	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
@@ -99,6 +103,14 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	return migrateRKEClusterStates(wranglerContext)
 }
 
+// runPreflightMigrations runs migrations that are required *before* dashboard controllers are allowed to start.
+func runPreflightMigrations(wranglerContext *wrangler.Context) error {
+	if err := versionTombstone(wranglerContext.Core.ConfigMap()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
 	cm, err := configMapController.Cache().Get(cattleNamespace, configMapName)
 	if err != nil && !k8serror.IsNotFound(err) {
@@ -133,6 +145,43 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 	}
 
 	return err
+}
+
+func versionTombstone(configMapController controllerv1.ConfigMapController) error {
+	cm, err := getConfigMap(configMapController, rancherVersionTombstoneConfig)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	validate := false
+
+	if rancherversion.Version == "dev" {
+		logrus.Debugf("Development environment detected, skipping tombstone validation.")
+	} else if !semver.IsValid(rancherversion.Version) {
+		logrus.Errorf("Rancher version %s is not semver compliant, skipping tombstone validation.", rancherversion.Version)
+	} else if semver.Prerelease(rancherversion.Version) != "" {
+		logrus.Infof("Rancher version %s detected as prerelease, skipping tombstone validation.", rancherversion.Version)
+	} else {
+		validate = true
+	}
+
+	lastVersion := cm.Data[rancherVersionKey]
+	if lastVersion != "" && validate {
+		if !semver.IsValid(lastVersion) {
+			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation.", lastVersion)
+			// Hotfixes count as previous versions, and alpha/rc versions are assumed to be at your own risk.
+			// If users want to downgrade to consume a hotfix, they should not be prevented.
+		} else if semver.Prerelease(lastVersion) != "" {
+			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation.", rancherversion.Version)
+		} else if semver.Compare(lastVersion, rancherversion.Version) == 1 {
+			logrus.Errorf("Detected Rancher downgrade from %s to %s. In order to perform a rollback of Rancher, use the Rancher Backup Restore Operator. If a suitable backup is unavailable, version tombstone validation can be temporarily disabled by deleting the %s config map in the cattle-system namespace.",
+				lastVersion, rancherversion.Version, rancherVersionTombstoneConfig)
+			return ErrTombstoneValidation
+		}
+	}
+
+	cm.Data[rancherVersionKey] = rancherversion.Version
+	return createOrUpdateConfigMap(configMapController, cm)
 }
 
 // forceUpgradeLogout will delete all dashboard tokens forcing a logout.  This is useful when there is a major frontend
