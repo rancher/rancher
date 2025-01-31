@@ -4,7 +4,7 @@ go 1.23.0
 
 toolchain go1.23.5
 
-replace github.com/rancher/norman => github.com/bigkevmcd/norman v0.0.0-20250130143538-2457cc1a1356
+replace github.com/rancher/norman => github.com/bigkevmcd/norman v0.0.0-20250131134800-5f1cd0ca4937
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
