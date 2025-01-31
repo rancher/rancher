@@ -187,6 +187,26 @@ func (p *rotatingSNIProvider) Run(ctx context.Context) {
 	logrus.Info("starting extension api cert rotator")
 	defer logrus.Info("stopping extension api cert rotator")
 
+	p.secrets.OnChange(ctx, "imperative-api-cert-rotator", func(key string, secret *corev1.Secret) (*corev1.Secret, error) {
+		p.certMu.Lock()
+		defer p.certMu.Unlock()
+
+		certData, ok := secret.Data[SecretFieldNameCert]
+		if !ok {
+			return nil, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameCert)
+		}
+
+		keyData, ok := secret.Data[SecretFieldNameKey]
+		if !ok {
+			return nil, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameKey)
+		}
+
+		p.cert = certData
+		p.key = keyData
+
+		return nil, nil
+	})
+
 	go func() {
 		for {
 			select {
