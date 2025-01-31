@@ -6,6 +6,7 @@ import (
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	extcore "github.com/rancher/steve/pkg/ext"
@@ -90,34 +91,51 @@ func (uas *Store) Create(ctx context.Context,
 	// retrieving useractivity object from raw data
 	objUserActivity, ok := obj.(*ext.UserActivity)
 	if !ok {
-
+		return nil, fmt.Errorf("error casting runtime object to UserActivity")
 	}
 
 	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenId, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token: %v", objUserActivity.Spec.TokenId)
+		return nil, fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenId, err)
 	}
 
 	user, err := uas.checker.UserName(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("no user found: %v", err)
 	}
+
+	lastActivity := metav1.Now()
+	// TODO: replace '10' with the value of auth-user-session-ttl-minutes
+	return uas.create(ctx, objUserActivity, token, user, lastActivity, 10)
+}
+
+// create sets the LastActivity and CurrentTimeout fields on the UserActivity object
+// provided by the user within the request.
+func (uas *Store) create(_ context.Context,
+	userActivity *ext.UserActivity,
+	token *v3Legacy.Token,
+	user string,
+	lastActivity metav1.Time,
+	authUserSessionTtlMinutes int) (*ext.UserActivity, error) {
+	if token.UserID != userActivity.Spec.TokenId {
+		return nil, fmt.Errorf("token from request and token from session mismatch")
+	}
 	// verifies the token has label with user which made the request.
 	if token.Labels[tokenUserId] == user {
 		// once validated the request, we can define the lastActivity time.
-		lastActivity := metav1.Now()
-		// TODO: replace '10' with the value of auth-user-session-ttl-minutes
 		newIdleTimeout := metav1.Time{
-			Time: lastActivity.Local().Add(time.Minute * time.Duration(10)),
+			Time: lastActivity.Local().Add(time.Minute * time.Duration(authUserSessionTtlMinutes)).UTC(),
 		}
 
 		token.LastIdleTimeout = newIdleTimeout
-		uas.tokenController.Update(token)
+		userActivity.Status.LastActivity = lastActivity.String()
+		userActivity.Status.CurrentTimeout = newIdleTimeout.String()
+		_, err := uas.tokenController.Update(token)
+		if err != nil {
+			return nil, fmt.Errorf("error updating token: %v", err)
+		}
 
-		objUserActivity.Status.LastActivity = lastActivity.String()
-		objUserActivity.Status.CurrentTimeout = newIdleTimeout.String()
-
-		return objUserActivity, nil
+		return userActivity, nil
 	}
 
 	return nil, fmt.Errorf("unable to create useractivity")
