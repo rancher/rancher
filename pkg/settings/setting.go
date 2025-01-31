@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -40,6 +41,14 @@ func init() {
 			Name: "kube-system",
 		},
 	}
+}
+
+// Returns true if the disallowed entries indicate that the named NS should not
+// be written to.
+func DisallowedNamespace(name string) bool {
+	return slices.ContainsFunc(lifecycle.DisallowedEntries, func(de lifecycle.DisallowEntry) bool {
+		return strings.HasPrefix(name, de.Name) && de.Kind == "Namespace"
+	})
 }
 
 var (

@@ -16,8 +16,8 @@ import (
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	projectpkg "github.com/rancher/rancher/pkg/project"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -56,7 +56,7 @@ type nsLifecycle struct {
 }
 
 func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
-	if isGKENamespace(obj) {
+	if settings.DisallowedNamespace(obj.Name) {
 		return obj, nil
 	}
 
@@ -516,10 +516,6 @@ func crByNS(obj interface{}) ([]string, error) {
 }
 
 func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager) {
-	if isGKENamespace(namespace) {
-		return
-	}
-
 	if _, ok := namespace.Annotations[projectIDAnnotation]; ok {
 		for i := 0; i < 10; i++ {
 			time.Sleep(time.Millisecond * 500)
@@ -618,8 +614,4 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 			logrus.Errorf("async cleanup of RBAC for namespace %s failed: %v", namespaceName, err)
 		}
 	}()
-}
-
-func isGKENamespace(ns *corev1.Namespace) bool {
-	return strings.HasPrefix(ns.Name, "gke-")
 }
