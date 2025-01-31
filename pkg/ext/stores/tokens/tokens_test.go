@@ -182,12 +182,14 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("failed to get secret, arbitrary error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, nil)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().
 			Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(nil, someerror)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, nil)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -198,13 +200,16 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("failed to get secret, not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, nil)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().
 			Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, nil)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
+
 		assert.False(t, ok)
 		assert.Equal(t, apierrors.NewNotFound(schema.GroupResource{}, ""), err)
 	})
@@ -212,15 +217,16 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("user info missing from context", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
+		auth.EXPECT().UserName(gomock.Any()).Return("", invalidContext)
 		secrets.EXPECT().
 			Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 
-		auth.EXPECT().UserName(gomock.Any()).Return("", invalidContext)
-
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -230,15 +236,17 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("not owned, no permission, not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().
 			Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdl/ksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -248,9 +256,10 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().
 			Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(&properSecret, nil)
@@ -261,6 +270,7 @@ func Test_Store_Delete(t *testing.T) {
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil).Times(2)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.True(t, ok)
@@ -275,15 +285,17 @@ func Test_Store_Get(t *testing.T) {
 	t.Run("not owned, no permission, not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().
 			Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdl/ksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Equal(t, bogusNotFoundError, err)
@@ -293,15 +305,17 @@ func Test_Store_Get(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().
 			Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
@@ -316,11 +330,13 @@ func Test_Store_Update(t *testing.T) {
 	t.Run("not owned, no permission, not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdl/ksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.update(context.TODO(), &ext.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "bogus",
@@ -334,10 +350,11 @@ func Test_Store_Update(t *testing.T) {
 	t.Run("owned", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		timer := NewMocktimeHandler(ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, timer, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil)
 
 		secrets.EXPECT().
@@ -359,6 +376,7 @@ func Test_Store_Update(t *testing.T) {
 		modified := properToken.DeepCopy()
 		modified.Spec.TTL = 2000
 
+		store := New(nil, secrets, users, nil, nil, timer, nil, auth)
 		tok, err := store.update(context.TODO(), modified, &metav1.UpdateOptions{})
 
 		// set the expected status changes
@@ -379,14 +397,16 @@ func Test_Store_Watch(t *testing.T) {
 	t.Run("backend watch creation error closes watch channel", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(nil, someerror)
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -397,9 +417,10 @@ func Test_Store_Watch(t *testing.T) {
 	t.Run("context cancellation does not close watch channel", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
 
+		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(NewWatcher(), nil)
 
@@ -407,6 +428,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		todo, cancel := context.WithCancel(context.TODO())
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -425,8 +447,10 @@ func Test_Store_Watch(t *testing.T) {
 	t.Run("closing backend channel does not close watch channel", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
+
+		users.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcher()
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
@@ -434,6 +458,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -452,8 +477,10 @@ func Test_Store_Watch(t *testing.T) {
 	t.Run("event for non-secret is ignored", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
+
+		users.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
@@ -461,6 +488,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -479,8 +507,10 @@ func Test_Store_Watch(t *testing.T) {
 	t.Run("event for broken secret is ignored", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
+
+		users.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &corev1.Secret{}})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
@@ -488,6 +518,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -506,8 +537,10 @@ func Test_Store_Watch(t *testing.T) {
 	t.Run("event for non-owned secret is ignored", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
+
+		users.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
@@ -515,6 +548,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdl/ksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -533,8 +567,10 @@ func Test_Store_Watch(t *testing.T) {
 	t.Run("receive event for owned secret", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
-		store := New(nil, secrets, nil, nil, nil, nil, nil, auth)
+
+		users.EXPECT().Cache().Return(nil)
 
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: "update"})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
@@ -542,6 +578,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().UserName(gomock.Any()).Return("lkajdlksjlkds", nil)
 
+		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -573,7 +610,7 @@ func Test_Store_Create(t *testing.T) {
 		storeSetup func(                 // configure store backend clients
 			space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-			users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+			users *fake.MockNonNamespacedCacheInterface[*v3.User],
 			timer *MocktimeHandler,
 			hasher *MockhashHandler,
 			auth *MockauthHandler)
@@ -586,7 +623,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -602,7 +639,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -618,7 +655,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -641,7 +678,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -670,7 +707,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -699,7 +736,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -729,7 +766,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -742,7 +779,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(nil, someerror)
 			},
 		},
@@ -761,7 +798,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -774,7 +811,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(nil, nil)
 			},
 		},
@@ -793,7 +830,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -806,7 +843,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(&v3.User{
 						Enabled: &isfalse,
 					}, nil)
@@ -827,7 +864,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -844,7 +881,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
 			},
 		},
@@ -863,7 +900,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -879,7 +916,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
 
 				hasher.EXPECT().MakeAndHashSecret().
@@ -901,7 +938,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -917,9 +954,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				// principal local://world
-
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
@@ -951,7 +986,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -967,9 +1002,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				// principal local://world
-
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
@@ -1001,7 +1034,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -1017,9 +1050,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				// principal local://world
-
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
@@ -1059,7 +1090,7 @@ func Test_Store_Create(t *testing.T) {
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -1075,9 +1106,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets.EXPECT().Get("cattle-tokens", "hello", gomock.Any()).
 					Return(nil, someerror)
 
-				// principal local://world
-
-				users.EXPECT().Get("world", gomock.Any()).
+				users.EXPECT().Get("world").
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
@@ -1111,12 +1140,16 @@ func Test_Store_Create(t *testing.T) {
 			// assemble and configure a store from mock clients ...
 			space := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 			timer := NewMocktimeHandler(ctrl)
 			hasher := NewMockhashHandler(ctrl)
 			auth := NewMockauthHandler(ctrl)
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+
 			store := New(space, secrets, users, nil, nil, timer, hasher, auth)
-			test.storeSetup(space, secrets, users, timer, hasher, auth)
+			test.storeSetup(space, secrets, ucache, timer, hasher, auth)
 
 			// perform test and validate results
 			tok, err := store.create(context.TODO(), test.tok, test.opts)
@@ -1230,7 +1263,11 @@ func Test_SystemStore_List(t *testing.T) {
 
 			// assemble and configure store from mock clients ...
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-			store := NewSystem(nil, secrets, nil, nil, nil, nil, nil)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+
+			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
 			test.storeSetup(secrets)
 
 			// perform test and validate results
@@ -1297,7 +1334,11 @@ func Test_SystemStore_Delete(t *testing.T) {
 
 			// assemble and configure store from mock clients ...
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-			store := NewSystem(nil, secrets, nil, nil, nil, nil, nil)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+
+			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
 			test.storeSetup(secrets)
 
 			// perform test and validate results
@@ -1317,7 +1358,11 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 
 		// assemble and configure store from mock clients ...
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		store := NewSystem(nil, secrets, nil, nil, nil, nil, nil)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
 
 		var patchData []byte
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
@@ -1342,7 +1387,11 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 
 		// assemble and configure store from mock clients ...
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		store := NewSystem(nil, secrets, nil, nil, nil, nil, nil)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
 
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).
@@ -1865,10 +1914,15 @@ func Test_SystemStore_Update(t *testing.T) {
 
 			// assemble and configure store from mock clients ...
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+
 			timer := NewMocktimeHandler(ctrl)
 			hasher := NewMockhashHandler(ctrl)
 			auth := NewMockauthHandler(ctrl)
-			store := NewSystem(nil, secrets, nil, nil, timer, hasher, auth)
+
+			store := NewSystem(nil, secrets, users, nil, timer, hasher, auth)
 			test.storeSetup(secrets, timer, hasher, auth)
 
 			// perform test and validate results
@@ -2091,7 +2145,11 @@ func Test_SystemStore_Get(t *testing.T) {
 
 			// assemble and configure store from mock clients ...
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-			store := NewSystem(nil, secrets, nil, nil, nil, nil, nil)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+
+			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
 			test.storeSetup(secrets)
 
 			// perform test and validate results
