@@ -102,7 +102,7 @@ type SystemStore struct {
 	namespaceClient   v1.NamespaceClient // access to namespaces
 	initialized       bool               // flag is set when this store ensured presence of the backing namespace
 	secretClient      v1.SecretClient
-	userClient        v3.UserClient
+	userClient        v3.UserCache
 	normanTokenClient v3.TokenCache // ProviderAndPrincipal extraction
 
 	authorizer authorizer.Authorizer
@@ -148,7 +148,7 @@ func New(
 		SystemStore: SystemStore{
 			namespaceClient:   namespaceClient,
 			secretClient:      secretClient,
-			userClient:        userClient,
+			userClient:        userClient.Cache(),
 			normanTokenClient: tokenClient,
 			authorizer:        authorizer,
 			timer:             timer,
@@ -196,7 +196,7 @@ func NewSystem(
 	tokenStore := SystemStore{
 		namespaceClient:   namespaceClient,
 		secretClient:      secretClient,
-		userClient:        userClient,
+		userClient:        userClient.Cache(),
 		normanTokenClient: tokenClient,
 		timer:             timer,
 		hasher:            hasher,
@@ -450,7 +450,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// `access_token` data managed by OIDC-based auth providers. The actual primary storage for
 	// this is actually a regular k8s Secret associated with the User.
 
-	user, err := t.userClient.Get(token.Spec.UserID, metav1.GetOptions{})
+	user, err := t.userClient.Get(token.Spec.UserID)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve user %s: %w",
 			token.Spec.UserID, err))
