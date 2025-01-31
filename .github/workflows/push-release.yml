@@ -725,7 +725,8 @@ jobs:
           ARTIFACTS_DISTRIBUTION_ID: EUK3RJTBZG1QG
         uses: ./.github/actions/build-artifacts-index
   docker-image-digests:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
+    # Only on tags that don't contain -hotfix
+    if: ${{ github.event_name == 'push' && contains(github.ref, 'tags/') && !contains(github.ref_name, '-hotfix') }}
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:latest
     needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
@@ -746,6 +747,7 @@ jobs:
         shell: bash
         run: zypper install -y aws-cli wget jq awk
       - name: install gh
+        if: ${{ !contains(github.ref_name, '-security') }}
         shell: bash
         run: |
           mkdir -p /tmp/gh
@@ -777,18 +779,21 @@ jobs:
           ARTIFACTS_TYPE: "digests"
         run: scripts/artifacts-hashes.sh
       - name: Read App Secrets
+        if: ${{ !contains(github.ref_name, '-security') }}
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
       - name: Create App Token
+        if: ${{ !contains(github.ref_name, '-security') }}
         uses: actions/create-github-app-token@v1
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
           private-key: ${{ env.PRIVATE_KEY }}
       - name: Upload digests
+        if: ${{ !contains(github.ref_name, '-security') }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -797,3 +802,26 @@ jobs:
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2019_FILE" --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2022_FILE" --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
+      - name: Load Secrets from Vault
+        if: contains(github.ref_name, '-security')
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
+      - name: Upload artifacts to bucket
+        if: contains(github.ref_name, '-security')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }}
+        run: |
+          aws s3 cp "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE" s3://prime-artifacts/rancher/${{ env.TAG }}/
+          aws s3 cp "$ARTIFACTS_BASE_DIR/$LINUX_ARM64_FILE" s3://prime-artifacts/rancher/${{ env.TAG }}/
+          aws s3 cp "$ARTIFACTS_BASE_DIR/$WINDOWS_2019_FILE" s3://prime-artifacts/rancher/${{ env.TAG }}/
+          aws s3 cp "$ARTIFACTS_BASE_DIR/$WINDOWS_2022_FILE" s3://prime-artifacts/rancher/${{ env.TAG }}/
+          aws s3 cp "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" s3://prime-artifacts/rancher/${{ env.TAG }}/
+      - name: Build artifacts index
+        if: contains(github.ref_name, '-security')
+        env:
+          ARTIFACTS_DISTRIBUTION_ID: EUK3RJTBZG1QG
+        uses: ./.github/actions/build-artifacts-index
