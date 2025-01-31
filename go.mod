@@ -4,8 +4,6 @@ go 1.23.0
 
 toolchain go1.23.5
 
-replace github.com/rancher/norman => github.com/bigkevmcd/norman v0.0.0-20250131134800-5f1cd0ca4937
-
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
@@ -448,3 +446,5 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+replace github.com/rancher/norman => github.com/bigkevmcd/norman v0.0.0-20250131135843-af5d662d96fb
