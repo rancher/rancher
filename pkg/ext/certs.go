@@ -254,10 +254,15 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 	}
 
 	p.certMu.Lock()
-	defer p.certMu.Unlock()
 
 	p.cert = cert
 	p.key = key
+
+	defer p.certMu.Unlock()
+
+	for _, listener := range p.listeners {
+		listener.Enqueue()
+	}
 
 	return nil
 }
