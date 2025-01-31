@@ -17,6 +17,7 @@ import (
 var (
 	capiCRDs = map[string]bool{
 		"Machine":            true,
+		"MachinePool":        true,
 		"MachineHealthCheck": true,
 		"MachineDeployment":  true,
 		"MachineSet":         true,
