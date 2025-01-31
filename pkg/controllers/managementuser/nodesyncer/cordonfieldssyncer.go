@@ -11,7 +11,6 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubectl"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/sirupsen/logrus"
@@ -29,7 +28,7 @@ const (
 var nodeMapLock = sync.Mutex{}
 var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within", "global timeout reached"}
 
-func (m *nodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) syncCordonFields(key string, obj *v32.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil, nil
 	}
@@ -67,7 +66,7 @@ func (m *nodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object
 	return obj, err
 }
 
-func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) {
+func (d *nodeDrain) drainNode(key string, obj *v32.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil, nil
 	}
@@ -112,7 +111,7 @@ func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) 
 	return nil, nil
 }
 
-func (d *nodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, originalErr error, kubeErr error), originalErr error, kubeErr error) (*v3.Node, error) {
+func (d *nodeDrain) updateNode(node *v32.Node, updateFunc func(node *v32.Node, originalErr error, kubeErr error), originalErr error, kubeErr error) (*v32.Node, error) {
 	updatedObj, err := d.machines.Update(node)
 	if err != nil && errors.IsConflict(err) {
 		// retrying twelve times, if conflict error still exists, give up
@@ -135,7 +134,7 @@ func (d *nodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, ori
 	return updatedObj, err
 }
 
-func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, nodeName string, cancel context.CancelFunc) {
+func (d *nodeDrain) drain(ctx context.Context, obj *v32.Node, nodeName string, cancel context.CancelFunc) {
 	defer deleteFromContextMap(d.nodesToContext, obj.Name)
 
 	for {
@@ -194,7 +193,7 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, nodeName string, ca
 			}
 		}
 		if !stopped {
-			nodeCopy := updatedObj.(*v3.Node).DeepCopy()
+			nodeCopy := updatedObj.(*v32.Node).DeepCopy()
 			setConditionComplete(nodeCopy, err, kubeErr)
 			_, updateErr := d.updateNode(nodeCopy, setConditionComplete, err, kubeErr)
 			if kubeErr != nil || updateErr != nil {
@@ -212,7 +211,7 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, nodeName string, ca
 	}
 }
 
-func (d *nodeDrain) resetDesiredNodeUnschedulable(obj *v3.Node) error {
+func (d *nodeDrain) resetDesiredNodeUnschedulable(obj *v32.Node) error {
 	nodeCopy := obj.DeepCopy()
 	removeDrainCondition(nodeCopy)
 	nodeCopy.Spec.DesiredNodeUnschedulable = ""
@@ -275,7 +274,7 @@ func filterErrorMsg(msg string, nodeName string) string {
 	return strings.Join(upd, "\n")
 }
 
-func removeDrainCondition(obj *v3.Node) {
+func removeDrainCondition(obj *v32.Node) {
 	exists := false
 	for _, condition := range obj.Status.Conditions {
 		if condition.Type == "Drained" {
@@ -314,13 +313,13 @@ func ignoreErr(msg string) (bool, bool) {
 	return false, false
 }
 
-func setConditionDraining(node *v3.Node, err error, kubeErr error) {
+func setConditionDraining(node *v32.Node, err error, kubeErr error) {
 	v32.NodeConditionDrained.Unknown(node)
 	v32.NodeConditionDrained.Reason(node, "")
 	v32.NodeConditionDrained.Message(node, "")
 }
 
-func setConditionComplete(node *v3.Node, err error, kubeErr error) {
+func setConditionComplete(node *v32.Node, err error, kubeErr error) {
 	if err == nil {
 		v32.NodeConditionDrained.True(node)
 	} else {
