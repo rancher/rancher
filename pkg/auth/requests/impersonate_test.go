@@ -159,7 +159,9 @@ func TestAuthenticateImpersonation(t *testing.T) {
 					},
 					UserID: "impUser",
 				}, nil)
-				store := exttokenstore.NewSystem(nil, nil, nil, cache, nil, nil, nil)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, nil, users, cache, nil, nil, nil)
 				return store
 			},
 			wantUserInfo: &user.DefaultInfo{
@@ -204,6 +206,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				cache.EXPECT().
 					Get("kubeconfig-u-user5zfww").
 					Return(nil, errors.New("unexpected error"))
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				secrets.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww", gomock.Any()).
@@ -228,7 +232,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
 						},
 					}, nil)
-				store := exttokenstore.NewSystem(nil, secrets, nil, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantUserInfo: &user.DefaultInfo{
@@ -367,7 +371,9 @@ func TestAuthenticateImpersonation(t *testing.T) {
 					},
 					UserID: "someoneelse",
 				}, nil)
-				store := exttokenstore.NewSystem(nil, nil, nil, cache, nil, nil, nil)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, nil, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "request token user does not match impersonation user",
@@ -425,7 +431,9 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
 						},
 					}, nil)
-				store := exttokenstore.NewSystem(nil, secrets, nil, cache, nil, nil, nil)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "request token user does not match impersonation user",
@@ -457,7 +465,9 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			extTokenStore: func() *exttokenstore.SystemStore {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().Get(gomock.Any()).Times(0)
-				store := exttokenstore.NewSystem(nil, nil, nil, cache, nil, nil, nil)
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
+				store := exttokenstore.NewSystem(nil, nil, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "multiple requesttokenid values",
@@ -582,11 +592,13 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				// Note: Have to fail both norman and ext sides of the token fetch
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().Get("kubeconfig-u-user5zfww").Return(nil, errors.New("unexpected error"))
+				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				secrets.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww", gomock.Any()).
 					Return(nil, errors.New("unexpected error"))
-				store := exttokenstore.NewSystem(nil, secrets, nil, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "error getting request token",
