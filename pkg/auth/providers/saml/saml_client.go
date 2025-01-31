@@ -316,8 +316,11 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Debugf("SAML [FinalizeSamlLogout]: response validation failed: %v", err)
 		if parseErr, ok := err.(*saml.InvalidResponseError); ok {
-			log.Debugf("SAML RESPONSE: ===\n%s\n===\nSAML NOW: %s\nSAML ERROR: %s",
-				parseErr.Response, parseErr.Now, parseErr.PrivateErr)
+			// Note: If access to the response itself is needed (debugging)
+			// just add `parseErr.Response` to the log statement.
+
+			log.Debugf("SAML NOW: %s\nSAML ERROR: %s",
+				parseErr.Now, parseErr.PrivateErr)
 		}
 
 		rURL, errParse := url.Parse(redirectURL)
