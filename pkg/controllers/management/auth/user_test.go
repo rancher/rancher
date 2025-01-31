@@ -403,8 +403,10 @@ func TestUpdated(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			secrets := wranglerfake.NewMockControllerInterface[*v1.Secret, *v1.SecretList](ctrl)
+			users := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
 			timer := exttokens.NewMocktimeHandler(ctrl)
-			store := exttokens.NewSystem(nil, secrets, nil, nil, timer, nil, nil)
+			store := exttokens.NewSystem(nil, secrets, users, nil, timer, nil, nil)
 			ul.extTokenStore = store
 
 			tt.mockSetup(secrets, timer)
