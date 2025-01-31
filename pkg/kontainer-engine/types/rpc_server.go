@@ -150,7 +150,6 @@ func (s *GrpcServer) ServeOrDie(listenAddr string) {
 	if err := s.grpcServer.Serve(listen); err != nil {
 		logrus.Fatalf("%v", err)
 	}
-	return
 }
 
 func (s *GrpcServer) Stop() {
