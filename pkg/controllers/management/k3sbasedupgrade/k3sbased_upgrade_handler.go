@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -217,14 +218,17 @@ func (h *handler) nodesNeedUpgrade(cluster *mgmtv3.Cluster, version string) (boo
 		return false, err
 	}
 	for _, node := range v3NodeList {
-		isNewer, err := nodesyncer.IsNewerVersion(node.Status.InternalNodeStatus.NodeInfo.KubeletVersion, version)
-		if err != nil {
-			return false, err
-		}
-		if isNewer {
-			logrus.Debugf("[k3s-based-upgrader] cluster [%s] version [%s] is newer than observed node [%s] version [%s]",
-				cluster.Name, version, node.Name, node.Status.InternalNodeStatus.NodeInfo.KubeletVersion)
-			return true, nil
+		// if node is windows, skip upgrade check
+		if os, ok := node.Status.NodeLabels[corev1.LabelOSStable]; ok && os != "windows" {
+			isNewer, err := nodesyncer.IsNewerVersion(node.Status.InternalNodeStatus.NodeInfo.KubeletVersion, version)
+			if err != nil {
+				return false, err
+			}
+			if isNewer {
+				logrus.Debugf("[k3s-based-upgrader] cluster [%s] version [%s] is newer than observed node [%s] version [%s]",
+					cluster.Name, version, node.Name, node.Status.InternalNodeStatus.NodeInfo.KubeletVersion)
+				return true, nil
+			}
 		}
 	}
 	return false, nil

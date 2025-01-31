@@ -181,7 +181,12 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error)
 		return nil, err
 	} else if ok {
 		node = node.DeepCopy()
-		node.Labels[UpgradeEnabledLabel] = "true"
+		// only linux nodes are supported in imported clusters
+		if node.Labels[corev1.LabelOSStable] == "linux" {
+			node.Labels[UpgradeEnabledLabel] = "true"
+		} else {
+			node.Labels[UpgradeEnabledLabel] = "false"
+		}
 		return n.nodesSyncer.nodeClient.Update(node)
 	}
 
