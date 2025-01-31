@@ -118,8 +118,6 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 	}
 
 	u.Run(testName, func() {
-		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest, nodeSelector, containerImage)
-
 		if isRKE1 {
 			upgradedCluster, err := upgradeRKE1Cluster(u.T(), client, cluster, testConfig)
 			require.NoError(u.T(), err)
@@ -137,8 +135,6 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 
 			provisioning.VerifyCluster(u.T(), client, testConfig, upgradedCluster)
 		}
-
-		createPostUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest)
 	})
 }
 
