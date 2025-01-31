@@ -56,6 +56,10 @@ type nsLifecycle struct {
 }
 
 func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
+	if isGKENamespace(obj) {
+		return obj, nil
+	}
+
 	obj, err := n.resourceQuotaInit(obj)
 	if err != nil {
 		return obj, err
@@ -94,9 +98,6 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
-	if isGKENamespace(obj) {
-		return false, nil
-	}
 
 	// add fleet namespace to system project
 	if IsFleetNamespace(obj) &&
