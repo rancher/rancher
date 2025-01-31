@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -44,6 +45,11 @@ func (k *K3SPSACTTestSuite) SetupSuite() {
 	k.client = client
 
 	if k.provisioningConfig.K3SKubernetesVersions == nil {
+		k3sVersions, err := kubernetesversions.Default(k.client, clusters.K3SClusterType.String(), nil)
+		require.NoError(k.T(), err)
+
+		k.provisioningConfig.K3SKubernetesVersions = k3sVersions
+	} else if k.provisioningConfig.K3SKubernetesVersions[0] == "all" {
 		k3sVersions, err := kubernetesversions.ListK3SAllVersions(k.client)
 		require.NoError(k.T(), err)
 

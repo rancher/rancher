@@ -37,7 +37,7 @@ const (
 	privateKeySSHKeyRegExPattern = `-----BEGIN RSA PRIVATE KEY-{3,}\n([\s\S]*?)\n-{3,}END RSA PRIVATE KEY-----`
 )
 
-// rotateCerts rotates the certificates in a cluster
+// rotateCerts rotates the certificates in a RKE2/K3S downstream cluster.
 func rotateCerts(client *rancher.Client, clusterName string) error {
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	if err != nil {
@@ -172,6 +172,7 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 	return nil
 }
 
+// rotateRKE1Certs rotates the certificates in a RKE1 downstream cluster.
 func rotateRKE1Certs(client *rancher.Client, clusterName string) error {
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	if err != nil {
@@ -318,8 +319,9 @@ func getCertificatesFromV3Node(client *rancher.Client, v3Node *management.Node) 
 		"kube-apiserver-proxy-client",
 		"$(find /etc/kubernetes/ssl -name 'kube-etcd-*' | grep -v \"key\")",
 		"kube-controller-manager",
-		"kube-node",
-		"kube-proxy",
+		// Due to GH issue https://github.com/rancher/rancher/issues/44993, kube-node and kube-proxy are commented out.
+		//"kube-node",
+		//"kube-proxy",
 		"kube-scheduler",
 	}
 

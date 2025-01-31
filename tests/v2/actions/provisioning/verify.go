@@ -60,12 +60,10 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 		FieldSelector:  "metadata.name=" + cluster.ID,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
-	reports.TimeoutRKEReport(cluster, err)
 	require.NoError(t, err)
 
 	checkFunc := shepherdclusters.IsHostedProvisioningClusterReady
 	err = wait.WatchWait(watchInterface, checkFunc)
-	reports.TimeoutRKEReport(cluster, err)
 	require.NoError(t, err)
 
 	assert.Equal(t, clustersConfig.KubernetesVersion, cluster.RancherKubernetesEngineConfig.Version)
