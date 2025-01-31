@@ -211,14 +211,14 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"clusterName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ClusterName is the cluster that the token is scoped to. If empty, the token can be used for all clusters.",
+							Description: "ClusterName is the cluster that the token is scoped to. When empty, the default, the token can be used for all clusters.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"ttl": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TTL is the time-to-live of the token, in milliseconds. The default of 0 expands to 30 days.",
+							Description: "TTL is the time-to-live of the token, in milliseconds. The default of 0 is treated as 30 days.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",
@@ -226,14 +226,14 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"enabled": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Enabled indicates an active token.",
+							Description: "Enabled indicates an active token. The `null` state maps to `true`, making that the default.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind hold the kind of token. The value \"session\" is for login/session tokens. Any other value (including the empty string) stands for some kind of derived token.",
+							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",

@@ -27,19 +27,21 @@ type TokenSpec struct {
 	// +optional
 	Description string `json:"description, omitempty"`
 	// ClusterName is the cluster that the token is scoped to.
-	// If empty, the token can be used for all clusters.
+	// When empty, the default, the token can be used for all clusters.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
 	// TTL is the time-to-live of the token, in milliseconds.
-	// The default of 0 expands to 30 days.
+	// The default of 0 is treated as 30 days.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token.
+	// The `null` state maps to `true`, making that the default.
 	// +optional
-	Enabled bool `json:"enabled,omitempty"`
-	// Kind hold the kind of token. The value "session" is for login/session
-	// tokens. Any other value (including the empty string) stands for some
-	// kind of derived token.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Kind describes the nature of the token. The value "session"
+	// indicates a login/session token. Any other value, including
+	// the empty string, which is the default, stands for some kind
+	// of derived token.
 	// +optional
 	Kind string `json:"kind"`
 }
