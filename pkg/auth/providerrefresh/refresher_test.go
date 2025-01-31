@@ -194,8 +194,7 @@ func Test_refreshAttributes(t *testing.T) {
 	}
 
 	eTokenSetupEmpty := func(
-		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-		users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 		secrets.EXPECT().
 			List("cattle-tokens", gomock.Any()).
 			Return(&corev1.SecretList{}, nil).
@@ -203,8 +202,7 @@ func Test_refreshAttributes(t *testing.T) {
 	}
 
 	eTokenSetupLoginLocal := func(
-		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-		users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 		secrets.EXPECT().
 			List("cattle-tokens", gomock.Any()).
 			Return(&corev1.SecretList{
@@ -216,8 +214,7 @@ func Test_refreshAttributes(t *testing.T) {
 	}
 
 	eTokenSetupDerivedLocal := func(
-		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-		users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 		secrets.EXPECT().
 			List("cattle-tokens", gomock.Any()).
 			Return(&corev1.SecretList{
@@ -233,8 +230,7 @@ func Test_refreshAttributes(t *testing.T) {
 	}
 
 	eTokenSetupLocal := func(
-		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-		users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 		secrets.EXPECT().
 			List("cattle-tokens", gomock.Any()).
 			Return(&corev1.SecretList{
@@ -255,8 +251,7 @@ func Test_refreshAttributes(t *testing.T) {
 	}
 
 	eTokenSetupDerivedShibboleth := func(
-		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-		users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 		secrets.EXPECT().
 			List("cattle-tokens", gomock.Any()).
 			Return(&corev1.SecretList{
@@ -282,9 +277,7 @@ func Test_refreshAttributes(t *testing.T) {
 		enabled               bool
 		deleted               bool
 		want                  *v3.UserAttribute // result expected from refreshAttributes
-		eTokenSetup           func(
-			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-			users *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList])
+		eTokenSetup           func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList])
 	}{
 		{
 			name:        "local user no tokens",
@@ -456,6 +449,7 @@ func Test_refreshAttributes(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
 
 			// standard capture of delete and update events. See
 			// also the `tokens` interface used by the refresher
@@ -475,7 +469,7 @@ func Test_refreshAttributes(t *testing.T) {
 
 			// additional ext token setup
 			if tt.eTokenSetup != nil {
-				tt.eTokenSetup(secrets, users)
+				tt.eTokenSetup(secrets)
 			}
 
 			r := &refresher{
