@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"sync"
 	"time"
 
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
@@ -21,6 +20,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/util/keyutil"
 	netutils "k8s.io/utils/net"
@@ -32,8 +34,10 @@ const (
 	SecretFieldNameCert = "cert"
 	SecretFieldNameKey  = "key"
 
-	// certCheckInterval = time.Hour
-	certCheckInterval = time.Minute
+	SecretLabelProvider = "provider"
+
+	certCheckInterval        = time.Hour
+	maxRemainingCertLifetime = time.Hour
 )
 
 // GenerateSelfSignedCertKey generates a self-signed certificate.
@@ -142,9 +146,8 @@ type rotatingSNIProvider struct {
 
 	expiresAfter time.Duration
 
-	certMu sync.RWMutex
-	cert   []byte
-	key    []byte
+	cert []byte
+	key  []byte
 
 	secrets wranglercorev1.SecretController
 }
@@ -177,50 +180,50 @@ func (p *rotatingSNIProvider) Name() string {
 }
 
 func (p *rotatingSNIProvider) CurrentCertKeyContent() ([]byte, []byte) {
-	p.certMu.RLock()
-	defer p.certMu.RUnlock()
-
 	return bytes.Clone(p.cert), bytes.Clone(p.key)
 }
 
-func (p *rotatingSNIProvider) Run(ctx context.Context) {
-	logrus.Info("starting extension api cert rotator")
-	defer logrus.Info("stopping extension api cert rotator")
+func (p *rotatingSNIProvider) Run(ctx context.Context) error {
+	logrus.Info("starting imperative api cert rotator")
+	defer logrus.Info("stopping imperative api cert rotator")
 
-	p.secrets.OnChange(ctx, "imperative-api-cert-rotator", func(key string, secret *corev1.Secret) (*corev1.Secret, error) {
-		p.certMu.Lock()
-		defer p.certMu.Unlock()
+	req, err := labels.NewRequirement(SecretLabelProvider, selection.Equals, []string{p.name})
+	if err != nil {
+		return fmt.Errorf("failed to create label requirement: %w", err)
+	}
 
-		certData, ok := secret.Data[SecretFieldNameCert]
-		if !ok {
-			return nil, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameCert)
-		}
-
-		keyData, ok := secret.Data[SecretFieldNameKey]
-		if !ok {
-			return nil, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameKey)
-		}
-
-		p.cert = certData
-		p.key = keyData
-
-		return nil, nil
+	watcher, err := p.secrets.Watch(Namespace, metav1.ListOptions{
+		LabelSelector: labels.NewSelector().Add(*req).String(),
 	})
+	if err != nil {
+		return fmt.Errorf("failed to create secret watcher: %w", err)
+	}
+	defer watcher.Stop()
 
 	go func() {
+		if err := p.handleCert(); err != nil {
+			logrus.Error(err)
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(certCheckInterval):
 				if err := p.handleCert(); err != nil {
-					logrus.WithError(err).Error("failed to handle cert")
+					logrus.Error(err)
+				}
+			case event := <-watcher.ResultChan():
+				if err := p.handleCertEvent(event); err != nil {
+					logrus.Error(err)
 				}
 			}
 		}
 	}()
 
 	<-ctx.Done()
+
+	return nil
 }
 
 func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
@@ -234,6 +237,9 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      p.secretName,
 				Namespace: Namespace,
+				Labels: map[string]string{
+					SecretLabelProvider: p.name,
+				},
 			},
 			Data: map[string][]byte{
 				SecretFieldNameCert: cert,
@@ -244,6 +250,8 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 		if _, err := p.secrets.Create(secret); err != nil {
 			return fmt.Errorf("failed to create secret: %w", err)
 		}
+
+		logrus.Errorf("created imperative api cert secret")
 	} else {
 		secret.Data[SecretFieldNameCert] = cert
 		secret.Data[SecretFieldNameKey] = key
@@ -251,14 +259,12 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 		if _, err := p.secrets.Update(secret); err != nil {
 			return fmt.Errorf("failed to update secret: %w", err)
 		}
-	}
 
-	p.certMu.Lock()
+		logrus.Errorf("updated imperative api cert secret")
+	}
 
 	p.cert = cert
 	p.key = key
-
-	defer p.certMu.Unlock()
 
 	for _, listener := range p.listeners {
 		listener.Enqueue()
@@ -267,7 +273,7 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 	return nil
 }
 
-func (p *rotatingSNIProvider) willCertExpire(secret *corev1.Secret, d time.Duration) (bool, error) {
+func (p *rotatingSNIProvider) willCertExpireWithinDuration(secret *corev1.Secret, d time.Duration) (bool, error) {
 	certData, ok := secret.Data[SecretFieldNameCert]
 	if !ok {
 		return false, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameCert)
@@ -297,18 +303,46 @@ func (p *rotatingSNIProvider) handleCert() error {
 		if err := p.createOrUpdateCerts(nil); err != nil {
 			return fmt.Errorf("failed to create new cert: %w", err)
 		}
-	} else {
+
+		return nil
+	} else if err != nil {
 		return fmt.Errorf("failed to get secret: %w", err)
 	}
 
-	willExpire, err := p.willCertExpire(secret, time.Hour)
+	willExpire, err := p.willCertExpireWithinDuration(secret, maxRemainingCertLifetime)
 	if err != nil {
 		return fmt.Errorf("failed to check if cert will expire: %w", err)
 	}
 
 	if willExpire {
+		logrus.Infof("imperative api cabundle will expire within '%s', regenerating", maxRemainingCertLifetime)
 		if err := p.createOrUpdateCerts(secret); err != nil {
 			return fmt.Errorf("failed to update expired cert: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (p *rotatingSNIProvider) handleCertEvent(event watch.Event) error {
+	switch event.Type {
+	case watch.Added, watch.Modified:
+		secret := event.Object.(*corev1.Secret)
+		certData, ok := secret.Data[SecretFieldNameCert]
+		if !ok {
+			return fmt.Errorf("secret does not container field '%s'", SecretFieldNameCert)
+		}
+
+		keyData, ok := secret.Data[SecretFieldNameKey]
+		if !ok {
+			return fmt.Errorf("secret does not contain field '%s'", SecretFieldNameKey)
+		}
+
+		p.cert = certData
+		p.key = keyData
+	case watch.Deleted:
+		if err := p.createOrUpdateCerts(nil); err != nil {
+			return err
 		}
 	}
 
@@ -323,7 +357,7 @@ func (f listenerFunc) Enqueue() {
 
 func ApiServiceCertListener(provider dynamiccertificates.SNICertKeyContentProvider, apiservice wranglerapiregistrationv1.APIServiceController) dynamiccertificates.Listener {
 	return listenerFunc(func() {
-		logrus.Info("api service cert updated")
+		logrus.Info("imperative api APIService cert updated")
 		caBundle, _ := provider.CurrentCertKeyContent()
 		if err := CreateOrUpdateAPIService(apiservice, caBundle); err != nil {
 			logrus.WithError(err).Error("failed to update api service")

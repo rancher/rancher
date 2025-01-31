@@ -162,17 +162,14 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
 
 		go func() {
-			sniProvider.Run(ctx)
+			if err := sniProvider.Run(ctx); err != nil {
+				logrus.Errorf("sni provider failed: %s", err)
+			}
 		}()
 
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
 
 		if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
-			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-		}
-
-		caBundle, _ := sniProvider.CurrentCertKeyContent()
-		if err := CreateOrUpdateAPIService(wranglerContext.API.APIService(), caBundle); err != nil {
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 		}
 
