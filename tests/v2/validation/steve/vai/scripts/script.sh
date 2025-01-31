@@ -14,9 +14,9 @@ check_go() {
 # Install Go if not already installed
 if ! check_go; then
     echo "Go not found. Installing Go..."
-    curl -L -o go1.23.4.linux-amd64.tar.gz https://go.dev/dl/go1.23.4.linux-amd64.tar.gz --insecure
-    tar -C /usr/local -xzf go1.23.4.linux-amd64.tar.gz
-    rm go1.23.4.linux-amd64.tar.gz
+    curl -L -o go1.22.4.linux-amd64.tar.gz https://go.dev/dl/go1.22.4.linux-amd64.tar.gz --insecure
+    tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
+    rm go1.22.4.linux-amd64.tar.gz
     echo "Go installed successfully."
 else
     echo "Go is already installed."
@@ -55,14 +55,20 @@ import (
 )
 
 func main() {
-    tableName := strings.ReplaceAll(os.Getenv("TABLE_NAME"), "\"", "")
-    resourceName := os.Getenv("RESOURCE_NAME")
-
-    db, err := sql.Open("sqlite", "/var/lib/rancher/informer_object_fields.db")
+    db, err := sql.Open("sqlite", "/var/lib/rancher/informer_object_cache.db")
     if err != nil {
         log.Fatal(err)
     }
     defer db.Close()
+
+    fmt.Println("Creating database snapshot...")
+    _, err = db.Exec("VACUUM INTO '/tmp/snapshot.db'")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    tableName := strings.ReplaceAll(os.Getenv("TABLE_NAME"), "\"", "")
+    resourceName := os.Getenv("RESOURCE_NAME")
 
     query := fmt.Sprintf("SELECT \"metadata.name\" FROM \"%s\" WHERE \"metadata.name\" = ?", tableName)
     stmt, err := db.Prepare(query)
