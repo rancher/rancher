@@ -5,19 +5,22 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"math"
 	"math/big"
-	"net"
 	"sync"
 	"time"
 
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/wait"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/util/keyutil"
 	netutils "k8s.io/utils/net"
@@ -25,20 +28,19 @@ import (
 
 const (
 	CertificateBlockType = "CERTIFICATE"
-)
 
-func ipsToStrings(ips []net.IP) []string {
-	ss := make([]string, 0, len(ips))
-	for _, ip := range ips {
-		ss = append(ss, ip.String())
-	}
-	return ss
-}
+	SecretFieldNameCert = "cert"
+	SecretFieldNameKey  = "key"
+
+	// certCheckInterval = time.Hour
+	certCheckInterval = time.Minute
+)
 
 // GenerateSelfSignedCertKey generates a self-signed certificate.
 // Based on the self-signed cert generate code in client-go: https://pkg.go.dev/k8s.io/client-go/util/cert#GenerateSelfSignedCertKeyWithFixtures
 func GenerateSelfSignedCertKeyWithOpts(host string, expireAfter time.Duration) ([]byte, []byte, error) {
-	validFrom := time.Now().Add(-time.Hour) // valid an hour earlier to avoid flakes due to clock skew
+	// valid for an extra check interval before current time to ensure total cert coverage and avoid any issues with clock skew
+	validFrom := time.Now().Add(-certCheckInterval)
 	maxAge := expireAfter
 
 	caKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
@@ -131,7 +133,9 @@ var _ dynamiccertificates.Notifier = &rotatingSNIProvider{}
 var _ dynamiccertificates.CertKeyContentProvider = &rotatingSNIProvider{}
 
 type rotatingSNIProvider struct {
-	name     string
+	name       string
+	secretName string
+
 	sninames []string
 
 	listeners []dynamiccertificates.Listener
@@ -141,13 +145,20 @@ type rotatingSNIProvider struct {
 	certMu sync.RWMutex
 	cert   []byte
 	key    []byte
+
+	secrets wranglercorev1.SecretController
 }
 
-func NewSNIProviderForCname(name string, cnames []string) (*rotatingSNIProvider, error) {
+func NewSNIProviderForCname(name string, cnames []string, secrets wranglercorev1.SecretController) (*rotatingSNIProvider, error) {
 	content := &rotatingSNIProvider{
-		name:         name,
-		sninames:     cnames,
+		name:       name,
+		secretName: fmt.Sprintf("%s-cert-ca", name),
+
+		sninames: cnames,
+
 		expiresAfter: time.Hour * 24 * 365,
+
+		secrets: secrets,
 	}
 
 	return content, nil
@@ -176,34 +187,104 @@ func (p *rotatingSNIProvider) Run(ctx context.Context) {
 	logrus.Info("starting extension api cert rotator")
 	defer logrus.Info("stopping extension api cert rotator")
 
-	if err := p.updateCerts(); err != nil {
-		logrus.WithError(err).Errorf("initial cert rotation failed")
-	}
-
-	go wait.Until(func() {
-		if err := p.updateCerts(); err != nil {
-			logrus.WithError(err).Error("failed to update extension api cert")
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(certCheckInterval):
+				if err := p.handleCert(); err != nil {
+					logrus.WithError(err).Error("failed to handle cert")
+				}
+			}
 		}
-	}, p.expiresAfter, ctx.Done())
+	}()
 
 	<-ctx.Done()
 }
 
-func (p *rotatingSNIProvider) updateCerts() error {
-	logrus.Info("updating extension api cert")
-
-	cert, key, err := GenerateSelfSignedCertKeyWithOpts("extension-api", p.expiresAfter)
+func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
+	cert, key, err := GenerateSelfSignedCertKeyWithOpts(p.sninames[0], p.expiresAfter)
 	if err != nil {
-		return fmt.Errorf("failed to generate self signed cert: %w", err)
+		return fmt.Errorf("failed to generate cert: %w", err)
+	}
+
+	if secret == nil {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      p.secretName,
+				Namespace: Namespace,
+			},
+			Data: map[string][]byte{
+				SecretFieldNameCert: cert,
+				SecretFieldNameKey:  key,
+			},
+		}
+
+		if _, err := p.secrets.Create(secret); err != nil {
+			return fmt.Errorf("failed to create secret: %w", err)
+		}
+	} else {
+		secret.Data[SecretFieldNameCert] = cert
+		secret.Data[SecretFieldNameKey] = key
+
+		if _, err := p.secrets.Update(secret); err != nil {
+			return fmt.Errorf("failed to update secret: %w", err)
+		}
 	}
 
 	p.certMu.Lock()
+	defer p.certMu.Unlock()
+
 	p.cert = cert
 	p.key = key
-	p.certMu.Unlock()
 
-	for _, listener := range p.listeners {
-		listener.Enqueue()
+	return nil
+}
+
+func (p *rotatingSNIProvider) willCertExpire(secret *corev1.Secret, d time.Duration) (bool, error) {
+	certData, ok := secret.Data[SecretFieldNameCert]
+	if !ok {
+		return false, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameCert)
+	}
+
+	keyData, ok := secret.Data[SecretFieldNameKey]
+	if !ok {
+		return false, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameKey)
+	}
+
+	cert, err := tls.X509KeyPair(certData, keyData)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse cert: %w", err)
+	}
+
+	if time.Now().Add(d).After(cert.Leaf.NotAfter) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (p *rotatingSNIProvider) handleCert() error {
+	secret, err := p.secrets.Get(Namespace, p.secretName, metav1.GetOptions{})
+
+	if apierrors.IsNotFound(err) {
+		if err := p.createOrUpdateCerts(nil); err != nil {
+			return fmt.Errorf("failed to create new cert: %w", err)
+		}
+	} else {
+		return fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	willExpire, err := p.willCertExpire(secret, time.Hour)
+	if err != nil {
+		return fmt.Errorf("failed to check if cert will expire: %w", err)
+	}
+
+	if willExpire {
+		if err := p.createOrUpdateCerts(secret); err != nil {
+			return fmt.Errorf("failed to update expired cert: %w", err)
+		}
 	}
 
 	return nil
