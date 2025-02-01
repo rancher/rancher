@@ -51,7 +51,7 @@ const (
 func createOrUpdateClusterMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
 	roleName := getClusterMembershipRoleName(rt, rtb)
 	roleRef := v1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
+		APIGroup: rbac.RBACApiGroup,
 		Kind:     "ClusterRole",
 		Name:     roleName,
 	}
@@ -157,7 +157,7 @@ func getClusterMembershipRoleName(rt *v3.RoleTemplate, rtb metav1.Object) string
 func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rt *v3.RoleTemplate, rbController crbacv1.RoleBindingController) error {
 	roleName := getProjectMembershipRoleName(rt, prtb)
 	roleRef := v1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
+		APIGroup: rbac.RBACApiGroup,
 		Kind:     "Role",
 		Name:     roleName,
 	}

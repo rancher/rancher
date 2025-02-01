@@ -47,6 +47,7 @@ const (
 	promotedSuffix                    = "promoted"
 	clusterManagementPlaneSuffix      = "cluster-mgmt"
 	projectManagementPlaneSuffix      = "project-mgmt"
+	RBACApiGroup                      = "rbac.authorization.k8s.io"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -108,7 +109,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 	}
 
 	// apiGroup default for both User and Group
-	apiGroup := "rbac.authorization.k8s.io"
+	apiGroup := RBACApiGroup
 
 	if kind == "ServiceAccount" {
 		// ServiceAccount default is empty string
@@ -471,7 +472,7 @@ func BuildAggregatingClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName st
 // BuildClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the ClusterRole specified by roleRefName.
 func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
 	roleRef := rbacv1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
+		APIGroup: RBACApiGroup,
 		Kind:     "ClusterRole",
 		Name:     roleRefName,
 	}

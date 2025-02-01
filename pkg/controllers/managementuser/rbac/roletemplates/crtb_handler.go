@@ -6,7 +6,6 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
-	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -20,10 +19,11 @@ import (
 type crtbHandler struct {
 	impersonationHandler *impersonationHandler
 	crbClient            wrbacv1.ClusterRoleBindingController
-	crtbCache            controllersv3.ClusterRoleTemplateBindingCache
-	crtbClient           controllersv3.ClusterRoleTemplateBindingClient
+	crtbCache            mgmtv3.ClusterRoleTemplateBindingCache
+	crtbClient           mgmtv3.ClusterRoleTemplateBindingClient
 	rtClient             mgmtv3.RoleTemplateController
 	s                    *status.Status
+	clusterName          string
 }
 
 func newCRTBHandler(uc *config.UserContext) *crtbHandler {
@@ -34,21 +34,27 @@ func newCRTBHandler(uc *config.UserContext) *crtbHandler {
 			crtbCache:   uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 			prtbCache:   uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		},
-		crbClient:  uc.RBACw.ClusterRoleBinding(),
-		crtbCache:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-		crtbClient: uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
-		rtClient:   uc.Management.Wrangler.Mgmt.RoleTemplate(),
-		s:          status.NewStatus(),
+		crbClient:   uc.RBACw.ClusterRoleBinding(),
+		crtbCache:   uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		crtbClient:  uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		rtClient:    uc.Management.Wrangler.Mgmt.RoleTemplate(),
+		s:           status.NewStatus(),
+		clusterName: uc.ClusterName,
 	}
 }
 
 // OnChange ensures that the correct ClusterRoleBinding exists for the ClusterRoleTemplateBinding
 func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	remoteConditions := []metav1.Condition{}
 	if crtb == nil || crtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
+	// Only run this controller if the CRTB is for this cluster
+	if crtb.ClusterName != c.clusterName {
+		return nil, nil
+	}
+
+	remoteConditions := []metav1.Condition{}
 	if err := c.reconcileBindings(crtb, &remoteConditions); err != nil {
 		return nil, errors.Join(err, c.updateStatus(crtb, remoteConditions))
 	}
@@ -119,6 +125,11 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 // OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	// Only run this controller if the CRTB is for this cluster
+	if crtb.ClusterName != c.clusterName {
+		return nil, nil
+	}
+
 	err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
 	if err != nil {
 		return crtb, errors.Join(err, c.updateStatus(crtb, crtb.Status.RemoteConditions))

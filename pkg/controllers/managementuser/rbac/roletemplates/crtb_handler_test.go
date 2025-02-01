@@ -87,7 +87,7 @@ func Test_reconcileBindings(t *testing.T) {
 			name: "error building cluster role binding",
 			crtb: &v3.ClusterRoleTemplateBinding{},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			wantErr: true,
 			wantedCondition: &reducedCondition{
@@ -101,7 +101,7 @@ func Test_reconcileBindings(t *testing.T) {
 				c.EXPECT().List(defaultListOption).Return(nil, errDefault)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			crtb:    defaultCRTB.DeepCopy(),
 			wantErr: true,
@@ -117,7 +117,7 @@ func Test_reconcileBindings(t *testing.T) {
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, errDefault)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			crtb:    defaultCRTB.DeepCopy(),
 			wantErr: true,
@@ -133,7 +133,7 @@ func Test_reconcileBindings(t *testing.T) {
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
@@ -149,7 +149,7 @@ func Test_reconcileBindings(t *testing.T) {
 				}, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
@@ -167,10 +167,10 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
-				c.EXPECT().Delete("bad-crb1", gomock.Any()).Return(errDefault)
+				c.EXPECT().Delete("bad-crb1", &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			crtb:    defaultCRTB.DeepCopy(),
 			wantErr: true,
@@ -192,12 +192,12 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
-				c.EXPECT().Delete("bad-crb1", gomock.Any()).Return(nil)
-				c.EXPECT().Delete("bad-crb2", gomock.Any()).Return(nil)
+				c.EXPECT().Delete("bad-crb1", &metav1.DeleteOptions{}).Return(nil)
+				c.EXPECT().Delete("bad-crb2", &metav1.DeleteOptions{}).Return(nil)
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
@@ -219,11 +219,11 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
-				c.EXPECT().Delete("bad-crb1", gomock.Any()).Return(nil)
-				c.EXPECT().Delete("bad-crb2", gomock.Any()).Return(nil)
+				c.EXPECT().Delete("bad-crb1", &metav1.DeleteOptions{}).Return(nil)
+				c.EXPECT().Delete("bad-crb2", &metav1.DeleteOptions{}).Return(nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nonExternalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
@@ -234,7 +234,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error checking if roletemplate is external",
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(nil, errDefault)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
@@ -250,7 +250,7 @@ func Test_reconcileBindings(t *testing.T) {
 				c.EXPECT().Create(externalCRB.DeepCopy()).Return(nil, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
-				m.EXPECT().Get("test-rt", gomock.Any()).Return(externalRT.DeepCopy(), nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(externalRT.DeepCopy(), nil)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
@@ -314,7 +314,7 @@ func Test_deleteBindings(t *testing.T) {
 				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{
 					Items: []rbacv1.ClusterRoleBinding{{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}}},
 				}, nil)
-				c.EXPECT().Delete("crb1", gomock.Any()).Return(errDefault)
+				c.EXPECT().Delete("crb1", &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			crtb:    defaultCRTB.DeepCopy(),
 			wantErr: true,
@@ -329,7 +329,7 @@ func Test_deleteBindings(t *testing.T) {
 				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{
 					Items: []rbacv1.ClusterRoleBinding{{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}}},
 				}, nil)
-				c.EXPECT().Delete("crb1", gomock.Any()).Return(errNotFound)
+				c.EXPECT().Delete("crb1", &metav1.DeleteOptions{}).Return(errNotFound)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
@@ -346,8 +346,8 @@ func Test_deleteBindings(t *testing.T) {
 						{ObjectMeta: metav1.ObjectMeta{Name: "crb2"}},
 					},
 				}, nil)
-				c.EXPECT().Delete("crb1", gomock.Any()).Return(nil)
-				c.EXPECT().Delete("crb2", gomock.Any()).Return(nil)
+				c.EXPECT().Delete("crb1", &metav1.DeleteOptions{}).Return(nil)
+				c.EXPECT().Delete("crb2", &metav1.DeleteOptions{}).Return(nil)
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantedCondition: &reducedCondition{
