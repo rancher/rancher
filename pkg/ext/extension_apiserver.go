@@ -148,7 +148,6 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	case "true":
 		logrus.Info("creating imperative extension apiserver resources")
 
-		wranglerContext.Core.Secret()
 		sniProvider, err := NewSNIProviderForCname(
 			"imperative-api-sni-provider",
 			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
