@@ -52,7 +52,7 @@ func VerifyDeployment(steveClient *steveV1.Client, deployment *steveV1.SteveAPIO
 }
 
 func VerifyDeploymentUpgrade(client *rancher.Client, clusterName string, namespaceName string, appv1Deployment *appv1.Deployment, expectedRevision string, image string, expectedReplicas int) error {
-	logrus.Info("Waiting deployment comes up active")
+	logrus.Infof("Waiting for deployment %s to become active", appv1Deployment.Name)
 	err := charts.WatchAndWaitDeployments(client, clusterName, namespaceName, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + appv1Deployment.Name,
 	})
@@ -72,7 +72,6 @@ func VerifyDeploymentUpgrade(client *rancher.Client, clusterName string, namespa
 		return err
 	}
 
-	logrus.Infof("Counting all pods running by image %s", image)
 	countPods, err := pods.CountPodContainerRunningByImage(client, clusterName, namespaceName, image)
 	if err != nil {
 		return err
@@ -87,7 +86,7 @@ func VerifyDeploymentUpgrade(client *rancher.Client, clusterName string, namespa
 }
 
 func VerifyDeploymentScale(client *rancher.Client, clusterName string, namespaceName string, scaleDeployment *appv1.Deployment, image string, expectedReplicas int) error {
-	logrus.Info("Waiting deployment comes up active")
+	logrus.Infof("Waiting for deployment %s to become active", scaleDeployment.Name)
 	err := charts.WatchAndWaitDeployments(client, clusterName, namespaceName, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + scaleDeployment.Name,
 	})
@@ -101,7 +100,6 @@ func VerifyDeploymentScale(client *rancher.Client, clusterName string, namespace
 		return err
 	}
 
-	logrus.Infof("Counting all pods running by image %s", image)
 	countPods, err := pods.CountPodContainerRunningByImage(client, clusterName, namespaceName, image)
 	if err != nil {
 		return err
@@ -188,32 +186,37 @@ func VerifyOrchestrationStatus(client *rancher.Client, clusterID, namespaceName 
 }
 
 func VerifyCreateDeployment(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Creating new deployment")
-	_, err = CreateDeployment(client, clusterID, namespace.Name, 1, "", "", false, false, false, true)
-
-	return err
-}
-
-func VerifyCreateDeploymentSideKick(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
-	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
-	if err != nil {
-		return err
-	}
-
-	logrus.Info("Creating new deployment")
 	createdDeployment, err := CreateDeployment(client, clusterID, namespace.Name, 1, "", "", false, false, false, true)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Waiting for all pods to be running")
+	logrus.Infof("Creating new deployment %s", createdDeployment.Name)
+	err = pods.WatchAndWaitPodContainerRunning(client, clusterID, namespace.Name, createdDeployment)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func VerifyCreateDeploymentSideKick(client *rancher.Client, clusterID string) error {
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
+	if err != nil {
+		return err
+	}
+
+	createdDeployment, err := CreateDeployment(client, clusterID, namespace.Name, 1, "", "", false, false, false, true)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Creating new deployment %s", createdDeployment.Name)
 	err = pods.WatchAndWaitPodContainerRunning(client, clusterID, namespace.Name, createdDeployment)
 	if err != nil {
 		return err
@@ -232,13 +235,12 @@ func VerifyCreateDeploymentSideKick(client *rancher.Client, clusterID string) er
 
 	createdDeployment.Spec.Template.Spec.Containers = append(createdDeployment.Spec.Template.Spec.Containers, newContainerTemplate)
 
-	logrus.Info("Updating image deployment")
 	updatedDeployment, err := UpdateDeployment(client, clusterID, namespace.Name, createdDeployment, true)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Waiting deployment comes up active")
+	logrus.Infof("Updating deployment image, %s", createdDeployment.Name)
 	err = charts.WatchAndWaitDeployments(client, clusterID, namespace.Name, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + updatedDeployment.Name,
 	})
@@ -253,18 +255,17 @@ func VerifyCreateDeploymentSideKick(client *rancher.Client, clusterID string) er
 }
 
 func VerifyDeploymentUpgradeRollback(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Creating new deployment")
 	upgradeDeployment, err := CreateDeployment(client, clusterID, namespace.Name, 2, "", "", false, false, false, true)
 	if err != nil {
 		return err
 	}
 
+	logrus.Infof("Creating new deployment %s", upgradeDeployment.Name)
 	err = VerifyDeploymentUpgrade(client, clusterID, namespace.Name, upgradeDeployment, "1", nginxImageName, 2)
 	if err != nil {
 		return err
@@ -282,7 +283,7 @@ func VerifyDeploymentUpgradeRollback(client *rancher.Client, clusterID string) e
 	)
 	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
 
-	logrus.Info("Updating deployment")
+	logrus.Infof("Updating deployment %s", upgradeDeployment.Name)
 	upgradeDeployment, err = UpdateDeployment(client, clusterID, namespace.Name, upgradeDeployment, true)
 	if err != nil {
 		return err
@@ -307,7 +308,7 @@ func VerifyDeploymentUpgradeRollback(client *rancher.Client, clusterID string) e
 	newContainerTemplate.Stdin = true
 	upgradeDeployment.Spec.Template.Spec.Containers = []corev1.Container{newContainerTemplate}
 
-	logrus.Info("Updating deployment")
+	logrus.Infof("Updating deployment %s", upgradeDeployment.Name)
 	_, err = UpdateDeployment(client, clusterID, namespace.Name, upgradeDeployment, true)
 	if err != nil {
 		return err
@@ -318,7 +319,7 @@ func VerifyDeploymentUpgradeRollback(client *rancher.Client, clusterID string) e
 		return err
 	}
 
-	logrus.Info("Rollback deployment")
+	logrus.Infof("Rollback deployment %s", upgradeDeployment.Name)
 	logRollback, err := RollbackDeployment(client, clusterID, namespace.Name, upgradeDeployment.Name, 1)
 	if err != nil {
 		return err
@@ -332,7 +333,7 @@ func VerifyDeploymentUpgradeRollback(client *rancher.Client, clusterID string) e
 		return err
 	}
 
-	logrus.Info("Rollback deployment")
+	logrus.Infof("Rollback deployment %s", upgradeDeployment.Name)
 	logRollback, err = RollbackDeployment(client, clusterID, namespace.Name, upgradeDeployment.Name, 2)
 	if err != nil {
 		return err
@@ -346,7 +347,7 @@ func VerifyDeploymentUpgradeRollback(client *rancher.Client, clusterID string) e
 		return err
 	}
 
-	logrus.Info("Rollback deployment")
+	logrus.Infof("Rollback deployment %s", upgradeDeployment.Name)
 	logRollback, err = RollbackDeployment(client, clusterID, namespace.Name, upgradeDeployment.Name, 3)
 	if err != nil {
 		return err
@@ -364,18 +365,17 @@ func VerifyDeploymentUpgradeRollback(client *rancher.Client, clusterID string) e
 }
 
 func VerifyDeploymentPodScaleUp(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Creating new deployment")
 	scaleUpDeployment, err := CreateDeployment(client, clusterID, namespace.Name, 1, "", "", false, false, false, true)
 	if err != nil {
 		return err
 	}
 
+	logrus.Infof("Creating new deployment %s", scaleUpDeployment.Name)
 	err = VerifyDeploymentScale(client, clusterID, namespace.Name, scaleUpDeployment, nginxImageName, 1)
 	if err != nil {
 		return err
@@ -413,18 +413,17 @@ func VerifyDeploymentPodScaleUp(client *rancher.Client, clusterID string) error 
 }
 
 func VerifyDeploymentPodScaleDown(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Creating new deployment")
 	scaleDownDeployment, err := CreateDeployment(client, clusterID, namespace.Name, 3, "", "", false, false, false, true)
 	if err != nil {
 		return err
 	}
 
+	logrus.Infof("Creating new deployment %s", scaleDownDeployment.Name)
 	err = VerifyDeploymentScale(client, clusterID, namespace.Name, scaleDownDeployment, nginxImageName, 3)
 	if err != nil {
 		return err
@@ -462,18 +461,16 @@ func VerifyDeploymentPodScaleDown(client *rancher.Client, clusterID string) erro
 }
 
 func VerifyDeploymentPauseOrchestration(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Creating new deployment")
 	pauseDeployment, err := CreateDeployment(client, clusterID, namespace.Name, 2, "", "", false, false, false, true)
 	if err != nil {
 		return err
 	}
-
+	logrus.Infof("Creating new deployment %s", pauseDeployment.Name)
 	err = VerifyDeploymentScale(client, clusterID, namespace.Name, pauseDeployment, nginxImageName, 2)
 	if err != nil {
 		return err
@@ -486,7 +483,6 @@ func VerifyDeploymentPauseOrchestration(client *rancher.Client, clusterID string
 		return err
 	}
 
-	logrus.Info("Verifying orchestration is paused")
 	err = VerifyOrchestrationStatus(client, clusterID, namespace.Name, pauseDeployment.Name, true)
 	if err != nil {
 		return err
@@ -512,7 +508,6 @@ func VerifyDeploymentPauseOrchestration(client *rancher.Client, clusterID string
 		return err
 	}
 
-	logrus.Info("Waiting for all pods to be running")
 	err = pods.WatchAndWaitPodContainerRunning(client, clusterID, namespace.Name, pauseDeployment)
 	if err != nil {
 		return err
@@ -535,8 +530,10 @@ func VerifyDeploymentPauseOrchestration(client *rancher.Client, clusterID string
 	pauseDeployment, err = UpdateDeployment(client, clusterID, namespace.Name, pauseDeployment, true)
 
 	err = VerifyDeploymentScale(client, clusterID, namespace.Name, pauseDeployment, redisImageName, int(replicas))
+	if err != nil {
+		return err
+	}
 
-	logrus.Info("Verifying orchestration is active")
 	err = VerifyOrchestrationStatus(client, clusterID, namespace.Name, pauseDeployment.Name, false)
 	if err != nil {
 		return err
