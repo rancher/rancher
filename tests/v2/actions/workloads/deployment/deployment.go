@@ -25,9 +25,9 @@ const (
 	defaultNamespace    = "default"
 	port                = "port"
 	DeploymentSteveType = "apps.deployment"
-	nginxImageName      = "nginx"
+	nginxImageName      = "public.ecr.aws/docker/library/nginx"
 	ubuntuImageName     = "ubuntu"
-	redisImageName      = "redis"
+	redisImageName      = "public.ecr.aws/docker/library/redis"
 	podSteveType        = "pod"
 )
 
