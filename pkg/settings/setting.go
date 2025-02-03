@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -27,28 +26,10 @@ const (
 )
 
 func init() {
-	lifecycle.DisallowedEntries = []lifecycle.DisallowEntry{
-		{
-			Kind: "Namespace",
-			Name: "gke-",
-		},
-		{
-			Kind: "Namespace",
-			Name: "kube-system",
-		},
-		{
-			Kind: "DaemonSet",
-			Name: "kube-system",
-		},
+	lifecycle.DisallowedNamespaces = []string{
+		"gke-",
+		"kube-system",
 	}
-}
-
-// Returns true if the disallowed entries indicate that the named NS should not
-// be written to.
-func DisallowedNamespace(name string) bool {
-	return slices.ContainsFunc(lifecycle.DisallowedEntries, func(de lifecycle.DisallowEntry) bool {
-		return strings.HasPrefix(name, de.Name) && de.Kind == "Namespace"
-	})
 }
 
 var (

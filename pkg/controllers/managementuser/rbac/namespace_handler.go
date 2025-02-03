@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
@@ -16,7 +17,6 @@ import (
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	projectpkg "github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -56,7 +56,7 @@ type nsLifecycle struct {
 }
 
 func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
-	if settings.DisallowedNamespace(obj.Name) {
+	if lifecycle.IsDisallowedNamespace(obj) {
 		return obj, nil
 	}
 
@@ -88,7 +88,7 @@ func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error
 }
 
 func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
-	if settings.DisallowedNamespace(obj.Name) {
+	if lifecycle.IsDisallowedNamespace(obj) {
 		return obj, nil
 	}
 
@@ -102,7 +102,6 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
-
 	// add fleet namespace to system project
 	if IsFleetNamespace(obj) &&
 		// If this is the local cluster, then only move the namespace to ths system project if the projectIDAnnotation is
