@@ -11,7 +11,6 @@ import (
 	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,7 +27,7 @@ func TestStore_create(t *testing.T) {
 		userActivity *ext.UserActivity
 		token        *v3Legacy.Token
 		user         string
-		lastActivity metav1.Time
+		lastActivity v1.Time
 		idleMins     int
 	}
 	tests := []struct {
