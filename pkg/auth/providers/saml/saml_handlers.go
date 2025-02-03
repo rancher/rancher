@@ -13,6 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const rancherUserID = "rancherUserID"
+
 // ServeHTTP is the handler for /saml/metadata and /saml/acs endpoints
 func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	serviceProvider := s.serviceProvider
@@ -68,7 +70,7 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 }
 
 // HandleSamlLogin is the endpoint for /saml/login endpoint
-func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (string, error) {
+func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request, userID string) (string, error) {
 	serviceProvider := s.serviceProvider
 	if r.URL.Path == serviceProvider.AcsURL.Path {
 		return "", fmt.Errorf("don't wrap Middleware with RequireAccount")
@@ -92,6 +94,9 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 	claims := state.Claims.(jwt.MapClaims)
 	claims["id"] = req.ID
 	claims["uri"] = r.URL.String()
+	if userID != "" {
+		claims[rancherUserID] = userID
+	}
 	signedState, err := state.SignedString(secretBlock)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
