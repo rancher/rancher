@@ -9,6 +9,6 @@ Assignees: ''
 
 Please use the below table to fill out your Epic.
 
-| Issue | Team | Blockers | Milestone | Notes |
+| Issue | Team | Milestone | Blockers | Notes |
 |-------|-------|-----------|------------|-------|
-|Issue Link | Team_Name | Blocker(s)(if any) | Milestone_Link | Notes (if any) | 
+|Issue Link | Team_Name | Milestone_Link | Blocker(s)(if any) | Notes (if any) | 
