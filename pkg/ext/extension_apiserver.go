@@ -161,7 +161,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
 
 		go func() {
-			if err := sniProvider.Run(ctx); err != nil {
+			if err := sniProvider.Run(ctx.Done()); err != nil {
 				logrus.Errorf("sni provider failed: %s", err)
 			}
 		}()
