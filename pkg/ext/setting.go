@@ -17,13 +17,12 @@ type settingController struct {
 
 	sniProvider *rotatingSNIProvider
 
-	valueMu sync.Mutex
-	value   string
-
-	stopChan chan struct{}
+	stopChanMu sync.Mutex
+	stopChan   chan struct{}
 }
 
-// func (c *SettingController) sync(_ context.Context, _ string, obj *v3.Setting) (runtime.Object, error) {
+// todo: toggle the listening port
+// todo: toggle the cert authenticator
 func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
@@ -33,19 +32,17 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 		return obj, nil
 	}
 
-	c.valueMu.Lock()
-	defer c.valueMu.Unlock()
-
-	if c.value == obj.Value {
-		return obj, nil
-	}
-
 	switch obj.Value {
 	case "true":
-		// todo: create extension API server resources
-		logrus.Info("creating imperative extension apiserver resources")
+		logrus.Info("enabling imperative apiserver")
 
+		c.stopChanMu.Lock()
+		if c.stopChan != nil {
+			logrus.Debug("imperative extension apiserver already enabled")
+			break
+		}
 		c.stopChan = make(chan struct{})
+		c.stopChanMu.Unlock()
 
 		go func() {
 			if err := c.sniProvider.Run(c.stopChan); err != nil {
@@ -57,16 +54,21 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 		}
 	default:
-		logrus.Info("cleaning up imperative extension apiserver resources")
+		logrus.Info("disabling up imperative apiserver")
 
+		c.stopChanMu.Lock()
+		if c.stopChan == nil {
+			logrus.Debug("imperative extension apiserver is not enabled")
+			break
+		}
 		close(c.stopChan)
+		c.stopChan = nil
+		c.stopChanMu.Unlock()
 
 		if err := CleanupExtensionAPIServer(c.services, c.apiservices); err != nil {
 			return nil, err
 		}
 	}
-
-	c.value = obj.Value
 
 	return nil, nil
 }
