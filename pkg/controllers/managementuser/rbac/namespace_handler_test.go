@@ -23,6 +23,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// TODO: New namespace created when in the disallow list
+// TODO: Namespaced updated when in the disallow list
+
 func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 	const namespaceName = "test-ns"
 	tests := []struct {
