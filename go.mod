@@ -447,4 +447,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/rancher/norman => github.com/bigkevmcd/norman v0.0.0-20250131135843-af5d662d96fb
+replace github.com/rancher/norman => github.com/bigkevmcd/norman v0.0.0-20250203135351-0aaab0476349
