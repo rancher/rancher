@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/rancher/norman/lifecycle"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -22,6 +24,17 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	p := podResources{
 		podLister: workload.Core.Pods("").Controller().Lister(),
 		nodes:     workload.Core.Nodes(""),
+	}
+
+	// If we can't write to Nodes do not add a Handler.
+	n := &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Node",
+		},
+	}
+	if lifecycle.IsDisallowedGVK(n) {
+		return
 	}
 
 	workload.Core.Nodes("").AddHandler(ctx, "podresource", p.onChange)
@@ -67,7 +80,7 @@ func (p *podResources) getNonTerminatedPods(node *corev1.Node) ([]*corev1.Pod, e
 	var pods []*corev1.Pod
 	fromCache, err := p.podLister.List("", labels.NewSelector())
 	if err != nil {
-		return pods, err
+		return nil, err
 	}
 
 	for _, pod := range fromCache {
@@ -80,6 +93,7 @@ func (p *podResources) getNonTerminatedPods(node *corev1.Node) ([]*corev1.Pod, e
 		}
 		pods = append(pods, pod)
 	}
+
 	return pods, nil
 }
 

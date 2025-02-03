@@ -16,6 +16,7 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -29,6 +30,13 @@ func init() {
 	lifecycle.DisallowedNamespaces = []string{
 		"gke-",
 		"kube-system",
+	}
+
+	lifecycle.DisallowedGVKs = []schema.GroupVersionKind{
+		{
+			Version: "v1",
+			Kind:    "Node",
+		},
 	}
 }
 

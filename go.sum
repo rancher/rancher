@@ -1523,8 +1523,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
-github.com/bigkevmcd/norman v0.0.0-20250131135843-af5d662d96fb h1:SGU3/4/Fl6e2fMjv4Nv8F9qnRaOSk2Fa66cb1PFFaMk=
-github.com/bigkevmcd/norman v0.0.0-20250131135843-af5d662d96fb/go.mod h1:xufFdzfD+ko2FpNKK7GEBS3VwY4MhqOAKEwfeaXsuAA=
+github.com/bigkevmcd/norman v0.0.0-20250203135351-0aaab0476349 h1:vhPLojU6E+R3fD3zeTNoEUb83sBlrTK1l4h2iZyk9dM=
+github.com/bigkevmcd/norman v0.0.0-20250203135351-0aaab0476349/go.mod h1:xufFdzfD+ko2FpNKK7GEBS3VwY4MhqOAKEwfeaXsuAA=
 github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c/go.mod h1:MKsuJmJgSg28kpZDP6UIiPt0e0Oz0kqKNGyRaWEPv84=
 github.com/blang/semver v3.5.1+incompatible h1:cQNTCjp13qL8KC3Nbxr/y2Bqb63oX6wdnnjpJbkM4JQ=
 github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
