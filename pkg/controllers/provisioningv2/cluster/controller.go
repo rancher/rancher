@@ -40,13 +40,14 @@ import (
 )
 
 const (
-	ByCluster             = "by-cluster"
-	ByCloudCred           = "by-cloud-cred"
-	creatorIDAnn          = "field.cattle.io/creatorId"
-	administratedAnn      = "provisioning.cattle.io/administrated"
-	mgmtClusterNameAnn    = "provisioning.cattle.io/management-cluster-name"
-	fleetWorkspaceNameAnn = "provisioning.cattle.io/fleet-workspace-name"
-	externallyManagedAnn  = "provisioning.cattle.io/externally-managed"
+	ByCluster                 = "by-cluster"
+	ByCloudCred               = "by-cloud-cred"
+	creatorIDAnn              = "field.cattle.io/creatorId"
+	administratedAnn          = "provisioning.cattle.io/administrated"
+	mgmtClusterNameAnn        = "provisioning.cattle.io/management-cluster-name"
+	mgmtClusterDisplayNameAnn = "provisioning.cattle.io/management-cluster-display-name"
+	fleetWorkspaceNameAnn     = "provisioning.cattle.io/fleet-workspace-name"
+	externallyManagedAnn      = "provisioning.cattle.io/externally-managed"
 )
 
 var (
@@ -130,6 +131,8 @@ func Register(
 		},
 	)
 
+	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-update", h.OnChange)
+
 	clients.Mgmt.Cluster().OnChange(ctx, "cluster-watch", h.createToken)
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
@@ -212,6 +215,8 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 		},
 	}
 
+	provCluster.Annotations[mgmtClusterDisplayNameAnn] = cluster.Spec.DisplayName
+
 	if cluster.Spec.ClusterAgentDeploymentCustomization != nil {
 		clusterAgentCustomizationCopy := cluster.Spec.ClusterAgentDeploymentCustomization.DeepCopy()
 		provCluster.Spec.ClusterAgentDeploymentCustomization = &v1.AgentDeploymentCustomization{
@@ -287,6 +292,26 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 		return cluster, err
 	}
 	return cluster, err
+}
+
+// OnChange updates annotations on clusters.provisioning.cattle.io/v1 for server-side pagination.
+func (h *handler) OnChange(_ string, cluster *v1.Cluster) (*v1.Cluster, error) {
+	if cluster == nil || cluster.DeletionTimestamp != nil || h.isLegacyCluster(cluster) {
+		// generateProvisioningClusterFromLegacyCluster manages clusters.provisioning.cattle.io/v1
+		// for legacy clusters.management.cattle.io/v3
+		return cluster, nil
+	}
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+	// createNewCluster sets the display name of a clusters.management.cattle.io/v3 cluster
+	// to match the user-provided name from clusters.provisioning.cattle.io/v1 object
+	if cluster.Annotations[mgmtClusterDisplayNameAnn] == cluster.Name {
+		return cluster, nil
+	}
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy.Annotations[mgmtClusterDisplayNameAnn] = cluster.Name
+	return h.clusters.Update(clusterCopy)
 }
 
 func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
