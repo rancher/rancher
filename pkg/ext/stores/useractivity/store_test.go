@@ -2,6 +2,7 @@ package useractivity
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -38,7 +39,7 @@ func TestStore_create(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name: "",
+			name: "valid useractivity is created",
 			args: args{
 				in0: nil,
 				userActivity: &ext.UserActivity{
@@ -67,7 +68,7 @@ func TestStore_create(t *testing.T) {
 					func(token *v3Legacy.Token) (*v3Legacy.Token, error) {
 						return token, nil
 					},
-				).AnyTimes()
+				).Times(1)
 			},
 			want: &ext.UserActivity{
 				Spec: ext.UserActivitySpec{
@@ -79,6 +80,84 @@ func TestStore_create(t *testing.T) {
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "UserID is different from TokenId",
+			args: args{
+				in0: nil,
+				userActivity: &ext.UserActivity{
+					Spec: ext.UserActivitySpec{
+						TokenId: "u-mo773yttt4",
+					},
+				},
+				token: &v3Legacy.Token{
+					ObjectMeta: v1.ObjectMeta{
+						Labels: map[string]string{
+							tokenUserId: "admin",
+						},
+					},
+					UserID: "u-mo773yttt3",
+				},
+			},
+			mockSetup: func() {},
+			want:      nil,
+			wantErr:   true,
+		},
+		{
+			name: "token label userId is different from user",
+			args: args{
+				in0: nil,
+				userActivity: &ext.UserActivity{
+					Spec: ext.UserActivitySpec{
+						TokenId: "u-mo773yttt4",
+					},
+				},
+				token: &v3Legacy.Token{
+					ObjectMeta: v1.ObjectMeta{
+						Labels: map[string]string{
+							tokenUserId: "admin",
+						},
+					},
+					UserID: "u-mo773yttt4",
+				},
+				user: "standard-user-1",
+			},
+			mockSetup: func() {},
+			want:      nil,
+			wantErr:   true,
+		},
+		{
+			name: "error updating token value LastIdleTimeout",
+			args: args{
+				in0: nil,
+				userActivity: &ext.UserActivity{
+					Spec: ext.UserActivitySpec{
+						TokenId: "u-mo773yttt4",
+					},
+				},
+				token: &v3Legacy.Token{
+					ObjectMeta: v1.ObjectMeta{
+						Labels: map[string]string{
+							tokenUserId: "admin",
+						},
+					},
+					UserID: "u-mo773yttt4",
+				},
+				user: "admin",
+				lastActivity: v1.Time{
+					Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+				},
+				idleMins: 10,
+			},
+			mockSetup: func() {
+				mockTokenControllerFake.EXPECT().Update(gomock.Any()).DoAndReturn(
+					func(token *v3Legacy.Token) (*v3Legacy.Token, error) {
+						return nil, errors.New("some error happend")
+					},
+				).Times(1)
+			},
+			want:    nil,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

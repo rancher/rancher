@@ -121,24 +121,24 @@ func (uas *Store) create(_ context.Context,
 		return nil, fmt.Errorf("token from request and token from session mismatch")
 	}
 	// verifies the token has label with user which made the request.
-	if token.Labels[tokenUserId] == user {
-		// once validated the request, we can define the lastActivity time.
-		newIdleTimeout := metav1.Time{
-			Time: lastActivity.Local().Add(time.Minute * time.Duration(authUserSessionTtlMinutes)).UTC(),
-		}
-
-		token.LastIdleTimeout = newIdleTimeout
-		userActivity.Status.LastActivity = lastActivity.String()
-		userActivity.Status.CurrentTimeout = newIdleTimeout.String()
-		_, err := uas.tokenController.Update(token)
-		if err != nil {
-			return nil, fmt.Errorf("error updating token: %v", err)
-		}
-
-		return userActivity, nil
+	if token.Labels[tokenUserId] != user {
+		return nil, fmt.Errorf("token label userId is different from user")
 	}
 
-	return nil, fmt.Errorf("unable to create useractivity")
+	// once validated the request, we can define the lastActivity time.
+	newIdleTimeout := metav1.Time{
+		Time: lastActivity.Local().Add(time.Minute * time.Duration(authUserSessionTtlMinutes)).UTC(),
+	}
+
+	token.LastIdleTimeout = newIdleTimeout
+	userActivity.Status.LastActivity = lastActivity.String()
+	userActivity.Status.CurrentTimeout = newIdleTimeout.String()
+	_, err := uas.tokenController.Update(token)
+	if err != nil {
+		return nil, fmt.Errorf("error updating token: %v", err)
+	}
+
+	return userActivity, nil
 }
 
 // The rest of the methods will be left empty.
