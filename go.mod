@@ -125,21 +125,21 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
 	github.com/rancher/aks-operator v1.10.2
-	github.com/rancher/apiserver v0.0.0-20241009200134-5a4ecca7b988
+	github.com/rancher/apiserver v0.4.1
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1
 	github.com/rancher/eks-operator v1.10.2
 	github.com/rancher/fleet/pkg/apis v0.11.3
 	github.com/rancher/gke-operator v1.10.2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813
+	github.com/rancher/lasso v0.2.0
 	github.com/rancher/machine v0.15.0-rancher125
 	github.com/rancher/norman v0.4.1
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.2
 	github.com/rancher/shepherd v0.0.0-20241217192141-80755a9de656
-	github.com/rancher/steve v0.0.0-20241029132712-2175e090fe4b
+	github.com/rancher/steve v0.4.1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.1.0
