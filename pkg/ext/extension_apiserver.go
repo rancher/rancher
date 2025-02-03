@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
@@ -15,7 +14,6 @@ import (
 	steveserver "github.com/rancher/steve/pkg/server"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,12 +111,12 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController) error {
 	return nil
 }
 
-func CleanupExtensionAPIServer(wranglerContext *wrangler.Context) error {
-	if err := wranglerContext.Core.Service().Delete(Namespace, TargetServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+func CleanupExtensionAPIServer(services wranglercorev1.ServiceController, apiservices wranglerapiregistrationv1.APIServiceController) error {
+	if err := services.Delete(Namespace, TargetServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 		return fmt.Errorf("failed to delete service: %w", err)
 	}
 
-	if err := wranglerContext.API.APIService().Delete(APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+	if err := apiservices.Delete(APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 		return fmt.Errorf("failed to delete APIService: %w", err)
 	}
 
@@ -143,50 +141,31 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		}),
 	}
 
-	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
-	switch os.Getenv("CATTLE_IMPERATIVE_API_EXTENSION") {
-	case "true":
-		logrus.Info("creating imperative extension apiserver resources")
-
-		sniProvider, err := NewSNIProviderForCname(
-			"imperative-api-sni-provider",
-			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
-			wranglerContext.Core.Secret(),
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
-		}
-
-		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
-
-		go func() {
-			if err := sniProvider.Run(ctx.Done()); err != nil {
-				logrus.Errorf("sni provider failed: %s", err)
-			}
-		}()
-
-		additionalSniProviders = append(additionalSniProviders, sniProvider)
-
-		if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
-			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-		}
-
-		defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
-		}
-
-		authenticators = append(authenticators, defaultAuthenticator)
-	default:
-		logrus.Info("deleting imperative extension apiserver resources")
-
-		if err := CleanupExtensionAPIServer(wranglerContext); err != nil {
-			return nil, fmt.Errorf("failed to clean up extension api resources: %w", err)
-		}
+	sniProvider, err := NewSNIProviderForCname(
+		"imperative-api-sni-provider",
+		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
+		wranglerContext.Core.Secret(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
 	}
 
+	sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
+
+	additionalSniProviders := []dynamiccertificates.SNICertKeyContentProvider{sniProvider}
+
+	// switch os.Getenv("CATTLE_IMPERATIVE_API_EXTENSION") {
+	// case "true":
+	// 	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
+	// 	}
+
+	// 	authenticators = append(authenticators, defaultAuthenticator)
+	// }
+
 	scheme := wrangler.Scheme
+
 	// Only need to listen on localhost because that port will be reached
 	// from a remotedialer tunnel on localhost
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
@@ -246,6 +225,14 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	if err = extstores.InstallStores(extensionAPIServer, scheme); err != nil {
 		return nil, fmt.Errorf("failed to install install stores: %w", err)
 	}
+
+	settingController := settingController{
+		services:    wranglerContext.Core.Service(),
+		apiservices: wranglerContext.API.APIService(),
+
+		sniProvider: sniProvider,
+	}
+	wranglerContext.Mgmt.Setting().OnChange(ctx, "imperative-api-extension", settingController.sync)
 
 	return extensionAPIServer, nil
 }
