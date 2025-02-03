@@ -2,7 +2,6 @@ package ext
 
 import (
 	"bytes"
-	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/util/keyutil"
 	netutils "k8s.io/utils/net"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -183,9 +183,8 @@ func (p *rotatingSNIProvider) CurrentCertKeyContent() ([]byte, []byte) {
 	return bytes.Clone(p.cert), bytes.Clone(p.key)
 }
 
-func (p *rotatingSNIProvider) Run(ctx context.Context) error {
+func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 	logrus.Info("starting imperative api cert rotator")
-	defer logrus.Info("stopping imperative api cert rotator")
 
 	req, err := labels.NewRequirement(SecretLabelProvider, selection.Equals, []string{p.name})
 	if err != nil {
@@ -198,32 +197,31 @@ func (p *rotatingSNIProvider) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create secret watcher: %w", err)
 	}
-	defer watcher.Stop()
 
-	go func() {
-		if err := p.handleCert(); err != nil {
-			logrus.Error(err)
-		}
+	if err := p.handleCert(); err != nil {
+		logrus.Error(err)
+	}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(certCheckInterval):
-				if err := p.handleCert(); err != nil {
-					logrus.Error(err)
-				}
-			case event := <-watcher.ResultChan():
-				if err := p.handleCertEvent(event); err != nil {
-					logrus.Error(err)
-				}
+	for {
+		select {
+		case <-stopChan:
+			logrus.Info("stopping imperative api cert rotator")
+
+			watcher.Stop()
+
+			if err := p.secrets.Delete(Namespace, p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+				logrus.Error(err)
+			}
+		case <-time.After(certCheckInterval):
+			if err := p.handleCert(); err != nil {
+				logrus.Error(err)
+			}
+		case event := <-watcher.ResultChan():
+			if err := p.handleCertEvent(event); err != nil {
+				logrus.Error(err)
 			}
 		}
-	}()
-
-	<-ctx.Done()
-
-	return nil
+	}
 }
 
 func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
@@ -358,6 +356,7 @@ func (f listenerFunc) Enqueue() {
 func ApiServiceCertListener(provider dynamiccertificates.SNICertKeyContentProvider, apiservice wranglerapiregistrationv1.APIServiceController) dynamiccertificates.Listener {
 	return listenerFunc(func() {
 		logrus.Info("imperative api APIService cert updated")
+
 		caBundle, _ := provider.CurrentCertKeyContent()
 		if err := CreateOrUpdateAPIService(apiservice, caBundle); err != nil {
 			logrus.WithError(err).Error("failed to update api service")
