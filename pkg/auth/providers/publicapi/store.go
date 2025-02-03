@@ -1,14 +1,11 @@
 package publicapi
 
 import (
-	"strings"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/store/empty"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
-	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/util"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -63,19 +60,6 @@ func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Sc
 				}
 				result = append(result, provider)
 			}
-		}
-	}
-	return result, nil
-}
-
-func (s *authProvidersStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	result, err := s.Update(apiContext, schema, data, id)
-	if err != nil {
-		return nil, err
-	}
-	if strings.EqualFold(settings.FirstLogin.Get(), "true") {
-		if err := settings.FirstLogin.Set("false"); err != nil {
-			return nil, err
 		}
 	}
 	return result, nil

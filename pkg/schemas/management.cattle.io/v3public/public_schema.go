@@ -32,6 +32,7 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImportAndCustomize(&PublicVersion, v3.AuthProvider{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
+			schema.ResourceMethods = []string{http.MethodGet}
 		}).
 		// Local provider
 		MustImportAndCustomize(&PublicVersion, v3.LocalProvider{}, func(schema *types.Schema) {
