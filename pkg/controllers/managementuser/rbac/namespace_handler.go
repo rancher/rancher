@@ -88,6 +88,10 @@ func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error
 }
 
 func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
+	if settings.DisallowedNamespace(obj.Name) {
+		return obj, nil
+	}
+
 	_, err := n.syncNS(obj)
 	return obj, err
 }
