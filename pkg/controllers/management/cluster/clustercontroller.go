@@ -102,7 +102,7 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, 
 		}
 
 		driver := service.NewEngineService(
-			clusterprovisioner.NewPersistentStore(c.namespaces, c.coreV1),
+			clusterprovisioner.NewPersistentStore(c.namespaces, c.coreV1, c.clusterClient),
 		)
 		k8sCapabilities, err := driver.GetK8sCapabilities(context.Background(), kontainerDriver.Name, kontainerDriver,
 			cluster.Spec)
