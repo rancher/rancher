@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type ETCDSnapshotsGetter interface {
 
 // ETCDSnapshotInterface has methods to work with ETCDSnapshot resources.
 type ETCDSnapshotInterface interface {
-	Create(ctx context.Context, eTCDSnapshot *v1.ETCDSnapshot, opts metav1.CreateOptions) (*v1.ETCDSnapshot, error)
-	Update(ctx context.Context, eTCDSnapshot *v1.ETCDSnapshot, opts metav1.UpdateOptions) (*v1.ETCDSnapshot, error)
+	Create(ctx context.Context, eTCDSnapshot *rkecattleiov1.ETCDSnapshot, opts metav1.CreateOptions) (*rkecattleiov1.ETCDSnapshot, error)
+	Update(ctx context.Context, eTCDSnapshot *rkecattleiov1.ETCDSnapshot, opts metav1.UpdateOptions) (*rkecattleiov1.ETCDSnapshot, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, eTCDSnapshot *v1.ETCDSnapshot, opts metav1.UpdateOptions) (*v1.ETCDSnapshot, error)
+	UpdateStatus(ctx context.Context, eTCDSnapshot *rkecattleiov1.ETCDSnapshot, opts metav1.UpdateOptions) (*rkecattleiov1.ETCDSnapshot, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ETCDSnapshot, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ETCDSnapshotList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rkecattleiov1.ETCDSnapshot, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*rkecattleiov1.ETCDSnapshotList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ETCDSnapshot, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rkecattleiov1.ETCDSnapshot, err error)
 	ETCDSnapshotExpansion
 }
 
 // eTCDSnapshots implements ETCDSnapshotInterface
 type eTCDSnapshots struct {
-	*gentype.ClientWithList[*v1.ETCDSnapshot, *v1.ETCDSnapshotList]
+	*gentype.ClientWithList[*rkecattleiov1.ETCDSnapshot, *rkecattleiov1.ETCDSnapshotList]
 }
 
 // newETCDSnapshots returns a ETCDSnapshots
 func newETCDSnapshots(c *RkeV1Client, namespace string) *eTCDSnapshots {
 	return &eTCDSnapshots{
-		gentype.NewClientWithList[*v1.ETCDSnapshot, *v1.ETCDSnapshotList](
+		gentype.NewClientWithList[*rkecattleiov1.ETCDSnapshot, *rkecattleiov1.ETCDSnapshotList](
 			"etcdsnapshots",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.ETCDSnapshot { return &v1.ETCDSnapshot{} },
-			func() *v1.ETCDSnapshotList { return &v1.ETCDSnapshotList{} }),
+			func() *rkecattleiov1.ETCDSnapshot { return &rkecattleiov1.ETCDSnapshot{} },
+			func() *rkecattleiov1.ETCDSnapshotList { return &rkecattleiov1.ETCDSnapshotList{} },
+		),
 	}
 }
