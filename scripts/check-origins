@@ -3,7 +3,7 @@ set -e
 cd $(dirname $0)
 
 if  [ -n "$CATTLE_KDM_BRANCH" ]; then
-    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > ../bin/data.json
+    curl -sLf https://raw.githubusercontent.com/chiukapoor/kontainer-driver-metadata/refs/heads/${CATTLE_KDM_BRANCH}/data/data.json > ../bin/data.json
 elif [ ! -e ../bin/data.json ] && [ -e ../kontainer-driver-metadata/data/data.json ]; then
     cp ../kontainer-driver-metadata/data/data.json ../bin/data.json
 fi
