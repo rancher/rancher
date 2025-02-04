@@ -35,16 +35,23 @@ var (
 	timeoutSeconds = int64(defaults.TwoMinuteTimeout)
 )
 
+// InstallStackStateChart installs the StackState chart into the specified Kubernetes cluster and namespace.
+// It uses Rancher client and configuration details, and waits for the chart deployment to complete successfully.
+// Parameters:
+// - client: the Rancher client used for connecting to the Kubernetes cluster.
+// - installOptions: the installation options including cluster info and chart version.
+// - stackstateConfigs: configuration details for StackState such as the service token and URL.
+// - systemProjectID: the ID of the system project where the chart is deployed.
+// - additionalValues: additional Helm chart values as a map for custom configurations.
+// Returns an error if the chart installation fails or its status cannot be confirmed.
 func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string, additionalValues map[string]interface{}) error {
 
-	// Get server URL for chart configuration
 	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
 	if err != nil {
 		log.Info("Error getting server setting.")
 		return err
 	}
 
-	// Create payload options
 	stackstateChartInstallActionPayload := &payloadOpts{
 		InstallOptions: *installOptions,
 		Name:           StackStateChartRepo,
@@ -366,7 +373,7 @@ func CreateClusterRepo(client *rancher.Client, catalogClient *catalog.Client, na
 	client.Session.RegisterCleanupFunc(func() error {
 
 		var propagation = metav1.DeletePropagationForeground
-		err := catalogClient.ClusterRepos().Delete(context.Background(), "suse-observability", metav1.DeleteOptions{PropagationPolicy: &propagation})
+		err := catalogClient.ClusterRepos().Delete(context.Background(), name, metav1.DeleteOptions{PropagationPolicy: &propagation})
 		if err != nil {
 			return err
 		}
