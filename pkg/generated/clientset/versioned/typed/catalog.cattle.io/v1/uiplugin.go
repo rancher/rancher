@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	catalogcattleiov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type UIPluginsGetter interface {
 
 // UIPluginInterface has methods to work with UIPlugin resources.
 type UIPluginInterface interface {
-	Create(ctx context.Context, uIPlugin *v1.UIPlugin, opts metav1.CreateOptions) (*v1.UIPlugin, error)
-	Update(ctx context.Context, uIPlugin *v1.UIPlugin, opts metav1.UpdateOptions) (*v1.UIPlugin, error)
+	Create(ctx context.Context, uIPlugin *catalogcattleiov1.UIPlugin, opts metav1.CreateOptions) (*catalogcattleiov1.UIPlugin, error)
+	Update(ctx context.Context, uIPlugin *catalogcattleiov1.UIPlugin, opts metav1.UpdateOptions) (*catalogcattleiov1.UIPlugin, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, uIPlugin *v1.UIPlugin, opts metav1.UpdateOptions) (*v1.UIPlugin, error)
+	UpdateStatus(ctx context.Context, uIPlugin *catalogcattleiov1.UIPlugin, opts metav1.UpdateOptions) (*catalogcattleiov1.UIPlugin, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.UIPlugin, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.UIPluginList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*catalogcattleiov1.UIPlugin, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*catalogcattleiov1.UIPluginList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.UIPlugin, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *catalogcattleiov1.UIPlugin, err error)
 	UIPluginExpansion
 }
 
 // uIPlugins implements UIPluginInterface
 type uIPlugins struct {
-	*gentype.ClientWithList[*v1.UIPlugin, *v1.UIPluginList]
+	*gentype.ClientWithList[*catalogcattleiov1.UIPlugin, *catalogcattleiov1.UIPluginList]
 }
 
 // newUIPlugins returns a UIPlugins
 func newUIPlugins(c *CatalogV1Client, namespace string) *uIPlugins {
 	return &uIPlugins{
-		gentype.NewClientWithList[*v1.UIPlugin, *v1.UIPluginList](
+		gentype.NewClientWithList[*catalogcattleiov1.UIPlugin, *catalogcattleiov1.UIPluginList](
 			"uiplugins",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.UIPlugin { return &v1.UIPlugin{} },
-			func() *v1.UIPluginList { return &v1.UIPluginList{} }),
+			func() *catalogcattleiov1.UIPlugin { return &catalogcattleiov1.UIPlugin{} },
+			func() *catalogcattleiov1.UIPluginList { return &catalogcattleiov1.UIPluginList{} },
+		),
 	}
 }
