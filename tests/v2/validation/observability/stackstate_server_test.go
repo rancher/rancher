@@ -85,7 +85,6 @@ func (sss *StackStateServerTestSuite) SetupSuite() {
 	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
 	sss.stackstateConfigs = &stackstateConfigs
 
-	// Install StackState Chart Repo
 	_, err = sss.catalogClient.ClusterRepos().Get(context.TODO(), observabilityChartName, meta.GetOptions{})
 	if k8sErrors.IsNotFound(err) {
 		err = charts.CreateClusterRepo(sss.client, sss.catalogClient, observabilityChartName, observabilityChartURL)
@@ -107,11 +106,9 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 	defer subsession.Cleanup()
 
 	sss.Run("Install SUSE Observability Chart", func() {
-		// Read cattle config
 		var stackstateConfigs observability.StackStateConfig
 		config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
 
-		// Set base config values
 		baseConfig := observability.BaseConfig{
 			Global: struct {
 				ImageRegistry string `json:"imageRegistry" yaml:"imageRegistry"`
@@ -152,7 +149,6 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 			},
 		}
 
-		// Read sizing config
 		sizingConfigData, err := os.ReadFile("resources/10-nonha_sizing_values.yaml")
 		require.NoError(sss.T(), err)
 
@@ -160,7 +156,6 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		err = yaml.Unmarshal(sizingConfigData, &sizingConfig)
 		require.NoError(sss.T(), err)
 
-		// Convert structs back to map[string]interface{} for chart values
 		ingressConfigMap, err := structToMap(ingressConfig)
 		require.NoError(sss.T(), err)
 
@@ -170,7 +165,6 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		sizingConfigMap, err := structToMap(sizingConfig)
 		require.NoError(sss.T(), err)
 
-		// Merge the values
 		mergedValues := mergeValues(ingressConfigMap, baseConfigMap, sizingConfigMap)
 
 		systemProject, err := rancherProjects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
@@ -178,7 +172,6 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		require.NotNil(sss.T(), systemProject.ID, "System project is nil.")
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
-		// Install the chart
 		err = charts.InstallStackStateChart(sss.client, sss.stackstateChartInstallOptions, sss.stackstateConfigs, systemProjectID, mergedValues)
 		require.NoError(sss.T(), err)
 	})
