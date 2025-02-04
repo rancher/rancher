@@ -12,7 +12,6 @@ import (
 )
 
 func VerifyCreateStatefulset(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
@@ -39,13 +38,12 @@ func VerifyCreateStatefulset(client *rancher.Client, clusterID string) error {
 		nil,
 	)
 
-	logrus.Info("Creating new statefulset")
+	logrus.Infof("Creating new statefulset %s", containerName)
 	statefulsetTemplate, err := CreateStatefulset(client, clusterID, namespace.Name, podTemplate, 1)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Waiting statefulset comes up active")
 	err = charts.WatchAndWaitStatefulSets(client, clusterID, namespace.Name, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + statefulsetTemplate.Name,
 	})

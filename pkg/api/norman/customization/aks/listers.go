@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/subscription/armsubscription"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mcuadros/go-version"
@@ -133,6 +134,8 @@ func NewManagedClustersClient(cap *Capabilities) (*armcontainerservice.ManagedCl
 	return clientFactory.NewManagedClustersClient(), nil
 }
 
+// NewSubscriptionsServiceClient creates a new instance of armsubscription.NewClientFactory from
+// github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/subscription/armsubscription module.
 func NewSubscriptionServiceClient(cap *Capabilities) (*armsubscription.SubscriptionsClient, error) {
 	cloud, _ := GetEnvironment(cap.Environment)
 
@@ -153,6 +156,30 @@ func NewSubscriptionServiceClient(cap *Capabilities) (*armsubscription.Subscript
 	}
 
 	return clientFactory.NewSubscriptionsClient(), nil
+}
+
+// NewSubscriptionServiceNewClient creates a new instance of armsubscriptions.Client from
+// github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions module.
+func NewSubscriptionServiceNewClient(cap *Capabilities) (*armsubscriptions.Client, error) {
+	cloud, _ := GetEnvironment(cap.Environment)
+
+	cred, err := NewClientSecretCredential(cap)
+	if err != nil {
+		return nil, err
+	}
+
+	options := &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloud,
+		},
+	}
+
+	clientFactory, err := armsubscriptions.NewClientFactory(cred, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientFactory.NewClient(), nil
 }
 
 type sortableVersion []string
@@ -527,6 +554,45 @@ func listLocations(ctx context.Context, cap *Capabilities) ([]byte, int, error) 
 	}
 
 	return encodeOutput(locations)
+}
+
+type regionsResponseBody struct {
+	Name              string `json:"name"`
+	DisplayName       string `json:"displayName"`
+	AvailabilityZones bool   `json:"availabilityZones"`
+}
+
+func listRegions(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	client, err := NewSubscriptionServiceNewClient(cap)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	var regions []regionsResponseBody
+	pager := client.NewListLocationsPager(cap.SubscriptionID, &armsubscriptions.ClientListLocationsOptions{IncludeExtendedLocations: nil})
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, http.StatusBadRequest, fmt.Errorf("failed to get regions: %w", err)
+		}
+
+		var region regionsResponseBody
+		for _, v := range page.Value {
+			region = regionsResponseBody{
+				Name:              to.String(v.Name),
+				DisplayName:       to.String(v.DisplayName),
+				AvailabilityZones: false,
+			}
+
+			if len(v.AvailabilityZoneMappings) > 0 {
+				region.AvailabilityZones = true
+			}
+
+			regions = append(regions, region)
+		}
+	}
+
+	return encodeOutput(regions)
 }
 
 func encodeOutput(result interface{}) ([]byte, int, error) {

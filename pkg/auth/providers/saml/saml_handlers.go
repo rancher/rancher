@@ -13,6 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const rancherUserID = "rancherUserID"
+
 // ServeHTTP is the handler for /saml/metadata and /saml/acs endpoints
 func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	serviceProvider := s.serviceProvider
@@ -40,8 +42,11 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Debugf("SAML [ServeHTTP]: assertion validation failed: %q", err)
 
 			if parseErr, ok := err.(*saml.InvalidResponseError); ok {
-				log.Debugf("SAML RESPONSE: ===\n%s\n===\nSAML NOW: %s\nSAML ERROR: %s",
-					parseErr.Response, parseErr.Now, parseErr.PrivateErr)
+				// Note: If access to the response itself is needed (debugging)
+				// just add `parseErr.Response` to the log statement.
+
+				log.Debugf("SAML NOW: %s\nSAML ERROR: %s",
+					parseErr.Now, parseErr.PrivateErr)
 			}
 
 			redirectURL := r.URL.Host + "/login?errorCode=403"
@@ -97,7 +102,7 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 }
 
 // HandleSamlLogin is the endpoint for /saml/login endpoint
-func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (string, error) {
+func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request, userID string) (string, error) {
 	serviceProvider := s.serviceProvider
 	if r.URL.Path == serviceProvider.AcsURL.Path {
 		return "", fmt.Errorf("don't wrap Middleware with RequireAccount")
@@ -121,6 +126,9 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request) (stri
 	claims := state.Claims.(jwt.MapClaims)
 	claims["id"] = req.ID
 	claims["uri"] = r.URL.String()
+	if userID != "" {
+		claims[rancherUserID] = userID
+	}
 
 	signedState, err := state.SignedString(secretBlock)
 	if err != nil {

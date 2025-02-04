@@ -576,6 +576,8 @@ func (grb *globalRoleBindingLifecycle) purgeInvalidNamespacedRBs(rbs []*v1.RoleB
 	return returnError
 }
 
+// updateStatus updates the Status field of the GRB. localConditions are created in each reconciliation loop.
+// Status is only update if any condition has changed.
 func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding, localConditions []metav1.Condition) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grbFromCluster, err := c.grbLister.Get(grb.Name)
@@ -586,18 +588,27 @@ func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding,
 			return nil
 		}
 
-		grbFromCluster.Status.SummaryLocal = status.SummaryCompleted
-		if grbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
-			grbFromCluster.Status.Summary = status.SummaryCompleted
-		}
+		foundError := false
 		for _, c := range localConditions {
 			if c.Status != metav1.ConditionTrue {
 				grbFromCluster.Status.Summary = status.SummaryError
 				grbFromCluster.Status.SummaryLocal = status.SummaryError
+				foundError = true
 				break
 			}
 		}
+		if !foundError {
+			grbFromCluster.Status.SummaryLocal = status.SummaryCompleted
+			isAdminGlobalRole, err := rbac.IsAdminGlobalRole(grb.GlobalRoleName, c.grLister)
+			if err != nil {
+				return err
+			}
+			if !isAdminGlobalRole || grbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
+				grbFromCluster.Status.Summary = status.SummaryCompleted
+			}
+		}
 
+		status.KeepLastTransitionTimeIfConditionHasNotChanged(localConditions, grbFromCluster.Status.LocalConditions)
 		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
 		grbFromCluster.Status.ObservedGenerationLocal = grb.ObjectMeta.Generation
 		grbFromCluster.Status.LocalConditions = localConditions

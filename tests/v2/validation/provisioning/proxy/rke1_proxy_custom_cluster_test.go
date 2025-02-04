@@ -128,5 +128,6 @@ func (r *ProxyRKE1CustomClusterTestSuite) TestProxyRKE1CustomCluster() {
 }
 
 func TestProxyRKE1CustomClusterTestSuite(t *testing.T) {
+	t.Skip("This test has been deprecated; check https://github.com/rancher/tfp-automation for updated tests")
 	suite.Run(t, new(ProxyRKE1CustomClusterTestSuite))
 }

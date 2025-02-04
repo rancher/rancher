@@ -1,15 +1,17 @@
 name: Provisioning tests
 on:
-  pull_request:
-    branches:
-      - main
-      - release/v*
-    paths-ignore:
-      # omit tests from triggering CI except when CI tests are changed
-      - 'tests/v2/validation/**'
-      - 'tests/v2/actions/**'
-      - 'tests/v2/codecoverage/**'
-      - 'tests/validation/**'
+  workflow_call:
+    inputs:
+      parent_run_id:
+        type: string
+        description: "parent run_id to download images from"
+        required: true
+
+env:
+  TAG: v2.11-${{ github.sha }}-head
+  COMMIT: ${{ github.sha }}
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
 jobs:
   provisioning_tests:
     strategy:
@@ -34,6 +36,10 @@ jobs:
           CATTLE_FEATURES: "provisioningprebootstrap=true"
     name: Provisioning tests
     runs-on: runs-on,runner=16cpu-linux-x64,ram=64,run-id=${{ github.run_id }}
+    env:
+      # this is due to the dapper pod having a host-port on the registry-cache container
+      # we can hit this registry from dapper OR the host docker if we use the docker IP
+      REGISTRY: "172.17.0.2:5000"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,10 +49,40 @@ jobs:
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
           chmod +x ./.dapper
-      - name: Configure Docker for cgroupfs
+      - name: Configure Docker for cgroupfs/insecure-registry
         run: |
-          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
+          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"], "insecure-registries": ["172.17.0.2:5000"]}' | sudo tee /etc/docker/daemon.json
           sudo systemctl restart docker
+          sudo docker info
+      - name: Download Docker images artifact
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.parent_run_id }}
+          github-token: ${{ github.token }}
+          path: "/tmp"
+          merge-multiple: true
+      - name: Load rancher/rancher image
+        run: |
+          image_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+
+          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
+          docker tag "$image_id" ${{ env.IMAGE }}:${{ env.TAG }}
+          echo "the image created is ${{ env.IMAGE }}:${{ env.TAG }}"
+      - name: Load rancher/rancher-agent image
+        run: |
+          image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_agent_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+
+          AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
+          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          echo "the image created is ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}"
       - name: Run tests
         run: ./.dapper provisioning-tests
         env:
@@ -54,3 +90,4 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
           CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
+          CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"

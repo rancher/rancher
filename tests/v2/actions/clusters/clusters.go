@@ -404,6 +404,7 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 		ClusterAgentDeploymentCustomization: clusterAgentDeploymentCustomization,
 		FleetAgentDeploymentCustomization:   fleetAgentDeploymentCustomization,
 		AgentEnvVars:                        agentEnvVars,
+		EnableNetworkPolicy:                 &clustersConfig.EnableNetworkPolicy,
 	}
 
 	if clustersConfig.AgentEnvVars != nil {

@@ -3,14 +3,19 @@ description: "Install yq from source"
 inputs:
   version:
     description: "yq version"
-    default: v4.44.3
+    default: v4.45.1
   arch:
     description: "host arch"
     required: true
+  use-sudo:
+    description: "use sudo to move the yq binary"
+    default: false
 runs:
   using: "composite"
   steps:
     - name: install yq
       shell: bash
-      run: curl -fsL https://github.com/mikefarah/yq/releases/download/${{ inputs.version }}/yq_linux_${{ inputs.arch }}.tar.gz | tar xz && mv yq_linux_${{ inputs.arch }} /usr/bin/yq
+      run: |
+        curl -fsL https://github.com/mikefarah/yq/releases/download/${{ inputs.version }}/yq_linux_${{ inputs.arch }}.tar.gz | tar xz
+        ${{ inputs.use-sudo ==  'true' && 'sudo' || '' }} mv yq_linux_${{ inputs.arch }} /usr/bin/yq
 

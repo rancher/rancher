@@ -84,7 +84,6 @@ func (ct *ClusterTemplateExportTestSuite) SetupSuite() {
 	require.NoError(ct.T(), err)
 
 	provisioning.VerifyRKE1Cluster(ct.T(), standardClient, clusterConfig, ct.cluster)
-	provisioning.DisableUpdateConfig(ct.client)
 }
 
 func (ct *ClusterTemplateExportTestSuite) TestExportClusterTemplate() {

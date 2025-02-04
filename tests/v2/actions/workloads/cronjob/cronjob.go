@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	nginxImageName = "nginx"
+	nginxImageName = "public.ecr.aws/docker/library/nginx"
 )
 
 var CronJobGroupVersionResource = schema.GroupVersionResource{

@@ -64,11 +64,10 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 	logrus.Debugf("SAML [testAndEnable]: Final redirect will be (%v)", finalRedirectURL)
 
 	provider.clientState.SetPath(provider.serviceProvider.AcsURL.Path)
-	provider.clientState.SetState(request.Response, request.Request, "Rancher_UserID", provider.userMGR.GetUser(request))
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_Action", testAndEnableAction)
 
-	idpRedirectURL, err := provider.HandleSamlLogin(request.Response, request.Request)
+	idpRedirectURL, err := provider.HandleSamlLogin(request.Response, request.Request, provider.userMGR.GetUser(request))
 	if err != nil {
 		return err
 	}

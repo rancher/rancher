@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	nginxImageName = "nginx"
+	nginxImageName = "public.ecr.aws/docker/library/nginx"
 )
 
 var StatefulsetGroupVersionResource = schema.GroupVersionResource{

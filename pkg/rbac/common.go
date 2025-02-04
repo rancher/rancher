@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/slice"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -278,4 +279,36 @@ func isRuleInTargetAPIGroup(rule rbacv1.PolicyRule) bool {
 		}
 	}
 	return false
+}
+
+// IsAdminGlobalRole detects whether a GlobalRole has admin permissions or not.
+func IsAdminGlobalRole(rtName string, grLister v3.GlobalRoleLister) (bool, error) {
+	gr, err := grLister.Get("", rtName)
+	if err != nil {
+		return false, err
+	}
+
+	// global role is builtin admin role
+	if gr.Builtin && gr.Name == GlobalAdmin {
+		return true, nil
+	}
+
+	var hasResourceRule, hasNonResourceRule bool
+	for _, rule := range gr.Rules {
+		if slice.ContainsString(rule.Resources, "*") && slice.ContainsString(rule.APIGroups, "*") && slice.ContainsString(rule.Verbs, "*") {
+			hasResourceRule = true
+			continue
+		}
+		if slice.ContainsString(rule.NonResourceURLs, "*") && slice.ContainsString(rule.Verbs, "*") {
+			hasNonResourceRule = true
+			continue
+		}
+	}
+
+	// global role has an admin resource rule, and admin nonResourceURLs rule
+	if hasResourceRule && hasNonResourceRule {
+		return true, nil
+	}
+
+	return false, nil
 }

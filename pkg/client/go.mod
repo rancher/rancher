@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/client
 
 go 1.23.0
 
-toolchain go1.23.4
+toolchain go1.23.5
 
 require (
 	github.com/rancher/norman v0.0.0-20241001183610-78a520c160ab

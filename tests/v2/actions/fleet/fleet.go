@@ -123,7 +123,7 @@ func VerifyGitRepo(client *rancher.Client, gitRepoID, k8sClusterID, steveCluster
 		}
 
 		// after checking clusterStatus, check gitRepoStatus. gitRepoStatus can start in a healthy state,
-		// so if errors come up during clusterBundle deployments, its status will update to a negative / error state that aren'
+		// so if errors come up during clusterBundle deployments, its status will update to a negative / error state
 		gitRepo, err := client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(gitRepoID)
 		if err != nil {
 			return false, err

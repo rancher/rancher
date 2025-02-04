@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -44,6 +45,11 @@ func (r *RKE1PSACTTestSuite) SetupSuite() {
 	r.client = client
 
 	if r.provisioningConfig.RKE1KubernetesVersions == nil {
+		rke1Versions, err := kubernetesversions.Default(r.client, clusters.RKE1ClusterType.String(), nil)
+		require.NoError(r.T(), err)
+
+		r.provisioningConfig.RKE1KubernetesVersions = rke1Versions
+	} else if r.provisioningConfig.RKE1KubernetesVersions[0] == "all" {
 		rke1Versions, err := kubernetesversions.ListRKE1AllVersions(r.client)
 		require.NoError(r.T(), err)
 

@@ -66,6 +66,7 @@ RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECT
 LABEL io.cattle.agent=true
 
 ARG RANCHER_REPO=rancher
+ARG VERSION=${VERSION}
 ENV AGENT_IMAGE ${RANCHER_REPO}/rancher-agent:${VERSION}
 # For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
 ARG CATTLE_RANCHER_WEBHOOK_VERSION

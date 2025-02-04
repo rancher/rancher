@@ -8,12 +8,12 @@ import (
 
 func TestPickImagesFromValuesMap(t *testing.T) {
 	testCases := []struct {
-		description         string
 		values              map[interface{}]interface{}
-		chartNameAndVersion string
-		osType              OSType
-		tagToIgnore         string
 		expectedImagesSet   map[string]map[string]struct{}
+		description         string
+		chartNameAndVersion string
+		tagToIgnore         string
+		osType              OSType
 	}{
 		{
 			description: "Want linux images",

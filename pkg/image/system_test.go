@@ -32,11 +32,11 @@ func TestFetchImagesFromSystem(t *testing.T) {
 	}
 
 	testCases := []struct {
-		caseName                  string
 		inputRkeSystemImages      map[string]rketypes.RKESystemImages
-		inputOsType               OSType
+		caseName                  string
 		outputShouldContainImages []string
 		outputShouldNotContain    []string
+		inputOsType               OSType
 	}{
 		{
 			caseName:             "fetch linux images from system images",

@@ -10,7 +10,6 @@ import (
 )
 
 func VerifyCreateCronjob(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
@@ -38,13 +37,12 @@ func VerifyCreateCronjob(client *rancher.Client, clusterID string) error {
 		nil,
 	)
 
-	logrus.Info("Creating new cronjob")
 	cronJobTemplate, err := CreateCronjob(client, clusterID, namespace.Name, "*/1 * * * *", podTemplate)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("Waiting cronjob comes up active")
+	logrus.Infof("Creating new cronjob %s", cronJobTemplate.Name)
 	err = WatchAndWaitCronjob(client, clusterID, namespace.Name, cronJobTemplate)
 
 	return err

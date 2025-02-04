@@ -9,7 +9,6 @@ import (
 )
 
 func VerifyCreateDaemonSet(client *rancher.Client, clusterID string) error {
-	logrus.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(client, clusterID)
 	if err != nil {
 		return err
@@ -21,7 +20,7 @@ func VerifyCreateDaemonSet(client *rancher.Client, clusterID string) error {
 		return err
 	}
 
-	logrus.Info("Waiting daemonset comes up active")
+	logrus.Infof("Waiting for daemonset %s to become active", createdDaemonset.Name)
 	err = charts.WatchAndWaitDaemonSets(client, clusterID, namespace.Name, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + createdDaemonset.Name,
 	})

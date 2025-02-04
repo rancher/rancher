@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +26,7 @@ const RancherVersionAnnotationKey = "catalog.cattle.io/rancher-version"
 var chartsToCheckConstraints = map[string]struct{}{
 	"rancher-istio": {},
 }
+
 var systemChartsToCheckConstraints = map[string]struct{}{
 	"rancher-monitoring": {},
 }
@@ -90,7 +90,7 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 			logrus.Info(err)
 			continue
 		}
-		tag, _ := chartsToIgnoreTags[version.Name]
+		tag := chartsToIgnoreTags[version.Name]
 		chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
 		for _, values := range versionValues {
 			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType, tag); err != nil {
@@ -281,7 +281,7 @@ func decodeValuesFile(path string) (map[interface{}]interface{}, error) {
 }
 
 func decodeYAMLFile(r io.Reader, target interface{}) error {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

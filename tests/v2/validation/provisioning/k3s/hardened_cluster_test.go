@@ -54,6 +54,11 @@ func (c *HardenedK3SClusterProvisioningTestSuite) SetupSuite() {
 	c.client = client
 
 	if c.provisioningConfig.K3SKubernetesVersions == nil {
+		k3sVersions, err := kubernetesversions.Default(c.client, extensionscluster.K3SClusterType.String(), nil)
+		require.NoError(c.T(), err)
+
+		c.provisioningConfig.K3SKubernetesVersions = k3sVersions
+	} else if c.provisioningConfig.K3SKubernetesVersions[0] == "all" {
 		k3sVersions, err := kubernetesversions.ListK3SAllVersions(c.client)
 		require.NoError(c.T(), err)
 
