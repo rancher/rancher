@@ -225,16 +225,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2 and /openapi/v3 supported", nil
 			}
 
-			// Until https://github.com/rancher/rancher/issues/47483 is fixed
-			// we limit nonResourceURLs to what is effectively an admin user
-			attrs := authorizer.AttributesRecord{
-				User:            a.GetUser(),
-				Verb:            "*",
-				APIGroup:        "*",
-				Resource:        "*",
-				ResourceRequest: true,
-			}
-			return aslAuthorizer.Authorize(ctx, attrs)
+			return aslAuthorizer.Authorize(ctx, a)
 		}),
 		SNICerts: additionalSniProviders,
 	}
