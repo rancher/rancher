@@ -10,6 +10,7 @@ import (
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -900,7 +901,6 @@ func userMatch(name string, token *ext.Token) bool {
 // the user creating the token, has access to the cluster the token-to-be is
 // limited in scope to. An error is thrown if not, or when the check itself
 // failed.
-
 func (t *SystemStore) IsClusterAccessible(ctx context.Context, clusterName string) error {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
@@ -931,6 +931,28 @@ func (t *SystemStore) IsClusterAccessible(ctx context.Context, clusterName strin
 	}
 
 	return nil
+}
+
+// Fetch is a convenience function for retrieving a token by name, regardless of
+// type. I.e. this function auto-detects if the referenced token is
+// norman/legacy, or ext, and returns a proper interface hiding the differences
+// from the caller. It is public because it is of use to other parts of rancher,
+// not just here.
+func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
+	// checking for a norman token first, as it is the currently more common
+	// type of tokens. in other words, high probability that we are done
+	// with a single request. or even none, if the token is found in the
+	// cache.
+	if norman, err := t.normanTokenClient.Get(tokenID); err == nil {
+		return norman, nil
+	}
+
+	// not a norman token, now check for ext token
+	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+		return ext, nil
+	}
+
+	return nil, fmt.Errorf("unable to fetch unknown token %s", tokenID)
 }
 
 // ////////////////////////////////////////////////////////////////////////////////
@@ -1024,25 +1046,13 @@ func (tp *tokenAuth) ProviderAndPrincipal(ctx context.Context, store *SystemStor
 		return "", "", err
 	}
 
-	// check for norman token first, as the currently more common type of tokens.
-	// in other words, high probability that we are done with a single request.
-	// or even none, for the tokens in the cache.
-	if norman, err := store.normanTokenClient.Get(tokenID); err == nil {
-		provider := norman.AuthProvider
-		principal := norman.UserPrincipal.Name
-
-		return provider, principal, nil
+	token, err := store.Fetch(tokenID)
+	if err != nil {
+		// Well, an invalid token has invalid data
+		return "", "", fmt.Errorf("context contains invalid provider/principal data")
 	}
 
-	// not a norman token, now check for ext token
-	if ext, err := store.Get(tokenID, &metav1.GetOptions{}); err == nil {
-		provider := ext.Status.AuthProvider
-		principal := ext.Status.PrincipalID
-
-		return provider, principal, nil
-	}
-
-	return "", "", fmt.Errorf("context contains invalid provider/principal data")
+	return token.GetAuthProvider(), token.GetUserPrincipal().Name, nil
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
