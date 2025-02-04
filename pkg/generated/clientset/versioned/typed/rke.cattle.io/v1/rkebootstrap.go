@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type RKEBootstrapsGetter interface {
 
 // RKEBootstrapInterface has methods to work with RKEBootstrap resources.
 type RKEBootstrapInterface interface {
-	Create(ctx context.Context, rKEBootstrap *v1.RKEBootstrap, opts metav1.CreateOptions) (*v1.RKEBootstrap, error)
-	Update(ctx context.Context, rKEBootstrap *v1.RKEBootstrap, opts metav1.UpdateOptions) (*v1.RKEBootstrap, error)
+	Create(ctx context.Context, rKEBootstrap *rkecattleiov1.RKEBootstrap, opts metav1.CreateOptions) (*rkecattleiov1.RKEBootstrap, error)
+	Update(ctx context.Context, rKEBootstrap *rkecattleiov1.RKEBootstrap, opts metav1.UpdateOptions) (*rkecattleiov1.RKEBootstrap, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, rKEBootstrap *v1.RKEBootstrap, opts metav1.UpdateOptions) (*v1.RKEBootstrap, error)
+	UpdateStatus(ctx context.Context, rKEBootstrap *rkecattleiov1.RKEBootstrap, opts metav1.UpdateOptions) (*rkecattleiov1.RKEBootstrap, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.RKEBootstrap, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.RKEBootstrapList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rkecattleiov1.RKEBootstrap, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*rkecattleiov1.RKEBootstrapList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RKEBootstrap, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKEBootstrap, err error)
 	RKEBootstrapExpansion
 }
 
 // rKEBootstraps implements RKEBootstrapInterface
 type rKEBootstraps struct {
-	*gentype.ClientWithList[*v1.RKEBootstrap, *v1.RKEBootstrapList]
+	*gentype.ClientWithList[*rkecattleiov1.RKEBootstrap, *rkecattleiov1.RKEBootstrapList]
 }
 
 // newRKEBootstraps returns a RKEBootstraps
 func newRKEBootstraps(c *RkeV1Client, namespace string) *rKEBootstraps {
 	return &rKEBootstraps{
-		gentype.NewClientWithList[*v1.RKEBootstrap, *v1.RKEBootstrapList](
+		gentype.NewClientWithList[*rkecattleiov1.RKEBootstrap, *rkecattleiov1.RKEBootstrapList](
 			"rkebootstraps",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.RKEBootstrap { return &v1.RKEBootstrap{} },
-			func() *v1.RKEBootstrapList { return &v1.RKEBootstrapList{} }),
+			func() *rkecattleiov1.RKEBootstrap { return &rkecattleiov1.RKEBootstrap{} },
+			func() *rkecattleiov1.RKEBootstrapList { return &rkecattleiov1.RKEBootstrapList{} },
+		),
 	}
 }

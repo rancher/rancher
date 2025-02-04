@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	catalogcattleiov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type OperationsGetter interface {
 
 // OperationInterface has methods to work with Operation resources.
 type OperationInterface interface {
-	Create(ctx context.Context, operation *v1.Operation, opts metav1.CreateOptions) (*v1.Operation, error)
-	Update(ctx context.Context, operation *v1.Operation, opts metav1.UpdateOptions) (*v1.Operation, error)
+	Create(ctx context.Context, operation *catalogcattleiov1.Operation, opts metav1.CreateOptions) (*catalogcattleiov1.Operation, error)
+	Update(ctx context.Context, operation *catalogcattleiov1.Operation, opts metav1.UpdateOptions) (*catalogcattleiov1.Operation, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, operation *v1.Operation, opts metav1.UpdateOptions) (*v1.Operation, error)
+	UpdateStatus(ctx context.Context, operation *catalogcattleiov1.Operation, opts metav1.UpdateOptions) (*catalogcattleiov1.Operation, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Operation, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.OperationList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*catalogcattleiov1.Operation, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*catalogcattleiov1.OperationList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Operation, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *catalogcattleiov1.Operation, err error)
 	OperationExpansion
 }
 
 // operations implements OperationInterface
 type operations struct {
-	*gentype.ClientWithList[*v1.Operation, *v1.OperationList]
+	*gentype.ClientWithList[*catalogcattleiov1.Operation, *catalogcattleiov1.OperationList]
 }
 
 // newOperations returns a Operations
 func newOperations(c *CatalogV1Client, namespace string) *operations {
 	return &operations{
-		gentype.NewClientWithList[*v1.Operation, *v1.OperationList](
+		gentype.NewClientWithList[*catalogcattleiov1.Operation, *catalogcattleiov1.OperationList](
 			"operations",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Operation { return &v1.Operation{} },
-			func() *v1.OperationList { return &v1.OperationList{} }),
+			func() *catalogcattleiov1.Operation { return &catalogcattleiov1.Operation{} },
+			func() *catalogcattleiov1.OperationList { return &catalogcattleiov1.OperationList{} },
+		),
 	}
 }
