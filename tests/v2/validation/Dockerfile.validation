@@ -20,8 +20,8 @@ RUN go mod download && \
 # Configure Corral
 ENV CORRAL_VERSION="v1.1.1"
 RUN go install github.com/rancherlabs/corral@${CORRAL_VERSION}
-
 RUN mkdir /root/.ssh && chmod 600 .ssh/jenkins-*
+RUN zypper install -y openssh
 RUN for pem_file in .ssh/jenkins-*; do \
       ssh-keygen -f "$pem_file" -y > "/root/.ssh/$(basename "$pem_file").pub"; \
     done
@@ -34,7 +34,7 @@ SHELL ["/bin/bash", "-c"]
 RUN if [[ -z '$EXTERNAL_ENCODED_VPN' ]] ; then \
       echo 'no vpn provided' ; \
     else \
-      apt-get update && apt-get -y install openvpn net-tools && \
+      zypper refresh && zypper install -y openvpn net-tools && \
       echo $EXTERNAL_ENCODED_VPN | base64 -d > external.ovpn && \
       if [[ -z '$VPN_ENCODED_LOGIN' ]] ; then \
         echo 'no passcode provided' ; \
