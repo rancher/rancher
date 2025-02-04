@@ -3,6 +3,7 @@ package useractivity
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
@@ -93,20 +94,20 @@ func (uas *Store) Create(ctx context.Context,
 	if !ok {
 		return nil, fmt.Errorf("error casting runtime object to UserActivity")
 	}
-
+	// retrieve token information
 	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenId, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenId, err)
 	}
-
+	// retrieve user name
 	user, err := uas.checker.UserName(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("no user found: %v", err)
 	}
-
-	lastActivity := metav1.Now()
+	// set when last activity happened
+	lastActivity := metav1.Now().UTC()
 	// TODO: replace '10' with the value of auth-user-session-ttl-minutes
-	return uas.create(ctx, objUserActivity, token, user, lastActivity, 10)
+	return uas.create(ctx, objUserActivity, token, user, lastActivity, 2)
 }
 
 // create sets the LastActivity and CurrentTimeout fields on the UserActivity object
@@ -115,21 +116,26 @@ func (uas *Store) create(_ context.Context,
 	userActivity *ext.UserActivity,
 	token *v3Legacy.Token,
 	user string,
-	lastActivity metav1.Time,
+	lastActivity time.Time,
 	authUserSessionTtlMinutes int) (*ext.UserActivity, error) {
-	if token.UserID != userActivity.Spec.TokenId {
-		return nil, fmt.Errorf("token from request and token from session mismatch")
+
+	// UserActivity name must have the following format:
+	// ua_$(USER)_$(TOKEN)
+	expectedName := strings.Join([]string{"ua", user, token.UserID}, "_")
+	// ensure the UserActivity object is crafted as expected.
+	if userActivity.Name != expectedName {
+		return nil, fmt.Errorf("UserActivity name: %s mismatch from the expected one: %s", userActivity.Name, expectedName)
 	}
-	// verifies the token has label with user which made the request.
-	if token.Labels[tokenUserId] != user {
-		return nil, fmt.Errorf("token label userId is different from user")
+	// ensure the token specified in the UserActivity is the same
+	// we are using to do the request.
+	if token.UserID != userActivity.Spec.TokenId {
+		return nil, fmt.Errorf("Token from request: %s and token from session: %s mismatch", token.UserID, userActivity.Spec.TokenId)
 	}
 
 	// once validated the request, we can define the lastActivity time.
 	newIdleTimeout := metav1.Time{
 		Time: lastActivity.Local().Add(time.Minute * time.Duration(authUserSessionTtlMinutes)).UTC(),
 	}
-
 	token.LastIdleTimeout = newIdleTimeout
 	userActivity.Status.LastActivity = lastActivity.String()
 	userActivity.Status.CurrentTimeout = newIdleTimeout.String()
@@ -155,7 +161,50 @@ func (uas *Store) Delete(ctx context.Context,
 func (uas *Store) Get(ctx context.Context,
 	name string,
 	options *metav1.GetOptions) (runtime.Object, error) {
-	return nil, fmt.Errorf("unable to get useractivity")
+	// retrieve user name
+	user, err := uas.checker.UserName(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("no user found: %v", err)
+	}
+	return uas.get(ctx, user, name, options)
+}
+
+// get returns the UserActivity based on the token name.
+// It is used to know, from the frontend, how much time is
+// remained before the idle timeout.
+func (uas *Store) get(ctx context.Context, user string, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
+	// UserActivity name must have the following format:
+	// ua_$(USER)_$(TOKEN)
+	uaName := strings.Split(uaname, "_")
+	if len(uaName) != 3 {
+		return nil, fmt.Errorf("UserActivity name is wrong")
+	}
+	// retrieve token information
+	tokenId := uaName[2]
+	token, err := uas.tokenController.Get(tokenId, *options)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get token %s: %v", tokenId, err)
+	}
+	// verify user is the same
+	userId := uaName[1]
+	if userId != user {
+		return nil, fmt.Errorf("UserActivity name: %s and user: %s don't match", userId, user)
+	}
+
+	// crafting UserActivity from requested Token name.
+	ua := &ext.UserActivity{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: uaname,
+		},
+		Spec: ext.UserActivitySpec{
+			TokenId: token.UserID,
+		},
+		Status: ext.UserActivityStatus{
+			CurrentTimeout: token.LastIdleTimeout.String(),
+		},
+	}
+
+	return ua, nil
 }
 
 // NewList implements [rest.Lister]
@@ -187,7 +236,8 @@ func (uas *Store) Update(ctx context.Context,
 	objInfo rest.UpdatedObjectInfo,
 	createValidation rest.ValidateObjectFunc,
 	updateValidation rest.ValidateObjectUpdateFunc,
-	forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	forceAllowCreate bool,
+	options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	return nil, false, fmt.Errorf("unable to update useractivity")
 }
 

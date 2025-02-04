@@ -3,6 +3,7 @@ package useractivity
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -11,7 +12,9 @@ import (
 	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestStore_create(t *testing.T) {
@@ -27,7 +30,7 @@ func TestStore_create(t *testing.T) {
 		userActivity *ext.UserActivity
 		token        *v3Legacy.Token
 		user         string
-		lastActivity v1.Time
+		lastActivity time.Time
 		idleMins     int
 	}
 	tests := []struct {
@@ -42,6 +45,9 @@ func TestStore_create(t *testing.T) {
 			args: args{
 				in0: nil,
 				userActivity: &ext.UserActivity{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "ua_admin_u-mo773yttt4",
+					},
 					Spec: ext.UserActivitySpec{
 						TokenId: "u-mo773yttt4",
 					},
@@ -54,11 +60,9 @@ func TestStore_create(t *testing.T) {
 					},
 					UserID: "u-mo773yttt4",
 				},
-				user: "admin",
-				lastActivity: v1.Time{
-					Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
-				},
-				idleMins: 10,
+				user:         "admin",
+				lastActivity: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+				idleMins:     10,
 			},
 			mockSetup: func() {
 				// we don't care about the object returned by the Update function,
@@ -70,6 +74,9 @@ func TestStore_create(t *testing.T) {
 				).Times(1)
 			},
 			want: &ext.UserActivity{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "ua_admin_u-mo773yttt4",
+				},
 				Spec: ext.UserActivitySpec{
 					TokenId: "u-mo773yttt4",
 				},
@@ -130,6 +137,9 @@ func TestStore_create(t *testing.T) {
 			args: args{
 				in0: nil,
 				userActivity: &ext.UserActivity{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "ua_admin_u-mo773yttt4",
+					},
 					Spec: ext.UserActivitySpec{
 						TokenId: "u-mo773yttt4",
 					},
@@ -142,11 +152,9 @@ func TestStore_create(t *testing.T) {
 					},
 					UserID: "u-mo773yttt4",
 				},
-				user: "admin",
-				lastActivity: v1.Time{
-					Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
-				},
-				idleMins: 10,
+				user:         "admin",
+				lastActivity: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).UTC(),
+				idleMins:     10,
 			},
 			mockSetup: func() {
 				mockTokenControllerFake.EXPECT().Update(gomock.Any()).DoAndReturn(
@@ -169,6 +177,117 @@ func TestStore_create(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Store.create() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStore_get(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
+	uas := &Store{
+		tokenController: mockTokenControllerFake,
+		checker:         nil,
+	}
+	contextBG := context.Background()
+	type args struct {
+		ctx     context.Context
+		user    string
+		name    string
+		options *metav1.GetOptions
+	}
+	tests := []struct {
+		name      string
+		args      args
+		mockSetup func()
+		want      runtime.Object
+		wantErr   bool
+	}{
+		{
+			name: "valid useractivity retrieved",
+			args: args{
+				ctx:     contextBG,
+				user:    "admin",
+				name:    "ua_admin_token-12345",
+				options: &v1.GetOptions{},
+			},
+			mockSetup: func() {
+				mockTokenControllerFake.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&v3Legacy.Token{
+					UserID: "token-12345",
+					LastIdleTimeout: v1.Time{
+						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+					},
+				}, nil).Times(1)
+			},
+			want: &ext.UserActivity{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "ua_admin_token-12345",
+				},
+				Spec: ext.UserActivitySpec{
+					TokenId: "token-12345",
+				},
+				Status: ext.UserActivityStatus{
+					CurrentTimeout: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid useractivity name",
+			args: args{
+				ctx:     contextBG,
+				user:    "admin",
+				name:    "ua_admin_token_12345",
+				options: &v1.GetOptions{},
+			},
+			mockSetup: func() {},
+			want:      nil,
+			wantErr:   true,
+		},
+		{
+			name: "invalid token retrieved",
+			args: args{
+				ctx:     contextBG,
+				user:    "admin",
+				name:    "ua_admin_token-12345",
+				options: &v1.GetOptions{},
+			},
+			mockSetup: func() {
+				mockTokenControllerFake.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("invalid token name")).Times(1)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "invalid user name retrieved",
+			args: args{
+				ctx:     contextBG,
+				user:    "admin",
+				name:    "ua_user1_token-12345",
+				options: &v1.GetOptions{},
+			},
+			mockSetup: func() {
+				mockTokenControllerFake.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&v3Legacy.Token{
+					UserID: "token-12345",
+					LastIdleTimeout: v1.Time{
+						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+					},
+				}, nil).Times(1)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		tt.mockSetup()
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := uas.get(tt.args.ctx, tt.args.user, tt.args.name, tt.args.options)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Store.get() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Store.get() = %v, want %v", got, tt.want)
 			}
 		})
 	}
