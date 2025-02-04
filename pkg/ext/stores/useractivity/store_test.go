@@ -12,7 +12,6 @@ import (
 	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -194,7 +193,7 @@ func TestStore_get(t *testing.T) {
 		ctx     context.Context
 		user    string
 		name    string
-		options *metav1.GetOptions
+		options *v1.GetOptions
 	}
 	tests := []struct {
 		name      string
