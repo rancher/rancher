@@ -223,6 +223,7 @@ func (c *ResourceSyncController) sync(key string, obj *corev1.Secret) (runtime.O
 		logrus.Debugf("[resource-sync][secret] creating secret %v/%v in cluster %v", ns, name, c.clusterName)
 
 		newSecret := &corev1.Secret{
+			Type:       obj.Type,
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
 			Data:       obj.Data,
 		}
