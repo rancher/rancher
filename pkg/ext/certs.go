@@ -212,6 +212,8 @@ func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 			if err := p.secrets.Delete(Namespace, p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 				logrus.Error(err)
 			}
+
+			return nil
 		case <-time.After(certCheckInterval):
 			if err := p.handleCert(); err != nil {
 				logrus.Error(err)
@@ -328,7 +330,7 @@ func (p *rotatingSNIProvider) handleCertEvent(event watch.Event) error {
 		secret := event.Object.(*corev1.Secret)
 		certData, ok := secret.Data[SecretFieldNameCert]
 		if !ok {
-			return fmt.Errorf("secret does not container field '%s'", SecretFieldNameCert)
+			return fmt.Errorf("secret does not contain field '%s'", SecretFieldNameCert)
 		}
 
 		keyData, ok := secret.Data[SecretFieldNameKey]
