@@ -447,4 +447,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/rancher/shepherd => github.com/git-ival/shepherd v0.0.0-20241015170255-908d10899ff5
+replace github.com/rancher/shepherd => github.com/git-ival/shepherd v0.0.0-20250204235746-1ff7549b3ecd
