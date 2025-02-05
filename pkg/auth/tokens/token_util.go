@@ -67,10 +67,6 @@ func IsIdleExpired(token v3.Token, lastTimeActivity metav1.Time) bool {
 		return false
 	}
 
-	fmt.Println("last idle timeout:", token.LastIdleTimeout.String())
-	fmt.Println("last time activity:", lastTimeActivity.String())
-	fmt.Println("================================================")
-	fmt.Println()
 	return token.LastIdleTimeout.Compare(lastTimeActivity.Time) <= 0
 }
 
@@ -172,7 +168,6 @@ func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error)
 
 	currentTime := metav1.Now()
 	if IsIdleExpired(*storedToken, currentTime) {
-		fmt.Println("EXPIRED")
 		return http.StatusGone, errors.New("must authenticate, idle session timeout expired")
 	}
 	return http.StatusOK, nil
