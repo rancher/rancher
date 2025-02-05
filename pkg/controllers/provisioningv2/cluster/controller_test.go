@@ -24,6 +24,65 @@ func TestRegexp(t *testing.T) {
 	assert.False(t, mgmtNameRegexp.MatchString("ac-12345b"))
 }
 
+func TestController_updateImportedCluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		cluster     *v1.Cluster
+		mgmtCluster *v3.Cluster
+	}{
+		{
+			name: "test-override",
+			cluster: &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"foo": "bar"},
+					Annotations: map[string]string{"test.io": "true"},
+				},
+				Spec: v1.ClusterSpec{
+					ClusterAgentDeploymentCustomization: getTestClusterAgentCustomizationV1(),
+				},
+			},
+			mgmtCluster: &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"foo": "bar2"},
+					Annotations: map[string]string{"test.io": "false"},
+				},
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						ClusterAgentDeploymentCustomization: getTestClusterAgentCustomizationV3Updated(),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](mockCtrl)
+			clusterCache.EXPECT().Get(gomock.AssignableToTypeOf("")).Return(tt.mgmtCluster, nil).AnyTimes()
+
+			h := handler{
+				mgmtClusterCache: clusterCache,
+			}
+
+			obj, _, err := h.updateImportedCluster(tt.cluster, tt.cluster.Status, tt.mgmtCluster)
+
+			assert.Nil(t, err)
+
+			jsonData, _ := json.Marshal(obj[0])
+			var legacyCluster v3.Cluster
+			json.Unmarshal(jsonData, &legacyCluster)
+
+			switch tt.name {
+			case "test-override":
+				assert.Equal(t, tt.mgmtCluster.Labels, legacyCluster.Labels)
+				assert.Equal(t, tt.mgmtCluster.Annotations, legacyCluster.Annotations)
+				assert.Equal(t, tt.mgmtCluster.Spec.ClusterAgentDeploymentCustomization, legacyCluster.Spec.ClusterAgentDeploymentCustomization)
+			}
+		})
+	}
+}
+
 func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -140,6 +199,7 @@ func TestController_createNewCluster(t *testing.T) {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: v1.ClusterSpec{
+					RKEConfig:                           &v1.RKEConfig{},
 					ClusterAgentDeploymentCustomization: getTestClusterAgentCustomizationV1(),
 					FleetAgentDeploymentCustomization:   getTestFleetAgentCustomizationV1(),
 				},
@@ -153,10 +213,17 @@ func TestController_createNewCluster(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](mockCtrl)
 	clusterCache.EXPECT().Get(gomock.AssignableToTypeOf("")).Return(&v3.Cluster{}, nil).AnyTimes()
+	featureCache := fake.NewMockNonNamespacedCacheInterface[*v3.Feature](mockCtrl)
+	rkeLockedValue := true
+	featureCache.EXPECT().Get(gomock.AssignableToTypeOf("")).Return(&v3.Feature{
+		ObjectMeta: metav1.ObjectMeta{Name: "rke2"},
+		Status:     v3.FeatureStatus{LockedValue: &rkeLockedValue},
+	}, nil).AnyTimes()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := handler{
 				mgmtClusterCache: clusterCache,
+				featureCache:     featureCache,
 			}
 
 			obj, _, err := h.createNewCluster(tt.cluster, tt.cluster.Status, tt.clusterSpec)
@@ -192,6 +259,22 @@ func getTestClusterAgentCustomizationV3() *v3.AgentDeploymentCustomization {
 		AppendTolerations:            getTestClusterAgentToleration(),
 		OverrideAffinity:             getTestClusterAgentAffinity(),
 		OverrideResourceRequirements: getTestClusterAgentResourceReq(),
+	}
+}
+
+func getTestClusterAgentCustomizationV3Updated() *v3.AgentDeploymentCustomization {
+	resourceRequirements := &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse("700"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("250Mi"),
+		},
+	}
+	return &v3.AgentDeploymentCustomization{
+		AppendTolerations:            getTestClusterAgentToleration(),
+		OverrideAffinity:             getTestClusterAgentAffinity(),
+		OverrideResourceRequirements: resourceRequirements,
 	}
 }
 

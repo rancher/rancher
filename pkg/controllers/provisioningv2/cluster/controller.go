@@ -333,9 +333,49 @@ func mgmtClusterName() (string, error) {
 	return name.SafeConcatName("c", "m", rand[:8]), nil
 }
 
+func (h *handler) updateImportedCluster(cluster *v1.Cluster, status v1.ClusterStatus, mgmtCluster *v3.Cluster) ([]runtime.Object, v1.ClusterStatus, error) {
+	newCluster := &v3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        mgmtCluster.Name,
+			Labels:      mgmtCluster.Labels,
+			Annotations: mgmtCluster.Annotations,
+		},
+		Spec: mgmtCluster.Spec,
+	}
+
+	if features.ProvisioningV2FleetWorkspaceBackPopulation.Enabled() {
+		if forcedFleetWorkspaceName, ok := cluster.Annotations[fleetWorkspaceNameAnn]; ok && forcedFleetWorkspaceName != "" { // force set the fleet workspace name
+			newCluster.Spec.FleetWorkspaceName = forcedFleetWorkspaceName
+		}
+		// backpopulateMgmtClusterFleetWorkspaceName() is not required, newCluster already has FleetWorkspaceName from mgmt cluster
+	}
+
+	delete(cluster.Annotations, creatorIDAnn)
+	status.FleetWorkspaceName = newCluster.Spec.FleetWorkspaceName
+
+	normalizedCluster, err := NormalizeCluster(newCluster, cluster.Spec.RKEConfig == nil)
+	if err != nil {
+		return nil, status, err
+	}
+
+	return h.updateStatus([]runtime.Object{
+		normalizedCluster,
+	}, cluster, status, newCluster)
+}
+
 // createNewCluster creates a homologated clusters.management.cattle.io/v3 object based on a
 // clusters.provisioning.cattle.io/v1 object and the spec of the clusters.management.cattle.io/v3 object passed in.
+// It ensures the management cluster remains the source of truth for imported clusters after cluster creation.
 func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
+	if cluster.Spec.RKEConfig == nil {
+		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+		if err == nil {
+			return h.updateImportedCluster(cluster, status, mgmtCluster)
+		} else if !apierror.IsNotFound(err) {
+			return nil, status, err
+		}
+	}
+
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
 	spec.DefaultPodSecurityAdmissionConfigurationTemplateName = cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
