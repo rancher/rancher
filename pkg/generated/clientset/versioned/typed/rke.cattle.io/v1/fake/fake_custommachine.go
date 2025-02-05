@@ -19,129 +19,32 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeCustomMachines implements CustomMachineInterface
-type FakeCustomMachines struct {
+// fakeCustomMachines implements CustomMachineInterface
+type fakeCustomMachines struct {
+	*gentype.FakeClientWithList[*v1.CustomMachine, *v1.CustomMachineList]
 	Fake *FakeRkeV1
-	ns   string
 }
 
-var custommachinesResource = v1.SchemeGroupVersion.WithResource("custommachines")
-
-var custommachinesKind = v1.SchemeGroupVersion.WithKind("CustomMachine")
-
-// Get takes name of the customMachine, and returns the corresponding customMachine object, and an error if there is any.
-func (c *FakeCustomMachines) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CustomMachine, err error) {
-	emptyResult := &v1.CustomMachine{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(custommachinesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeCustomMachines(fake *FakeRkeV1, namespace string) rkecattleiov1.CustomMachineInterface {
+	return &fakeCustomMachines{
+		gentype.NewFakeClientWithList[*v1.CustomMachine, *v1.CustomMachineList](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("custommachines"),
+			v1.SchemeGroupVersion.WithKind("CustomMachine"),
+			func() *v1.CustomMachine { return &v1.CustomMachine{} },
+			func() *v1.CustomMachineList { return &v1.CustomMachineList{} },
+			func(dst, src *v1.CustomMachineList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.CustomMachineList) []*v1.CustomMachine { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.CustomMachineList, items []*v1.CustomMachine) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1.CustomMachine), err
-}
-
-// List takes label and field selectors, and returns the list of CustomMachines that match those selectors.
-func (c *FakeCustomMachines) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CustomMachineList, err error) {
-	emptyResult := &v1.CustomMachineList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(custommachinesResource, custommachinesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.CustomMachineList{ListMeta: obj.(*v1.CustomMachineList).ListMeta}
-	for _, item := range obj.(*v1.CustomMachineList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested customMachines.
-func (c *FakeCustomMachines) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(custommachinesResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a customMachine and creates it.  Returns the server's representation of the customMachine, and an error, if there is any.
-func (c *FakeCustomMachines) Create(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.CreateOptions) (result *v1.CustomMachine, err error) {
-	emptyResult := &v1.CustomMachine{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(custommachinesResource, c.ns, customMachine, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.CustomMachine), err
-}
-
-// Update takes the representation of a customMachine and updates it. Returns the server's representation of the customMachine, and an error, if there is any.
-func (c *FakeCustomMachines) Update(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.UpdateOptions) (result *v1.CustomMachine, err error) {
-	emptyResult := &v1.CustomMachine{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(custommachinesResource, c.ns, customMachine, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.CustomMachine), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCustomMachines) UpdateStatus(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.UpdateOptions) (result *v1.CustomMachine, err error) {
-	emptyResult := &v1.CustomMachine{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(custommachinesResource, "status", c.ns, customMachine, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.CustomMachine), err
-}
-
-// Delete takes name of the customMachine and deletes it. Returns an error if one occurs.
-func (c *FakeCustomMachines) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(custommachinesResource, c.ns, name, opts), &v1.CustomMachine{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCustomMachines) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(custommachinesResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.CustomMachineList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched customMachine.
-func (c *FakeCustomMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CustomMachine, err error) {
-	emptyResult := &v1.CustomMachine{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(custommachinesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.CustomMachine), err
 }

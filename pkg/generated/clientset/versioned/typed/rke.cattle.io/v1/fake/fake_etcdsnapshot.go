@@ -19,129 +19,32 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeETCDSnapshots implements ETCDSnapshotInterface
-type FakeETCDSnapshots struct {
+// fakeETCDSnapshots implements ETCDSnapshotInterface
+type fakeETCDSnapshots struct {
+	*gentype.FakeClientWithList[*v1.ETCDSnapshot, *v1.ETCDSnapshotList]
 	Fake *FakeRkeV1
-	ns   string
 }
 
-var etcdsnapshotsResource = v1.SchemeGroupVersion.WithResource("etcdsnapshots")
-
-var etcdsnapshotsKind = v1.SchemeGroupVersion.WithKind("ETCDSnapshot")
-
-// Get takes name of the eTCDSnapshot, and returns the corresponding eTCDSnapshot object, and an error if there is any.
-func (c *FakeETCDSnapshots) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ETCDSnapshot, err error) {
-	emptyResult := &v1.ETCDSnapshot{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(etcdsnapshotsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeETCDSnapshots(fake *FakeRkeV1, namespace string) rkecattleiov1.ETCDSnapshotInterface {
+	return &fakeETCDSnapshots{
+		gentype.NewFakeClientWithList[*v1.ETCDSnapshot, *v1.ETCDSnapshotList](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("etcdsnapshots"),
+			v1.SchemeGroupVersion.WithKind("ETCDSnapshot"),
+			func() *v1.ETCDSnapshot { return &v1.ETCDSnapshot{} },
+			func() *v1.ETCDSnapshotList { return &v1.ETCDSnapshotList{} },
+			func(dst, src *v1.ETCDSnapshotList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.ETCDSnapshotList) []*v1.ETCDSnapshot { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.ETCDSnapshotList, items []*v1.ETCDSnapshot) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1.ETCDSnapshot), err
-}
-
-// List takes label and field selectors, and returns the list of ETCDSnapshots that match those selectors.
-func (c *FakeETCDSnapshots) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ETCDSnapshotList, err error) {
-	emptyResult := &v1.ETCDSnapshotList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(etcdsnapshotsResource, etcdsnapshotsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.ETCDSnapshotList{ListMeta: obj.(*v1.ETCDSnapshotList).ListMeta}
-	for _, item := range obj.(*v1.ETCDSnapshotList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested eTCDSnapshots.
-func (c *FakeETCDSnapshots) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(etcdsnapshotsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a eTCDSnapshot and creates it.  Returns the server's representation of the eTCDSnapshot, and an error, if there is any.
-func (c *FakeETCDSnapshots) Create(ctx context.Context, eTCDSnapshot *v1.ETCDSnapshot, opts metav1.CreateOptions) (result *v1.ETCDSnapshot, err error) {
-	emptyResult := &v1.ETCDSnapshot{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(etcdsnapshotsResource, c.ns, eTCDSnapshot, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ETCDSnapshot), err
-}
-
-// Update takes the representation of a eTCDSnapshot and updates it. Returns the server's representation of the eTCDSnapshot, and an error, if there is any.
-func (c *FakeETCDSnapshots) Update(ctx context.Context, eTCDSnapshot *v1.ETCDSnapshot, opts metav1.UpdateOptions) (result *v1.ETCDSnapshot, err error) {
-	emptyResult := &v1.ETCDSnapshot{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(etcdsnapshotsResource, c.ns, eTCDSnapshot, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ETCDSnapshot), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeETCDSnapshots) UpdateStatus(ctx context.Context, eTCDSnapshot *v1.ETCDSnapshot, opts metav1.UpdateOptions) (result *v1.ETCDSnapshot, err error) {
-	emptyResult := &v1.ETCDSnapshot{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(etcdsnapshotsResource, "status", c.ns, eTCDSnapshot, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ETCDSnapshot), err
-}
-
-// Delete takes name of the eTCDSnapshot and deletes it. Returns an error if one occurs.
-func (c *FakeETCDSnapshots) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(etcdsnapshotsResource, c.ns, name, opts), &v1.ETCDSnapshot{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeETCDSnapshots) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(etcdsnapshotsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.ETCDSnapshotList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched eTCDSnapshot.
-func (c *FakeETCDSnapshots) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ETCDSnapshot, err error) {
-	emptyResult := &v1.ETCDSnapshot{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(etcdsnapshotsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ETCDSnapshot), err
 }

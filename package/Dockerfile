@@ -45,18 +45,18 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG CHART_DEFAULT_BRANCH=dev-v2.11
+ARG CHART_DEFAULT_BRANCH=v1.32-rancher
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.10
+ARG CATTLE_KDM_BRANCH=v1.32-rancher
 ARG VERSION=${VERSION}
 
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher125
-ENV CATTLE_K3S_VERSION v1.31.1+k3s1
+ENV CATTLE_K3S_VERSION v1.32.0+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.14
 ENV TINI_VERSION v0.18.0
@@ -105,7 +105,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
     # in git.rancher.io
     git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
     # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone -b $CATTLE_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721/ && \
+    git clone -b $CATTLE_CHART_DEFAULT_BRANCH --depth 1 https://github.com/chiukapoor/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/cf3633ed98cd12a6fef63cafe25250982640225938313fb83b553d458f095d28/ && \
     git clone -b $CATTLE_PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 && \
     git clone -b $CATTLE_RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 && \
     # Revert the previous change in git.rancher.io from .gitconfig
@@ -132,7 +132,7 @@ ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERS
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.31.1-k3s1 \
+COPY --from=rancher/k3s:v1.32.0-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -224,7 +224,7 @@ ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
-RUN curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
+RUN curl -sLf https://raw.githubusercontent.com/chiukapoor/kontainer-driver-metadata/refs/heads/${CATTLE_KDM_BRANCH}/data/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
 ENV ETCDCTL_API=3
 
@@ -235,7 +235,7 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 # Enable exporting of the k3s images as part of the build process.
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS images
 
-ENV CATTLE_K3S_VERSION v1.31.1+k3s1
+ENV CATTLE_K3S_VERSION v1.32.0+k3s1
 
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 

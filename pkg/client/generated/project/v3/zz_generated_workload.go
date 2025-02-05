@@ -66,10 +66,12 @@ const (
 	WorkloadFieldReplicationControllerConfig          = "replicationControllerConfig"
 	WorkloadFieldReplicationControllerStatus          = "replicationControllerStatus"
 	WorkloadFieldResourceClaims                       = "resourceClaims"
+	WorkloadFieldResources                            = "resources"
 	WorkloadFieldRestartPolicy                        = "restartPolicy"
 	WorkloadFieldRunAsGroup                           = "runAsGroup"
 	WorkloadFieldRunAsNonRoot                         = "runAsNonRoot"
 	WorkloadFieldRuntimeClassName                     = "runtimeClassName"
+	WorkloadFieldSELinuxChangePolicy                  = "seLinuxChangePolicy"
 	WorkloadFieldScale                                = "scale"
 	WorkloadFieldScheduling                           = "scheduling"
 	WorkloadFieldSchedulingGates                      = "schedulingGates"
@@ -161,10 +163,12 @@ type Workload struct {
 	ReplicationControllerConfig          *ReplicationControllerConfig                     `json:"replicationControllerConfig,omitempty" yaml:"replicationControllerConfig,omitempty"`
 	ReplicationControllerStatus          *ReplicationControllerStatus                     `json:"replicationControllerStatus,omitempty" yaml:"replicationControllerStatus,omitempty"`
 	ResourceClaims                       []PodResourceClaim                               `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
+	Resources                            *ResourceRequirements                            `json:"resources,omitempty" yaml:"resources,omitempty"`
 	RestartPolicy                        string                                           `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                           *int64                                           `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                         *bool                                            `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName                     string                                           `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
+	SELinuxChangePolicy                  string                                           `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scale                                *int64                                           `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                           *Scheduling                                      `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates                      []PodSchedulingGate                              `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`

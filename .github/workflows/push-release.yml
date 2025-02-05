@@ -138,7 +138,7 @@ jobs:
         with:
           k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
       - name: Download data.json
-        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+        run: curl -sLf https://raw.githubusercontent.com/chiukapoor/kontainer-driver-metadata/refs/heads/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data/data.json > ./data.json
       - name: Build and export server
         id: build
         uses: docker/build-push-action@v5
@@ -564,7 +564,7 @@ jobs:
       - name: Download data.json
         run: |
           mkdir -p bin
-          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
+          curl -sLf https://raw.githubusercontent.com/chiukapoor/kontainer-driver-metadata/refs/heads/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data/data.json > ./bin/data.json
           cp ./bin/data.json ./bin/rancher-data.json
       - name: Create k3s images file
         uses: ./.github/actions/k3s-images
