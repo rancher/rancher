@@ -39,6 +39,7 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase:    v3.ClusterSpecBase{},
 					FleetWorkspaceName: "test-fleet-workspace-name",
+					DisplayName:        "test-cluster",
 				},
 			},
 			expected: true,
@@ -111,6 +112,7 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 			case "test-default":
 				assert.Nil(t, provCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Nil(t, provCluster.Spec.FleetAgentDeploymentCustomization)
+				assert.Equal(t, provCluster.Annotations[mgmtClusterDisplayNameAnn], tt.cluster.Spec.DisplayName)
 			case "test-cluster-agent-customization":
 				assert.Equal(t, getTestClusterAgentCustomizationV1(), provCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Equal(t, getTestFleetAgentCustomizationV1(), provCluster.Spec.FleetAgentDeploymentCustomization)
