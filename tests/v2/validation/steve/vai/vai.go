@@ -3,9 +3,7 @@ package vai
 import (
 	"fmt"
 	"github.com/rancher/shepherd/clients/rancher"
-	"github.com/rancher/shepherd/extensions/vai"
 	"strings"
-	"sync"
 )
 
 const (
@@ -43,18 +41,6 @@ func isVaiEnabled(client *rancher.Client) (bool, error) {
 	}
 
 	return value, nil
-}
-
-func enableVAI(client *rancher.Client, vaiEnabled *bool, once *sync.Once) error {
-	var enableErr error
-	once.Do(func() {
-		if err := vai.EnableVaiCaching(client); err != nil {
-			enableErr = fmt.Errorf("failed to enable VAI caching: %w", err)
-			return
-		}
-		*vaiEnabled = true
-	})
-	return enableErr
 }
 
 func filterTestCases[T SupportedWithVai](testCases []T, vaiEnabled bool) []T {
