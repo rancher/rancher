@@ -157,6 +157,11 @@ push_cattle_agent_image()
   echo "registry-cache pod found! waiting for pod to be running"
   kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=ready pod/registry-cache -n default
 
+  # things are a little weird here - we are port-forwarding in to the registry cache but 
+  # want to listen to the docker address so the docker daemon can hit this process.
+  kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml port-forward -n default svc/registry-cache 5000:5000 --address 172.17.0.2 & 
+  sleep 1
+
   # we're referring to the docker IP of the current pod...but since the docker socket is from the host localhost
   # won't work. so we refer to it by the internal docker IP of the container to make it all work.
   echo "setting up credentials"
