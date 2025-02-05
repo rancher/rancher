@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"hash/maphash"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"math"
 	"math/rand"
 	"strconv"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -167,7 +168,9 @@ func calculateBackoff(numberOfRetries int) time.Duration {
 	h.SetSeed(maphash.MakeSeed())
 	rand := rand.New(rand.NewSource(int64(h.Sum64())))
 	temp := float64(minWait) * math.Pow(2, float64(numberOfRetries))
-	backoff := time.Duration(temp*(1-0.2)) + time.Duration(rand.Int63n(int64(2*0.2*temp)))
+	// rand.Int63n panics if jitter <= 0
+	jitter := int64(math.Max(1, 2*0.2*temp))
+	backoff := time.Duration(temp*(1-0.2)) + time.Duration(rand.Int63n(jitter))
 	if backoff < minWait {
 		return minWait
 	}
