@@ -74,18 +74,18 @@ jobs:
           retention-days: 4
           overwrite: true
       - name: Load Secrets from Vault
-        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'tags/') && !contains(github.ref_name, '-hotfix') && !contains(github.ref_name, '-security') }}
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: Authenticate with Google Cloud
-        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'tags/') && !contains(github.ref_name, '-hotfix') && !contains(github.ref_name, '-security') }}
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ env.GOOGLE_AUTH }}
       - name: Upload
-        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'tags/') && !contains(github.ref_name, '-hotfix') && !contains(github.ref_name, '-security') }}
         uses: google-github-actions/upload-cloud-storage@v2
         with:
           destination: releases.rancher.com/server-charts
@@ -93,8 +93,28 @@ jobs:
           parent: false
           process_gcloudignore: false
           predefinedAcl: publicRead
-          headers: |-
+          headers: |
             cache-control: public,no-cache,proxy-revalidate
+      - name: Load Secrets from Vault
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'tags/') && contains(github.ref_name, '-hotfix') }}
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | OPTIMUS_CHARTS_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | OPTIMUS_CHARTS_SECRET_KEY ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
+      - name: Upload chart to bucket
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'tags/') }} && ${{ contains(github.ref_name, '-hotfix') || contains(github.ref_name, '-security') }}
+        run: |
+          AWS_ACCESS_KEY_ID=${{ env.OPTIMUS_CHARTS_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.OPTIMUS_CHARTS_SECRET_KEY }} aws s3 cp --recursive ./bin/chart s3://charts.optimus.rancher.io/server-charts
+      - name: Invalidate Cloudfront cache
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'tags/') && contains(github.ref_name, '-hotfix') }}
+        env:
+          CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
+        shell: bash
+        run: |
+          AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }} aws cloudfront create-invalidation --distribution-id ${{ env.CHARTS_DISTRIBUTION_ID }} --paths "/*"
   build-server:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
