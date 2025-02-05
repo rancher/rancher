@@ -27,6 +27,7 @@ type HarvesterMachineConfig struct {
 	ImageName   string `json:"imageName" yaml:"imageName"`
 	DiskBus     string `json:"diskBus" yaml:"diskBus"`
 	SSHUser     string `json:"sshUser" yaml:"sshUser"`
+	UserData    string `json:"userData" yaml:"userData"`
 }
 
 // NewHarvesterMachineConfig is a constructor to set up rke-machine-config.cattle.io.harvesterconfig.
@@ -51,7 +52,11 @@ func NewHarvesterMachineConfig(generatedPoolName, namespace string) []unstructur
 		machineConfig.Object["imageName"] = harvesterMachineConfig.ImageName
 		machineConfig.Object["vmNamespace"] = harvesterMachineConfigs.VMNamespace
 		machineConfig.Object["sshUser"] = harvesterMachineConfig.SSHUser
+		machineConfig.Object["userData"] = "I2Nsb3VkLWNvbmZpZwpwYWNrYWdlX3VwZGF0ZTogdHJ1ZQpwYWNrYWdlczoKICAtIHFlbXUtZ3Vlc3QtYWdlbnQKcnVuY21kOgogIC0gLSBzeXN0ZW1jdGwKICAgIC0gZW5hYmxlCiAgICAtIC0tbm93CiAgICAtIHFlbXUtZ3Vlc3QtYWdlbnQuc2VydmljZQo="
 
+		if harvesterMachineConfig.UserData != "" {
+			machineConfig.Object["userData"] = harvesterMachineConfig.UserData
+		}
 		multiConfig = append(multiConfig, machineConfig)
 	}
 
