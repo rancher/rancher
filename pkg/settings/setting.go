@@ -27,16 +27,18 @@ const (
 )
 
 func init() {
-	lifecycle.DisallowedNamespaces = []string{
-		"gke-",
-		"kube-system",
-	}
+	if os.Getenv("ENABLE_GKE") != "" {
+		lifecycle.DisallowedNamespaces = []string{
+			"gke-",
+			"kube-system",
+		}
 
-	lifecycle.DisallowedGVKs = []schema.GroupVersionKind{
-		{
-			Version: "v1",
-			Kind:    "Node",
-		},
+		lifecycle.DisallowedGVKs = []schema.GroupVersionKind{
+			{
+				Version: "v1",
+				Kind:    "Node",
+			},
+		}
 	}
 }
 
