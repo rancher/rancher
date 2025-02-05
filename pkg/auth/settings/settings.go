@@ -1,10 +1,11 @@
 package settings
 
 var (
-	AuthUserInfoResyncCron    = newSetting("0 0 * * *")
-	AuthUserSessionTTLMinutes = newSetting("960")  // 16 hours
-	AuthUserInfoMaxAgeSeconds = newSetting("3600") // 1 hour
-	FirstLogin                = newSetting("true")
+	AuthUserInfoResyncCron        = newSetting("0 0 * * *")
+	AuthUserSessionTTLMinutes     = newSetting("960")  // 16 hours
+	AuthUserSessionIdleTTLMinutes = newSetting("960")  // 16 hours
+	AuthUserInfoMaxAgeSeconds     = newSetting("3600") // 1 hour
+	FirstLogin                    = newSetting("true")
 )
 
 type Setting interface {

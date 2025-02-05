@@ -29,7 +29,7 @@ func TestStore_create(t *testing.T) {
 		userActivity *ext.UserActivity
 		token        *v3Legacy.Token
 		user         string
-		lastActivity time.Time
+		lastActivity v1.Time
 		idleMins     int
 	}
 	tests := []struct {
@@ -59,9 +59,11 @@ func TestStore_create(t *testing.T) {
 					},
 					UserID: "u-mo773yttt4",
 				},
-				user:         "admin",
-				lastActivity: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
-				idleMins:     10,
+				user: "admin",
+				lastActivity: v1.Time{
+					Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+				},
+				idleMins: 10,
 			},
 			mockSetup: func() {
 				// we don't care about the object returned by the Update function,
@@ -151,9 +153,11 @@ func TestStore_create(t *testing.T) {
 					},
 					UserID: "u-mo773yttt4",
 				},
-				user:         "admin",
-				lastActivity: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).UTC(),
-				idleMins:     10,
+				user: "admin",
+				lastActivity: v1.Time{
+					Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).UTC(),
+				},
+				idleMins: 10,
 			},
 			mockSetup: func() {
 				mockTokenControllerFake.EXPECT().Update(gomock.Any()).DoAndReturn(

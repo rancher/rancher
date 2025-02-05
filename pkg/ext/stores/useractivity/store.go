@@ -9,6 +9,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	extcore "github.com/rancher/steve/pkg/ext"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -105,9 +106,12 @@ func (uas *Store) Create(ctx context.Context,
 		return nil, fmt.Errorf("no user found: %v", err)
 	}
 	// set when last activity happened
-	lastActivity := metav1.Now().UTC()
-	// TODO: replace '10' with the value of auth-user-session-ttl-minutes
-	return uas.create(ctx, objUserActivity, token, user, lastActivity, 2)
+	lastActivity := metav1.Now()
+	// retrieve setting for auth-user-session-idle-ttl-minutes
+	idleTimeout := settings.AuthUserSessionIdleTTLMinutes.GetInt()
+	fmt.Println("idle timeout:", idleTimeout)
+
+	return uas.create(ctx, objUserActivity, token, user, lastActivity, idleTimeout)
 }
 
 // create sets the LastActivity and CurrentTimeout fields on the UserActivity object
@@ -116,26 +120,27 @@ func (uas *Store) create(_ context.Context,
 	userActivity *ext.UserActivity,
 	token *v3Legacy.Token,
 	user string,
-	lastActivity time.Time,
-	authUserSessionTtlMinutes int) (*ext.UserActivity, error) {
+	lastActivity metav1.Time,
+	authUserSessionIdleTTLMinutes int) (*ext.UserActivity, error) {
 
 	// UserActivity name must have the following format:
 	// ua_$(USER)_$(TOKEN)
-	expectedName := strings.Join([]string{"ua", user, token.UserID}, "_")
+	expectedName := strings.Join([]string{"ua", user, token.Name}, "_")
 	// ensure the UserActivity object is crafted as expected.
 	if userActivity.Name != expectedName {
 		return nil, fmt.Errorf("UserActivity name: %s mismatch from the expected one: %s", userActivity.Name, expectedName)
 	}
 	// ensure the token specified in the UserActivity is the same
 	// we are using to do the request.
-	if token.UserID != userActivity.Spec.TokenId {
-		return nil, fmt.Errorf("Token from request: %s and token from session: %s mismatch", token.UserID, userActivity.Spec.TokenId)
+	if token.Name != userActivity.Spec.TokenId {
+		return nil, fmt.Errorf("token from request: %s and token from session: %s mismatch", token.UserID, userActivity.Spec.TokenId)
 	}
 
 	// once validated the request, we can define the lastActivity time.
 	newIdleTimeout := metav1.Time{
-		Time: lastActivity.Local().Add(time.Minute * time.Duration(authUserSessionTtlMinutes)).UTC(),
+		Time: lastActivity.Local().Add(time.Minute * time.Duration(authUserSessionIdleTTLMinutes)).UTC(),
 	}
+	fmt.Println("new idle timeout:", newIdleTimeout.String())
 	token.LastIdleTimeout = newIdleTimeout
 	userActivity.Status.LastActivity = lastActivity.String()
 	userActivity.Status.CurrentTimeout = newIdleTimeout.String()
@@ -172,7 +177,7 @@ func (uas *Store) Get(ctx context.Context,
 // get returns the UserActivity based on the token name.
 // It is used to know, from the frontend, how much time is
 // remained before the idle timeout.
-func (uas *Store) get(ctx context.Context, user string, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
+func (uas *Store) get(_ context.Context, user string, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
 	// UserActivity name must have the following format:
 	// ua_$(USER)_$(TOKEN)
 	uaName := strings.Split(uaname, "_")
