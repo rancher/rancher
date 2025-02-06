@@ -63,7 +63,7 @@ ENV TINI_VERSION v0.18.0
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.12
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v0.7.1
+ENV DOCKER_MACHINE_HARVESTER_VERSION v1.0.0
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV CATTLE_WINS_AGENT_VERSION v0.5.0-rc.2
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -129,7 +129,7 @@ ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERS
     TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
     TINI_URL=TINI_URL_${ARCH}
 
-ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz 
+ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
 # Set up K3s: copy the necessary binaries from the K3s image.
 COPY --from=rancher/k3s:v1.31.1-k3s1 \
@@ -280,14 +280,14 @@ ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 
 COPY --chown=root:root --chmod=0755 \
-     --from=build /app/rancher /usr/bin/
+    --from=build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
-     --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+    --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 
 COPY --chown=root:root --chmod=0755 \
-        package/loglevel \
-        package/entrypoint.sh \
-        package/jailer.sh /usr/bin/
+    package/loglevel \
+    package/entrypoint.sh \
+    package/jailer.sh /usr/bin/
 
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
@@ -295,11 +295,11 @@ VOLUME /var/lib/cni
 VOLUME /var/log
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
-      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
-      "org.opencontainers.image.description"="Rancher Manager: complete container management platform." \
-      "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
-      "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
-      "org.opencontainers.image.version"=${VERSION} \
-      "org.opensuse.reference"=rancher/rancher:${VERSION}
+    "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
+    "org.opencontainers.image.description"="Rancher Manager: complete container management platform." \
+    "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
+    "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
+    "org.opencontainers.image.version"=${VERSION} \
+    "org.opensuse.reference"=rancher/rancher:${VERSION}
 
 ENTRYPOINT ["entrypoint.sh"]
