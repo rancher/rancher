@@ -2418,8 +2418,8 @@ github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoG
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/rancher/aks-operator v1.10.0 h1:9PGJUyzso2Tg9o64sYI6++mCke9ToRchvN5uZqPV+kY=
 github.com/rancher/aks-operator v1.10.0/go.mod h1:n7CBXwN5mpJZT7/3PYg6cWBAVCqjayhaUiRtTCH1FMQ=
-github.com/rancher/apiserver v0.0.0-20241009200134-5a4ecca7b988 h1:e7wP0J4JQdG1FwsHt+FichFwH0ZUPTC93BI3ObmYBRU=
-github.com/rancher/apiserver v0.0.0-20241009200134-5a4ecca7b988/go.mod h1:79I0nWWx1+D7lDwHrHxN5O+QzC2EPqJC46KfaMkd14w=
+github.com/rancher/apiserver v0.5.1 h1:CYx5AL7xskmW+0tjnX5910NAIVxk/yvDeWFsDIBzGKY=
+github.com/rancher/apiserver v0.5.1/go.mod h1:79I0nWWx1+D7lDwHrHxN5O+QzC2EPqJC46KfaMkd14w=
 github.com/rancher/backup-restore-operator v1.2.1 h1:jsCChVZlezQnEagVs9YG+kaG8w5xXuBng6SPukrY2rs=
 github.com/rancher/backup-restore-operator v1.2.1/go.mod h1:LSqy4Qzt+GVfLed63cSvwzAJ75tWH7Xdvczdkp4RiW4=
 github.com/rancher/channelserver v0.7.0 h1:ZN5o8aD4mD31uhjEEW2e9yQXa3eOb+4Cp6DcWm7W/Lc=
@@ -2439,8 +2439,8 @@ github.com/rancher/helm/v3 v3.16.1-rancher1/go.mod h1:r+xBHHP20qJeEqtvBXMf7W35QD
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
 github.com/rancher/kubernetes-provider-detector v0.1.5/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
 github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB2YjTVagmu4NkhBvbE8nBcGykHRENH6arI=
-github.com/rancher/lasso v0.0.0-20250123080302-9325fed68518 h1:aElNUJg6kxTvs/e4yfMEkk0Dgzo/lyHl85xDqP+FC+A=
-github.com/rancher/lasso v0.0.0-20250123080302-9325fed68518/go.mod h1:stR7zYyew1IOnKYV5vFx1kXX5/pUoKeo5K5c78qAdV8=
+github.com/rancher/lasso v0.2.0 h1:0YaprDYRZNMQoG9/308ZI+oxvof2JUjo9rYT2It38L8=
+github.com/rancher/lasso v0.2.0/go.mod h1:stR7zYyew1IOnKYV5vFx1kXX5/pUoKeo5K5c78qAdV8=
 github.com/rancher/machine v0.15.0-rancher125 h1:J8HfJH0xm/ECwwHc6gSEBKLMKokZ6qP4tCLxO9iOdnQ=
 github.com/rancher/machine v0.15.0-rancher125/go.mod h1:9rlwC2p8rZUzJ2u3hunI6nMrPn2qPV9vmIOSmPXqOE4=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
