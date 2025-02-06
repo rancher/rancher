@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/types/convert"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
@@ -121,6 +122,10 @@ func NewWorkloadController(ctx context.Context, workload *config.UserOnlyContext
 }
 
 func (c *CommonController) syncDeployments(key string, obj *k8sappv1.Deployment) (runtime.Object, error) {
+	if lifecycle.IsDisallowedNamespace(obj) {
+		return obj, nil
+	}
+
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -156,6 +161,10 @@ func (c *CommonController) syncReplicaSet(key string, obj *k8sappv1.ReplicaSet) 
 }
 
 func (c *CommonController) syncDaemonSet(key string, obj *k8sappv1.DaemonSet) (runtime.Object, error) {
+	if lifecycle.IsDisallowedNamespace(obj) {
+		return obj, nil
+	}
+
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
