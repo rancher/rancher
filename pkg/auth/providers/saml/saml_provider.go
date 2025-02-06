@@ -127,7 +127,8 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_RequestID", login.RequestID)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_ResponseType", login.ResponseType)
 
-		idpRedirectURL, err := provider.HandleSamlLogin(apiContext.Response, apiContext.Request)
+		// userID is not needed for login. It's only needed for testAndEnable
+		idpRedirectURL, err := provider.HandleSamlLogin(apiContext.Response, apiContext.Request, "")
 		if err != nil {
 			return err
 		}
