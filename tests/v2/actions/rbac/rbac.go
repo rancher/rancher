@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rbacv2 "github.com/rancher/rancher/tests/v2/actions/kubeapi/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -14,6 +13,7 @@ import (
 	"github.com/rancher/shepherd/extensions/users"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -33,6 +33,7 @@ const (
 	CrtbView                  Role = "clusterroletemplatebindings-view"
 	ProjectsCreate            Role = "projects-create"
 	ProjectsView              Role = "projects-view"
+	ManageClusterMembers	  Role = "clusterroletemplatebindings-manage"
 	ManageWorkloads           Role = "workloads-manage"
 	ActiveStatus                   = "active"
 	ForbiddenError                 = "403 Forbidden"
@@ -215,4 +216,21 @@ func GetGlobalRoleByName(client *rancher.Client, globalRoleName string) (*v3.Glo
 	}
 
 	return matchingGlobalRole, nil
+}
+
+// GetClusterRoleTemplateBindings is a helper function that fetches clusterroletemplatebindings for a specific user
+func GetClusterRoleTemplateBindings(rancherClient *rancher.Client, userID string) ([]v3.ClusterRoleTemplateBinding, error) {
+	listOpt := v1.ListOptions{}
+	crtbList, err := rbacv2.ListClusterRoleTemplateBindings(rancherClient, listOpt)
+	if err != nil {
+		return nil, err
+	}
+
+	var userCRTBList []v3.ClusterRoleTemplateBinding
+	for _, crtb := range crtbList.Items {
+		if crtb.UserName == userID {
+			userCRTBList = append(userCRTBList, crtb)
+		}
+	}
+	return userCRTBList, nil
 }
