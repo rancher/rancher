@@ -21,6 +21,8 @@ var (
 		"MachineDeployment":  true,
 		"MachineSet":         true,
 		"Cluster":            true,
+		// The capi-controller-manager will get stuck in a restart loop until a version is released with the fix for https://github.com/kubernetes-sigs/cluster-api/issues/11775
+		"MachinePool": true,
 	}
 
 	//go:embed capi-crds.yaml capi-webhooks.yaml
