@@ -3,6 +3,7 @@ package charts
 import (
 	"context"
 	"fmt"
+	"gopkg.in/yaml.v2"
 
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -390,4 +391,86 @@ func buildClusterRepo(name, url string) *rv1.ClusterRepo {
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       rv1.RepoSpec{URL: url},
 	}
+}
+
+// StructToMap Helper function to convert struct to map[string]interface{}
+func StructToMap(obj interface{}) (map[string]interface{}, error) {
+	data, err := yaml.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	var intermediate map[interface{}]interface{}
+	if err = yaml.Unmarshal(data, &intermediate); err != nil {
+		return nil, err
+	}
+
+	return convertMapInterfaceToMapString(intermediate), nil
+}
+
+// Converts map[interface{}]interface{} to map[string]interface{}
+func convertMapInterfaceToMapString(obj map[interface{}]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for k, v := range obj {
+		key := fmt.Sprintf("%v", k)
+		result[key] = convertToStringKeys(v)
+	}
+	return result
+}
+
+// convertToStringKeys converts any map[interface{}]interface{} to map[string]interface{} recursively
+func convertToStringKeys(val interface{}) interface{} {
+	switch v := val.(type) {
+	case map[interface{}]interface{}:
+		return convertMapToStringKeys(v)
+	case []interface{}:
+		convertedSlice := make([]interface{}, len(v))
+		for i, v2 := range v {
+			convertedSlice[i] = convertToStringKeys(v2)
+		}
+		return convertedSlice
+	default:
+		return v
+	}
+}
+
+// convertMapToStringKeys converts a map[interface{}]interface{} to a map[string]interface{}
+func convertMapToStringKeys(input map[interface{}]interface{}) map[string]interface{} {
+	strMap := make(map[string]interface{})
+	for k, v := range input {
+		strKey := fmt.Sprintf("%v", k)
+		strMap[strKey] = convertToStringKeys(v)
+	}
+	return strMap
+}
+
+// MergeValues merges multiple map[string]interface{} values into one, recursively merging nested maps if keys overlap.
+func MergeValues(values ...map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, currentMap := range values {
+		for key, currentValue := range currentMap {
+			if existingValue, exists := result[key]; exists {
+				// Check if both existing and current values are maps,
+				// if so, recursively merge them
+				mergedMap := mergeMaps(existingValue, currentValue)
+				if mergedMap != nil {
+					result[key] = mergedMap
+					continue
+				}
+			}
+			// Otherwise, overwrite with the current value
+			result[key] = currentValue
+		}
+	}
+	return result
+}
+
+// mergeMaps recursively merges two maps if both are maps, else returns nil
+func mergeMaps(existingValue, currentValue interface{}) map[string]interface{} {
+	existingMap, ok1 := existingValue.(map[string]interface{})
+	currentMap, ok2 := currentValue.(map[string]interface{})
+	if ok1 && ok2 {
+		return MergeValues(existingMap, currentMap)
+	}
+	return nil
 }

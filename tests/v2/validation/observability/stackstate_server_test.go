@@ -5,7 +5,6 @@ package observability
 import (
 	// Standard library imports
 	"context"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -161,16 +160,16 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 	err = yaml.Unmarshal(sizingConfigData, &sizingConfig)
 	require.NoError(sss.T(), err)
 
-	ingressConfigMap, err := structToMap(ingressConfig)
+	ingressConfigMap, err := charts.StructToMap(ingressConfig)
 	require.NoError(sss.T(), err)
 
-	baseConfigMap, err := structToMap(baseConfig)
+	baseConfigMap, err := charts.StructToMap(baseConfig)
 	require.NoError(sss.T(), err)
 
-	sizingConfigMap, err := structToMap(sizingConfig)
+	sizingConfigMap, err := charts.StructToMap(sizingConfig)
 	require.NoError(sss.T(), err)
 
-	mergedValues := mergeValues(ingressConfigMap, baseConfigMap, sizingConfigMap)
+	mergedValues := charts.MergeValues(ingressConfigMap, baseConfigMap, sizingConfigMap)
 
 	systemProject, err := rancherProjects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
 	require.NoError(sss.T(), err)
@@ -204,88 +203,6 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		podErrors := pods.StatusPods(sss.client, clusterName)
 		require.Empty(sss.T(), podErrors)
 	})
-}
-
-// Helper function to convert struct to map[string]interface{}
-func structToMap(obj interface{}) (map[string]interface{}, error) {
-	data, err := yaml.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	var intermediate map[interface{}]interface{}
-	if err = yaml.Unmarshal(data, &intermediate); err != nil {
-		return nil, err
-	}
-
-	return convertMapInterfaceToMapString(intermediate), nil
-}
-
-// Converts map[interface{}]interface{} to map[string]interface{}
-func convertMapInterfaceToMapString(obj map[interface{}]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-	for k, v := range obj {
-		key := fmt.Sprintf("%v", k)
-		result[key] = convertToStringKeys(v)
-	}
-	return result
-}
-
-// convertToStringKeys converts any map[interface{}]interface{} to map[string]interface{} recursively
-func convertToStringKeys(val interface{}) interface{} {
-	switch v := val.(type) {
-	case map[interface{}]interface{}:
-		return convertMapToStringKeys(v)
-	case []interface{}:
-		convertedSlice := make([]interface{}, len(v))
-		for i, v2 := range v {
-			convertedSlice[i] = convertToStringKeys(v2)
-		}
-		return convertedSlice
-	default:
-		return v
-	}
-}
-
-// convertMapToStringKeys converts a map[interface{}]interface{} to a map[string]interface{}
-func convertMapToStringKeys(input map[interface{}]interface{}) map[string]interface{} {
-	strMap := make(map[string]interface{})
-	for k, v := range input {
-		strKey := fmt.Sprintf("%v", k)
-		strMap[strKey] = convertToStringKeys(v)
-	}
-	return strMap
-}
-
-// mergeValues merges multiple map[string]interface{} values into one, recursively merging nested maps if keys overlap.
-func mergeValues(values ...map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-	for _, currentMap := range values {
-		for key, currentValue := range currentMap {
-			if existingValue, exists := result[key]; exists {
-				// Check if both existing and current values are maps,
-				// if so, recursively merge them
-				mergedMap := mergeMaps(existingValue, currentValue)
-				if mergedMap != nil {
-					result[key] = mergedMap
-					continue
-				}
-			}
-			// Otherwise, overwrite with the current value
-			result[key] = currentValue
-		}
-	}
-	return result
-}
-
-// mergeMaps recursively merges two maps if both are maps, else returns nil
-func mergeMaps(existingValue, currentValue interface{}) map[string]interface{} {
-	existingMap, ok1 := existingValue.(map[string]interface{})
-	currentMap, ok2 := currentValue.(map[string]interface{})
-	if ok1 && ok2 {
-		return mergeValues(existingMap, currentMap)
-	}
-	return nil
 }
 
 func TestStackStateServerTestSuite(t *testing.T) {
