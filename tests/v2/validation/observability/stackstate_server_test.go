@@ -70,14 +70,14 @@ func (sss *StackStateServerTestSuite) SetupSuite() {
 	require.NoError(sss.T(), err)
 
 	projectTemplate := kubeprojects.NewProjectTemplate(cluster.ID)
-	projectTemplate.Name = charts.StackstateNamespace
+	projectTemplate.Name = charts.StackStateServerNamespace
 	project, err := client.Steve.SteveType(project).Create(projectTemplate)
 	require.NoError(sss.T(), err)
 	sss.projectID = project.ID
 
-	ssNamespaceExists, err := namespaces.GetNamespaceByName(client, cluster.ID, charts.StackstateNamespace)
+	ssNamespaceExists, err := namespaces.GetNamespaceByName(client, cluster.ID, charts.StackStateServerNamespace)
 	if ssNamespaceExists == nil && k8sErrors.IsNotFound(err) {
-		_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackstateNamespace, "", map[string]string{}, map[string]string{})
+		_, err = namespaces.CreateNamespace(client, cluster.ID, project.Name, charts.StackStateServerNamespace, "", map[string]string{}, map[string]string{})
 	}
 	require.NoError(sss.T(), err)
 
@@ -92,7 +92,7 @@ func (sss *StackStateServerTestSuite) SetupSuite() {
 	}
 	require.NoError(sss.T(), err)
 
-	latestSSVersion, err := sss.catalogClient.GetLatestChartVersion(charts.StackStateChartRepo, observabilityChartName)
+	latestSSVersion, err := sss.catalogClient.GetLatestChartVersion(charts.StackStateServerChartRepo, observabilityChartName)
 
 	sss.stackstateChartInstallOptions = &charts.InstallOptions{
 		Cluster:   cluster,
@@ -105,7 +105,7 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 	subsession := sss.session.NewSession()
 	defer subsession.Cleanup()
 
-	sss.Run("Install SUSE Observability Chart", func() {
+	sss.Run("Install SUSE Observability Server Chart with non HA values", func() {
 		var stackstateConfigs observability.StackStateConfig
 		config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
 
@@ -172,7 +172,7 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 		require.NotNil(sss.T(), systemProject.ID, "System project is nil.")
 		systemProjectID := strings.Split(systemProject.ID, ":")[1]
 
-		err = charts.InstallStackStateChart(sss.client, sss.stackstateChartInstallOptions, sss.stackstateConfigs, systemProjectID, mergedValues)
+		err = charts.InstallStackStateServerChart(sss.client, sss.stackstateChartInstallOptions, systemProjectID, mergedValues)
 		require.NoError(sss.T(), err)
 	})
 }

@@ -28,14 +28,15 @@ const (
 	StackstateNamespace          = "stackstate"
 	StackstateCRD                = "observability.rancher.io.configuration"
 	RancherPartnerChartRepo      = "rancher-partner-charts"
-	StackStateChartRepo          = "suse-observability"
+	StackStateServerChartRepo    = "suse-observability"
+	StackStateServerNamespace    = "suse-observability"
 )
 
 var (
 	timeoutSeconds = int64(defaults.TwoMinuteTimeout)
 )
 
-// InstallStackStateChart installs the StackState chart into the specified Kubernetes cluster and namespace.
+// InstallStackStateServerChart installs the StackState chart into the specified Kubernetes cluster and namespace.
 // It uses Rancher client and configuration details, and waits for the chart deployment to complete successfully.
 // Parameters:
 // - client: the Rancher client used for connecting to the Kubernetes cluster.
@@ -44,7 +45,7 @@ var (
 // - systemProjectID: the ID of the system project where the chart is deployed.
 // - additionalValues: additional Helm chart values as a map for custom configurations.
 // Returns an error if the chart installation fails or its status cannot be confirmed.
-func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string, additionalValues map[string]interface{}) error {
+func InstallStackStateServerChart(client *rancher.Client, installOptions *InstallOptions, systemProjectID string, additionalValues map[string]interface{}) error {
 
 	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
 	if err != nil {
@@ -54,12 +55,12 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 
 	stackstateChartInstallActionPayload := &payloadOpts{
 		InstallOptions: *installOptions,
-		Name:           StackStateChartRepo,
-		Namespace:      StackstateNamespace,
+		Name:           StackStateServerChartRepo,
+		Namespace:      StackStateServerNamespace,
 		Host:           serverSetting.Value,
 	}
 
-	chartInstallAction := newStackStateChartInstallAction(stackstateChartInstallActionPayload, stackstateConfigs, systemProjectID, additionalValues)
+	chartInstallAction := newStackStateServerChartInstallAction(stackstateChartInstallActionPayload, systemProjectID, additionalValues)
 
 	catalogClient, err := client.GetClusterCatalogClient(installOptions.Cluster.ID)
 	if err != nil {
@@ -67,14 +68,14 @@ func InstallStackStateChart(client *rancher.Client, installOptions *InstallOptio
 		return err
 	}
 
-	err = catalogClient.InstallChart(chartInstallAction, StackStateChartRepo)
+	err = catalogClient.InstallChart(chartInstallAction, StackStateServerChartRepo)
 	if err != nil {
 		log.Info("Error installing the StackState chart")
 		return err
 	}
 
-	watchAppInterface, err := catalogClient.Apps(StackstateNamespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + StackStateChartRepo,
+	watchAppInterface, err := catalogClient.Apps(StackStateServerNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + StackStateServerChartRepo,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
@@ -251,7 +252,7 @@ func newStackstateAgentChartInstallAction(p *payloadOpts, stackstateConfigs *obs
 	return chartInstallAction
 }
 
-func newStackStateChartInstallAction(p *payloadOpts, stackstateConfigs *observability.StackStateConfig, systemProjectID string, additionalValues map[string]interface{}) *types.ChartInstallAction {
+func newStackStateServerChartInstallAction(p *payloadOpts, systemProjectID string, additionalValues map[string]interface{}) *types.ChartInstallAction {
 
 	chartInstall := newChartInstall(p.Name, p.Version, p.Cluster.ID, p.Cluster.Name, p.Host, stackStateChart, systemProjectID, p.DefaultRegistry, additionalValues)
 
@@ -262,7 +263,7 @@ func newStackStateChartInstallAction(p *payloadOpts, stackstateConfigs *observab
 }
 
 // UpgradeStackstateAgentChart is a helper function that upgrades the stackstate agent chart.
-func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig, systemProjectID string) error {
+func UpgradeStackstateAgentChart(client *rancher.Client, installOptions *InstallOptions, stackstateConfigs *observability.StackStateConfig) error {
 	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
 	if err != nil {
 		return err
