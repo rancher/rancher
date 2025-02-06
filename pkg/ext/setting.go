@@ -17,6 +17,8 @@ type settingController struct {
 
 	sniProvider *rotatingSNIProvider
 
+	authenticator *ToggleUnionAuthenticator
+
 	stopChanMu sync.Mutex
 	stopChan   chan struct{}
 }
@@ -44,6 +46,8 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 		c.stopChan = make(chan struct{})
 		c.stopChanMu.Unlock()
 
+		c.authenticator.SetEnabled(authenticatorNameSteveDefault, true)
+
 		go func() {
 			if err := c.sniProvider.Run(c.stopChan); err != nil {
 				logrus.Errorf("sni provider failed: %s", err)
@@ -64,6 +68,8 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 		close(c.stopChan)
 		c.stopChan = nil
 		c.stopChanMu.Unlock()
+
+		c.authenticator.SetEnabled(authenticatorNameSteveDefault, false)
 
 		if err := CleanupExtensionAPIServer(c.services, c.apiservices); err != nil {
 			return nil, err

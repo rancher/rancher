@@ -129,18 +129,6 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, nil
 	}
 
-	authenticators := []authenticator.Request{
-		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-			reqUser, ok := request.UserFrom(req.Context())
-			if !ok {
-				return nil, false, nil
-			}
-			return &authenticator.Response{
-				User: reqUser,
-			}, true, nil
-		}),
-	}
-
 	sniProvider, err := NewSNIProviderForCname(
 		"imperative-api-sni-provider",
 		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
@@ -154,16 +142,6 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	additionalSniProviders := []dynamiccertificates.SNICertKeyContentProvider{sniProvider}
 
-	// switch os.Getenv("CATTLE_IMPERATIVE_API_EXTENSION") {
-	// case "true":
-	// 	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
-	// 	}
-
-	// 	authenticators = append(authenticators, defaultAuthenticator)
-	// }
-
 	scheme := wrangler.Scheme
 
 	// Only need to listen on localhost because that port will be reached
@@ -173,7 +151,22 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
 	}
 
-	authenticator := steveext.NewUnionAuthenticator(authenticators...)
+	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
+	}
+
+	toggleAuthenticator := NewToggleUnionAuthenticator()
+	toggleAuthenticator.Add(authenticatorNameRancherUser, authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		reqUser, ok := request.UserFrom(req.Context())
+		if !ok {
+			return nil, false, nil
+		}
+		return &authenticator.Response{
+			User: reqUser,
+		}, true, nil
+	}), true)
+	toggleAuthenticator.Add(authenticatorNameSteveDefault, defaultAuthenticator, false)
 
 	aslAuthorizer := steveext.NewAccessSetAuthorizer(wranglerContext.ASL)
 	codecs := serializer.NewCodecFactory(scheme)
@@ -190,7 +183,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			// and that's what this replacement map is doing.
 			"com.github.rancher.rancher.pkg.apis.ext.cattle.io.v1": "io.cattle.ext.v1",
 		},
-		Authenticator: authenticator,
+		Authenticator: toggleAuthenticator,
 		Authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 			if a.IsResourceRequest() {
 				return aslAuthorizer.Authorize(ctx, a)
@@ -226,11 +219,13 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, fmt.Errorf("failed to install install stores: %w", err)
 	}
 
-	settingController := settingController{
+	settingController := &settingController{
 		services:    wranglerContext.Core.Service(),
 		apiservices: wranglerContext.API.APIService(),
 
 		sniProvider: sniProvider,
+
+		authenticator: toggleAuthenticator,
 	}
 	wranglerContext.Mgmt.Setting().OnChange(ctx, "imperative-api-extension", settingController.sync)
 

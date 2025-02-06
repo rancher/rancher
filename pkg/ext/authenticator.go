@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	authenticatorNameDefault      = "default"
-	authenticatorNameCertprovider = "cert-provider"
+	authenticatorNameSteveDefault = "default"
+	authenticatorNameRancherUser  = "rancher-user"
 )
 
 type toggle[T any] struct {
