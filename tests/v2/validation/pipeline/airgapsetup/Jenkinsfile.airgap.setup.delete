@@ -1,0 +1,101 @@
+#!groovy
+node {
+  def TERRAFORM_DIR = './root/go/src/github.com/rancher/tfp-automation/modules/airgap'
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+  def imageName = "tfp-automation-cleanup-${job_name}${env.BUILD_NUMBER}"
+  def terraformVolume = "s3_data"
+
+  def branch = "${env.BRANCH}"
+  if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
+        branch = "${env.BRANCH}"
+  }
+  def s3Container = "${job_name}${env.BUILD_NUMBER}_s3_file_download"
+  def repo = scm.userRemoteConfigs
+  if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+    repo = [[url: "${env.REPO}"]]
+  }
+  def s3Config = env.AWS_S3_BUCKET_CONFIG
+
+
+  withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: 'RANCHER_LINODE_ACCESSKEY'),
+                    string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                    string(credentialsId: 'AWS_SSH_KEY_NAME', variable: 'AWS_SSH_KEY_NAME'),
+                    string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
+      stage('Checkout') {
+              deleteDir()
+              checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${branch}"]],
+                        extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                        userRemoteConfigs: repo
+                      ])
+            }
+        stage('Configure and Build') {
+          sh "docker build . -f Dockerfile --build-arg TERRAFORM_VERSION=${env.TERRAFORM_VERSION} -t ${imageName}"
+        }
+        stage('Setup'){
+            sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
+            sh returnStdout:true, script: 'chmod a+x ./yq'
+            
+            AWS_ACCESS_KEY_ID = sh (
+                  script: "echo '${s3Config}' | ./yq '.accessKey'",
+                  returnStdout: true
+                ).trim()
+
+            AWS_SECRET_ACCESS_KEY = sh (
+                  script: "echo '${s3Config}' | ./yq '.secretKey'",
+                  returnStdout: true
+                ).trim()
+                      
+            AWS_S3_BUCKET = sh (
+                  script: "echo '${s3Config}' | ./yq '.s3Bucket'",
+                  returnStdout: true
+                ).trim()     
+
+            AWS_S3_REGION =    sh (
+                  script: "echo '${s3Config}' | ./yq '.s3BucketRegion'",
+                  returnStdout: true
+                ).trim()
+        }
+
+        stage('Cleanup setup'){
+          try{
+            script {
+            sh """
+                docker volume create $terraformVolume
+
+                docker run --name $s3Container \
+                -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
+                -v $terraformVolume:/terraform-files  \
+                amazon/aws-cli \
+                s3 cp s3://$AWS_S3_BUCKET/terraform/ /terraform-files --recursive
+
+                docker run --rm -t -v $terraformVolume:/terraform-files --name $testContainer ${imageName} \
+                sh -c "chmod +x -R /terraform-files && terraform -chdir=/terraform-files init && terraform -chdir=/terraform-files destroy -auto-approve"
+
+                docker run --rm \
+                -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
+                amazon/aws-cli \
+                s3 rm s3://$AWS_S3_BUCKET/terraform/ --recursive
+                """   
+            }
+          }catch{
+            sh "docker rm $s3Container"
+            sh  "docker volume rm $terraformVolume"            
+          }
+            sh "docker rm $s3Container"
+            sh  "docker volume rm $terraformVolume"
+        }
+    }
+}
