@@ -6,8 +6,6 @@ import (
 	// Standard library imports
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
-	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	"os"
 	"strings"
 	"testing"
@@ -21,12 +19,20 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	// Local/internal imports
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/charts"
+	"github.com/rancher/rancher/tests/v2/actions/fleet"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
+	kubeprojects "github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	"github.com/rancher/rancher/tests/v2/actions/observability"
 	rancherProjects "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	extencharts "github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
+	extensionscluster "github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
 )
@@ -105,75 +111,98 @@ func (sss *StackStateServerTestSuite) TestInstallStackState() {
 	subsession := sss.session.NewSession()
 	defer subsession.Cleanup()
 
+	var stackstateConfigs observability.StackStateConfig
+	config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
+
+	baseConfig := observability.BaseConfig{
+		Global: struct {
+			ImageRegistry string `json:"imageRegistry" yaml:"imageRegistry"`
+		}{
+			ImageRegistry: "registry.rancher.com",
+		},
+		Stackstate: observability.StackstateServerConfig{
+			BaseUrl: stackstateConfigs.Url,
+			Authentication: observability.AuthenticationConfig{
+				AdminPassword: stackstateConfigs.AdminPassword,
+			},
+			ApiKey: observability.ApiKeyConfig{
+				Key: stackstateConfigs.ClusterApiKey,
+			},
+			License: observability.LicenseConfig{
+				Key: stackstateConfigs.License,
+			},
+		},
+	}
+
+	ingressConfig := observability.IngressConfig{
+		Ingress: observability.Ingress{
+			Enabled: true,
+			Annotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "50m",
+			},
+			Hosts: []observability.Host{
+				{
+					Host: stackstateConfigs.Url,
+				},
+			},
+			TLS: []observability.TLSConfig{
+				{
+					Hosts:      []string{stackstateConfigs.Url},
+					SecretName: "tls-secret",
+				},
+			},
+		},
+	}
+
+	sizingConfigData, err := os.ReadFile("resources/10-nonha_sizing_values.yaml")
+	require.NoError(sss.T(), err)
+
+	var sizingConfig observability.SizingConfig
+	err = yaml.Unmarshal(sizingConfigData, &sizingConfig)
+	require.NoError(sss.T(), err)
+
+	ingressConfigMap, err := structToMap(ingressConfig)
+	require.NoError(sss.T(), err)
+
+	baseConfigMap, err := structToMap(baseConfig)
+	require.NoError(sss.T(), err)
+
+	sizingConfigMap, err := structToMap(sizingConfig)
+	require.NoError(sss.T(), err)
+
+	mergedValues := mergeValues(ingressConfigMap, baseConfigMap, sizingConfigMap)
+
+	systemProject, err := rancherProjects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
+	require.NoError(sss.T(), err)
+	require.NotNil(sss.T(), systemProject.ID, "System project is nil.")
+	systemProjectID := strings.Split(systemProject.ID, ":")[1]
+
 	sss.Run("Install SUSE Observability Server Chart with non HA values", func() {
-		var stackstateConfigs observability.StackStateConfig
-		config.LoadConfig(stackStateConfigFileKey, &stackstateConfigs)
-
-		baseConfig := observability.BaseConfig{
-			Global: struct {
-				ImageRegistry string `json:"imageRegistry" yaml:"imageRegistry"`
-			}{
-				ImageRegistry: "registry.rancher.com",
-			},
-			Stackstate: observability.StackstateServerConfig{
-				BaseUrl: stackstateConfigs.Url,
-				Authentication: observability.AuthenticationConfig{
-					AdminPassword: stackstateConfigs.AdminPassword,
-				},
-				ApiKey: observability.ApiKeyConfig{
-					Key: stackstateConfigs.ClusterApiKey,
-				},
-				License: observability.LicenseConfig{
-					Key: stackstateConfigs.License,
-				},
-			},
-		}
-
-		ingressConfig := observability.IngressConfig{
-			Ingress: observability.Ingress{
-				Enabled: true,
-				Annotations: map[string]string{
-					"nginx.ingress.kubernetes.io/proxy-body-size": "50m",
-				},
-				Hosts: []observability.Host{
-					{
-						Host: stackstateConfigs.Url,
-					},
-				},
-				TLS: []observability.TLSConfig{
-					{
-						Hosts:      []string{stackstateConfigs.Url},
-						SecretName: "tls-secret",
-					},
-				},
-			},
-		}
-
-		sizingConfigData, err := os.ReadFile("resources/10-nonha_sizing_values.yaml")
-		require.NoError(sss.T(), err)
-
-		var sizingConfig observability.SizingConfig
-		err = yaml.Unmarshal(sizingConfigData, &sizingConfig)
-		require.NoError(sss.T(), err)
-
-		ingressConfigMap, err := structToMap(ingressConfig)
-		require.NoError(sss.T(), err)
-
-		baseConfigMap, err := structToMap(baseConfig)
-		require.NoError(sss.T(), err)
-
-		sizingConfigMap, err := structToMap(sizingConfig)
-		require.NoError(sss.T(), err)
-
-		mergedValues := mergeValues(ingressConfigMap, baseConfigMap, sizingConfigMap)
-
-		systemProject, err := rancherProjects.GetProjectByName(sss.client, sss.cluster.ID, systemProject)
-		require.NoError(sss.T(), err)
-		require.NotNil(sss.T(), systemProject.ID, "System project is nil.")
-		systemProjectID := strings.Split(systemProject.ID, ":")[1]
-
 		err = charts.InstallStackStateServerChart(sss.client, sss.stackstateChartInstallOptions, systemProjectID, mergedValues)
 		require.NoError(sss.T(), err)
+		log.Info("Stackstate server chart installed successfully")
+
+		sss.T().Log("Verifying the deployments of stackstate server chart to have expected number of available replicas")
+		err = extencharts.WatchAndWaitDeployments(sss.client, sss.cluster.ID, charts.StackStateServerNamespace, meta.ListOptions{})
+		require.NoError(sss.T(), err)
+
+		sss.T().Log("Verifying the daemonsets of stackstate server chart to have expected number of available replicas nodes")
+		err = extencharts.WatchAndWaitDaemonSets(sss.client, sss.cluster.ID, charts.StackStateServerNamespace, meta.ListOptions{})
+		require.NoError(sss.T(), err)
+
+		clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(sss.client, sss.client.RancherConfig.ClusterName, fleet.Namespace)
+		var clusterName string
+		if clusterObject != nil {
+			status := &provv1.ClusterStatus{}
+			err := steveV1.ConvertToK8sType(clusterObject.Status, status)
+			require.NoError(sss.T(), err)
+			clusterName = status.ClusterName
+		} else {
+			clusterName, err = extensionscluster.GetClusterIDByName(sss.client, sss.client.RancherConfig.ClusterName)
+			require.NoError(sss.T(), err)
+		}
+		podErrors := pods.StatusPods(sss.client, clusterName)
+		require.Empty(sss.T(), podErrors)
 	})
 }
 
