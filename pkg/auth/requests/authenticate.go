@@ -3,16 +3,21 @@ package requests
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -32,7 +37,7 @@ var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must au
 // Authenticator authenticates a request.
 type Authenticator interface {
 	Authenticate(req *http.Request) (*AuthenticatorResponse, error)
-	TokenFromRequest(req *http.Request) (*v3.Token, error)
+	TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error)
 }
 
 // AuthenticatorResponse is the response returned by an Authenticator.
@@ -57,6 +62,7 @@ type tokenAuthenticator struct {
 	clusterRouter       ClusterRouter
 	refreshUser         func(userID string, force bool)
 	now                 func() time.Time // Make it easier to test.
+	extTokenStore       *exttokenstore.SystemStore
 }
 
 // ToAuthMiddleware converts an Authenticator to an auth.Middleware.
@@ -83,6 +89,9 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	_ = tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
+	// Rancher Backend direct Ext Token Access via in-built custom handler store instance
+	extTokenStore := exttokenstore.NewSystemFromWrangler(mgmtCtx.Wrangler)
+
 	return &tokenAuthenticator{
 		ctx:                 ctx,
 		tokenIndexer:        tokenInformer.GetIndexer(),
@@ -94,7 +103,8 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		refreshUser: func(userID string, force bool) {
 			go providerRefresher.TriggerUserRefresh(userID, force)
 		},
-		now: time.Now,
+		now:           time.Now,
+		extTokenStore: extTokenStore,
 	}
 }
 
@@ -114,32 +124,38 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, err
 	}
 
-	if token.Enabled != nil && !*token.Enabled {
+	if !token.GetIsEnabled() {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "user's token is not enabled")
 	}
-	if token.ClusterName != "" && token.ClusterName != a.clusterRouter(req) {
+	cluster := token.ObjClusterName()
+	if cluster != "" && cluster != a.clusterRouter(req) {
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
 	// If the auth provider is specified make sure it exists and enabled.
-	if token.AuthProvider != "" {
-		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
+	if token.GetAuthProvider() != "" {
+		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider())
 		if err != nil {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "error checking if provider %s is disabled: %v", token.AuthProvider, err)
+			return nil, errors.Wrapf(ErrMustAuthenticate,
+				"error checking if provider %s is disabled: %v",
+				token.GetAuthProvider(), err)
 		}
 		if disabled {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled", token.AuthProvider)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled",
+				token.GetAuthProvider())
 		}
 	}
 
-	attribs, err := a.userAttributeLister.Get("", token.UserID)
+	attribs, err := a.userAttributeLister.Get("", token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve userattribute %s: %v", token.UserID, err)
+		return nil, errors.Wrapf(ErrMustAuthenticate,
+			"failed to retrieve userattribute %s: %v", token.GetUserID(), err)
 	}
 
-	authUser, err := a.userLister.Get("", token.UserID)
+	authUser, err := a.userLister.Get("", token.GetUserID())
 	if err != nil {
-		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve user %s: %v", token.UserID, err)
+		return nil, errors.Wrapf(ErrMustAuthenticate,
+			"failed to retrieve user %s: %v", token.GetUserID(), err)
 	}
 
 	if authUser.Enabled != nil && !*authUser.Enabled {
@@ -149,8 +165,9 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	var groups []string
 	hitProvider := false
 	if attribs != nil {
+		authp := token.GetAuthProvider()
 		for provider, gps := range attribs.GroupPrincipals {
-			if provider == token.AuthProvider {
+			if provider == authp {
 				hitProvider = true
 			}
 			for _, principal := range gps.Items {
@@ -162,7 +179,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	// fallback to legacy token.GroupPrincipals
 	if !hitProvider {
-		for _, principal := range token.GroupPrincipals {
+		for _, principal := range token.GetGroupPrincipals() {
 			// TODO This is a short cut for now. Will actually need to lookup groups in future
 			name := strings.TrimPrefix(principal.Name, "local://")
 			groups = append(groups, name)
@@ -170,12 +187,12 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
 
-	if !(authUser.IsSystem() || strings.HasPrefix(token.UserID, "system:")) {
-		a.refreshUser(token.UserID, false)
+	if !(authUser.IsSystem() || strings.HasPrefix(token.GetUserID(), "system:")) {
+		a.refreshUser(token.GetUserID(), false)
 	}
 
 	extras := map[string][]string{
-		common.ExtraRequestTokenID: {token.Name},
+		common.ExtraRequestTokenID: {token.GetName()},
 		common.ExtraRequestHost:    {req.Host},
 	}
 	for key, value := range getUserExtraInfo(token, authUser, attribs) {
@@ -184,8 +201,8 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	authResp := &AuthenticatorResponse{
 		IsAuthed:      true,
-		User:          token.UserID,
-		UserPrincipal: token.UserPrincipal.Name,
+		User:          token.GetUserID(),
+		UserPrincipal: token.GetUserPrincipal().Name,
 		Groups:        groups,
 		Extras:        extras,
 	}
@@ -193,44 +210,55 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	logrus.Debugf("Extras returned %v", authResp.Extras)
 
 	now := a.now().Truncate(time.Second) // Use the second precision.
-	if token.LastUsedAt != nil {
-		if now.Equal(token.LastUsedAt.Time.Truncate(time.Second)) {
+	lastUsed := token.GetLastUsedAt()
+	if lastUsed != nil {
+		if now.Equal(lastUsed.Time.Truncate(time.Second)) {
 			// Throttle subsecond updates.
 			return authResp, nil
 		}
 	}
 
 	if err := func() error {
-		patch, err := json.Marshal([]struct {
-			Op    string `json:"op"`
-			Path  string `json:"path"`
-			Value any    `json:"value"`
-		}{{
-			Op:    "replace",
-			Path:  "/lastUsedAt",
-			Value: metav1.NewTime(now),
-		}})
-		if err != nil {
-			return err
-		}
+		// patching is done specific to the underlying token type.
+		switch token.(type) {
+		case *v3.Token:
+			// norman legacy token
+			patch, err := json.Marshal([]struct {
+				Op    string `json:"op"`
+				Path  string `json:"path"`
+				Value any    `json:"value"`
+			}{{
+				Op:    "replace",
+				Path:  "/lastUsedAt",
+				Value: metav1.NewTime(now),
+			}})
+			if err != nil {
+				return err
+			}
 
-		_, err = a.tokenClient.Patch(token.Name, types.JSONPatchType, patch)
-		return err
+			_, err = a.tokenClient.Patch(token.GetName(), types.JSONPatchType, patch)
+			return err
+		case *ext.Token:
+			// ext token
+			return a.extTokenStore.UpdateLastUsedAt(token.GetName(), now)
+		}
+		return fmt.Errorf("unknown token type")
 	}(); err != nil {
 		// Log the error and move on to avoid failing the request.
-		logrus.Errorf("Error updating lastUsedAt for token %s: %v", token.Name, err)
+		logrus.Errorf("Error updating lastUsedAt for token %s: %v", token.GetName(), err)
 		return authResp, nil
 	}
 
-	logrus.Debugf("Updated lastUsedAt for token %s", token.Name)
+	logrus.Debugf("Updated lastUsedAt for token %s", token.GetName())
 	return authResp, nil
 }
 
-func getUserExtraInfo(token *v3.Token, user *v3.User, attribs *v3.UserAttribute) map[string][]string {
+func getUserExtraInfo(token accessor.TokenAccessor, user *v3.User, attribs *v3.UserAttribute) map[string][]string {
 	extraInfo := make(map[string][]string)
 
+	ap := token.GetAuthProvider()
 	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
-		if token.AuthProvider == "local" || token.AuthProvider == "" {
+		if ap == "local" || ap == "" {
 			// Gather all extraInfo for all external auth providers present in the userAttributes.
 			for _, extra := range attribs.ExtraByProvider {
 				for key, value := range extra {
@@ -240,12 +268,12 @@ func getUserExtraInfo(token *v3.Token, user *v3.User, attribs *v3.UserAttribute)
 			return extraInfo
 		}
 		// AuthProvider is set in the token.
-		if extraInfo, ok := attribs.ExtraByProvider[token.AuthProvider]; ok {
+		if extraInfo, ok := attribs.ExtraByProvider[ap]; ok {
 			return extraInfo
 		}
 	}
 
-	extraInfo = providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
+	extraInfo = providers.GetUserExtraAttributes(ap, token.GetUserPrincipal())
 	// If principal id is not set in extra, read from user.
 	if extraInfo != nil {
 		if len(extraInfo[common.UserAttributePrincipalID]) == 0 {
@@ -260,7 +288,7 @@ func getUserExtraInfo(token *v3.Token, user *v3.User, attribs *v3.UserAttribute)
 }
 
 // TokenFromRequest retrieves and verifies the token from the request.
-func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
+func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
 	if tokenAuthValue == "" {
 		return nil, ErrMustAuthenticate
@@ -272,12 +300,35 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	}
 
 	lookupUsingClient := false
+
+	if extTokenName, found := strings.CutPrefix(tokenName, "ext/"); found {
+		// Ext token detected. Perform roughly the same process as for legacy tokens, using
+		// a different store.  No indexer/cache in play here.
+
+		storedToken, err := a.extTokenStore.Get(extTokenName, "", &metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, ErrMustAuthenticate
+			}
+			return nil, errors.Wrapf(ErrMustAuthenticate,
+				"failed to retrieve auth token, error: %#v", err)
+		}
+		if _, err := extVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
+		}
+
+		return storedToken, nil
+	}
+
+	// Process legacy norman/v3 token
+
 	objs, err := a.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			lookupUsingClient = true
 		} else {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token from cache, error: %v", err)
+			return nil, errors.Wrapf(ErrMustAuthenticate,
+				"failed to retrieve auth token from cache, error: %v", err)
 		}
 	} else if len(objs) == 0 {
 		lookupUsingClient = true
@@ -301,4 +352,32 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 	}
 
 	return storedToken, nil
+}
+
+// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
+func extVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
+	invalidAuthTokenErr := errors.New("Invalid auth token value")
+
+	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	// Ext token always has a hash. Only a hash.
+
+	hasher, err := hashers.GetHasherForHash(storedToken.Status.TokenHash)
+	if err != nil {
+		logrus.Errorf("unable to get a hasher for token with error %v", err)
+		return http.StatusInternalServerError,
+			fmt.Errorf("unable to verify hash '%s'", storedToken.Status.TokenHash)
+	}
+
+	if err := hasher.VerifyHash(storedToken.Status.TokenHash, tokenKey); err != nil {
+		logrus.Errorf("VerifyHash failed with error: %v", err)
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	if storedToken.Status.Expired {
+		return http.StatusGone, errors.New("must authenticate")
+	}
+	return http.StatusOK, nil
 }
