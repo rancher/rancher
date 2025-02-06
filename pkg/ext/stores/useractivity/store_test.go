@@ -210,7 +210,6 @@ func TestStore_get(t *testing.T) {
 			name: "valid useractivity retrieved",
 			args: args{
 				ctx:     contextBG,
-				user:    "admin",
 				name:    "ua_admin_token-12345",
 				options: &v1.GetOptions{},
 			},
@@ -239,7 +238,6 @@ func TestStore_get(t *testing.T) {
 			name: "invalid useractivity name",
 			args: args{
 				ctx:     contextBG,
-				user:    "admin",
 				name:    "ua_admin_token_12345",
 				options: &v1.GetOptions{},
 			},
@@ -251,7 +249,6 @@ func TestStore_get(t *testing.T) {
 			name: "invalid token retrieved",
 			args: args{
 				ctx:     contextBG,
-				user:    "admin",
 				name:    "ua_admin_token-12345",
 				options: &v1.GetOptions{},
 			},
@@ -265,7 +262,6 @@ func TestStore_get(t *testing.T) {
 			name: "invalid user name retrieved",
 			args: args{
 				ctx:     contextBG,
-				user:    "admin",
 				name:    "ua_user1_token-12345",
 				options: &v1.GetOptions{},
 			},
@@ -284,7 +280,7 @@ func TestStore_get(t *testing.T) {
 	for _, tt := range tests {
 		tt.mockSetup()
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := uas.get(tt.args.ctx, tt.args.user, tt.args.name, tt.args.options)
+			got, err := uas.get(tt.args.ctx, tt.args.name, tt.args.options)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store.get() error = %v, wantErr %v", err, tt.wantErr)
 				return
