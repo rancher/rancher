@@ -30,10 +30,8 @@ node {
 
   withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: 'RANCHER_LINODE_ACCESSKEY'),
                     string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
                     string(credentialsId: 'AWS_SSH_KEY_NAME', variable: 'AWS_SSH_KEY_NAME'),
-                    string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
   stage('Checkout') {
           deleteDir()
           checkout([
@@ -46,7 +44,7 @@ node {
     stage('Configure and Build') {
       config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
       config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
-      config = config.replace('${RANCHER_LINODE_ACCESSKEY}', env.RANCHER_LINODE_ACCESSKEY)
+      config. config.replace('${ADMIN_PASSWORD}', env.ADMIN_PASSWORD)
 
       writeFile file: 'config.yml', text: config
 
@@ -58,7 +56,7 @@ node {
       sh "./configure.sh"
       sh "./build.sh"
     }
-    stage('Run Module Test') {
+    stage('Deploy Rancher airgap') {
       try {
         sh """
           docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
