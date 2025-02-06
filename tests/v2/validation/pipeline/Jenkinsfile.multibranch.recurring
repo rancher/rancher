@@ -6,9 +6,10 @@ node {
     def jobName = "${JOB_NAME}"
     def config = env.CONFIG
     def filename = "config.yaml"
-    def hostnameSuffix = ["v2.7-head":"v27", "v2.8-head":"v28", "v2.9-head":"v29", "head":"main"]
-    def releaseBranchTagMap = ["v2.7-head":"release/v2.7", "v2.8-head":"release/v2.8", "v2.9-head":"release/v2.9", "head":"main"]
-    def tagChartMap = ["v2.7-head":"2.7.12", "v2.8-head":"2.8.8", "v2.9-head":"2.9.2", "head":"2.9.2"]
+    def hostnameSuffix = ["v2.8-head":"v28", "v2.9-head":"v29", "v2.10-head":"v210", "head":"main"]
+    def releaseBranchTagMap = ["v2.8-head":"release/v2.8", "v2.9-head":"release/v2.9", "v2.10-head":"release/v2.10", "head":"main"]
+    def tagChartMap = ["v2.8-head":"2.8.11", "v2.9-head":"2.9.5", "v2.10-head":"2.10.1", "head":"2.10.1"]
+    def primeChartMap = ["v2.8-head", "v2.9-head"]
     def rancherChartRepo = "prime"
     def configPath = ""
 
@@ -58,7 +59,7 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
-                          string(credentialsId: 'PRIME_STAGING_REPO', variable: 'PRIME_STAGING_REPO'),
+                          string(credentialsId: 'PRIME_REPO', variable: 'PRIME_REPO'),
                           string(credentialsId: 'PRIME_STAGING_REGISTRY', variable: 'PRIME_STAGING_REGISTRY'),
                           string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
           
@@ -104,10 +105,10 @@ node {
                     sh "./yq e '.corralConfigs.corralConfigVars.aws_hostname_prefix = \"${hostname}\"' -i ${configPath}"
                     sh "./yq e '.rancher.host = \"${rancherHostName}\"' -i ${configPath}"
                     
-                    if (testTag == "v2.7-head") {
-                      def cattleImageEnvVar = '[\\"CATTLE_AGENT_IMAGE|'+"${env.PRIME_STAGING_REGISTRY}"+'/rancher/rancher-agent:v2.7-head\\"]'
+                    if ( primeChartMap.contains(testTag) ) {
+                      def cattleImageEnvVar = "[\\\"CATTLE_AGENT_IMAGE|${env.PRIME_STAGING_REGISTRY}/rancher/rancher-agent:${testTag}\\\"]"
                       def rancherImage = "${env.PRIME_STAGING_REGISTRY}/rancher/rancher"
-                      sh "./yq e '.corralConfigs.corralConfigVars.rancher_chart_url = \"${env.PRIME_STAGING_REPO}\"' -i ${configPath}"
+                      sh "./yq e '.corralConfigs.corralConfigVars.rancher_chart_url = \"${env.PRIME_REPO}\"' -i ${configPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.rancher_chart_repo = \"${rancherChartRepo}\"' -i ${configPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.rancher_image = \"${rancherImage}\"' -i ${configPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.env_var_map = \"${cattleImageEnvVar}\"' -i ${configPath}"
