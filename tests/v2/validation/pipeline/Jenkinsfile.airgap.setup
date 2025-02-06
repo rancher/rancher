@@ -2,6 +2,7 @@
 node {
   def homePath = pwd() + "/"
   def rootPath = "/root/go/src/github.com/rancher/tfp-automation/"
+  def TERRAFORM_DIR = './root/go/src/github.com/rancher/tfp-automation/modules/airgap'
   def testsDir = "github.com/rancher/tfp-automation/tests/${env.TEST_PACKAGE}"
   def job_name = "${JOB_NAME}"
   if (job_name.contains('/')) { 
@@ -15,10 +16,13 @@ node {
   def envFile = ".env"
   def config = env.CONFIG
   def testPackage = env.TEST_PACKAGE?.trim()
+  def terraformVolume = "s3_data"
+
   def branch = "${env.BRANCH}"
   if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
         branch = "${env.BRANCH}"
   }
+  def s3Container = "${job_name}${env.BUILD_NUMBER}_s3_file_download"
   def repo = scm.userRemoteConfigs
   if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
     repo = [[url: "${env.REPO}"]]
@@ -27,6 +31,8 @@ node {
   if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
         timeout = "${env.TIMEOUT}" 
   }
+  def s3Config = env.AWS_S3_BUCKET_CONFIG
+
 
   withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
@@ -34,40 +40,115 @@ node {
                     string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
                     string(credentialsId: 'AWS_SSH_KEY_NAME', variable: 'AWS_SSH_KEY_NAME'),
                     string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
-  stage('Checkout') {
-          deleteDir()
-          checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: "*/${branch}"]],
-                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                    userRemoteConfigs: repo
-                  ])
+      stage('Checkout') {
+              deleteDir()
+              checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${branch}"]],
+                        extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                        userRemoteConfigs: repo
+                      ])
+            }
+        stage('Configure and Build') {
+          config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+          config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+
+          writeFile file: 'config.yml', text: config
+
+          def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
+          writeFile file: 'key.pem', text: decoded
+          
+          env.CATTLE_TEST_CONFIG=rootPath+'config.yml'
+
+          sh "./configure.sh"
+          sh "./build.sh"
         }
-    stage('Configure and Build') {
-      config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
-      config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
-      config = config.replace('${RANCHER_LINODE_ACCESSKEY}', env.RANCHER_LINODE_ACCESSKEY)
+        stage('Setup'){
+            sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
+            sh returnStdout:true, script: 'chmod a+x ./yq'
 
-      writeFile file: 'config.yml', text: config
+            println "AWS s3 config ${s3Config}"
+            
+            AWS_S3_BUCKET = sh (
+                  script: "echo '${s3Config}' | ./yq '.s3Bucket'",
+                  returnStdout: true
+                ).trim()
+                
+            println "AWS_S3_BUCKET: ${AWS_S3_BUCKET}"
 
-      def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
-      writeFile file: 'key.pem', text: decoded
-      
-      env.CATTLE_TEST_CONFIG=rootPath+'config.yml'
+            AWS_S3_REGION =    sh (
+                  script: "echo '${s3Config}' | ./yq '.s3BucketRegion'",
+                  returnStdout: true
+                ).trim()
+            println "AWS_S3_REGION: ${AWS_S3_REGION}"
 
-      sh "./configure.sh"
-      sh "./build.sh"
+        }
+        if  (!(env.HA_CLEANUP.toBoolean())) {
+          stage('Run Module Test') {
+            try {
+              sh """
+                docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
+                /root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} --jsonfile ${testResultsJSON} -- -timeout=${timeout} -v ${params.TEST_CASE};
+                if [ -f ${rootPath}reporter ]; then ${rootPath}reporter; fi"
+              """
+            } catch(err) {
+                echo 'Test run had failures. Collecting results...'
+            }
+          }
+          stage('Upload tf files to S3 bucket'){
+            try{
+                sh "docker cp ${testContainer}:/root/ ./"
+                sh "ls -lR"
+                script {
+                  sh """
+                      if ls $TERRAFORM_DIR/. 1> /dev/null 2>&1; then
+                          echo "Terraform files found, starting upload."
+                      else
+                          echo "No Terraform files found!"
+                          exit 1
+                      fi
+                        docker run --rm \
+                          -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                          -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                          -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
+                          -v $TERRAFORM_DIR/:/root/terraform/ \
+                          amazon/aws-cli \
+                          s3 cp /root/terraform/. s3://$AWS_S3_BUCKET/terraform/ --recursive
+                      """
+                  }
+              }catch(err){
+                  echo "Unable to get the output: ${err}"
+                }
+           }
+        }else{
+          stage('Cleanup setup'){
+              script {
+                sh """
+                    docker volume create $terraformVolume
+
+                    docker run --name $s3Container \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
+                    -v $terraformVolume:/terraform-files  \
+                    amazon/aws-cli \
+                    s3 cp s3://$AWS_S3_BUCKET/terraform/ /terraform-files --recursive
+
+                    docker run --rm -t -v $terraformVolume:/terraform-files --name $testContainer ${imageName} \
+                    sh -c "ls -lR /terraform-files && terraform -chdir=/terraform-files init && terraform -chdir=/terraform-files destroy -auto-approve"
+
+                    docker run --rm \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
+                    amazon/aws-cli \
+                    s3 rm s3://$AWS_S3_BUCKET/terraform/ --recursive
+
+                    docker rm $testContainer
+                    docker volume rm $terraformVolume
+                 """   
+              }
+           }
+        }
     }
-    stage('Run Module Test') {
-      try {
-        sh """
-          docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
-          /root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} --jsonfile ${testResultsJSON} -- -timeout=${timeout} -v ${params.TEST_CASE};
-          if [ -f ${rootPath}reporter ]; then ${rootPath}reporter; fi"
-        """
-      } catch(err) {
-          echo 'Test run had failures. Collecting results...'
-      }
-    }
-  }
 }
