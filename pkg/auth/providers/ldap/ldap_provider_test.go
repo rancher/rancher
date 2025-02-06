@@ -7,9 +7,8 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/objectclient"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
@@ -34,18 +33,18 @@ func Test_getBasicLogin(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      args
-		wantLogin *v32.BasicLogin
+		wantLogin *v3.BasicLogin
 		wantErr   bool
 	}{
 		{
 			name: "good input credentials",
 			args: args{
-				input: &v32.BasicLogin{
+				input: &v3.BasicLogin{
 					Username: DummyUsername,
 					Password: DummyPassword,
 				},
 			},
-			wantLogin: &v32.BasicLogin{
+			wantLogin: &v3.BasicLogin{
 				Username: DummyUsername,
 				Password: DummyPassword,
 			},
@@ -56,7 +55,7 @@ func Test_getBasicLogin(t *testing.T) {
 			args: args{
 				input: "badinput",
 			},
-			wantLogin: &v32.BasicLogin{},
+			wantLogin: &v3.BasicLogin{},
 			wantErr:   true,
 		},
 	}
@@ -81,7 +80,6 @@ func Test_getBasicLogin(t *testing.T) {
 func Test_ldapProvider_getLDAPConfig(t *testing.T) {
 	type fields struct {
 		ctx                   context.Context
-		authConfigs           v3.AuthConfigInterface
 		secrets               wcorev1.SecretController
 		userMGR               user.Manager
 		tokenMGR              *tokens.Manager
@@ -91,10 +89,10 @@ func Test_ldapProvider_getLDAPConfig(t *testing.T) {
 		testAndApplyInputType string
 		userScope             string
 		groupScope            string
-		mockGenericClient     mockGenericClient
 	}
 	tests := []struct {
 		name                 string
+		objectMap            map[string]interface{}
 		fields               fields
 		wantStoredLdapConfig *v3.LdapConfig
 		wantCaPool           *x509.CertPool
@@ -107,7 +105,67 @@ func Test_ldapProvider_getLDAPConfig(t *testing.T) {
 				certs:  DummyCerts,
 			},
 			wantStoredLdapConfig: &v3.LdapConfig{
-				LdapFields: v32.LdapFields{
+				LdapFields: v3.LdapFields{
+					Certificate: DummyCerts,
+				},
+			},
+			objectMap: map[string]interface{}{
+				"Certificate": DummyCerts,
+			},
+			wantCaPool: x509.NewCertPool(),
+			wantErr:    false,
+		},
+		{
+			name: "ldap config is nil",
+			fields: fields{
+				providerName: "okta",
+			},
+			objectMap: map[string]interface{}{
+				"openLdapConfig": nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "ldap config not found",
+			fields: fields{
+				providerName: "okta",
+			},
+			objectMap: map[string]interface{}{},
+			wantErr:   true,
+		},
+		{
+			name: "no servers found",
+			fields: fields{
+				providerName: "okta",
+			},
+			objectMap: map[string]interface{}{
+				"openLdapConfig": map[string]interface{}{
+					"servers": []string{},
+				},
+			},
+			wantStoredLdapConfig: &v3.LdapConfig{
+				LdapFields: v3.LdapFields{
+					Servers: []string{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "server gets added",
+			fields: fields{
+				providerName: "okta",
+				caPool:       x509.NewCertPool(),
+				certs:        DummyCerts,
+			},
+			objectMap: map[string]interface{}{
+				"openLdapConfig": map[string]interface{}{
+					"Certificate": DummyCerts,
+					"servers":     []string{"server1"},
+				},
+			},
+			wantStoredLdapConfig: &v3.LdapConfig{
+				LdapFields: v3.LdapFields{
+					Servers:     []string{"server1"},
 					Certificate: DummyCerts,
 				},
 			},
@@ -117,9 +175,9 @@ func Test_ldapProvider_getLDAPConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			m := mockGenericClient{ObjectMap: tt.objectMap}
 			p := &ldapProvider{
 				ctx:                   tt.fields.ctx,
-				authConfigs:           tt.fields.authConfigs,
 				secrets:               tt.fields.secrets,
 				userMGR:               tt.fields.userMGR,
 				tokenMGR:              tt.fields.tokenMGR,
@@ -130,22 +188,24 @@ func Test_ldapProvider_getLDAPConfig(t *testing.T) {
 				userScope:             tt.fields.userScope,
 				groupScope:            tt.fields.groupScope,
 			}
-			gotStoredLdapConfig, gotCaPool, err := p.getLDAPConfig(tt.fields.mockGenericClient)
+			gotStoredLdapConfig, gotCaPool, err := p.getLDAPConfig(m)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ldapProvider.getLDAPConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(gotStoredLdapConfig, tt.wantStoredLdapConfig) {
-				t.Errorf("ldapProvider.getLDAPConfig() got = %v, want %v", gotStoredLdapConfig, tt.wantStoredLdapConfig)
+				t.Errorf("ldapProvider.getLDAPConfig() got ldapConfig = %v, want %v", gotStoredLdapConfig, tt.wantStoredLdapConfig)
 			}
 			if !reflect.DeepEqual(gotCaPool, tt.wantCaPool) {
-				t.Errorf("ldapProvider.getLDAPConfig() got1 = %v, want %v", gotCaPool, tt.wantCaPool)
+				t.Errorf("ldapProvider.getLDAPConfig() got caPool = %v, want %v", gotCaPool, tt.wantCaPool)
 			}
 		})
 	}
 }
 
-type mockGenericClient struct{}
+type mockGenericClient struct {
+	ObjectMap map[string]interface{}
+}
 
 func (m mockGenericClient) UnstructuredClient() objectclient.GenericClient {
 	panic("unimplemented")
@@ -161,9 +221,7 @@ func (m mockGenericClient) GetNamespaced(namespace, name string, opts metav1.Get
 }
 func (m mockGenericClient) Get(name string, opts metav1.GetOptions) (runtime.Object, error) {
 	u := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"Certificate": DummyCerts,
-		},
+		Object: m.ObjectMap,
 	}
 	return u, nil
 }

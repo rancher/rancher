@@ -258,7 +258,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 
 	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {
 		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
-		if !ok {
+		if !ok || subLdapConfig == nil {
 			return nil, nil, ErrorNotConfigured{}
 		}
 
