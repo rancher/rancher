@@ -1,15 +1,13 @@
 package machinepools
 
 import (
-	"github.com/rancher/shepherd/pkg/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	DOKind                              = "DigitaloceanConfig"
-	DOPoolType                          = "rke-machine-config.cattle.io.digitaloceanconfig"
-	DOResourceConfig                    = "digitaloceanconfigs"
-	DOMachineConfigConfigurationFileKey = "doMachineConfigs"
+	DOKind           = "DigitaloceanConfig"
+	DOPoolType       = "rke-machine-config.cattle.io.digitaloceanconfig"
+	DOResourceConfig = "digitaloceanconfigs"
 )
 
 type DOMachineConfigs struct {
@@ -36,12 +34,9 @@ type DOMachineConfig struct {
 
 // NewDigitalOceanMachineConfig is a constructor to set up rke-machine-config.cattle.io.digitaloceanconfig. It returns an *unstructured.Unstructured
 // that CreateMachineConfig uses to created the rke-machine-config
-func NewDigitalOceanMachineConfig(generatedPoolName, namespace string) []unstructured.Unstructured {
-	var doMachineConfigs DOMachineConfigs
-	config.LoadConfig(DOMachineConfigConfigurationFileKey, &doMachineConfigs)
+func NewDigitalOceanMachineConfig(machineConfigs MachineConfigs, generatedPoolName, namespace string) []unstructured.Unstructured {
 	var multiConfig []unstructured.Unstructured
-
-	for _, doMachineConfig := range doMachineConfigs.DOMachineConfig {
+	for _, doMachineConfig := range machineConfigs.DOMachineConfigs.DOMachineConfig {
 		machineConfig := unstructured.Unstructured{}
 		machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
 		machineConfig.SetKind(DOKind)
@@ -54,7 +49,7 @@ func NewDigitalOceanMachineConfig(generatedPoolName, namespace string) []unstruc
 		machineConfig.Object["ipv6"] = doMachineConfig.IPV6
 		machineConfig.Object["monitoring"] = doMachineConfig.Monitoring
 		machineConfig.Object["privateNetworking"] = doMachineConfig.PrivateNetworking
-		machineConfig.Object["region"] = doMachineConfigs.Region
+		machineConfig.Object["region"] = machineConfigs.DOMachineConfigs.Region
 		machineConfig.Object["size"] = doMachineConfig.Size
 		machineConfig.Object["sshKeyContents"] = doMachineConfig.SSHKeyContents
 		machineConfig.Object["sshKeyFingerprint"] = doMachineConfig.SSHKeyFingerprint
@@ -71,12 +66,10 @@ func NewDigitalOceanMachineConfig(generatedPoolName, namespace string) []unstruc
 }
 
 // GetDOMachineRoles returns a list of roles from the given machineConfigs
-func GetDOMachineRoles() []Roles {
-	var doMachineConfigs DOMachineConfigs
-	config.LoadConfig(DOMachineConfigConfigurationFileKey, &doMachineConfigs)
+func GetDOMachineRoles(machineConfigs MachineConfigs) []Roles {
 	var allRoles []Roles
 
-	for _, doMachineConfig := range doMachineConfigs.DOMachineConfig {
+	for _, doMachineConfig := range machineConfigs.DOMachineConfigs.DOMachineConfig {
 		allRoles = append(allRoles, doMachineConfig.Roles)
 	}
 
