@@ -7,7 +7,8 @@ import (
 )
 
 // +genclient
-// +kubebuilder:skipversion
+// +kubebuilder:resource:scope=Namespaced,path=apps
+// +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type App struct {
