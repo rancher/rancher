@@ -158,7 +158,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	roleName := getProjectMembershipRoleName(rt, prtb)
 	roleRef := v1.RoleRef{
 		APIGroup: rbac.RBACApiGroup,
-		Kind:     "Role",
+		Kind:     "ClusterRole",
 		Name:     roleName,
 	}
 
@@ -200,13 +200,13 @@ func buildProjectMembershipBinding(roleRef v1.RoleRef, prtb *v3.ProjectRoleTempl
 	if err != nil {
 		return nil, err
 	}
-	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
+	clusterName, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	rbName := rbac.NameForRoleBinding(projectName, roleRef, subject)
 	rtbLabel := getRTBLabel(prtb)
 
 	return &v1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: projectName,
+			Namespace: clusterName,
 			Name:      rbName,
 			Labels:    map[string]string{rtbLabel: "true"},
 		},
