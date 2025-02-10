@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
-	v1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
+	upgradecattleiov1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -37,33 +37,34 @@ type PlansGetter interface {
 
 // PlanInterface has methods to work with Plan resources.
 type PlanInterface interface {
-	Create(ctx context.Context, plan *v1.Plan, opts metav1.CreateOptions) (*v1.Plan, error)
-	Update(ctx context.Context, plan *v1.Plan, opts metav1.UpdateOptions) (*v1.Plan, error)
+	Create(ctx context.Context, plan *upgradecattleiov1.Plan, opts metav1.CreateOptions) (*upgradecattleiov1.Plan, error)
+	Update(ctx context.Context, plan *upgradecattleiov1.Plan, opts metav1.UpdateOptions) (*upgradecattleiov1.Plan, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, plan *v1.Plan, opts metav1.UpdateOptions) (*v1.Plan, error)
+	UpdateStatus(ctx context.Context, plan *upgradecattleiov1.Plan, opts metav1.UpdateOptions) (*upgradecattleiov1.Plan, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Plan, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PlanList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*upgradecattleiov1.Plan, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*upgradecattleiov1.PlanList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Plan, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *upgradecattleiov1.Plan, err error)
 	PlanExpansion
 }
 
 // plans implements PlanInterface
 type plans struct {
-	*gentype.ClientWithList[*v1.Plan, *v1.PlanList]
+	*gentype.ClientWithList[*upgradecattleiov1.Plan, *upgradecattleiov1.PlanList]
 }
 
 // newPlans returns a Plans
 func newPlans(c *UpgradeV1Client, namespace string) *plans {
 	return &plans{
-		gentype.NewClientWithList[*v1.Plan, *v1.PlanList](
+		gentype.NewClientWithList[*upgradecattleiov1.Plan, *upgradecattleiov1.PlanList](
 			"plans",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Plan { return &v1.Plan{} },
-			func() *v1.PlanList { return &v1.PlanList{} }),
+			func() *upgradecattleiov1.Plan { return &upgradecattleiov1.Plan{} },
+			func() *upgradecattleiov1.PlanList { return &upgradecattleiov1.PlanList{} },
+		),
 	}
 }

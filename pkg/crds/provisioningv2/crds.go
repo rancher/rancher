@@ -17,10 +17,12 @@ import (
 var (
 	capiCRDs = map[string]bool{
 		"Machine":            true,
+		"MachinePool":        true,
 		"MachineHealthCheck": true,
 		"MachineDeployment":  true,
 		"MachineSet":         true,
 		"Cluster":            true,
+		"MachineDrainRule":   true,
 	}
 
 	//go:embed capi-crds.yaml capi-webhooks.yaml
