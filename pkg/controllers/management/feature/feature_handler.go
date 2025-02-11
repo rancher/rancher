@@ -24,6 +24,7 @@ import (
 
 type handler struct {
 	featuresClient       managementv3.FeatureClient
+	featureEnqueue       func(string, time.Duration)
 	tokensLister         managementv3.TokenCache
 	tokenEnqueue         func(string, time.Duration)
 	nodeDriverController normanv3.NodeDriverInterface
@@ -33,6 +34,7 @@ type handler struct {
 func Register(ctx context.Context, management *config.ManagementContext, wContext *wrangler.Context) {
 	h := handler{
 		featuresClient:       wContext.Mgmt.Feature(),
+		featureEnqueue:       wContext.Mgmt.Feature().EnqueueAfter,
 		tokensLister:         wContext.Mgmt.Token().Cache(),
 		tokenEnqueue:         wContext.Mgmt.Token().EnqueueAfter,
 		nodeDriverController: management.Management.NodeDrivers(""),
@@ -56,9 +58,7 @@ func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	}
 
 	if obj.Name == features.Harvester.Name() {
-		if err = h.syncHarvesterNodeDriver(obj); err != nil {
-			return obj, err
-		}
+		return obj, h.syncHarvesterNodeDriver(obj)
 	}
 
 	if obj.Name == features.HarvesterBaremetalContainerWorkload.Name() {
@@ -108,27 +108,32 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 // when the Harvester feature is disabled and that the node driver is enabled,
 // when the Harvester feature is enabled - provided that the node driver
 // exists. If it doesn't exist, the node driver is created.
-func (h *handler) syncHarvesterNodeDriver(feat *v3.Feature) error {
-	if feat.Spec.Value == nil {
-		logrus.Debugf("feature %v contains nil value", feat.Name)
+func (h *handler) syncHarvesterNodeDriver(feature *v3.Feature) error {
+	if feature.Spec.Value == nil {
+		logrus.Debugf("feature %s contains nil value", feature.Name)
 		return nil
 	}
 
-	m, err := h.nodeDriverController.Controller().Lister().Get("", feat.Name)
+	driver, err := h.nodeDriverController.Controller().Lister().Get("", datamanagement.HarvesterDriver)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return datamanagement.AddHarvesterMachineDriver(h.managementContext)
 		}
+		h.featureEnqueue(feature.Name, 10*time.Second)
 		return err
 	}
 
-	n := m.DeepCopy()
-	n.Spec.Active = *feat.Spec.Value
+	if driver.Spec.Active == *feature.Spec.Value {
+		return nil
+	}
 
-	if !reflect.DeepEqual(m, n) {
-		logrus.Infof("updating node driver %v", n.Name)
-		_, err = h.nodeDriverController.Update(n)
-		return err
+	driver = driver.DeepCopy()
+	driver.Spec.Active = *feature.Spec.Value
+
+	logrus.Infof("updating node driver %s", driver.Name)
+	_, err = h.nodeDriverController.Update(driver)
+	if err != nil {
+		h.featureEnqueue(feature.Name, 10*time.Second)
 	}
 	return nil
 }
