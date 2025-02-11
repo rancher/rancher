@@ -13,7 +13,6 @@ node {
     def buildTestContainer = "${job_name}${env.BUILD_NUMBER}-buildtest"
     def configGeneratorContainer = "${job_name}${env.BUILD_NUMBER}_generator"
     def cleanupTestContainer = "${job_name}${env.BUILD_NUMBER}_cleanup"
-    def setupContainer = "${job_name}${env.BUILD_NUMBER}-buildtest"
 
     def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
 
@@ -177,14 +176,14 @@ node {
                 }
 
                 try{
-                  sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e --build-arg CORRAL_VERSION=${env.CORRAL_VERSION} --build-arg RKE_VERSION=${env.RKE_VERSION} -t ${imageName}"
+                  sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e -t ${imageName}"
                   
                   sh "docker volume create --name ${validationVolume}"
 
-                  sh "docker run -v ${validationVolume}:/root  --name ${setupContainer} -t " +
+                  sh "docker run -v ${validationVolume}:/root  --name ${buildTestContainer} -t " +
                   "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_k8s_version.sh\""
 
-                  sh "docker cp ${setupContainer}:/root/go/src/github.com/rancher/rancher/testrancherk8s.yaml ./"
+                  sh "docker cp ${buildTestContainer}:/root/go/src/github.com/rancher/rancher/testrancherk8s.yaml ./"
 
                   if (sh(script: "test -s ./${testRancherVersions} && echo 'not_empty' || echo 'empty'", returnStdout: true).trim() == "empty") {
                       error "ERROR: (${testRancherVersions}) is empty or missing!"
@@ -250,13 +249,15 @@ node {
                 } catch (err) {
                   echo "Unable to get the versions of Rancher and Kubernetes: ${err}"
                   error "Rancher and k8s versions cannot be retrieved."
-                  sh "docker stop ${setupContainer}"
-                  sh "docker rm -v ${setupContainer}"
+                  sh "docker stop ${buildTestContainer}"
+                  sh "docker rm -v ${buildTestContainer}"
                   sh "docker volume rm -f ${validationVolume}"
+                  sh "docker rmi ${imageName}"
                 }
-                sh "docker stop ${setupContainer}"
-                sh "docker rm -v ${setupContainer}"
+                sh "docker stop ${buildTestContainer}"
+                sh "docker rm -v ${buildTestContainer}"
                 sh "docker volume rm -f ${validationVolume}"
+                sh "docker rmi ${imageName}"
                 
                 dir("./rancher/tests/v2/validation") {
                   writeFile file: filename, text: config

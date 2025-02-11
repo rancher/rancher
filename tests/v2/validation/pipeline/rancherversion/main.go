@@ -32,8 +32,8 @@ type RancherK8sVersions struct {
 }
 
 var (
-	rancherVersion          = os.Getenv("RANCHER_VERSION")
-	rancherVersionToUpgrade = os.Getenv("RANCHER_VERSION_TO_UPGRADE")
+	rancherVersion            = os.Getenv("RANCHER_VERSION")
+	rancherVersionToUpgrade   = os.Getenv("RANCHER_VERSION_TO_UPGRADE")
 	communityBaseURL          = "https://github.com/rancher/rancher/releases/download/" + rancherVersion + "/rancher-images.txt"
 	communityBaseURLToUpgrade = "https://github.com/rancher/rancher/releases/download/" + rancherVersionToUpgrade + "/rancher-images.txt"
 	primeRelease              = true
@@ -126,6 +126,7 @@ func main() {
 
 // getResponseData extracts the data from the given URL and returns the response body as a byte slice.
 func getResponseData(urlb string) ([]byte, error) {
+	logrus.Info("This is the urlb", urlb)
 	resp, err := http.Get(urlb)
 	if err != nil {
 		fmt.Printf("Error fetching URL: %v\n", err)
@@ -138,7 +139,7 @@ func getResponseData(urlb string) ([]byte, error) {
 	return responseData, err
 }
 
-// getRke2K3sVersionMap extracts the rke2 and k3s version map from the rancher-images.txt for a community release and 
+// getRke2K3sVersionMap extracts the rke2 and k3s version map from the rancher-images.txt for a community release and
 // prime.ribs.rancher.io for a prime released version of rancher.
 func getRke2K3sVersionMap(urlb, matchFilter, file string, primeRelease bool) (latestVersions []*version.Version, err error) {
 	var k8sVersionData []byte
@@ -150,7 +151,9 @@ func getRke2K3sVersionMap(urlb, matchFilter, file string, primeRelease bool) (la
 		}
 	} else {
 		k8sVersionData, err = os.ReadFile(file)
-		if k8sVersionData == nil {
+
+		logrus.Info("This is the k8sVersionData")
+		if string(k8sVersionData) == "Not Found" {
 			return nil, errors.New("Community version file is empty")
 		}
 	}
@@ -203,6 +206,7 @@ func extractRke2K3sVersions(urlb, matchFilter string, primeRelease, primeRelease
 		k8sVersions = append(k8sVersions, latestVersions[len(latestVersions)-2].Original(), latestVersions[len(latestVersions)-1].Original())
 	}
 
+	logrus.Info("Getting the version", k8sVersions)
 	return k8sVersions, nil
 }
 
@@ -244,7 +248,7 @@ func getRkeVersionMap(urlb, file string, primeRelease bool) ([]string, error) {
 	return versions, nil
 }
 
-// extractRkeVersions is a helper that returns the RKE1 k8s versions 
+// extractRkeVersions is a helper that returns the RKE1 k8s versions
 func extractRkeVersions(urlb string, primeRelease, primeReleaseToUpgrade bool) (k8sVersions []string, err error) {
 	versions, err := getRkeVersionMap(urlb, fileName, primeRelease)
 	if err != nil {
@@ -267,8 +271,8 @@ func extractRkeVersions(urlb string, primeRelease, primeReleaseToUpgrade bool) (
 	return k8sVersions, err
 }
 
-// extractRancherVersion is a helper uses prime.ribs.rancher.io to get the latest if no version provided, returns empty 
-// if the provided version is a community release 
+// extractRancherVersion is a helper uses prime.ribs.rancher.io to get the latest if no version provided, returns empty
+// if the provided version is a community release
 func extractRancherVersion(urlb, rancherVersion string) (string, error) {
 	rancherVersionData, err := getResponseData(urlb)
 	if err != nil {
@@ -299,6 +303,7 @@ func extractRancherVersion(urlb, rancherVersion string) (string, error) {
 	sort.Sort(version.Collection(versions))
 	if rancherVersion == "" {
 		rancherVersion = "v" + versions[len(versions)-1].String()
+		return rancherVersion, nil
 	}
 	return "", nil
 }
