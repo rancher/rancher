@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ext/listener"
 	"github.com/rancher/rancher/pkg/settings"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -19,12 +20,12 @@ type settingController struct {
 
 	authenticator *ToggleUnionAuthenticator
 
+	listener *listener.Listener
+
 	stopChanMu sync.Mutex
 	stopChan   chan struct{}
 }
 
-// todo: toggle the listening port
-// todo: toggle the cert authenticator
 func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
@@ -54,6 +55,10 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 			}
 		}()
 
+		if err := c.listener.Start(); err != nil {
+			return nil, fmt.Errorf("failed to start listener: %w", err)
+		}
+
 		if err := CreateOrUpdateService(c.services); err != nil {
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 		}
@@ -68,6 +73,10 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 		close(c.stopChan)
 		c.stopChan = nil
 		c.stopChanMu.Unlock()
+
+		if err := c.listener.Stop(); err != nil {
+			return nil, fmt.Errorf("failed to stop listener: %w", err)
+		}
 
 		c.authenticator.SetEnabled(authenticatorNameSteveDefault, false)
 

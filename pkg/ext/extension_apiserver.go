@@ -3,10 +3,10 @@ package ext
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/ext/listener"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -146,7 +146,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	// Only need to listen on localhost because that port will be reached
 	// from a remotedialer tunnel on localhost
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
+	ln, err := listener.NewListener(fmt.Sprintf(":%d", Port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
 	}
@@ -226,6 +226,8 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		sniProvider: sniProvider,
 
 		authenticator: toggleAuthenticator,
+
+		listener: ln,
 	}
 	wranglerContext.Mgmt.Setting().OnChange(ctx, "imperative-api-extension", settingController.sync)
 
