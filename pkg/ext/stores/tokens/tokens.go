@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -38,6 +41,8 @@ const (
 	UserIDLabel    = "authn.management.cattle.io/token-userId"
 	KindLabel      = "authn.management.cattle.io/kind"
 	IsLogin        = "session"
+
+	GroupCattleAuthenticated = "system:cattle:authenticated"
 
 	// data fields used by the backing secrets to store token information
 	FieldAnnotations    = "annotations"
@@ -392,7 +397,7 @@ func (t *Store) Watch(
 // Actual K8s verb implementations
 
 func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
-	user, err := t.auth.UserName(ctx)
+	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
@@ -403,8 +408,11 @@ func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.Cr
 }
 
 func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
+	// check if the user does not wish to actually change anything
+	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
+
 	// ensure existence of the namespace holding our secrets. run once per store.
-	if !t.initialized {
+	if !dryRun && !t.initialized {
 		_, err := t.namespaceClient.Create(&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: TokenNamespace,
@@ -458,9 +466,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve user %s: %w",
 			token.Spec.UserID, err))
 	}
-	if user == nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get user %s", token.Spec.UserID))
-	}
 
 	// Reject operation if the user is disabled.
 	if user.Enabled != nil && !*user.Enabled {
@@ -504,6 +509,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		}
 	}
 
+	// Abort, user does not wish to actually change anything.
+	if dryRun {
+		return token, nil
+	}
+
 	// Save new secret
 	newSecret, err := t.secretClient.Create(secret)
 	if err != nil {
@@ -540,7 +550,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 }
 
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
-	user, err := t.auth.UserName(ctx)
+	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return apierrors.NewInternalError(err)
 	}
@@ -571,7 +581,7 @@ func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions
 		return nil, err
 	}
 
-	user, err := t.auth.UserName(ctx)
+	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
@@ -612,7 +622,7 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 }
 
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
-	user, err := t.auth.UserName(ctx)
+	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
@@ -627,8 +637,30 @@ func (t *SystemStore) List(options *metav1.ListOptions) (*ext.TokenList, error) 
 }
 
 func (t *SystemStore) list(fullView bool, user, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
+	// Merge our own selection request (user match!) into the caller's demands
+	var localOptions metav1.ListOptions
+	if fullView {
+		// The system is allowed to list all tokens. No internal filtering is applied.
+		localOptions = *options
+	} else {
+		// Non-system requests always filter the tokens down to those of the current user.
+		var err error
+		localOptions, err = ListOptionMerge(user, options)
+		if err != nil {
+			return nil,
+				apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w",
+					err))
+		}
+		empty := metav1.ListOptions{}
+		if localOptions == empty {
+			// The setup indicated that we can bail out. I.e the
+			// options ask for something which cannot match.
+			return &ext.TokenList{}, nil
+		}
+	}
+
 	// Core token listing from backing secrets
-	secrets, err := t.secretClient.List(TokenNamespace, *options)
+	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
 	}
@@ -640,10 +672,8 @@ func (t *SystemStore) list(fullView bool, user, sessionID string, options *metav
 		if err != nil {
 			continue
 		}
-		// users can only list their own tokens. the system can list all for its tasks.
-		if !fullView && !userMatch(user, token) {
-			continue
-		}
+
+		// Filtering for users is done already, see above where the options are set up and/or merged.
 
 		token.Status.Current = token.Name == sessionID
 		tokens = append(tokens, *token)
@@ -658,7 +688,7 @@ func (t *SystemStore) list(fullView bool, user, sessionID string, options *metav
 }
 
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
-	user, err := t.auth.UserName(ctx)
+	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
@@ -675,7 +705,11 @@ func (t *SystemStore) Update(token *ext.Token, options *metav1.UpdateOptions) (*
 	return t.update("", true, token, options)
 }
 
-func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
+func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.Token,
+	options *metav1.UpdateOptions) (*ext.Token, error) {
+	// check if the user does not wish to actually change anything
+	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
+
 	currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -734,6 +768,11 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 			token.Name, err))
 	}
 
+	// Abort, user does not wish to actually change anything.
+	if dryRun {
+		return token, nil
+	}
+
 	newSecret, err := t.secretClient.Update(secret)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to update token %s: %w",
@@ -780,7 +819,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 }
 
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
-	user, err := t.auth.UserName(ctx)
+	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
@@ -792,12 +831,27 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		ch: make(chan watch.Event, 100),
 	}
 
+	localOptions, err := ListOptionMerge(user, options)
+	if err != nil {
+		return nil,
+			apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w",
+				err))
+	}
+
+	empty := metav1.ListOptions{}
+	if localOptions == empty {
+		// The setup indicated that we can bail out. I.e the options ask
+		// for something which cannot match. Simply return the watcher,
+		// without feeding it anything.
+		return consumer, nil
+	}
+
 	sessionID := t.auth.SessionID(ctx)
 
 	// watch the backend secrets for changes and transform their events into
 	// the appropriate token events.
 	go func() {
-		producer, err := t.secretClient.Watch(TokenNamespace, *options)
+		producer, err := t.secretClient.Watch(TokenNamespace, localOptions)
 		if err != nil {
 			close(consumer.ch)
 			return
@@ -831,10 +885,10 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					continue
 				}
 
-				// skip tokens not owned by watching user
-				if !userMatch(user, token) {
-					continue
-				}
+				// skipping tokens not owned by the watching
+				// user is not required. The watch filter (see
+				// ListOptionMerge above) takes care of only
+				// asking for owned tokens
 
 				token.Status.Current = token.Name == sessionID
 
@@ -987,7 +1041,7 @@ type hashHandler interface {
 type authHandler interface {
 	ProviderAndPrincipal(ctx context.Context, store *SystemStore) (string, string, error)
 	SessionID(ctx context.Context) string
-	UserName(ctx context.Context) (string, error)
+	UserName(ctx context.Context, store *SystemStore) (string, error)
 }
 
 // Standard implementations for the above interfaces.
@@ -1033,13 +1087,32 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 }
 
 // UserName hides the details of extracting a user name from the request context
-func (tp *tokenAuth) UserName(ctx context.Context) (string, error) {
+func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
 		return "", fmt.Errorf("context has no user info")
 	}
 
-	return userInfo.GetName(), nil
+	userName := userInfo.GetName()
+
+	if strings.Contains(userName, ":") { // E.g. system:admin
+		return "", apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
+	}
+
+	if !slices.Contains(userInfo.GetGroups(), GroupCattleAuthenticated) {
+		return "", apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
+	}
+
+	_, err := store.userClient.Get(userName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s not found", userName))
+		}
+
+		return "", apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
+	}
+
+	return userName, nil
 }
 
 // ProviderAndPrincipal hides the details of extracting the auth provider and
@@ -1103,6 +1176,52 @@ func SessionID(ctx context.Context) (string, error) {
 }
 
 // Internal supporting functionality
+
+// ListOptionMerge merges external filter options with the internal filter (for
+// the current user).  A non-error empty result indicates that the options
+// specified a filter which cannot match anything.  I.e. the calling user
+// requests a filter for a different user than itself.
+func ListOptionMerge(user string, options *metav1.ListOptions) (metav1.ListOptions, error) {
+	var localOptions metav1.ListOptions
+
+	quest := labels.Set(map[string]string{
+		UserIDLabel: user,
+	})
+	empty := metav1.ListOptions{}
+	if options == nil || *options == empty {
+		// No external filter to contend with, just set the internal
+		// filter.
+		localOptions = metav1.ListOptions{
+			LabelSelector: quest.AsSelector().String(),
+		}
+	} else {
+		// We have to contend with an external filter, and merge ours
+		// into it.
+		localOptions = *options
+		callerQuest, err := labels.ConvertSelectorToLabelsMap(localOptions.LabelSelector)
+		if err != nil {
+			return localOptions, err
+		}
+		if callerQuest.Has(UserIDLabel) {
+			// The external filter does filter for user as, possible
+			// conflict.
+			if callerQuest[UserIDLabel] != user {
+				// It asks for a user other than the current.
+				// We can bail now, with an empty result, as
+				// nothing can match.
+				return localOptions, nil
+			}
+			// It asks for the current user, same as the internal
+			// filter would do.  We can pass the options as is.
+		} else {
+			// The external filter has nothing about the user.
+			// We can simply add the internal filter.
+			localOptions.LabelSelector = labels.Merge(callerQuest, quest).AsSelector().String()
+		}
+	}
+
+	return localOptions, nil
+}
 
 // secretFromToken converts the token argument into the equivalent secrets to
 // store in k8s.
