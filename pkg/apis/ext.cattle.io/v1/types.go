@@ -23,9 +23,9 @@ type Token struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec is the spec of RancherToken
+	// Spec is the spec of the ext Token
 	Spec TokenSpec `json:"spec"`
-	// +optional
+	// Status is the status of the ext Token
 	Status TokenStatus `json:"status"`
 }
 
@@ -106,10 +106,9 @@ type TokenStatus struct {
 	// v3.Principal structure for the token.
 	LoginName string `json:loginName`
 
-	// PrincipalID is retrieved from the UserAttribute resource referenced by
-	// `Spec.UserID`. It is the first principal id found for the auth
-	// provider. Stored as it is one of the pieces required to internally
-	// assemble a v3.Principal structure for the token.
+	// PrincipalID is retrieved by way of the token governing the session
+	// which made the request. Stored as it is one of the pieces required to
+	// internally assemble a v3.Principal structure for the token.
 	PrincipalID string `json:principalID`
 
 	// GroupPrincipals holds detailed group information

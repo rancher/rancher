@@ -118,19 +118,20 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec is the spec of RancherToken",
+							Description: "Spec is the spec of the ext Token",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus"),
+							Description: "Status is the status of the ext Token",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus"),
 						},
 					},
 				},
-				Required: []string{"spec"},
+				Required: []string{"spec", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -317,7 +318,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"PrincipalID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PrincipalID is retrieved from the UserAttribute resource referenced by `Spec.UserID`. It is the first principal id found for the auth provider. Stored as it is one of the pieces required to internally assemble a v3.Principal structure for the token.",
+							Description: "PrincipalID is retrieved by way of the token governing the session which made the request. Stored as it is one of the pieces required to internally assemble a v3.Principal structure for the token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
