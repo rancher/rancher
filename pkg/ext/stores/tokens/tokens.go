@@ -92,7 +92,6 @@ var GVR = schema.GroupVersionResource{
 // users. Wrapped around a SystemStore it performs the necessary checks to
 // ensure that Users have only access to the tokens they are permitted to.
 type Store struct {
-	lock sync.Mutex // serialization of access
 	SystemStore
 }
 
@@ -260,17 +259,12 @@ func (t *Store) Destroy() {
 // The interface methods mostly delegate to the actual store methods, with some
 // general method-dependent boilerplate behaviour before and/or after.
 
-// NOTE: Stores serialize all access through them with a mutex.
-
 // Create implements [rest.Creator]
 func (t *Store) Create(
 	ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions) (runtime.Object, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	if createValidation != nil {
 		err := createValidation(ctx, obj)
 		if err != nil {
@@ -294,9 +288,6 @@ func (t *Store) Delete(
 	name string,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	// locate resource first
 	obj, err := t.get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
@@ -325,9 +316,6 @@ func (t *Store) Get(
 	ctx context.Context,
 	name string,
 	options *metav1.GetOptions) (runtime.Object, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	return t.get(ctx, name, options)
 }
 
@@ -342,9 +330,6 @@ func (t *Store) NewList() runtime.Object {
 func (t *Store) List(
 	ctx context.Context,
 	internaloptions *metainternalversion.ListOptions) (runtime.Object, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	options, err := extcore.ConvertListOptions(internaloptions)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
@@ -371,9 +356,6 @@ func (t *Store) Update(
 	updateValidation rest.ValidateObjectUpdateFunc,
 	forceAllowCreate bool,
 	options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	return extcore.CreateOrUpdate(ctx, name, objInfo, createValidation,
 		updateValidation, forceAllowCreate, options,
 		t.get, t.create, t.update)
@@ -383,9 +365,6 @@ func (t *Store) Update(
 func (t *Store) Watch(
 	ctx context.Context,
 	internaloptions *metainternalversion.ListOptions) (watch.Interface, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	options, err := extcore.ConvertListOptions(internaloptions)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
