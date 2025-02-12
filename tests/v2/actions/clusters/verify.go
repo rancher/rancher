@@ -8,20 +8,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	labelWorker = "labelSelector=node-role.kubernetes.io/worker=true"
-)
-
 var (
+	LabelWorker            = "labelSelector=node-role.kubernetes.io/worker=true"
 	SmallerPoolClusterSize = errors.New("Machine pool cluster size is smaller than expected pool size")
 )
 
 // VerifyNodePoolSize is a helper function that checks if the machine pool cluster size is greater than or equal to poolSize
-func VerifyNodePoolSize(steveClient *steveV1.Client, poolSize int) error {
+func VerifyNodePoolSize(steveClient *steveV1.Client, labelSelector string, poolSize int) error {
 	logrus.Info("Checking node pool")
 
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
+	logrus.Infof("Getting the node using the label [%v]", labelSelector)
+	query, err := url.ParseQuery(labelSelector)
 	if err != nil {
 		return err
 	}

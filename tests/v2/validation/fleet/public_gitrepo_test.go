@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/fleet"
+	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -82,6 +83,9 @@ func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 		fleetVersion += " windows"
 	}
 
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(f.client, f.clusterID)
+	require.NoError(f.T(), err)
+
 	f.Run("fleet "+fleetVersion, func() {
 		fleetGitRepo := v1alpha1.GitRepo{
 			ObjectMeta: metav1.ObjectMeta{
@@ -92,6 +96,7 @@ func (f *FleetPublicRepoTestSuite) TestGitRepoDeployment() {
 				Repo:            fleet.ExampleRepo,
 				Branch:          fleet.BranchName,
 				Paths:           []string{fleet.GitRepoPathLinux},
+				TargetNamespace: namespace.Name,
 				CorrectDrift:    &v1alpha1.CorrectDrift{},
 				ImageScanCommit: v1alpha1.CommitSpec{AuthorName: "", AuthorEmail: ""},
 				Targets:         []v1alpha1.GitTarget{{ClusterName: f.client.RancherConfig.ClusterName}},

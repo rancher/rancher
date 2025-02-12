@@ -33,7 +33,6 @@ const (
 	GitRepoPathLinux   = "simple"
 	GitRepoPathWindows = "multi-cluster/windows-helm"
 	CniCalico          = "calico"
-	labelWorker        = "labelSelector=node-role.kubernetes.io/worker=true"
 )
 
 // GitRepoConfig is a function that reads in the gitRepo object from the config file
