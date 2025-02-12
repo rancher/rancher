@@ -421,7 +421,7 @@ jobs:
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
             --append ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
             --append ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 
-          
+
           if [[ "${{ github.ref_name }}" == release/v* ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
             docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
               ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 \
@@ -692,3 +692,26 @@ jobs:
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2019_FILE" --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2022_FILE" --clobber
           gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
+  notify-release:
+    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL
+      - name: Send notification
+        env:
+          TAG: ${{ github.ref_name }}
+          STATUS: "Completed ✅"
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          curl -X POST ${{ env.WEBHOOK_URL }} -d '{"tag": "${{ env.TAG }}","status": "${{ env.STATUS }}","commit_url": "${{ env.COMMIT_URL }}","workflow_url": "${{ env.WORKFLOW_URL }}"}'
