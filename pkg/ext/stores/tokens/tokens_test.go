@@ -1379,7 +1379,7 @@ func Test_SystemStore_List(t *testing.T) {
 			test.storeSetup(secrets)
 
 			// perform test and validate results
-			toks, err := store.list(false, test.user, test.session, test.opts)
+			toks, err := store.list(test.user, test.session, test.opts)
 			if test.err != nil {
 				assert.Equal(t, test.err, err)
 				assert.Nil(t, toks)
