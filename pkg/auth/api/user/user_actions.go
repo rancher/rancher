@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"golang.org/x/crypto/bcrypt"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -123,10 +122,7 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 	// immediate expiration. note: A TTL of 0 is not suitable, this triggers the TTL default of
 	// 30 days.
 
-	filterForUser := labels.Set(map[string]string{exttokenstore.UserIDLabel: userID})
-	objs, err := h.ExtTokenStore.List(&v1.ListOptions{
-		LabelSelector: filterForUser.AsSelector().String(),
-	})
+	objs, err := h.ExtTokenStore.ListForUser(userID)
 	if err != nil {
 		return fmt.Errorf("error getting ext tokens for user %s: %v", userID, err)
 	}
