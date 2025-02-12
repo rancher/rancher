@@ -19,7 +19,6 @@ import (
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
@@ -356,16 +355,10 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 	return tokens, nil
 }
 
-func (l *userLifecycle) getExtTokensByUserName(username string) ([]*ext.Token, error) {
-	filterForUser := labels.Set(map[string]string{
-		exttokenstore.UserIDLabel: username,
-	})
-
-	objs, err := l.extTokenStore.List(&metav1.ListOptions{
-		LabelSelector: filterForUser.AsSelector().String(),
-	})
+func (l *userLifecycle) getExtTokensByUserName(userName string) ([]*ext.Token, error) {
+	objs, err := l.extTokenStore.ListForUser(userName)
 	if err != nil {
-		return nil, fmt.Errorf("error getting ext tokens for user %s: %v", username, err)
+		return nil, fmt.Errorf("error getting ext tokens for user %s: %v", userName, err)
 	}
 
 	// objs.Items is []ext.Token, i.e a value slice, not a pointer slice.
