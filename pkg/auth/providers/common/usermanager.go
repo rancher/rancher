@@ -16,8 +16,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	"github.com/rancher/rancher/pkg/wrangler"
 	wrangrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
@@ -39,15 +39,15 @@ const (
 	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
 )
 
-func NewUserManagerNoBindings(scaledContext *config.ScaledContext) (user.Manager, error) {
-	userInformer := scaledContext.Wrangler.Mgmt.User().Informer()
+func NewUserManagerNoBindings(wranglerContext *wrangler.Context) (user.Manager, error) {
+	userInformer := wranglerContext.Mgmt.User().Informer()
 
 	return &userManager{
-		users:       scaledContext.Wrangler.Mgmt.User(),
+		users:       wranglerContext.Mgmt.User(),
 		userIndexer: userInformer.GetIndexer(),
-		tokens:      scaledContext.Wrangler.Mgmt.Token(),
-		tokenLister: scaledContext.Wrangler.Mgmt.Token().Cache(),
-		rbacClient:  scaledContext.Wrangler.RBAC,
+		tokens:      wranglerContext.Mgmt.Token(),
+		tokenLister: wranglerContext.Mgmt.Token().Cache(),
+		rbacClient:  wranglerContext.RBAC,
 	}, nil
 }
 
@@ -58,8 +58,8 @@ var backoff = wait.Backoff{
 	Steps:    7,
 }
 
-func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
-	userInformer := scaledContext.Wrangler.Mgmt.User().Informer()
+func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
+	userInformer := wranglerContext.Mgmt.User().Informer()
 	userIndexers := map[string]cache.IndexFunc{
 		userByPrincipalIndex: userByPrincipal,
 	}
@@ -67,7 +67,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		return nil, err
 	}
 
-	crtbInformer := scaledContext.Wrangler.Mgmt.ClusterRoleTemplateBinding().Informer()
+	crtbInformer := wranglerContext.Mgmt.ClusterRoleTemplateBinding().Informer()
 	crtbIndexers := map[string]cache.IndexFunc{
 		crtbsByPrincipalAndUserIndex: crtbsByPrincipalAndUser,
 	}
@@ -75,7 +75,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		return nil, err
 	}
 
-	prtbInformer := scaledContext.Wrangler.Mgmt.ProjectRoleTemplateBinding().Informer()
+	prtbInformer := wranglerContext.Mgmt.ProjectRoleTemplateBinding().Informer()
 	prtbIndexers := map[string]cache.IndexFunc{
 		prtbsByPrincipalAndUserIndex: prtbsByPrincipalAndUser,
 	}
@@ -83,7 +83,7 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 		return nil, err
 	}
 
-	grbInformer := scaledContext.Wrangler.Mgmt.GlobalRoleBinding().Informer()
+	grbInformer := wranglerContext.Mgmt.GlobalRoleBinding().Informer()
 	grbIndexers := map[string]cache.IndexFunc{
 		grbByUserIndex: grbByUser,
 	}
@@ -93,18 +93,18 @@ func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 
 	return &userManager{
 		manageBindings:           true,
-		users:                    scaledContext.Wrangler.Mgmt.User(),
+		users:                    wranglerContext.Mgmt.User(),
 		userIndexer:              userInformer.GetIndexer(),
 		crtbIndexer:              crtbInformer.GetIndexer(),
 		prtbIndexer:              prtbInformer.GetIndexer(),
-		tokens:                   scaledContext.Wrangler.Mgmt.Token(),
-		tokenLister:              scaledContext.Wrangler.Mgmt.Token().Cache(),
-		globalRoleBindings:       scaledContext.Wrangler.Mgmt.GlobalRoleBinding(),
-		globalRoleLister:         scaledContext.Wrangler.Mgmt.GlobalRole().Cache(),
+		tokens:                   wranglerContext.Mgmt.Token(),
+		tokenLister:              wranglerContext.Mgmt.Token().Cache(),
+		globalRoleBindings:       wranglerContext.Mgmt.GlobalRoleBinding(),
+		globalRoleLister:         wranglerContext.Mgmt.GlobalRole().Cache(),
 		grbIndexer:               grbInformer.GetIndexer(),
-		clusterRoleLister:        scaledContext.Wrangler.RBAC.ClusterRole().Cache(),
-		clusterRoleBindingLister: scaledContext.Wrangler.RBAC.ClusterRoleBinding().Cache(),
-		rbacClient:               scaledContext.Wrangler.RBAC,
+		clusterRoleLister:        wranglerContext.RBAC.ClusterRole().Cache(),
+		clusterRoleBindingLister: wranglerContext.RBAC.ClusterRoleBinding().Cache(),
+		rbacClient:               wranglerContext.RBAC,
 	}, nil
 }
 
@@ -250,13 +250,24 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		return "", errors.New("failed to generate token key")
 	}
 
+	labels := map[string]string{
+		tokens.UserIDLabel:    input.UserName,
+		tokens.TokenKindLabel: input.Kind,
+	}
+	if input.Labels != nil {
+		for k, v := range input.Labels {
+			if k == tokens.UserIDLabel || k == tokens.TokenKindLabel {
+				// Don't allow overriding user id and kind labels.
+				continue
+			}
+			labels[k] = v
+		}
+	}
+
 	token = &v3.Token{
 		ObjectMeta: v1.ObjectMeta{
-			Name: input.TokenName,
-			Labels: map[string]string{
-				tokens.UserIDLabel:    input.UserName,
-				tokens.TokenKindLabel: input.Kind,
-			},
+			Name:   input.TokenName,
+			Labels: labels,
 		},
 		TTLMillis:     0,
 		Description:   input.Description,
