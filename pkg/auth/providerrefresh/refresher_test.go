@@ -195,21 +195,19 @@ func Test_refreshAttributes(t *testing.T) {
 	eTokenSetupEmpty := func(
 		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 		scache *fake.MockCacheInterface[*corev1.Secret]) {
-		secrets.EXPECT().
+		scache.EXPECT().
 			List("cattle-tokens", gomock.Any()).
-			Return(&corev1.SecretList{}, nil).
+			Return([]*corev1.Secret{}, nil).
 			AnyTimes()
 	}
 
 	eTokenSetupLoginLocal := func(
 		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 		scache *fake.MockCacheInterface[*corev1.Secret]) {
-		secrets.EXPECT().
+		scache.EXPECT().
 			List("cattle-tokens", gomock.Any()).
-			Return(&corev1.SecretList{
-				Items: []corev1.Secret{
-					eLoginSecretLocal,
-				},
+			Return([]*corev1.Secret{
+				&eLoginSecretLocal,
 			}, nil).
 			AnyTimes()
 	}
@@ -217,12 +215,10 @@ func Test_refreshAttributes(t *testing.T) {
 	eTokenSetupDerivedLocal := func(
 		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 		scache *fake.MockCacheInterface[*corev1.Secret]) {
-		secrets.EXPECT().
+		scache.EXPECT().
 			List("cattle-tokens", gomock.Any()).
-			Return(&corev1.SecretList{
-				Items: []corev1.Secret{
-					eDerivedSecretLocal,
-				},
+			Return([]*corev1.Secret{
+				&eDerivedSecretLocal,
 			}, nil).
 			AnyTimes()
 		scache.EXPECT().
@@ -234,13 +230,11 @@ func Test_refreshAttributes(t *testing.T) {
 	eTokenSetupLocal := func(
 		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 		scache *fake.MockCacheInterface[*corev1.Secret]) {
-		secrets.EXPECT().
+		scache.EXPECT().
 			List("cattle-tokens", gomock.Any()).
-			Return(&corev1.SecretList{
-				Items: []corev1.Secret{
-					eLoginSecretLocal,
-					eDerivedSecretLocal,
-				},
+			Return([]*corev1.Secret{
+				&eLoginSecretLocal,
+				&eDerivedSecretLocal,
 			}, nil).
 			AnyTimes()
 		scache.EXPECT().
@@ -256,12 +250,10 @@ func Test_refreshAttributes(t *testing.T) {
 	eTokenSetupDerivedShibboleth := func(
 		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 		scache *fake.MockCacheInterface[*corev1.Secret]) {
-		secrets.EXPECT().
+		scache.EXPECT().
 			List("cattle-tokens", gomock.Any()).
-			Return(&corev1.SecretList{
-				Items: []corev1.Secret{
-					eDerivedSecretShibboleth,
-				},
+			Return([]*corev1.Secret{
+				&eDerivedSecretShibboleth,
 			}, nil).
 			AnyTimes()
 		scache.EXPECT().
