@@ -608,34 +608,54 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 
 	sessionID := t.auth.SessionID(ctx)
 
-	return t.SystemStore.list(false, user, sessionID, options)
+	return t.SystemStore.list(user, sessionID, options)
 }
 
-func (t *SystemStore) List(options *metav1.ListOptions) (*ext.TokenList, error) {
-	return t.list(true, "", "", options)
-}
+// ListForUser returns the set of token owned by the named user. It is an
+// internal call invoked by other parts of Rancher
+func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
+	// As internal call this method can use the cache of secrets.
+	// Query the cache, with proper label selector
+	quest := labels.Set(map[string]string{
+		UserIDLabel: userName,
+	}).AsSelector()
+	secrets, err := t.secretCache.List(TokenNamespace, quest)
 
-func (t *SystemStore) list(fullView bool, user, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
-	// Merge our own selection request (user match!) into the caller's demands
-	var localOptions metav1.ListOptions
-	if fullView {
-		// The system is allowed to list all tokens. No internal filtering is applied.
-		localOptions = *options
-	} else {
-		// Non-system requests always filter the tokens down to those of the current user.
-		var err error
-		localOptions, err = ListOptionMerge(user, options)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for user %s: %w", userName, err))
+	}
+
+	var tokens []ext.Token
+	for _, secret := range secrets {
+		token, err := tokenFromSecret(secret)
+		// ignore broken tokens
 		if err != nil {
-			return nil,
-				apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w",
-					err))
+			continue
 		}
-		empty := metav1.ListOptions{}
-		if localOptions == empty {
-			// The setup indicated that we can bail out. I.e the
-			// options ask for something which cannot match.
-			return &ext.TokenList{}, nil
-		}
+
+		// Note: We do not care about `Current` in the caller, so no
+		// code here to set that field properly.
+		tokens = append(tokens, *token)
+	}
+
+	list := ext.TokenList{
+		Items: tokens,
+	}
+	return &list, nil
+}
+
+func (t *SystemStore) list(user, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
+	// Non-system requests always filter the tokens down to those of the current user.
+	// Merge our own selection request (user match!) into the caller's demands
+	localOptions, err := ListOptionMerge(user, options)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
+	}
+	empty := metav1.ListOptions{}
+	if localOptions == empty {
+		// The setup indicated that we can bail out. I.e the
+		// options ask for something which cannot match.
+		return &ext.TokenList{}, nil
 	}
 
 	// Core token listing from backing secrets
