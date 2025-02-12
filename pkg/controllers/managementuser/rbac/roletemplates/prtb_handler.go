@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -12,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/slice"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +21,9 @@ import (
 const (
 	prtbOwnerLabel      = "authz.cluster.cattle.io/prtb-owner"
 	projectIDAnnotation = "field.cattle.io/projectId"
+	namespaceReadOnly   = "namespaces-readonly"
+	namespaceEdit       = "namespaces-edit"
+	namespacesCreate    = "create-ns"
 )
 
 type prtbHandler struct {
@@ -85,8 +88,8 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		return err
 	}
 
-	// Handle promoted role.
-	if err := p.reconcilePromotedRole(prtb); err != nil {
+	// Handle cluster role bindings for special permissions.
+	if err := p.reconcileClusterRoleBindings(prtb); err != nil {
 		return err
 	}
 
@@ -106,7 +109,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	roleRef := rbacv1.RoleRef{
 		Kind:     "ClusterRole",
 		Name:     roleName,
-		APIGroup: rbac.RBACApiGroup,
+		APIGroup: rbacv1.GroupName,
 	}
 
 	namespaces, err := p.getNamespacesFromProject(prtb)
@@ -144,15 +147,14 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	}
 
 	// Only run this controller if the PRTB is for this cluster
-	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
+	clusterName, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	if clusterName != p.clusterName {
 		return nil, nil
 	}
 
 	// Select all namespaces in project.
-	_, projectId, _ := strings.Cut(prtb.ProjectName, ":")
 	namespaces, err := p.nsClient.List(metav1.ListOptions{
-		LabelSelector: projectIDAnnotation + "=" + projectId,
+		LabelSelector: projectIDAnnotation + "=" + projectName,
 	})
 	if err != nil {
 		return nil, err
@@ -161,6 +163,7 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	lo := metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)}
 
 	var returnError error
+	// Remove all role bindings.
 	for _, n := range namespaces.Items {
 		rbs, err := p.rbClient.List(n.Name, lo)
 		if err != nil {
@@ -174,6 +177,18 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		}
 	}
 
+	// Remove all cluster role bindings.
+	crbs, err := p.crbClient.List(lo)
+	if err != nil {
+		return nil, err
+	}
+	for _, crb := range crbs.Items {
+		err = p.crbClient.Delete(crb.Name, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			returnError = errors.Join(returnError, err)
+		}
+	}
+
 	if prtb.UserName != "" {
 		if err = p.impersonationHandler.deleteServiceAccountImpersonator(prtb.UserName); err != nil {
 			return nil, err
@@ -183,64 +198,122 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	return nil, returnError
 }
 
-func (p *prtbHandler) reconcilePromotedRole(prtb *v3.ProjectRoleTemplateBinding) error {
-	hasPromotedRule, err := p.doesRoleTemplateHavePromotedRules(prtb)
-	if err != nil {
-		return err
-	}
+// reconcileClusterRoleBindings handles the promoted and namespace Cluster Role Bindings for a PRTB.
+// Promoted CRBs are for any rules that are non-namespace scoped that are given by the PRTB.
+// Namespace CRBs are to give the user either edit or read-only access to the namespaces within the project. Primarily used by the UI.
+func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
+	crbs := []*rbacv1.ClusterRoleBinding{}
 
-	// If there are no promoted rules, no need for cluster role binding.
-	if !hasPromotedRule {
+	// If the RoleTemplate doesn't exist yet, there's no way to tell if Promoted or Namespace Rules exist
+	rt, err := p.rtClient.Get(prtb.RoleTemplateName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
 		return nil
-	}
-
-	promotedRuleName := rbac.PromotedClusterRoleNameFor(prtb.RoleTemplateName)
-	crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(prtb, promotedRuleName)
-	if err != nil {
+	} else if err != nil {
 		return err
 	}
 
-	var matchingCRB *rbacv1.ClusterRoleBinding
-	currentCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
+	// Check for promoted rules.
+	hasPromotedRule, err := p.doesRoleTemplateHavePromotedRules(rt)
 	if err != nil {
 		return err
 	}
-	if currentCRBs == nil {
-		return fmt.Errorf("error listing ClusterRoleBindings. Returned list is nil")
-	}
-
-	// Find if the required CRB that already exists and delete all excess CRBs.
-	// There should only ever be 1 cluster role binding per CRTB.
-	for _, currentCRB := range currentCRBs.Items {
-		if rbac.AreClusterRoleBindingContentsSame(crb, &currentCRB) && matchingCRB == nil {
-			matchingCRB = &currentCRB
-			continue
+	if hasPromotedRule {
+		promotedRuleName := rbac.PromotedClusterRoleNameFor(prtb.RoleTemplateName)
+		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(prtb, promotedRuleName)
+		if err != nil {
+			return err
 		}
-		if err := p.crbClient.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
+		crbs = append(crbs, crb)
+	}
+
+	// Namespace rules always need to be created.
+	namespaceCRBs, err := p.buildNamespaceBindings(prtb)
+	if err != nil {
+		return err
+	}
+
+	crbs = append(crbs, namespaceCRBs...)
+
+	return p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name))
+}
+
+// buildNamespaceBindings builds the Cluster Role Bindings used to provide access to the project's namespaces.
+func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding) ([]*rbacv1.ClusterRoleBinding, error) {
+	cr, err := p.crClient.Get(rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName), metav1.GetOptions{})
+	// With no CR the namespace bindings can't be created
+	if apierrors.IsNotFound(err) || cr == nil {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
+	for _, rule := range cr.Rules {
+		hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, rbacv1.ResourceAll)
+		hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, rbacv1.APIGroupAll)
+		if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
+			if slice.ContainsString(rule.Verbs, rbacv1.VerbAll) || slice.ContainsString(rule.Verbs, "create") {
+				// need binding for create-ns and namespaces-edit
+				namespaceCreateCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, namespacesCreate)
+				if err != nil {
+					return nil, err
+				}
+				namespaceEditCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceEdit)
+				if err != nil {
+					return nil, err
+				}
+				return []*rbacv1.ClusterRoleBinding{namespaceCreateCR, namespaceEditCR}, nil
+			}
+		}
+	}
+	// Didn't have edit access to namespaces, needs read access binding
+	namespaceCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceReadOnly)
+	if err != nil {
+		return nil, err
+	}
+	return []*rbacv1.ClusterRoleBinding{namespaceCR}, nil
+}
+
+// ensureOnlyDesiredClusterRoleBindingsExists takes a list of ClusterRoleBindings and ensures they are the only CRBs that exist for this PRTB.
+// Deletes any CRBs with the prtbOwnerLabel that aren't in the given list.
+func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.ClusterRoleBinding, prtbOwnerLabel string) error {
+	// Turn the slice into a map for easier operations.
+	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
+	for _, crb := range crbs {
+		desiredCRBs[crb.Name] = crb
+	}
+
+	// Check if any Cluster Role Bindings exist already.
+	currentCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: prtbOwnerLabel})
+	if err != nil || currentCRBs == nil {
+		return err
+	}
+
+	// Search for the ClusterRoleBindings that are needed, all others should be removed.
+	for _, currentCRB := range currentCRBs.Items {
+		if desiredCRB, ok := desiredCRBs[currentCRB.Name]; ok {
+			if rbac.AreClusterRoleBindingContentsSame(&currentCRB, desiredCRB) {
+				delete(desiredCRBs, desiredCRB.Name)
+				continue
+			}
+		}
+		if err = p.crbClient.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}
 
-	// If we didn't find an existing CRB, create it.
-	if matchingCRB == nil {
+	// Any remaining ClusterRoleBindings in the desiredCRBs get created.
+	for _, crb := range desiredCRBs {
 		if _, err := p.crbClient.Create(crb); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
 // doesRoleTemplateHavePromotedRules checks if the PRTB's RoleTemplate has a ClusterRole for promoted rules.
-func (p *prtbHandler) doesRoleTemplateHavePromotedRules(prtb *v3.ProjectRoleTemplateBinding) (bool, error) {
-	rt, err := p.rtClient.Get(prtb.RoleTemplateName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	_, err = p.crClient.Get(rbac.PromotedClusterRoleNameFor(rt.Name), metav1.GetOptions{})
+func (p *prtbHandler) doesRoleTemplateHavePromotedRules(rt *v3.RoleTemplate) (bool, error) {
+	_, err := p.crClient.Get(rbac.PromotedClusterRoleNameFor(rt.Name), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, err
 	}

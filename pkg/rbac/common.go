@@ -45,9 +45,9 @@ const (
 	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
 	promotedSuffix                    = "promoted"
+	namespaceSuffix                   = "namespaces"
 	clusterManagementPlaneSuffix      = "cluster-mgmt"
 	projectManagementPlaneSuffix      = "project-mgmt"
-	RBACApiGroup                      = "rbac.authorization.k8s.io"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -109,7 +109,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 	}
 
 	// apiGroup default for both User and Group
-	apiGroup := RBACApiGroup
+	apiGroup := rbacv1.GroupName
 
 	if kind == "ServiceAccount" {
 		// ServiceAccount default is empty string
@@ -472,7 +472,7 @@ func BuildAggregatingClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName st
 // BuildClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the ClusterRole specified by roleRefName.
 func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.ClusterRoleBinding, error) {
 	roleRef := rbacv1.RoleRef{
-		APIGroup: RBACApiGroup,
+		APIGroup: rbacv1.GroupName,
 		Kind:     "ClusterRole",
 		Name:     roleRefName,
 	}
@@ -522,6 +522,11 @@ func ClusterRoleNameFor(s string) string {
 // PromotedClusterRoleNameFor appends the promoted suffix to a string safely (ie <= 63 characters)
 func PromotedClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, promotedSuffix)
+}
+
+// NamespaceClusterRoleNameFor appends the namespace suffix to a string safely (ie <= 63 characters)
+func NamespaceClusterRoleNameFor(s string) string {
+	return name.SafeConcatName(s, namespaceSuffix)
 }
 
 // AggregatedClusterRoleNameFor appends the aggregation suffix to a string safely (ie <= 63 characters)

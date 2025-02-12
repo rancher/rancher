@@ -712,17 +712,17 @@ var (
 	defaultRoleRef = rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
 		Name:     "test-project-project-member",
-		Kind:     "Role",
+		Kind:     "ClusterRole",
 	}
 	projectOwnerRoleRef = rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
 		Name:     "test-project-project-owner",
-		Kind:     "Role",
+		Kind:     "ClusterRole",
 	}
 	defaultRoleBinding = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rb-ic5yeh4wyv",
-			Namespace: "test-project",
+			Name:      "rb-y5xedljk46",
+			Namespace: "test-cluster",
 			Labels:    map[string]string{"test-namespace_test-prtb": "true"},
 		},
 		Subjects: []rbacv1.Subject{defaultSubject},
@@ -730,8 +730,8 @@ var (
 	}
 	projectOwnerRoleBinding = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rb-htozml5myv",
-			Namespace: "test-project",
+			Name:      "rb-3hgt2h3gvw",
+			Namespace: "test-cluster",
 			Labels:    map[string]string{"test-namespace_test-prtb": "true"},
 		},
 		Subjects: []rbacv1.Subject{defaultSubject},
@@ -764,7 +764,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 		{
 			name: "error getting rolebinding",
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(nil, errDefault)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			prtb:    defaultPRTB.DeepCopy(),
 			rt:      projectMemberRT.DeepCopy(),
@@ -773,7 +773,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 		{
 			name: "rolebinding not found error creating",
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(defaultRoleBinding.DeepCopy()).Return(nil, errDefault)
 			},
 			prtb:    defaultPRTB.DeepCopy(),
@@ -783,7 +783,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 		{
 			name: "rolebinding not found success creating",
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(defaultRoleBinding.DeepCopy()).Return(nil, nil)
 			},
 			prtb: defaultPRTB.DeepCopy(),
@@ -792,7 +792,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 		{
 			name: "rolebinding already exists",
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(defaultRoleBinding.DeepCopy(), nil)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(defaultRoleBinding.DeepCopy(), nil)
 			},
 			prtb: defaultPRTB.DeepCopy(),
 			rt:   projectMemberRT.DeepCopy(),
@@ -802,7 +802,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
 				rb := defaultRoleBinding.DeepCopy()
 				rb.Subjects = []rbacv1.Subject{}
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
 				m.EXPECT().Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{}).Return(nil)
 				m.EXPECT().Create(defaultRoleBinding.DeepCopy()).Return(nil, nil)
 			},
@@ -814,7 +814,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
 				rb := defaultRoleBinding.DeepCopy()
 				rb.RoleRef = rbacv1.RoleRef{}
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
 				m.EXPECT().Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{}).Return(nil)
 				m.EXPECT().Create(defaultRoleBinding.DeepCopy()).Return(nil, nil)
 			},
@@ -826,7 +826,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
 				rb := defaultRoleBinding.DeepCopy()
 				rb.RoleRef = rbacv1.RoleRef{}
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
 				m.EXPECT().Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			prtb:    defaultPRTB.DeepCopy(),
@@ -838,7 +838,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
 				rb := defaultRoleBinding.DeepCopy()
 				rb.RoleRef = rbacv1.RoleRef{}
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
 				m.EXPECT().Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{}).Return(nil)
 				m.EXPECT().Create(defaultRoleBinding.DeepCopy()).Return(nil, errDefault)
 			},
@@ -851,7 +851,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
 				rb := defaultRoleBinding.DeepCopy()
 				rb.Labels = map[string]string{}
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
 				m.EXPECT().Update(defaultRoleBinding.DeepCopy()).Return(nil, nil)
 			},
 			prtb: defaultPRTB.DeepCopy(),
@@ -862,7 +862,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
 				rb := defaultRoleBinding.DeepCopy()
 				rb.Labels = map[string]string{}
-				m.EXPECT().Get(defaultRoleBinding.Namespace, defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
+				m.EXPECT().Get("test-cluster", defaultRoleBinding.Name, metav1.GetOptions{}).Return(rb, nil)
 				m.EXPECT().Update(defaultRoleBinding.DeepCopy()).Return(nil, errDefault)
 			},
 			prtb:    defaultPRTB.DeepCopy(),
@@ -872,7 +872,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 		{
 			name: "create owner rolebinding",
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().Get(projectOwnerRoleBinding.Namespace, projectOwnerRoleBinding.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Get("test-cluster", projectOwnerRoleBinding.Name, metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Create(projectOwnerRoleBinding.DeepCopy()).Return(nil, nil)
 			},
 			prtb: defaultPRTB.DeepCopy(),

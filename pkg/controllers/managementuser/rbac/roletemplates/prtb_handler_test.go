@@ -2,6 +2,7 @@ package roletemplates
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -23,22 +24,6 @@ var (
 		RoleTemplateName: "test-rt",
 		ProjectName:      "c-abc123:p-xyz789",
 	}
-	promotedCRB = rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "crb-422tiqvlec",
-			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Kind:     "ClusterRole",
-			Name:     "test-rt-promoted-aggregator",
-			APIGroup: "rbac.authorization.k8s.io",
-		},
-		Subjects: []rbacv1.Subject{{
-			Name:     "test-user",
-			Kind:     "User",
-			APIGroup: "rbac.authorization.k8s.io",
-		}},
-	}
 	defaultRT = v3.RoleTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
 	}
@@ -50,46 +35,28 @@ var (
 func Test_doesRoleTemplateHavePromotedRules(t *testing.T) {
 	tests := []struct {
 		name      string
-		prtb      *v3.ProjectRoleTemplateBinding
-		getRTFunc func() (*v3.RoleTemplate, error)
+		rt        *v3.RoleTemplate
 		getCRFunc func() (*rbacv1.ClusterRole, error)
 		want      bool
 		wantErr   bool
 	}{
 		{
-			name:      "error getting role template",
-			prtb:      defaultPRTB.DeepCopy(),
-			getRTFunc: func() (*v3.RoleTemplate, error) { return nil, errDefault },
-			want:      false,
-			wantErr:   true,
-		},
-		{
-			name:      "role template not found",
-			prtb:      defaultPRTB.DeepCopy(),
-			getRTFunc: func() (*v3.RoleTemplate, error) { return nil, errNotFound },
-			want:      false,
-			wantErr:   false,
-		},
-		{
 			name:      "error getting cluster role",
-			prtb:      defaultPRTB.DeepCopy(),
-			getRTFunc: func() (*v3.RoleTemplate, error) { return defaultRT.DeepCopy(), nil },
+			rt:        defaultRT.DeepCopy(),
 			getCRFunc: func() (*rbacv1.ClusterRole, error) { return nil, errDefault },
 			want:      false,
 			wantErr:   true,
 		},
 		{
 			name:      "cluster role not found",
-			prtb:      defaultPRTB.DeepCopy(),
-			getRTFunc: func() (*v3.RoleTemplate, error) { return defaultRT.DeepCopy(), nil },
+			rt:        defaultRT.DeepCopy(),
 			getCRFunc: func() (*rbacv1.ClusterRole, error) { return nil, errNotFound },
 			want:      false,
 			wantErr:   false,
 		},
 		{
 			name:      "cluster role found",
-			prtb:      defaultPRTB.DeepCopy(),
-			getRTFunc: func() (*v3.RoleTemplate, error) { return defaultRT.DeepCopy(), nil },
+			rt:        defaultRT.DeepCopy(),
 			getCRFunc: func() (*rbacv1.ClusterRole, error) { return &rbacv1.ClusterRole{}, nil },
 			want:      true,
 			wantErr:   false,
@@ -102,17 +69,12 @@ func Test_doesRoleTemplateHavePromotedRules(t *testing.T) {
 			if tt.getCRFunc != nil {
 				crController.EXPECT().Get(promotedCRName, metav1.GetOptions{}).Return(tt.getCRFunc())
 			}
-			rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
-			if tt.getRTFunc != nil {
-				rtController.EXPECT().Get(tt.prtb.RoleTemplateName, metav1.GetOptions{}).Return(tt.getRTFunc())
-			}
 
 			p := &prtbHandler{
 				crClient: crController,
-				rtClient: rtController,
 			}
 
-			got, err := p.doesRoleTemplateHavePromotedRules(tt.prtb)
+			got, err := p.doesRoleTemplateHavePromotedRules(tt.rt)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.doesRoleTemplateHavePromotedRules() error = %v, wantErr %v", err, tt.wantErr)
@@ -270,172 +232,6 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 }
 
 var (
-	listOptions = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner=test-prtb"}
-)
-
-func Test_reconcilePromotedRole(t *testing.T) {
-	type clients struct {
-		crClient  *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
-		crbClient *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
-		rtClient  *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
-	}
-	tests := []struct {
-		name         string
-		setupClients func(*clients)
-		prtb         *v3.ProjectRoleTemplateBinding
-		wantErr      bool
-	}{
-		{
-			name: "no roletemplate for prtb",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, errNotFound)
-			},
-		},
-		{
-			name: "error getting roletemplate in doesRoleTemplateHavePromotedRules",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, errDefault)
-			},
-			wantErr: true,
-		},
-		{
-			name: "no promoted role for prtb",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, errNotFound)
-			},
-		},
-		{
-			name: "error getting cluster role in doesRoleTemplateHavePromotedRules",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, errDefault)
-			},
-			wantErr: true,
-		},
-		{
-			name: "error listing crbs",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, nil)
-				c.crbClient.EXPECT().List(listOptions).Return(nil, errDefault)
-			},
-			wantErr: true,
-		},
-		{
-			name: "listed crbs is nil",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, nil)
-				c.crbClient.EXPECT().List(listOptions).Return(nil, nil)
-			},
-			wantErr: true,
-		},
-		{
-			name: "error creating crb",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, nil)
-				c.crbClient.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{},
-				}, nil)
-				c.crbClient.EXPECT().Create(promotedCRB.DeepCopy()).Return(nil, errDefault)
-			},
-			wantErr: true,
-		},
-		{
-			name: "crb gets created",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, nil)
-				c.crbClient.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{},
-				}, nil)
-				c.crbClient.EXPECT().Create(promotedCRB.DeepCopy()).Return(nil, nil)
-			},
-		},
-		{
-			name: "unwanted crbs get deleted",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, nil)
-				c.crbClient.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						*promotedCRB.DeepCopy(),
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb"},
-						},
-					},
-				}, nil)
-				c.crbClient.EXPECT().Delete("bad-crb", &metav1.DeleteOptions{}).Return(nil)
-			},
-		},
-		{
-			name: "error deleting crbs",
-			prtb: defaultPRTB.DeepCopy(),
-			setupClients: func(c *clients) {
-				c.rtClient.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-cr"},
-				}, nil)
-				c.crClient.EXPECT().Get("test-cr-promoted", metav1.GetOptions{}).Return(nil, nil)
-				c.crbClient.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						*promotedCRB.DeepCopy(),
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb"},
-						},
-					},
-				}, nil)
-				c.crbClient.EXPECT().Delete("bad-crb", &metav1.DeleteOptions{}).Return(errDefault)
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			clients := &clients{
-				crClient:  fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
-				crbClient: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
-				rtClient:  fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl),
-			}
-			tt.setupClients(clients)
-			p := &prtbHandler{
-				crClient:  clients.crClient,
-				crbClient: clients.crbClient,
-				rtClient:  clients.rtClient,
-			}
-			if err := p.reconcilePromotedRole(tt.prtb); (err != nil) != tt.wantErr {
-				t.Errorf("prtbHandler.reconcilePromotedRole() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-var (
 	namespaceListOptions = metav1.ListOptions{LabelSelector: "field.cattle.io/projectId=p-xyz789"}
 	rbListOptions        = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner=test-prtb"}
 	defaultRoleBinding   = rbacv1.RoleBinding{
@@ -557,6 +353,305 @@ func Test_prtbHandler_reconcileBindings(t *testing.T) {
 			}
 			if err := p.reconcileBindings(tt.prtb); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+var (
+	crReadOnly = rbacv1.ClusterRole{
+		Rules: []rbacv1.PolicyRule{
+			{
+				Resources: []string{"pods"},
+				APIGroups: []string{""},
+				Verbs:     []string{"get"},
+			},
+		},
+	}
+	crbReadOnly = rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "crb-cbjxdllmgx",
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "p-xyz789-namespaces-readonly",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+	}
+	crbCreateNS = rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "crb-h4flnes3qr",
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "create-ns",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+	}
+	crbEdit = rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "crb-lgj7lku5l7",
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "p-xyz789-namespaces-edit",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+	}
+)
+
+func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
+	tests := []struct {
+		name          string
+		prtb          *v3.ProjectRoleTemplateBinding
+		setupCRClient func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList])
+		want          []*rbacv1.ClusterRoleBinding
+		wantErr       bool
+	}{
+		{
+			name: "no cluster role found",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+			},
+			want: nil,
+		},
+		{
+			name: "cluster role is nil",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, nil)
+			},
+			want: nil,
+		},
+		{
+			name: "error getting cluster role",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, errDefault)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "namespaces read only cluster role",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(crReadOnly.DeepCopy(), nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbReadOnly.DeepCopy()},
+		},
+		{
+			name: "namespaces create cluster roles",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Resources: []string{"namespaces"},
+							APIGroups: []string{""},
+							Verbs:     []string{"create"},
+						},
+					},
+				}, nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy()},
+		},
+		{
+			name: "wildcards create edit cluster roles",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Resources: []string{"*"},
+							APIGroups: []string{"*"},
+							Verbs:     []string{"*"},
+						},
+					},
+				}, nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy()},
+		},
+	}
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			if tt.setupCRClient != nil {
+				tt.setupCRClient(crController)
+			}
+			p := &prtbHandler{
+				crClient: crController,
+			}
+			got, err := p.buildNamespaceBindings(tt.prtb)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("prtbHandler.buildNamespaceBindings() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("prtbHandler.buildNamespaceBindings() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
+	tests := []struct {
+		name               string
+		crbs               []*rbacv1.ClusterRoleBinding
+		setupCRBController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])
+		wantErr            bool
+	}{
+		{
+			name: "error listing crbs",
+			crbs: []*rbacv1.ClusterRoleBinding{},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "error listing crbs",
+			crbs: []*rbacv1.ClusterRoleBinding{},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "error creating CRB",
+			crbs: []*rbacv1.ClusterRoleBinding{
+				{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}}).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "no pre-existing CRBs, create all",
+			crbs: []*rbacv1.ClusterRoleBinding{
+				{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "crb2"}},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}}).Return(nil, nil)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "crb2"}}).Return(nil, nil)
+			},
+		},
+		{
+			name: "pre-existing CRBs, no creation necessary",
+			crbs: []*rbacv1.ClusterRoleBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "crb1"},
+					RoleRef:    defaultCRB.RoleRef,
+					Subjects:   defaultCRB.Subjects,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "crb2"},
+					RoleRef:    defaultCRB.RoleRef,
+					Subjects:   defaultCRB.Subjects,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "crb1"},
+						RoleRef:    defaultCRB.RoleRef,
+						Subjects:   defaultCRB.Subjects,
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "crb2"},
+						RoleRef:    defaultCRB.RoleRef,
+						Subjects:   defaultCRB.Subjects,
+					},
+				}}, nil)
+			},
+		},
+		{
+			name: "pre-existing incorrect CRB, delete and create correct CRB",
+			crbs: []*rbacv1.ClusterRoleBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "crb1"},
+					RoleRef:    defaultCRB.RoleRef,
+					Subjects:   defaultCRB.Subjects,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "crb2"},
+					RoleRef:    defaultCRB.RoleRef,
+					Subjects:   defaultCRB.Subjects,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "crb1"},
+						RoleRef:    defaultCRB.RoleRef,
+						Subjects:   defaultCRB.Subjects,
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "crb2"},
+					},
+				}}, nil)
+				m.EXPECT().Delete("crb2", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: "crb2"},
+					RoleRef:    defaultCRB.RoleRef,
+					Subjects:   defaultCRB.Subjects,
+				})
+			},
+		},
+		{
+			name: "error deleting CRB",
+			crbs: []*rbacv1.ClusterRoleBinding{},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{
+					{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}},
+				}}, nil)
+				m.EXPECT().Delete("crb1", &metav1.DeleteOptions{}).Return(errDefault)
+			},
+			wantErr: true,
+		},
+	}
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+			if tt.setupCRBController != nil {
+				tt.setupCRBController(crbController)
+			}
+			p := &prtbHandler{
+				crbClient: crbController,
+			}
+			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, "ownerlabel"); (err != nil) != tt.wantErr {
+				t.Errorf("prtbHandler.reconcileClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

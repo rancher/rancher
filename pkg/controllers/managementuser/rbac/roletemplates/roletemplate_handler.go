@@ -30,12 +30,12 @@ type roleTemplateHandler struct {
 }
 
 // OnChange ensures that the following Cluster Roles exist:
-//  1. a ClusterRole with the same name as the RoleTemplate (unless RoleTemplate is External)
-//  2. an Aggregating ClusterRole that aggregates all inherited RoleTemplates with the name "RoleTemplateName-aggregator"
+//  1. A ClusterRole with the same name as the RoleTemplate (unless RoleTemplate is External)
+//  2. An Aggregating ClusterRole that aggregates all inherited RoleTemplates with the name "RoleTemplateName-aggregator"
 //
-// For RoleTemplates with the Context == "Project", we also ensure:
+// For RoleTemplates with the Context == "Project", the additional cluster roles are created:
 //  1. If the RoleTemplate has any rules for Global Resources, make a ClusterRole with those named "RoleTemplateName-promoted"
-//  2. an Aggregating ClusterRole that aggregates all inherited RoleTemplates' promoted Cluster Roles named "RoleTemplateName-promoted-aggregator"
+//  2. An Aggregating ClusterRole that aggregates all inherited RoleTemplates' promoted Cluster Roles named "RoleTemplateName-promoted-aggregator"
 func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	if rt == nil || rt.DeletionTimestamp != nil {
 		return nil, nil
@@ -59,32 +59,20 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 // clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate using the given rules.
 func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
 	res := []*rbacv1.ClusterRole{}
+
+	if rt.Context == projectContext {
+		// ClusterRoles for promoted rules
+		var promotedClusterRoles []*rbacv1.ClusterRole
+		promotedClusterRoles, rt.Rules = buildPromotedClusterRoles(rt)
+		res = append(res, promotedClusterRoles...)
+	}
+
 	// If the RoleTemplate refers to an external cluster role, don't modify/create it. Instead we will aggregate it.
 	if !rt.External {
 		res = append(res, rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rt.Name), rt.Name, rt.Rules))
 	}
 	res = append(res, rbac.BuildAggregatingClusterRole(rt, rbac.ClusterRoleNameFor))
 
-	// Projects can have 2 extra cluster roles for global resources
-	if rt.Context == projectContext {
-		promotedRules := getPromotedRules(rt.Rules)
-
-		// If there are no promoted rules and no inherited RoleTemplates, no need for additional cluster roles
-		if len(promotedRules) == 0 && len(rt.RoleTemplateNames) == 0 {
-			return res
-		}
-
-		if len(promotedRules) != 0 {
-			// 3. Project global resources cluster role
-			res = append(res, rbac.BuildClusterRole(rbac.PromotedClusterRoleNameFor(rt.Name), rt.Name, promotedRules))
-		}
-
-		// 4. Project global resources aggregating cluster role
-		// It's possible for this role to have no rules if there are no promoted rules in any of the inherited RoleTemplates or in the above ClusterRole (3)
-		// but without fetching all those RoleTemplates and looking through their rules, it's not possible to prevent this ahead of time as the Rules in
-		// an aggregating cluster role only get populated at run time
-		res = append(res, rbac.BuildAggregatingClusterRole(rt, rbac.PromotedClusterRoleNameFor))
-	}
 	return res
 }
 
@@ -116,6 +104,31 @@ func (rth *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.Rol
 	return nil, returnedErrors
 }
 
+// buildPromotedClusterRoles looks for promoted rules in a project role template and creates required promoted cluster roles.
+// It also returns the role template rules with the promoted rules removed.
+func buildPromotedClusterRoles(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, []rbacv1.PolicyRule) {
+	clusterRoles := []*rbacv1.ClusterRole{}
+
+	promotedRules, rules := extractPromotedRules(rt.Rules)
+
+	// If there are no promoted rules and no inherited RoleTemplates, no need for additional cluster roles
+	if len(promotedRules) == 0 && len(rt.RoleTemplateNames) == 0 {
+		return clusterRoles, rules
+	}
+
+	if len(promotedRules) != 0 {
+		// Create a promoted cluster role
+		clusterRoles = append(clusterRoles, rbac.BuildClusterRole(rbac.PromotedClusterRoleNameFor(rt.Name), rt.Name, promotedRules))
+	}
+
+	// It's possible for this role to have no rules if there are no promoted rules in any of the inherited RoleTemplates or in the promoted ClusterRole
+	// but without fetching all those RoleTemplates and looking through their rules, it's not possible to prevent this ahead of time as the Rules in
+	// an aggregating cluster role only get populated at run time
+	clusterRoles = append(clusterRoles, rbac.BuildAggregatingClusterRole(rt, rbac.PromotedClusterRoleNameFor))
+
+	return clusterRoles, rules
+}
+
 var promotedRulesForProjects = map[string]string{
 	"navlinks":          "ui.cattle.io",
 	"nodes":             "",
@@ -126,10 +139,13 @@ var promotedRulesForProjects = map[string]string{
 	"clusters":          "management.cattle.io",
 }
 
-// getPromotedRules filters a list of PolicyRules for promoted rules for projects and returns them as a list
-func getPromotedRules(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
+// extractPromotedRules filters a list of PolicyRules for promoted rules for projects and returns the list of promoted rules
+// and the original rules without promoted rules.
+func extractPromotedRules(rules []rbacv1.PolicyRule) ([]rbacv1.PolicyRule, []rbacv1.PolicyRule) {
 	promotedRules := []rbacv1.PolicyRule{}
+	nonPromotedRules := []rbacv1.PolicyRule{}
 	for _, r := range rules {
+		rulePromoted := false
 		for resource, apigroup := range promotedRulesForProjects {
 			ruleCopy := r
 			if slice.ContainsString(r.Resources, resource) || slice.ContainsString(r.Resources, rbacv1.ResourceAll) {
@@ -140,12 +156,18 @@ func getPromotedRules(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
 					if resource == "clusters" {
 						ruleCopy.ResourceNames = []string{"local"}
 					}
+					rulePromoted = true
 					promotedRules = append(promotedRules, ruleCopy)
+					continue
 				}
 			}
 		}
+		// If the rule is not a promoted rule, or contains * as Resource or APIGroup, return it as the rest of the rules
+		if !rulePromoted || slice.ContainsString(r.Resources, rbacv1.ResourceAll) || slice.ContainsString(r.APIGroups, rbacv1.APIGroupAll) {
+			nonPromotedRules = append(nonPromotedRules, r)
+		}
 	}
-	return promotedRules
+	return promotedRules, nonPromotedRules
 }
 
 // addLabelToExternalRole ensures the external role has the right aggregation label.

@@ -125,6 +125,10 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 // OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	if crtb == nil {
+		return nil, nil
+	}
+
 	// Only run this controller if the CRTB is for this cluster
 	if crtb.ClusterName != c.clusterName {
 		return nil, nil

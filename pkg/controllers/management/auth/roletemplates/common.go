@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -50,8 +50,8 @@ const (
 // createOrUpdateClusterMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster referenced by the CRTB or PRTB.
 func createOrUpdateClusterMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
 	roleName := getClusterMembershipRoleName(rt, rtb)
-	roleRef := v1.RoleRef{
-		APIGroup: rbac.RBACApiGroup,
+	roleRef := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
 		Kind:     "ClusterRole",
 		Name:     roleName,
 	}
@@ -89,7 +89,7 @@ func createOrUpdateClusterMembershipBinding(rtb metav1.Object, rt *v3.RoleTempla
 }
 
 // buildClusterMembershipBinding returns the ClusterRoleBinding needed to give membership to the Cluster.
-func buildClusterMembershipBinding(roleRef v1.RoleRef, rtb metav1.Object) (*v1.ClusterRoleBinding, error) {
+func buildClusterMembershipBinding(roleRef rbacv1.RoleRef, rtb metav1.Object) (*rbacv1.ClusterRoleBinding, error) {
 	subject, err := rbac.BuildSubjectFromRTB(rtb)
 	if err != nil {
 		return nil, err
@@ -98,12 +98,12 @@ func buildClusterMembershipBinding(roleRef v1.RoleRef, rtb metav1.Object) (*v1.C
 	crbName := rbac.NameForClusterRoleBinding(roleRef, subject)
 	rtbLabel := getRTBLabel(rtb)
 
-	return &v1.ClusterRoleBinding{
+	return &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   crbName,
 			Labels: map[string]string{rtbLabel: "true"},
 		},
-		Subjects: []v1.Subject{subject},
+		Subjects: []rbacv1.Subject{subject},
 		RoleRef:  roleRef,
 	}, nil
 }
@@ -156,8 +156,8 @@ func getClusterMembershipRoleName(rt *v3.RoleTemplate, rtb metav1.Object) string
 // createOrUpdateProjectMembershipBinding ensures the RoleBinding required to give Project access to a user exists.
 func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rt *v3.RoleTemplate, rbController crbacv1.RoleBindingController) error {
 	roleName := getProjectMembershipRoleName(rt, prtb)
-	roleRef := v1.RoleRef{
-		APIGroup: rbac.RBACApiGroup,
+	roleRef := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
 		Kind:     "ClusterRole",
 		Name:     roleName,
 	}
@@ -195,7 +195,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 }
 
 // buildProjectMembershipBinding returns the RoleBinding required to give access to the Project specified by the PRTB.
-func buildProjectMembershipBinding(roleRef v1.RoleRef, prtb *v3.ProjectRoleTemplateBinding) (*v1.RoleBinding, error) {
+func buildProjectMembershipBinding(roleRef rbacv1.RoleRef, prtb *v3.ProjectRoleTemplateBinding) (*rbacv1.RoleBinding, error) {
 	subject, err := rbac.BuildSubjectFromRTB(prtb)
 	if err != nil {
 		return nil, err
@@ -204,13 +204,13 @@ func buildProjectMembershipBinding(roleRef v1.RoleRef, prtb *v3.ProjectRoleTempl
 	rbName := rbac.NameForRoleBinding(projectName, roleRef, subject)
 	rtbLabel := getRTBLabel(prtb)
 
-	return &v1.RoleBinding{
+	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: clusterName,
 			Name:      rbName,
 			Labels:    map[string]string{rtbLabel: "true"},
 		},
-		Subjects: []v1.Subject{subject},
+		Subjects: []rbacv1.Subject{subject},
 		RoleRef:  roleRef,
 	}, nil
 }

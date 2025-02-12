@@ -91,13 +91,13 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 					Name: "myroletemplate",
 				},
 				Context: "project",
-				Rules:   []rbacv1.PolicyRule{samplePromotedRule},
+				Rules:   []rbacv1.PolicyRule{sampleRule, samplePromotedRule},
 			},
 			verify: func(t *testing.T, roles []*rbacv1.ClusterRole) {
 				if got, want := len(roles), 4; got != want {
 					t.Errorf("expected %d roles but got %d", want, got)
 				}
-				for i, want := range []string{"myroletemplate", "myroletemplate-aggregator", "myroletemplate-promoted", "myroletemplate-promoted-aggregator"} {
+				for i, want := range []string{"myroletemplate-promoted", "myroletemplate-promoted-aggregator", "myroletemplate", "myroletemplate-aggregator"} {
 					if got := roles[i].Name; got != want {
 						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
 					}
@@ -123,7 +123,7 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 				if got, want := len(roles), 3; got != want {
 					t.Errorf("expected %d roles but got %d", want, got)
 				}
-				for i, want := range []string{"myroletemplate", "myroletemplate-aggregator", "myroletemplate-promoted-aggregator"} {
+				for i, want := range []string{"myroletemplate-promoted-aggregator", "myroletemplate", "myroletemplate-aggregator"} {
 					if got := roles[i].Name; got != want {
 						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
 					}
@@ -170,12 +170,12 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 				if got, want := len(roles), 3; got != want {
 					t.Errorf("expected %d roles but got %d", want, got)
 				}
-				for i, want := range []string{"myroletemplate-aggregator", "myroletemplate-promoted", "myroletemplate-promoted-aggregator"} {
+				for i, want := range []string{"myroletemplate-promoted", "myroletemplate-promoted-aggregator", "myroletemplate-aggregator"} {
 					if got := roles[i].Name; got != want {
 						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
 					}
 				}
-				if got := roles[0].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
+				if got := roles[1].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
 					t.Errorf("expected aggregation rule not to be empty")
 				}
 				if got := roles[2].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
@@ -193,12 +193,13 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 	}
 }
 
-func Test_getPromotedRules(t *testing.T) {
+func Test_extractPromotedRules(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name  string
-		rules []rbacv1.PolicyRule
-		want  []rbacv1.PolicyRule
+		name                 string
+		rules                []rbacv1.PolicyRule
+		wantPromotedRules    []rbacv1.PolicyRule
+		wantNonPromotedRules []rbacv1.PolicyRule
 	}{
 		{
 			name: "no promoted rules",
@@ -209,7 +210,14 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{""},
 				},
 			},
-			want: []rbacv1.PolicyRule{},
+			wantPromotedRules: []rbacv1.PolicyRule{},
+			wantNonPromotedRules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					Resources: []string{"pods"},
+					APIGroups: []string{""},
+				},
+			},
 		},
 		{
 			name: "promoted rules",
@@ -220,13 +228,14 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{""},
 				},
 			},
-			want: []rbacv1.PolicyRule{
+			wantPromotedRules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
 					Resources: []string{"nodes"},
 					APIGroups: []string{""},
 				},
 			},
+			wantNonPromotedRules: []rbacv1.PolicyRule{},
 		},
 		{
 			name: "same resource name wrong apigroup",
@@ -237,7 +246,14 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{"cattle.io"},
 				},
 			},
-			want: []rbacv1.PolicyRule{},
+			wantPromotedRules: []rbacv1.PolicyRule{},
+			wantNonPromotedRules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					Resources: []string{"nodes"},
+					APIGroups: []string{"cattle.io"},
+				},
+			},
 		},
 		{
 			name: "wildcard apigroup converted to promoted apigroup",
@@ -248,11 +264,18 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{"*"},
 				},
 			},
-			want: []rbacv1.PolicyRule{
+			wantPromotedRules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
 					Resources: []string{"nodes"},
 					APIGroups: []string{""},
+				},
+			},
+			wantNonPromotedRules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					Resources: []string{"nodes"},
+					APIGroups: []string{"*"},
 				},
 			},
 		},
@@ -265,7 +288,7 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{""},
 				},
 			},
-			want: []rbacv1.PolicyRule{
+			wantPromotedRules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
 					Resources: []string{"nodes"},
@@ -274,6 +297,13 @@ func Test_getPromotedRules(t *testing.T) {
 				{
 					Verbs:     []string{"get"},
 					Resources: []string{"persistentvolumes"},
+					APIGroups: []string{""},
+				},
+			},
+			wantNonPromotedRules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					Resources: []string{"*"},
 					APIGroups: []string{""},
 				},
 			},
@@ -292,10 +322,17 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{""},
 				},
 			},
-			want: []rbacv1.PolicyRule{
+			wantPromotedRules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
 					Resources: []string{"nodes"},
+					APIGroups: []string{""},
+				},
+			},
+			wantNonPromotedRules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					Resources: []string{"pods"},
 					APIGroups: []string{""},
 				},
 			},
@@ -309,7 +346,7 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{"management.cattle.io"},
 				},
 			},
-			want: []rbacv1.PolicyRule{
+			wantPromotedRules: []rbacv1.PolicyRule{
 				{
 					Verbs:         []string{"get"},
 					Resources:     []string{"clusters"},
@@ -317,6 +354,7 @@ func Test_getPromotedRules(t *testing.T) {
 					ResourceNames: []string{"local"},
 				},
 			},
+			wantNonPromotedRules: []rbacv1.PolicyRule{},
 		},
 		{
 			name: "all promoted rules",
@@ -357,7 +395,7 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{"management.cattle.io"},
 				},
 			},
-			want: []rbacv1.PolicyRule{
+			wantPromotedRules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
 					Resources: []string{"navlinks"},
@@ -395,6 +433,7 @@ func Test_getPromotedRules(t *testing.T) {
 					ResourceNames: []string{"local"},
 				},
 			},
+			wantNonPromotedRules: []rbacv1.PolicyRule{},
 		},
 		{
 			name: "star star gives all promoted rules",
@@ -405,7 +444,7 @@ func Test_getPromotedRules(t *testing.T) {
 					APIGroups: []string{"*"},
 				},
 			},
-			want: []rbacv1.PolicyRule{
+			wantPromotedRules: []rbacv1.PolicyRule{
 				{
 					Verbs:     []string{"get"},
 					Resources: []string{"navlinks"},
@@ -443,13 +482,21 @@ func Test_getPromotedRules(t *testing.T) {
 					ResourceNames: []string{"local"},
 				},
 			},
+			wantNonPromotedRules: []rbacv1.PolicyRule{
+				{
+					Verbs:     []string{"get"},
+					Resources: []string{"*"},
+					APIGroups: []string{"*"},
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := getPromotedRules(tt.rules)
-			assert.ElementsMatch(t, got, tt.want)
+			promoted, nonPromoted := extractPromotedRules(tt.rules)
+			assert.ElementsMatch(t, promoted, tt.wantPromotedRules)
+			assert.ElementsMatch(t, nonPromoted, tt.wantNonPromotedRules)
 		})
 	}
 }
