@@ -170,14 +170,15 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	loginTokens = make(map[string][]accessor.TokenAccessor)
 	derivedTokens = make(map[string][]accessor.TokenAccessor)
 
-	// List all tokens for the user, norman and ext.
+	// List all tokens, norman and ext.
+	// For ext tokens we actually filter for the user here.
 
 	allNormanTokens, err := r.tokenLister.List("", labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	allExtTokens, err := r.extTokenStore.List(&metav1.ListOptions{})
+	allExtTokens, err := r.extTokenStore.ListForUser(user.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +194,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		allTokens = append(allTokens, &ex)
 	}
 
-	// split into derived versus login tokens
+	// split into derived versus login tokens, filter for the user
 
 	for providerName := range providers.ProviderNames {
 		loginTokens[providerName] = []accessor.TokenAccessor{}
@@ -201,6 +202,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	for _, token := range allTokens {
+		// Needed for the norman tokens. Ext has already filtered for this.
 		if token.GetUserID() != user.Name {
 			continue
 		}

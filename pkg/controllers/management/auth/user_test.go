@@ -275,33 +275,30 @@ func TestUpdated(t *testing.T) {
 				mockUserManager.EXPECT().
 					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
 					Return(nil)
-				secrets.EXPECT().
+				scache.EXPECT().
 					List("cattle-tokens", gomock.Any()).
-					Return(&v1.SecretList{
-						Items: []v1.Secret{
-							v1.Secret{
-								ObjectMeta: metav1.ObjectMeta{
-									Name: "testuser-token",
-								},
-								Data: map[string][]byte{
-									exttokens.FieldAnnotations:    []byte("null"),
-									exttokens.FieldAuthProvider:   []byte("somebody"),
-									exttokens.FieldDisplayName:    []byte("myself"),
-									exttokens.FieldEnabled:        []byte("true"),
-									exttokens.FieldHash:           []byte("kla9jkdmj"),
-									exttokens.FieldKind:           []byte(exttokens.IsLogin),
-									exttokens.FieldLabels:         []byte("null"),
-									exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-									exttokens.FieldLoginName:      []byte("hello"),
-									exttokens.FieldPrincipalID:    []byte("world"),
-									exttokens.FieldTTL:            []byte("4000"),
-									exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
-									exttokens.FieldUserID:         []byte("testuser"),
-								},
+					Return([]*v1.Secret{
+						&v1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "testuser-token",
+							},
+							Data: map[string][]byte{
+								exttokens.FieldAnnotations:    []byte("null"),
+								exttokens.FieldAuthProvider:   []byte("somebody"),
+								exttokens.FieldDisplayName:    []byte("myself"),
+								exttokens.FieldEnabled:        []byte("true"),
+								exttokens.FieldHash:           []byte("kla9jkdmj"),
+								exttokens.FieldKind:           []byte(exttokens.IsLogin),
+								exttokens.FieldLabels:         []byte("null"),
+								exttokens.FieldLastUpdateTime: []byte("13:00:05"),
+								exttokens.FieldLoginName:      []byte("hello"),
+								exttokens.FieldPrincipalID:    []byte("world"),
+								exttokens.FieldTTL:            []byte("4000"),
+								exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
+								exttokens.FieldUserID:         []byte("testuser"),
 							},
 						},
-					}, nil).
-					AnyTimes()
+					}, nil).AnyTimes()
 				secrets.EXPECT().
 					Delete("cattle-tokens", "testuser-token", gomock.Any()).
 					Return(nil)
@@ -343,55 +340,33 @@ func TestUpdated(t *testing.T) {
 
 						return s, nil
 					})
-				secrets.EXPECT().
+				theTokenSecret := v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser-token",
+					},
+					Data: map[string][]byte{
+						exttokens.FieldAnnotations:    []byte("null"),
+						exttokens.FieldAuthProvider:   []byte("somebody"),
+						exttokens.FieldDisplayName:    []byte("myself"),
+						exttokens.FieldEnabled:        []byte("true"),
+						exttokens.FieldHash:           []byte("kla9jkdmj"),
+						exttokens.FieldKind:           []byte(""),
+						exttokens.FieldLabels:         []byte("null"),
+						exttokens.FieldLastUpdateTime: []byte("13:00:05"),
+						exttokens.FieldLoginName:      []byte("hello"),
+						exttokens.FieldPrincipalID:    []byte("world"),
+						exttokens.FieldTTL:            []byte("4000"),
+						exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
+						exttokens.FieldUserID:         []byte("testuser"),
+					},
+				}
+				scache.EXPECT().
 					List("cattle-tokens", gomock.Any()).
-					Return(&v1.SecretList{
-						Items: []v1.Secret{
-							v1.Secret{
-								ObjectMeta: metav1.ObjectMeta{
-									Name: "testuser-token",
-								},
-								Data: map[string][]byte{
-									exttokens.FieldAnnotations:    []byte("null"),
-									exttokens.FieldAuthProvider:   []byte("somebody"),
-									exttokens.FieldDisplayName:    []byte("myself"),
-									exttokens.FieldEnabled:        []byte("true"),
-									exttokens.FieldHash:           []byte("kla9jkdmj"),
-									exttokens.FieldKind:           []byte(""),
-									exttokens.FieldLabels:         []byte("null"),
-									exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-									exttokens.FieldLoginName:      []byte("hello"),
-									exttokens.FieldPrincipalID:    []byte("world"),
-									exttokens.FieldTTL:            []byte("4000"),
-									exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
-									exttokens.FieldUserID:         []byte("testuser"),
-								},
-							},
-						},
-					}, nil).
+					Return([]*v1.Secret{&theTokenSecret}, nil).
 					AnyTimes()
 				scache.EXPECT().
 					Get("cattle-tokens", "testuser-token").
-					Return(&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "testuser-token",
-						},
-						Data: map[string][]byte{
-							exttokens.FieldAnnotations:    []byte("null"),
-							exttokens.FieldAuthProvider:   []byte("somebody"),
-							exttokens.FieldDisplayName:    []byte("myself"),
-							exttokens.FieldEnabled:        []byte("true"),
-							exttokens.FieldHash:           []byte("kla9jkdmj"),
-							exttokens.FieldKind:           []byte(""),
-							exttokens.FieldLabels:         []byte("null"),
-							exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-							exttokens.FieldLoginName:      []byte("hello"),
-							exttokens.FieldPrincipalID:    []byte("world"),
-							exttokens.FieldTTL:            []byte("4000"),
-							exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
-							exttokens.FieldUserID:         []byte("testuser"),
-						},
-					}, nil).
+					Return(&theTokenSecret, nil).
 					AnyTimes()
 			},
 			expectedUser: &v3.User{
