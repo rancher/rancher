@@ -31,6 +31,7 @@ func init() {
 }
 
 type Interface interface {
+	Kubeconfig() KubeconfigController
 	Token() TokenController
 	UserActivity() UserActivityController
 }
@@ -43,6 +44,10 @@ func New(controllerFactory controller.SharedControllerFactory) Interface {
 
 type version struct {
 	controllerFactory controller.SharedControllerFactory
+}
+
+func (v *version) Kubeconfig() KubeconfigController {
+	return generic.NewController[*v1.Kubeconfig, *v1.KubeconfigList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Kubeconfig"}, "kubeconfigs", true, v.controllerFactory)
 }
 
 func (v *version) Token() TokenController {
