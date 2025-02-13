@@ -142,17 +142,8 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 
 // OnRemove removes all Role Bindings in each project namespace made by the PRTB.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil {
-		return nil, nil
-	}
-
-	// Only run this controller if the PRTB is for this cluster
-	clusterName, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
-	if clusterName != p.clusterName {
-		return nil, nil
-	}
-
 	// Select all namespaces in project.
+	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	namespaces, err := p.nsClient.List(metav1.ListOptions{
 		LabelSelector: projectIDAnnotation + "=" + projectName,
 	})
@@ -195,7 +186,7 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		}
 	}
 
-	return nil, returnError
+	return prtb, returnError
 }
 
 // reconcileClusterRoleBindings handles the promoted and namespace Cluster Role Bindings for a PRTB.
