@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -70,11 +71,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 	return l
 }
 
-func (l *Provider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+func (l *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (l *Provider) Logout(apiContext *types.APIContext, token *v3.Token) error {
+func (l *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
@@ -202,13 +203,13 @@ func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 	return l.getGroupPrincipals(user)
 }
 
-func (l *Provider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
+func (l *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	return l.SearchPrincipalsDedupe(searchKey, principalType, token, nil)
 }
 
 // SearchPrincipalsDedupe performs principal search, but deduplicates the results against the supplied list (that should have come from other non-local auth providers)
 // This is to avoid getting duplicate search results
-func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token v3.Token, principalsFromOtherProviders []v3.Principal) ([]v3.Principal, error) {
+func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token accessor.TokenAccessor, principalsFromOtherProviders []v3.Principal) ([]v3.Principal, error) {
 	fromOtherProviders := map[string]bool{}
 	for _, p := range principalsFromOtherProviders {
 		fromOtherProviders[p.Name] = true
@@ -239,14 +240,14 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 				}
 			}
 			principalID := getLocalPrincipalID(user)
-			userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, &token)
+			userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, token)
 			principals = append(principals, userPrincipal)
 		}
 	}
 
 	if principalType == "" || principalType == "group" {
 		for _, group := range localGroups {
-			groupPrincipal := l.toPrincipal("group", group.DisplayName, "", Name+"://"+group.Name, &token)
+			groupPrincipal := l.toPrincipal("group", group.DisplayName, "", Name+"://"+group.Name, token)
 			principals = append(principals, groupPrincipal)
 		}
 	}
@@ -254,7 +255,7 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 	return principals, nil
 }
 
-func (l *Provider) toPrincipal(principalType, displayName, loginName, id string, token *v3.Token) v3.Principal {
+func (l *Provider) toPrincipal(principalType, displayName, loginName, id string, token accessor.TokenAccessor) v3.Principal {
 	if displayName == "" {
 		displayName = loginName
 	}
@@ -270,19 +271,19 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	if principalType == "user" {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = l.isThisUserMe(token.UserPrincipal, princ)
+			princ.Me = l.isThisUserMe(token, princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
-			princ.MemberOf = l.tokenMGR.IsMemberOf(*token, princ)
+			princ.MemberOf = l.tokenMGR.IsMemberOf(token, princ)
 		}
 	}
 
 	return princ
 }
 
-func (l *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	// TODO implement group lookup (local groups currently not implemented, so we can skip)
 	// parsing id to get the external id and type. id looks like github_[user|org|team]://12345
 	var name string
@@ -298,7 +299,7 @@ func (l *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principa
 	}
 
 	princID := getLocalPrincipalID(user)
-	princ := l.toPrincipal("user", user.DisplayName, user.Username, princID, &token)
+	princ := l.toPrincipal("user", user.DisplayName, user.Username, princID, token)
 	return princ, nil
 }
 
@@ -370,12 +371,10 @@ func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*v
 
 }
 
-func (l *Provider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
-
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
+func (l *Provider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
+	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
+		me.GetUserName() == other.LoginName &&
+		me.GetUserPrincipalType() == other.PrincipalType
 }
 
 func (l *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
@@ -482,6 +481,19 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 	}
 	if userPrincipal.LoginName != "" {
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}
+
+func (l *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	principalID := token.GetUserPrincipalID()
+	userName := token.GetUserName()
+	extras := make(map[string][]string)
+	if principalID != "" {
+		extras[common.UserAttributePrincipalID] = []string{principalID}
+	}
+	if userName != "" {
+		extras[common.UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }
