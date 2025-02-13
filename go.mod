@@ -45,7 +45,7 @@ replace (
 	k8s.io/kms => k8s.io/kms v0.30.1
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.30.1
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.30.1
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9
+	k8s.io/kube-openapi => k8s.io/kube-openapi 2c72e554b1e7
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.30.1
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.30.1
 	k8s.io/kubectl => k8s.io/kubectl v0.30.1
