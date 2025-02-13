@@ -286,10 +286,10 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
-			princ.Me = o.IsThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = o.IsThisUserMe(token, princ)
 			if princ.Me {
-				princ.LoginName = token.GetUserPrincipal().LoginName
-				princ.DisplayName = token.GetUserPrincipal().DisplayName
+				princ.LoginName = token.GetUserName()
+				princ.DisplayName = token.GetUserDisplayName()
 			}
 		}
 	} else {
@@ -370,11 +370,10 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	return storedOidcConfig, nil
 }
 
-func (o *OpenIDCProvider) IsThisUserMe(me v3.Principal, other v3.Principal) bool {
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
+func (o *OpenIDCProvider) IsThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
+	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
+		me.GetUserName() == other.LoginName &&
+		me.GetUserPrincipalType() == other.PrincipalType
 }
 
 func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
@@ -384,6 +383,19 @@ func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map
 	}
 	if userPrincipal.LoginName != "" {
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}
+
+func (o *OpenIDCProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	principalID := token.GetUserPrincipalID()
+	userName := token.GetUserName()
+	extras := make(map[string][]string)
+	if principalID != "" {
+		extras[common.UserAttributePrincipalID] = []string{principalID}
+	}
+	if userName != "" {
+		extras[common.UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }

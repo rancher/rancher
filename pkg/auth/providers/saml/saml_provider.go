@@ -325,11 +325,10 @@ func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token a
 	if principalType == s.userType {
 		princ.PrincipalType = common.UserPrincipalType
 		if token != nil {
-			tuprinc := token.GetUserPrincipal()
-			princ.Me = s.isThisUserMe(tuprinc, princ)
+			princ.Me = s.isThisUserMe(token, princ)
 			if princ.Me {
-				princ.LoginName = tuprinc.LoginName
-				princ.DisplayName = tuprinc.DisplayName
+				princ.LoginName = token.GetUserName()
+				princ.DisplayName = token.GetUserDisplayName()
 			}
 		}
 	} else {
@@ -412,11 +411,9 @@ func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 	return p, nil
 }
 
-func (s *Provider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
+func (s *Provider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
+	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
+		me.GetUserPrincipalType() == other.PrincipalType
 }
 
 func (s *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -523,6 +520,19 @@ func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 	}
 	if userPrincipal.LoginName != "" {
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}
+
+func (s *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	principalID := token.GetUserPrincipalID()
+	userName := token.GetUserName()
+	extras := make(map[string][]string)
+	if principalID != "" {
+		extras[common.UserAttributePrincipalID] = []string{principalID}
+	}
+	if userName != "" {
+		extras[common.UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }

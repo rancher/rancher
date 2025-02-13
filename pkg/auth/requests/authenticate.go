@@ -202,7 +202,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp := &AuthenticatorResponse{
 		IsAuthed:      true,
 		User:          token.GetUserID(),
-		UserPrincipal: token.GetUserPrincipal().Name,
+		UserPrincipal: token.GetUserPrincipalID(),
 		Groups:        groups,
 		Extras:        extras,
 	}
@@ -273,14 +273,15 @@ func getUserExtraInfo(token accessor.TokenAccessor, user *v3.User, attribs *v3.U
 		}
 	}
 
-	extraInfo = providers.GetUserExtraAttributes(ap, token.GetUserPrincipal())
+	extraInfo = providers.GetUserExtraAttributesFromToken(ap, token)
+
 	// If principal id is not set in extra, read from user.
 	if extraInfo != nil {
 		if len(extraInfo[common.UserAttributePrincipalID]) == 0 {
 			extraInfo[common.UserAttributePrincipalID] = user.PrincipalIDs
 		}
 		if len(extraInfo[common.UserAttributeUserName]) == 0 {
-			extraInfo[common.UserAttributeUserName] = []string{user.DisplayName}
+			extraInfo[common.UserAttributeUserName] = []string{user.Username}
 		}
 	}
 

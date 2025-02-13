@@ -295,7 +295,7 @@ func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID str
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
-	principal.Me = samePrincipal(token.GetUserPrincipal(), principal)
+	principal.Me = samePrincipal(token, principal)
 	return principal, nil
 }
 
@@ -315,7 +315,7 @@ func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name 
 		return nil, err
 	}
 	for _, principal := range principals {
-		principal.Me = samePrincipal(token.GetUserPrincipal(), principal)
+		principal.Me = samePrincipal(token, principal)
 	}
 	return principals, nil
 }
@@ -521,11 +521,10 @@ func (ap *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPri
 	return allowed, nil
 }
 
-func samePrincipal(me v3.Principal, other v3.Principal) bool {
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
+func samePrincipal(me accessor.TokenAccessor, other v3.Principal) bool {
+	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
+		me.GetUserName() == other.LoginName &&
+		me.GetUserPrincipalType() == other.PrincipalType
 }
 
 // UpdateGroupCacheSize attempts to update the size of the group cache defined at the package level.
@@ -553,6 +552,19 @@ func (ap *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[strin
 	}
 	if userPrincipal.LoginName != "" {
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}
+
+func (ap *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	principalID := token.GetUserPrincipalID()
+	userName := token.GetUserName()
+	extras := make(map[string][]string)
+	if principalID != "" {
+		extras[common.UserAttributePrincipalID] = []string{principalID}
+	}
+	if userName != "" {
+		extras[common.UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }

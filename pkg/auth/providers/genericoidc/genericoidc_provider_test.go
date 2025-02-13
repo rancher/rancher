@@ -134,10 +134,12 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 			name:        "fetch principal",
 			principalID: "genericoidc_user://1234567",
 			token: ext.Token{
+				Spec: ext.TokenSpec{
+					PrincipalID: "genericoidc_user://1234567",
+				},
 				Status: ext.TokenStatus{
 					DisplayName:  "Test User",
-					LoginName:    "1234567",
-					PrincipalID:  "genericoidc_user://1234567",
+					UserName:     "1234567",
 					AuthProvider: Name,
 				},
 			},
