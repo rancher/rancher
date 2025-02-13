@@ -91,7 +91,11 @@ func Test_refreshAttributes(t *testing.T) {
 		IsDerived:    false,
 		AuthProvider: providers.LocalProvider,
 		UserPrincipal: v3.Principal{
-			Provider: providers.LocalProvider,
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "local://user-abcde",
+			},
+			LoginName: "admin",
+			Provider:  providers.LocalProvider,
 			ExtraInfo: map[string]string{
 				common.UserAttributePrincipalID: "local://user-abcde",
 				common.UserAttributeUserName:    "admin",
@@ -107,7 +111,11 @@ func Test_refreshAttributes(t *testing.T) {
 		IsDerived:    true,
 		AuthProvider: saml.ShibbolethName,
 		UserPrincipal: v3.Principal{
-			Provider: saml.ShibbolethName,
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "shibboleth_user://user1",
+			},
+			LoginName: "user1",
+			Provider:  saml.ShibbolethName,
 			ExtraInfo: map[string]string{
 				common.UserAttributePrincipalID: "shibboleth_user://user1",
 				common.UserAttributeUserName:    "user1",
@@ -123,13 +131,13 @@ func Test_refreshAttributes(t *testing.T) {
 	eLoginTokenLocal := ext.Token{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-login-local"},
 		Spec: ext.TokenSpec{
-			UserID: "user-abcde",
-			Kind:   exttokens.IsLogin,
+			UserID:      "user-abcde",
+			Kind:        exttokens.IsLogin,
+			PrincipalID: "local://user-abcde",
 		},
 		Status: ext.TokenStatus{
 			AuthProvider: providers.LocalProvider,
-			LoginName:    "admin",
-			PrincipalID:  "local://user-abcde",
+			UserName:     "admin",
 		},
 	}
 
@@ -144,11 +152,11 @@ func Test_refreshAttributes(t *testing.T) {
 			exttokens.FieldKind:           []byte(exttokens.IsLogin),
 			exttokens.FieldLabels:         []byte("null"),
 			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-			exttokens.FieldLoginName:      []byte("admin"),
 			exttokens.FieldPrincipalID:    []byte("local://user-abcde"),
 			exttokens.FieldTTL:            []byte("4000"),
 			exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
 			exttokens.FieldUserID:         []byte("user-abcde"),
+			exttokens.FieldUserName:       []byte("admin"),
 		},
 	}
 
@@ -163,13 +171,13 @@ func Test_refreshAttributes(t *testing.T) {
 	eDerivedTokenShibboleth := ext.Token{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-derived-shibboleth"},
 		Spec: ext.TokenSpec{
-			UserID: "user-abcde",
-			Kind:   "",
+			UserID:      "user-abcde",
+			Kind:        "",
+			PrincipalID: "shibboleth_user://user1",
 		},
 		Status: ext.TokenStatus{
 			AuthProvider: saml.ShibbolethName,
-			LoginName:    "user1",
-			PrincipalID:  "shibboleth_user://user1",
+			UserName:     "user1",
 		},
 	}
 
@@ -184,11 +192,11 @@ func Test_refreshAttributes(t *testing.T) {
 			exttokens.FieldKind:           []byte(""),
 			exttokens.FieldLabels:         []byte("null"),
 			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-			exttokens.FieldLoginName:      []byte("user1"),
 			exttokens.FieldPrincipalID:    []byte("shibboleth_user://user1"),
 			exttokens.FieldTTL:            []byte("4000"),
 			exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
 			exttokens.FieldUserID:         []byte("user-abcde"),
+			exttokens.FieldUserName:       []byte("user1"),
 		},
 	}
 
@@ -618,7 +626,19 @@ func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken
 }
 
 func (p *mockLocalProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	return token.GetUserPrincipal(), nil
+	return v3.Principal{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: token.GetUserPrincipalID(),
+		},
+		DisplayName:   token.GetUserDisplayName(),
+		LoginName:     token.GetUserName(),
+		Provider:      token.GetAuthProvider(),
+		PrincipalType: token.GetUserPrincipalType(),
+		ExtraInfo: map[string]string{
+			common.UserAttributePrincipalID: token.GetUserPrincipalID(),
+			common.UserAttributeUserName:    token.GetUserName(),
+		},
+	}, nil
 }
 
 func (p *mockLocalProvider) CustomizeSchema(schema *types.Schema) {
@@ -641,6 +661,13 @@ func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal v3.Principal) m
 	return map[string][]string{
 		common.UserAttributePrincipalID: []string{userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
 		common.UserAttributeUserName:    []string{userPrincipal.ExtraInfo[common.UserAttributeUserName]},
+	}
+}
+
+func (p *mockLocalProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	return map[string][]string{
+		common.UserAttributePrincipalID: []string{token.GetUserPrincipalID()},
+		common.UserAttributeUserName:    []string{token.GetUserName()},
 	}
 }
 
@@ -678,7 +705,19 @@ func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, my
 }
 
 func (p *mockShibbolethProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	return token.GetUserPrincipal(), nil
+	return v3.Principal{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: token.GetUserPrincipalID(),
+		},
+		DisplayName:   token.GetUserDisplayName(),
+		LoginName:     token.GetUserName(),
+		Provider:      token.GetAuthProvider(),
+		PrincipalType: token.GetUserPrincipalType(),
+		ExtraInfo: map[string]string{
+			common.UserAttributePrincipalID: token.GetUserPrincipalID(),
+			common.UserAttributeUserName:    token.GetUserName(),
+		},
+	}, nil
 }
 
 func (p *mockShibbolethProvider) CustomizeSchema(schema *types.Schema) {
@@ -701,6 +740,13 @@ func (p *mockShibbolethProvider) GetUserExtraAttributes(userPrincipal v3.Princip
 	return map[string][]string{
 		common.UserAttributePrincipalID: []string{userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
 		common.UserAttributeUserName:    []string{userPrincipal.ExtraInfo[common.UserAttributeUserName]},
+	}
+}
+
+func (p *mockShibbolethProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	return map[string][]string{
+		common.UserAttributePrincipalID: []string{token.GetUserPrincipalID()},
+		common.UserAttributeUserName:    []string{token.GetUserName()},
 	}
 }
 

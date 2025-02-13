@@ -399,7 +399,7 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token acces
 	if principalType == userType {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = g.isThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = g.isThisUserMe(token, princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -411,10 +411,10 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token acces
 	return princ
 }
 
-func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
-	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
-		me.LoginName == other.LoginName &&
-		me.PrincipalType == other.PrincipalType
+func (g *ghProvider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
+	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
+		me.GetUserName() == other.LoginName &&
+		me.GetUserPrincipalType() == other.PrincipalType
 }
 
 func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -437,6 +437,19 @@ func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 	}
 	if userPrincipal.LoginName != "" {
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}
+
+func (g *ghProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	principalID := token.GetUserPrincipalID()
+	userName := token.GetUserName()
+	extras := make(map[string][]string)
+	if principalID != "" {
+		extras[common.UserAttributePrincipalID] = []string{principalID}
+	}
+	if userName != "" {
+		extras[common.UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }

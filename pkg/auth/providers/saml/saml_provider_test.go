@@ -196,6 +196,10 @@ func (p *mockLdapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) ma
 	panic("GetUserExtraAttributes Unimplemented!")
 }
 
+func (p *mockLdapProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	panic("GetUserExtraAttributesFromToken Unimplemented!")
+}
+
 func (p *mockLdapProvider) IsDisabledProvider() (bool, error) {
 	panic("IsDisabledProvider Unimplemented!")
 }
