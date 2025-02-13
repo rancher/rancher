@@ -738,11 +738,16 @@ func (p *Planner) forceDeleteAllDeletingEtcdMachines(cp *rkev1.RKEControlPlane, 
 			continue
 		}
 		logrus.Infof("[planner] rkecluster %s/%s: force deleting etcd machine %s/%s as cluster was not sane and machine was deleting", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
-		// Update the CAPI machine annotation for exclude node draining and set it to true to get the CAPI controllers to not try to drain this node.
+		// If the etcd plane has been replaced, there will not be a functional apiserver to point to. When deleting
+		// machines, CAPI will attempt to both drain and detach volumes. If the apiserver is unreachable and the
+		// machine's spec.nodeDrainTimeout and spec.nodeVolumeDetachTimeout are nil or 0, CAPI will attempt these
+		// operations indefinitely, effectively blocking the deletion of these machines. The exclude drain and exclude
+		// volume detach annotations must be applied in order for deletion to proceed for these objects.
 		if deletingEtcdNode.Machine.Annotations == nil {
 			deletingEtcdNode.Machine.Annotations = map[string]string{}
 		}
 		deletingEtcdNode.Machine.Annotations[capi.ExcludeNodeDrainingAnnotation] = "true"
+		deletingEtcdNode.Machine.Annotations[capi.ExcludeWaitForNodeVolumeDetachAnnotation] = "true"
 		var err error
 		deletingEtcdNode.Machine, err = p.machines.Update(deletingEtcdNode.Machine)
 		if err != nil {
