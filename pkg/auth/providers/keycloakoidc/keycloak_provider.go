@@ -115,7 +115,7 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
-			princ.Me = k.IsThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = k.IsThisUserMe(token, princ)
 		}
 	} else {
 		princ.PrincipalType = GroupType

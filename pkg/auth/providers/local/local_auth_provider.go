@@ -270,7 +270,7 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	if principalType == "user" {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = l.isThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = l.isThisUserMe(token, princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -370,12 +370,10 @@ func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*v
 
 }
 
-func (l *Provider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
-
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
+func (l *Provider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
+	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
+		me.GetUserName() == other.LoginName &&
+		me.GetUserPrincipalType() == other.PrincipalType
 }
 
 func (l *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
@@ -482,6 +480,19 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 	}
 	if userPrincipal.LoginName != "" {
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}
+
+func (l *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	principalID := token.GetUserPrincipalID()
+	userName := token.GetUserName()
+	extras := make(map[string][]string)
+	if principalID != "" {
+		extras[common.UserAttributePrincipalID] = []string{principalID}
+	}
+	if userName != "" {
+		extras[common.UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }

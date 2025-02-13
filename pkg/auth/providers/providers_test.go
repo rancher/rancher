@@ -200,6 +200,10 @@ func (f fakeProvider) GetUserExtraAttributes(_ v3.Principal) map[string][]string
 	panic("implement me")
 }
 
+func (f fakeProvider) GetUserExtraAttributesFromToken(_ accessor.TokenAccessor) map[string][]string {
+	panic("implement me")
+}
+
 func (f fakeProvider) IsDisabledProvider() (bool, error) {
 	panic("implement me")
 }
