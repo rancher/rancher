@@ -9,10 +9,13 @@ node {
       job_name = job_names[job_names.size() - 1] 
     }
 
+    def config = env.CONFIG
     def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
     def setupContainer = "${job_name}${env.BUILD_NUMBER}_setup"
     def configGeneratorContainer = "${job_name}${env.BUILD_NUMBER}_generator"
     def cleanupContainer = "${job_name}${env.BUILD_NUMBER}_cleanup"
+    def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
+    def testRancherVersions = "testrancherk8s.yaml"
 
     def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
 
@@ -29,6 +32,7 @@ node {
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.8"
     def defaultTag = "validation"
+    def localConfigFileName = ""
 
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
@@ -111,23 +115,108 @@ node {
           dir ("./") {
             try {
               stage('Configure and Build') {
+                config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+                config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
                 if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
                   dir("./tests/v2/validation/.ssh") {
                     def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
                     writeFile file: AWS_SSH_KEY_NAME, text: decoded
                   }
                 }
+                
+                try{
+                  sh "./tests/v2/validation/build.sh"
+                  
+                  sh "docker volume create --name ${validationVolume}"
+
+                  sh "docker run -v ${validationVolume}:/root  --name ${setupContainer} -t " +
+                  "${imageName} sh -c \"${workPath}pipeline/scripts/rancher_k8s_version.sh\""
+
+                  sh "docker cp ${setupContainer}:/root/go/src/github.com/rancher/rancher/testrancherk8s.yaml ./"
+
+                  println "contents of test rancher versions: ./${testRancherVersions}"
+                  
+                 def rancherRKE2Version = sh(
+                      script: "grep -E '^rancherRKE2Version:' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher RKE2 version ${rancherRKE2Version}"
+
+
+                  def rancherRKE2VersionToUpgrade = sh(
+                      script: "grep 'rancherRKE2VersionToUpgrade' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher RKE2 version to upgrade ${rancherRKE2VersionToUpgrade}"
+                  
+                  def rancherK3sVersion = sh(
+                      script: "grep -E '^rancherK3sVersion:' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher K3s version ${rancherK3sVersion}"
+                  
+                  def rancherK3sVersionToUpgrade = sh(
+                      script: "grep 'rancherK3sVersionToUpgrade' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher K3s version to upgrade ${rancherK3sVersionToUpgrade}"
+                  
+                  def rancherRKEVersion = sh(
+                      script: "grep -E '^rancherRKEVersion:' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher RKE version ${rancherRKEVersion}"
+                  
+                  def rancherRKEVersionToUpgrade = sh(
+                      script: "grep 'rancherRKEVersionToUpgrade' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher RKE version to upgrade ${rancherRKEVersionToUpgrade}"
+                  
+                  def rancherVersion = sh(
+                      script: "grep 'rancherVersion' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher rancher version ${rancherVersion}"
+                  
+                  def rancherImageTag = sh(
+                      script: "grep 'rancherImageTag' ./${testRancherVersions} | awk '{print \$2}'",
+                      returnStdout: true
+                    ).trim()
+                  println "Rancher rancher image tag version ${rancherImageTag}"
+
+                config = config.replace('${RANCHER_RKE2_VERSION}', rancherRKE2Version)
+                config = config.replace('${RANCHER_RKE2_VERSION_TO_UPGRADE}', rancherRKE2VersionToUpgrade)
+                config = config.replace('${RANCHER_K3S_VERSION}', rancherK3sVersion)
+                config = config.replace('${RANCHER_K3S_VERSION_TO_UPGRADE}', rancherK3sVersionToUpgrade)
+                config = config.replace('${RANCHER_RKE_VERSION}', rancherRKEVersion)
+                config = config.replace('${RANCHER_RKE_VERSION_TO_UPGRADE}', rancherRKEVersionToUpgrade)
+                config = config.replace('${RANCHER_VERSION}', rancherVersion)
+                config = config.replace('${RANCHER_IMAGE_TAG}', rancherImageTag)
+                }catch (err){
+                    sh "docker stop ${setupContainer}"
+                    sh "docker rm -v ${setupContainer}"
+                    sh "docker volume rm -f ${validationVolume}"
+                    sh "docker rmi ${imageName}"
+                  }
+
+
+                sh "docker stop ${setupContainer}"
+                sh "docker rm -v ${setupContainer}"
+                sh "docker volume rm -f ${validationVolume}"
+                sh "docker rmi ${imageName}"
+
 
                 dir("./tests/v2/validation") {
                   def filename = "config.yaml"
-                  def configContents = env.CONFIG
 
-                  writeFile file: filename, text: configContents
+                  writeFile file: filename, text: config
                   env.CATTLE_TEST_CONFIG = workPath+filename
                 }
 
                 sh "./tests/v2/validation/configure.sh"
                 sh "./tests/v2/validation/build.sh"
+
               }
               stage('Setup') {
                 sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
@@ -272,8 +361,17 @@ node {
 
                 for (int i = 0; i < configs.size(); i++) {
                   def configName = configs[i]
+                  if (configName.contains('local')) {
+                    echo "skipping pushing local to the global variable"
+                    localConfigFileName = "$configName"
+                    continue
+                  }
                   echo "pushing ${configName} to the global variable"
                   configFiles << "${configName}"
+                }
+                
+                dir("./${patchedConfigsDir}") {
+                  sh "docker cp ${configGeneratorContainer}:${rootPath}${configsDir}/${localConfigFileName} ."
                 }
 
                 println "Removing the tagged image"
@@ -290,7 +388,7 @@ node {
                  configFiles.each {
                    def configPath = "./${configsDir}/$it"
                    def absoluteConfigPath = "${rootPath}${configsDir}/$it"
-
+                   
                    def testCase = sh (
                      script: "./yq '.testCases.provisioningTestCase'  ${configPath}",
                      returnStdout: true
@@ -338,11 +436,12 @@ node {
                   echo "Cluster mapping had failures: " + err
                   }
                 }
+                echo "pushing ${localConfigFileName} to the global variable"
+                configFiles << "${localConfigFileName}"
               }
               stage('Run preupgrade checks') {
                 try {
                   jobs = [:]
-
                   configFiles.each {
                     try {
                       def configPath = "./${configsDir}/$it"
@@ -393,6 +492,39 @@ node {
 
                 build job: 'rancher-v3_ha_upgrade', parameters: upgradeParams
               }
+              
+              stage('Upgrade local cluster version') {
+                try {
+                      def configPath = "./${configsDir}/${localConfigFileName}"
+                      def configYaml = readFile(file: "./${patchedConfigsDir}/${localConfigFileName}")
+
+                      def testCase = sh (
+                        script: "./yq '.testCases.upgradeKubernetesTestCase'  ${configPath}",
+                        returnStdout: true
+                      ).trim()
+
+                      def testPackage = sh (
+                        script: "./yq '.testCases.upgradeTestCase'  ${configPath}",
+                        returnStdout: true
+                      ).trim()
+
+                      def goValidationParams = [
+                        string(name: 'TIMEOUT', value: "2h"),
+                        text(name: 'CONFIG', value: configYaml),
+                        string(name: 'REPO', value: "${rancherRepo}"),
+                        string(name: 'BRANCH', value: "${branch}"),
+                        string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+                        string(name: 'TAGS', value: "${defaultTag}"),
+                        string(name: 'GOTEST_TESTCASE', value: "${testCase}" ),
+                        string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}")
+                      ]
+
+                      build job: 'go-automation-freeform-job', parameters: goValidationParams
+                } catch(err) {
+                  echo "Kubernetes upgrade tests had failures: " + err
+                }
+              }
+
               stage('Run postupgrade checks') {
                 try {
                   jobs = [:]
