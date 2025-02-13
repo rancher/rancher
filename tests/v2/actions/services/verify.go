@@ -139,55 +139,55 @@ func VerifyClusterIP(client *rancher.Client, clusterName string, steveClient *st
 		return err
 	}
 
-	for _, machine := range nodeList.Data {
-		logrus.Info("Getting the node IP")
-		newNode := &corev1.Node{}
-		err = steveV1.ConvertToK8sType(machine.JSONResp, newNode)
+	firstMachine := nodeList.Data[0]
+
+	logrus.Info("Getting the node IP")
+	newNode := &corev1.Node{}
+	err = steveV1.ConvertToK8sType(firstMachine.JSONResp, newNode)
+	if err != nil {
+		return err
+	}
+
+	log := ""
+	if strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") || strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
+		_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
 		if err != nil {
 			return err
 		}
 
-		log := ""
-		if strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") || strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
-			_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
-			if err != nil {
-				return err
-			}
-
-			sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
-			if err != nil {
-				return err
-			}
-
-			sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
-			if err != nil {
-				return err
-			}
-
-			logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
-
-			log, err = sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s", clusterIP, path))
-			if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-				return err
-			}
-		} else {
-			nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeExternalIP)
-			if nodeIP == "" {
-				nodeIP = kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
-			}
-
-			logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
-
-			execCmd := []string{"curl", fmt.Sprintf("%s:%s", clusterIP, path)}
-			log, err = kubectl.Command(client, nil, clusterName, execCmd, "")
-			if err != nil {
-				return err
-			}
+		sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
+		if err != nil {
+			return err
 		}
 
-		if strings.Contains(log, content) {
-			return nil
+		sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &firstMachine)
+		if err != nil {
+			return err
 		}
+
+		logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
+
+		log, err = sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s", clusterIP, path))
+		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+			return err
+		}
+	} else {
+		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeExternalIP)
+		if nodeIP == "" {
+			nodeIP = kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
+		}
+
+		logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
+
+		execCmd := []string{"curl", fmt.Sprintf("%s:%s", clusterIP, path)}
+		log, err = kubectl.Command(client, nil, clusterName, execCmd, "")
+		if err != nil {
+			return err
+		}
+	}
+
+	if strings.Contains(log, content) {
+		return nil
 	}
 	return errors.New("Unable to connect to the cluster")
 }

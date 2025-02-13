@@ -5,11 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"errors"
-
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/fleet"
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -23,10 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	nodePoolsize = 3
 )
 
 type UpgradeTestSuite struct {
@@ -79,16 +72,6 @@ func (u *UpgradeTestSuite) SetupSuite() {
 func (u *UpgradeTestSuite) TestNewCommitFleetRepo() {
 	u.session = session.NewSession()
 
-	steveClient, err := u.client.Steve.ProxyDownstream(u.cluster.ID)
-	require.NoError(u.T(), err)
-
-	err = clusters.VerifyNodePoolSize(steveClient, clusters.LabelWorker, nodePoolsize)
-	if errors.Is(err, clusters.SmallerPoolClusterSize) {
-		u.T().Skip("The deploy fleet repo and upgrade test requires at least 3 worker nodes.")
-	} else {
-		require.NoError(u.T(), err)
-	}
-
 	log.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(u.client, u.cluster.ID)
 	require.NoError(u.T(), err)
@@ -126,18 +109,8 @@ func (u *UpgradeTestSuite) TestNewCommitFleetRepo() {
 	require.NoError(u.T(), err)
 }
 
-func (u *UpgradeTestSuite) TestForceFleetRepo() {
+func (u *UpgradeTestSuite) TestGitRepoForceUpdate() {
 	u.session = session.NewSession()
-
-	steveClient, err := u.client.Steve.ProxyDownstream(u.cluster.ID)
-	require.NoError(u.T(), err)
-
-	err = clusters.VerifyNodePoolSize(steveClient, clusters.LabelWorker, nodePoolsize)
-	if errors.Is(err, clusters.SmallerPoolClusterSize) {
-		u.T().Skip("The deploy fleet repo and upgrade test requires at least 3 worker nodes.")
-	} else {
-		require.NoError(u.T(), err)
-	}
 
 	log.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(u.client, u.cluster.ID)
@@ -166,16 +139,6 @@ func (u *UpgradeTestSuite) TestForceFleetRepo() {
 
 func (u *UpgradeTestSuite) TestPauseFleetRepo() {
 	u.session = session.NewSession()
-
-	steveClient, err := u.client.Steve.ProxyDownstream(u.cluster.ID)
-	require.NoError(u.T(), err)
-
-	err = clusters.VerifyNodePoolSize(steveClient, clusters.LabelWorker, nodePoolsize)
-	if errors.Is(err, clusters.SmallerPoolClusterSize) {
-		u.T().Skip("The deploy fleet repo and upgrade test requires at least 3 worker nodes.")
-	} else {
-		require.NoError(u.T(), err)
-	}
 
 	log.Info("Creating new project and namespace")
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(u.client, u.cluster.ID)

@@ -8,8 +8,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	LabelWorker = "labelSelector=node-role.kubernetes.io/worker=true"
+)
+
 var (
-	LabelWorker            = "labelSelector=node-role.kubernetes.io/worker=true"
 	SmallerPoolClusterSize = errors.New("Machine pool cluster size is smaller than expected pool size")
 )
 
