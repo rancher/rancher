@@ -327,7 +327,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	cmd := exec.Command("git", append([]string{"-c", kv}, args...)...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_PASSWORD=%s", g.password))
 	userAgentValue := fmt.Sprintf("%s/%s %s", "git-rancher", settings.ServerVersion.Get(), "(Git-based Helm Repository)")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_HTTP_USER_AGENT=%s", userAgentValue))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_HTTP_USER_AGENT=%s", userAgentValue))
 
 	stderrBuf := &bytes.Buffer{}
 	cmd.Stderr = stderrBuf
