@@ -1729,8 +1729,8 @@ github.com/fxamacker/cbor/v2 v2.7.0 h1:iM5WgngdRBanHcxugY4JySA0nk1wZorNOpTgCMedv
 github.com/fxamacker/cbor/v2 v2.7.0/go.mod h1:pxXPTn3joSm21Gbwsv0w9OSA2y1HFR9qXEeXQVeNoDQ=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
-github.com/git-ival/shepherd v0.0.0-20250205220745-59642adc8f24 h1:q75U+VW4Z+hXxhrcsPtSz+A+0cCMEb5AAsgaagdvd6c=
-github.com/git-ival/shepherd v0.0.0-20250205220745-59642adc8f24/go.mod h1:relMIZBbmYQyZUgVWfomrpHKO0we3AmbrUD0EFYoXyc=
+github.com/git-ival/shepherd v0.0.0-20250206215219-25733a1eb02f h1:qtiiRJKamlTmt9W6k+mszsMQgp/ebX/6qXaIA0lDH2Q=
+github.com/git-ival/shepherd v0.0.0-20250206215219-25733a1eb02f/go.mod h1:relMIZBbmYQyZUgVWfomrpHKO0we3AmbrUD0EFYoXyc=
 github.com/gliderlabs/ssh v0.3.7 h1:iV3Bqi942d9huXnzEF2Mt+CY9gLu8DNM4Obd+8bODRE=
 github.com/gliderlabs/ssh v0.3.7/go.mod h1:zpHEXBstFnQYtGnB8k8kQLol82umzn/2/snG7alWVD8=
 github.com/go-asn1-ber/asn1-ber v1.5.1/go.mod h1:hEBeB/ic+5LoWskz+yKT7vGhhPYkProFKoKdwZRWMe0=
@@ -2457,8 +2457,6 @@ github.com/rancher/rke v1.8.0-rc.1 h1:fqsxjBOYAYtqk9D2US3rBfwDtXyExsahy6lNE7C1Zr
 github.com/rancher/rke v1.8.0-rc.1/go.mod h1:+x++Mvl0A3jIzNLiu8nkraqZXiHg6VPWv0Xl4iQCg+A=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20241213222351-98e341c77d0b h1:uX+XbQgpqpfxfvDI+6uPb1DeeDqEwa7lE+QtYuPCqzU=
-github.com/rancher/shepherd v0.0.0-20241213222351-98e341c77d0b/go.mod h1:urZvZCFSgT+9NVjAV0y8v+pzuqziaS3aYfoMfk9TENw=
 github.com/rancher/steve v0.5.6 h1:76m20p4AcRgP+sWIQQy2VBW7FMrxpY7n3PHUc35BQ1g=
 github.com/rancher/steve v0.5.6/go.mod h1:8F+laYoiX/ieNugO3WXUaN327oOhQe7DZsRTH3VZjXw=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde h1:x5VZI/0TUx1MeZirh6e0OMAInhCmq6yRvD6897458Ng=
