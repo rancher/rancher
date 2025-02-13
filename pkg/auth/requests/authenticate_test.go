@@ -51,9 +51,10 @@ func (r *fakeUserRefresher) reset() {
 }
 
 type fakeProvider struct {
-	name                       string
-	disabled                   bool
-	getUserExtraAttributesFunc func(v3.Principal) map[string][]string
+	name                                string
+	disabled                            bool
+	getUserExtraAttributesFunc          func(v3.Principal) map[string][]string
+	getUserExtraAttributesFromTokenFunc func(token accessor.TokenAccessor) map[string][]string
 }
 
 func (p *fakeProvider) IsDisabledProvider() (bool, error) {
@@ -107,7 +108,18 @@ func (p *fakeProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 
 	return map[string][]string{
 		common.UserAttributePrincipalID: {userPrincipal.Name},
-		common.UserAttributeUserName:    {userPrincipal.DisplayName},
+		common.UserAttributeUserName:    {userPrincipal.LoginName},
+	}
+}
+
+func (p *fakeProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
+	if p.getUserExtraAttributesFromTokenFunc != nil {
+		return p.getUserExtraAttributesFromTokenFunc(token)
+	}
+
+	return map[string][]string{
+		common.UserAttributePrincipalID: {token.GetUserPrincipalID()},
+		common.UserAttributeUserName:    {token.GetUserName()},
 	}
 }
 
@@ -136,7 +148,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
-		DisplayName:  "fake-user",
+		Username:     "fake-user",
 		PrincipalIDs: []string{userPrincipalID},
 	}
 
@@ -156,7 +168,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			Me:            true,
 			PrincipalType: "user",
 			Provider:      fakeProvider.name,
-			DisplayName:   user.DisplayName,
+			LoginName:     user.Username,
 		},
 	}
 
@@ -196,7 +208,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		ExtraByProvider: map[string]map[string][]string{
 			fakeProvider.name: {
 				common.UserAttributePrincipalID: {userPrincipalID},
-				common.UserAttributeUserName:    {user.DisplayName},
+				common.UserAttributeUserName:    {user.Username},
 			},
 			providers.LocalProvider: {
 				common.UserAttributePrincipalID: {"local://" + userID},
@@ -382,28 +394,32 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.True(t, resp.IsAuthed)
 		assert.True(t, userRefresher.called)
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], user.PrincipalIDs[0])
-		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.DisplayName)
+		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.Username)
 	})
 
 	t.Run("fill extra from the user if unable to get from neither userattribute nor provider", func(t *testing.T) {
 		oldUserAttributeExtra := userAttribute.ExtraByProvider
 		oldFakeProviderGetUserExtraAttributesFunc := fakeProvider.getUserExtraAttributesFunc
+		oldFakeProviderGetUserExtraAttributesFromTokenFunc := fakeProvider.getUserExtraAttributesFromTokenFunc
 		defer func() {
 			userAttribute.ExtraByProvider = oldUserAttributeExtra
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
+			fakeProvider.getUserExtraAttributesFromTokenFunc = oldFakeProviderGetUserExtraAttributesFromTokenFunc
 		}()
 		userAttribute.ExtraByProvider = nil
 		fakeProvider.getUserExtraAttributesFunc = func(userPrincipal v3.Principal) map[string][]string { return map[string][]string{} }
+		fakeProvider.getUserExtraAttributesFromTokenFunc = func(token accessor.TokenAccessor) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
+
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
 		assert.True(t, userRefresher.called)
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], user.PrincipalIDs[0])
-		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.DisplayName)
+		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.Username)
 	})
 
 	t.Run("provider refresh is not called if token user id has system prefix", func(t *testing.T) {
@@ -646,7 +662,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
 		},
-		DisplayName:  "fake-user",
+		Username:     "fake-user",
 		PrincipalIDs: []string{userPrincipalID},
 	}
 
@@ -659,16 +675,16 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			CreationTimestamp: metav1.NewTime(now),
 		},
 		Spec: ext.TokenSpec{
-			UserID:  userID,
-			TTL:     57600000,
-			Kind:    exttokenstore.IsLogin,
-			Enabled: pointer.Bool(true),
+			UserID:      userID,
+			TTL:         57600000,
+			Kind:        exttokenstore.IsLogin,
+			Enabled:     pointer.Bool(true),
+			PrincipalID: userPrincipalID,
 		},
 		Status: ext.TokenStatus{
 			TokenHash:      tokenHash,
 			AuthProvider:   fakeProvider.name,
-			DisplayName:    user.DisplayName,
-			PrincipalID:    userPrincipalID,
+			UserName:       user.Username,
 			LastUpdateTime: "13:00",
 		},
 	}
@@ -686,11 +702,11 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
 			exttokenstore.FieldLabels:         []byte("null"),
 			exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-			exttokenstore.FieldLoginName:      []byte(""),
 			exttokenstore.FieldPrincipalID:    []byte(userPrincipalID),
 			exttokenstore.FieldTTL:            []byte("57600000"),
 			exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
 			exttokenstore.FieldUserID:         []byte(userID),
+			exttokenstore.FieldUserName:       []byte(user.Username),
 		},
 	}
 
@@ -720,7 +736,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		ExtraByProvider: map[string]map[string][]string{
 			fakeProvider.name: {
 				common.UserAttributePrincipalID: {userPrincipalID},
-				common.UserAttributeUserName:    {user.DisplayName},
+				common.UserAttributeUserName:    {user.Username},
 			},
 			providers.LocalProvider: {
 				common.UserAttributePrincipalID: {"local://" + userID},
@@ -930,23 +946,27 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
+
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
 		assert.True(t, userRefresher.called)
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], user.PrincipalIDs[0])
-		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.DisplayName)
+		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.Username)
 	})
 
 	t.Run("fill extra from the user if unable to get from neither userattribute nor provider", func(t *testing.T) {
 		oldUserAttributeExtra := userAttribute.ExtraByProvider
 		oldFakeProviderGetUserExtraAttributesFunc := fakeProvider.getUserExtraAttributesFunc
+		oldFakeProviderGetUserExtraAttributesFromTokenFunc := fakeProvider.getUserExtraAttributesFromTokenFunc
 		defer func() {
 			userAttribute.ExtraByProvider = oldUserAttributeExtra
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
+			fakeProvider.getUserExtraAttributesFromTokenFunc = oldFakeProviderGetUserExtraAttributesFromTokenFunc
 		}()
 		userAttribute.ExtraByProvider = nil
 		fakeProvider.getUserExtraAttributesFunc = func(userPrincipal v3.Principal) map[string][]string { return map[string][]string{} }
+		fakeProvider.getUserExtraAttributesFromTokenFunc = func(token accessor.TokenAccessor) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
@@ -956,7 +976,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		assert.True(t, resp.IsAuthed)
 		assert.True(t, userRefresher.called)
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], user.PrincipalIDs[0])
-		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.DisplayName)
+		assert.Contains(t, resp.Extras[common.UserAttributeUserName], user.Username)
 	})
 
 	t.Run("provider refresh is not called if token user id has system prefix", func(t *testing.T) {

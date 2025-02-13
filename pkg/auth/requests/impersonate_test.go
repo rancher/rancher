@@ -230,10 +230,10 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
 							exttokenstore.FieldLabels:         []byte("null"),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-							exttokenstore.FieldLoginName:      []byte(""),
 							exttokenstore.FieldPrincipalID:    []byte("local://kubeconfig-u-user5zfww"),
 							exttokenstore.FieldTTL:            []byte("57600000"),
 							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+							exttokenstore.FieldUserName:       []byte(""),
 						},
 					}, nil)
 				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
@@ -433,10 +433,10 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
 							exttokenstore.FieldLabels:         []byte("null"),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-							exttokenstore.FieldLoginName:      []byte(""),
 							exttokenstore.FieldPrincipalID:    []byte("local://kubeconfig-u-user5zfww"),
 							exttokenstore.FieldTTL:            []byte("57600000"),
 							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+							exttokenstore.FieldUserName:       []byte(""),
 						},
 					}, nil)
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)

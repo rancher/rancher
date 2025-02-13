@@ -105,7 +105,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		return nil
 	}
 
-	p, err := convertPrincipal(apiContext.Schema, token.GetUserPrincipal())
+	p, err := convertPrincipal(apiContext.Schema, providers.GetUserPrincipal(token))
 	if err != nil {
 		return err
 	}
