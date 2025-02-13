@@ -162,7 +162,8 @@ func (a *Answer) ObjClusterName() string {
 }
 
 type ImportedConfig struct {
-	KubeConfig string `json:"kubeConfig" norman:"type=password"`
+	KubeConfig         string `json:"kubeConfig" norman:"type=password"`
+	PrivateRegistryURL string `json:"privateRegistryURL,omitempty"`
 }
 
 type ClusterStatus struct {

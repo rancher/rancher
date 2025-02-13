@@ -15,6 +15,7 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
+	"github.com/rancher/rancher/pkg/image"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -145,14 +146,16 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
-					ImportedConfig: &apimgmtv3.ImportedConfig{},
+					ImportedConfig: &apimgmtv3.ImportedConfig{
+						PrivateRegistryURL: "localhost:5001",
+					},
 				},
 			},
 			url:        "some-dummy-url",
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "1d9554ad0e8dda26a8e4fa96879a5954a478bf9b22e2b1de4273292774390226",
+				"cattle-cluster-agent": "c6d1cc337380cebbb112a2cadd32ee37f09fbf60a891f6fbfefb4dc60511a4ce",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -184,11 +187,13 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 
 			mockSecrets = tt.secrets
 			var b bytes.Buffer
+			if tt.cluster.Spec.ImportedConfig != nil && tt.cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
+				tt.agentImage = image.ResolveWithCluster(tt.agentImage, tt.cluster)
+			}
 			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isWindowsCluster, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister)
 
 			assert.Nil(t, err)
 			decoder := scheme.Codecs.UniversalDeserializer()
-
 			for _, r := range strings.Split(b.String(), "---") {
 				if len(r) == 0 {
 					continue
