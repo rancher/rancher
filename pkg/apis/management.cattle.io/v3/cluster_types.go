@@ -123,9 +123,25 @@ type ClusterSpecBase struct {
 }
 
 type AgentDeploymentCustomization struct {
-	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
-	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
-	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+	AppendTolerations            []v1.Toleration               `json:"appendTolerations,omitempty"`
+	OverrideAffinity             *v1.Affinity                  `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements *v1.ResourceRequirements      `json:"overrideResourceRequirements,omitempty"`
+	SchedulingCustomization      *AgentSchedulingCustomization `json:"schedulingCustomization,omitempty"`
+}
+
+type AgentSchedulingCustomization struct {
+	PriorityClass       *PriorityClassSpec       `json:"priorityClass,omitempty"`
+	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
+}
+
+type PriorityClassSpec struct {
+	Value      int                  `json:"value,omitempty"`
+	Preemption *v1.PreemptionPolicy `json:"preemption,omitempty"`
+}
+
+type PodDisruptionBudgetSpec struct {
+	MinAvailable   string `json:"minAvailable,omitempty"`
+	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 }
 
 type ClusterSpec struct {
