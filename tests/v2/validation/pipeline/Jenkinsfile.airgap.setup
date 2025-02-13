@@ -1,0 +1,71 @@
+#!groovy
+node {
+  def homePath = pwd() + "/"
+  def rootPath = "/root/go/src/github.com/rancher/tfp-automation/"
+  def testsDir = "github.com/rancher/tfp-automation/tests/${env.TEST_PACKAGE}"
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+  def imageName = "tfp-automation-validation-${job_name}${env.BUILD_NUMBER}"
+  def testResultsOut = "results.xml"
+  def testResultsJSON = "results.json"
+  def envFile = ".env"
+  def config = env.CONFIG
+  def testPackage = env.TEST_PACKAGE?.trim()
+  def branch = "${env.BRANCH}"
+  if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
+        branch = "${env.BRANCH}"
+  }
+  def repo = scm.userRemoteConfigs
+  if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+    repo = [[url: "${env.REPO}"]]
+  }
+  def timeout = "${env.TIMEOUT}"
+  if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
+        timeout = "${env.TIMEOUT}" 
+  }
+
+  withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                    string(credentialsId: 'AWS_SSH_KEY_NAME', variable: 'AWS_SSH_KEY_NAME'),
+  stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: repo
+                  ])
+        }
+    stage('Configure and Build') {
+      config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+      config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+      config. config.replace('${ADMIN_PASSWORD}', env.ADMIN_PASSWORD)
+
+      writeFile file: 'config.yml', text: config
+
+      def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
+      writeFile file: 'key.pem', text: decoded
+      
+      env.CATTLE_TEST_CONFIG=rootPath+'config.yml'
+
+      sh "./configure.sh"
+      sh "./build.sh"
+    }
+    stage('Deploy Rancher airgap') {
+      try {
+        sh """
+          docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
+          /root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} --jsonfile ${testResultsJSON} -- -timeout=${timeout} -v ${params.TEST_CASE};
+          if [ -f ${rootPath}reporter ]; then ${rootPath}reporter; fi"
+        """
+      } catch(err) {
+          echo 'Test run had failures. Collecting results...'
+      }
+    }
+  }
+}
