@@ -77,7 +77,7 @@ func BuildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	}
 	scaledContext.Dialer = dialerFactory
 
-	userManager, err := common.NewUserManager(scaledContext)
+	userManager, err := common.NewUserManager(wranglerContext)
 	if err != nil {
 		return nil, nil, nil, err
 	}
