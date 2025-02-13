@@ -216,3 +216,30 @@ func GetGlobalRoleByName(client *rancher.Client, globalRoleName string) (*v3.Glo
 
 	return matchingGlobalRole, nil
 }
+
+// GetGlobalRoleBindingByName is a helper function to fetch global role binding by name
+func GetGlobalRoleBindingByName(client *rancher.Client, globalRoleBindingName string) (*v3.GlobalRoleBinding, error) {
+	var matchingGlobalRoleBinding *v3.GlobalRoleBinding
+
+	err := kwait.PollUntilContextTimeout(context.TODO(), defaults.FiveSecondTimeout, defaults.OneMinuteTimeout, false, func(ctx context.Context) (done bool, pollErr error) {
+		grblist, err := client.WranglerContext.Mgmt.GlobalRoleBinding().List(v1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		for _, grb := range grblist.Items {
+			if grb.Name == globalRoleBindingName {
+				matchingGlobalRoleBinding = &grb
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error while polling for global role binding: %w", err)
+	}
+
+	return matchingGlobalRoleBinding, nil
+}
