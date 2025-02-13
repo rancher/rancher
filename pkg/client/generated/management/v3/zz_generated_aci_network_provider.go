@@ -30,6 +30,7 @@ const (
 	AciNetworkProviderFieldDisableWaitForNetwork                = "disableWaitForNetwork"
 	AciNetworkProviderFieldDropLogDisableEvents                 = "dropLogDisableEvents"
 	AciNetworkProviderFieldDropLogEnable                        = "dropLogEnable"
+	AciNetworkProviderFieldDropLogOpflexRedirectDropLogs        = "dropLogOpflexRedirectDropLogs"
 	AciNetworkProviderFieldDurationWaitForNetwork               = "durationWaitForNetwork"
 	AciNetworkProviderFieldDynamicExternalSubnet                = "externDynamic"
 	AciNetworkProviderFieldEnableEndpointSlice                  = "enableEndpointSlice"
@@ -87,6 +88,7 @@ const (
 	AciNetworkProviderFieldOverlayVRFName                       = "overlayVrfName"
 	AciNetworkProviderFieldPBRTrackingNonSnat                   = "pbrTrackingNonSnat"
 	AciNetworkProviderFieldPodSubnetChunkSize                   = "podSubnetChunkSize"
+	AciNetworkProviderFieldProactiveConf                        = "proactiveConf"
 	AciNetworkProviderFieldRunGbpContainer                      = "runGbpContainer"
 	AciNetworkProviderFieldRunOpflexServerContainer             = "runOpflexServerContainer"
 	AciNetworkProviderFieldServiceGraphEndpointAddDelay         = "serviceGraphEndpointAddDelay"
@@ -151,6 +153,7 @@ type AciNetworkProvider struct {
 	DisableWaitForNetwork                string              `json:"disableWaitForNetwork,omitempty" yaml:"disableWaitForNetwork,omitempty"`
 	DropLogDisableEvents                 string              `json:"dropLogDisableEvents,omitempty" yaml:"dropLogDisableEvents,omitempty"`
 	DropLogEnable                        string              `json:"dropLogEnable,omitempty" yaml:"dropLogEnable,omitempty"`
+	DropLogOpflexRedirectDropLogs        string              `json:"dropLogOpflexRedirectDropLogs,omitempty" yaml:"dropLogOpflexRedirectDropLogs,omitempty"`
 	DurationWaitForNetwork               string              `json:"durationWaitForNetwork,omitempty" yaml:"durationWaitForNetwork,omitempty"`
 	DynamicExternalSubnet                string              `json:"externDynamic,omitempty" yaml:"externDynamic,omitempty"`
 	EnableEndpointSlice                  string              `json:"enableEndpointSlice,omitempty" yaml:"enableEndpointSlice,omitempty"`
@@ -208,6 +211,7 @@ type AciNetworkProvider struct {
 	OverlayVRFName                       string              `json:"overlayVrfName,omitempty" yaml:"overlayVrfName,omitempty"`
 	PBRTrackingNonSnat                   string              `json:"pbrTrackingNonSnat,omitempty" yaml:"pbrTrackingNonSnat,omitempty"`
 	PodSubnetChunkSize                   string              `json:"podSubnetChunkSize,omitempty" yaml:"podSubnetChunkSize,omitempty"`
+	ProactiveConf                        string              `json:"proactiveConf,omitempty" yaml:"proactiveConf,omitempty"`
 	RunGbpContainer                      string              `json:"runGbpContainer,omitempty" yaml:"runGbpContainer,omitempty"`
 	RunOpflexServerContainer             string              `json:"runOpflexServerContainer,omitempty" yaml:"runOpflexServerContainer,omitempty"`
 	ServiceGraphEndpointAddDelay         string              `json:"serviceGraphEndpointAddDelay,omitempty" yaml:"serviceGraphEndpointAddDelay,omitempty"`
