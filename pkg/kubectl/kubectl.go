@@ -49,6 +49,23 @@ func ApplyWithNamespace(yaml []byte, namespace string, kubeConfig *clientcmdapi.
 	return runWithHTTP2(cmd)
 }
 
+func RestartRolloutWithNamespace(namespace, name string, kubeConfig *clientcmdapi.Config) ([]byte, error) {
+	kubeConfigFile, err := writeKubeConfig(kubeConfig)
+	defer cleanup(kubeConfigFile)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("kubectl",
+		"--kubeconfig",
+		kubeConfigFile.Name(),
+		"-n",
+		namespace,
+		"rollout",
+		"restart",
+		name)
+	return runWithHTTP2(cmd)
+}
+
 func RolloutStatusWithNamespace(namespace, name, timeout string, kubeConfig *clientcmdapi.Config) ([]byte, error) {
 	kubeConfigFile, err := writeKubeConfig(kubeConfig)
 	defer cleanup(kubeConfigFile)
