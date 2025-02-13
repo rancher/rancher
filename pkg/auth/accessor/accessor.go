@@ -24,9 +24,14 @@ type TokenAccessor interface {
 	GetAuthProvider() string
 	// GetUserID returns the id of the user owning the token.
 	GetUserID() string
-	// GetUserPrincipal returns principal data about the token's owning
-	// user.
-	GetUserPrincipal() v3.Principal
+	// GetUserPrincipalID returns the id of the controlling principal
+	GetUserPrincipalID() string
+	// GetUserPrincipalType returns the type of the controlling principal
+	GetUserPrincipalType() string
+	// GetUserDisplayName returns the display name of the controlling user
+	GetUserDisplayName() string
+	// GetUserName returns the (login) name of the controlling user
+	GetUserName() string
 	// GetProviderInfo returns a map of provider-specific information.
 	GetProviderInfo() map[string]string
 	// ObjClusterName returns the name of the cluter the token is restricted
