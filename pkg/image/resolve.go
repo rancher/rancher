@@ -57,7 +57,6 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 		}
 		return path.Join(reg, image)
 	}
-
 	return image
 }
 

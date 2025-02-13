@@ -3,7 +3,6 @@ package cluster
 import (
 	"encoding/base64"
 	"encoding/json"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -50,6 +49,11 @@ func GetPrivateClusterLevelRegistry(cluster *v3.Cluster) *rketypes.PrivateRegist
 		config := cluster.Spec.RancherKubernetesEngineConfig
 		return &config.PrivateRegistries[0]
 	}
+	if cluster != nil && cluster.Spec.ImportedConfig != nil && cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
+		return &rketypes.PrivateRegistry{
+			URL: cluster.Spec.ImportedConfig.PrivateRegistryURL,
+		}
+	}
 	return nil
 }
 
@@ -90,6 +94,13 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	// provisioning clusters do not have a populated `RancherKubernetesEngineConfig`.
 	if rkeClusterRegistryOrGlobalSystemDefault := GetPrivateRegistry(cluster); rkeClusterRegistryOrGlobalSystemDefault != nil {
 		rkeClusterURLOrGlobalSystemDefault = rkeClusterRegistryOrGlobalSystemDefault.URL
+
+		// Return the private registry URL for imported clusters if it's configured. Skip generating
+		// .dockerconfigjson since authentication is handled at the distro level for imported clusters.
+		if cluster.Spec.ImportedConfig != nil && cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
+			return rkeClusterURLOrGlobalSystemDefault, "", nil
+		}
+
 		// check for RKE1 ECR credentials first
 		if rkeClusterRegistryOrGlobalSystemDefault.ECRCredentialPlugin != nil {
 			// generate ecr authConfig
