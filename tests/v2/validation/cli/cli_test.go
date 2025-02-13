@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/rancher/tests/v2/actions/cli"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/pkg/config"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,10 @@ func (c *CLITestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	c.session = testSession
 
-	client, err := rancher.NewClient("", testSession)
+	rancherConfig := new(rancher.Config)
+	config.LoadConfig(rancher.ConfigurationFileKey, rancherConfig)
+
+	client, err := rancher.NewClientForConfig("", rancherConfig, testSession)
 	require.NoError(c.T(), err)
 
 	c.client = client
