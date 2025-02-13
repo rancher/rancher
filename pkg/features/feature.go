@@ -156,6 +156,12 @@ var (
 		false,
 		false,
 		true).lockOnInstall()
+	ClusterAgentSchedulingCustomization = newFeature(
+		"cluster-agent-scheduling-customization",
+		"Enables the automatic deployment of Pod Disruption Budgets and Priority Classes when deploying the cattle-cluster-agent. Disabling this feature will not impact existing clusters.",
+		false,
+		true,
+		true)
 )
 
 type Feature struct {

@@ -48,6 +48,8 @@ const (
 	mgmtClusterDisplayNameAnn = "provisioning.cattle.io/management-cluster-display-name"
 	fleetWorkspaceNameAnn     = "provisioning.cattle.io/fleet-workspace-name"
 	externallyManagedAnn      = "provisioning.cattle.io/externally-managed"
+
+	manageSchedulingDefaultsAnn = "provisioning.cattle.io/enable-scheduling-customization"
 )
 
 var (
@@ -134,6 +136,10 @@ func Register(
 	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-update", h.OnChange)
 
 	clients.Mgmt.Cluster().OnChange(ctx, "cluster-watch", h.createToken)
+
+	clients.Provisioning.Cluster().OnChange(ctx, "v1-scheduling-customization-backfill", h.updateV1SchedulingCustomization)
+	clients.Mgmt.Cluster().OnChange(ctx, "v3-scheduling-customization-backfill", h.updateV3SchedulingCustomization)
+
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 
@@ -231,6 +237,24 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
 			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
 			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+
+	if cluster.Spec.ClusterAgentDeploymentCustomization != nil && cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization != nil {
+		provCluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization = &v1.AgentSchedulingCustomization{}
+
+		if cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget != nil {
+			provCluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget = &v1.PodDisruptionBudgetSpec{
+				MinAvailable:   cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MinAvailable,
+				MaxUnavailable: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MaxUnavailable,
+			}
+		}
+
+		if cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass != nil {
+			provCluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v1.PriorityClassSpec{
+				Value:      cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
+				Preemption: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Preemption,
+			}
 		}
 	}
 
@@ -418,6 +442,24 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
 			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
 			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+
+	if cluster.Spec.ClusterAgentDeploymentCustomization != nil && cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization != nil {
+		spec.ClusterAgentDeploymentCustomization.SchedulingCustomization = &v3.AgentSchedulingCustomization{}
+
+		if cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget != nil {
+			spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget = &v3.PodDisruptionBudgetSpec{
+				MaxUnavailable: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MaxUnavailable,
+				MinAvailable:   cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MinAvailable,
+			}
+		}
+
+		if cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass != nil {
+			spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v3.PriorityClassSpec{
+				Value:      cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
+				Preemption: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Preemption,
+			}
 		}
 	}
 

@@ -251,6 +251,14 @@ func getTestClusterAgentCustomizationV1() *v1.AgentDeploymentCustomization {
 		AppendTolerations:            getTestClusterAgentToleration(),
 		OverrideAffinity:             getTestClusterAgentAffinity(),
 		OverrideResourceRequirements: getTestClusterAgentResourceReq(),
+		SchedulingCustomization: &v1.AgentSchedulingCustomization{
+			PriorityClass: &v1.PriorityClassSpec{
+				Value: 1000,
+			},
+			PodDisruptionBudget: &v1.PodDisruptionBudgetSpec{
+				MinAvailable: "1",
+			},
+		},
 	}
 }
 
@@ -259,6 +267,14 @@ func getTestClusterAgentCustomizationV3() *v3.AgentDeploymentCustomization {
 		AppendTolerations:            getTestClusterAgentToleration(),
 		OverrideAffinity:             getTestClusterAgentAffinity(),
 		OverrideResourceRequirements: getTestClusterAgentResourceReq(),
+		SchedulingCustomization: &v3.AgentSchedulingCustomization{
+			PriorityClass: &v3.PriorityClassSpec{
+				Value: 1000,
+			},
+			PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+				MinAvailable: "1",
+			},
+		},
 	}
 }
 
