@@ -69,8 +69,20 @@ func (t *Token) GetUserID() string {
 	return t.UserID
 }
 
-func (t *Token) GetUserPrincipal() Principal {
-	return t.UserPrincipal
+func (t *Token) GetUserPrincipalID() string {
+	return t.UserPrincipal.Name
+}
+
+func (t *Token) GetUserPrincipalType() string {
+	return t.UserPrincipal.PrincipalType
+}
+
+func (t *Token) GetUserDisplayName() string {
+	return t.UserPrincipal.DisplayName
+}
+
+func (t *Token) GetUserName() string {
+	return t.UserPrincipal.LoginName
 }
 
 func (t *Token) ObjClusterName() string {
