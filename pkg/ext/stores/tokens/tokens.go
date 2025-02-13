@@ -56,7 +56,7 @@ const (
 	FieldLabels         = "labels"
 	FieldLastUpdateTime = "last-update-time"
 	FieldLastUsedAt     = "last-used-at"
-	FieldLoginName      = "login-name"
+	FieldUserName       = "user-name"
 	FieldPrincipalID    = "principal-id"
 	FieldTTL            = "ttl"
 	FieldUID            = "kube-uid"
@@ -380,7 +380,7 @@ func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.Cr
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
-	if !userMatch(user, token) {
+	if !userMatchOrDefault(user, token) {
 		return nil, apierrors.NewBadRequest("unable to create token for other user")
 	}
 	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options)
@@ -459,6 +459,14 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, apierrors.NewInternalError(err)
 	}
 
+	// Auto-fill the spec with the principal id, or ensure that the
+	// specified id matches the request. Same as we do for the user id.
+	if token.Spec.PrincipalID == "" {
+		token.Spec.PrincipalID = principalID
+	} else if token.Spec.PrincipalID != principalID {
+		return nil, apierrors.NewBadRequest("unable to create token for other principal id")
+	}
+
 	// Generate secret and its hash
 
 	tokenValue, hashedValue, err := t.hasher.MakeAndHashSecret()
@@ -469,8 +477,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	token.Status.TokenHash = hashedValue
 	token.Status.AuthProvider = authProvider
 	token.Status.DisplayName = user.DisplayName
-	token.Status.LoginName = user.Username
-	token.Status.PrincipalID = principalID
+	token.Status.UserName = user.Username
 	token.Status.LastUpdateTime = t.timer.Now()
 
 	rest.FillObjectMetaSystemFields(token)
@@ -955,6 +962,16 @@ func userMatch(name string, token *ext.Token) bool {
 	return name == token.Spec.UserID
 }
 
+// userMatchOrDefault hides the details of matching a user name against an ext
+// token, and may set the default if nothing is specified in the token.
+func userMatchOrDefault(name string, token *ext.Token) bool {
+	if token.Spec.UserID == "" {
+		token.Spec.UserID = name
+		return true
+	}
+	return name == token.Spec.UserID
+}
+
 // ClusterCheck determines if the user a token is made for, who is the same as
 // the user creating the token, has access to the cluster the token-to-be is
 // limited in scope to. An error is thrown if not, or when the check itself
@@ -1129,7 +1146,7 @@ func (tp *tokenAuth) ProviderAndPrincipal(ctx context.Context, store *SystemStor
 		return "", "", fmt.Errorf("context contains invalid provider/principal data")
 	}
 
-	return token.GetAuthProvider(), token.GetUserPrincipal().Name, nil
+	return token.GetAuthProvider(), token.GetUserPrincipalID(), nil
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
@@ -1297,6 +1314,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", enabled)
 	secret.StringData[FieldDescription] = token.Spec.Description
 	secret.StringData[FieldKind] = token.Spec.Kind
+	secret.StringData[FieldPrincipalID] = token.Spec.PrincipalID
 
 	lastUsedAsString := ""
 	if token.Status.LastUsedAt != nil {
@@ -1319,8 +1337,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 
 	secret.StringData[FieldAuthProvider] = token.Status.AuthProvider
 	secret.StringData[FieldDisplayName] = token.Status.DisplayName
-	secret.StringData[FieldLoginName] = token.Status.LoginName
-	secret.StringData[FieldPrincipalID] = token.Status.PrincipalID
+	secret.StringData[FieldUserName] = token.Status.UserName
 
 	return secret, nil
 }
@@ -1347,7 +1364,7 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	token.Spec.Kind = string(secret.Data[FieldKind])
 
 	token.Status.DisplayName = string(secret.Data[FieldDisplayName])
-	token.Status.LoginName = string(secret.Data[FieldLoginName])
+	token.Status.UserName = string(secret.Data[FieldUserName])
 
 	userId := string(secret.Data[FieldUserID])
 	if userId == "" {
@@ -1403,14 +1420,11 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 	token.Status.LastUpdateTime = lastUpdateTime
 
-	// The principal id is the object name of the virtual v3.Principal
-	// resource and is therefore a required data element. display and login
-	// name on the other hand are optional.
 	principalID := string(secret.Data[FieldPrincipalID])
 	if principalID == "" {
 		return token, fmt.Errorf("principal id missing")
 	}
-	token.Status.PrincipalID = principalID
+	token.Spec.PrincipalID = principalID
 
 	kubeUID := string(secret.Data[FieldUID])
 	if kubeUID == "" {
