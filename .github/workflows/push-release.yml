@@ -696,7 +696,7 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:latest
-    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests]
+    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests, merge-installer-manifest]
     permissions:
       contents: read
       id-token: write
