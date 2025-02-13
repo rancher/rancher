@@ -153,20 +153,20 @@ func (t *Token) GetAuthProvider() string {
 	return t.Status.AuthProvider
 }
 
-func (t *Token) GetUserPrincipal() apiv3.Principal {
-	return apiv3.Principal{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: t.Status.PrincipalID,
-		},
-		DisplayName:   t.Status.DisplayName,
-		LoginName:     t.Status.LoginName,
-		Provider:      t.Status.AuthProvider,
-		PrincipalType: "user",
-		ExtraInfo: map[string]string{
-			UserAttributePrincipalID: t.Status.PrincipalID,
-			UserAttributeUserName:    t.Status.LoginName,
-		},
-	}
+func (t *Token) GetUserPrincipalID() string {
+	return t.Spec.PrincipalID
+}
+
+func (t *Token) GetUserPrincipalType() string {
+	return "user"
+}
+
+func (t *Token) GetUserDisplayName() string {
+	return t.Status.DisplayName
+}
+
+func (t *Token) GetUserName() string {
+	return t.Status.UserName
 }
 
 func (t *Token) GetGroupPrincipals() []apiv3.Principal {
