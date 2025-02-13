@@ -1,5 +1,7 @@
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
+github.com/bigkevmcd/norman v0.0.0-20250204113800-c906f2177073 h1:0s4vllI2ARU7lPqZbg7lMqOQH47GXeCyaJpcItYoLbg=
+github.com/bigkevmcd/norman v0.0.0-20250204113800-c906f2177073/go.mod h1:xufFdzfD+ko2FpNKK7GEBS3VwY4MhqOAKEwfeaXsuAA=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
@@ -92,8 +94,6 @@ github.com/rancher/gke-operator v1.10.0 h1:vV9jLErnH5VRBpK/kCzem8T7/yEDqLVXIcv20
 github.com/rancher/gke-operator v1.10.0/go.mod h1:k3oIJMCilpaLHeHPRy90S3pfZ05vbe+b+g1ISiHQbLo=
 github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813 h1:V/LY8pUHZG9Kc+xEDWDOryOnCU6/Q+Lsr9QQEQnshpU=
 github.com/rancher/lasso v0.0.0-20240924233157-8f384efc8813/go.mod h1:IxgTBO55lziYhTEETyVKiT8/B5Rg92qYiRmcIIYoPgI=
-github.com/rancher/norman v0.5.1 h1:jbp49IcX2Hn+N2QA3MHdIXeUG0VgCSIjJs4xnqG+j90=
-github.com/rancher/norman v0.5.1/go.mod h1:qX/OG/4wY27xSAcSdRilUBxBumV6Ey2CWpAeaKnBQDs=
 github.com/rancher/rke v1.8.0-rc.1 h1:fqsxjBOYAYtqk9D2US3rBfwDtXyExsahy6lNE7C1Zr4=
 github.com/rancher/rke v1.8.0-rc.1/go.mod h1:+x++Mvl0A3jIzNLiu8nkraqZXiHg6VPWv0Xl4iQCg+A=
 github.com/rancher/wrangler/v3 v3.1.0 h1:8ETBnQOEcZaR6WBmUSysWW7WnERBOiNTMJr4Dj3UG/s=
