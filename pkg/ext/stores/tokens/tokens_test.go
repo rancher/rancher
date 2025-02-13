@@ -45,7 +45,7 @@ var (
 			"kube-uid":         []byte("2905498-kafld-lkad"),
 			"labels":           []byte("null"),
 			"last-update-time": []byte("13:00:05"),
-			"login-name":       []byte("hello"),
+			"user-name":        []byte("hello"),
 			"principal-id":     []byte("world"),
 			"ttl":              []byte("4000"),
 			"user-id":          []byte("lkajdlksjlkds"),
@@ -66,7 +66,7 @@ var (
 			"kube-uid":         []byte("2905498-kafld-lkad"),
 			"labels":           []byte("null"),
 			"last-update-time": []byte("13:00:05"),
-			"login-name":       []byte("hello"),
+			"user-name":        []byte("hello"),
 			"principal-id":     []byte("world"),
 			"ttl":              []byte("4000"),
 		},
@@ -88,6 +88,7 @@ var (
 			TTL:         4000,
 			Enabled:     pointer.Bool(false),
 			Kind:        "session",
+			PrincipalID: "world",
 		},
 		Status: ext.TokenStatus{
 			TokenValue:     "",
@@ -97,8 +98,7 @@ var (
 			AuthProvider:   "somebody",
 			LastUpdateTime: "13:00:05",
 			DisplayName:    "myself",
-			LoginName:      "hello",
-			PrincipalID:    "world",
+			UserName:       "hello",
 		},
 	}
 
@@ -126,7 +126,7 @@ var (
 			"kube-uid":         []byte("2905498-kafld-lkad"),
 			"labels":           []byte("null"),
 			"last-update-time": []byte("this is a fake now"),
-			"login-name":       []byte("hello"),
+			"user-name":        []byte("hello"),
 			"principal-id":     []byte("world"),
 			"ttl":              []byte("5000"),
 			"user-id":          []byte("lkajdlksjlkds"),
@@ -147,7 +147,7 @@ var (
 			"kube-uid":         []byte("2905498-kafld-lkad"),
 			"labels":           []byte("null"),
 			"last-update-time": []byte("this is a fake now"),
-			"login-name":       []byte("hello"),
+			"user-name":        []byte("hello"),
 			"principal-id":     []byte("world"),
 			"ttl":              []byte("3000"),
 			"user-id":          []byte("lkajdlksjlkds"),
@@ -718,26 +718,9 @@ func Test_Store_Create(t *testing.T) {
 			auth *MockauthHandler)
 	}{
 		{
-			name: "permission error", // forbidden, or failed in the check
-			err:  apierrors.NewBadRequest("unable to create token for other user"),
-			tok:  &ext.Token{},
-			opts: &metav1.CreateOptions{},
-			storeSetup: func( // configure store backend clients
-				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				scache *fake.MockCacheInterface[*corev1.Secret],
-				users *fake.MockNonNamespacedCacheInterface[*v3.User],
-				timer *MocktimeHandler,
-				hasher *MockhashHandler,
-				auth *MockauthHandler) {
-
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdl/ksjlkds", nil)
-			},
-		},
-		{
 			name: "user name mismatch",
 			err:  createUserMismatch,
-			tok:  &ext.Token{},
+			tok:  &ext.Token{Spec: ext.TokenSpec{UserID: "other"}},
 			opts: &metav1.CreateOptions{},
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
@@ -2258,6 +2241,7 @@ func Test_SystemStore_Get(t *testing.T) {
 					TTL:         4000,
 					Enabled:     pointer.Bool(false),
 					Kind:        "session",
+					PrincipalID: "world",
 				},
 				Status: ext.TokenStatus{
 					TokenValue:     "",
@@ -2267,8 +2251,7 @@ func Test_SystemStore_Get(t *testing.T) {
 					AuthProvider:   "somebody",
 					LastUpdateTime: "13:00:05",
 					DisplayName:    "myself",
-					LoginName:      "hello",
-					PrincipalID:    "world",
+					UserName:       "hello",
 				},
 			},
 		},
