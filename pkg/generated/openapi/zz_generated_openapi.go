@@ -197,7 +197,14 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 				Properties: map[string]spec.Schema{
 					"userID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UserID is the user id",
+							Description: "UserID is the kube resource id of the user owning the token. By default that is the user who owned the token making the request creating this token. Currently this default is enforced, i.e. using a different user is rejected as forbidden.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"PrincipalID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PrincipalID is the id of the user in the auth provider used. By default that is the principle who owned the token making the request creating this token. Currently this default is enforced, i.e. using a different principle is rejected as forbidden.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -241,7 +248,6 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"userID"},
 			},
 		},
 	}
@@ -294,7 +300,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"authProvider": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AuthProvider names the auth provider managing the user. This information is retrieved from the UserAttribute resource referenced by `Spec.UserID`.",
+							Description: "AuthProvider names the auth provider managing the user. This is derived from the principal id and cannot be changed.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -302,23 +308,15 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"DisplayName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DisplayName is the display name of the User referenced by `Spec.UserID`. Stored as it is one of the pieces required to to internally assemble a v3.Principal structure for the token.",
+							Description: "DisplayName is the display name of the User owning the token. This is derived from the user and cannot be changed.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"LoginName": {
+					"UserName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "LoginName is the name of the User referenced by `Spec.UserID`. Stored as it is one of the pieces required to to internally assemble a v3.Principal structure for the token.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"PrincipalID": {
-						SchemaProps: spec.SchemaProps{
-							Description: "PrincipalID is retrieved by way of the token governing the session which made the request. Stored as it is one of the pieces required to internally assemble a v3.Principal structure for the token.",
+							Description: "UserName is the name of the User owning the token. This is derived from the user and cannot be changed.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -339,7 +337,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"current", "expired", "expiresAt", "authProvider", "DisplayName", "LoginName", "PrincipalID", "lastUpdateTime"},
+				Required: []string{"current", "expired", "expiresAt", "authProvider", "DisplayName", "UserName", "lastUpdateTime"},
 			},
 		},
 		Dependencies: []string{

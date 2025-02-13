@@ -6,15 +6,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	// copied from package "pkg/auth/providers/common" (provider.go).
-	// BEWARE the local copies are necessary because import of the package
-	// triggers CI failure around modules and dependencies, crewjam/saml in
-	// particular.
-	UserAttributePrincipalID = "principalid"
-	UserAttributeUserName    = "username"
-)
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -31,8 +22,18 @@ type Token struct {
 
 // TokenSpec contains the user-specifiable parts of the Token
 type TokenSpec struct {
-	// UserID is the user id
-	UserID string `json:"userID"`
+	// UserID is the kube resource id of the user owning the token. By
+	// default that is the user who owned the token making the request
+	// creating this token. Currently this default is enforced, i.e. using a
+	// different user is rejected as forbidden.
+	// +optional
+	UserID string `json:"userID,omitempty"`
+	// PrincipalID is the id of the user in the auth provider used. By
+	// default that is the principle who owned the token making the request
+	// creating this token. Currently this default is enforced, i.e. using a
+	// different principle is rejected as forbidden.
+	// +optional
+	PrincipalID string `json:principalID,omitempty`
 	// Human readable description.
 	// +optional
 	Description string `json:"description, omitempty"`
@@ -87,29 +88,21 @@ type TokenStatus struct {
 	// expire at all.
 	ExpiresAt string `json:"expiresAt"`
 
+	// AuthProvider names the auth provider managing the user. This is
+	// derived from the principal id and cannot be changed.
+	AuthProvider string `json:"authProvider"`
+
 	// User derived data. This information is complex/expensive to
 	// determine. As such this is stored in the backing secret to avoid
 	// recomputing it whenever the token is retrieved.
 
-	// AuthProvider names the auth provider managing the user. This
-	// information is retrieved from the UserAttribute resource referenced
-	// by `Spec.UserID`.
-	AuthProvider string `json:"authProvider"`
-
-	// DisplayName is the display name of the User referenced by
-	// `Spec.UserID`. Stored as it is one of the pieces required to to
-	// internally assemble a v3.Principal structure for the token.
+	// DisplayName is the display name of the User owning the token. This is
+	// derived from the user and cannot be changed.
 	DisplayName string `json:displayName`
 
-	// LoginName is the name of the User referenced by `Spec.UserID`. Stored
-	// as it is one of the pieces required to to internally assemble a
-	// v3.Principal structure for the token.
-	LoginName string `json:loginName`
-
-	// PrincipalID is retrieved by way of the token governing the session
-	// which made the request. Stored as it is one of the pieces required to
-	// internally assemble a v3.Principal structure for the token.
-	PrincipalID string `json:principalID`
+	// UserName is the name of the User owning the token. This is derived
+	// from the user and cannot be changed.
+	UserName string `json:userName`
 
 	// GroupPrincipals holds detailed group information
 	// This is not supported here.
