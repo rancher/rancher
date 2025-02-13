@@ -3,8 +3,11 @@
 package connectivity
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
 	"github.com/rancher/rancher/tests/v2/actions/services"
 	"github.com/rancher/rancher/tests/v2/actions/workloads"
@@ -12,7 +15,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionClusters "github.com/rancher/shepherd/extensions/clusters"
 	shepworkloads "github.com/rancher/shepherd/extensions/workloads"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -26,7 +29,8 @@ import (
 )
 
 const (
-	defaultPort = 80
+	nodePoolsize = 3
+	defaultPort  = 80
 )
 
 type PortTestSuite struct {
@@ -53,7 +57,7 @@ func (p *PortTestSuite) SetupSuite() {
 	clusterName := client.RancherConfig.ClusterName
 	require.NotEmptyf(p.T(), clusterName, "Cluster name to install should be set")
 
-	clusterID, err := clusters.GetClusterIDByName(p.client, clusterName)
+	clusterID, err := extensionClusters.GetClusterIDByName(p.client, clusterName)
 	require.NoError(p.T(), err, "Error getting cluster ID")
 
 	p.cluster, err = p.client.Management.Cluster.ByID(clusterID)
@@ -189,7 +193,7 @@ func (p *PortTestSuite) TestClusterIP() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, daemonsetName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), daemonsetName)
 	require.NoError(p.T(), err)
 }
 
@@ -301,7 +305,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, deploymentName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
 	require.NoError(p.T(), err)
 
 	log.Info("Scaling down deployment")
@@ -313,7 +317,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, deploymentName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
 	require.NoError(p.T(), err)
 
 	log.Info("Upgrading deployment")
@@ -328,7 +332,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = validateClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, port, deploymentName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
 	require.NoError(p.T(), err)
 }
 
@@ -343,11 +347,11 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	steveClient, err := p.client.Steve.ProxyDownstream(p.cluster.ID)
 	require.NoError(p.T(), err)
 
-	isPool, err := IsNodePoolSizeValid(steveClient)
-	require.NoError(p.T(), err)
-
-	if !isPool {
-		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes.")
+	err = clusters.VerifyNodePoolSize(steveClient, clusters.LabelWorker, nodePoolsize)
+	if errors.Is(err, clusters.SmallerPoolClusterSize) {
+		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes")
+	} else {
+		require.NoError(p.T(), err)
 	}
 
 	if p.cluster.EnableNetworkPolicy == nil || !*p.cluster.EnableNetworkPolicy {
