@@ -93,7 +93,7 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Token is the main extension Token structure",
+				Description: "Token instances are used to authenticate requests made against the Rancher backend.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -118,14 +118,14 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec is the spec of the ext Token",
+							Description: "Spec contains the user-accessible configuration of the token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is the status of the ext Token",
+							Description: "Status contains system information about the token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus"),
 						},
@@ -192,7 +192,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TokenSpec contains the user-specifiable parts of the Token",
+				Description: "TokenSpec contains the user-specifiable parts of the Token.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"userID": {
@@ -204,7 +204,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"PrincipalID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PrincipalID is the id of the user in the auth provider used. By default that is the principle who owned the token making the request creating this token. Currently this default is enforced, i.e. using a different principle is rejected as forbidden.",
+							Description: "PrincipalID is the id of the user in the auth provider used. By default that is the principal who owns the token making the request creating this token. Currently this default is enforced, i.e. using a different principle is rejected as forbidden.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -226,7 +226,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"ttl": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TTL is the time-to-live of the token, in milliseconds. The default of 0 is treated as 30 days.",
+							Description: "TTL is the time-to-live of the token, in milliseconds. The default value, `0`, is treated as 30 days.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",
@@ -234,7 +234,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"enabled": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Enabled indicates an active token. The `null` state maps to `true`, making that the default.",
+							Description: "Enabled indicates an active token. The default (`null`) indicates an enabled token.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -257,19 +257,19 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TokenStatus contains the data derived from the specification or otherwise generated.",
+				Description: "TokenStatus contains system information about the Token.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"tokenValue": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TokenValue is the access key. Shown only on token creation. Not saved.",
+							Description: "TokenValue is the access key. It is shown only on token creation and not saved.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"tokenHash": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TokenHash is the hash of the value. Only thing saved.",
+							Description: "TokenHash is the hash of the TokenValue.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -284,7 +284,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"expired": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expired is a boolean flag, derived from creation time and time-to-live. True indicates that the token has exceeded its time to live, as counted from creation.",
+							Description: "Expired is a boolean flag. True indicates that the token has exceeded its time to live, as counted from the Token's creation.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -292,7 +292,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"expiresAt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpiresAt is creation time + time-to-live, i.e. the time when the token expires.  This is set to the empty string if the token does not expire at all.",
+							Description: "ExpiresAt provides the time when the token expires. This field is set to the empty string if the token does not expire at all.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -300,7 +300,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"authProvider": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AuthProvider names the auth provider managing the user. This is derived from the principal id and cannot be changed.",
+							Description: "AuthProvider names the auth provider managing the user owning the token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -308,7 +308,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"DisplayName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DisplayName is the display name of the User owning the token. This is derived from the user and cannot be changed.",
+							Description: "DisplayName is the display name of the User owning the token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -316,7 +316,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"UserName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UserName is the name of the User owning the token. This is derived from the user and cannot be changed.",
+							Description: "UserName is the regular name of the User owning the token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -324,7 +324,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"lastUpdateTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "LastUpdateTime provides the time of last change to the token",
+							Description: "LastUpdateTime provides the time of the last change to the token",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
