@@ -9,12 +9,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/norman/lifecycle"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -24,6 +26,22 @@ const (
 	AgentTLSModeSystemStore           = "system-store"
 )
 
+func init() {
+	if os.Getenv("ENABLE_GKE") != "" {
+		lifecycle.DisallowedNamespaces = []string{
+			"gke-",
+			"kube-system",
+		}
+
+		lifecycle.DisallowedGVKs = []schema.GroupVersionKind{
+			{
+				Version: "v1",
+				Kind:    "Node",
+			},
+		}
+	}
+}
+
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
 	settings       = map[string]Setting{}
@@ -31,7 +49,7 @@ var (
 	InjectDefaults string
 
 	systemNamespaces = []string{
-		"kube-system",
+		// "kube-system",
 		"kube-public",
 		"cattle-system",
 		"cattle-alerting",

@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	"github.com/rancher/norman/lifecycle"
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/sirupsen/logrus"
@@ -19,6 +20,10 @@ type ServicesController struct {
 }
 
 func (s *ServicesController) sync(key string, obj *corev1.Service) (runtime.Object, error) {
+	if lifecycle.IsDisallowedNamespace(obj) {
+		return nil, nil
+	}
+
 	if obj == nil || obj.DeletionTimestamp != nil {
 		namespace := ""
 		if obj != nil {

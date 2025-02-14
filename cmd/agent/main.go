@@ -36,6 +36,10 @@ import (
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
+
+	// NOTE: Imported to configure the disallows.
+	// This should be moved to a shared location
+	_ "github.com/rancher/rancher/pkg/settings"
 )
 
 var (
