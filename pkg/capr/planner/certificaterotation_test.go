@@ -256,6 +256,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 		version             string
 		setup               func(mp *mockPlanner)
 		joinServer          string
+		os                  string
 		entryIsControlPlane bool
 		machineGlobalConfig *rkev1.GenericMap
 		expected            expected
@@ -266,6 +267,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+k3s1",
 			entryIsControlPlane: true,
 			joinServer:          "my-magic-joinserver",
+			os:                  capr.DefaultMachineOS,
 			setup:               genericSetup,
 			expected: expected{
 				otiIndex: 2,
@@ -289,6 +291,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+rke2r1",
 			entryIsControlPlane: true,
 			joinServer:          "my-magic-joinserver",
+			os:                  capr.DefaultMachineOS,
 			setup:               genericSetup,
 			rotateCertificates: &rkev1.RotateCertificates{
 				Generation: 244,
@@ -315,6 +318,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+k3s1",
 			entryIsControlPlane: true,
 			joinServer:          "my-magic-joinserver",
+			os:                  capr.DefaultMachineOS,
 			setup:               genericSetup,
 			expected: expected{
 				otiIndex: 4,
@@ -338,6 +342,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+rke2r1",
 			entryIsControlPlane: true,
 			joinServer:          "my-magic-joinserver",
+			os:                  capr.DefaultMachineOS,
 			setup:               genericSetup,
 			expected: expected{
 				otiIndex: 5,
@@ -361,6 +366,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+rke2r1",
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
+			os:                  capr.DefaultMachineOS,
 			expected: expected{
 				otiIndex: 1,
 				oti: &[]plan.OneTimeInstruction{idempotentRestartInstructions(
@@ -373,10 +379,27 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			},
 		},
 		{
+			name:                "test rke2 Windows worker-only instruction",
+			version:             "v1.25.7+rke2r1",
+			entryIsControlPlane: false,
+			joinServer:          "my-magic-joinserver",
+			os:                  capr.WindowsMachineOS,
+			expected: expected{
+				otiIndex: 0,
+				oti: &[]plan.OneTimeInstruction{windowsIdempotentRestartInstructions(
+					"certificate-rotation/restart",
+					strconv.FormatInt(int64(0), 10),
+					"rke2")[0]}[0],
+				otiCount:   1,
+				joinServer: "",
+			},
+		},
+		{
 			name:                "test k3s worker-only instruction",
 			version:             "v1.25.7+k3s1",
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
+			os:                  capr.DefaultMachineOS,
 			expected: expected{
 				otiIndex: 1,
 				oti: &[]plan.OneTimeInstruction{idempotentRestartInstructions(
@@ -393,6 +416,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			version:             "v1.25.7+k3s1",
 			entryIsControlPlane: true,
 			joinServer:          "my-magic-joinserver",
+			os:                  capr.DefaultMachineOS,
 			setup:               genericSetup,
 			machineGlobalConfig: &rkev1.GenericMap{
 				Data: map[string]interface{}{
@@ -441,7 +465,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			} else {
 				controlPlane.Spec.RotateCertificates = &rkev1.RotateCertificates{}
 			}
-			entry := createTestPlanEntry(capr.DefaultMachineOS)
+			entry := createTestPlanEntry(tt.os)
 			if tt.entryIsControlPlane {
 				entry.Machine.Labels[capr.ControlPlaneRoleLabel] = "true"
 				entry.Metadata.Labels[capr.ControlPlaneRoleLabel] = "true"
