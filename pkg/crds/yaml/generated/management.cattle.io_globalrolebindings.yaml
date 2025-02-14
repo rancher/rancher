@@ -203,6 +203,10 @@ spec:
           userName:
             description: UserName is the name of the user subject to be bound. Immutable.
             type: string
+          userPrincipalName:
+            description: UserPrincipalName is the name of the user principal subject
+              added to the cluster. Immutable.
+            type: string
         required:
         - globalRoleName
         type: object

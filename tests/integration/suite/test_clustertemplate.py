@@ -412,7 +412,12 @@ def test_revision_creation_permission(admin_mc, remove_resource,
 def test_updated_members_revision_access(admin_mc, remove_resource,
                                          user_factory):
     # create cluster template without members and a revision
-    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    try:
+        cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    except Exception as err:
+        print("KEVIN!!!! failed to create the cluster template", str(err))
+        raise err
+    print("KEVIN!!!! cluster_template created")
     remove_resource(cluster_template)
     templateId = cluster_template.id
     rev = \
@@ -422,7 +427,12 @@ def test_updated_members_revision_access(admin_mc, remove_resource,
     user_member = user_factory()
     members = [{"userPrincipalId": "local://" + user_member.user.id,
                 "accessType": "read-only"}]
-    admin_mc.client.update(cluster_template, members=members)
+    try:
+        print("KEVIN!!!! updating the template with members")
+        admin_mc.client.update(cluster_template, members=members)
+    except Exception as err:
+        print("KEVIN!!!! failed to update the template", str(err))
+        raise err
 
     # this member should get access to existing revision "rev"
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
