@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	kubeapinodes "github.com/rancher/shepherd/extensions/kubeapi/nodes"
 	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/sshkeys"
 	"github.com/sirupsen/logrus"
@@ -97,7 +96,7 @@ func VerifyAWSLoadBalancer(t *testing.T, client *rancher.Client, serviceLB *v1.S
 }
 
 // VerifyClusterIP is a helper function that verifies the cluster is able to connect to the cluster ip service by ssh shell
-func VerifyClusterIP(client *rancher.Client, clusterName string, steveClient *steveV1.Client, serviceID string, path string, content string) error {
+func VerifyClusterIP(client *rancher.Client, clusterName string, clusterID string, steveClient *steveV1.Client, serviceID string, path string, content string) error {
 	serviceResp, err := steveClient.SteveType(ServiceSteveType).ByID(serviceID)
 	if err != nil {
 		return err
@@ -172,15 +171,10 @@ func VerifyClusterIP(client *rancher.Client, clusterName string, steveClient *st
 			return err
 		}
 	} else {
-		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeExternalIP)
-		if nodeIP == "" {
-			nodeIP = kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
-		}
-
 		logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
 
 		execCmd := []string{"curl", fmt.Sprintf("%s:%s", clusterIP, path)}
-		log, err = kubectl.Command(client, nil, clusterName, execCmd, "")
+		log, err = kubectl.Command(client, nil, clusterID, execCmd, "")
 		if err != nil {
 			return err
 		}

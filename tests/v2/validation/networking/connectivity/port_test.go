@@ -193,7 +193,7 @@ func (p *PortTestSuite) TestClusterIP() {
 	err = services.VerifyService(steveClient, serviceResp)
 	require.NoError(p.T(), err)
 
-	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), daemonsetName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, p.cluster.ID, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), daemonsetName)
 	require.NoError(p.T(), err)
 }
 
@@ -305,7 +305,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, p.cluster.ID, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
 	require.NoError(p.T(), err)
 
 	log.Info("Scaling down deployment")
@@ -317,7 +317,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, p.cluster.ID, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
 	require.NoError(p.T(), err)
 
 	log.Info("Upgrading deployment")
@@ -332,7 +332,7 @@ func (p *PortTestSuite) TestClusterIPScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = services.VerifyClusterIP(p.client, p.cluster.Name, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
+	err = services.VerifyClusterIP(p.client, p.cluster.Name, p.cluster.ID, steveClient, serviceResp.ID, fmt.Sprintf("%d/name.html", port), deploymentName)
 	require.NoError(p.T(), err)
 }
 

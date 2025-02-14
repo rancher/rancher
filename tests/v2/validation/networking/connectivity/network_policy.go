@@ -214,7 +214,13 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 	if err != nil {
 		return err
 	}
-	_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+
+	provisioningClusterID, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
+	if err != nil {
+		return err
+	}
+
+	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
 	if err != nil {
 		return err
 	}
@@ -225,6 +231,12 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 	}
 
 	pods, err := wc.Core.Pod().List(namespaceName, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	newCluster := &provv1.Cluster{}
+	err = steveV1.ConvertToK8sType(cluster, newCluster)
 	if err != nil {
 		return err
 	}
@@ -244,32 +256,40 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 			return err
 		}
 
-		_, found := slices.BinarySearch(nodes, newNode.Name)
-		if found {
-			nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
+		log := ""
+		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
+		if strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") || strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
+			_, found := slices.BinarySearch(nodes, newNode.Name)
+			if found {
+				_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+				if err != nil {
+					return err
+				}
 
-			sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
-			if err != nil {
-				return err
-			}
+				sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
+				if err != nil {
+					return err
+				}
 
-			sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
-			if err != nil {
-				return err
-			}
+				sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
+				if err != nil {
+					return err
+				}
 
-			log, err := sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
-			if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-				return err
+				log, err = sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
+				if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+					return err
+				}
 			}
+		} else {
+			log, _ = curlCommand(client, clusterID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
+		}
 
-			logrus.Infof("Log of the curl command {%v}", log)
-			if strings.Contains(log, workloadName) {
-				return nil
-			}
+		logrus.Infof("Log of the curl command {%v}", log)
+		if strings.Contains(log, workloadName) {
+			return nil
 		}
 	}
-
 	return errors.New("Unable to connect to the host port")
 }
 
