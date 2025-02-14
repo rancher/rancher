@@ -2,6 +2,7 @@ package ext
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -35,17 +36,18 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 		return obj, nil
 	}
 
-	switch obj.Value {
+	c.stopChanMu.Lock()
+	defer c.stopChanMu.Unlock()
+
+	switch strings.ToLower(obj.Value) {
 	case "true":
 		logrus.Info("enabling imperative apiserver")
 
-		c.stopChanMu.Lock()
 		if c.stopChan != nil {
 			logrus.Debug("imperative extension apiserver already enabled")
 			break
 		}
 		c.stopChan = make(chan struct{})
-		c.stopChanMu.Unlock()
 
 		c.authenticator.SetEnabled(authenticatorNameSteveDefault, true)
 
@@ -65,14 +67,12 @@ func (c *settingController) sync(_ string, obj *v3.Setting) (*v3.Setting, error)
 	default:
 		logrus.Info("disabling up imperative apiserver")
 
-		c.stopChanMu.Lock()
 		if c.stopChan == nil {
 			logrus.Debug("imperative extension apiserver is not enabled")
 			break
 		}
 		close(c.stopChan)
 		c.stopChan = nil
-		c.stopChanMu.Unlock()
 
 		if err := c.listener.Stop(); err != nil {
 			return nil, fmt.Errorf("failed to stop listener: %w", err)
