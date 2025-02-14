@@ -106,6 +106,11 @@ rules:
   verbs:
   - '*'
 
+{{- if .PodDisruptionBudget }}
+---
+{{ .PodDisruptionBudget }}
+{{- end }}
+
 ---
 
 apiVersion: apps/v1
@@ -168,6 +173,9 @@ spec:
       {{- end }}
       {{- if .AppendTolerations }}
 {{ .AppendTolerations | indent 6 }}
+      {{- end }}
+      {{ if .EnablePriorityClass }}
+      priorityClassName: cattle-cluster-agent-priority-class
       {{- end }}
       containers:
         - name: cluster-register
@@ -530,5 +538,35 @@ kind: DaemonSet
 metadata:
     name: cattle-node-agent
     namespace: cattle-system
+`
+
+	cattleClusterAgentPriorityClassTemplate = `
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: cattle-cluster-agent-priority-class
+value: {{ .PriorityClassValue }}
+{{ if .PreemptionPolicy }}
+preemptionPolicy: {{ .PreemptionPolicy }}
+{{- end }}
+description: {{ .Description }}
+`
+
+	cattleClusterPodDisruptionBudgetTemplate = `
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cattle-cluster-agent-pod-disruption-budget
+  namespace: cattle-system
+spec:
+{{- if .MinAvailable }}
+  minAvailable: {{ .MinAvailable }}
+{{- end }}
+{{- if .MaxUnavailable }}
+  maxUnavailable: {{ .MaxUnavailable }}
+{{- end }}
+  selector:
+    matchLabels:
+      app: cattle-cluster-agent
 `
 )
