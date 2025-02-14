@@ -514,27 +514,11 @@ func (s *Provider) hasLdapGroupSearch() bool {
 }
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
-	extras := make(map[string][]string)
-	if userPrincipal.Name != "" {
-		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
-	}
-	if userPrincipal.LoginName != "" {
-		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
-	}
-	return extras
+	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
 func (s *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	principalID := token.GetUserPrincipalID()
-	userName := token.GetUserName()
-	extras := make(map[string][]string)
-	if principalID != "" {
-		extras[common.UserAttributePrincipalID] = []string{principalID}
-	}
-	if userName != "" {
-		extras[common.UserAttributeUserName] = []string{userName}
-	}
-	return extras
+	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 // IsDisabledProvider checks if the SAML auth provider is currently disabled in Rancher.
