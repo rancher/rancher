@@ -186,7 +186,12 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return fmt.Errorf("couldn't list nodes err=%v", err)
 	}
 
-	cni, err := npmgr.getClusterCNI(clusterNamespace, nodes[0])
+	var node *corev1.Node
+	if len(nodes) > 0 {
+		node = nodes[0]
+	}
+
+	cni, err := npmgr.getClusterCNI(clusterNamespace, node)
 	if err != nil {
 		return err
 	}
