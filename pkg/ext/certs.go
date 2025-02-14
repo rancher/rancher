@@ -251,7 +251,7 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 			return fmt.Errorf("failed to create secret: %w", err)
 		}
 
-		logrus.Errorf("created imperative api cert secret")
+		logrus.Info("created imperative api cert secret")
 	} else {
 		secret.Data[SecretFieldNameCert] = cert
 		secret.Data[SecretFieldNameKey] = key
@@ -260,7 +260,7 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 			return fmt.Errorf("failed to update secret: %w", err)
 		}
 
-		logrus.Errorf("updated imperative api cert secret")
+		logrus.Info("updated imperative api cert secret")
 	}
 
 	p.cert = cert
