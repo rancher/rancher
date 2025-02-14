@@ -73,9 +73,11 @@ func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTim
 func GetUserExternalID(username string, loginDomain string) string {
 	if strings.Contains(username, "\\") {
 		return username
-	} else if loginDomain != "" {
+	}
+	if loginDomain != "" {
 		return loginDomain + "\\" + username
 	}
+
 	return username
 }
 
