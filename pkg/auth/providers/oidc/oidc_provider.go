@@ -377,27 +377,11 @@ func (o *OpenIDCProvider) IsThisUserMe(me accessor.TokenAccessor, other v3.Princ
 }
 
 func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
-	extras := make(map[string][]string)
-	if userPrincipal.Name != "" {
-		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
-	}
-	if userPrincipal.LoginName != "" {
-		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
-	}
-	return extras
+	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
 func (o *OpenIDCProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	principalID := token.GetUserPrincipalID()
-	userName := token.GetUserName()
-	extras := make(map[string][]string)
-	if principalID != "" {
-		extras[common.UserAttributePrincipalID] = []string{principalID}
-	}
-	if userName != "" {
-		extras[common.UserAttributeUserName] = []string{userName}
-	}
-	return extras
+	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
