@@ -27,6 +27,8 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.30.1
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.30.1
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.30.1
+	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.4.1
+
 )
 
 require (

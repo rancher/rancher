@@ -59,6 +59,7 @@ replace (
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.7.3
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.18.5
+	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 )
 
 require (
