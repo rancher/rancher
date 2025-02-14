@@ -546,27 +546,11 @@ func UpdateGroupCacheSize(size string) {
 }
 
 func (ap *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
-	extras := make(map[string][]string)
-	if userPrincipal.Name != "" {
-		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
-	}
-	if userPrincipal.LoginName != "" {
-		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
-	}
-	return extras
+	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
 func (ap *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	principalID := token.GetUserPrincipalID()
-	userName := token.GetUserName()
-	extras := make(map[string][]string)
-	if principalID != "" {
-		extras[common.UserAttributePrincipalID] = []string{principalID}
-	}
-	if userName != "" {
-		extras[common.UserAttributeUserName] = []string{userName}
-	}
-	return extras
+	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 // IsDisabledProvider checks if the Azure AD auth provider is currently disabled in Rancher.
