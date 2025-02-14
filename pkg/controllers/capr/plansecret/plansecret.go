@@ -27,20 +27,22 @@ import (
 )
 
 type handler struct {
-	secrets             corecontrollers.SecretClient
-	machinesCache       capicontrollers.MachineCache
-	machinesClient      capicontrollers.MachineClient
-	etcdSnapshotsClient rkev1controllers.ETCDSnapshotClient
-	etcdSnapshotsCache  rkev1controllers.ETCDSnapshotCache
+	secrets              corecontrollers.SecretClient
+	machinesCache        capicontrollers.MachineCache
+	machinesClient       capicontrollers.MachineClient
+	etcdSnapshotsClient  rkev1controllers.ETCDSnapshotClient
+	etcdSnapshotsCache   rkev1controllers.ETCDSnapshotCache
+	rkeControlPlaneCache rkev1controllers.RKEControlPlaneCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := handler{
-		secrets:             clients.Core.Secret(),
-		machinesCache:       clients.CAPI.Machine().Cache(),
-		machinesClient:      clients.CAPI.Machine(),
-		etcdSnapshotsClient: clients.RKE.ETCDSnapshot(),
-		etcdSnapshotsCache:  clients.RKE.ETCDSnapshot().Cache(),
+		secrets:              clients.Core.Secret(),
+		machinesCache:        clients.CAPI.Machine().Cache(),
+		machinesClient:       clients.CAPI.Machine(),
+		etcdSnapshotsClient:  clients.RKE.ETCDSnapshot(),
+		etcdSnapshotsCache:   clients.RKE.ETCDSnapshot().Cache(),
+		rkeControlPlaneCache: clients.RKE.RKEControlPlane().Cache(),
 	}
 	clients.Core.Secret().OnChange(ctx, "plan-secret", h.OnChange)
 }
@@ -110,7 +112,23 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 		// true failure unless we have required that the plan not fail at any point, or we have reached the maximum of attempts configured.
 		// After a successful application, the checksum is cleared by the system-agent.
 		if maxFailures == "-1" || failureCount == maxFailures {
-			err = h.reconcileMachinePlanAppliedCondition(secret, fmt.Errorf("error applying plan -- check rancher-system-agent.service logs on node for more information"))
+			var andRuntimeUnit string
+			if clusterName, ok := secret.Labels[capr.ClusterNameLabel]; ok && len(clusterName) > 0 {
+				if controlPlane, err := h.rkeControlPlaneCache.Get(secret.Namespace, clusterName); err != nil {
+					logrus.Errorf("unable to get RKEControlPlane (%s/%s) for plan secret (%s/%s): %v", secret.Namespace, clusterName, secret.Namespace, secret.Name, err)
+				} else {
+					var runtimeUnit string
+					if secret.Labels[capr.ControlPlaneRoleLabel] == "true" || secret.Labels[capr.EtcdRoleLabel] == "true" {
+						runtimeUnit = capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion)
+					} else {
+						runtimeUnit = capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion)
+					}
+					if runtimeUnit != "" {
+						andRuntimeUnit = fmt.Sprintf(" and %s.service", runtimeUnit)
+					}
+				}
+			}
+			err = h.reconcileMachinePlanAppliedCondition(secret, fmt.Errorf("error applying plan -- check rancher-system-agent.service%s logs on node for more information", andRuntimeUnit))
 		}
 		return secret, err
 	}
