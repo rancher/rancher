@@ -20,10 +20,12 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 )
 
-const scriptURL = "https://raw.githubusercontent.com/rancher/rancher/refs/heads/release/v2.9/tests/v2/validation/steve/vai/scripts/script.sh"
+const (
+	scriptURL     = "https://raw.githubusercontent.com/rancher/rancher/refs/heads/release/v2.9/tests/v2/validation/steve/vai/scripts/script.sh"
+	logBufferSize = "256MB"
+)
 
 type VaiTestSuite struct {
 	suite.Suite
@@ -82,35 +84,6 @@ func (v *VaiTestSuite) ensureVaiDisabled() {
 	}
 }
 
-// TestVaiEnabled runs all tests with VAI enabled
-func (v *VaiTestSuite) TestVaiEnabled() {
-	v.ensureVaiEnabled()
-
-	v.Run("SecretFilters", func() {
-		supportedWithVai := filterTestCases(secretFilterTestCases, true)
-		v.runSecretFilterTestCases(supportedWithVai)
-	})
-
-	v.Run("PodFilters", func() {
-		supportedWithVai := filterTestCases(podFilterTestCases, true)
-		v.runPodFilterTestCases(supportedWithVai)
-	})
-
-	v.Run("SecretSorting", func() {
-		supportedWithVai := filterTestCases(secretSortTestCases, true)
-		v.runSecretSortTestCases(supportedWithVai)
-	})
-
-	v.Run("SecretLimit", func() {
-		supportedWithVai := filterTestCases(secretLimitTestCases, true)
-		v.runSecretLimitTestCases(supportedWithVai)
-	})
-
-	v.Run("CheckDBFilesInPods", v.checkDBFilesInPods)
-	v.Run("CheckSecretInDB", v.checkSecretInVAIDatabase)
-	v.Run("CheckNamespaceInAllVAIDatabases", v.checkNamespaceInAllVAIDatabases)
-}
-
 // TestVaiDisabled runs all tests with VAI disabled
 func (v *VaiTestSuite) TestVaiDisabled() {
 	v.ensureVaiDisabled()
@@ -140,26 +113,6 @@ func (v *VaiTestSuite) TestVaiDisabled() {
 		require.NoError(v.T(), err)
 		require.NotEmpty(v.T(), pods.Data, "Should be able to list pods even with VAI disabled")
 	})
-}
-
-func TestVaiTestSuite(t *testing.T) {
-	suite.Run(t, new(VaiTestSuite))
-}
-
-func formatDuration(d time.Duration) string {
-	d = d.Round(time.Second)
-	h := d / time.Hour
-	d -= h * time.Hour
-	m := d / time.Minute
-	d -= m * time.Minute
-	s := d / time.Second
-	if h > 0 {
-		return fmt.Sprintf("%d hours %d minutes %d seconds", h, m, s)
-	} else if m > 0 {
-		return fmt.Sprintf("%d minutes %d seconds", m, s)
-	} else {
-		return fmt.Sprintf("%d seconds", s)
-	}
 }
 
 func (v *VaiTestSuite) testNormalOperationsWithVaiDisabled() {
@@ -386,7 +339,7 @@ func (v *VaiTestSuite) checkDBFilesInPods() {
 	for _, pod := range rancherPods {
 		v.T().Run(fmt.Sprintf("Checking pod %s", pod), func(t *testing.T) {
 			lsCmd := []string{"kubectl", "exec", pod, "-n", "cattle-system", "--", "ls"}
-			output, err := kubectl.Command(v.client, nil, "local", lsCmd, "")
+			output, err := kubectl.Command(v.client, nil, "local", lsCmd, logBufferSize)
 			if err != nil {
 				t.Errorf("Error executing command in pod %s: %v", pod, err)
 				return
@@ -462,7 +415,7 @@ func (v *VaiTestSuite) checkSecretInVAIDatabase() {
 		}
 
 		v.T().Logf("Executing command on pod %s", pod)
-		output, err := kubectl.Command(v.client, nil, "local", cmd, "")
+		output, err := kubectl.Command(v.client, nil, "local", cmd, logBufferSize)
 		if err != nil {
 			v.T().Logf("Error executing script on pod %s: %v", pod, err)
 			continue
@@ -490,9 +443,60 @@ func (v *VaiTestSuite) checkSecretInVAIDatabase() {
 	v.T().Log("checkSecretInVAIDatabase test completed")
 }
 
+func (v *VaiTestSuite) buildVAIQueryOnPods() error {
+	v.T().Log("Building VAI query program on all pods...")
+
+	rancherPods, err := listRancherPods(v.client)
+	if err != nil {
+		return fmt.Errorf("failed to list Rancher pods: %v", err)
+	}
+
+	for _, pod := range rancherPods {
+		v.T().Logf("Building VAI query on pod %s", pod)
+
+		cmd := []string{
+			"kubectl", "exec", pod, "-n", "cattle-system", "--",
+			"/bin/sh", "-c",
+			fmt.Sprintf("curl -k -sSL %s | sh", scriptURL),
+		}
+
+		v.T().Logf("Executing command: %s", strings.Join(cmd, " "))
+
+		output, err := kubectl.Command(v.client, nil, "local", cmd, "")
+		if err != nil {
+			v.T().Logf("Error building VAI query on pod %s: %v", pod, err)
+			v.T().Logf("Command output: %s", output)
+			return fmt.Errorf("failed to build vai-query on pod %s: %v", pod, err)
+		}
+
+		v.T().Logf("Successfully built VAI query on pod %s", pod)
+	}
+
+	return nil
+}
+
+// checkNamespaceInPod checks if a namespace exists in a specific pod's VAI database
+func (v *VaiTestSuite) checkNamespaceInPod(pod, namespaceName string) (bool, string, error) {
+	v.T().Logf("Checking namespace %s in pod %s", namespaceName, pod)
+	cmd := []string{
+		"kubectl", "exec", pod, "-n", "cattle-system", "--",
+		"sh", "-c",
+		fmt.Sprintf("TABLE_NAME='_v1_Namespace_fields' RESOURCE_NAME='%s' /usr/local/bin/vai-query", namespaceName),
+	}
+
+	output, err := kubectl.Command(v.client, nil, "local", cmd, logBufferSize)
+	if err != nil {
+		return false, output, fmt.Errorf("failed to execute command on pod %s: %v", pod, err)
+	}
+
+	return strings.Contains(output, namespaceName), output, nil
+}
+
+// checkNamespaceInAllVAIDatabases checks if a namespace exists in all Rancher pods' VAI databases
 func (v *VaiTestSuite) checkNamespaceInAllVAIDatabases() {
 	v.T().Log("Starting TestCheckNamespaceInAllVAIDatabases test")
 
+	// Create namespace to test
 	namespaceName := fmt.Sprintf("db-namespace-%s", namegen.RandStringLower(randomStringLength))
 	v.T().Logf("Generated namespace name: %s", namespaceName)
 
@@ -506,38 +510,30 @@ func (v *VaiTestSuite) checkNamespaceInAllVAIDatabases() {
 	require.NoError(v.T(), err)
 	v.T().Log("Namespace created successfully")
 
+	// Ensure namespace is in the list
 	_, err = v.client.Steve.SteveType("namespace").List(nil)
 	require.NoError(v.T(), err)
 
-	v.T().Log("Listing Rancher pods...")
+	// Get list of pods
 	rancherPods, err := listRancherPods(v.client)
 	require.NoError(v.T(), err)
-	v.T().Logf("Found %d Rancher pods", len(rancherPods))
+	podCount := len(rancherPods)
+	v.T().Logf("Found %d Rancher pods", podCount)
+	require.NotEmpty(v.T(), rancherPods, "No Rancher pods found")
 
-	v.T().Logf("Using script URL: %s", scriptURL)
-
+	// Check each pod
 	var outputs []string
 	namespaceFoundCount := 0
 
 	for i, pod := range rancherPods {
 		v.T().Logf("Processing pod %d: %s", i+1, pod)
-		cmd := []string{
-			"kubectl", "exec", pod, "-n", "cattle-system", "--",
-			"sh", "-c",
-			fmt.Sprintf("curl -k -sSL %s | TABLE_NAME='_v1_Namespace_fields' RESOURCE_NAME='%s' sh", scriptURL, namespaceName),
-		}
 
-		v.T().Logf("Executing command on pod %s", pod)
-		output, err := kubectl.Command(v.client, nil, "local", cmd, "")
-		if err != nil {
-			v.T().Logf("Error executing script on pod %s: %v", pod, err)
-			continue
-		}
-		v.T().Logf("Command executed successfully on pod %s", pod)
+		found, output, err := v.checkNamespaceInPod(pod, namespaceName)
+		require.NoError(v.T(), err)
 
 		outputs = append(outputs, fmt.Sprintf("Output from pod %s:\n%s", pod, output))
 
-		if strings.Contains(output, namespaceName) {
+		if found {
 			v.T().Logf("Namespace found in pod %s", pod)
 			namespaceFoundCount++
 		} else {
@@ -545,14 +541,59 @@ func (v *VaiTestSuite) checkNamespaceInAllVAIDatabases() {
 		}
 	}
 
+	// Log all outputs
 	v.T().Log("Logging all outputs:")
 	for i, output := range outputs {
 		v.T().Logf("Output %d:\n%s", i+1, output)
 	}
 
 	v.T().Logf("Namespace found count: %d", namespaceFoundCount)
-	assert.Equal(v.T(), len(rancherPods), namespaceFoundCount,
+	assert.Equal(v.T(), podCount, namespaceFoundCount,
 		fmt.Sprintf("Namespace %s not found in all Rancher pods' databases. Found in %d out of %d pods.",
-			namespaceName, namespaceFoundCount, len(rancherPods)))
+			namespaceName, namespaceFoundCount, podCount))
 	v.T().Log("TestCheckNamespaceInAllVAIDatabases test completed")
+}
+
+// TestVaiEnabled runs all VAI-enabled tests
+func (v *VaiTestSuite) TestVaiEnabled() {
+	v.ensureVaiEnabled()
+
+	// First ensure VAI query program is built on each pod
+	v.Run("SetupVAIQuery", func() {
+		rancherPods, err := listRancherPods(v.client)
+		require.NoError(v.T(), err)
+		require.NotEmpty(v.T(), rancherPods, "No Rancher pods found")
+
+		err = v.buildVAIQueryOnPods()
+		require.NoError(v.T(), err, "Failed to build VAI query program on pods")
+	})
+
+	// Run all VAI-dependent tests
+	v.Run("SecretFilters", func() {
+		supportedWithVai := filterTestCases(secretFilterTestCases, true)
+		v.runSecretFilterTestCases(supportedWithVai)
+	})
+
+	v.Run("PodFilters", func() {
+		supportedWithVai := filterTestCases(podFilterTestCases, true)
+		v.runPodFilterTestCases(supportedWithVai)
+	})
+
+	v.Run("SecretSorting", func() {
+		supportedWithVai := filterTestCases(secretSortTestCases, true)
+		v.runSecretSortTestCases(supportedWithVai)
+	})
+
+	v.Run("SecretLimit", func() {
+		supportedWithVai := filterTestCases(secretLimitTestCases, true)
+		v.runSecretLimitTestCases(supportedWithVai)
+	})
+
+	v.Run("CheckDBFilesInPods", v.checkDBFilesInPods)
+	v.Run("CheckSecretInDB", v.checkSecretInVAIDatabase)
+	v.Run("CheckNamespaceInAllVAIDatabases", v.checkNamespaceInAllVAIDatabases)
+}
+
+func TestVaiTestSuite(t *testing.T) {
+	suite.Run(t, new(VaiTestSuite))
 }
