@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	kubeapinodes "github.com/rancher/shepherd/extensions/kubeapi/nodes"
 	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/sshkeys"
 	"github.com/sirupsen/logrus"
@@ -172,11 +171,6 @@ func VerifyClusterIP(client *rancher.Client, clusterName string, steveClient *st
 			return err
 		}
 	} else {
-		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeExternalIP)
-		if nodeIP == "" {
-			nodeIP = kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
-		}
-
 		logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
 
 		execCmd := []string{"curl", fmt.Sprintf("%s:%s", clusterIP, path)}

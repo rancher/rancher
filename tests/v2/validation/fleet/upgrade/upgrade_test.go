@@ -15,20 +15,21 @@ import (
 	extensionClusters "github.com/rancher/shepherd/extensions/clusters"
 	extensionsfleet "github.com/rancher/shepherd/extensions/fleet"
 	"github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/nodes"
 	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type UpgradeTestSuite struct {
 	suite.Suite
-	client      *rancher.Client
-	session     *session.Session
-	cluster     *management.Cluster
-	clusterName string
-	gitRepo     *v1alpha1.GitRepo
+	client          *rancher.Client
+	session         *session.Session
+	cluster         *management.Cluster
+	clusterName     string
+	sshNode         *nodes.Node
+	fleetSecretName string
 }
 
 func (u *UpgradeTestSuite) TearDownSuite() {
@@ -67,6 +68,15 @@ func (u *UpgradeTestSuite) SetupSuite() {
 	if !strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") && !strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") {
 		u.clusterName = u.cluster.ID
 	}
+
+	steveClient, err := u.client.Steve.ProxyDownstream(u.cluster.ID)
+	require.NoError(u.T(), err)
+
+	u.sshNode, err = createSSHNode(u.client, steveClient, u.cluster.Name)
+	require.NoError(u.T(), err)
+
+	u.fleetSecretName, err = createFleetSSHSecret(u.client, string(u.sshNode.SSHKey))
+	require.NoError(u.T(), err)
 }
 
 func (u *UpgradeTestSuite) TestNewCommitFleetRepo() {
@@ -76,16 +86,13 @@ func (u *UpgradeTestSuite) TestNewCommitFleetRepo() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(u.client, u.cluster.ID)
 	require.NoError(u.T(), err)
 
-	log.Info("Getting gitsecret")
-	secret, err := u.client.WranglerContext.Core.Secret().Get(fleet.Namespace, gitSecret, metav1.GetOptions{})
+	log.Info("Cloning Git Repo")
+	repoName := namegenerator.AppendRandomString("repo-name")
+	_, err = u.sshNode.ExecuteCommand(fmt.Sprintf("cd ~/ && git clone %s %s", fleet.ExampleRepo, repoName))
 	require.NoError(u.T(), err)
 
-	username := string(secret.Data["username"])
-	accessToken := string(secret.Data["password"])
-
 	log.Info("Creating Fleet repo")
-	gitUserRepo := fmt.Sprintf("https://github.com/%s/fleet-examples", username)
-	repoObject, err := createFleetGitRepo(u.client, gitUserRepo, namespace.Name, u.clusterName, u.cluster.ID)
+	repoObject, err := createFleetGitRepo(u.client, u.sshNode, repoName, namespace.Name, u.clusterName, u.cluster.ID, u.fleetSecretName)
 	require.NoError(u.T(), err)
 
 	log.Info("Getting GitRepoStatus")
@@ -96,8 +103,7 @@ func (u *UpgradeTestSuite) TestNewCommitFleetRepo() {
 	err = steveV1.ConvertToK8sType(gitRepo.Status, gitStatus)
 	require.NoError(u.T(), err)
 
-	repoName := namegenerator.AppendRandomString("repo-name")
-	err = gitPushCommit(u.client, repoName, gitUserRepo, username, accessToken)
+	err = gitPushCommit(u.client, u.sshNode, repoName)
 	require.NoError(u.T(), err)
 
 	u.T().Log("Verifying the Fleet GitRepo")
@@ -116,8 +122,13 @@ func (u *UpgradeTestSuite) TestGitRepoForceUpdate() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(u.client, u.cluster.ID)
 	require.NoError(u.T(), err)
 
+	log.Info("Cloning Git Repo")
+	repoName := namegenerator.AppendRandomString("repo-name")
+	_, err = u.sshNode.ExecuteCommand(fmt.Sprintf("cd ~/ && git clone %s %s", fleet.ExampleRepo, repoName))
+	require.NoError(u.T(), err)
+
 	log.Info("Creating Fleet repo")
-	repoObject, err := createFleetGitRepo(u.client, fleet.ExampleRepo, namespace.Name, u.clusterName, u.cluster.ID)
+	repoObject, err := createFleetGitRepo(u.client, u.sshNode, repoName, namespace.Name, u.clusterName, u.cluster.ID, u.fleetSecretName)
 	require.NoError(u.T(), err)
 
 	log.Info("Getting GitRepo")
@@ -144,16 +155,13 @@ func (u *UpgradeTestSuite) TestPauseFleetRepo() {
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(u.client, u.cluster.ID)
 	require.NoError(u.T(), err)
 
-	log.Info("Getting gitsecret")
-	secret, err := u.client.WranglerContext.Core.Secret().Get(fleet.Namespace, gitSecret, metav1.GetOptions{})
+	log.Info("Cloning Git Repo")
+	repoName := namegenerator.AppendRandomString("repo-name")
+	_, err = u.sshNode.ExecuteCommand(fmt.Sprintf("cd ~/ && git clone %s %s", fleet.ExampleRepo, repoName))
 	require.NoError(u.T(), err)
 
-	username := string(secret.Data["username"])
-	accessToken := string(secret.Data["password"])
-
 	log.Info("Creating Fleet repo")
-	gitUserRepo := fmt.Sprintf("https://github.com/%s/fleet-examples", username)
-	repoObject, err := createFleetGitRepo(u.client, gitUserRepo, namespace.Name, u.clusterName, u.cluster.ID)
+	repoObject, err := createFleetGitRepo(u.client, u.sshNode, repoName, namespace.Name, u.clusterName, u.cluster.ID, u.fleetSecretName)
 	require.NoError(u.T(), err)
 
 	log.Info("Getting GitRepo")
@@ -169,8 +177,7 @@ func (u *UpgradeTestSuite) TestPauseFleetRepo() {
 	repoObject, err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).Update(lastRepoObject, gitRepo)
 	require.NoError(u.T(), err)
 
-	repoName := namegenerator.AppendRandomString("repo-name")
-	err = gitPushCommit(u.client, repoName, gitUserRepo, username, accessToken)
+	err = gitPushCommit(u.client, u.sshNode, repoName)
 	require.NoError(u.T(), err)
 
 	log.Info("Getting last GitRepo")
