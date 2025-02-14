@@ -68,6 +68,15 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	}
 
 	oidcConfig = oidcConfigApplyInput.OIDCConfig
+	// setting a bool for group search flag
+	// this only needs updated when an auth provider is enabled or edited
+	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
+		falseBool := false
+		oidcConfig.GroupSearchEnabled = &falseBool
+	} else {
+		trueBool := true
+		oidcConfig.GroupSearchEnabled = &trueBool
+	}
 	oidcLogin := &v32.OIDCLogin{
 		Code: oidcConfigApplyInput.Code,
 	}
@@ -89,21 +98,12 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	oidcConfig.Issuer = issuerURL.String()
 
 	// call provider
-	userPrincipal, groupPrincipals, providerToken, claimInfo, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
+	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
 		}
 		return errors.Wrap(err, "[generic oidc]: server error while authenticating")
-	}
-	// setting a bool for group search flag
-	// this only needs updated when an auth provider is enabled or edited
-	if claimInfo.Groups == nil && claimInfo.FullGroupPath == nil {
-		falseBool := false
-		oidcConfig.GroupSearchEnabled = &falseBool
-	} else {
-		trueBool := true
-		oidcConfig.GroupSearchEnabled = &trueBool
 	}
 	user, err := o.UserMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
 	if err != nil {
@@ -133,4 +133,16 @@ func validateScopes(input string) bool {
 	}
 	values := strings.Fields(input)
 	return slices.Contains(values, "openid")
+}
+
+func setGroupSearchEnabled(claimInfo ClaimInfo, oidcConfig v32.OIDCConfig) {
+	// setting a bool for group search flag
+	// this only needs updated when an auth provider is enabled or edited
+	if claimInfo.Groups == nil && claimInfo.FullGroupPath == nil {
+		falseBool := false
+		oidcConfig.GroupSearchEnabled = &falseBool
+	} else {
+		trueBool := true
+		oidcConfig.GroupSearchEnabled = &trueBool
+	}
 }
