@@ -12,7 +12,6 @@ import (
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
-	"github.com/rancher/rancher/tests/v2/actions/services"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -168,24 +167,6 @@ func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, erro
 	}
 }
 
-// IsNodePoolSizeValid is a helper function that checks if the machine pool cluster size is greater than or equal to 3
-func IsNodePoolSizeValid(steveClient *steveV1.Client) (bool, error) {
-	logrus.Info("Checking node pool")
-
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
-	if err != nil {
-		return false, err
-	}
-
-	nodeList, err := steveClient.SteveType("node").List(query)
-	if err != nil {
-		return false, err
-	}
-
-	return len(nodeList.Data) >= 3, err
-}
-
 // validateLoadBalancer is a helper function that verifies the cluster is able to connect to the load balancer
 func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) error {
 	logrus.Infof("Getting the node using the label [%v]", labelWorker)
@@ -233,7 +214,13 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 	if err != nil {
 		return err
 	}
-	_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+
+	provisioningClusterID, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
+	if err != nil {
+		return err
+	}
+
+	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
 	if err != nil {
 		return err
 	}
@@ -244,6 +231,12 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 	}
 
 	pods, err := wc.Core.Pod().List(namespaceName, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	newCluster := &provv1.Cluster{}
+	err = steveV1.ConvertToK8sType(cluster, newCluster)
 	if err != nil {
 		return err
 	}
@@ -263,32 +256,44 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 			return err
 		}
 
-		_, found := slices.BinarySearch(nodes, newNode.Name)
-		if found {
-			nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
+		log := ""
+		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeExternalIP)
+		if nodeIP == "" {
+			nodeIP = kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
+		}
 
-			sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
-			if err != nil {
-				return err
-			}
+		if strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") || strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
+			_, found := slices.BinarySearch(nodes, newNode.Name)
+			if found {
+				_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+				if err != nil {
+					return err
+				}
 
-			sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
-			if err != nil {
-				return err
-			}
+				sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
+				if err != nil {
+					return err
+				}
 
-			log, err := sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
-			if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-				return err
-			}
+				sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
+				if err != nil {
+					return err
+				}
 
-			logrus.Infof("Log of the curl command {%v}", log)
-			if strings.Contains(log, workloadName) {
-				return nil
+				log, err = sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
+				if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+					return err
+				}
 			}
+		} else {
+			log, _ = curlCommand(client, clusterID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
+		}
+
+		logrus.Infof("Log of the curl command {%v}", log)
+		if strings.Contains(log, workloadName) {
+			return nil
 		}
 	}
-
 	return errors.New("Unable to connect to the host port")
 }
 
@@ -325,69 +330,6 @@ func validateNodePort(client *rancher.Client, clusterID string, steveClient *ste
 	}
 
 	return errors.New("Unable to connect to the node port")
-}
-
-// validateClusterIP is a helper function that verifies the cluster is able to connect to the cluster ip service by ssh shell
-func validateClusterIP(client *rancher.Client, clusterName string, steveClient *steveV1.Client, serviceID string, hostPort int, workloadName string) error {
-	serviceResp, err := steveClient.SteveType(services.ServiceSteveType).ByID(serviceID)
-	if err != nil {
-		return err
-	}
-
-	logrus.Info("Getting the cluster IP")
-	newService := &corev1.Service{}
-	err = steveV1.ConvertToK8sType(serviceResp.JSONResp, newService)
-	if err != nil {
-		return err
-	}
-
-	_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
-	if err != nil {
-		return err
-	}
-
-	clusterIP := newService.Spec.ClusterIP
-
-	sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
-	if err != nil {
-		return err
-	}
-
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
-	if err != nil {
-		return err
-	}
-
-	nodeList, err := steveClient.SteveType("node").List(query)
-	if err != nil {
-		return err
-	}
-
-	for _, machine := range nodeList.Data {
-		logrus.Info("Getting the node IP")
-		newNode := &corev1.Node{}
-		err = steveV1.ConvertToK8sType(machine.JSONResp, newNode)
-		if err != nil {
-			return err
-		}
-		sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
-		if err != nil {
-			return err
-		}
-
-		log, err := sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", clusterIP, strconv.Itoa(hostPort)))
-		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-			return err
-		}
-		logrus.Info(log)
-		logrus.Info(err)
-
-		if strings.Contains(log, workloadName) {
-			return nil
-		}
-	}
-	return errors.New("Unable to connect to the cluster")
 }
 
 // validateWorkload is a helper function that verifies if all pods are running by image
