@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -11,6 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"golang.org/x/crypto/bcrypt"
@@ -36,6 +38,7 @@ type Handler struct {
 	UserClient               v3.UserInterface
 	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
 	UserAuthRefresher        providerrefresh.UserAuthRefresher
+	ExtTokenStore            *exttokenstore.SystemStore
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -113,6 +116,21 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 	user, err = h.UserClient.Update(user)
 	if err != nil {
 		return err
+	}
+
+	// session tokens expire on password change. A TTL of 1 millisecond is used to triggere
+	// immediate expiration. note: A TTL of 0 is not suitable, this triggers the TTL default of
+	// 30 days.
+
+	objs, err := h.ExtTokenStore.ListForUser(userID)
+	if err != nil {
+		return fmt.Errorf("error getting ext tokens for user %s: %v", userID, err)
+	}
+	for _, token := range objs.Items {
+		if !token.GetIsDerived() {
+			token.Spec.TTL = 1
+			h.ExtTokenStore.Update(&token, &v1.UpdateOptions{})
+		}
 	}
 
 	return nil

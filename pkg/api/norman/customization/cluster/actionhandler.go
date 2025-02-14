@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -148,10 +149,10 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
-		AuthProvider:  authToken.AuthProvider,
+		AuthProvider:  authToken.GetAuthProvider(),
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
-		UserPrincipal: authToken.UserPrincipal,
+		UserPrincipal: providers.GetUserPrincipal(authToken),
 	}, nil
 }
 
