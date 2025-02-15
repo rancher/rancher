@@ -68,14 +68,11 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	}
 
 	oidcConfig = oidcConfigApplyInput.OIDCConfig
-	// setting a bool for group search flag
-	// this only needs updated when an auth provider is enabled or edited
+	// set a default value for GroupSearchEnabled
+	// in case user input is nil for some reasons.
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
 		falseBool := false
 		oidcConfig.GroupSearchEnabled = &falseBool
-	} else {
-		trueBool := true
-		oidcConfig.GroupSearchEnabled = &trueBool
 	}
 	oidcLogin := &v32.OIDCLogin{
 		Code: oidcConfigApplyInput.Code,
@@ -133,16 +130,4 @@ func validateScopes(input string) bool {
 	}
 	values := strings.Fields(input)
 	return slices.Contains(values, "openid")
-}
-
-func setGroupSearchEnabled(claimInfo ClaimInfo, oidcConfig v32.OIDCConfig) {
-	// setting a bool for group search flag
-	// this only needs updated when an auth provider is enabled or edited
-	if claimInfo.Groups == nil && claimInfo.FullGroupPath == nil {
-		falseBool := false
-		oidcConfig.GroupSearchEnabled = &falseBool
-	} else {
-		trueBool := true
-		oidcConfig.GroupSearchEnabled = &trueBool
-	}
 }
