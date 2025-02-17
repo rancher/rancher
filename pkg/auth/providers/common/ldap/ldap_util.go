@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -34,31 +35,35 @@ func Connect(config *v3.LdapConfig, caPool *x509.CertPool) (*ldapv3.Conn, error)
 
 func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTimeout int64, caPool *x509.CertPool) (*ldapv3.Conn, error) {
 	logrus.Debug("Now creating Ldap connection")
-	var lConn *ldapv3.Conn
-	var err error
-	var tlsConfig *tls.Config
+	var (
+		lConn     *ldapv3.Conn
+		err       error
+		tlsConfig *tls.Config
+	)
 	ldapv3.DefaultTimeout = time.Duration(connectionTimeout) * time.Millisecond
+
 	if len(servers) < 1 {
-		return nil, errors.New("invalid server config. at least 1 server needs to be configured")
+		return nil, errors.New("ldap: invalid server config. at least 1 server needs to be configured")
 	}
+
 	for _, server := range servers {
 		tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
 		if TLS {
 			lConn, err = ldapv3.DialTLS("tcp", fmt.Sprintf("%s:%d", server, port), tlsConfig)
 			if err != nil {
-				err = fmt.Errorf("Error creating ssl connection: %v", err)
+				err = fmt.Errorf("ldap: error creating ssl connection: %w", err)
 			}
 		} else if startTLS {
 			lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
 			if err != nil {
-				err = fmt.Errorf("Error creating connection for startTLS: %v", err)
+				err = fmt.Errorf("ldap: error creating connection for startTLS: %w", err)
 			} else if err = lConn.StartTLS(tlsConfig); err != nil {
-				err = fmt.Errorf("Error upgrading startTLS connection: %v", err)
+				err = fmt.Errorf("ldap: error upgrading startTLS connection: %w", err)
 			}
 		} else {
 			lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
 			if err != nil {
-				err = fmt.Errorf("Error creating connection: %v", err)
+				err = fmt.Errorf("ldap: error creating connection: %w", err)
 			}
 		}
 		if err == nil {
@@ -192,7 +197,7 @@ func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, provi
 		}
 		kind = "group"
 	} else {
-		return nil, fmt.Errorf("Failed to get attributes for %s", dnStr)
+		return nil, fmt.Errorf("ldap: error getting attributes for %s", dnStr)
 	}
 
 	principal := &v3.Principal{
@@ -210,7 +215,7 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
 	groupMap[groupPrincipal.ObjectMeta.Name] = true
 	principals := []v3.Principal{}
-	//var searchAttributes []string
+
 	parts := strings.SplitN(groupPrincipal.ObjectMeta.Name, ":", 2)
 	if len(parts) != 2 {
 		return errors.Errorf("invalid id %v", groupPrincipal.ObjectMeta.Name)
@@ -218,9 +223,11 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	groupDN := strings.TrimPrefix(parts[1], "//")
 
 	filter := fmt.Sprintf(
-		"(&(%v=%v)(%v=%v))",
-		config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(groupDN),
-		config.ObjectClass, config.GroupObjectClass,
+		"(&(%s=%s)(%s=%s))",
+		SanitizeAttr(config.GroupMemberMappingAttribute),
+		ldapv3.EscapeFilter(groupDN),
+		config.ObjectClass,
+		SanitizeAttr(config.GroupObjectClass),
 	)
 
 	searchGroup := NewWholeSubtreeSearchRequest(
@@ -255,6 +262,7 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -273,6 +281,7 @@ func FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, g
 			nonDupGroupPrincipals = append(nonDupGroupPrincipals, gp)
 		}
 	}
+
 	return nonDupGroupPrincipals
 }
 
@@ -313,4 +322,18 @@ func NewDefaultSearchRequest(baseDN, filter string, scope int, attributes []stri
 		attributes,               // Attributes
 		nil,                      // Controls
 	)
+}
+
+var (
+	numHyphenPrefix   = regexp.MustCompile(`^[0-9\-]`)
+	notAlphaNumHyphen = regexp.MustCompile(`[^a-zA-Z0-9\-]`)
+	validAttr         = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-]*$`)
+)
+
+func SanitizeAttr(attr string) string {
+	return numHyphenPrefix.ReplaceAllString(notAlphaNumHyphen.ReplaceAllString(attr, ""), "")
+}
+
+func IsValidAttr(attr string) bool {
+	return validAttr.MatchString(attr)
 }

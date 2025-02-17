@@ -6,18 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,12 +55,22 @@ var (
 	}
 )
 
+type userManager interface {
+	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
+	CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error)
+}
+
+type tokenManager interface {
+	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
+	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+}
+
 type ldapProvider struct {
 	ctx                   context.Context
-	authConfigs           v3.AuthConfigInterface
+	authConfigs           mgmtv3.AuthConfigInterface
 	secrets               wcorev1.SecretController
-	userMGR               user.Manager
-	tokenMGR              *tokens.Manager
+	userMGR               userManager
+	tokenMGR              tokenManager
 	certs                 string
 	caPool                *x509.CertPool
 	providerName          string
@@ -70,7 +79,7 @@ type ldapProvider struct {
 	groupScope            string
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, providerName string) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR userManager, tokenMGR tokenManager, providerName string) common.AuthProvider {
 	return &ldapProvider{
 		ctx:                   ctx,
 		authConfigs:           mgmtCtx.Management.AuthConfigs(""),
@@ -120,8 +129,8 @@ func (p *ldapProvider) TransformToAuthProvider(authConfig map[string]interface{}
 	return ldap, nil
 }
 
-func toBasicLogin(input interface{}) (*v32.BasicLogin, error) {
-	login, ok := input.(*v32.BasicLogin)
+func toBasicLogin(input interface{}) (*v3.BasicLogin, error) {
+	login, ok := input.(*v3.BasicLogin)
 	if !ok {
 		return nil, errors.New("unexpected input type")
 	}
@@ -245,7 +254,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
 	authConfigObj, err := genericClient.Get(p.providerName, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve %s, error: %v", p.providerName, err)
+		return nil, nil, fmt.Errorf("failed to retrieve %s, error: %w", p.providerName, err)
 	}
 
 	u, ok := authConfigObj.(runtime.Unstructured)
@@ -314,7 +323,7 @@ func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, group
 func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string, string, error) {
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid id %v", principalID)
+		return "", "", fmt.Errorf("invalid id %s", principalID)
 	}
 	scope := parts[0]
 	externalID := strings.TrimPrefix(parts[1], "//")
@@ -331,7 +340,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	externalID string, scope string, config *v3.LdapConfig, caPool *x509.CertPool) (*v3.Principal, error) {
 
 	if scope != p.userScope && scope != p.groupScope {
-		return nil, fmt.Errorf("invalid scope")
+		return nil, fmt.Errorf("invalid %s and/or %s scope", p.userScope, p.groupScope)
 	}
 
 	lConn, err := ldap.Connect(config, caPool)
@@ -350,8 +359,8 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 
 	if scope == p.userScope {
 		filter := fmt.Sprintf(
-			"(&(%v=%v)(%v=%v))",
-			ObjectClass, config.UserObjectClass,
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
 			config.UserLoginAttribute, ldapv3.EscapeFilter(externalID),
 		)
 
@@ -362,8 +371,8 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		)
 	} else {
 		filter := fmt.Sprintf(
-			"(&(%v=%v)(%v=%v))",
-			ObjectClass, config.GroupObjectClass,
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass),
 			config.GroupDNAttribute, ldapv3.EscapeFilter(externalID),
 		)
 
