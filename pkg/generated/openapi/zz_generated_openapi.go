@@ -217,16 +217,9 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
-					"clusterName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ClusterName is the cluster that the token is scoped to. When empty, the default, the token can be used for all clusters.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"ttl": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TTL is the time-to-live of the token, in milliseconds. The default value, `0`, is treated as 30 days.",
+							Description: "TTL is the time-to-live of the token, in milliseconds. The default, 30 days, is indicated by the value `0`.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",

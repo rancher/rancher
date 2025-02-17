@@ -37,12 +37,8 @@ type TokenSpec struct {
 	// Human readable description.
 	// +optional
 	Description string `json:"description, omitempty"`
-	// ClusterName is the cluster that the token is scoped to.
-	// When empty, the default, the token can be used for all clusters.
-	// +optional
-	ClusterName string `json:"clusterName,omitempty"`
 	// TTL is the time-to-live of the token, in milliseconds.
-	// The default value, `0`, is treated as 30 days.
+	// The default, 30 days, is indicated by the value `0`.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an
@@ -109,7 +105,7 @@ func (t *Token) GetUserID() string {
 }
 
 func (t *Token) ObjClusterName() string {
-	return t.Spec.ClusterName
+	return ""
 }
 
 func (t *Token) GetAuthProvider() string {
