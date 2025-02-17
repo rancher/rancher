@@ -47,7 +47,6 @@ const (
 	// data fields used by the backing secrets to store token information
 	FieldAnnotations    = "annotations"
 	FieldAuthProvider   = "auth-provider"
-	FieldClusterName    = "cluster-name"
 	FieldDescription    = "description"
 	FieldDisplayName    = "display-name"
 	FieldEnabled        = "enabled"
@@ -488,13 +487,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 			token.Name, err))
 	}
 
-	// Check the user's accessibility of the cluster the token is limited to, if such is done.
-	if token.Spec.ClusterName != "" {
-		if err := t.IsClusterAccessible(ctx, token.Spec.ClusterName); err != nil {
-			return nil, err
-		}
-	}
-
 	// Abort, user does not wish to actually change anything.
 	if dryRun {
 		return token, nil
@@ -739,10 +731,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit user id",
 			token.Name))
 	}
-	if token.Spec.ClusterName != currentToken.Spec.ClusterName {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit cluster name",
-			token.Name))
-	}
+
 	if token.Spec.Kind != currentToken.Spec.Kind {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kind",
 			token.Name))
@@ -970,42 +959,6 @@ func userMatchOrDefault(name string, token *ext.Token) bool {
 		return true
 	}
 	return name == token.Spec.UserID
-}
-
-// ClusterCheck determines if the user a token is made for, who is the same as
-// the user creating the token, has access to the cluster the token-to-be is
-// limited in scope to. An error is thrown if not, or when the check itself
-// failed.
-func (t *SystemStore) IsClusterAccessible(ctx context.Context, clusterName string) error {
-	userInfo, ok := request.UserFrom(ctx)
-	if !ok {
-		return apierrors.NewInternalError(
-			fmt.Errorf("error checking authorization of user to access cluster %s: bad context",
-				clusterName))
-	}
-
-	decision, _, err := t.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
-		User:            userInfo,
-		Verb:            "get",
-		APIGroup:        "management.cattle.io",
-		Resource:        "clusters",
-		ResourceRequest: true,
-		Name:            clusterName,
-	})
-
-	if err != nil {
-		return apierrors.NewInternalError(
-			fmt.Errorf("error checking authorization of user %s to access cluster %s: %w",
-				userInfo.GetName(), clusterName, err))
-	}
-
-	if decision != authorizer.DecisionAllow {
-		return apierrors.NewForbidden(GVR.GroupResource(), clusterName,
-			fmt.Errorf("user %s has no permission to access",
-				userInfo.GetName()))
-	}
-
-	return nil
 }
 
 // Fetch is a convenience function for retrieving a token by name, regardless of
@@ -1309,7 +1262,6 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	enabled := token.Spec.Enabled == nil || *token.Spec.Enabled
 
 	secret.StringData[FieldUserID] = token.Spec.UserID
-	secret.StringData[FieldClusterName] = token.Spec.ClusterName
 	secret.StringData[FieldTTL] = fmt.Sprintf("%d", ttl)
 	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", enabled)
 	secret.StringData[FieldDescription] = token.Spec.Description
@@ -1360,7 +1312,6 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 
 	token.Spec.Description = string(secret.Data[FieldDescription])
-	token.Spec.ClusterName = string(secret.Data[FieldClusterName])
 	token.Spec.Kind = string(secret.Data[FieldKind])
 
 	token.Status.DisplayName = string(secret.Data[FieldDisplayName])
