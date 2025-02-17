@@ -43,3 +43,57 @@ func TestGetUserExternalID(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeAttribute(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"", ""},
+		{"   ", ""},
+		{"a", "a"},
+		{"a1", "a1"},
+		{"a-b", "a-b"},
+		{" a- b", "a-b"},
+		{"-ab", "ab"},
+		{"a!()&|", "a"},
+		{"a_b", "ab"},
+		{"1ab", "ab"},
+		{" 1ab", "ab"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.in, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, test.want, SanitizeAttr(test.in))
+		})
+	}
+}
+func TestIsValidAttribute(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in    string
+		valid bool
+	}{
+		{"a", true},
+		{"a1", true},
+		{"a1-", true},
+		{"a-b", true},
+		{"a1-b2", true},
+		{"", false},
+		{"1a", false},
+		{"-a", false},
+		{"-1a", false},
+		{"1-a", false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.in, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, test.valid, IsValidAttr(test.in))
+		})
+	}
+}

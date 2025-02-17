@@ -26,7 +26,7 @@ var (
 	DummyPassword = "testuser1"
 )
 
-func Test_getBasicLogin(t *testing.T) {
+func TestGetBasicLogin(t *testing.T) {
 	type args struct {
 		input interface{}
 	}
@@ -77,7 +77,7 @@ func Test_getBasicLogin(t *testing.T) {
 	}
 }
 
-func Test_ldapProvider_getLDAPConfig(t *testing.T) {
+func TestLdapProviderGetLDAPConfig(t *testing.T) {
 	type fields struct {
 		ctx                   context.Context
 		secrets               wcorev1.SecretController
