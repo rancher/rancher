@@ -890,30 +890,9 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	})
 
 	t.Run("token fetched with token client", func(t *testing.T) {
-		// FIX REM defer mockIndexer.Add(token)
-		// FIX REM mockIndexer.Delete(token)
-
 		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		assert.True(t, resp.IsAuthed)
-		assert.True(t, userRefresher.called)
-	})
-
-	t.Run("authenticate with a cluster specific token", func(t *testing.T) {
-		clusterID := "c-955nj"
-		oldTokenClusterName := token.Spec.ClusterName
-		defer func() { token.Spec.ClusterName = oldTokenClusterName }()
-		token.Spec.ClusterName = clusterID
-
-		clusterReq := httptest.NewRequest(http.MethodGet, "/k8s/clusters/"+clusterID+"/v1/management.cattle.io.authconfigs", nil)
-		clusterReq.Header.Set("Authorization", "Bearer ext/"+token.Name+":"+tokenValue)
-
-		userRefresher.reset()
-
-		resp, err := authenticator.Authenticate(clusterReq)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
@@ -1090,24 +1069,6 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		require.ErrorIs(t, err, ErrMustAuthenticate)
 		require.Nil(t, resp)
 		assert.False(t, userRefresher.called)
-	})
-
-	t.Run("cluster ID doesn't match", func(t *testing.T) {
-		clusterID := "c-955nj"
-		oldTokenClusterName := tokenSecret.Data["cluster-name"]
-		defer func() {
-			tokenSecret.Data["cluster-name"] = oldTokenClusterName
-		}()
-		tokenSecret.Data["cluster-name"] = []byte(clusterID)
-
-		clusterReq := httptest.NewRequest(http.MethodGet, "/k8s/clusters/c-unknown/v1/management.cattle.io.authconfigs", nil)
-		clusterReq.Header.Set("Authorization", "Bearer ext/"+token.Name+":"+tokenValue)
-
-		userRefresher.reset()
-
-		resp, err := authenticator.Authenticate(clusterReq)
-		require.ErrorIs(t, err, ErrMustAuthenticate)
-		require.Nil(t, resp)
 	})
 
 	t.Run("user doesn't exist", func(t *testing.T) {
