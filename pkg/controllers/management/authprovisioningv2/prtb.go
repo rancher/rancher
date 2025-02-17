@@ -73,6 +73,7 @@ func (h *handler) ensureClusterViewBinding(cluster *v1.Cluster, prtb *v3.Project
 					UID:        cluster.UID,
 				},
 			},
+			Labels: map[string]string{rbac.PrtbOwnerLabel: prtb.Name},
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,

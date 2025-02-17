@@ -79,6 +79,7 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 				Name:        name.SafeConcatName("crt", cluster.Name, crtb.Name, hashedSubject),
 				Namespace:   cluster.Namespace,
 				Annotations: map[string]string{clusterNameLabel: cluster.GetName(), clusterNamespaceLabel: cluster.GetNamespace()},
+				Labels:      map[string]string{rbac.CrtbOwnerLabel: crtb.Name},
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
@@ -98,6 +99,7 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 				Name:        name.SafeConcatName(clusterViewName(cluster), crtb.Name, hashedSubject),
 				Namespace:   cluster.Namespace,
 				Annotations: map[string]string{clusterNameLabel: cluster.GetName(), clusterNamespaceLabel: cluster.GetNamespace()},
+				Labels:      map[string]string{rbac.CrtbOwnerLabel: crtb.Name},
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
