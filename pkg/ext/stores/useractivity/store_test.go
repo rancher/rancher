@@ -31,6 +31,7 @@ func TestStore_create(t *testing.T) {
 		user         string
 		lastActivity v1.Time
 		idleMins     int
+		dryRun       bool
 	}
 	tests := []struct {
 		name      string
@@ -170,11 +171,54 @@ func TestStore_create(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "create useractivity with dry-run option",
+			args: args{
+				in0: nil,
+				userActivity: &ext.UserActivity{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "ua_admin_u-mo773yttt4",
+					},
+					Spec: ext.UserActivitySpec{
+						TokenId: "u-mo773yttt4",
+					},
+				},
+				token: &v3Legacy.Token{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "u-mo773yttt4",
+						Labels: map[string]string{
+							tokenUserId: "admin",
+						},
+					},
+					UserID: "u-mo773yttt4",
+				},
+				user: "admin",
+				lastActivity: v1.Time{
+					Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+				},
+				idleMins: 10,
+				dryRun:   true,
+			},
+			mockSetup: func() {},
+			want: &ext.UserActivity{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "ua_admin_u-mo773yttt4",
+				},
+				Spec: ext.UserActivitySpec{
+					TokenId: "u-mo773yttt4",
+				},
+				Status: ext.UserActivityStatus{
+					CurrentTimeout: time.Date(2025, 1, 31, 16, 54, 0, 0, &time.Location{}).String(),
+					LastActivity:   time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockSetup()
-			got, err := uas.create(tt.args.in0, tt.args.userActivity, tt.args.token, tt.args.user, tt.args.lastActivity, tt.args.idleMins)
+			got, err := uas.create(tt.args.in0, tt.args.userActivity, tt.args.token, tt.args.user, tt.args.lastActivity, tt.args.idleMins, tt.args.dryRun)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store.create() error = %v, wantErr %v", err, tt.wantErr)
 				return
