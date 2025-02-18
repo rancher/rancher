@@ -129,7 +129,7 @@ func (uas *Store) create(_ context.Context,
 	// ensure the token specified in the UserActivity is the same
 	// we are using to do the request.
 	if token.Name != userActivity.Spec.TokenId {
-		return nil, fmt.Errorf("token name provided mismatches from expected: %s - %s", token.Name, userActivity.Spec.TokenId)
+		return nil, fmt.Errorf("token name mismatch: have %s - expected %s", token.Name, userActivity.Spec.TokenId)
 	}
 
 	// once validated the request, we can define the lastActivity time.
