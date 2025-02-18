@@ -2,7 +2,7 @@ ARG SERVERCORE_VERSION
 ARG ARCH=amd64
 ARG VERSION=dev
 
-FROM library/golang:1.23.5 as build
+FROM library/golang:1.23.6 as build
 
 WORKDIR C:/app
 COPY . .
