@@ -152,7 +152,7 @@ var (
 	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
-	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
+	// AuthUserSessionIdleTTLMinutes represents the time to live without user activity for tokens controlling a login session, in minutes.
 	// By default, the value for auth-user-session-idle-ttl-minutes should be set
 	// at the same value of auth-user-session-ttl-minutes (for backward compatibility reasons),
 	// and must never be greater than this value.
