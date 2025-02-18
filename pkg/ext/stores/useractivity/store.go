@@ -165,7 +165,7 @@ func (uas *Store) Get(ctx context.Context,
 }
 
 // get returns the UserActivity based on the token name.
-// It is used to know, from the frontend, how much time is
+// It is used to know, from the frontend, how much time
 // remained before the idle timeout.
 func (uas *Store) get(_ context.Context, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
 	user, token, err := getUserActivityName(uaname)
