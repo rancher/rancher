@@ -264,7 +264,7 @@ func (grb *globalRoleBindingLifecycle) reconcileSubject(binding *v3.GlobalRoleBi
 	}
 
 	grb.status.AddCondition(localConditions, condition, grbHasNoSubject, errors.New("GRB has no subject"))
-	return nil, fmt.Errorf("GlobalRoleBinding %v has no subject", binding.Name)
+	return binding, fmt.Errorf("GlobalRoleBinding %v has no subject", binding.Name)
 }
 
 // reconcileClusterPermissions grants permissions for the binding in all downstream (non-local) clusters. Will also

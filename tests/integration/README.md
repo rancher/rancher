@@ -4,7 +4,7 @@
 
 ---
 
-Instructions for installing dependencies can be found in the [wiki](https://github.com/rancher/rancher/wiki/Setting-Up-Rancher-2.0-Development-Environment#setting-up-and-running-the-tests).
+Instructions for installing dependencies can be found in the [wiki](https://github.com/rancher/rancher/wiki/Setting-Up-Rancher-Development-Environment).
 
 ## CI
 
@@ -26,7 +26,7 @@ pip install tox
 
 ---
 
-*The tests require python 3.7. Some other versions may work, but are not guaranteed to be supported.*
+*The tests require python 3.11. Some other versions may work, but are not guaranteed to be supported.*
 
 Start a local rancher instance on port 8443. If the password is not set to `admin`, set the environment variable `RANCHER_SERVER_PASSWORD` to the appropriate password.
 
