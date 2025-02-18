@@ -21,7 +21,6 @@ func TestStore_create(t *testing.T) {
 	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
 	uas := &Store{
 		tokenController: mockTokenControllerFake,
-		checker:         nil,
 	}
 
 	type args struct {
@@ -235,7 +234,6 @@ func TestStore_get(t *testing.T) {
 	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
 	uas := &Store{
 		tokenController: mockTokenControllerFake,
-		checker:         nil,
 	}
 	contextBG := context.Background()
 	type args struct {
