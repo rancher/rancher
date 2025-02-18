@@ -97,9 +97,9 @@ func (uas *Store) Create(ctx context.Context,
 		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T", zeroUA, objUserActivity))
 	}
 	// retrieve token information
-	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenId, metav1.GetOptions{})
+	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenID, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenId, err)
+		return nil, fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenID, err)
 	}
 	// set when last activity happened
 	lastActivity := metav1.Time{
@@ -134,8 +134,8 @@ func (uas *Store) create(_ context.Context,
 	}
 	// ensure the token specified in the UserActivity is the same
 	// we are using to do the request.
-	if token.Name != userActivity.Spec.TokenId {
-		return nil, fmt.Errorf("token name mismatch: have %s - expected %s", token.Name, userActivity.Spec.TokenId)
+	if token.Name != userActivity.Spec.TokenID {
+		return nil, fmt.Errorf("token name mismatch: have %s - expected %s", token.Name, userActivity.Spec.TokenID)
 	}
 
 	// once validated the request, we can define the lastActivity time.
@@ -188,7 +188,7 @@ func (uas *Store) get(_ context.Context, uaname string, options *metav1.GetOptio
 			Name: uaname,
 		},
 		Spec: ext.UserActivitySpec{
-			TokenId: tokenId.Name,
+			TokenID: tokenId.Name,
 		},
 		Status: ext.UserActivityStatus{
 			CurrentTimeout: tokenId.LastIdleTimeout.String(),
