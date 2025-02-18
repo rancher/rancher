@@ -179,7 +179,7 @@ func (uas *Store) get(_ context.Context, uaname string, options *metav1.GetOptio
 	}
 	// verify user is the same
 	if tokenId.UserID != user {
-		return nil, fmt.Errorf("user provided mismatches from expected: %s - %s", user, tokenId.UserID)
+		return nil, fmt.Errorf("user provided mismatch: have %s - expected %s", user, tokenId.UserID)
 	}
 
 	// crafting UserActivity from requested Token name.
