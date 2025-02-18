@@ -158,8 +158,6 @@ func (uas *Store) create(_ context.Context,
 	return userActivity, nil
 }
 
-// The rest of the methods will be left empty.
-
 // Get implements [rest.Getter]
 func (uas *Store) Get(ctx context.Context,
 	name string,
