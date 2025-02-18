@@ -159,9 +159,9 @@ func NewSNIProviderForCname(name string, cnames []string, secrets wranglercorev1
 
 		sninames: cnames,
 
-		expiresAfter: time.Hour * 24 * 365,
+		expiresAfter: time.Hour * 24 * 90,
 
-		secrets: secrets,
+                secrets: secrets,
 	}
 
 	return content, nil
