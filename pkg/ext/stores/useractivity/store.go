@@ -124,7 +124,7 @@ func (uas *Store) create(_ context.Context,
 	}
 	// ensure the UserActivity object is crafted as expected.
 	if userActivity.Name != expectedName {
-		return nil, fmt.Errorf("useractivity name provided mismatches from expected: %s - %s", userActivity.Name, expectedName)
+		return nil, fmt.Errorf("useractivity name mismatch: have %s - expected %s", userActivity.Name, expectedName)
 	}
 	// ensure the token specified in the UserActivity is the same
 	// we are using to do the request.
