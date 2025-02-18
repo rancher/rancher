@@ -103,7 +103,10 @@ func (uas *Store) Create(ctx context.Context,
 	// retrieve setting for auth-user-session-idle-ttl-minutes
 	idleTimeout := settings.AuthUserSessionIdleTTLMinutes.GetInt()
 
-	return uas.create(ctx, objUserActivity, token, token.UserID, lastActivity, idleTimeout)
+	// check if it's a dry-run
+	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
+
+	return uas.create(ctx, objUserActivity, token, token.UserID, lastActivity, idleTimeout, dryRun)
 }
 
 // create sets the LastActivity and CurrentTimeout fields on the UserActivity object
@@ -113,7 +116,8 @@ func (uas *Store) create(_ context.Context,
 	token *v3Legacy.Token,
 	user string,
 	lastActivity metav1.Time,
-	authUserSessionIdleTTLMinutes int) (*ext.UserActivity, error) {
+	authUserSessionIdleTTLMinutes int,
+	dryRun bool) (*ext.UserActivity, error) {
 
 	expectedName, err := setUserActivityName(user, token.Name)
 	if err != nil {
@@ -133,12 +137,16 @@ func (uas *Store) create(_ context.Context,
 	newIdleTimeout := metav1.Time{
 		Time: lastActivity.Add(time.Minute * time.Duration(authUserSessionIdleTTLMinutes)).UTC(),
 	}
-	token.LastIdleTimeout = newIdleTimeout
 	userActivity.Status.LastActivity = lastActivity.String()
 	userActivity.Status.CurrentTimeout = newIdleTimeout.String()
-	_, err = uas.tokenController.Update(token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update token: %v", err)
+
+	// if it's not a dry-run, commit the changes
+	if !dryRun {
+		token.LastIdleTimeout = newIdleTimeout
+		_, err = uas.tokenController.Update(token)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update token: %v", err)
+		}
 	}
 
 	return userActivity, nil
