@@ -85,6 +85,12 @@ func (uas *Store) Create(ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions) (runtime.Object, error) {
+	if createValidation != nil {
+		err := createValidation(ctx, obj)
+		if err != nil {
+			return obj, err
+		}
+	}
 
 	// retrieving useractivity object from raw data
 	objUserActivity, ok := obj.(*ext.UserActivity)
