@@ -155,7 +155,7 @@ var (
 	// AuthUserSessionIdleTTLMinutes represents the time to live without user activity for tokens controlling a login session, in minutes.
 	// By default, the value for auth-user-session-idle-ttl-minutes should be set
 	// to the same value as auth-user-session-ttl-minutes (for backward compatibility reasons),
-	// and must never be greater than this value.
+	// and it must never be greater than this value.
 	AuthUserSessionIdleTTLMinutes = NewSetting("auth-user-session-idle-ttl-minutes", "960") // 16 hours
 
 	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
