@@ -50,5 +50,4 @@ func (h *versionHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	rw.Write(body)
-	rw.WriteHeader(http.StatusOK)
 }
