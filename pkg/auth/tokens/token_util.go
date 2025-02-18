@@ -168,8 +168,6 @@ func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error)
 
 	currentTime := metav1.Now()
 	if IsIdleExpired(*storedToken, currentTime) {
-		// reset token.LastIdleTimeout before de-authenticating the user
-		//storedToken.LastIdleTimeout = metav1.NewTime(time.Time{})
 		return http.StatusGone, errors.New("must authenticate, idle session timeout expired")
 	}
 	return http.StatusOK, nil
