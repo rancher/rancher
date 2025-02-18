@@ -10,6 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -95,7 +96,8 @@ func (uas *Store) Create(ctx context.Context,
 	// retrieving useractivity object from raw data
 	objUserActivity, ok := obj.(*ext.UserActivity)
 	if !ok {
-		return nil, fmt.Errorf("error casting runtime object to useractivity")
+		var zeroUA *ext.UserActivity
+		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T", zeroUA, objUserActivity))
 	}
 	// retrieve token information
 	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenId, metav1.GetOptions{})
