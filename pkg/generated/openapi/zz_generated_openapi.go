@@ -195,13 +195,13 @@ func schema_pkg_apis_extcattleio_v1_UserActivitySpec(ref common.ReferenceCallbac
 				Properties: map[string]spec.Schema{
 					"tokenId": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "TokenId is the token Id for which the UserActivity will update the LastIdleTimeout value on the Token resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
-				Required: []string{"tokenId"},
 			},
 		},
 	}
@@ -215,20 +215,20 @@ func schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"currentTimeout": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "CurrentTimeout is the timestap of the idle timeout. The idle timeout is calculated by adding the auth-user-session-idle-ttl-minutes attribute to the time the request is made.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"lastActivity": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "LastActivity is the timestamp of the last user activity tracked by the UI.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
-				Required: []string{"currentTimeout", "lastActivity"},
 			},
 		},
 	}
