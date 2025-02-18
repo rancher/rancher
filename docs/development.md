@@ -9,12 +9,13 @@ This script uses `docker buildx` in order to enable cross-building of different
 architecture images. To build an image for your current OS and architecture, run
 from the Rancher project root:
 ```shell
-TAG="localhost:5000/my-test-repo/image:tag" make quick
+REPO="localhost:5000/my-test-repo/image" TAG="tag" make quick
 ```
 
 If you wish to cross-build for a different architecture, set the variable `ARCH`:
 ```shell
-TAG="localhost:5000/my-test-repo/image:tag" \
+REPO="localhost:5000/my-test-repo/image" \
+  TAG="tag" \
   ARCH="amd64" \
   make quick
 ```
