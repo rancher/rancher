@@ -48,7 +48,7 @@ func TestStore_create(t *testing.T) {
 						Name: "ua_admin_u-mo773yttt4",
 					},
 					Spec: ext.UserActivitySpec{
-						TokenId: "u-mo773yttt4",
+						TokenID: "u-mo773yttt4",
 					},
 				},
 				token: &v3Legacy.Token{
@@ -80,7 +80,7 @@ func TestStore_create(t *testing.T) {
 					Name: "ua_admin_u-mo773yttt4",
 				},
 				Spec: ext.UserActivitySpec{
-					TokenId: "u-mo773yttt4",
+					TokenID: "u-mo773yttt4",
 				},
 				Status: ext.UserActivityStatus{
 					CurrentTimeout: time.Date(2025, 1, 31, 16, 54, 0, 0, &time.Location{}).String(),
@@ -95,7 +95,7 @@ func TestStore_create(t *testing.T) {
 				in0: nil,
 				userActivity: &ext.UserActivity{
 					Spec: ext.UserActivitySpec{
-						TokenId: "u-mo773yttt4",
+						TokenID: "u-mo773yttt4",
 					},
 				},
 				token: &v3Legacy.Token{
@@ -117,7 +117,7 @@ func TestStore_create(t *testing.T) {
 				in0: nil,
 				userActivity: &ext.UserActivity{
 					Spec: ext.UserActivitySpec{
-						TokenId: "u-mo773yttt4",
+						TokenID: "u-mo773yttt4",
 					},
 				},
 				token: &v3Legacy.Token{
@@ -143,7 +143,7 @@ func TestStore_create(t *testing.T) {
 						Name: "ua_admin_u-mo773yttt4",
 					},
 					Spec: ext.UserActivitySpec{
-						TokenId: "u-mo773yttt4",
+						TokenID: "u-mo773yttt4",
 					},
 				},
 				token: &v3Legacy.Token{
@@ -179,7 +179,7 @@ func TestStore_create(t *testing.T) {
 						Name: "ua_admin_u-mo773yttt4",
 					},
 					Spec: ext.UserActivitySpec{
-						TokenId: "u-mo773yttt4",
+						TokenID: "u-mo773yttt4",
 					},
 				},
 				token: &v3Legacy.Token{
@@ -204,7 +204,7 @@ func TestStore_create(t *testing.T) {
 					Name: "ua_admin_u-mo773yttt4",
 				},
 				Spec: ext.UserActivitySpec{
-					TokenId: "u-mo773yttt4",
+					TokenID: "u-mo773yttt4",
 				},
 				Status: ext.UserActivityStatus{
 					CurrentTimeout: time.Date(2025, 1, 31, 16, 54, 0, 0, &time.Location{}).String(),
@@ -271,7 +271,7 @@ func TestStore_get(t *testing.T) {
 					Name: "ua_admin_token-12345",
 				},
 				Spec: ext.UserActivitySpec{
-					TokenId: "token-12345",
+					TokenID: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
 					CurrentTimeout: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
