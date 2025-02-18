@@ -20,8 +20,8 @@ type UserActivity struct {
 }
 
 type UserActivitySpec struct {
-	// TokenId is the token Id for which the UserActivity will update
-	// the LastIdleTimeout value on the Token resource.
+	// TokenId is the Id of the Token managed by the UserActivity.
+	// The UserActivity updates the field LastIdleTimeout of this token.
 	// +optional
 	TokenId string `json:"tokenId"`
 }
