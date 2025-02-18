@@ -10,12 +10,9 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	extcore "github.com/rancher/steve/pkg/ext"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -149,14 +146,6 @@ func (uas *Store) create(_ context.Context,
 
 // The rest of the methods will be left empty.
 
-// Delete implements [rest.GracefulDeleter]
-func (uas *Store) Delete(ctx context.Context,
-	name string,
-	deleteValidation rest.ValidateObjectFunc,
-	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	return nil, false, fmt.Errorf("unable to delete useractivity")
-}
-
 // Get implements [rest.Getter]
 func (uas *Store) Get(ctx context.Context,
 	name string,
@@ -196,45 +185,6 @@ func (uas *Store) get(_ context.Context, uaname string, options *metav1.GetOptio
 	}
 
 	return ua, nil
-}
-
-// NewList implements [rest.Lister]
-func (t *Store) NewList() runtime.Object {
-	objList := &ext.UserActivityList{}
-	objList.GetObjectKind().SetGroupVersionKind(GVK)
-	return objList
-}
-
-// List implements [rest.Lister]
-func (uas *Store) List(ctx context.Context,
-	internaloptions *metainternalversion.ListOptions) (runtime.Object, error) {
-	return nil, fmt.Errorf("unable to list useractivity")
-}
-
-// ConvertToTable implements [rest.Lister]
-func (t *Store) ConvertToTable(
-	ctx context.Context,
-	object runtime.Object,
-	tableOptions runtime.Object) (*metav1.Table, error) {
-
-	return extcore.ConvertToTableDefault[*ext.UserActivity](ctx, object, tableOptions,
-		GVR.GroupResource())
-}
-
-// Update implements [rest.Updater]
-func (uas *Store) Update(ctx context.Context,
-	name string,
-	objInfo rest.UpdatedObjectInfo,
-	createValidation rest.ValidateObjectFunc,
-	updateValidation rest.ValidateObjectUpdateFunc,
-	forceAllowCreate bool,
-	options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	return nil, false, fmt.Errorf("unable to update useractivity")
-}
-
-// Watch implements [rest.Watcher]
-func (uas *Store) Watch(ctx context.Context, internaloptions *metainternalversion.ListOptions) (watch.Interface, error) {
-	return nil, fmt.Errorf("unable to watch useractivity")
 }
 
 // userHandler is an interface hiding the details of retrieving the user name
