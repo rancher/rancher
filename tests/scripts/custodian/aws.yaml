@@ -180,7 +180,7 @@ policies:
   filters:
      # nlb name not in accepted user keys
     - type: value
-      key: LoadBalancerArn
+      key: LoadBalancerName
       op: regex
       #doesNOTcontain
       value:  "^((?!USERKEYS).)*$"
@@ -192,7 +192,7 @@ policies:
     - "tag:DeletesOnFriday": absent
     - not: 
       - type: value
-        key: LoadBalancerArn
+        key: LoadBalancerName
         op: regex
         value:  "^.*DONOTDELETEKEYS.*$"
   actions:
@@ -217,7 +217,7 @@ policies:
   filters:
     # nlb is named with accepted user key
     - type: value
-      key: LoadBalancerArn
+      key: LoadBalancerName
       op: regex
       value:  "^.*USERKEYS.*$"
     # nlb is not doNotDelete
@@ -228,7 +228,7 @@ policies:
     - "tag:DeletesOnFriday": absent
     - not: 
       - type: value
-        key: LoadBalancerArn
+        key: LoadBalancerName
         op: regex
         value:  "^.*DONOTDELETEKEYS.*$"
   actions:
