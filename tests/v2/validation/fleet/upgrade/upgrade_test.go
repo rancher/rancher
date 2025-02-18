@@ -72,7 +72,7 @@ func (u *UpgradeTestSuite) SetupSuite() {
 	steveClient, err := u.client.Steve.ProxyDownstream(u.cluster.ID)
 	require.NoError(u.T(), err)
 
-	u.sshNode, err = createSSHNode(u.client, steveClient, u.cluster.Name)
+	u.sshNode, err = createSSHNode(u.client, steveClient, u.cluster.Name, u.cluster.ID)
 	require.NoError(u.T(), err)
 
 	u.fleetSecretName, err = createFleetSSHSecret(u.client, string(u.sshNode.SSHKey))
