@@ -23,7 +23,7 @@ policies:
   actions:
     - type: set-labels
       labels:
-        unknown_user: setForDeletion
+        unknown_user: setfordeletion
     - type: mark-for-op
       op: delete
       days: 1
@@ -48,7 +48,7 @@ policies:
   actions:
     - type: set-labels
       labels:
-        known_user: setForDeletion
+        known_user: setfordeletion
     - type: mark-for-op
       op: delete
       days: 2
