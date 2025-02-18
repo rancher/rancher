@@ -23,7 +23,7 @@ policies:
   actions:
     - type: set-labels
       labels:
-        unknown_user: setForDeletion
+        unknown_user: setfordeletion
     - type: mark-for-op
       op: delete
       days: 1
@@ -48,7 +48,7 @@ policies:
   actions:
     - type: set-labels
       labels:
-        known_user: setForDeletion
+        known_user: setfordeletion
     - type: mark-for-op
       op: delete
       days: 2
@@ -69,4 +69,69 @@ policies:
   actions:
     - type: delete
 
-# GKE - no support for labels nor tags at this time
+# GKE 
+- name: gcp-mark-unknown-cluster-for-deletion
+  resource: gcp.gke-cluster
+  description: |
+    Mark unknown clusters for deletion in 1 day
+  filters:
+    # instance name not in accepted user keys
+    - type: value
+      key: name
+      op: regex
+      #doesNOTcontain
+      value:  "^((?!USERKEYS).)*$"
+    # tagging not supported through cloud custodian at this time
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: set-labels
+      labels:
+        unknown_user: setfordeletion
+    - type: mark-for-op
+      op: delete
+      days: 1
+
+
+- name: gcp-mark-known-cluster-for-deletion
+  resource: gcp.gke-cluster
+  description: |
+    Mark known user clusters for deletion in 2 days
+  filters:
+    # cluster is named with accepted user key
+    - type: value
+      key: name
+      op: regex
+      value:  "^.*USERKEYS.*$"
+    # tagging not supported through cloud custodian at this time
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: set-labels
+      labels:
+        known_user: setfordeletion
+    - type: mark-for-op
+      op: delete
+      days: 2
+
+- name: gcp-terminate-cluster
+  resource: gcp.gke-cluster
+  description: |
+    Delete any marked clusters which have been 
+    marked for deletion for more than 1 day.
+  filters:
+    - or:
+      - type: marked-for-op
+        label: unknown_user
+        op: delete
+      - type: marked-for-op
+        label: known_user
+        op: delete
+  actions:
+    - type: delete
