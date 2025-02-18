@@ -245,7 +245,7 @@ func TestIsIdleExpired(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "shoul expire (equal values)",
+			name: "should expire (equal values)",
 			args: args{
 				token: v3.Token{
 					LastIdleTimeout: metav1.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
