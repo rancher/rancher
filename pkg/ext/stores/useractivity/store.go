@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
@@ -29,7 +28,6 @@ const (
 // +k8s:deepcopy-gen=false
 type Store struct {
 	tokenController v3.TokenController
-	checker         userHandler
 }
 
 var GV = schema.GroupVersion{
@@ -51,7 +49,6 @@ var GVR = schema.GroupVersionResource{
 func NewFromWrangler(wranglerCtx *wrangler.Context) *Store {
 	return &Store{
 		tokenController: wranglerCtx.Mgmt.Token(),
-		checker:         &tokenChecker{},
 	}
 }
 
@@ -199,24 +196,4 @@ func (uas *Store) get(_ context.Context, uaname string, options *metav1.GetOptio
 	}
 
 	return ua, nil
-}
-
-// userHandler is an interface hiding the details of retrieving the user name
-// from the store. This makes these operations mockable for store testing.
-type userHandler interface {
-	UserName(ctx context.Context) (string, error)
-}
-
-type tokenChecker struct{}
-
-// UserName hides the details of extracting a user name from the request context
-// TODO: move under dedicated package once Andrea's PR is merged, since both PRs implement the same methods.
-// (https://github.com/rancher/rancher/pull/47643/files#top)
-func (tp *tokenChecker) UserName(ctx context.Context) (string, error) {
-	userInfo, ok := request.UserFrom(ctx)
-	if !ok {
-		return "", fmt.Errorf("context has no user info")
-	}
-
-	return userInfo.GetName(), nil
 }
