@@ -9,12 +9,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -46,7 +46,7 @@ var scopes = []string{UserScope, GroupScope}
 
 type adProvider struct {
 	ctx         context.Context
-	authConfigs v3.AuthConfigInterface
+	authConfigs mgmtv3.AuthConfigInterface
 	configMaps  wcorev1.ConfigMapCache
 	secrets     wcorev1.SecretController
 	userMGR     user.Manager
@@ -94,7 +94,7 @@ func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) 
 }
 
 func (p *adProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v32.BasicLogin)
+	login, ok := input.(*v3.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
@@ -182,7 +182,7 @@ func (p *adProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 	return false
 }
 
-func (p *adProvider) getActiveDirectoryConfig() (*v32.ActiveDirectoryConfig, *x509.CertPool, error) {
+func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
 	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
 	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get("activedirectory", metav1.GetOptions{})
 	if err != nil {
@@ -195,7 +195,7 @@ func (p *adProvider) getActiveDirectoryConfig() (*v32.ActiveDirectoryConfig, *x5
 	}
 	storedADConfigMap := u.UnstructuredContent()
 
-	storedADConfig := &v32.ActiveDirectoryConfig{}
+	storedADConfig := &v3.ActiveDirectoryConfig{}
 	err = common.Decode(storedADConfigMap, storedADConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to decode Active Directory Config: %w", err)

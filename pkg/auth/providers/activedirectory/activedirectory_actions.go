@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -75,6 +77,60 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must supply a server")
 	}
 
+	if config.UserSearchAttribute != "" {
+		for _, attr := range strings.Split(config.UserSearchAttribute, "|") {
+			if !ldap.IsValidAttr(attr) {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userSearchAttribute")
+			}
+		}
+	}
+	if config.UserLoginAttribute != "" && !ldap.IsValidAttr(config.UserLoginAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userLoginAttribute")
+	}
+	if config.UserObjectClass != "" && !ldap.IsValidAttr(config.UserObjectClass) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userObjectClass")
+	}
+	if config.UserNameAttribute != "" && !ldap.IsValidAttr(config.UserNameAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userNameAttribute")
+	}
+	if config.UserEnabledAttribute != "" && !ldap.IsValidAttr(config.UserEnabledAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userEnabledAttribute")
+	}
+	if config.GroupSearchAttribute != "" && !ldap.IsValidAttr(config.GroupSearchAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupSearchAttribute")
+	}
+	if config.GroupObjectClass != "" && !ldap.IsValidAttr(config.GroupObjectClass) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupObjectClass")
+	}
+	if config.GroupNameAttribute != "" && !ldap.IsValidAttr(config.GroupNameAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupNameAttribute")
+	}
+	if config.GroupDNAttribute != "" && !ldap.IsValidAttr(config.GroupDNAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupDNAttribute")
+	}
+	if config.GroupMemberUserAttribute != "" && !ldap.IsValidAttr(config.GroupMemberUserAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupMemberUserAttribute")
+	}
+	if config.GroupMemberMappingAttribute != "" && !ldap.IsValidAttr(config.GroupMemberMappingAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupMemberMappingAttribute")
+	}
+
+	if config.UserLoginFilter != "" {
+		if _, err := ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
+			return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "invalid userLoginFilter")
+		}
+	}
+	if config.UserSearchFilter != "" {
+		if _, err := ldapv3.CompileFilter(config.UserSearchFilter); err != nil {
+			return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "invalid userSearchFilter")
+		}
+	}
+	if config.GroupSearchFilter != "" {
+		if _, err := ldapv3.CompileFilter(config.GroupSearchFilter); err != nil {
+			return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "invalid groupSearchFilter")
+		}
+	}
+
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
 		return err
@@ -86,7 +142,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		return err
 	}
 
-	// if this works, save adConfig CR adding enabled flag
+	// If this works, save adConfig CR adding enabled flag.
 	config.Enabled = configApplyInput.Enabled
 	err = p.saveActiveDirectoryConfig(config)
 	if err != nil {
