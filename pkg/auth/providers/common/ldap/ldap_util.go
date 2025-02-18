@@ -324,16 +324,24 @@ func NewDefaultSearchRequest(baseDN, filter string, scope int, attributes []stri
 	)
 }
 
+// According to RFC4512, attribute names (descriptors) should adhere to the following syntax
+// descr = keystring
+// keystring = leadkeychar *keychar
+// leadkeychar = ALPHA
+// keychar = ALPHA / DIGIT / HYPHEN
+// See https://datatracker.ietf.org/doc/html/rfc4512#section-1.4
 var (
 	numHyphenPrefix   = regexp.MustCompile(`^[0-9\-]`)
 	notAlphaNumHyphen = regexp.MustCompile(`[^a-zA-Z0-9\-]`)
 	validAttr         = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-]*$`)
 )
 
+// SanitizeAttr removes all invalid character from the LDAP attribute name.
 func SanitizeAttr(attr string) string {
 	return numHyphenPrefix.ReplaceAllString(notAlphaNumHyphen.ReplaceAllString(attr, ""), "")
 }
 
+// IsValidAttr returns true is the given attribute name conforms with the syntax defined in RFC4512.
 func IsValidAttr(attr string) bool {
 	return validAttr.MatchString(attr)
 }
