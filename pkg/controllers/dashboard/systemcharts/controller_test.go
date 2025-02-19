@@ -8,9 +8,12 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	chartfake "github.com/rancher/rancher/pkg/controllers/dashboard/chart/fake"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
+	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
@@ -36,17 +39,43 @@ var (
 			chart.WebhookChartName: testYAML,
 		},
 	}
-	emptyConfig     = &v1.ConfigMap{}
-	originalVersion = settings.RancherWebhookVersion.Get()
-	originalMCM     = features.MCM.Enabled()
-	sucDeployment   = &appsv1.Deployment{
+	emptyConfig                            = &v1.ConfigMap{}
+	originalWebhookVersion                 = settings.RancherWebhookVersion.Get()
+	originalCAPIVersion                    = settings.RancherProvisioningCAPIVersion.Get()
+	originalSUCVersion                     = settings.SystemUpgradeControllerChartVersion.Get()
+	originalImportedVersionManagement      = settings.ImportedClusterVersionManagement.Get()
+	originalMCM                            = features.MCM.Enabled()
+	originalMCMAgent                       = features.MCMAgent.Enabled()
+	originalManagedSystemUpgradeController = features.ManagedSystemUpgradeController.Enabled()
+	sucDeployment                          = &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "system-upgrade-controller",
-			Namespace: "cattle-system",
+			Name:      chart.SystemUpgradeControllerChartName,
+			Namespace: namespace.System,
+		},
+	}
+	localCuster = &v3.Cluster{
+		Status: v3.ClusterStatus{
+			Driver: "k3s",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "local",
+			Annotations: map[string]string{
+				importedclusterversionmanagement.VersionManagementAnno: "system-default",
+			},
+		},
+	}
+	plans = []*upgradev1.Plan{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "k3s-master-plan",
+				Annotations: map[string]string{
+					k3sbasedupgrade.RancherManagedPlan: "true",
+				},
+			},
 		},
 	}
 )
@@ -65,6 +94,9 @@ type testMocks struct {
 	configCache     *fake.MockCacheInterface[*v1.ConfigMap]
 	deployment      *fake.MockControllerInterface[*appsv1.Deployment, *appsv1.DeploymentList]
 	deploymentCache *fake.MockCacheInterface[*appsv1.Deployment]
+	clusterCache    *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+	plan            *fake.MockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList]
+	planCache       *fake.MockCacheInterface[*upgradev1.Plan]
 }
 
 func (t *testMocks) Handler() *handler {
@@ -74,6 +106,9 @@ func (t *testMocks) Handler() *handler {
 		chartsConfig:    chart.RancherConfigGetter{ConfigCache: t.configCache},
 		deployment:      t.deployment,
 		deploymentCache: t.deploymentCache,
+		clusterCache:    t.clusterCache,
+		plan:            t.plan,
+		planCache:       t.planCache,
 	}
 }
 
@@ -91,15 +126,20 @@ func Test_ChartInstallation(t *testing.T) {
 		wantErr          bool
 	}{
 		{
-			name: "normal installation",
+			name: "normal installation in downstream cluster",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				settings.RancherWebhookVersion.Set("2.0.0")
-				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
-				settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				features.MCM.Set(false)
+				features.MCMAgent.Set(true)
+				features.ManagedSystemUpgradeController.Set(true)
 
+				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"capi":              nil,
@@ -122,6 +162,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// rancher-provisioning-capi
 				expectedProvCAPIValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"global": map[string]interface{}{
@@ -130,7 +171,6 @@ func Test_ChartInstallation(t *testing.T) {
 						},
 					},
 				}
-
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
 					"rancher-provisioning-capi",
@@ -141,6 +181,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// system-upgrade-controller
 				expectedSUCValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"global": map[string]interface{}{
@@ -149,10 +190,9 @@ func Test_ChartInstallation(t *testing.T) {
 						},
 					},
 				}
-
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"system-upgrade-controller",
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -160,7 +200,341 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in downstream cluster with imported-cluster-version-management disabled and existing plans",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				features.MCM.Set(false)
+				features.MCMAgent.Set(true)
+				features.ManagedSystemUpgradeController.Set(false)
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				// nothing to do in this case
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in downstream cluster with imported-cluster-version-management disabled",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				features.MCM.Set(false)
+				features.MCMAgent.Set(true)
+				features.ManagedSystemUpgradeController.Set(false)
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				mocks.manager.EXPECT().Uninstall(namespace.System, chart.SystemUpgradeControllerChartName).Return(nil)
+				mocks.manager.EXPECT().Remove(namespace.System, chart.SystemUpgradeControllerChartName)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in local cluster",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				expectedSUCValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.SystemUpgradeControllerChartName,
+					"",
+					"2.0.0",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in local cluster with imported-cluster-version-managements disabled",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.ImportedClusterVersionManagement.Set("false")
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				mocks.manager.EXPECT().Uninstall(namespace.System, chart.SystemUpgradeControllerChartName).Return(nil)
+				mocks.manager.EXPECT().Remove(namespace.System, chart.SystemUpgradeControllerChartName)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in local cluster with imported-cluster-version-managements disabled and with existing plans",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.ImportedClusterVersionManagement.Set("false")
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				// nothing to do in this case
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
 			},
 		},
 		{
@@ -169,10 +543,13 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(6)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				settings.RancherWebhookVersion.Set("2.0.0")
-				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
-				settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 
+				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"capi": nil,
 					"mcm": map[string]interface{}{
@@ -194,6 +571,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// rancher-provisioning-capi
 				expectedProvCAPIValues := map[string]interface{}{
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -211,6 +589,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// system-upgrade-controller
 				expectedSUCValues := map[string]interface{}{
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -218,10 +597,9 @@ func Test_ChartInstallation(t *testing.T) {
 						},
 					},
 				}
-
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"system-upgrade-controller",
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -229,7 +607,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
 			},
 		},
 		{
@@ -238,10 +618,13 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(6)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				settings.RancherWebhookVersion.Set("2.0.1")
-				settings.RancherProvisioningCAPIVersion.Set("2.0.1")
-				settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.1")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.1")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
 
+				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"capi": nil,
 					"mcm": map[string]interface{}{
@@ -266,6 +649,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
+				// rancher-provisioning-capi
 				expectedProvCAPIValues := map[string]interface{}{
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -276,7 +660,6 @@ func Test_ChartInstallation(t *testing.T) {
 						"repository": "rancher-test.io/rancher/mirrored-cluster-api-controller",
 					},
 				}
-
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
 					"rancher-provisioning-capi",
@@ -287,6 +670,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
+				// system-upgrade-controller
 				expectedSUCValues := map[string]interface{}{
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -303,10 +687,9 @@ func Test_ChartInstallation(t *testing.T) {
 						},
 					},
 				}
-
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"system-upgrade-controller",
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.1",
 					expectedSUCValues,
@@ -314,7 +697,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
+				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
 			},
 			registryOverride: "rancher-test.io",
 		},
@@ -324,10 +709,14 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(6)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				settings.RancherWebhookVersion.Set("2.0.0")
-				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
-				settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				features.MCM.Set(true)
+
+				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"priorityClassName": "newClass",
 					"capi":              nil,
@@ -347,6 +736,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// rancher-provisioning-capi
 				expectedProvCAPIValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"global": map[string]interface{}{
@@ -365,6 +755,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// system-upgrade-controller
 				expectedSUCValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"global": map[string]interface{}{
@@ -375,7 +766,7 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"system-upgrade-controller",
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -383,17 +774,22 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// reset setting to default values before each test
-			settings.RancherWebhookVersion.Set(originalVersion)
-			settings.RancherProvisioningCAPIVersion.Set(originalVersion)
-			settings.SystemUpgradeControllerChartVersion.Set(originalVersion)
+			_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
+			_ = settings.RancherProvisioningCAPIVersion.Set(originalCAPIVersion)
+			_ = settings.SystemUpgradeControllerChartVersion.Set(originalSUCVersion)
+			_ = settings.ImportedClusterVersionManagement.Set(originalImportedVersionManagement)
 			features.MCM.Set(originalMCM)
+			features.MCMAgent.Set(originalMCMAgent)
+			features.ManagedSystemUpgradeController.Set(originalManagedSystemUpgradeController)
 
 			ctrl := gomock.NewController(t)
 
@@ -403,9 +799,12 @@ func Test_ChartInstallation(t *testing.T) {
 				namespaceCtrl:   fake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl),
 				configCache:     fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
 				deploymentCache: fake.NewMockCacheInterface[*appsv1.Deployment](ctrl),
+				plan:            fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
+				planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
+				clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
 			}
 
-			// allow test to add expected calls to mocks and run any additional setup
+			// allow test to add expected calls to mock and run any additional setup
 			tt.setup(mocks)
 			h := mocks.Handler()
 
