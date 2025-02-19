@@ -117,9 +117,9 @@ func downloadRKESSHKey(client *rancher.Client, clusterID string, v3Node *v3.Node
 	fileName := namegenerator.AppendRandomString("file-name")
 	zipFile := fmt.Sprintf("%s.zip", fileName)
 
-	curlCommand := fmt.Sprintf("curl -sSL -k -H '%s' %s --output %s", autorizationBearer, downloadUrl, zipFile)
-	unzipCommand := fmt.Sprintf("unzip %s -d %s", zipFile, fileName)
-	catCommand := fmt.Sprintf("cat %s/%s/id_rsa", fileName, client.RancherConfig.ClusterName)
+	curlCommand := fmt.Sprintf("curl -s -sSL -k -H '%s' %s --output %s", autorizationBearer, downloadUrl, zipFile)
+	unzipCommand := fmt.Sprintf("unzip -q %s -d %s", zipFile, fileName)
+	catCommand := fmt.Sprintf("cat %s/%s/id_rsa", fileName, v3Node.Status.NodeName)
 	bashCommand := fmt.Sprintf("%s && %s && %s", curlCommand, unzipCommand, catCommand)
 
 	execCmd := []string{"bash", "-c", bashCommand}

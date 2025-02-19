@@ -348,7 +348,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	require.NoError(p.T(), err)
 
 	err = clusters.VerifyNodePoolSize(steveClient, clusters.LabelWorker, nodePoolsize)
-	if strings.Contains(err.Error(), clusters.SmallerPoolMessageError) {
+	if err != nil && strings.Contains(err.Error(), clusters.SmallerPoolMessageError) {
 		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes")
 	} else {
 		require.NoError(p.T(), err)
