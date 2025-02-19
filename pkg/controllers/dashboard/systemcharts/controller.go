@@ -154,6 +154,23 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
+			ReleaseNamespace: namespace.System,
+			ChartName:        chart.RemoteDialerProxyChartName,
+			Values: func() map[string]interface{} {
+
+				values := map[string]interface{}{}
+				values["service"] = map[string]interface{}{
+					"httpsPort": 5555,
+					"peerPort":  6666,
+				}
+
+				return values
+			},
+			Enabled:         func() bool { return true },
+			Uninstall:       false,
+			RemoveNamespace: false,
+		},
+		{
 			ReleaseNamespace:    namespace.System,
 			ChartName:           chart.WebhookChartName,
 			ExactVersionSetting: settings.RancherWebhookVersion,

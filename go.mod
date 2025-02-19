@@ -130,7 +130,7 @@ require (
 	github.com/rancher/apiserver v0.5.1
 	github.com/rancher/backup-restore-operator v1.2.1
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.6.1-rc.2
+	github.com/rancher/dynamiclistener v0.6.1
 	github.com/rancher/eks-operator v1.11.0-rc.2
 	github.com/rancher/fleet/pkg/apis v0.12.0-alpha.2
 	github.com/rancher/gke-operator v1.10.0
@@ -139,7 +139,7 @@ require (
 	github.com/rancher/machine v0.15.0-rancher125
 	github.com/rancher/norman v0.5.1
 	github.com/rancher/rancher/pkg/client v0.0.0
-	github.com/rancher/remotedialer v0.4.0
+	github.com/rancher/remotedialer v0.4.2-0.20250219212905-c0db75b814ef
 	github.com/rancher/rke v1.8.0-rc.1
 	github.com/rancher/shepherd v0.0.0-20241213222351-98e341c77d0b
 	github.com/rancher/steve v0.5.6
