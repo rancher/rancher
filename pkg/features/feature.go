@@ -162,6 +162,13 @@ var (
 		false,
 		true,
 		true)
+
+	ImperativeApiExtension = newFeature(
+		"imperative-api-extension",
+		"Enable imperative API extension as a k8s aggregation layer as proxy to the kube apiserver",
+		true,
+		false,
+		true)
 )
 
 type Feature struct {
