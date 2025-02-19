@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
+	"github.com/rancher/rancher/tests/v2/actions/ssh"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -19,11 +18,9 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	kubeapinodes "github.com/rancher/shepherd/extensions/kubeapi/nodes"
 	"github.com/rancher/shepherd/extensions/kubectl"
-	"github.com/rancher/shepherd/extensions/sshkeys"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -203,7 +200,7 @@ func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient 
 }
 
 // validateHostPortSSH is a helper function that verifies the cluster is able to connect to the node host port by ssh shell
-func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName string, steveClient *steveV1.Client, hostPort int, workloadName string, namespaceName string) error {
+func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName string, steveClient *steveV1.Client, hostPort int, workloadName string) error {
 	logrus.Infof("Getting the node using the label [%v]", labelWorker)
 	query, err := url.ParseQuery(labelWorker)
 	if err != nil {
@@ -215,39 +212,6 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 		return err
 	}
 
-	provisioningClusterID, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
-	if err != nil {
-		return err
-	}
-
-	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
-	if err != nil {
-		return err
-	}
-
-	wc, err := client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
-	if err != nil {
-		return err
-	}
-
-	pods, err := wc.Core.Pod().List(namespaceName, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	newCluster := &provv1.Cluster{}
-	err = steveV1.ConvertToK8sType(cluster, newCluster)
-	if err != nil {
-		return err
-	}
-
-	var nodes []string
-	nodes = make([]string, 0)
-	for _, podItem := range pods.Items {
-		nodeName := podItem.Spec.NodeName
-		nodes = append(nodes, nodeName)
-	}
-
 	for _, machine := range nodeList.Data {
 		logrus.Info("Getting the node IP")
 		newNode := &corev1.Node{}
@@ -256,33 +220,20 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 			return err
 		}
 
-		log := ""
 		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
-		if strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") || strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
-			_, found := slices.BinarySearch(nodes, newNode.Name)
-			if found {
-				_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
-				if err != nil {
-					return err
-				}
 
-				sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
-				if err != nil {
-					return err
-				}
+		sshNode, err := ssh.CreateSSH(client, steveClient, clusterName, clusterID)
+		if err != nil {
+			return err
+		}
 
-				sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &machine)
-				if err != nil {
-					return err
-				}
+		curlCommand := fmt.Sprintf("curl %s:%s/name.html", nodeIP, strconv.Itoa(hostPort))
 
-				log, err = sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
-				if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-					return err
-				}
-			}
-		} else {
-			log, _ = curlCommand(client, clusterID, fmt.Sprintf("%s:%s/name.html", nodeIP, strconv.Itoa(hostPort)))
+		logrus.Infof("curl command {%v}", curlCommand)
+
+		log, err := sshNode.ExecuteCommand(curlCommand)
+		if err != nil {
+			continue
 		}
 
 		logrus.Infof("Log of the curl command {%v}", log)
@@ -290,6 +241,7 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 			return nil
 		}
 	}
+
 	return errors.New("Unable to connect to the host port")
 }
 

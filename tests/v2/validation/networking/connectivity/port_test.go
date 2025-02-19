@@ -103,7 +103,7 @@ func (p *PortTestSuite) TestHostPort() {
 	err = charts.WatchAndWaitDaemonSets(p.client, p.cluster.ID, p.namespace.Name, metav1.ListOptions{})
 	require.NoError(p.T(), err)
 
-	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, daemonsetName, p.namespace.Name)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, daemonsetName)
 	require.NoError(p.T(), err)
 }
 
@@ -394,7 +394,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 3, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName)
 	require.NoError(p.T(), err)
 
 	log.Info("Scaling down deployment")
@@ -406,7 +406,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName)
 	require.NoError(p.T(), err)
 
 	log.Info("Upgrading deployment")
@@ -421,7 +421,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	err = validateWorkload(p.client, p.cluster.ID, deploymentTemplate, containerImage, 2, namespace.Name)
 	require.NoError(p.T(), err)
 
-	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName, namespace.Name)
+	err = validateHostPortSSH(p.client, p.cluster.ID, p.cluster.Name, steveClient, hostPort, deploymentName)
 	require.NoError(p.T(), err)
 }
 

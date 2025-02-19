@@ -9,6 +9,7 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/fleet"
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/rancher/tests/v2/actions/ssh"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -72,7 +73,7 @@ func (u *UpgradeTestSuite) SetupSuite() {
 	steveClient, err := u.client.Steve.ProxyDownstream(u.cluster.ID)
 	require.NoError(u.T(), err)
 
-	u.sshNode, err = createSSHNode(u.client, steveClient, u.cluster.Name, u.cluster.ID)
+	u.sshNode, err = ssh.CreateSSH(u.client, steveClient, u.cluster.Name, u.cluster.ID)
 	require.NoError(u.T(), err)
 
 	u.fleetSecretName, err = createFleetSSHSecret(u.client, string(u.sshNode.SSHKey))
