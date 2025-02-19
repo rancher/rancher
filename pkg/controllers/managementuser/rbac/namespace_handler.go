@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
@@ -55,6 +56,10 @@ type nsLifecycle struct {
 }
 
 func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
+	if lifecycle.IsDisallowedNamespace(obj) {
+		return obj, nil
+	}
+
 	obj, err := n.resourceQuotaInit(obj)
 	if err != nil {
 		return obj, err
@@ -83,6 +88,10 @@ func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error
 }
 
 func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
+	if lifecycle.IsDisallowedNamespace(obj) {
+		return obj, nil
+	}
+
 	_, err := n.syncNS(obj)
 	return obj, err
 }
