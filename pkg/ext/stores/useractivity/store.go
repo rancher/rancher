@@ -99,7 +99,11 @@ func (uas *Store) Create(ctx context.Context,
 	// retrieve token information
 	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenID, metav1.GetOptions{})
 	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("failed to get token %s: %v", objUserActivity.Spec.TokenID, err))
+		if apierrors.IsNotFound(err) {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", objUserActivity.Spec.TokenID, err))
+		} else {
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenID, err))
+		}
 	}
 	// set when last activity happened
 	lastActivity := metav1.Time{
