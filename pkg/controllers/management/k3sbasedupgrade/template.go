@@ -28,7 +28,7 @@ var genericPlan = planv1.Plan{
 	},
 	ObjectMeta: metav1.ObjectMeta{
 		Namespace: systemUpgradeNS,
-		Labels:    map[string]string{rancherManagedPlan: "true"},
+		Labels:    map[string]string{RancherManagedPlan: "true"},
 	},
 	Spec: planv1.PlanSpec{
 		Concurrency:        0,

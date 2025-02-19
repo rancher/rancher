@@ -40,6 +40,8 @@ import (
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
+	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -132,6 +134,7 @@ type Context struct {
 	API                 apiregv1.Interface
 	CRD                 crdv1.Interface
 	K8s                 *kubernetes.Clientset
+	Plan                plancontrolers.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -160,6 +163,7 @@ type Context struct {
 	core         *core.Factory
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
+	plan         *upgrade.Factory
 
 	started bool
 }
@@ -253,6 +257,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.Core = wContextCopy.core.WithAgent(userAgent).V1()
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
+	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
 
 	return &wContextCopy
 }
@@ -281,6 +286,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	mgmt, err := management.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := upgrade.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -445,6 +455,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		SystemChartsManager:     systemCharts,
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
+		Plan:                    plan.Upgrade().V1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -460,6 +471,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		capi:         capi,
 		rke:          rke,
 		rbac:         rbac,
+		plan:         plan,
 	}
 
 	return wContext, nil
