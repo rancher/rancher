@@ -121,7 +121,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 	}
 	for _, chartDef := range h.getChartsToInstall() {
 		if chartDef.Uninstall {
-			// it is important to remove the chat from the desired chart list
+			// it is important to remove the chart from the desired chart list
 			h.manager.Remove(chartDef.ReleaseNamespace, chartDef.ChartName)
 			if err := h.manager.Uninstall(chartDef.ReleaseNamespace, chartDef.ChartName); err != nil {
 				return repo, err
