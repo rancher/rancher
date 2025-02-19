@@ -7,6 +7,7 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/machinepools"
 	provisioning "github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/cloudcredentials"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
@@ -337,7 +339,10 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 
 				k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
+				credentialSpec := cloudcredentials.LoadCloudCredential(string(k3sProvider.Name))
+				machineConfigSpec := machinepools.LoadMachineConfigs(string(k3sProvider.Name))
+
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, credentialSpec, testConfig, machineConfigSpec, nil)
 				reports.TimeoutClusterReport(clusterObject, err)
 				require.NoError(rt.T(), err)
 
@@ -357,7 +362,10 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 
 				k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
+				credentialSpec := cloudcredentials.LoadCloudCredential(string(k3sProvider.Name))
+				machineConfigSpec := machinepools.LoadMachineConfigs(string(k3sProvider.Name))
+
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, credentialSpec, testConfig, machineConfigSpec, nil)
 				reports.TimeoutClusterReport(clusterObject, err)
 				require.NoError(rt.T(), err)
 
@@ -403,7 +411,10 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 
 				rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
+				credentialSpec := cloudcredentials.LoadCloudCredential(string(rke2Provider.Name))
+				machineConfigSpec := machinepools.LoadMachineConfigs(string(rke2Provider.Name))
+
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, credentialSpec, testConfig, machineConfigSpec, nil)
 				reports.TimeoutClusterReport(clusterObject, err)
 				require.NoError(rt.T(), err)
 
@@ -421,7 +432,10 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 
 				rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
-				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
+				credentialSpec := cloudcredentials.LoadCloudCredential(string(rke2Provider.Name))
+				machineConfigSpec := machinepools.LoadMachineConfigs(string(rke2Provider.Name))
+
+				clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, credentialSpec, testConfig, machineConfigSpec, nil)
 				reports.TimeoutClusterReport(clusterObject, err)
 				require.NoError(rt.T(), err)
 
