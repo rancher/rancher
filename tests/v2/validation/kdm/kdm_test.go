@@ -176,7 +176,8 @@ func findLatestVersion(allVersions []string) (string, error) {
 }
 
 func (k *KDMTestSuite) TestChangeKDMurl() {
-	// change kdm url to release
+	// set kdm url to a branch NOT containing newer versions
+	// NOTE: This does NOT need to be changed when switching KDM branches from `dev` to `release` and vice-versa
 	k.updateKDMurl("https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/refs/heads/dev-v2.9-2024-07-patches/data/data.json")
 
 	// scale Rancher to 3 replicas
@@ -189,7 +190,8 @@ func (k *KDMTestSuite) TestChangeKDMurl() {
 	k.Require().NoError(err, "error getting kubernetes version")
 	log.Infof("current RKE2 version available: %s", currentRKE2Version)
 
-	// change kdm url to dev
+	// change KDM URL to branch containing newer versions
+	// NOTE: This does NOT need to be changed when switching KDM branches from `dev` to `release` and vice-versa
 	k.updateKDMurl("https://releases.rancher.com/kontainer-driver-metadata/dev-v2.9/data.json")
 
 	var updatedRKE2Version string
