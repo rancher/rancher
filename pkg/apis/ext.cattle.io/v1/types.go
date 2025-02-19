@@ -13,9 +13,9 @@ type UserActivity struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec is the spec of UserActivity
+	// Spec contains the user-accessible configuration of the useractivity.
 	Spec UserActivitySpec `json:"spec"`
-	// +optional
+	// Status contains system information about the useractivity.
 	Status UserActivityStatus `json:"status"`
 }
 
