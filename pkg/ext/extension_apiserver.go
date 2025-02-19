@@ -89,7 +89,7 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController) error {
 				},
 			},
 			Selector: map[string]string{
-				"app": "rancher",
+				"app": "api-extension",
 			},
 		},
 	}
