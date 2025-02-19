@@ -3,8 +3,8 @@
 package connectivity
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/actions/clusters"
@@ -348,7 +348,7 @@ func (p *PortTestSuite) TestHostPortScaleAndUpgrade() {
 	require.NoError(p.T(), err)
 
 	err = clusters.VerifyNodePoolSize(steveClient, clusters.LabelWorker, nodePoolsize)
-	if errors.Is(err, clusters.SmallerPoolClusterSize) {
+	if strings.Contains(err.Error(), clusters.SmallerPoolMessageError) {
 		p.T().Skip("The Host Port scale up/down test requires at least 3 worker nodes")
 	} else {
 		require.NoError(p.T(), err)

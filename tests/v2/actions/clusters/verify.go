@@ -9,11 +9,8 @@ import (
 )
 
 const (
-	LabelWorker = "labelSelector=node-role.kubernetes.io/worker=true"
-)
-
-var (
-	SmallerPoolClusterSize = errors.New("Machine pool cluster size is smaller than expected pool size")
+	LabelWorker             = "labelSelector=node-role.kubernetes.io/worker=true"
+	SmallerPoolMessageError = "Machine pool cluster size is smaller than expected pool size"
 )
 
 // VerifyNodePoolSize is a helper function that checks if the machine pool cluster size is greater than or equal to poolSize
@@ -32,7 +29,7 @@ func VerifyNodePoolSize(steveClient *steveV1.Client, labelSelector string, poolS
 	}
 
 	if len(nodeList.Data) < poolSize {
-		return SmallerPoolClusterSize
+		return errors.New(SmallerPoolMessageError)
 	}
 
 	return nil
