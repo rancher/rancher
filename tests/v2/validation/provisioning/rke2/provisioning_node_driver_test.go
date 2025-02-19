@@ -40,7 +40,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.provisioningConfig = new(provisioninginput.Config)
 	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.provisioningConfig)
 
-	client, err := rancher.NewClient("", testSession)
+	rancherConfig := new(rancher.Config)
+	config.LoadConfig(rancher.ConfigurationFileKey, rancherConfig)
+
+	client, err := rancher.NewClientForConfig("", rancherConfig, testSession)
 	require.NoError(r.T(), err)
 	r.client = client
 
