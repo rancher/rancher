@@ -99,7 +99,7 @@ func (uas *Store) Create(ctx context.Context,
 	// retrieve token information
 	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenID, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenID, err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenID, err))
 	}
 	// set when last activity happened
 	lastActivity := metav1.Time{
@@ -126,16 +126,16 @@ func (uas *Store) create(_ context.Context,
 
 	expectedName, err := setUserActivityName(user, token.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set useractivity name: %v", err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to set useractivity name: %v", err))
 	}
 	// ensure the UserActivity object is crafted as expected.
 	if userActivity.Name != expectedName {
-		return nil, fmt.Errorf("useractivity name mismatch: have %s - expected %s", userActivity.Name, expectedName)
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("useractivity name mismatch: have %s - expected %s", userActivity.Name, expectedName))
 	}
 	// ensure the token specified in the UserActivity is the same
 	// we are using to do the request.
 	if token.Name != userActivity.Spec.TokenID {
-		return nil, fmt.Errorf("token name mismatch: have %s - expected %s", token.Name, userActivity.Spec.TokenID)
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("token name mismatch: have %s - expected %s", token.Name, userActivity.Spec.TokenID))
 	}
 
 	// once validated the request, we can define the lastActivity time.
@@ -150,7 +150,7 @@ func (uas *Store) create(_ context.Context,
 		token.LastIdleTimeout = newIdleTimeout
 		_, err = uas.tokenController.Update(token)
 		if err != nil {
-			return nil, fmt.Errorf("failed to update token: %v", err)
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to update token: %v", err))
 		}
 	}
 
@@ -170,16 +170,16 @@ func (uas *Store) Get(ctx context.Context,
 func (uas *Store) get(_ context.Context, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
 	user, token, err := getUserActivityName(uaname)
 	if err != nil {
-		return nil, fmt.Errorf("wrong useractivity name: %v", err)
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("wrong useractivity name: %v", err))
 	}
 	// retrieve token information
 	tokenId, err := uas.tokenController.Get(token, *options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token %s: %v", token, err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %v", token, err))
 	}
 	// verify user is the same
 	if tokenId.UserID != user {
-		return nil, fmt.Errorf("user provided mismatch: have %s - expected %s", user, tokenId.UserID)
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("user provided mismatch: have %s - expected %s", user, tokenId.UserID))
 	}
 
 	// crafting UserActivity from requested Token name.
