@@ -211,7 +211,7 @@ func (s *Store) get(_ context.Context, uaname string, options *metav1.GetOptions
 			TokenID: tokenId.Name,
 		},
 		Status: ext.UserActivityStatus{
-			ExpiresAt: tokenId.LastIdleTimeout.String(),
+			ExpiresAt: tokenId.ActivityLastSeenAt.String(),
 		},
 	}
 
