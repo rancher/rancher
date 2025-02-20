@@ -229,7 +229,7 @@ type GlobalRoleBinding struct {
 	// +optional
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 
-	// UserPrincipalName is the name of the user principal subject added to the cluster. Immutable.
+	// UserPrincipalName is the name of the user principal subject to be bound. Immutable.
 	// +optional
 	UserPrincipalName string `json:"userPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 
