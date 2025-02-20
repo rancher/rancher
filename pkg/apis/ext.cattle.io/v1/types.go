@@ -32,9 +32,9 @@ type UserActivityStatus struct {
 	// auth-user-session-idle-ttl-minutes attribute to the time
 	// the request is made.
 	// +optional
-	CurrentTimeout string `json:"currentTimeout"`
+	ExpiresAt string `json:"expiresAt"`
 	// LastActivity is the timestamp of the last user activity
 	// tracked by the UI.
 	// +optional
-	LastActivity string `json:"lastActivity,omitempty"`
+	LastSeetAt string `json:"lastSeenAt,omitempty"`
 }
