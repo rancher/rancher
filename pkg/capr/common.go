@@ -128,7 +128,9 @@ const (
 	MinimumHostnameLengthLimit = 10
 	MaximumHostnameLengthLimit = 63
 
-	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
+	SystemAgentDataDirEnvVar   = "CATTLE_AGENT_VAR_DIR"
+	SnapshotFileNameAnnotation = "etcdsnapshot.rke.io/snapshot-file-name"
+	SnapshotNameAnnotation     = "etcdsnapshot.rke.io/snapshot-name"
 )
 
 var (
@@ -386,21 +388,21 @@ func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 }
 
 // GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
-func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
+func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (*capi.Machine, error) {
 	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterNameLabel, cluster.Name))
 	if err != nil {
-		return false, nil, err
+		return nil, err
 	}
 	machines, err := machineCache.List(cluster.Namespace, ls)
 	if err != nil {
-		return false, nil, err
+		return nil, err
 	}
 	for _, machine := range machines {
 		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
-			return true, machine, nil
+			return machine, nil
 		}
 	}
-	return true, nil, fmt.Errorf("unable to find node %s in machines", nodeName)
+	return nil, fmt.Errorf("unable to find node %s in machines", nodeName)
 }
 
 // GetMachineByID attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
@@ -713,4 +715,24 @@ func FormatWindowsEnvVar(envVar corev1.EnvVar, isPlanVariable bool) string {
 	envVar.Value = strings.Trim(envVar.Value, "$")
 
 	return fmt.Sprintf("%s=%s", envVar.Name, envVar.Value)
+}
+
+func ToOwnerReference(obj runtime.Object) (metav1.OwnerReference, error) {
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return metav1.OwnerReference{}, err
+	}
+	typeMeta, err := meta.TypeAccessor(obj)
+	if err != nil {
+		return metav1.OwnerReference{}, err
+	}
+
+	return metav1.OwnerReference{
+		APIVersion:         typeMeta.GetAPIVersion(),
+		Kind:               typeMeta.GetKind(),
+		Name:               objectMeta.GetName(),
+		UID:                objectMeta.GetUID(),
+		Controller:         &[]bool{true}[0],
+		BlockOwnerDeletion: &[]bool{true}[0],
+	}, nil
 }

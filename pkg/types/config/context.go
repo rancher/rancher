@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
+	"github.com/rancher/rancher/pkg/generated/controllers/k3s.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2"
@@ -218,8 +219,11 @@ type UserContext struct {
 	Cluster        clusterv3.Interface
 	Storage        storagev1.Interface
 
-	RBACw          wrbacv1.Interface
-	Corew          wcorev1.Interface
+	RBACw wrbacv1.Interface
+	Corew wcorev1.Interface
+
+	K3s k3s.Interface
+
 	KindNamespaces map[schema.GroupVersionKind]string
 }
 
