@@ -210,9 +210,13 @@ func (s *Store) get(_ context.Context, uaname string, options *metav1.GetOptions
 		Spec: ext.UserActivitySpec{
 			TokenID: tokenId.Name,
 		},
-		Status: ext.UserActivityStatus{
-			ExpiresAt: tokenId.ActivityLastSeenAt.String(),
-		},
+		Status: ext.UserActivityStatus{},
+	}
+
+	if tokenId.ActivityLastSeenAt != nil {
+		ua.Status.ExpiresAt = tokenId.ActivityLastSeenAt.String()
+	} else {
+		ua.Status.ExpiresAt = metav1.Time{}.String()
 	}
 
 	return ua, nil

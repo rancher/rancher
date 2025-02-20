@@ -37,7 +37,7 @@ type Token struct {
 	AuthProvider       string            `json:"authProvider"`
 	TTLMillis          int64             `json:"ttl"`
 	LastUsedAt         *metav1.Time      `json:"lastUsedAt,omitempty"`
-	ActivityLastSeenAt metav1.Time       `json:"activityLastSeenAt,omitempty"`
+	ActivityLastSeenAt *metav1.Time      `json:"activityLastSeenAt,omitempty"`
 	IsDerived          bool              `json:"isDerived"`
 	Description        string            `json:"description"`
 	Expired            bool              `json:"expired"`
