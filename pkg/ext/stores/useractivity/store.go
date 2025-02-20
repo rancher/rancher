@@ -99,6 +99,9 @@ func (s *Store) Create(ctx context.Context,
 		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T", zeroUA, objUserActivity))
 	}
 	// retrieve token information
+	if objUserActivity.Spec.TokenID == "" {
+		return nil, apierrors.NewBadRequest("can't retrieve token with empty string")
+	}
 	token, err := s.tokenController.Get(objUserActivity.Spec.TokenID, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
