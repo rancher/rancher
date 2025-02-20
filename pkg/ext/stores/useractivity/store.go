@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	UserActivityNamespace    = "cattle-useractivity-data"
-	tokenUserId              = "authn.management.cattle.io/token-userId"
 	SingularName             = "useractivity"
 	PluralName               = "useractivities"
 	GroupCattleAuthenticated = "system:cattle:authenticated"
@@ -183,7 +181,6 @@ func (s *Store) create(_ context.Context,
 	newIdleTimeout := metav1.Time{
 		Time: lastActivity.Add(time.Minute * time.Duration(authUserSessionIdleTTLMinutes)).UTC(),
 	}
-	userActivity.Status.LastSeetAt = lastActivity.String()
 	userActivity.Status.ExpiresAt = newIdleTimeout.String()
 
 	// if it's not a dry-run, commit the changes
