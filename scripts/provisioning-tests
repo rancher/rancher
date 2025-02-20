@@ -63,7 +63,12 @@ export CATTLE_FEATURES=${CATTLE_FEATURES}
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
+
 # defaulting to :head (matching the hardcoded value within rancher) if CATTLE_AGENT_IMAGE or TAG is not specified
+if [ $TAG = "dev" ]; then 
+    TAG="head"
+fi
+
 export CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/rancher-agent:${TAG:-head}}
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
@@ -172,15 +177,15 @@ push_cattle_agent_image()
 # Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
 # time before Rancher is ready and therefore causing flakiness of the health check below.
 
-container_id=$(docker create rancher/rancher:$TAG)
-if [ -z $container_id ]; then
-  echo "building rancher from source - no preloaded container image available"
-  ./scripts/build-server
+if ! docker image inspect rancher/rancher:$TAG >/dev/null 2>&1 ; then
+    echo "building rancher from source - no preloaded container image available"
+    ./scripts/build-server
 else
-  # otherwise just copy it from the artifacts that are already there. neat!
-  echo "pulling bin/rancher from preloaded container image"
-  docker cp $container_id:/usr/bin/rancher bin/rancher
-  docker rm $container_id
+    # otherwise just copy it from the artifacts that are already there. neat!
+    echo "pulling bin/rancher from preloaded container image"
+    container_id=$(docker create rancher/rancher:$TAG)
+    docker cp $container_id:/usr/bin/rancher bin/rancher
+    docker rm $container_id
 fi
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
