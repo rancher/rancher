@@ -36,7 +36,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -81,6 +80,8 @@ const (
 	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
 	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
+
+	SnapshotNameAnnotation = "etcdsnapshot.rke.io/snapshot-name"
 
 	JoinServerImplausible = "implausible"
 
@@ -128,9 +129,7 @@ const (
 	MinimumHostnameLengthLimit = 10
 	MaximumHostnameLengthLimit = 63
 
-	SystemAgentDataDirEnvVar   = "CATTLE_AGENT_VAR_DIR"
-	SnapshotFileNameAnnotation = "etcdsnapshot.rke.io/snapshot-file-name"
-	SnapshotNameAnnotation     = "etcdsnapshot.rke.io/snapshot-name"
+	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
 )
 
 var (
@@ -385,39 +384,6 @@ func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 	}
 
 	return "", nil
-}
-
-// GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
-func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (*capi.Machine, error) {
-	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterNameLabel, cluster.Name))
-	if err != nil {
-		return nil, err
-	}
-	machines, err := machineCache.List(cluster.Namespace, ls)
-	if err != nil {
-		return nil, err
-	}
-	for _, machine := range machines {
-		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
-			return machine, nil
-		}
-	}
-	return nil, fmt.Errorf("unable to find node %s in machines", nodeName)
-}
-
-// GetMachineByID attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
-func GetMachineByID(machineCache capicontrollers.MachineCache, machineID, clusterNamespace, clusterName string) (bool, *capi.Machine, error) {
-	machines, err := machineCache.List(clusterNamespace, labels.SelectorFromSet(map[string]string{
-		ClusterNameLabel: clusterName,
-		MachineIDLabel:   machineID,
-	}))
-	if err != nil || len(machines) > 1 {
-		return false, nil, err
-	}
-	if len(machines) == 1 {
-		return true, machines[0], nil
-	}
-	return true, nil, fmt.Errorf("unable to find machine by ID %s for cluster %s", machineID, clusterName)
 }
 
 func CopyPlanMetadataToSecret(secret *corev1.Secret, metadata *plan.Metadata) {

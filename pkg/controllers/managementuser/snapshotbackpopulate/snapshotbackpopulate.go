@@ -5,6 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	k3s "github.com/rancher/rancher/pkg/apis/k3s.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -13,23 +17,16 @@ import (
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	k3scontrollers "github.com/rancher/rancher/pkg/generated/controllers/k3s.cattle.io/v1"
-	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	normancorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/name"
-	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"regexp"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"strings"
-	"time"
 )
 
 var (
@@ -50,18 +47,13 @@ const (
 type handler struct {
 	clusterName                string
 	clusterCache               provisioningcontrollers.ClusterCache
-	clusters                   provisioningcontrollers.ClusterClient
-	mgmtClusterCache           managementcontrollers.ClusterCache
 	controlPlaneCache          rkev1controllers.RKEControlPlaneCache
 	etcdSnapshotCache          rkev1controllers.ETCDSnapshotCache
 	etcdSnapshotController     rkev1controllers.ETCDSnapshotController
 	machineCache               capicontrollers.MachineCache
 	capiClusterCache           capicontrollers.ClusterCache
-	nodeController             normancorev1.NodeInterface
 	etcdSnapshotFileController k3scontrollers.ETCDSnapshotFileController
 	etcdSnapshotFileCache      k3scontrollers.ETCDSnapshotFileCache
-	v1ClusterNamespace         string
-	v1ClusterName              string
 }
 
 // Register sets up the v2provisioning snapshot backpopulate controller. This controller is responsible for monitoring
@@ -70,96 +62,56 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	h := handler{
 		clusterName:                userContext.ClusterName,
 		clusterCache:               userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
-		clusters:                   userContext.Management.Wrangler.Provisioning.Cluster(),
-		mgmtClusterCache:           userContext.Management.Wrangler.Mgmt.Cluster().Cache(),
 		controlPlaneCache:          userContext.Management.Wrangler.RKE.RKEControlPlane().Cache(),
 		etcdSnapshotCache:          userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
 		etcdSnapshotController:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
 		machineCache:               userContext.Management.Wrangler.CAPI.Machine().Cache(),
 		capiClusterCache:           userContext.Management.Wrangler.CAPI.Cluster().Cache(),
-		nodeController:             userContext.Core.Nodes(""),
 		etcdSnapshotFileController: userContext.K3s.V1().ETCDSnapshotFile(),
 		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
 	}
 
-	userContext.Management.Wrangler.RKE.ETCDSnapshot().OnChange(ctx, "snapshotbackpopulate", h.OnUpstreamChange)
-	userContext.K3s.V1().ETCDSnapshotFile().OnChange(ctx, "downstreamsnapshotbackpopulate", h.OnDownstreamChange)
-
-	relatedresource.Watch(ctx, "snapshot-reconcile-downstream-deletion", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if snapshot, ok := obj.(*k3s.ETCDSnapshotFile); ok {
-			if snapshot.DeletionTimestamp == nil {
-				return nil, nil
-			}
-			upstreamSnapshots, err := h.etcdSnapshotCache.List(h.v1ClusterNamespace, labels.SelectorFromSet(labels.Set{capr.ClusterNameLabel: h.v1ClusterName}))
-			if err != nil {
-				return nil, err
-			}
-			for _, upstreamSnapshot := range upstreamSnapshots {
-				if upstreamSnapshot.Annotations != nil && upstreamSnapshot.Annotations[capr.SnapshotNameAnnotation] == snapshot.Name {
-					return []relatedresource.Key{
-						{
-							Namespace: upstreamSnapshot.Namespace,
-							Name:      upstreamSnapshot.Name,
-						},
-					}, nil
-				}
-			}
-		}
-		return nil, nil
-	}, userContext.Management.Wrangler.RKE.ETCDSnapshot(), userContext.K3s.V1().ETCDSnapshotFile())
-
-	//relatedresource.WatchClusterScoped(ctx, "", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	//	if snapshot, ok := obj.(*rkev1.ETCDSnapshot); ok {
-	//		if snapshot.Annotations != nil && snapshot.Annotations[capr.SnapshotNameAnnotation] != "" {
-	//			return []relatedresource.Key{
-	//				{
-	//					Name: snapshot.Annotations[capr.SnapshotNameAnnotation],
-	//				},
-	//			}, nil
-	//		}
-	//	}
-	//	return nil, nil
-	//}, userContext.K3s.V1().ETCDSnapshotFile(), userContext.Management.Wrangler.RKE.ETCDSnapshot())
+	userContext.Management.Wrangler.RKE.ETCDSnapshot().OnChange(ctx, "snapshotcleanup", h.OnUpstreamChange)
+	userContext.K3s.V1().ETCDSnapshotFile().OnChange(ctx, "snapshotbackpopulate", h.OnDownstreamChange)
 }
 
-func getSnapshotStorageNodeLabel(controlPlane *rkev1.RKEControlPlane) string {
-	return fmt.Sprintf("etcd.%s.cattle.io/snapshot/storage-node", capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
-}
-
+// OnUpstreamChange will check if the downstream snapshot CR exists for a given snapshot, and if it does not the local
+// representation is summarily deleted.
 func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
 	if snapshot == nil {
 		return nil, nil
 	}
 
-	clusters, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.clusterName)
-	if err != nil || len(clusters) != 1 {
-		return snapshot, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.clusterName, err)
+	cluster, err := h.getCluster()
+	if err != nil {
+		return snapshot, err
 	}
 
-	cluster := clusters[0]
-	if h.v1ClusterName == "" {
-		h.v1ClusterName = cluster.Name
+	if snapshot.Namespace != cluster.Namespace {
+		return snapshot, nil
 	}
 
-	//logPrefix := fmt.Sprintf("[snapshotbackpopulate] rkecluster %s/%s:", cluster.Namespace, cluster.Name)
+	logPrefix := getLogPrefix(cluster)
 
 	controlPlane, err := h.controlPlaneCache.Get(cluster.Namespace, cluster.Name)
 	if err != nil {
 		return snapshot, err
 	}
 
-	// if controlplane is not currently performing a restore, and the node responsible for the snapshot has reconciled since
+	// if controlplane is currently performing a restore, reconciling snapshots will be postponed until post restore
 	if controlPlane.Spec.ETCDSnapshotRestore != nil && controlPlane.Status.ETCDSnapshotRestore != nil &&
 		controlPlane.Spec.ETCDSnapshotRestore.Generation != controlPlane.Status.ETCDSnapshotRestore.Generation {
 		h.etcdSnapshotController.EnqueueAfter(snapshot.Namespace, snapshot.Name, 1*time.Minute)
 		return snapshot, nil
 	}
 
+	// Only delete snapshots if the annotation is present: this will allow users to manually create snapshot objects during a DR scenario
 	if snapshot.Annotations == nil || snapshot.Annotations[capr.SnapshotNameAnnotation] == "" {
-		return nil, h.etcdSnapshotController.Delete(snapshot.Namespace, snapshot.Name, &metav1.DeleteOptions{})
+		logrus.Debugf("%s Local snapshot %s will not be deleted due to missing annotation %s", logPrefix, snapshot.Name, capr.SnapshotNameAnnotation)
+		return snapshot, nil
 	}
 
-	_, err = h.etcdSnapshotFileCache.Get(snapshot.Annotations[capr.SnapshotNameAnnotation])
+	_, err = h.etcdSnapshotFileController.Get(snapshot.Annotations[capr.SnapshotNameAnnotation], metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// If the downstream snapshot does not exist in the downstream cluster, delete the local version
 		return nil, h.etcdSnapshotController.Delete(snapshot.Namespace, snapshot.Name, &metav1.DeleteOptions{})
@@ -174,26 +126,45 @@ func (h *handler) OnDownstreamChange(_ string, snapshot *k3s.ETCDSnapshotFile) (
 		return nil, nil
 	}
 
-	clusters, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.clusterName)
-	if err != nil || len(clusters) != 1 {
-		return snapshot, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.clusterName, err)
+	cluster, err := h.getCluster()
+	if err != nil {
+		return snapshot, err
 	}
 
-	cluster := clusters[0]
-	if h.v1ClusterName == "" {
-		h.v1ClusterName = cluster.Name
+	logPrefix := getLogPrefix(cluster)
+
+	if cluster.DeletionTimestamp != nil {
+		logrus.Debugf("%s skipping snapshot reconcile as cluster is being deleted", logPrefix)
+		return snapshot, nil
 	}
 
-	logPrefix := fmt.Sprintf("[snapshotbackpopulate] rkecluster %s/%s:", cluster.Namespace, cluster.Name)
+	if snapshot.DeletionTimestamp != nil {
+		logrus.Infof("%s Downstream snapshot %s was deleted, deleting local snapshot representation", logPrefix, snapshot.Name)
+		upstreamSnapshots, err := h.getSnapshotsFromSnapshotFile(cluster, snapshot)
+		if err != nil {
+			return snapshot, err
+		}
+		for _, upstreamSnapshot := range upstreamSnapshots {
+			logrus.Infof("%s Deleting local snapshot %s", logPrefix, upstreamSnapshot.Name)
+			err := h.etcdSnapshotController.Delete(upstreamSnapshot.Namespace, upstreamSnapshot.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				logrus.Errorf("%s error deleting snapshot %s: %v", logPrefix, upstreamSnapshot.Name, err)
+			}
+
+		}
+		return snapshot, nil
+	}
 
 	controlPlane, err := h.controlPlaneCache.Get(cluster.Namespace, cluster.Name)
 	if err != nil {
 		return snapshot, err
 	}
-	// if controlplane is not currently performing a restore, and the node responsible for the snapshot has reconciled since
+
+	// if controlplane is currently performing a restore, reconciling snapshots will be postponed until post restore
 	if controlPlane.Spec.ETCDSnapshotRestore != nil && controlPlane.Status.ETCDSnapshotRestore != nil &&
 		controlPlane.Spec.ETCDSnapshotRestore.Generation != controlPlane.Status.ETCDSnapshotRestore.Generation {
-		h.etcdSnapshotController.EnqueueAfter(snapshot.Namespace, snapshot.Name, 1*time.Minute)
+		logrus.Debugf("%s skipping snapshot reconcile as cluster is being restored", logPrefix)
+		h.etcdSnapshotFileController.EnqueueAfter(snapshot.Name, 1*time.Minute)
 		return snapshot, nil
 	}
 
@@ -205,34 +176,21 @@ func (h *handler) OnDownstreamChange(_ string, snapshot *k3s.ETCDSnapshotFile) (
 	logrus.Infof("%s processing snapshot %s", logPrefix, snapshot.Name)
 
 	var machine *capi.Machine
-	labelSet := labels.Set{capr.ClusterNameLabel: cluster.Name}
-
-	if snapshot.Spec.S3 == nil {
-		machine, err = capr.GetMachineFromNode(h.machineCache, snapshot.Spec.NodeName, cluster)
-		if err != nil {
-			return snapshot, err
-		}
-		labelSet[capr.NodeNameLabel] = machine.Name
-	}
 
 	// get upstream snapshot object
 	// if upstream snapshot object does not exist, create it
-	upstreamSnapshots, err := h.etcdSnapshotCache.List(cluster.Namespace, labels.SelectorFromSet(labelSet))
+	upstreamSnapshots, err := h.getSnapshotsFromSnapshotFile(cluster, snapshot)
 	if err != nil {
 		return snapshot, err
 	}
 
-	var upstreamSnapshot *rkev1.ETCDSnapshot
-	for _, u := range upstreamSnapshots {
-		if u.Annotations[capr.SnapshotFileNameAnnotation] == snapshot.Spec.SnapshotName {
-			if upstreamSnapshot != nil {
-				return snapshot, fmt.Errorf("found multiple upstream snapshots for downstream snapshot %s", snapshot.Name)
+	if len(upstreamSnapshots) == 0 {
+		if snapshot.Spec.S3 == nil {
+			machine, err = h.getMachineFromNode(snapshot.Spec.NodeName, cluster)
+			if err != nil {
+				return snapshot, err
 			}
-			upstreamSnapshot = u
 		}
-	}
-
-	if upstreamSnapshot == nil {
 		// create snapshot
 		name := name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(snapshot.Spec.SnapshotName, "-")), string(S3))
 		upstream := rkev1.NewETCDSnapshot(cluster.Namespace, name, rkev1.ETCDSnapshot{})
@@ -243,6 +201,26 @@ func (h *handler) OnDownstreamChange(_ string, snapshot *k3s.ETCDSnapshotFile) (
 
 		_, err = h.etcdSnapshotController.Create(upstream)
 		return snapshot, err
+	} else if len(upstreamSnapshots) > 1 {
+		logrus.Warnf("%s Multiple snapshots objects found for snapshot %s", logPrefix, snapshot.Name)
+		for _, upstreamSnapshot := range upstreamSnapshots {
+			logrus.Infof("%s Deleting snapshot object %s", logPrefix, upstreamSnapshot.Name)
+			err = h.etcdSnapshotController.Delete(upstreamSnapshot.Namespace, upstreamSnapshot.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				logrus.Errorf("%s error deleting snapshot %s: %v", logPrefix, upstreamSnapshot.Name, err)
+			}
+		}
+		// re-enqueue to ensure the correct snapshot is regenerated
+		h.etcdSnapshotFileController.Enqueue(snapshot.Name)
+		return snapshot, nil
+	}
+
+	upstreamSnapshot := upstreamSnapshots[0]
+	if snapshot.Spec.S3 == nil {
+		machine, err = h.getMachineByID(upstreamSnapshot.Labels[capr.MachineIDLabel], cluster)
+		if err != nil {
+			return snapshot, err
+		}
 	}
 
 	// generate patch
@@ -336,7 +314,6 @@ func updateSnapshot(upstream *rkev1.ETCDSnapshot, snapshot *k3s.ETCDSnapshotFile
 		upstream.Annotations = map[string]string{}
 	}
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
-	upstream.Annotations[capr.SnapshotFileNameAnnotation] = snapshot.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = snapshot.Name
 
 	upstream.OwnerReferences = []metav1.OwnerReference{owner}
@@ -357,20 +334,61 @@ func updateSnapshot(upstream *rkev1.ETCDSnapshot, snapshot *k3s.ETCDSnapshotFile
 	return upstream, nil
 }
 
-// ETCDSnapshotS3 holds information about the S3 storage system holding the snapshot.
-type ETCDSnapshotS3 struct {
-	// Endpoint is the host or host:port of the S3 service
-	Endpoint string `json:"endpoint,omitempty"`
-	// EndpointCA is the path on disk to the S3 service's trusted CA list. Leave empty to use the OS CA bundle.
-	EndpointCA string `json:"endpointCA,omitempty"`
-	// SkipSSLVerify is true if TLS certificate verification is disabled
-	SkipSSLVerify bool `json:"skipSSLVerify,omitempty"`
-	// Bucket is the bucket holding the snapshot
-	Bucket string `json:"bucket,omitempty"`
-	// Region is the region of the S3 service
-	Region string `json:"region,omitempty"`
-	// Prefix is the prefix in which the snapshot file is stored.
-	Prefix string `json:"prefix,omitempty"`
-	// Insecure is true if the S3 service uses HTTP instead of HTTPS
-	Insecure bool `json:"insecure,omitempty"`
+// getCluster returns the provisioning cluster associated with the current userContext.
+func (h *handler) getCluster() (*provv1.Cluster, error) {
+	clusters, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.clusterName)
+	if err != nil || len(clusters) != 1 {
+		return nil, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.clusterName, err)
+	}
+	return clusters[0], nil
+}
+
+// getSnapshotsFromSnapshotFile returns all snapshots objects for the given cluster for the downstream snapshotfile object.
+// During normal operation, this will return either 0 snapshots, indicating that the snapshot has not been reconciled yet,
+// or 1 snapshot. While multiple snapshots being returned is possible via user intervention via manually editing snapshots,
+// this is an edge case and results in all local snapshot objects being deleted and the downstream snapshot being
+// re-enqueued for regeneration.
+func (h *handler) getSnapshotsFromSnapshotFile(cluster *provv1.Cluster, snapshotFile *k3s.ETCDSnapshotFile) ([]*rkev1.ETCDSnapshot, error) {
+	snapshots, err := h.etcdSnapshotCache.GetByIndex(cluster2.ByETCDSnapshotName, fmt.Sprintf("%s-%s-%s", cluster.Namespace, cluster.Name, snapshotFile.Name))
+	if err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
+// getMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func (h *handler) getMachineFromNode(nodeName string, cluster *provv1.Cluster) (*capi.Machine, error) {
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterNameLabel, cluster.Name))
+	if err != nil {
+		return nil, err
+	}
+	machines, err := h.machineCache.List(cluster.Namespace, ls)
+	if err != nil {
+		return nil, err
+	}
+	for _, machine := range machines {
+		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
+			return machine, nil
+		}
+	}
+	return nil, fmt.Errorf("unable to find node %s in machines", nodeName)
+}
+
+// getMachineByID attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func (h *handler) getMachineByID(machineID string, cluster *provv1.Cluster) (*capi.Machine, error) {
+	machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{
+		capr.ClusterNameLabel: cluster.Name,
+		capr.MachineIDLabel:   machineID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+	if len(machines) != 1 {
+		return nil, fmt.Errorf("unable to find machine by ID %s for cluster %s", machineID, cluster.Name)
+	}
+	return machines[0], nil
+}
+
+func getLogPrefix(cluster *provv1.Cluster) string {
+	return fmt.Sprintf("[snapshotbackpopulate] rkecluster %s/%s:", cluster.Namespace, cluster.Name)
 }
