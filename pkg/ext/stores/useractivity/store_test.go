@@ -10,12 +10,15 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8suser "k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestStore_create(t *testing.T) {
@@ -159,7 +162,7 @@ func TestStore_create(t *testing.T) {
 	}
 }
 
-func TestStore_get(t *testing.T) {
+func TestStoreGet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
 	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3Legacy.Token](ctrl)
@@ -184,8 +187,14 @@ func TestStore_get(t *testing.T) {
 		{
 			name: "valid useractivity retrieved",
 			args: args{
-				ctx:  contextBG,
-				name: "ua_admin_token-12345",
+				ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
+					Name:   "admin",
+					Groups: []string{GroupCattleAuthenticated},
+					Extra: map[string][]string{
+						common.ExtraRequestTokenID: {"token-12345"},
+					},
+				}),
+				name: "token-12345",
 			},
 			mockSetup: func() {
 				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3Legacy.Token{
@@ -197,6 +206,9 @@ func TestStore_get(t *testing.T) {
 						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
 					},
 				}, nil).AnyTimes()
+				mockUserCacheFake.EXPECT().Get(gomock.Any()).Return(
+					&v3Legacy.User{}, nil,
+				)
 			},
 			want: &ext.UserActivity{
 				ObjectMeta: v1.ObjectMeta{
@@ -251,7 +263,7 @@ func TestStore_get(t *testing.T) {
 	for _, tt := range tests {
 		tt.mockSetup()
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := uas.get(tt.args.ctx, tt.args.name)
+			got, err := uas.Get(tt.args.ctx, tt.args.name, &v1.GetOptions{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store.get() error = %v, wantErr %v", err, tt.wantErr)
 				return
