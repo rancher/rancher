@@ -15,15 +15,17 @@ import (
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestStore_create(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
+	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3Legacy.Token](ctrl)
 	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 	uas := &Store{
 		tokens:     mockTokenControllerFake,
-		tokenCache: mockTokenControllerFake.Cache(),
+		tokenCache: mockTokenCacheFake,
 		userCache:  mockUserCacheFake,
 	}
 
@@ -54,9 +56,6 @@ func TestStore_create(t *testing.T) {
 				token: &v3Legacy.Token{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "u-mo773yttt4",
-						Labels: map[string]string{
-							tokenUserId: "admin",
-						},
 					},
 					UserID: "u-mo773yttt4",
 				},
@@ -66,11 +65,11 @@ func TestStore_create(t *testing.T) {
 				idleMins: 10,
 			},
 			mockSetup: func() {
-				// we don't care about the object returned by the Update function,
+				// we don't care about the object returned by the Patch function,
 				// since we only check there are no errors.
-				mockTokenControllerFake.EXPECT().Update(gomock.Any()).DoAndReturn(
-					func(token *v3Legacy.Token) (*v3Legacy.Token, error) {
-						return token, nil
+				mockTokenControllerFake.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(name string, pt types.PatchType, data []byte, subresources ...string) (*v3Legacy.Token, error) {
+						return &v3Legacy.Token{}, nil
 					},
 				).Times(1)
 			},
@@ -85,42 +84,6 @@ func TestStore_create(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "UserID is different from TokenId",
-			args: args{
-				in0:          nil,
-				userActivity: &ext.UserActivity{},
-				token: &v3Legacy.Token{
-					ObjectMeta: v1.ObjectMeta{
-						Labels: map[string]string{
-							tokenUserId: "admin",
-						},
-					},
-					UserID: "u-mo773yttt3",
-				},
-			},
-			mockSetup: func() {},
-			want:      nil,
-			wantErr:   true,
-		},
-		{
-			name: "token label userId is different from user",
-			args: args{
-				in0:          nil,
-				userActivity: &ext.UserActivity{},
-				token: &v3Legacy.Token{
-					ObjectMeta: v1.ObjectMeta{
-						Labels: map[string]string{
-							tokenUserId: "admin",
-						},
-					},
-					UserID: "u-mo773yttt4",
-				},
-			},
-			mockSetup: func() {},
-			want:      nil,
-			wantErr:   true,
-		},
-		{
 			name: "error updating token value LastIdleTimeout",
 			args: args{
 				in0: nil,
@@ -130,12 +93,8 @@ func TestStore_create(t *testing.T) {
 					},
 				},
 				token: &v3Legacy.Token{
-					ObjectMeta: v1.ObjectMeta{
-						Labels: map[string]string{
-							tokenUserId: "admin",
-						},
-					},
-					UserID: "u-mo773yttt4",
+					ObjectMeta: v1.ObjectMeta{},
+					UserID:     "u-mo773yttt4",
 				},
 				lastActivity: v1.Time{
 					Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).UTC(),
@@ -143,8 +102,8 @@ func TestStore_create(t *testing.T) {
 				idleMins: 10,
 			},
 			mockSetup: func() {
-				mockTokenControllerFake.EXPECT().Update(gomock.Any()).DoAndReturn(
-					func(token *v3Legacy.Token) (*v3Legacy.Token, error) {
+				mockTokenControllerFake.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(name string, pt types.PatchType, data []byte, subresources ...string) (*v3Legacy.Token, error) {
 						return nil, errors.New("some error happend")
 					},
 				).AnyTimes()
@@ -164,9 +123,6 @@ func TestStore_create(t *testing.T) {
 				token: &v3Legacy.Token{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "u-mo773yttt4",
-						Labels: map[string]string{
-							tokenUserId: "admin",
-						},
 					},
 					UserID: "u-mo773yttt4",
 				},
