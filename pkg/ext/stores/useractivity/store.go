@@ -162,7 +162,7 @@ func (s *Store) create(_ context.Context,
 			Value any    `json:"value"`
 		}{{
 			Op:    "replace",
-			Path:  "/lastIdleTimeout",
+			Path:  "/activityLastSeenAt",
 			Value: newIdleTimeout,
 		}})
 		if err != nil {
