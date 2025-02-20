@@ -205,7 +205,7 @@ spec:
             type: string
           userPrincipalName:
             description: UserPrincipalName is the name of the user principal subject
-              added to the cluster. Immutable.
+              to be bound. Immutable.
             type: string
         required:
         - globalRoleName
