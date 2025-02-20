@@ -104,7 +104,7 @@ func (s *Store) Create(ctx context.Context,
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", objUserActivity.Spec.TokenID, err))
 		} else {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %v", objUserActivity.Spec.TokenID, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", objUserActivity.Spec.TokenID, err))
 		}
 	}
 	// set when last activity happened
@@ -132,7 +132,7 @@ func (s *Store) create(_ context.Context,
 
 	expectedName, err := setUserActivityName(user, token.Name)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to set useractivity name: %v", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to set useractivity name: %w", err))
 	}
 	// ensure the UserActivity object is crafted as expected.
 	if userActivity.Name != expectedName {
@@ -163,11 +163,11 @@ func (s *Store) create(_ context.Context,
 			Value: newIdleTimeout,
 		}})
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("%v", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("%w", err))
 		}
 		_, err = s.tokenController.Patch(token.GetName(), types.JSONPatchType, patch)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to patch token: %v", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to patch token: %w", err))
 		}
 	}
 
@@ -192,7 +192,7 @@ func (s *Store) get(_ context.Context, uaname string, options *metav1.GetOptions
 	// retrieve token information
 	tokenId, err := s.tokenController.Get(token, *options)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %v", token, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", token, err))
 	}
 	// verify user is the same
 	if tokenId.UserID != user {
