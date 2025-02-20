@@ -48,7 +48,7 @@ var GVR = schema.GroupVersionResource{
 	Resource: PluralName,
 }
 
-func NewFromWrangler(wranglerCtx *wrangler.Context) *Store {
+func New(wranglerCtx *wrangler.Context) *Store {
 	return &Store{
 		tokenController: wranglerCtx.Mgmt.Token(),
 	}

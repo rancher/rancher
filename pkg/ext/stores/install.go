@@ -14,7 +14,7 @@ func InstallStores(server *steveext.ExtensionAPIServer, wranglerContext *wrangle
 	steveext.AddToScheme(scheme)
 	extv1.AddToScheme(scheme)
 
-	err := server.Install(useractivity.PluralName, useractivity.GVK, useractivity.NewFromWrangler(wranglerContext))
+	err := server.Install(useractivity.PluralName, useractivity.GVK, useractivity.New(wranglerContext))
 	if err != nil {
 		return fmt.Errorf("unable to install useractivity store: %w", err)
 	}
