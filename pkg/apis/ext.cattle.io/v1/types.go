@@ -24,8 +24,4 @@ type UserActivityStatus struct {
 	// the request is made.
 	// +optional
 	ExpiresAt string `json:"expiresAt"`
-	// LastActivity is the timestamp of the last user activity
-	// tracked by the UI.
-	// +optional
-	LastSeetAt string `json:"lastSeenAt,omitempty"`
 }

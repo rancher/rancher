@@ -79,8 +79,7 @@ func TestStore_create(t *testing.T) {
 					Name: "u-mo773yttt4",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt:  time.Date(2025, 1, 31, 16, 54, 0, 0, &time.Location{}).String(),
-					LastSeetAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
+					ExpiresAt: time.Date(2025, 1, 31, 16, 54, 0, 0, &time.Location{}).String(),
 				},
 			},
 			wantErr: false,
@@ -183,8 +182,7 @@ func TestStore_create(t *testing.T) {
 					Name: "u-mo773yttt4",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt:  time.Date(2025, 1, 31, 16, 54, 0, 0, &time.Location{}).String(),
-					LastSeetAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
+					ExpiresAt: time.Date(2025, 1, 31, 16, 54, 0, 0, &time.Location{}).String(),
 				},
 			},
 			wantErr: false,

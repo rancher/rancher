@@ -194,13 +194,6 @@ func schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
-					"lastSeenAt": {
-						SchemaProps: spec.SchemaProps{
-							Description: "LastActivity is the timestamp of the last user activity tracked by the UI.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 				},
 			},
 		},
