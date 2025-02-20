@@ -6841,7 +6841,7 @@ func (in *Token) DeepCopyInto(out *Token) {
 		in, out := &in.LastUsedAt, &out.LastUsedAt
 		*out = (*in).DeepCopy()
 	}
-	in.LastIdleTimeout.DeepCopyInto(&out.LastIdleTimeout)
+	in.ActivityLastSeenAt.DeepCopyInto(&out.ActivityLastSeenAt)
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
 		*out = new(bool)

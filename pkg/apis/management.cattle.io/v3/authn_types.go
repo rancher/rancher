@@ -27,24 +27,24 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Token struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Token             string            `json:"token" norman:"writeOnly,noupdate"`
-	UserPrincipal     Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
-	GroupPrincipals   []Principal       `json:"groupPrincipals,omitempty" norman:"type=array[reference[principal]]"`
-	ProviderInfo      map[string]string `json:"providerInfo,omitempty"`
-	UserID            string            `json:"userId" norman:"type=reference[user]"`
-	AuthProvider      string            `json:"authProvider"`
-	TTLMillis         int64             `json:"ttl"`
-	LastUsedAt        *metav1.Time      `json:"lastUsedAt,omitempty"`
-	LastIdleTimeout   metav1.Time       `json:"lastIdleTimeout,omitempty"`
-	IsDerived         bool              `json:"isDerived"`
-	Description       string            `json:"description"`
-	Expired           bool              `json:"expired"`
-	ExpiresAt         string            `json:"expiresAt"`
-	Current           bool              `json:"current"`
-	ClusterName       string            `json:"clusterName,omitempty" norman:"noupdate,type=reference[cluster]"`
-	Enabled           *bool             `json:"enabled,omitempty" norman:"default=true"`
+	metav1.TypeMeta    `json:",inline"`
+	metav1.ObjectMeta  `json:"metadata,omitempty"`
+	Token              string            `json:"token" norman:"writeOnly,noupdate"`
+	UserPrincipal      Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
+	GroupPrincipals    []Principal       `json:"groupPrincipals,omitempty" norman:"type=array[reference[principal]]"`
+	ProviderInfo       map[string]string `json:"providerInfo,omitempty"`
+	UserID             string            `json:"userId" norman:"type=reference[user]"`
+	AuthProvider       string            `json:"authProvider"`
+	TTLMillis          int64             `json:"ttl"`
+	LastUsedAt         *metav1.Time      `json:"lastUsedAt,omitempty"`
+	ActivityLastSeenAt metav1.Time       `json:"activityLastSeenAt,omitempty"`
+	IsDerived          bool              `json:"isDerived"`
+	Description        string            `json:"description"`
+	Expired            bool              `json:"expired"`
+	ExpiresAt          string            `json:"expiresAt"`
+	Current            bool              `json:"current"`
+	ClusterName        string            `json:"clusterName,omitempty" norman:"noupdate,type=reference[cluster]"`
+	Enabled            *bool             `json:"enabled,omitempty" norman:"default=true"`
 }
 
 func (t *Token) ObjClusterName() string {

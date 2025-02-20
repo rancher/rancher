@@ -214,7 +214,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref common.ReferenceCallb
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"currentTimeout": {
+					"expiresAt": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CurrentTimeout is the timestamp at which the idle timer expires, invalidating the Token and session. It is calculated by adding the auth-user-session-idle-ttl-minutes attribute to the time the request is made.",
 							Default:     "",
@@ -222,7 +222,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
-					"lastActivity": {
+					"lastSeenAt": {
 						SchemaProps: spec.SchemaProps{
 							Description: "LastActivity is the timestamp of the last user activity tracked by the UI.",
 							Type:        []string{"string"},
