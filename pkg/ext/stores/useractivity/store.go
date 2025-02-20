@@ -55,33 +55,33 @@ func NewFromWrangler(wranglerCtx *wrangler.Context) *Store {
 }
 
 // GroupVersionKind implements [rest.GroupVersionKindProvider]
-func (t *Store) GroupVersionKind(_ schema.GroupVersion) schema.GroupVersionKind {
+func (s *Store) GroupVersionKind(_ schema.GroupVersion) schema.GroupVersionKind {
 	return GVK
 }
 
 // NamespaceScoped implements [rest.Scoper]
-func (t *Store) NamespaceScoped() bool {
+func (s *Store) NamespaceScoped() bool {
 	return false
 }
 
 // GetSingularName implements [rest.SingularNameProvider]
-func (t *Store) GetSingularName() string {
+func (s *Store) GetSingularName() string {
 	return SingularName
 }
 
 // New implements [rest.Storage]
-func (t *Store) New() runtime.Object {
+func (s *Store) New() runtime.Object {
 	obj := &ext.UserActivity{}
 	obj.GetObjectKind().SetGroupVersionKind(GVK)
 	return obj
 }
 
 // Destroy implements [rest.Storage]
-func (t *Store) Destroy() {
+func (s *Store) Destroy() {
 }
 
 // Create implements [rest.Creator]
-func (uas *Store) Create(ctx context.Context,
+func (s *Store) Create(ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions) (runtime.Object, error) {
@@ -99,7 +99,7 @@ func (uas *Store) Create(ctx context.Context,
 		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T", zeroUA, objUserActivity))
 	}
 	// retrieve token information
-	token, err := uas.tokenController.Get(objUserActivity.Spec.TokenID, metav1.GetOptions{})
+	token, err := s.tokenController.Get(objUserActivity.Spec.TokenID, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", objUserActivity.Spec.TokenID, err))
@@ -117,12 +117,12 @@ func (uas *Store) Create(ctx context.Context,
 	// check if it's a dry-run
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
-	return uas.create(ctx, objUserActivity, token, token.UserID, lastActivity, idleTimeout, dryRun)
+	return s.create(ctx, objUserActivity, token, token.UserID, lastActivity, idleTimeout, dryRun)
 }
 
 // create sets the LastActivity and CurrentTimeout fields on the UserActivity object
 // provided by the user within the request.
-func (uas *Store) create(_ context.Context,
+func (s *Store) create(_ context.Context,
 	userActivity *ext.UserActivity,
 	token *v3Legacy.Token,
 	user string,
@@ -165,7 +165,7 @@ func (uas *Store) create(_ context.Context,
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("%v", err))
 		}
-		_, err = uas.tokenController.Patch(token.GetName(), types.JSONPatchType, patch)
+		_, err = s.tokenController.Patch(token.GetName(), types.JSONPatchType, patch)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to patch token: %v", err))
 		}
@@ -175,22 +175,22 @@ func (uas *Store) create(_ context.Context,
 }
 
 // Get implements [rest.Getter]
-func (uas *Store) Get(ctx context.Context,
+func (s *Store) Get(ctx context.Context,
 	name string,
 	options *metav1.GetOptions) (runtime.Object, error) {
-	return uas.get(ctx, name, options)
+	return s.get(ctx, name, options)
 }
 
 // get returns the UserActivity based on the token name.
 // It is used to know, from the frontend, how much time
 // remains before the idle timeout triggers.
-func (uas *Store) get(_ context.Context, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
+func (s *Store) get(_ context.Context, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
 	user, token, err := getUserActivityName(uaname)
 	if err != nil {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("wrong useractivity name: %v", err))
 	}
 	// retrieve token information
-	tokenId, err := uas.tokenController.Get(token, *options)
+	tokenId, err := s.tokenController.Get(token, *options)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %v", token, err))
 	}
