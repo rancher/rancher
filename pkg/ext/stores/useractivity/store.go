@@ -9,7 +9,6 @@ import (
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -29,6 +28,10 @@ const (
 	PluralName               = "useractivities"
 	GroupCattleAuthenticated = "system:cattle:authenticated"
 )
+
+var timeNow = func() time.Time {
+	return time.Now().UTC()
+}
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
@@ -89,6 +92,8 @@ func (s *Store) Destroy() {
 }
 
 // Create implements [rest.Creator]
+// Create sets the LastActivity and CurrentTimeout fields on the UserActivity object
+// provided by the user within the request.
 func (s *Store) Create(ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
@@ -147,7 +152,7 @@ func (s *Store) Create(ctx context.Context,
 
 	// set when last activity happened
 	lastActivity := metav1.Time{
-		Time: time.Now().UTC(),
+		Time: timeNow(),
 	}
 	// retrieve setting for auth-user-session-idle-ttl-minutes
 	idleTimeout := settings.AuthUserSessionIdleTTLMinutes.GetInt()
@@ -155,33 +160,21 @@ func (s *Store) Create(ctx context.Context,
 	// check if it's a dry-run
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
-	return s.create(ctx, objUserActivity, activityToken, lastActivity, idleTimeout, dryRun)
-}
-
-// create sets the LastActivity and CurrentTimeout fields on the UserActivity object
-// provided by the user within the request.
-func (s *Store) create(_ context.Context,
-	userActivity *ext.UserActivity,
-	token *v3Legacy.Token,
-	lastActivity metav1.Time,
-	authUserSessionIdleTTLMinutes int,
-	dryRun bool) (*ext.UserActivity, error) {
-
 	// ensure generate name is not used
-	if userActivity.GenerateName != "" {
+	if objUserActivity.GenerateName != "" {
 		return nil, apierrors.NewBadRequest("name generation is not allowed")
 	}
 	// ensure the token specified in the UserActivity is the same
 	// we are using to do the request.
-	if token.Name != userActivity.Name {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("token name mismatch: have %s - expected %s", token.Name, userActivity.Name))
+	if activityToken.Name != objUserActivity.Name {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("token name mismatch: have %s - expected %s", activityToken.Name, objUserActivity.Name))
 	}
 
 	// once validated the request, we can define the lastActivity time.
 	newIdleTimeout := metav1.Time{
-		Time: lastActivity.Add(time.Minute * time.Duration(authUserSessionIdleTTLMinutes)).UTC(),
+		Time: lastActivity.Add(time.Minute * time.Duration(idleTimeout)).UTC(),
 	}
-	userActivity.Status.ExpiresAt = newIdleTimeout.String()
+	objUserActivity.Status.ExpiresAt = newIdleTimeout.String()
 
 	// if it's not a dry-run, commit the changes
 	if !dryRun {
@@ -197,13 +190,13 @@ func (s *Store) create(_ context.Context,
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("%w", err))
 		}
-		_, err = s.tokens.Patch(token.GetName(), types.JSONPatchType, patch)
+		_, err = s.tokens.Patch(activityToken.GetName(), types.JSONPatchType, patch)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to patch token: %w", err))
 		}
 	}
 
-	return userActivity, nil
+	return objUserActivity, nil
 }
 
 // Get implements [rest.Getter]
