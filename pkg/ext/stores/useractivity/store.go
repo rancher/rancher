@@ -210,13 +210,13 @@ func (s *Store) create(_ context.Context,
 func (s *Store) Get(ctx context.Context,
 	name string,
 	options *metav1.GetOptions) (runtime.Object, error) {
-	return s.get(ctx, name, options)
+	return s.get(ctx, name)
 }
 
 // get returns the UserActivity based on the token name.
 // It is used to know, from the frontend, how much time
 // remains before the idle timeout triggers.
-func (s *Store) get(ctx context.Context, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
+func (s *Store) get(ctx context.Context, uaname string) (runtime.Object, error) {
 	userInfo, err := s.userFrom(ctx)
 	if err != nil {
 		return nil, err

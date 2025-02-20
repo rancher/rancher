@@ -162,17 +162,17 @@ func TestStore_create(t *testing.T) {
 func TestStore_get(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
+	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3Legacy.Token](ctrl)
 	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 	uas := &Store{
 		tokens:     mockTokenControllerFake,
-		tokenCache: mockTokenControllerFake.Cache(),
+		tokenCache: mockTokenCacheFake,
 		userCache:  mockUserCacheFake,
 	}
 	contextBG := context.Background()
 	type args struct {
-		ctx     context.Context
-		name    string
-		options *v1.GetOptions
+		ctx  context.Context
+		name string
 	}
 	tests := []struct {
 		name      string
@@ -184,12 +184,11 @@ func TestStore_get(t *testing.T) {
 		{
 			name: "valid useractivity retrieved",
 			args: args{
-				ctx:     contextBG,
-				name:    "ua_admin_token-12345",
-				options: &v1.GetOptions{},
+				ctx:  contextBG,
+				name: "ua_admin_token-12345",
 			},
 			mockSetup: func() {
-				mockTokenControllerFake.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&v3Legacy.Token{
+				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3Legacy.Token{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "token-12345",
 					},
@@ -197,7 +196,7 @@ func TestStore_get(t *testing.T) {
 					ActivityLastSeenAt: &v1.Time{
 						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
 					},
-				}, nil).Times(1)
+				}, nil).AnyTimes()
 			},
 			want: &ext.UserActivity{
 				ObjectMeta: v1.ObjectMeta{
@@ -212,9 +211,8 @@ func TestStore_get(t *testing.T) {
 		{
 			name: "invalid useractivity name",
 			args: args{
-				ctx:     contextBG,
-				name:    "ua_admin_token_12345",
-				options: &v1.GetOptions{},
+				ctx:  contextBG,
+				name: "ua_admin_token_12345",
 			},
 			mockSetup: func() {},
 			want:      nil,
@@ -223,12 +221,11 @@ func TestStore_get(t *testing.T) {
 		{
 			name: "invalid token retrieved",
 			args: args{
-				ctx:     contextBG,
-				name:    "ua_admin_token-12345",
-				options: &v1.GetOptions{},
+				ctx:  contextBG,
+				name: "ua_admin_token-12345",
 			},
 			mockSetup: func() {
-				mockTokenControllerFake.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("invalid token name")).Times(1)
+				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(nil, fmt.Errorf("invalid token name")).AnyTimes()
 			},
 			want:    nil,
 			wantErr: true,
@@ -236,17 +233,16 @@ func TestStore_get(t *testing.T) {
 		{
 			name: "invalid user name retrieved",
 			args: args{
-				ctx:     contextBG,
-				name:    "ua_user1_token-12345",
-				options: &v1.GetOptions{},
+				ctx:  contextBG,
+				name: "ua_user1_token-12345",
 			},
 			mockSetup: func() {
-				mockTokenControllerFake.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&v3Legacy.Token{
+				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3Legacy.Token{
 					UserID: "token-12345",
 					ActivityLastSeenAt: &v1.Time{
 						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
 					},
-				}, nil).Times(1)
+				}, nil).AnyTimes()
 			},
 			want:    nil,
 			wantErr: true,
@@ -255,7 +251,7 @@ func TestStore_get(t *testing.T) {
 	for _, tt := range tests {
 		tt.mockSetup()
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := uas.get(tt.args.ctx, tt.args.name, tt.args.options)
+			got, err := uas.get(tt.args.ctx, tt.args.name)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store.get() error = %v, wantErr %v", err, tt.wantErr)
 				return
