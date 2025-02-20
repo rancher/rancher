@@ -19,6 +19,7 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
+	rancherFeatures "github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -175,6 +176,11 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 		}
 	}
 
+	err = cd.managePodDisruptionBudget(cluster)
+	if err != nil {
+		return err
+	}
+
 	err = cd.deployAgent(cluster)
 	if err != nil {
 		return err
@@ -265,14 +271,99 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
-	if !reflect.DeepEqual(cluster.Spec.ClusterAgentDeploymentCustomization, cluster.Status.AppliedClusterAgentDeploymentCustomization) {
-		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent customization mismatch for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedClusterAgentDeploymentCustomization, cluster.Spec.ClusterAgentDeploymentCustomization)
+	if pdbChanged, _ := util.AgentSchedulingPodDisruptionBudgetChanged(cluster); pdbChanged {
+		logrus.Infof("clusterDeploy: redeployAgent: will redeploy Rancher agent due to Pod Disruption Budget configuration changed for [%s],", cluster.Name)
+		return true
+	}
+
+	if util.AgentDeploymentCustomizationChanged(cluster) {
+		logrus.Infof("clusterDeploy: redeployAgent: will redeploy Rancher agent due to agent deployment customization changed for [%s],", cluster.Name)
 		return true
 	}
 
 	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
+}
+
+func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) error {
+	_, pdbDeleted := util.AgentSchedulingPodDisruptionBudgetChanged(cluster)
+	if !pdbDeleted {
+		return nil
+	}
+
+	logrus.Debugf("Removing Pod Disruption Budget for %s", cluster.Name)
+
+	pdbYaml, err := systemtemplate.PodDisruptionBudgetTemplate(cluster)
+	if err != nil {
+		return err
+	}
+
+	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
+
+	// Once the cluster agent manifest has been applied to an imported cluster
+	// any resources later omitted from that manifest must be manually removed.
+	o, err := kubectl.Delete(pdbYaml, kubeConfig)
+	if err != nil {
+		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", util.PodDisruptionBudgetName)) {
+			return fmt.Errorf("could not delete existing pod disruption budget: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, bool, bool, error) {
+	pcChanged, pcCreated, pcRemovedFromCluster := util.AgentSchedulingPriorityClassChanged(cluster)
+	if !pcChanged && !pcRemovedFromCluster && !pcCreated {
+		return pcChanged, pcCreated, pcRemovedFromCluster, nil
+	}
+
+	logrus.Debugf("Updating Priority Class for %s: pcChanged [%t], pcCreated [%t], pcRemoved [%t]", cluster.Name, pcChanged, pcCreated, pcRemovedFromCluster)
+
+	pcYaml, err := systemtemplate.PriorityClassTemplate(cluster)
+	if err != nil {
+		return pcChanged, pcCreated, pcRemovedFromCluster, fmt.Errorf("could not create priority class yaml: %w", err)
+	}
+
+	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
+	if err != nil {
+		return pcChanged, pcCreated, pcRemovedFromCluster, err
+	}
+
+	defer func() {
+		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
+
+	// priority classes are immutable, we need to completely delete and recreate
+	// the object to update it
+	o, err := kubectl.Delete(pcYaml, kubeConfig)
+	if err != nil {
+		if !strings.Contains(string(o), fmt.Sprintf("\"%s\" not found", util.PriorityClassName)) {
+			return pcChanged, pcCreated, pcRemovedFromCluster, fmt.Errorf("could not delete existing priority class : %w", err)
+		}
+	}
+
+	// if the feature has been disabled we should allow for the deletion of the PC, but not the recreation.
+	if !pcRemovedFromCluster && rancherFeatures.ClusterAgentSchedulingCustomization.Enabled() {
+		_, err = kubectl.Apply(pcYaml, kubeConfig)
+		if err != nil {
+			return pcChanged, pcCreated, pcRemovedFromCluster, fmt.Errorf("failed to create updated priority class: %w", err)
+		}
+	}
+
+	return pcChanged, pcCreated, pcRemovedFromCluster, nil
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
@@ -292,7 +383,14 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
 
-	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
+	pcChanged, pcCreated, pcDeleted, err := cd.managePriorityClass(cluster)
+	if err != nil {
+		return err
+	}
+
+	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
+	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated
+	if !agentManifestChanged && !pcChanged {
 		return nil
 	}
 
@@ -306,8 +404,26 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		}
 	}()
 
+	// if a user has only changed the priority class definition then the resulting cluster agent manifest
+	// will not be different (as it only contains a reference to the priority class name, which would not change).
+	// Due to this, kubectl.Apply will not roll out new instances of the agent with the adjusted priority value.
+	// In this case we need to manually roll out the deployment. The only exception to this is if the PC is
+	// being created for the first time or removed, at which point the reference needs to be updated.
+	if !agentManifestChanged {
+		logrus.Debugf("clusterDeploy: deployAgent: restarting rollout of cattle-cluster-agent deployment to apply updated priority class value")
+		output, err := kubectl.RestartRolloutWithNamespace("cattle-system", "deployment/cattle-cluster-agent", kubeConfig)
+		if err != nil {
+			logrus.Errorf("failed to rollout cattle-cluster-agent deployment: %s: %v", output, err)
+			return err
+		}
+		util.UpdateAppliedAgentDeploymentCustomization(cluster)
+		return nil
+	}
+
+	logrus.Tracef("clusterDeploy: deployAgent: detected a change in desired cluster agent manifest")
+
 	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, pcChanged || pcCreated)
 		if err != nil {
 			return cluster, err
 		}
@@ -393,7 +509,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
 
-	cluster.Status.AppliedClusterAgentDeploymentCustomization = cluster.Spec.ClusterAgentDeploymentCustomization
+	util.UpdateAppliedAgentDeploymentCustomization(cluster)
 
 	return nil
 }
@@ -429,7 +545,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *apimgmtv3.Cluster) (*clientcmdap
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, priorityClassExists bool) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
@@ -447,9 +563,10 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 	}
 
 	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url,
-		cluster.Spec.WindowsPreferedCluster, capr.PreBootstrap(cluster),
-		cluster, features, taints, cd.secretLister)
+	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name,
+		token, url, cluster.Spec.WindowsPreferedCluster,
+		capr.PreBootstrap(cluster), cluster, features,
+		taints, cd.secretLister, priorityClassExists)
 
 	return buf.Bytes(), err
 }
