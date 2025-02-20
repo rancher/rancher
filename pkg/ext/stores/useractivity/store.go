@@ -151,8 +151,8 @@ func (s *Store) create(_ context.Context,
 	newIdleTimeout := metav1.Time{
 		Time: lastActivity.Add(time.Minute * time.Duration(authUserSessionIdleTTLMinutes)).UTC(),
 	}
-	userActivity.Status.LastActivity = lastActivity.String()
-	userActivity.Status.CurrentTimeout = newIdleTimeout.String()
+	userActivity.Status.LastSeetAt = lastActivity.String()
+	userActivity.Status.ExpiresAt = newIdleTimeout.String()
 
 	// if it's not a dry-run, commit the changes
 	if !dryRun {
@@ -211,7 +211,7 @@ func (s *Store) get(_ context.Context, uaname string, options *metav1.GetOptions
 			TokenID: tokenId.Name,
 		},
 		Status: ext.UserActivityStatus{
-			CurrentTimeout: tokenId.LastIdleTimeout.String(),
+			ExpiresAt: tokenId.LastIdleTimeout.String(),
 		},
 	}
 
