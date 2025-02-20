@@ -116,6 +116,14 @@ func main() {
 					capi.Cluster{},
 				},
 			},
+			"k3s.cattle.io": {
+				Types: []interface{}{
+					"./pkg/apis/k3s.cattle.io/v1",
+				},
+				GenerateTypes:   true,
+				GenerateClients: true,
+			},
+
 			// This package is not a CRD but types from the extension API server.
 			"ext.cattle.io": {
 				PackageName: "ext.cattle.io",
@@ -134,9 +142,8 @@ func main() {
 		},
 	})
 
-	clusterAPIVersion := &types.APIVersion{Group: capi.GroupVersion.Group, Version: capi.GroupVersion.Version, Path: "/v1"}
-	generator.GenerateClient(factory.Schemas(clusterAPIVersion).Init(func(schemas *types.Schemas) *types.Schemas {
-		return schemas.MustImportAndCustomize(clusterAPIVersion, capi.Machine{}, func(schema *types.Schema) {
+	generator.GenerateClient(factory.Schemas(&types.APIVersion{Group: capi.GroupVersion.Group, Version: capi.GroupVersion.Version, Path: "/v1"}).Init(func(schemas *types.Schemas) *types.Schemas {
+		return schemas.MustImportAndCustomize(&types.APIVersion{Group: capi.GroupVersion.Group, Version: capi.GroupVersion.Version, Path: "/v1"}, capi.Machine{}, func(schema *types.Schema) {
 			schema.ID = "cluster.x-k8s.io.machine"
 		})
 	}), nil)
