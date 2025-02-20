@@ -143,8 +143,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	}
 
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
-	feature := features.GetFeatureByName(features.ImperativeApiExtension.Name())
-	if feature.Enabled() {
+	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
 		sniProvider, err := certForCommonName(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace))
