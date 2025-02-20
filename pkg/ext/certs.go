@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sync"
 	"time"
 
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
@@ -142,12 +143,14 @@ type rotatingSNIProvider struct {
 
 	sninames []string
 
+	listenerM sync.RWMutex
 	listeners []dynamiccertificates.Listener
 
 	expiresAfter time.Duration
 
-	cert []byte
-	key  []byte
+	contentMu sync.RWMutex
+	cert      []byte
+	key       []byte
 
 	secrets wranglercorev1.SecretController
 }
@@ -161,14 +164,26 @@ func NewSNIProviderForCname(name string, cnames []string, secrets wranglercorev1
 
 		expiresAfter: time.Hour * 24 * 90,
 
-                secrets: secrets,
+		secrets: secrets,
 	}
 
 	return content, nil
 }
 
 func (p *rotatingSNIProvider) AddListener(listener dynamiccertificates.Listener) {
+	p.listenerM.Lock()
+	defer p.listenerM.Unlock()
+
 	p.listeners = append(p.listeners, listener)
+}
+
+func (p *rotatingSNIProvider) notify() {
+	p.listenerM.RLock()
+	defer p.listenerM.RUnlock()
+
+	for _, listener := range p.listeners {
+		listener.Enqueue()
+	}
 }
 
 func (p *rotatingSNIProvider) SNINames() []string {
@@ -180,6 +195,9 @@ func (p *rotatingSNIProvider) Name() string {
 }
 
 func (p *rotatingSNIProvider) CurrentCertKeyContent() ([]byte, []byte) {
+	p.contentMu.RLock()
+	defer p.contentMu.RUnlock()
+
 	return bytes.Clone(p.cert), bytes.Clone(p.key)
 }
 
@@ -263,12 +281,12 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 		logrus.Info("updated imperative api cert secret")
 	}
 
+	p.contentMu.Lock()
 	p.cert = cert
 	p.key = key
+	p.contentMu.Unlock()
 
-	for _, listener := range p.listeners {
-		listener.Enqueue()
-	}
+	p.notify()
 
 	return nil
 }
@@ -338,8 +356,12 @@ func (p *rotatingSNIProvider) handleCertEvent(event watch.Event) error {
 			return fmt.Errorf("secret does not contain field '%s'", SecretFieldNameKey)
 		}
 
+		p.contentMu.Lock()
 		p.cert = certData
 		p.key = keyData
+		p.contentMu.Unlock()
+
+		p.notify()
 	case watch.Deleted:
 		if err := p.createOrUpdateCerts(nil); err != nil {
 			return err
