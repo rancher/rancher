@@ -207,16 +207,12 @@ func (s *Store) create(_ context.Context,
 }
 
 // Get implements [rest.Getter]
+// Get returns the UserActivity based on the token name.
+// It is used to know, from the frontend, how much time
+// remains before the idle timeout triggers.
 func (s *Store) Get(ctx context.Context,
 	name string,
 	options *metav1.GetOptions) (runtime.Object, error) {
-	return s.get(ctx, name)
-}
-
-// get returns the UserActivity based on the token name.
-// It is used to know, from the frontend, how much time
-// remains before the idle timeout triggers.
-func (s *Store) get(ctx context.Context, uaname string) (runtime.Object, error) {
 	userInfo, err := s.userFrom(ctx)
 	if err != nil {
 		return nil, err
@@ -229,32 +225,36 @@ func (s *Store) get(ctx context.Context, uaname string) (runtime.Object, error) 
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("missing request token ID"))
 	}
 
+	// retrieve auth token
 	authToken, err := s.tokenCache.Get(authTokenID)
 	if err != nil {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
 	}
 
-	activityToken, err := s.tokenCache.Get(uaname)
+	// retrieve activity token
+	activityToken, err := s.tokenCache.Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", uaname, err))
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", name, err))
 		} else {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", uaname, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", name, err))
 		}
 	}
 
+	// verify auth and activity token has the same auth provider
 	if authToken.AuthProvider != activityToken.AuthProvider {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, uaname))
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, name))
 	}
 
+	// verify auth and activity token has the same auth user principal
 	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, uaname))
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, name))
 	}
 
 	// crafting UserActivity from requested Token name.
 	ua := &ext.UserActivity{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: uaname,
+			Name: name,
 		},
 		Status: ext.UserActivityStatus{},
 	}
