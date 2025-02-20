@@ -228,7 +228,9 @@ func TestIsIdleExpired(t *testing.T) {
 			name: "should not expire",
 			args: args{
 				token: v3.Token{
-					LastIdleTimeout: metav1.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					ActivityLastSeenAt: metav1.Time{
+						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					},
 				},
 				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 9, 0, 0, &time.Location{}),
 			},
@@ -238,7 +240,9 @@ func TestIsIdleExpired(t *testing.T) {
 			name: "should expire",
 			args: args{
 				token: v3.Token{
-					LastIdleTimeout: metav1.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					ActivityLastSeenAt: metav1.Time{
+						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					},
 				},
 				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 11, 0, 0, &time.Location{}),
 			},
@@ -248,7 +252,9 @@ func TestIsIdleExpired(t *testing.T) {
 			name: "should expire (equal values)",
 			args: args{
 				token: v3.Token{
-					LastIdleTimeout: metav1.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					ActivityLastSeenAt: metav1.Time{
+						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					},
 				},
 				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
 			},
