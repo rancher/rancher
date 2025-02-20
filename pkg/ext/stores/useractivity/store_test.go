@@ -261,7 +261,7 @@ func TestStore_get(t *testing.T) {
 						Name: "token-12345",
 					},
 					UserID: "admin",
-					ActivityLastSeenAt: v1.Time{
+					ActivityLastSeenAt: &v1.Time{
 						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
 					},
 				}, nil).Times(1)
@@ -313,7 +313,7 @@ func TestStore_get(t *testing.T) {
 			mockSetup: func() {
 				mockTokenControllerFake.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&v3Legacy.Token{
 					UserID: "token-12345",
-					ActivityLastSeenAt: v1.Time{
+					ActivityLastSeenAt: &v1.Time{
 						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
 					},
 				}, nil).Times(1)
