@@ -2,6 +2,7 @@ package useractivity
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
@@ -151,10 +153,21 @@ func (uas *Store) create(_ context.Context,
 
 	// if it's not a dry-run, commit the changes
 	if !dryRun {
-		token.LastIdleTimeout = newIdleTimeout
-		_, err = uas.tokenController.Update(token)
+		patch, err := json.Marshal([]struct {
+			Op    string `json:"op"`
+			Path  string `json:"path"`
+			Value any    `json:"value"`
+		}{{
+			Op:    "replace",
+			Path:  "/lastIdleTimeout",
+			Value: newIdleTimeout,
+		}})
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to update token: %v", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("%v", err))
+		}
+		_, err = uas.tokenController.Patch(token.GetName(), types.JSONPatchType, patch)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to patch token: %v", err))
 		}
 	}
 
