@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -16,20 +19,25 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	k8suser "k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 const (
-	UserActivityNamespace = "cattle-useractivity-data"
-	tokenUserId           = "authn.management.cattle.io/token-userId"
-	SingularName          = "useractivity"
-	PluralName            = "useractivities"
+	UserActivityNamespace    = "cattle-useractivity-data"
+	tokenUserId              = "authn.management.cattle.io/token-userId"
+	SingularName             = "useractivity"
+	PluralName               = "useractivities"
+	GroupCattleAuthenticated = "system:cattle:authenticated"
 )
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 type Store struct {
-	tokenController v3.TokenController
+	tokens     v3.TokenController
+	tokenCache v3.TokenCache
+	userCache  v3.UserCache
 }
 
 var GV = schema.GroupVersion{
@@ -50,7 +58,9 @@ var GVR = schema.GroupVersionResource{
 
 func New(wranglerCtx *wrangler.Context) *Store {
 	return &Store{
-		tokenController: wranglerCtx.Mgmt.Token(),
+		tokens:     wranglerCtx.Mgmt.Token(),
+		tokenCache: wranglerCtx.Mgmt.Token().Cache(),
+		userCache:  wranglerCtx.Mgmt.User().Cache(),
 	}
 }
 
@@ -85,6 +95,18 @@ func (s *Store) Create(ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions) (runtime.Object, error) {
+	userInfo, err := s.userFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	extras := userInfo.GetExtra()
+
+	authTokenID := first(extras[common.ExtraRequestTokenID])
+	if authTokenID == "" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("missing request token ID"))
+	}
+
 	if createValidation != nil {
 		err := createValidation(ctx, obj)
 		if err != nil {
@@ -99,17 +121,32 @@ func (s *Store) Create(ctx context.Context,
 		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T", zeroUA, objUserActivity))
 	}
 	// retrieve token information
-	if objUserActivity.Spec.TokenID == "" {
+	if objUserActivity.Name == "" {
 		return nil, apierrors.NewBadRequest("can't retrieve token with empty string")
 	}
-	token, err := s.tokenController.Get(objUserActivity.Spec.TokenID, metav1.GetOptions{})
+
+	authToken, err := s.tokenCache.Get(authTokenID)
+	if err != nil {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
+	}
+
+	activityToken, err := s.tokenCache.Get(objUserActivity.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", objUserActivity.Spec.TokenID, err))
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", objUserActivity.Name, err))
 		} else {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", objUserActivity.Spec.TokenID, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", objUserActivity.Name, err))
 		}
 	}
+
+	if authToken.AuthProvider != activityToken.AuthProvider {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, objUserActivity.Name))
+	}
+
+	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, objUserActivity.Name))
+	}
+
 	// set when last activity happened
 	lastActivity := metav1.Time{
 		Time: time.Now().UTC(),
@@ -120,7 +157,7 @@ func (s *Store) Create(ctx context.Context,
 	// check if it's a dry-run
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
-	return s.create(ctx, objUserActivity, token, token.UserID, lastActivity, idleTimeout, dryRun)
+	return s.create(ctx, objUserActivity, activityToken, lastActivity, idleTimeout, dryRun)
 }
 
 // create sets the LastActivity and CurrentTimeout fields on the UserActivity object
@@ -128,23 +165,18 @@ func (s *Store) Create(ctx context.Context,
 func (s *Store) create(_ context.Context,
 	userActivity *ext.UserActivity,
 	token *v3Legacy.Token,
-	user string,
 	lastActivity metav1.Time,
 	authUserSessionIdleTTLMinutes int,
 	dryRun bool) (*ext.UserActivity, error) {
 
-	expectedName, err := setUserActivityName(user, token.Name)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to set useractivity name: %w", err))
-	}
-	// ensure the UserActivity object is crafted as expected.
-	if userActivity.Name != expectedName {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("useractivity name mismatch: have %s - expected %s", userActivity.Name, expectedName))
+	// ensure
+	if userActivity.GenerateName != "" {
+		return nil, apierrors.NewBadRequest("name generation is not allowed")
 	}
 	// ensure the token specified in the UserActivity is the same
 	// we are using to do the request.
-	if token.Name != userActivity.Spec.TokenID {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("token name mismatch: have %s - expected %s", token.Name, userActivity.Spec.TokenID))
+	if token.Name != userActivity.Name {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("token name mismatch: have %s - expected %s", token.Name, userActivity.Name))
 	}
 
 	// once validated the request, we can define the lastActivity time.
@@ -168,7 +200,7 @@ func (s *Store) create(_ context.Context,
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("%w", err))
 		}
-		_, err = s.tokenController.Patch(token.GetName(), types.JSONPatchType, patch)
+		_, err = s.tokens.Patch(token.GetName(), types.JSONPatchType, patch)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to patch token: %w", err))
 		}
@@ -187,19 +219,39 @@ func (s *Store) Get(ctx context.Context,
 // get returns the UserActivity based on the token name.
 // It is used to know, from the frontend, how much time
 // remains before the idle timeout triggers.
-func (s *Store) get(_ context.Context, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
-	user, token, err := getUserActivityName(uaname)
+func (s *Store) get(ctx context.Context, uaname string, options *metav1.GetOptions) (runtime.Object, error) {
+	userInfo, err := s.userFrom(ctx)
 	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("wrong useractivity name: %v", err))
+		return nil, err
 	}
-	// retrieve token information
-	tokenId, err := s.tokenController.Get(token, *options)
+
+	extras := userInfo.GetExtra()
+
+	authTokenID := first(extras[common.ExtraRequestTokenID])
+	if authTokenID == "" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("missing request token ID"))
+	}
+
+	authToken, err := s.tokenCache.Get(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", token, err))
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
 	}
-	// verify user is the same
-	if tokenId.UserID != user {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("user provided mismatch: have %s - expected %s", user, tokenId.UserID))
+
+	activityToken, err := s.tokenCache.Get(uaname)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", uaname, err))
+		} else {
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", uaname, err))
+		}
+	}
+
+	if authToken.AuthProvider != activityToken.AuthProvider {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, uaname))
+	}
+
+	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, uaname))
 	}
 
 	// crafting UserActivity from requested Token name.
@@ -207,17 +259,54 @@ func (s *Store) get(_ context.Context, uaname string, options *metav1.GetOptions
 		ObjectMeta: metav1.ObjectMeta{
 			Name: uaname,
 		},
-		Spec: ext.UserActivitySpec{
-			TokenID: tokenId.Name,
-		},
 		Status: ext.UserActivityStatus{},
 	}
 
-	if tokenId.ActivityLastSeenAt != nil {
-		ua.Status.ExpiresAt = tokenId.ActivityLastSeenAt.String()
+	if activityToken.ActivityLastSeenAt != nil {
+		ua.Status.ExpiresAt = activityToken.ActivityLastSeenAt.String()
 	} else {
 		ua.Status.ExpiresAt = metav1.Time{}.String()
 	}
 
 	return ua, nil
+}
+
+// userFrom is a helper that extracts and validates the user info from the request's context.
+func (s *Store) userFrom(ctx context.Context) (k8suser.Info, error) {
+	userInfo, ok := request.UserFrom(ctx)
+	if !ok {
+		return nil, apierrors.NewInternalError(fmt.Errorf("missing user info"))
+	}
+
+	userName := userInfo.GetName()
+
+	if strings.Contains(userName, ":") { // E.g. system:admin
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
+	}
+
+	if !slices.Contains(userInfo.GetGroups(), GroupCattleAuthenticated) {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
+	}
+
+	user, err := s.userCache.Get(userName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s not found", userName))
+		}
+
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
+	}
+
+	if user.Enabled != nil && !*user.Enabled {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s is disabled", userName))
+	}
+
+	return userInfo, nil
+}
+
+func first(values []string) string {
+	if len(values) > 0 {
+		return values[0]
+	}
+	return ""
 }

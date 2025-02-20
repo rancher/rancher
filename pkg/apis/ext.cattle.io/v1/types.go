@@ -13,17 +13,8 @@ type UserActivity struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec contains the user-accessible configuration of the useractivity.
-	Spec UserActivitySpec `json:"spec"`
 	// Status contains system information about the useractivity.
 	Status UserActivityStatus `json:"status"`
-}
-
-type UserActivitySpec struct {
-	// TokenID is the Id of the Token managed by the UserActivity.
-	// The UserActivity updates the field LastIdleTimeout of this token.
-	// +optional
-	TokenID string `json:"tokenId"`
 }
 
 type UserActivityStatus struct {
