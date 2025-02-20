@@ -32,9 +32,6 @@ import (
 const (
 	CertificateBlockType = "CERTIFICATE"
 
-	SecretFieldNameCert = "cert"
-	SecretFieldNameKey  = "key"
-
 	SecretLabelProvider = "provider"
 
 	certCheckInterval        = time.Hour
@@ -260,8 +257,8 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 				},
 			},
 			Data: map[string][]byte{
-				SecretFieldNameCert: cert,
-				SecretFieldNameKey:  key,
+				corev1.TLSPrivateKeyKey: key,
+				corev1.TLSCertKey:       cert,
 			},
 		}
 
@@ -271,8 +268,8 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 
 		logrus.Info("created imperative api cert secret")
 	} else {
-		secret.Data[SecretFieldNameCert] = cert
-		secret.Data[SecretFieldNameKey] = key
+		secret.Data[corev1.TLSCertKey] = cert
+		secret.Data[corev1.TLSPrivateKeyKey] = key
 
 		if _, err := p.secrets.Update(secret); err != nil {
 			return fmt.Errorf("failed to update secret: %w", err)
@@ -292,14 +289,14 @@ func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
 }
 
 func (p *rotatingSNIProvider) willCertExpireWithinDuration(secret *corev1.Secret, d time.Duration) (bool, error) {
-	certData, ok := secret.Data[SecretFieldNameCert]
+	certData, ok := secret.Data[corev1.TLSCertKey]
 	if !ok {
-		return false, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameCert)
+		return false, fmt.Errorf("secret does not contain field '%s'", corev1.TLSCertKey)
 	}
 
-	keyData, ok := secret.Data[SecretFieldNameKey]
+	keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
 	if !ok {
-		return false, fmt.Errorf("secret does not contain field '%s'", SecretFieldNameKey)
+		return false, fmt.Errorf("secret does not contain field '%s'", corev1.TLSPrivateKeyKey)
 	}
 
 	cert, err := tls.X509KeyPair(certData, keyData)
@@ -346,14 +343,14 @@ func (p *rotatingSNIProvider) handleCertEvent(event watch.Event) error {
 	switch event.Type {
 	case watch.Added, watch.Modified:
 		secret := event.Object.(*corev1.Secret)
-		certData, ok := secret.Data[SecretFieldNameCert]
+		certData, ok := secret.Data[corev1.TLSCertKey]
 		if !ok {
-			return fmt.Errorf("secret does not contain field '%s'", SecretFieldNameCert)
+			return fmt.Errorf("secret does not contain field '%s'", corev1.TLSCertKey)
 		}
 
-		keyData, ok := secret.Data[SecretFieldNameKey]
+		keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
 		if !ok {
-			return fmt.Errorf("secret does not contain field '%s'", SecretFieldNameKey)
+			return fmt.Errorf("secret does not contain field '%s'", corev1.TLSPrivateKeyKey)
 		}
 
 		p.contentMu.Lock()

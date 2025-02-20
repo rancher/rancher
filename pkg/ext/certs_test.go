@@ -244,8 +244,8 @@ func TestRotatingSNIProviderWithExistingExpiringSecret(t *testing.T) {
 			Namespace: Namespace,
 		},
 		Data: map[string][]byte{
-			SecretFieldNameCert: initialCert,
-			SecretFieldNameKey:  initialCa,
+			corev1.TLSCertKey:       initialCert,
+			corev1.TLSPrivateKeyKey: initialCa,
 		},
 	})
 	assert.NoError(t, err)
@@ -265,8 +265,8 @@ func TestRotatingSNIProviderWithExistingExpiringSecret(t *testing.T) {
 		secret, err := secretMock.Get(Namespace, provider.secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 
-		cert := secret.Data[SecretFieldNameCert]
-		ca := secret.Data[SecretFieldNameKey]
+		cert := secret.Data[corev1.TLSCertKey]
+		ca := secret.Data[corev1.TLSPrivateKeyKey]
 		if !bytes.Equal(initialCert, cert) && !bytes.Equal(initialCa, ca) {
 			cancel()
 		}
@@ -275,10 +275,10 @@ func TestRotatingSNIProviderWithExistingExpiringSecret(t *testing.T) {
 	secret, err := secretMock.Get(Namespace, provider.secretName, metav1.GetOptions{})
 	assert.NoError(t, err)
 
-	cert := secret.Data[SecretFieldNameCert]
+	cert := secret.Data[corev1.TLSCertKey]
 	assert.NotEqual(t, initialCert, cert)
 
-	ca := secret.Data[SecretFieldNameKey]
+	ca := secret.Data[corev1.TLSPrivateKeyKey]
 	assert.NotEqual(t, initialCa, ca)
 
 	close(stopChan)
