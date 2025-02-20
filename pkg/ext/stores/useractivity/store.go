@@ -167,7 +167,7 @@ func (s *Store) create(_ context.Context,
 	authUserSessionIdleTTLMinutes int,
 	dryRun bool) (*ext.UserActivity, error) {
 
-	// ensure
+	// ensure generate name is not used
 	if userActivity.GenerateName != "" {
 		return nil, apierrors.NewBadRequest("name generation is not allowed")
 	}
