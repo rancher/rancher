@@ -28,6 +28,7 @@ replace (
 	k8s.io/api => k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.31.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.32.2 => k8s.io/apimachinery v0.31.1
 	k8s.io/apiserver => k8s.io/apiserver v0.31.1
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.31.1
 	k8s.io/client-go => k8s.io/client-go v0.31.1
@@ -45,7 +46,7 @@ replace (
 	k8s.io/kms => k8s.io/kms v0.31.1
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.31.1
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.31.1
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20240411171206-dc4e619f62f3
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.31.1
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.31.1
 	k8s.io/kubectl => k8s.io/kubectl v0.31.1
@@ -58,6 +59,7 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.31.1
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.8.3
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 => sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 )
 
 require (
@@ -97,6 +99,7 @@ require (
 	github.com/docker/go-connections v0.5.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v5.9.0+incompatible
+	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-ldap/ldap/v3 v3.4.1
@@ -109,6 +112,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
+	github.com/k3s-io/api v0.1.0
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/microsoft/kiota-abstractions-go v1.7.0
@@ -169,16 +173,16 @@ require (
 	helm.sh/helm/v3 v3.16.2
 	k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver v0.31.1
-	k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.32.2
 	k8s.io/apiserver v0.31.1
 	k8s.io/cli-runtime v0.31.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/helm v2.17.0+incompatible
 	k8s.io/kube-aggregator v0.31.1
-	k8s.io/kube-openapi v0.0.0-20240411171206-dc4e619f62f3
+	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kubectl v0.31.1
 	k8s.io/kubernetes v1.31.1
-	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
+	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.8.3
@@ -225,7 +229,6 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
@@ -269,7 +272,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/gengo v0.0.0-20240826214909-a7b603a56eb7 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
+	k8s.io/gengo/v2 v2.0.0-20240826214909-a7b603a56eb7 // indirect
 	k8s.io/kms v0.31.1 // indirect
 	k8s.io/pod-security-admission v0.31.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
@@ -441,8 +444,8 @@ require (
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
-	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
 )
