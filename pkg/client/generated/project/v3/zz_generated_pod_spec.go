@@ -26,10 +26,12 @@ const (
 	PodSpecFieldPreemptionPolicy              = "preemptionPolicy"
 	PodSpecFieldReadinessGates                = "readinessGates"
 	PodSpecFieldResourceClaims                = "resourceClaims"
+	PodSpecFieldResources                     = "resources"
 	PodSpecFieldRestartPolicy                 = "restartPolicy"
 	PodSpecFieldRunAsGroup                    = "runAsGroup"
 	PodSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodSpecFieldRuntimeClassName              = "runtimeClassName"
+	PodSpecFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	PodSpecFieldScheduling                    = "scheduling"
 	PodSpecFieldSchedulingGates               = "schedulingGates"
 	PodSpecFieldSeccompProfile                = "seccompProfile"
@@ -71,10 +73,12 @@ type PodSpec struct {
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	ResourceClaims                []PodResourceClaim             `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
+	Resources                     *ResourceRequirements          `json:"resources,omitempty" yaml:"resources,omitempty"`
 	RestartPolicy                 string                         `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                         `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
+	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`

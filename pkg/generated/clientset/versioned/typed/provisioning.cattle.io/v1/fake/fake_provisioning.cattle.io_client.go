@@ -29,7 +29,7 @@ type FakeProvisioningV1 struct {
 }
 
 func (c *FakeProvisioningV1) Clusters(namespace string) v1.ClusterInterface {
-	return &FakeClusters{c, namespace}
+	return newFakeClusters(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

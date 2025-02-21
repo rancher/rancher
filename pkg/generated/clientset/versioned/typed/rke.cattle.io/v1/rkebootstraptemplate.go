@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,31 +37,32 @@ type RKEBootstrapTemplatesGetter interface {
 
 // RKEBootstrapTemplateInterface has methods to work with RKEBootstrapTemplate resources.
 type RKEBootstrapTemplateInterface interface {
-	Create(ctx context.Context, rKEBootstrapTemplate *v1.RKEBootstrapTemplate, opts metav1.CreateOptions) (*v1.RKEBootstrapTemplate, error)
-	Update(ctx context.Context, rKEBootstrapTemplate *v1.RKEBootstrapTemplate, opts metav1.UpdateOptions) (*v1.RKEBootstrapTemplate, error)
+	Create(ctx context.Context, rKEBootstrapTemplate *rkecattleiov1.RKEBootstrapTemplate, opts metav1.CreateOptions) (*rkecattleiov1.RKEBootstrapTemplate, error)
+	Update(ctx context.Context, rKEBootstrapTemplate *rkecattleiov1.RKEBootstrapTemplate, opts metav1.UpdateOptions) (*rkecattleiov1.RKEBootstrapTemplate, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.RKEBootstrapTemplate, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.RKEBootstrapTemplateList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rkecattleiov1.RKEBootstrapTemplate, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*rkecattleiov1.RKEBootstrapTemplateList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RKEBootstrapTemplate, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKEBootstrapTemplate, err error)
 	RKEBootstrapTemplateExpansion
 }
 
 // rKEBootstrapTemplates implements RKEBootstrapTemplateInterface
 type rKEBootstrapTemplates struct {
-	*gentype.ClientWithList[*v1.RKEBootstrapTemplate, *v1.RKEBootstrapTemplateList]
+	*gentype.ClientWithList[*rkecattleiov1.RKEBootstrapTemplate, *rkecattleiov1.RKEBootstrapTemplateList]
 }
 
 // newRKEBootstrapTemplates returns a RKEBootstrapTemplates
 func newRKEBootstrapTemplates(c *RkeV1Client, namespace string) *rKEBootstrapTemplates {
 	return &rKEBootstrapTemplates{
-		gentype.NewClientWithList[*v1.RKEBootstrapTemplate, *v1.RKEBootstrapTemplateList](
+		gentype.NewClientWithList[*rkecattleiov1.RKEBootstrapTemplate, *rkecattleiov1.RKEBootstrapTemplateList](
 			"rkebootstraptemplates",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.RKEBootstrapTemplate { return &v1.RKEBootstrapTemplate{} },
-			func() *v1.RKEBootstrapTemplateList { return &v1.RKEBootstrapTemplateList{} }),
+			func() *rkecattleiov1.RKEBootstrapTemplate { return &rkecattleiov1.RKEBootstrapTemplate{} },
+			func() *rkecattleiov1.RKEBootstrapTemplateList { return &rkecattleiov1.RKEBootstrapTemplateList{} },
+		),
 	}
 }
