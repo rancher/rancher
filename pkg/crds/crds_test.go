@@ -73,7 +73,7 @@ func TestEnsure_MCM(t *testing.T) {
 	features.MCM.Set(true)
 
 	MigratedResources = migrated
-	err := EnsureRequired(context.Background(), testClient.client)
+	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
 	require.NoError(t, err, "unexpected error when creating yaml")
 	sort.Strings(expected)
 	sort.Strings(testClient.CrdNames)
@@ -89,7 +89,7 @@ func TestEnsure_NonMCM(t *testing.T) {
 	MigratedResources = map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
 	expected := []string{capiCRD}
 
-	err := EnsureRequired(context.Background(), testClient.client)
+	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
 	require.NoError(t, err, "unexpected error when creating yaml")
 	sort.Strings(expected)
 	sort.Strings(testClient.CrdNames)
@@ -114,21 +114,21 @@ func TestEnsure_DesiredFS(t *testing.T) {
 func TestEnsure_DuplicateCRDs(t *testing.T) {
 	defer resetGlobals()
 	crdFS = dupFs
-	err := EnsureRequired(context.Background(), setupFakeClient().client)
+	err := EnsureRequired(context.Background(), setupFakeClient().client.CustomResourceDefinitions())
 	require.ErrorIs(t, err, errDuplicate, "expected duplicate error for redefined CRDs")
 }
 
 func TestEnsure_InvalidCRDs(t *testing.T) {
 	defer resetGlobals()
 	crdFS = badFS
-	err := EnsureRequired(context.Background(), setupFakeClient().client)
+	err := EnsureRequired(context.Background(), setupFakeClient().client.CustomResourceDefinitions())
 	require.Error(t, err, "expected error when invalid YAML file is encountered")
 }
 
 func TestEnsure_NonCRDsFound(t *testing.T) {
 	defer resetGlobals()
 	crdFS = podFS
-	err := EnsureRequired(context.Background(), setupFakeClient().client)
+	err := EnsureRequired(context.Background(), setupFakeClient().client.CustomResourceDefinitions())
 	require.Error(t, err, "expected error when invalid YAML file is encountered")
 }
 
@@ -142,7 +142,7 @@ func TestEnsure_failedCreate(t *testing.T) {
 		return true, nil, testsErr
 	})
 	features.MCM.Set(true)
-	err := EnsureRequired(context.Background(), testClient.client)
+	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
 	require.ErrorIs(t, err, testsErr, "expected error when creating YAML file got='%v'", err)
 }
 
@@ -159,7 +159,7 @@ func TestEnusure_metadata(t *testing.T) {
 	features.EmbeddedClusterAPI.Set(true)
 	features.ProvisioningV2.Set(true)
 
-	err := EnsureRequired(context.Background(), testClient.client)
+	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
 	require.NoError(t, err, "unexpected error when creating yaml")
 	sort.Strings(expected)
 	sort.Strings(testClient.CrdNames)
@@ -186,8 +186,10 @@ func TestEnusure_metadata(t *testing.T) {
 }
 
 func setupFakeClient() *FakeClient {
-	fakeClient := &FakeClient{client: fakeclientset.NewSimpleClientset(staticCRD).ApiextensionsV1().CustomResourceDefinitions().(*fake.FakeCustomResourceDefinitions)}
-	fakeClient.client.Fake.PrependReactor("create", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient := &FakeClient{
+		client: fakeclientset.NewSimpleClientset(staticCRD).ApiextensionsV1().(*fake.FakeApiextensionsV1),
+	}
+	fakeClient.client.PrependReactor("create", "customresourcedefinitions", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		crd := action.(k8stesting.CreateAction).GetObject().(*apiextv1.CustomResourceDefinition)
 		fakeClient.CrdNames = append(fakeClient.CrdNames, crd.Name)
 		if fakeClient.CRDValues == nil {
@@ -196,7 +198,7 @@ func setupFakeClient() *FakeClient {
 		fakeClient.CRDValues[crd.Name] = crd
 		return true, staticCRD, nil
 	})
-	fakeClient.client.Fake.PrependReactor("get", "customresourcedefinitions", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.client.PrependReactor("get", "customresourcedefinitions", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		return true, staticCRD, nil
 	})
 
@@ -204,7 +206,7 @@ func setupFakeClient() *FakeClient {
 }
 
 type FakeClient struct {
-	client    *fake.FakeCustomResourceDefinitions
+	client    *fake.FakeApiextensionsV1
 	CrdNames  []string
 	CRDValues map[string]*apiextv1.CustomResourceDefinition
 }

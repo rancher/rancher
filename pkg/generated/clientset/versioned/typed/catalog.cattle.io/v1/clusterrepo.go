@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	catalogcattleiov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type ClusterReposGetter interface {
 
 // ClusterRepoInterface has methods to work with ClusterRepo resources.
 type ClusterRepoInterface interface {
-	Create(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.CreateOptions) (*v1.ClusterRepo, error)
-	Update(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.UpdateOptions) (*v1.ClusterRepo, error)
+	Create(ctx context.Context, clusterRepo *catalogcattleiov1.ClusterRepo, opts metav1.CreateOptions) (*catalogcattleiov1.ClusterRepo, error)
+	Update(ctx context.Context, clusterRepo *catalogcattleiov1.ClusterRepo, opts metav1.UpdateOptions) (*catalogcattleiov1.ClusterRepo, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, clusterRepo *v1.ClusterRepo, opts metav1.UpdateOptions) (*v1.ClusterRepo, error)
+	UpdateStatus(ctx context.Context, clusterRepo *catalogcattleiov1.ClusterRepo, opts metav1.UpdateOptions) (*catalogcattleiov1.ClusterRepo, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterRepo, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterRepoList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*catalogcattleiov1.ClusterRepo, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*catalogcattleiov1.ClusterRepoList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRepo, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *catalogcattleiov1.ClusterRepo, err error)
 	ClusterRepoExpansion
 }
 
 // clusterRepos implements ClusterRepoInterface
 type clusterRepos struct {
-	*gentype.ClientWithList[*v1.ClusterRepo, *v1.ClusterRepoList]
+	*gentype.ClientWithList[*catalogcattleiov1.ClusterRepo, *catalogcattleiov1.ClusterRepoList]
 }
 
 // newClusterRepos returns a ClusterRepos
 func newClusterRepos(c *CatalogV1Client) *clusterRepos {
 	return &clusterRepos{
-		gentype.NewClientWithList[*v1.ClusterRepo, *v1.ClusterRepoList](
+		gentype.NewClientWithList[*catalogcattleiov1.ClusterRepo, *catalogcattleiov1.ClusterRepoList](
 			"clusterrepos",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterRepo { return &v1.ClusterRepo{} },
-			func() *v1.ClusterRepoList { return &v1.ClusterRepoList{} }),
+			func() *catalogcattleiov1.ClusterRepo { return &catalogcattleiov1.ClusterRepo{} },
+			func() *catalogcattleiov1.ClusterRepoList { return &catalogcattleiov1.ClusterRepoList{} },
+		),
 	}
 }

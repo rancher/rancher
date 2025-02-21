@@ -2688,6 +2688,7 @@ func (s *steveAPITestSuite) TestLinks() {
 	expectedID := secretObj.Namespace + "/" + secretObj.Name
 	links := readObj.JSONResp["links"].(map[string]any)
 	expectedLinks := map[string]any{
+		"patch":  fmt.Sprintf("https://%s/v1/secrets/%s", host, expectedID),
 		"remove": fmt.Sprintf("https://%s/v1/secrets/%s", host, expectedID),
 		"update": fmt.Sprintf("https://%s/v1/secrets/%s", host, expectedID),
 		"self":   fmt.Sprintf("https://%s/v1/secrets/%s", host, expectedID),
