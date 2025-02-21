@@ -181,15 +181,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ChartName:           chart.RemoteDialerProxyChartName,
 			ExactVersionSetting: settings.RemoteDialerProxyVersion,
 			Values: func() map[string]interface{} {
-				secret, err := ext.GetOrCreateRDPConnectSecret(h.secrets)
-				if err != nil {
-					return map[string]interface{}{}
-				}
-				return map[string]interface{}{
-					"service": map[string]interface{}{
-						"secret": secret,
-					},
-				}
+				return map[string]interface{}{}
 			},
 			Enabled: func() bool {
 				if ext.RDPEnabled() {
