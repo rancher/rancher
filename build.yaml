@@ -1,4 +1,5 @@
 webhookVersion: 106.0.0+up0.7.0-rc.3
+remoteDialerProxyVersion: 106.0.0+up0.4.4-rc.2
 provisioningCAPIVersion: 105.0.0+up0.4.0
 cspAdapterMinVersion: 105.0.0+up5.0.1-rc1
 defaultShellVersion: rancher/shell:v0.4.0-rc.1

@@ -9,12 +9,14 @@ fi
 file="$(git rev-parse --show-toplevel)/build.yaml"
 
 CATTLE_RANCHER_WEBHOOK_VERSION=$(yq -e '.webhookVersion' "$file")
+CATTLE_REMOTEDIALER_PROXY_VERSION=$(yq -e '.remoteDialerProxyVersion' "$file")
 CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(yq -e '.provisioningCAPIVersion' "$file")
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq -e '.cspAdapterMinVersion' "$file")
 CATTLE_DEFAULT_SHELL_VERSION=$(yq -e '.defaultShellVersion' "$file")
 CATTLE_FLEET_VERSION=$(yq -e '.fleetVersion' "$file")
 
 export CATTLE_RANCHER_WEBHOOK_VERSION
+export CATTLE_REMOTEDIALER_PROXY_VERSION
 export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 export CATTLE_CSP_ADAPTER_MIN_VERSION
 export CATTLE_DEFAULT_SHELL_VERSION
