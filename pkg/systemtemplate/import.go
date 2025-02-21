@@ -2,7 +2,6 @@ package systemtemplate
 
 import (
 	"bytes"
-	"crypto/md5"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -137,8 +136,8 @@ func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster, isPreBootstrap bool, cluster *apimgmtv3.Cluster,
 	agentFeatures map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister, pcExists bool) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
-	d := md5.Sum([]byte(url + token + namespace))
-	tokenKey := hex.EncodeToString(d[:])[:7]
+	d := sha256.Sum256([]byte(fmt.Sprintf("%s.%s.%s", url, token, namespace)))
+	tokenKey := hex.EncodeToString(d[:])[:10]
 
 	if authImage == "fixed" {
 		authImage = settings.AuthImage.Get()
