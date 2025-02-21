@@ -56,6 +56,8 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 		}
 
 		remoteDialerProxyClient.Run(ctx)
+
+		return nil
 	}
 
 	return DeleteRDPConnectSecret(wranglerContext.Core.Secret())
