@@ -10,6 +10,8 @@ import (
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/rancher/norman/types"
+	"github.com/rancher/shepherd/extensions/clusters"
 )
 
 var verifyIngress = true
@@ -41,12 +43,30 @@ func (u *UpgradeWorkloadTestSuite) SetupSuite() {
 }
 
 func (u *UpgradeWorkloadTestSuite) TestWorkloadPreUpgrade() {
+	var nodeSelector = make(map[string]string)
 	for _, cluster := range u.clusters {
 		cluster := cluster
 		testName := "Pre Upgrade checks for the cluster " + cluster.Name
 		u.Run(testName, func() {
 			cluster.FeaturesToTest.Ingress = &verifyIngress
-			createPreUpgradeWorkloads(u.T(), u.client, cluster.Name, cluster.FeaturesToTest, nil, containerImage)
+			clusterID, err := clusters.GetClusterIDByName(u.client, cluster.Name)
+			require.NoError(u.T(), err, "Error getting cluster ID")
+			nodes, err := u.client.Management.Node.ListAll(&types.ListOpts{
+				Filters: map[string]interface{}{
+					"clusterId": clusterID,
+				},
+			})
+			require.NoError(u.T(), err)
+
+			image := containerImage
+			for _, node := range nodes.Data {
+				if node.Labels["kubernetes.io/os"] == "windows" {
+					image = windowsContainerImage
+					nodeSelector["kubernetes.io/os"] = "windows"
+					break
+				}
+			}
+			createPreUpgradeWorkloads(u.T(), u.client, cluster.Name, cluster.FeaturesToTest, nodeSelector, image)
 		})
 	}
 }
