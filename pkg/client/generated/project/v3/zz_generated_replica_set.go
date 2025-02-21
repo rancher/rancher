@@ -42,10 +42,12 @@ const (
 	ReplicaSetFieldReplicaSetConfig              = "replicaSetConfig"
 	ReplicaSetFieldReplicaSetStatus              = "replicaSetStatus"
 	ReplicaSetFieldResourceClaims                = "resourceClaims"
+	ReplicaSetFieldResources                     = "resources"
 	ReplicaSetFieldRestartPolicy                 = "restartPolicy"
 	ReplicaSetFieldRunAsGroup                    = "runAsGroup"
 	ReplicaSetFieldRunAsNonRoot                  = "runAsNonRoot"
 	ReplicaSetFieldRuntimeClassName              = "runtimeClassName"
+	ReplicaSetFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	ReplicaSetFieldScale                         = "scale"
 	ReplicaSetFieldScheduling                    = "scheduling"
 	ReplicaSetFieldSchedulingGates               = "schedulingGates"
@@ -109,10 +111,12 @@ type ReplicaSet struct {
 	ReplicaSetConfig              *ReplicaSetConfig              `json:"replicaSetConfig,omitempty" yaml:"replicaSetConfig,omitempty"`
 	ReplicaSetStatus              *ReplicaSetStatus              `json:"replicaSetStatus,omitempty" yaml:"replicaSetStatus,omitempty"`
 	ResourceClaims                []PodResourceClaim             `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
+	Resources                     *ResourceRequirements          `json:"resources,omitempty" yaml:"resources,omitempty"`
 	RestartPolicy                 string                         `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                         `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
+	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scale                         *int64                         `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`

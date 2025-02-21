@@ -56,9 +56,9 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher125
-ENV CATTLE_K3S_VERSION v1.31.1+k3s1
+ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION v3.5.14
+ENV CATTLE_ETCD_VERSION v3.5.16
 ENV TINI_VERSION v0.18.0
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.12
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
@@ -132,7 +132,7 @@ ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERS
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.31.1-k3s1 \
+COPY --from=rancher/k3s:v1.32.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -235,7 +235,7 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 # Enable exporting of the k3s images as part of the build process.
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS images
 
-ENV CATTLE_K3S_VERSION v1.31.1+k3s1
+ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 
