@@ -23,7 +23,7 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 	gke.Register(ctx, wranglerContext, management)
 	clusterupstreamrefresher.Register(ctx, wranglerContext)
 
-	feature.Register(ctx, wranglerContext)
+	feature.Register(ctx, management, wranglerContext)
 
 	if features.ProvisioningV2.Enabled() {
 		if err := authprovisioningv2.Register(ctx, wranglerContext, management); err != nil {
