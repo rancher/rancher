@@ -16,7 +16,6 @@ import (
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -124,7 +123,7 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 		GrbLister: v.GrbLister,
 	}
 
-	//if user is admin, no checks needed
+	// if user is admin, no checks needed
 	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
 
 	isAdmin, err := ma.IsAdmin(callerID)
@@ -135,7 +134,7 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 		return nil
 	}
 
-	//enforcement is true, template is a must
+	// enforcement is true, template is a must
 	if spec.ClusterTemplateRevisionID == "" {
 		return httperror.NewFieldAPIError(httperror.MissingRequired, "", "A clusterTemplateRevision to create a cluster")
 	}
@@ -185,31 +184,6 @@ func (v *Validator) validateK3sBasedVersionUpgrade(request *types.APIContext, sp
 	// must wait for original status version to be set
 	if cluster.Status.Version == nil {
 		return upgradeNotReadyErr
-	}
-
-	var updateVersion string
-	if cluster.Status.Driver == v32.ClusterDriverRke2 {
-		updateVersion = spec.Rke2Config.Version
-	} else {
-		updateVersion = spec.K3sConfig.Version
-	}
-
-	prevVersion := cluster.Status.Version.GitVersion
-	if prevVersion == updateVersion {
-		// no op
-		return nil
-	}
-
-	isNewer, err := nodesyncer.IsNewerVersion(prevVersion, updateVersion)
-	if err != nil {
-		errMsg := fmt.Sprintf("unable to compare cluster version [%s]", updateVersion)
-		return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
-	}
-
-	if !isNewer {
-		// update version must be higher than previous version, downgrades are not supported
-		errMsg := fmt.Sprintf("cannot upgrade cluster version from [%s] to [%s]. New version must be higher.", prevVersion, updateVersion)
-		return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
 	}
 
 	return nil
