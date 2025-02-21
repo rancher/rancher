@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
@@ -144,8 +143,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	}
 
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
-	switch os.Getenv("CATTLE_IMPERATIVE_API_EXTENSION") {
-	case "true":
+	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
 		sniProvider, err := certForCommonName(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace))
@@ -170,7 +168,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		}
 
 		authenticators = append(authenticators, defaultAuthenticator)
-	default:
+	} else {
 		logrus.Info("deleting imperative extension apiserver resources")
 
 		if err := CleanupExtensionAPIServer(wranglerContext); err != nil {
