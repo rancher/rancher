@@ -9,6 +9,7 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
@@ -65,7 +66,7 @@ func (h *handler) deployPlans(cluster *mgmtv3.Cluster) error {
 	workerPlan := &planv1.Plan{}
 	// deactivate all existing plans that are not managed by Rancher
 	for i, plan := range planList.Items {
-		if _, ok := plan.Labels[rancherManagedPlan]; !ok {
+		if _, ok := plan.Labels[RancherManagedPlan]; !ok {
 			// inverse selection is used here, we select a non-existent label
 			lsr := metav1.LabelSelectorRequirement{
 				Key:      upgradeDisableLabelKey,
@@ -189,21 +190,34 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 
 	cluster = cluster.DeepCopy()
 	if masterPlan.Name == "" && workerPlan.Name == "" {
-		// enter upgrading state
-		if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
-			mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
-			mgmtv3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
-			return h.clusterClient.Update(cluster)
-		}
-		if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
-			// remain in upgrading state if we are passed empty plans
-			return cluster, nil
+		if importedclusterversionmanagement.Enabled(cluster) {
+			// enter upgrading state
+			if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
+				mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
+				mgmtv3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
+				return h.clusterClient.Update(cluster)
+			}
+			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
+				// remain in upgrading state if we are passed empty plans
+				return cluster, nil
+			}
+		} else {
+			// If the version management feature is disabled while the cluster is undergoing a version upgrade,
+			// the ongoing upgrade will continue to completion, after which the Rancher-managed plans will be removed.
+			// After the plans are removed, indicated by both plans being empty, the cluster's upgrade condition should be set to true.
+			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
+				cluster = upgradeDone(cluster)
+				return h.clusterClient.Update(cluster)
+			}
 		}
 	}
 
 	if masterPlan.Name != "" && len(masterPlan.Status.Applying) > 0 {
 		mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 		c := strategy.ServerConcurrency
+		if !importedclusterversionmanagement.Enabled(cluster) {
+			c = int(masterPlan.Spec.Concurrency)
+		}
 		masterPlanMessage := fmt.Sprintf("controlplane node [%s] being upgraded",
 			upgradingMessage(c, masterPlan.Status.Applying))
 		return h.enqueueOrUpdate(cluster, masterPlanMessage)
@@ -213,6 +227,9 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	if workerPlan.Name != "" && len(workerPlan.Status.Applying) > 0 {
 		mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 		c := strategy.WorkerConcurrency
+		if !importedclusterversionmanagement.Enabled(cluster) {
+			c = int(workerPlan.Spec.Concurrency)
+		}
 		workerPlanMessage := fmt.Sprintf("worker node [%s] being upgraded",
 			upgradingMessage(c, workerPlan.Status.Applying))
 		return h.enqueueOrUpdate(cluster, workerPlanMessage)
@@ -243,14 +260,18 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 
 	// if we made it this far nothing is applying
 	// see k3supgrade_handler also
+	cluster = upgradeDone(cluster)
+	return h.clusterClient.Update(cluster)
+}
+
+func upgradeDone(cluster *mgmtv3.Cluster) *mgmtv3.Cluster {
 	mgmtv3.ClusterConditionUpgraded.True(cluster)
 	mgmtv3.ClusterConditionUpgraded.Message(cluster, "")
 	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 		// If ACE is enabled, then force a re-deployment of the cluster-agent and kube-api-auth
 		cluster.Annotations[clusterdeploy.AgentForceDeployAnn] = "true"
 	}
-	return h.clusterClient.Update(cluster)
-
+	return cluster
 }
 
 func upgradingMessage(concurrency int, nodes []string) string {

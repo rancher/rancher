@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/crds/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	v1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io"
@@ -40,6 +41,12 @@ func FeatureCRD() crd.CRD {
 
 func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 	result := []crd.CRD{
+		newCRD(v1.Plan{}, func(c crd.CRD) crd.CRD {
+			c.GVK.Kind = "Plan"
+			c.GVK.Group = "upgrade.cattle.io"
+			c.GVK.Version = "v1"
+			return c
+		}),
 		newCRD(&uiv1.NavLink{}, func(c crd.CRD) crd.CRD {
 			c.Status = false
 			c.NonNamespace = true

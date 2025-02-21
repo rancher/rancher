@@ -350,6 +350,15 @@ var (
 	UnprivilegedJailUser = NewSetting("unprivileged-jail-user", "true")
 
 	ImperativeApiExtension = NewSetting("imperative-api-extension", "false")
+
+	// ImportedClusterVersionManagement enables the version management feature on imported RKE2/K3s cluster,
+	// and the local cluster if it is an RKE2/K3s cluster.
+	// The per-cluster version management annotation overrides this global setting at the cluster level.
+	// For existing clusters where the cluster-level version management is set to 'system-default',
+	// changing this flag will trigger a redeployment of the cluster agent during the next reconciliation
+	// (by default every 5 minutes, or as soon as the cluster is edited, whichever comes first).
+	// Valid values: ture, false
+	ImportedClusterVersionManagement = NewSetting("imported-cluster-version-management", "true")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

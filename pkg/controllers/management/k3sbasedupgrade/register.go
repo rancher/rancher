@@ -20,12 +20,14 @@ type handler struct {
 	systemAccountManager   *systemaccount.Manager
 	manager                *clustermanager.Manager
 	clusterEnqueueAfter    func(name string, duration time.Duration)
+	ctx                    context.Context
 }
 
 const (
 	systemUpgradeNS        = "cattle-system"
-	rancherManagedPlan     = "rancher-managed"
 	upgradeDisableLabelKey = "upgrade.cattle.io/disable"
+
+	RancherManagedPlan = "rancher-managed"
 )
 
 func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext, manager *clustermanager.Manager) {
@@ -37,6 +39,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		nodeLister:             mgmtCtx.Management.Nodes("").Controller().Lister(),
 		systemAccountManager:   systemaccount.NewManager(mgmtCtx),
 		manager:                manager,
+		ctx:                    ctx,
 	}
 	wContext.Mgmt.Cluster().OnChange(ctx, "k3s-upgrade-controller", h.onClusterChange)
 }
