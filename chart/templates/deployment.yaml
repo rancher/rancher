@@ -157,6 +157,8 @@ spec:
         - name: CATTLE_IMPERATIVE_API_EXTENSION
           value: "true"
 {{- end }}
+        - name: IMPERATIVE_API_DIRECT
+          value: "true"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
