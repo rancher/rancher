@@ -28,6 +28,7 @@ replace (
 	k8s.io/api => k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.31.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.32.2 => k8s.io/apimachinery v0.31.1
 	k8s.io/apiserver => k8s.io/apiserver v0.31.1
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.31.1
 	k8s.io/client-go => k8s.io/client-go v0.31.1
@@ -45,7 +46,7 @@ replace (
 	k8s.io/kms => k8s.io/kms v0.31.1
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.31.1
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.31.1
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20240411171206-dc4e619f62f3
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.31.1
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.31.1
 	k8s.io/kubectl => k8s.io/kubectl v0.31.1
@@ -58,6 +59,7 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.31.1
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.8.3
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 => sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 )
 
 require (
@@ -110,6 +112,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
+	github.com/k3s-io/api v0.1.0
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/microsoft/kiota-abstractions-go v1.7.0
@@ -170,7 +173,7 @@ require (
 	helm.sh/helm/v3 v3.16.2
 	k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver v0.31.1
-	k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.32.2
 	k8s.io/apiserver v0.31.1
 	k8s.io/cli-runtime v0.31.1
 	k8s.io/client-go v12.0.0+incompatible
@@ -240,7 +243,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/k3s-io/api v0.1.0 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/kr/fs v0.1.0 // indirect
