@@ -47,7 +47,7 @@ func TestStoreCreate(t *testing.T) {
 		name      string
 		args      args
 		mockSetup func()
-		want      *ext.UserActivity
+		want      runtime.Object
 		wantErr   bool
 	}{
 		{
@@ -93,6 +93,135 @@ func TestStoreCreate(t *testing.T) {
 					}, nil),
 
 					mockTokenControllerFake.EXPECT().Patch("token-12345", types.JSONPatchType, gomock.Any()).Return(&v3Legacy.Token{}, nil),
+				)
+			},
+			want: &ext.UserActivity{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "token-12345",
+				},
+				Status: ext.UserActivityStatus{
+					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, time.UTC)).String(),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "username not found",
+			args: args{
+				ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
+					Name:   "user-xyz",
+					Groups: []string{GroupCattleAuthenticated},
+					Extra: map[string][]string{
+						common.ExtraRequestTokenID: {"token-12345"},
+					},
+				}),
+				obj: &ext.UserActivity{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "token-12345",
+					},
+				},
+				validateFunc: nil,
+				options:      nil,
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					mockUserCacheFake.EXPECT().Get("user-xyz").Return(
+						nil, fmt.Errorf("user not found"),
+					),
+				)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "tokens dont match",
+			args: args{
+				ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
+					Name:   "admin",
+					Groups: []string{GroupCattleAuthenticated},
+					Extra: map[string][]string{
+						common.ExtraRequestTokenID: {"token-12345"},
+					},
+				}),
+				obj: &ext.UserActivity{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "token-12345",
+					},
+				},
+				validateFunc: nil,
+				options:      nil,
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "token-12345",
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: v3.Principal{},
+					}, nil),
+
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "token-12345",
+						},
+						AuthProvider:  "local",
+						UserPrincipal: v3.Principal{},
+					}, nil),
+				)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "dry run",
+			args: args{
+				ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
+					Name:   "admin",
+					Groups: []string{GroupCattleAuthenticated},
+					Extra: map[string][]string{
+						common.ExtraRequestTokenID: {"token-12345"},
+					},
+				}),
+				obj: &ext.UserActivity{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "token-12345",
+					},
+				},
+				validateFunc: nil,
+				options: &v1.CreateOptions{
+					DryRun: []string{metav1.DryRunAll},
+				},
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "token-12345",
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: v3.Principal{},
+					}, nil),
+
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "token-12345",
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: v3.Principal{},
+					}, nil),
 				)
 			},
 			want: &ext.UserActivity{
