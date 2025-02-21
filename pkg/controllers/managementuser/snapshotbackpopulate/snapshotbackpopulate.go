@@ -185,14 +185,16 @@ func (h *handler) OnDownstreamChange(_ string, snapshot *k3s.ETCDSnapshotFile) (
 	}
 
 	if len(upstreamSnapshots) == 0 {
+		storage := S3
 		if snapshot.Spec.S3 == nil {
+			storage = Local
 			machine, err = h.getMachineFromNode(snapshot.Spec.NodeName, cluster)
 			if err != nil {
 				return snapshot, err
 			}
 		}
 		// create snapshot
-		name := name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(snapshot.Spec.SnapshotName, "-")), string(S3))
+		name := name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(snapshot.Spec.SnapshotName, "-")), string(storage))
 		upstream := rkev1.NewETCDSnapshot(cluster.Namespace, name, rkev1.ETCDSnapshot{})
 		upstream, err = updateSnapshot(upstream, snapshot, cluster, capiCluster, machine)
 		if err != nil {
