@@ -107,8 +107,12 @@ func Test_Operation_SetB_MP_EtcdSnapshotCleanup(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, snapshot := range snapshotList.Items {
-		var podName string
-		if snapshot.SnapshotFile.NodeName != "s3" {
+		assert.NotNil(t, snapshot.Annotations)
+		assert.NotEqual(t, snapshot.Annotations[snapshotbackpopulate.StorageAnnotationKey], "")
+
+		storage := snapshotbackpopulate.Storage(snapshot.Annotations[snapshotbackpopulate.StorageAnnotationKey])
+		switch storage {
+		case snapshotbackpopulate.Local:
 			machines, err := clients.CAPI.Machine().List(newNs.Name, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.MachineIDLabel, snapshot.Labels[capr.MachineIDLabel])})
 			assert.NoError(t, err)
 
@@ -123,15 +127,8 @@ func Test_Operation_SetB_MP_EtcdSnapshotCleanup(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, podMachine)
 
-			podName = strings.ReplaceAll(podMachine.GetName(), ".", "-")
-		}
+			podName := strings.ReplaceAll(podMachine.GetName(), ".", "-")
 
-		assert.NotNil(t, snapshot.Annotations)
-		assert.NotEqual(t, snapshot.Annotations[snapshotbackpopulate.StorageAnnotationKey], "")
-
-		storage := snapshotbackpopulate.Storage(snapshot.Annotations[snapshotbackpopulate.StorageAnnotationKey])
-		switch storage {
-		case snapshotbackpopulate.Local:
 			// delete snapshot from pod
 			cmd := exec.Command("kubectl",
 				[]string{
@@ -149,12 +146,19 @@ func Test_Operation_SetB_MP_EtcdSnapshotCleanup(t *testing.T) {
 		case snapshotbackpopulate.S3:
 			// do nothing
 		}
+	}
 
+	// delete all first and then check each, realistically only the first one should matter since once the list is
+	// refreshed, they should all be deleted, but we could get unlucky and have a refresh between deletions.
+	for _, snapshot := range snapshotList.Items {
+		if snapshot.SnapshotFile.NodeName == "s3" {
+			continue
+		}
 		if err := retry.OnError(wait.Backoff{
-			Duration: 10 * time.Second,
+			Duration: 1 * time.Minute,
 			Factor:   1.0,
 			Jitter:   0.1,
-			Steps:    60,
+			Steps:    11,
 		}, func(err error) bool {
 			return true
 		}, func() error {
@@ -170,4 +174,5 @@ func Test_Operation_SetB_MP_EtcdSnapshotCleanup(t *testing.T) {
 			assert.FailNow(t, err.Error())
 		}
 	}
+
 }
