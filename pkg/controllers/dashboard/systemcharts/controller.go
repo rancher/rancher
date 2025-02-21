@@ -11,6 +11,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -38,8 +39,9 @@ const (
 
 var (
 	primaryImages = map[string]string{
-		chart.WebhookChartName:          "rancher/rancher-webhook",
-		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
+		chart.WebhookChartName:           "rancher/rancher-webhook",
+		chart.ProvisioningCAPIChartName:  "rancher/mirrored-cluster-api-controller",
+		chart.RemoteDialerProxyChartName: "rancher/remotedialer-proxy",
 	}
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookVersion.Name:               {},
@@ -58,6 +60,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		deployment:       wContext.Apps.Deployment(),
 		deploymentCache:  wContext.Apps.Deployment().Cache(),
 		clusterRepo:      wContext.Catalog.ClusterRepo(),
+		secrets:          wContext.Core.Secret(),
 		chartsConfig:     chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
 		registryOverride: registryOverride,
 	}
@@ -80,6 +83,7 @@ type handler struct {
 	deployment       deploymentControllers.DeploymentController
 	deploymentCache  deploymentControllers.DeploymentCache
 	clusterRepo      catalogcontrollers.ClusterRepoController
+	secrets          corecontrollers.SecretController
 	chartsConfig     chart.RancherConfigGetter
 	registryOverride string
 }
@@ -153,6 +157,32 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
+		{
+			ReleaseNamespace:    namespace.System,
+			ChartName:           chart.RemoteDialerProxyChartName,
+			ExactVersionSetting: settings.RemoteDialerProxyVersion,
+			Values: func() map[string]interface{} {
+				secret, err := ext.GetOrCreateRDPConnectSecret(h.secrets)
+				if err != nil {
+					return map[string]interface{}{}
+				}
+
+				return map[string]interface{}{
+					"service": map[string]interface{}{
+						"secret": secret,
+					},
+				}
+			},
+			Enabled: func() bool {
+				if ext.RDPEnabled() {
+					// do not deploy RDP in downstream cluster
+					return !features.MCMAgent.Enabled()
+				}
+				return false
+			},
+			Uninstall:       false,
+			RemoveNamespace: false,
+		},
 		{
 			ReleaseNamespace:    namespace.System,
 			ChartName:           chart.WebhookChartName,

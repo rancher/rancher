@@ -222,6 +222,9 @@ var (
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
 
+	// RemoteDialerProxyVersion is the exact version of the RDP that Rancher will install.
+	RemoteDialerProxyVersion = NewSetting("remodialer-proxy-version", "")
+
 	// RancherProvisioningCAPIVersion is the exact version of the cluster api controller that Rancher will install.
 	RancherProvisioningCAPIVersion = NewSetting("rancher-provisioning-capi-version", "")
 

@@ -77,6 +77,11 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 }
 
 func CreateOrUpdateService(service wranglercorev1.ServiceController) error {
+	appSelector := "rancher"
+	if RDPEnabled() {
+		appSelector = "api-extension"
+	}
+
 	desired := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TargetServiceName,
@@ -89,7 +94,7 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController) error {
 				},
 			},
 			Selector: map[string]string{
-				"app": "rancher",
+				"app": appSelector,
 			},
 		},
 	}
