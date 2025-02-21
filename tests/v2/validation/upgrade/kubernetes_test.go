@@ -52,9 +52,9 @@ func (u *UpgradeKubernetesTestSuite) TestUpgradeKubernetes() {
 			testConfig := clusters.ConvertConfigToClusterConfig(&cluster.ProvisioningInput)
 
 			if cluster.Name == local {
-				upgradeLocalCluster(&u.Suite, tt.name, tt.client, testConfig, cluster, containerImage)
+				upgradeLocalCluster(&u.Suite, tt.name, tt.client, testConfig, cluster)
 			} else {
-				upgradeDownstreamCluster(&u.Suite, tt.name, tt.client, cluster.Name, testConfig, cluster, nil, containerImage)
+				upgradeDownstreamCluster(&u.Suite, tt.name, tt.client, cluster.Name, testConfig, cluster, nil)
 			}
 		}
 	}
