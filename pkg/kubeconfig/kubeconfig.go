@@ -7,8 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
 )
@@ -18,9 +19,7 @@ const (
 	firstLen  = 49
 )
 
-var (
-	splitRegexp = regexp.MustCompile(`\S{1,76}`)
-)
+var splitRegexp = regexp.MustCompile(`\S{1,76}`)
 
 type kubeNode struct {
 	ClusterName string
@@ -42,23 +41,29 @@ type data struct {
 	Nodes           []kubeNode
 }
 
-func ForBasic(host, username, password string) (string, error) {
-	data := &data{
-		ClusterName: "cluster",
-		Host:        host,
-		Cert:        caCertString(),
-		User:        username,
-		Username:    username,
-		Password:    password,
-	}
+type Cluster struct {
+	Name   string
+	Server string
+	Cert   string
+}
+type User struct {
+	Name      string
+	Token     string
+	Host      string
+	ClusterID string
+}
 
-	if data.ClusterName == "" {
-		data.ClusterName = data.ClusterID
-	}
+type Context struct {
+	Name    string
+	User    string
+	Cluster string
+}
 
-	buf := &bytes.Buffer{}
-	err := basicTemplate.Execute(buf, data)
-	return buf.String(), err
+type KubeConfig struct {
+	Clusters       []Cluster
+	Users          []User
+	Contexts       []Context
+	CurrentContext string
 }
 
 func formatCertString(certData string) string {
@@ -117,7 +122,7 @@ func ForTokenBased(clusterName, clusterID, host, token string) (string, error) {
 	return buf.String(), err
 }
 
-func ForClusterTokenBased(cluster *managementv3.Cluster, nodes []*mgmtv3.Node, clusterID, host, token string) (string, error) {
+func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clusterID, host, token string) (string, error) {
 	clusterName := cluster.Name
 	if clusterName == "" {
 		clusterName = clusterID
@@ -162,5 +167,90 @@ func ForClusterTokenBased(cluster *managementv3.Cluster, nodes []*mgmtv3.Node, c
 
 	buf := &bytes.Buffer{}
 	err := tokenTemplate.Execute(buf, data)
+	return buf.String(), err
+}
+
+type Input struct {
+	ClusterID        string
+	Cluster          *apiv3.Cluster
+	Nodes            []*apiv3.Node
+	TokenKey         string
+	IsCurrentContext bool
+}
+
+func Generate(host string, input []Input) (string, error) {
+	k := KubeConfig{}
+	caCert := caCertString()
+
+	for _, entry := range input {
+		clusterName := entry.Cluster.Spec.DisplayName
+		if clusterName == "" {
+			clusterName = entry.ClusterID
+		}
+
+		k.Clusters = append(k.Clusters, Cluster{
+			Name:   clusterName,
+			Server: fmt.Sprintf("https://%s/k8s/clusters/%s", host, entry.ClusterID),
+			Cert:   caCert,
+		})
+		k.Users = append(k.Users, User{
+			Name:      clusterName,
+			Token:     entry.TokenKey,
+			ClusterID: entry.ClusterID,
+			Host:      host,
+		})
+		k.Contexts = append(k.Contexts, Context{
+			Name:    clusterName,
+			Cluster: clusterName,
+			User:    clusterName,
+		})
+		if entry.IsCurrentContext {
+			k.CurrentContext = clusterName
+		}
+
+		if !entry.Cluster.Spec.LocalClusterAuthEndpoint.Enabled {
+			continue
+		}
+
+		if authEndpoint := entry.Cluster.Spec.LocalClusterAuthEndpoint; authEndpoint.FQDN != "" {
+			fqdnName := clusterName + "-fqdn"
+			k.Clusters = append(k.Clusters, Cluster{
+				Name:   fqdnName,
+				Server: "https://" + authEndpoint.FQDN,
+				Cert:   formatCertString(base64.StdEncoding.EncodeToString([]byte(authEndpoint.CACerts))),
+			})
+			k.Contexts = append(k.Contexts, Context{
+				Name:    fqdnName,
+				Cluster: fqdnName,
+				User:    clusterName,
+			})
+
+			continue
+		}
+
+		for _, clusterNode := range entry.Nodes {
+			if clusterNode.Spec.ControlPlane {
+				nodeName := clusterName + "-" + strings.TrimPrefix(clusterNode.Spec.RequestedHostname, clusterName+"-")
+				k.Clusters = append(k.Clusters, Cluster{
+					Name:   nodeName,
+					Server: "https://" + node.GetEndpointNodeIP(clusterNode) + ":6443",
+					Cert:   formatCertString(entry.Cluster.Status.CACert),
+				})
+				k.Contexts = append(k.Contexts, Context{
+					Name:    nodeName,
+					Cluster: nodeName,
+					User:    clusterName,
+				})
+			}
+		}
+	}
+
+	if k.CurrentContext == "" {
+		k.CurrentContext = k.Contexts[0].Name
+	}
+
+	buf := &bytes.Buffer{}
+	err := multiClusterTemplate.Execute(buf, k)
+
 	return buf.String(), err
 }

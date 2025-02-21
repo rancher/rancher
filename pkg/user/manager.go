@@ -15,6 +15,7 @@ type TokenInput struct {
 	TTL           *int64
 	Randomize     bool
 	UserPrincipal v3.Principal
+	Labels        map[string]string
 }
 
 type Manager interface {
