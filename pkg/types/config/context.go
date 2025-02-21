@@ -6,6 +6,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	"sync"
 	"time"
 
@@ -218,8 +219,11 @@ type UserContext struct {
 	Cluster        clusterv3.Interface
 	Storage        storagev1.Interface
 
-	RBACw          wrbacv1.Interface
-	Corew          wcorev1.Interface
+	RBACw wrbacv1.Interface
+	Corew wcorev1.Interface
+
+	K3s k3s.Interface
+
 	KindNamespaces map[schema.GroupVersionKind]string
 }
 

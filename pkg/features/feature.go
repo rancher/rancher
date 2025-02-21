@@ -116,7 +116,7 @@ var (
 	ProvisioningV2FleetWorkspaceBackPopulation = newFeature(
 		"provisioningv2-fleet-workspace-back-population",
 		"[Experimental]: Allow Fleet workspace name to be changed on clusters administrated by provisioning v2",
-		false,
+		true,
 		false,
 		true)
 	UIExtension = newFeature(
@@ -124,8 +124,7 @@ var (
 		"Enable UI Extensions when starting Rancher",
 		true,
 		false,
-		true,
-	)
+		true)
 	UISQLCache = newFeature(
 		"ui-sql-cache",
 		"[Experimental]: Enable SQLite-backed caching to improve performance and provide additional UI sorting/filtering features.",
@@ -161,6 +160,12 @@ var (
 		"Enables the automatic deployment of Pod Disruption Budgets and Priority Classes when deploying the cattle-cluster-agent. Disabling this feature will not impact existing clusters.",
 		false,
 		true,
+		true)
+	Provisioningv2ETCDSnapshotBackPopulation = newFeature(
+		"v2prov-etcd-snapshot-backpopulate",
+		"Allow Rancher to create ETCD Snapshot CRs for downstream clusters in the local cluster",
+		true,
+		false,
 		true)
 )
 
