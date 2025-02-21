@@ -2,8 +2,8 @@ package rkecerts
 
 import (
 	"bytes"
-	"crypto/md5"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"io/ioutil"
 	"os"
@@ -243,8 +243,8 @@ func (b *Bundle) Changed() bool {
 			}
 			continue
 		}
-		oldCertChecksum := fmt.Sprintf("%x", md5.Sum([]byte(oldCertPEM)))
-		newCertChecksum := fmt.Sprintf("%x", md5.Sum([]byte(newCertPEM)))
+		oldCertChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(oldCertPEM)))
+		newCertChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(newCertPEM)))
 
 		if oldCertChecksum != newCertChecksum {
 			logrus.Infof("Certificate checksum changed (old: [%s], new [%s]) for [%s]", oldCertChecksum, newCertChecksum, item.Name)
