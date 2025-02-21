@@ -213,3 +213,59 @@ func expireToken(token *v3.Token) *v3.Token {
 	newToken.TTLMillis = 1
 	return newToken
 }
+
+func TestIsIdleExpired(t *testing.T) {
+	type args struct {
+		token            v3.Token
+		lastTimeActivity metav1.Time
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "should not expire",
+			args: args{
+				token: v3.Token{
+					ActivityLastSeenAt: &metav1.Time{
+						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					},
+				},
+				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 9, 0, 0, &time.Location{}),
+			},
+			want: false,
+		},
+		{
+			name: "should expire",
+			args: args{
+				token: v3.Token{
+					ActivityLastSeenAt: &metav1.Time{
+						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					},
+				},
+				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 11, 0, 0, &time.Location{}),
+			},
+			want: true,
+		},
+		{
+			name: "should expire (equal values)",
+			args: args{
+				token: v3.Token{
+					ActivityLastSeenAt: &metav1.Time{
+						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+					},
+				},
+				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsIdleExpired(tt.args.token, tt.args.lastTimeActivity); got != tt.want {
+				t.Errorf("IsIdleExpired() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
