@@ -170,10 +170,10 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	loginTokens = make(map[string][]accessor.TokenAccessor)
 	derivedTokens = make(map[string][]accessor.TokenAccessor)
 
-	// List all tokens, norman and ext.
+	// List all tokens, v3 and ext.
 	// For ext tokens we actually filter for the user here.
 
-	allNormanTokens, err := r.tokenLister.List("", labels.Everything())
+	allV3Tokens, err := r.tokenLister.List("", labels.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	// Merge the separate lists into a unified set
 
 	allTokens := []accessor.TokenAccessor{}
-	for _, token := range allNormanTokens {
+	for _, token := range allV3Tokens {
 		allTokens = append(allTokens, token)
 	}
 	for _, eToken := range allExtTokens.Items {
@@ -202,7 +202,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	for _, token := range allTokens {
-		// Needed for the norman tokens. Ext has already filtered for this.
+		// Needed for the v3 tokens. Ext has already filtered for this.
 		if token.GetUserID() != user.Name {
 			continue
 		}
@@ -360,9 +360,9 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		var err error
 		switch token.(type) {
 		case *v3.Token:
-			normanToken := token.(*v3.Token).DeepCopy()
-			normanToken.Enabled = pointer.Bool(false)
-			_, err = r.tokenMGR.UpdateToken(normanToken)
+			v3Token := token.(*v3.Token).DeepCopy()
+			v3Token.Enabled = pointer.Bool(false)
+			_, err = r.tokenMGR.UpdateToken(v3Token)
 		case *ext.Token:
 			extToken := token.(*ext.Token).DeepCopy()
 			extToken.Spec.Enabled = pointer.Bool(false)

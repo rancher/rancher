@@ -295,7 +295,7 @@ func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID str
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
-	principal.Me = samePrincipal(token, principal)
+	principal.Me = samePrincipal(token.GetUserPrincipal(), principal)
 	return principal, nil
 }
 
@@ -315,7 +315,7 @@ func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name 
 		return nil, err
 	}
 	for _, principal := range principals {
-		principal.Me = samePrincipal(token, principal)
+		principal.Me = samePrincipal(token.GetUserPrincipal(), principal)
 	}
 	return principals, nil
 }
@@ -521,10 +521,10 @@ func (ap *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPri
 	return allowed, nil
 }
 
-func samePrincipal(me accessor.TokenAccessor, other v3.Principal) bool {
-	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
-		me.GetUserName() == other.LoginName &&
-		me.GetUserPrincipalType() == other.PrincipalType
+func samePrincipal(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 // UpdateGroupCacheSize attempts to update the size of the group cache defined at the package level.
@@ -547,10 +547,6 @@ func UpdateGroupCacheSize(size string) {
 
 func (ap *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
-}
-
-func (ap *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 // IsDisabledProvider checks if the Azure AD auth provider is currently disabled in Rancher.

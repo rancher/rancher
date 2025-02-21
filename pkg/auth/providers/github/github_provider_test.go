@@ -339,10 +339,11 @@ func TestSearchPrincipalsExt(t *testing.T) {
 
 	token := ext.Token{
 		Spec: ext.TokenSpec{
-			PrincipalID: "github_user://9253000",
-		},
-		Status: ext.TokenStatus{
-			UserName: "developer",
+			UserPrincipal: v3.Principal{
+				ObjectMeta:    metav1.ObjectMeta{Name: "github_user://9253000"},
+				LoginName:     "developer",
+				PrincipalType: "user",
+			},
 		},
 	}
 

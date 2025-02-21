@@ -286,10 +286,11 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
-			princ.Me = o.IsThisUserMe(token, princ)
+			princ.Me = o.IsThisUserMe(token.GetUserPrincipal(), princ)
 			if princ.Me {
-				princ.LoginName = token.GetUserName()
-				princ.DisplayName = token.GetUserDisplayName()
+				tokenPrincipal := token.GetUserPrincipal()
+				princ.LoginName = tokenPrincipal.LoginName
+				princ.DisplayName = tokenPrincipal.DisplayName
 			}
 		}
 	} else {
@@ -370,18 +371,14 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	return storedOidcConfig, nil
 }
 
-func (o *OpenIDCProvider) IsThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
-	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
-		me.GetUserName() == other.LoginName &&
-		me.GetUserPrincipalType() == other.PrincipalType
+func (o *OpenIDCProvider) IsThisUserMe(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
-}
-
-func (o *OpenIDCProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {

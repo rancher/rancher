@@ -7,7 +7,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/accessor"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -56,22 +55,6 @@ func GetCommonUserExtraAttributes(userPrincipal v3.Principal) map[string][]strin
 	}
 	if userPrincipal.LoginName != "" {
 		extras[UserAttributeUserName] = []string{userPrincipal.LoginName}
-	}
-	return extras
-}
-
-// GetCommonUserExtraAttributesFromToken is a helper containing the default
-// implementation of the `GetUserExtraAttributesFromToken` provider interface
-// method.
-func GetCommonUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	principalID := token.GetUserPrincipalID()
-	userName := token.GetUserName()
-	extras := make(map[string][]string)
-	if principalID != "" {
-		extras[UserAttributePrincipalID] = []string{principalID}
-	}
-	if userName != "" {
-		extras[UserAttributeUserName] = []string{userName}
 	}
 	return extras
 }

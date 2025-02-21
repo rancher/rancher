@@ -19,19 +19,13 @@ type TokenAccessor interface {
 	// GetIsDerived returns a boolean flag indicating if the token is a
 	// derived (non-session) token, or not (session token).
 	GetIsDerived() bool
-	// GetAuthProvider returns the name of the auth provider the controlling
-	// the token.
+	// GetAuthProvider returns the name of the auth provider controlling the
+	// token. This is separate from `GetUserPrincipal().Provider` (A)
+	// because v3 Tokens have a separate field, which is used everywhere,
+	// and we cannot be sure that it is always in sync with (A).
 	GetAuthProvider() string
 	// GetUserID returns the id of the user owning the token.
 	GetUserID() string
-	// GetUserPrincipalID returns the id of the controlling principal
-	GetUserPrincipalID() string
-	// GetUserPrincipalType returns the type of the controlling principal
-	GetUserPrincipalType() string
-	// GetUserDisplayName returns the display name of the controlling user
-	GetUserDisplayName() string
-	// GetUserName returns the (login) name of the controlling user
-	GetUserName() string
 	// GetProviderInfo returns a map of provider-specific information.
 	GetProviderInfo() map[string]string
 	// ObjClusterName returns the name of the cluter the token is restricted
@@ -39,6 +33,8 @@ type TokenAccessor interface {
 	// use the `Get` prefix because it existed before and changing it was
 	// deemed to risky.
 	ObjClusterName() string
+	// GetUserPrincipal returns the data of the controlling principal
+	GetUserPrincipal() v3.Principal
 	// GetGroupPrincipals returns a slice of group principal information.
 	GetGroupPrincipals() []v3.Principal
 	// GetLastUsedAt returns the time of the token's last use.

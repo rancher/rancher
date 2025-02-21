@@ -1,14 +1,14 @@
 package tokens
 
 import (
-	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/pointer"
@@ -31,22 +30,26 @@ var (
 	// use for disabled tokens
 
 	// properSecret is the backend secret matching the properToken
-	properSecret = corev1.Secret{
+	properPrincipal = v3.Principal{
+		ObjectMeta:  metav1.ObjectMeta{Name: "world"},
+		Provider:    "somebody",
+		DisplayName: "myself",
+		LoginName:   "hello",
+	}
+	properPrincipalBytes, _ = json.Marshal(properPrincipal)
+	properSecret            = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bogus",
 		},
 		Data: map[string][]byte{
 			FieldAnnotations:    []byte("null"),
-			FieldAuthProvider:   []byte("somebody"),
 			FieldDescription:    []byte(""),
-			FieldDisplayName:    []byte("myself"),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
 			FieldKind:           []byte(IsLogin),
 			FieldLabels:         []byte("null"),
 			FieldLastUpdateTime: []byte("13:00:05"),
-			FieldUserName:       []byte("hello"),
-			FieldPrincipalID:    []byte("world"),
+			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("4000"),
 			FieldUID:            []byte("2905498-kafld-lkad"),
 			FieldUserID:         []byte("lkajdlksjlkds"),
@@ -59,16 +62,13 @@ var (
 		},
 		Data: map[string][]byte{
 			FieldAnnotations:    []byte("null"),
-			FieldAuthProvider:   []byte("somebody"),
 			FieldDescription:    []byte(""),
-			FieldDisplayName:    []byte("myself"),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
 			FieldKind:           []byte(IsLogin),
 			FieldLabels:         []byte("null"),
 			FieldLastUpdateTime: []byte("13:00:05"),
-			FieldUserName:       []byte("hello"),
-			FieldPrincipalID:    []byte("world"),
+			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("4000"),
 			FieldUID:            []byte("2905498-kafld-lkad"),
 		},
@@ -84,22 +84,19 @@ var (
 			UID:  types.UID("2905498-kafld-lkad"),
 		},
 		Spec: ext.TokenSpec{
-			UserID:      "lkajdlksjlkds",
-			Description: "",
-			TTL:         4000,
-			Enabled:     pointer.Bool(false),
-			Kind:        "session",
-			PrincipalID: "world",
+			UserID:        "lkajdlksjlkds",
+			Description:   "",
+			TTL:           4000,
+			Enabled:       pointer.Bool(false),
+			Kind:          "session",
+			UserPrincipal: properPrincipal,
 		},
 		Status: ext.TokenStatus{
 			TokenValue:     "",
 			TokenHash:      "kla9jkdmj",
 			Expired:        true,
 			ExpiresAt:      "0001-01-01T00:00:04Z",
-			AuthProvider:   "somebody",
 			LastUpdateTime: "13:00:05",
-			DisplayName:    "myself",
-			UserName:       "hello",
 		},
 	}
 
@@ -119,15 +116,12 @@ var (
 		},
 		Data: map[string][]byte{
 			FieldAnnotations:    []byte("null"),
-			FieldAuthProvider:   []byte("somebody"),
-			FieldDisplayName:    []byte("myself"),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
 			FieldKind:           []byte(IsLogin),
 			FieldLabels:         []byte("null"),
 			FieldLastUpdateTime: []byte("this is a fake now"),
-			FieldUserName:       []byte("hello"),
-			FieldPrincipalID:    []byte("world"),
+			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("5000"),
 			FieldUID:            []byte("2905498-kafld-lkad"),
 			FieldUserID:         []byte("lkajdlksjlkds"),
@@ -140,15 +134,12 @@ var (
 		},
 		Data: map[string][]byte{
 			FieldAnnotations:    []byte("null"),
-			FieldAuthProvider:   []byte("somebody"),
-			FieldDisplayName:    []byte("myself"),
 			FieldEnabled:        []byte("false"),
 			FieldHash:           []byte("kla9jkdmj"),
 			FieldKind:           []byte(IsLogin),
 			FieldLabels:         []byte("null"),
 			FieldLastUpdateTime: []byte("this is a fake now"),
-			FieldUserName:       []byte("hello"),
-			FieldPrincipalID:    []byte("world"),
+			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("3000"),
 			FieldUID:            []byte("2905498-kafld-lkad"),
 			FieldUserID:         []byte("lkajdlksjlkds"),
@@ -199,7 +190,7 @@ func Test_Store_Delete(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(nil, someerror)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -219,13 +210,13 @@ func Test_Store_Delete(t *testing.T) {
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
-			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
+			Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "bogus"))
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
-		assert.Equal(t, apierrors.NewNotFound(schema.GroupResource{}, ""), err)
+		assert.Equal(t, apierrors.NewNotFound(GVR.GroupResource(), "bogus"), err)
 	})
 
 	t.Run("user info missing from context", func(t *testing.T) {
@@ -243,7 +234,7 @@ func Test_Store_Delete(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -265,7 +256,7 @@ func Test_Store_Delete(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -290,7 +281,7 @@ func Test_Store_Delete(t *testing.T) {
 			Delete("cattle-tokens", "bogus", gomock.Any()).
 			Return(nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.True(t, ok)
@@ -317,7 +308,7 @@ func Test_Store_Get(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Equal(t, bogusNotFoundError, err)
@@ -339,7 +330,7 @@ func Test_Store_Get(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
@@ -361,7 +352,7 @@ func Test_Store_Get(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
@@ -383,7 +374,7 @@ func Test_Store_Update(t *testing.T) {
 		secrets.EXPECT().Cache().Return(nil)
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdl/ksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		tok, err := store.update(context.TODO(), &ext.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "bogus",
@@ -425,7 +416,7 @@ func Test_Store_Update(t *testing.T) {
 		modified := properToken.DeepCopy()
 		modified.Spec.TTL = 2000
 
-		store := New(nil, secrets, users, nil, nil, timer, nil, auth)
+		store := New(nil, secrets, users, nil, timer, nil, auth)
 		tok, err := store.update(context.TODO(), modified, &metav1.UpdateOptions{})
 
 		// set the expected status changes
@@ -457,7 +448,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdlksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -481,7 +472,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		todo, cancel := context.WithCancel(context.TODO())
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -513,7 +504,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdlksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -545,7 +536,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdlksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -577,7 +568,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdlksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -611,7 +602,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdl/ksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -643,7 +634,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdlksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -680,7 +671,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("lkajdlksjlkds", nil)
 
-		store := New(nil, secrets, users, nil, nil, nil, nil, auth)
+		store := New(nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -714,6 +705,7 @@ func Test_Store_Create(t *testing.T) {
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 			scache *fake.MockCacheInterface[*corev1.Secret],
 			users *fake.MockNonNamespacedCacheInterface[*v3.User],
+			token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 			timer *MocktimeHandler,
 			hasher *MockhashHandler,
 			auth *MockauthHandler)
@@ -728,6 +720,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -745,6 +738,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -769,6 +763,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -780,66 +775,6 @@ func Test_Store_Create(t *testing.T) {
 
 				scache.EXPECT().Get("cattle-tokens", "hello").
 					Return(&corev1.Secret{}, nil)
-			},
-		},
-		{
-			name: "reject a specified token value",
-			err:  apierrors.NewBadRequest("User provided token value is not permitted"),
-			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
-				},
-				Status: ext.TokenStatus{
-					TokenValue: "kfakdslfk",
-				},
-			},
-			opts: &metav1.CreateOptions{},
-			storeSetup: func( // configure store backend clients
-				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				scache *fake.MockCacheInterface[*corev1.Secret],
-				users *fake.MockNonNamespacedCacheInterface[*v3.User],
-				timer *MocktimeHandler,
-				hasher *MockhashHandler,
-				auth *MockauthHandler) {
-
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("", nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
-			},
-		},
-		{
-			name: "reject a specified token hash",
-			err:  apierrors.NewBadRequest("User provided token hash is not permitted"),
-			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
-				},
-				Status: ext.TokenStatus{
-					TokenHash: "kfakdslfk",
-				},
-			},
-			opts: &metav1.CreateOptions{},
-			storeSetup: func( // configure store backend clients
-				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				scache *fake.MockCacheInterface[*corev1.Secret],
-				users *fake.MockNonNamespacedCacheInterface[*v3.User],
-				timer *MocktimeHandler,
-				hasher *MockhashHandler,
-				auth *MockauthHandler) {
-
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("", nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 			},
 		},
 		// token generation and hash errors -- no mocking -- unable to induce and test
@@ -860,6 +795,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -893,6 +829,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -913,7 +850,7 @@ func Test_Store_Create(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  apierrors.NewInternalError(fmt.Errorf("context has no provider/principal data")),
+			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token session-token")),
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "hello",
@@ -928,6 +865,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -935,8 +873,13 @@ func Test_Store_Create(t *testing.T) {
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
 					Return("world", nil)
 
-				auth.EXPECT().ProviderAndPrincipal(gomock.Any(), gomock.Any()).
-					Return("", "", fmt.Errorf("context has no provider/principal data"))
+				// fail fetch of session token, v3 and ext
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token")
+				token.EXPECT().Get("session-token").
+					Return(nil, someerror)
+				scache.EXPECT().Get("cattle-tokens", "session-token").
+					Return(nil, someerror)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -965,14 +908,21 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("world", nil)
 
-				auth.EXPECT().ProviderAndPrincipal(gomock.Any(), gomock.Any()).
-					Return("local", "local://world", nil)
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token")
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -1004,14 +954,21 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("world", nil)
 
-				auth.EXPECT().ProviderAndPrincipal(gomock.Any(), gomock.Any()).
-					Return("local", "local://world", nil)
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token")
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -1053,14 +1010,21 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("world", nil)
 
-				auth.EXPECT().ProviderAndPrincipal(gomock.Any(), gomock.Any()).
-					Return("local", "local://world", nil)
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token")
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -1102,14 +1066,21 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).Return("world", nil)
 
-				auth.EXPECT().ProviderAndPrincipal(gomock.Any(), gomock.Any()).
-					Return("local", "local://world", nil)
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token")
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -1159,6 +1130,7 @@ func Test_Store_Create(t *testing.T) {
 				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
@@ -1166,8 +1138,14 @@ func Test_Store_Create(t *testing.T) {
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
 					Return("world", nil)
 
-				auth.EXPECT().ProviderAndPrincipal(gomock.Any(), gomock.Any()).
-					Return("local", "local://world", nil)
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token")
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -1210,6 +1188,7 @@ func Test_Store_Create(t *testing.T) {
 			space := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
 			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 			timer := NewMocktimeHandler(ctrl)
 			hasher := NewMockhashHandler(ctrl)
 			auth := NewMockauthHandler(ctrl)
@@ -1220,8 +1199,8 @@ func Test_Store_Create(t *testing.T) {
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			secrets.EXPECT().Cache().Return(scache)
 
-			store := New(space, secrets, users, nil, nil, timer, hasher, auth)
-			test.storeSetup(space, secrets, scache, ucache, timer, hasher, auth)
+			store := New(space, secrets, users, tcache, timer, hasher, auth)
+			test.storeSetup(space, secrets, scache, ucache, tcache, timer, hasher, auth)
 
 			// perform test and validate results
 			tok, err := store.create(context.TODO(), test.tok, test.opts)
@@ -1528,9 +1507,9 @@ func Test_SystemStore_Update(t *testing.T) {
 				auth *MockauthHandler) {
 				scache.EXPECT().
 					Get("cattle-tokens", "bogus").
-					Return(nil, emptyNotFoundError)
+					Return(nil, bogusNotFoundError)
 			},
-			err: emptyNotFoundError,
+			err: bogusNotFoundError,
 		},
 		{
 			name:     "some other error",
@@ -1547,10 +1526,11 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(nil, someerror)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", "bogus", someerror)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", "bogus",
+				someerror)),
 		},
 		{
-			name:     "empty secret (no user id)",
+			name:     "empty secret (no kube id)",
 			fullPerm: true,
 			opts:     &metav1.UpdateOptions{},
 			token:    &dummyToken,
@@ -1564,7 +1544,8 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&corev1.Secret{}, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", userIDMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus",
+				kubeIDMissingError)),
 		},
 		{
 			name:     "part-filled secret (no enabled)",
@@ -1642,7 +1623,10 @@ func Test_SystemStore_Update(t *testing.T) {
 				auth *MockauthHandler) {
 
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "auth-provider")
+				var up v3.Principal
+				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
+				up.Provider = ""
+				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
 
 				scache.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -1684,7 +1668,10 @@ func Test_SystemStore_Update(t *testing.T) {
 				auth *MockauthHandler) {
 
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "principal-id")
+				var up v3.Principal
+				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
+				up.Name = ""
+				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
 
 				scache.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2057,11 +2044,11 @@ func Test_SystemStore_Get(t *testing.T) {
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
-					Return(nil, emptyNotFoundError)
+					Return(nil, bogusNotFoundError)
 			},
 			tokname: "bogus",
 			opts:    &metav1.GetOptions{},
-			err:     emptyNotFoundError,
+			err:     bogusNotFoundError,
 			tok:     nil,
 		},
 		{
@@ -2073,11 +2060,12 @@ func Test_SystemStore_Get(t *testing.T) {
 			},
 			tokname: "bogus",
 			opts:    &metav1.GetOptions{},
-			err:     apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", "bogus", someerror)),
-			tok:     nil,
+			err: apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", "bogus",
+				someerror)),
+			tok: nil,
 		},
 		{
-			name: "empty secret (no user id)",
+			name: "empty secret (no kube id)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2085,8 +2073,9 @@ func Test_SystemStore_Get(t *testing.T) {
 			},
 			tokname: "bogus",
 			opts:    &metav1.GetOptions{},
-			err:     apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", userIDMissingError)),
-			tok:     nil,
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus",
+				kubeIDMissingError)),
+			tok: nil,
 		},
 		{
 			name: "part-filled secret (no enabled)",
@@ -2137,7 +2126,10 @@ func Test_SystemStore_Get(t *testing.T) {
 			name: "part-filled secret (no auth provider)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "auth-provider")
+				var up v3.Principal
+				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
+				up.Provider = ""
+				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
 
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2168,7 +2160,10 @@ func Test_SystemStore_Get(t *testing.T) {
 			name: "part-filled secret (no principal id)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "principal-id")
+				var up v3.Principal
+				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
+				up.Name = ""
+				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
 
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2215,22 +2210,19 @@ func Test_SystemStore_Get(t *testing.T) {
 					UID:  types.UID("2905498-kafld-lkad"),
 				},
 				Spec: ext.TokenSpec{
-					UserID:      "lkajdlksjlkds",
-					Description: "",
-					TTL:         4000,
-					Enabled:     pointer.Bool(false),
-					Kind:        "session",
-					PrincipalID: "world",
+					UserID:        "lkajdlksjlkds",
+					Description:   "",
+					TTL:           4000,
+					Enabled:       pointer.Bool(false),
+					Kind:          "session",
+					UserPrincipal: properPrincipal,
 				},
 				Status: ext.TokenStatus{
 					TokenValue:     "",
 					TokenHash:      "kla9jkdmj",
 					Expired:        true,
 					ExpiresAt:      "0001-01-01T00:00:04Z",
-					AuthProvider:   "somebody",
 					LastUpdateTime: "13:00:05",
-					DisplayName:    "myself",
-					UserName:       "hello",
 				},
 			},
 		},

@@ -115,22 +115,6 @@ func (m *MockauthHandler) EXPECT() *MockauthHandlerMockRecorder {
 	return m.recorder
 }
 
-// ProviderAndPrincipal mocks base method.
-func (m *MockauthHandler) ProviderAndPrincipal(ctx context.Context, store *SystemStore) (string, string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProviderAndPrincipal", ctx, store)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// ProviderAndPrincipal indicates an expected call of ProviderAndPrincipal.
-func (mr *MockauthHandlerMockRecorder) ProviderAndPrincipal(ctx, store any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProviderAndPrincipal", reflect.TypeOf((*MockauthHandler)(nil).ProviderAndPrincipal), ctx, store)
-}
-
 // SessionID mocks base method.
 func (m *MockauthHandler) SessionID(ctx context.Context) string {
 	m.ctrl.T.Helper()

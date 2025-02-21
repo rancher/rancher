@@ -2,6 +2,7 @@ package requests
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -213,6 +214,10 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 				secrets.EXPECT().Cache().Return(scache)
+				principalBytes, _ := json.Marshal(v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://kubeconfig-u-user5zfww"},
+					Provider:   "local",
+				})
 				scache.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww").
 					Return(&corev1.Secret{
@@ -223,17 +228,14 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							exttokenstore.FieldUserID: []byte("impUser"),
 							// everything else to satisfy the ext token read checks
 							exttokenstore.FieldAnnotations:    []byte("null"),
-							exttokenstore.FieldAuthProvider:   []byte("local"),
-							exttokenstore.FieldDisplayName:    []byte(""),
 							exttokenstore.FieldEnabled:        []byte("true"),
 							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
 							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
 							exttokenstore.FieldLabels:         []byte("null"),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-							exttokenstore.FieldPrincipalID:    []byte("local://kubeconfig-u-user5zfww"),
+							exttokenstore.FieldPrincipal:      principalBytes,
 							exttokenstore.FieldTTL:            []byte("57600000"),
 							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
-							exttokenstore.FieldUserName:       []byte(""),
 						},
 					}, nil)
 				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
@@ -416,6 +418,10 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 				secrets.EXPECT().Cache().Return(scache)
+				principalBytes, _ := json.Marshal(v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://kubeconfig-u-user5zfww"},
+					Provider:   "local",
+				})
 				scache.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww").
 					Return(&corev1.Secret{
@@ -426,17 +432,14 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							exttokenstore.FieldUserID: []byte("someoneelse"),
 							// everything else to satisfy the ext token read checks
 							exttokenstore.FieldAnnotations:    []byte("null"),
-							exttokenstore.FieldAuthProvider:   []byte("local"),
-							exttokenstore.FieldDisplayName:    []byte(""),
 							exttokenstore.FieldEnabled:        []byte("true"),
 							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
 							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
 							exttokenstore.FieldLabels:         []byte("null"),
 							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-							exttokenstore.FieldPrincipalID:    []byte("local://kubeconfig-u-user5zfww"),
+							exttokenstore.FieldPrincipal:      principalBytes,
 							exttokenstore.FieldTTL:            []byte("57600000"),
 							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
-							exttokenstore.FieldUserName:       []byte(""),
 						},
 					}, nil)
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)

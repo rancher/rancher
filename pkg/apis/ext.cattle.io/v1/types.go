@@ -50,13 +50,15 @@ type TokenSpec struct {
 	// different user is rejected as forbidden.
 	// +optional
 	UserID string `json:"userID,omitempty"`
-	// PrincipalID is the id of the user in the auth provider used. By
-	// default that is the principal who owns the token making the request
-	// creating this token. Currently this default is enforced, i.e. using a
-	// different principle is rejected as forbidden.
+	// UserPrincipal holds the information about the ext auth provider
+	// managed user (principal) owning the token.
+	UserPrincipal apiv3.Principal `json:"userPrincipal""`
+	// Kind describes the nature of the token. The value "session" indicates
+	// a login/session token. Any other value, including the empty string,
+	// which is the default, stands for some kind of derived token.
 	// +optional
-	PrincipalID string `json:principalID,omitempty`
-	// Human readable description.
+	Kind string `json:"kind"`
+	// Human readable free-form description of the token. For example, its purpose.
 	// +optional
 	Description string `json:"description, omitempty"`
 	// TTL is the time-to-live of the token, in milliseconds.
@@ -67,11 +69,6 @@ type TokenSpec struct {
 	// enabled token.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
-	// Kind describes the nature of the token. The value "session" indicates
-	// a login/session token. Any other value, including the empty string,
-	// which is the default, stands for some kind of derived token.
-	// +optional
-	Kind string `json:"kind"`
 }
 
 // TokenStatus contains system information about the Token.
@@ -91,12 +88,6 @@ type TokenStatus struct {
 	// ExpiresAt provides the time when the token expires. This field is set
 	// to the empty string if the token does not expire at all.
 	ExpiresAt string `json:"expiresAt"`
-	// AuthProvider names the auth provider managing the user owning the token.
-	AuthProvider string `json:"authProvider"`
-	// DisplayName is the display name of the User owning the token.
-	DisplayName string `json:displayName`
-	// UserName is the regular name of the User owning the token.
-	UserName string `json:userName`
 	// LastUpdateTime provides the time of the last change to the token
 	LastUpdateTime string `json:"lastUpdateTime"`
 	// LastUsedAt provides the last time the token was used in a request, at
@@ -128,32 +119,19 @@ func (t *Token) ObjClusterName() string {
 }
 
 func (t *Token) GetAuthProvider() string {
-	return t.Status.AuthProvider
+	return t.Spec.UserPrincipal.Provider
 }
-
-func (t *Token) GetUserPrincipalID() string {
-	return t.Spec.PrincipalID
-}
-
-func (t *Token) GetUserPrincipalType() string {
-	return "user"
-}
-
-func (t *Token) GetUserDisplayName() string {
-	return t.Status.DisplayName
-}
-
-func (t *Token) GetUserName() string {
-	return t.Status.UserName
+func (t *Token) GetUserPrincipal() apiv3.Principal {
+	return t.Spec.UserPrincipal
 }
 
 func (t *Token) GetGroupPrincipals() []apiv3.Principal {
-	// Not supported. Legacy in Norman tokens.
+	// Not supported. Legacy in v3 Tokens. Shed by ext tokens.
 	return []apiv3.Principal{}
 }
 
 func (t *Token) GetProviderInfo() map[string]string {
-	// Not supported. Legacy in Norman tokens.
+	// Not supported. Legacy in v3 tokens. Shed by ext tokens.
 	return map[string]string{}
 }
 

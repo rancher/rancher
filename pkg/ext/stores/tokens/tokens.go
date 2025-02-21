@@ -44,19 +44,16 @@ const (
 
 	GroupCattleAuthenticated = "system:cattle:authenticated"
 
-	// data fields used by the backing secrets to store token information
+	// names of the data fields used by the backing secrets to store token information
 	FieldAnnotations    = "annotations"
-	FieldAuthProvider   = "auth-provider"
 	FieldDescription    = "description"
-	FieldDisplayName    = "display-name"
 	FieldEnabled        = "enabled"
 	FieldHash           = "hash"
 	FieldKind           = "kind"
 	FieldLabels         = "labels"
 	FieldLastUpdateTime = "last-update-time"
 	FieldLastUsedAt     = "last-used-at"
-	FieldUserName       = "user-name"
-	FieldPrincipalID    = "principal-id"
+	FieldPrincipal      = "principal"
 	FieldTTL            = "ttl"
 	FieldUID            = "kube-uid"
 	FieldUserID         = "user-id"
@@ -104,7 +101,7 @@ type SystemStore struct {
 	secretClient    v1.SecretClient    // direct access to the backing secrets
 	secretCache     v1.SecretCache     // cached access to the backing secrets
 	userClient      v3.UserCache       // cached access to the v3.Users
-	v3TokenClient   v3.TokenCache      // cached access to v3.Tokens. See Fetch, ProviderAndPrincipal extraction.
+	v3TokenClient   v3.TokenCache      // cached access to v3.Tokens. See Fetch.
 	timer           timeHandler        // access to timestamp generation
 	hasher          hashHandler        // access to generation and hashing of secret values
 	auth            authHandler        // access to user retrieval from context
@@ -376,14 +373,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		}
 	}
 
-	// reject user-provided token value, or hash
-	if token.Status.TokenValue != "" {
-		return nil, apierrors.NewBadRequest("User provided token value is not permitted")
-	}
-	if token.Status.TokenHash != "" {
-		return nil, apierrors.NewBadRequest("User provided token hash is not permitted")
-	}
-
 	user, err := t.userClient.Get(token.Spec.UserID)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve user %s: %w",
@@ -395,33 +384,25 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, apierrors.NewBadRequest("operation references a disabled user")
 	}
 
-	// Retrieve auth provider and principal id for the user associated with
-	// the authenticated token of the request.
-
-	authProvider, principalID, err := t.auth.ProviderAndPrincipal(ctx, t)
+	// Get token of the request and use its principal as ours. Any attempt
+	// by the user to set their own information for the principal is
+	// discarded and written over. No checks are made, no errors are thrown.
+	requestToken, err := t.Fetch(t.auth.SessionID(ctx))
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
+	token.Spec.UserPrincipal = requestToken.GetUserPrincipal()
 
-	// Auto-fill the spec with the principal id, or ensure that the
-	// specified id matches the request. Same as we do for the user id.
-	if token.Spec.PrincipalID == "" {
-		token.Spec.PrincipalID = principalID
-	} else if token.Spec.PrincipalID != principalID {
-		return nil, apierrors.NewBadRequest("unable to create token for other principal id")
-	}
-
-	// Generate secret and its hash
+	// Generate a secret and its hash
 	tokenValue, hashedValue, err := t.hasher.MakeAndHashSecret()
 	if err != nil {
 		return nil, err
 	}
 
-	token.Status.TokenHash = hashedValue
-	token.Status.AuthProvider = authProvider
-	token.Status.DisplayName = user.DisplayName
-	token.Status.UserName = user.Username
-	token.Status.LastUpdateTime = t.timer.Now()
+	token.Status = ext.TokenStatus{
+		TokenHash:      hashedValue,
+		LastUpdateTime: t.timer.Now(),
+	}
 
 	rest.FillObjectMetaSystemFields(token)
 
@@ -431,7 +412,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 			token.Name, err))
 	}
 
-	// Return early, user does not wish to actually change anything.
+	// Return early as the user does not wish to actually change anything.
 	if dryRun {
 		return token, nil
 	}
@@ -441,7 +422,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			// can happen despite the early check for a pre-existing secret.
-			// something else may have raced us while the secret was assembled.
+			// another request may have raced us while the secret was assembled.
 			return nil, err
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store token %s: %w",
@@ -451,8 +432,8 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// Read changes back to return what was truly created, not what we thought we created
 	newToken, err := tokenFromSecret(newSecret)
 	if err != nil {
-		// An error here means that something broken was stored. Do not
-		// leave that broken thing behind.
+		// An error here means that something broken was stored.
+		// Do not leave that broken thing behind.
 		t.secretClient.Delete(TokenNamespace, secret.Name, &metav1.DeleteOptions{})
 
 		// And report what was broken
@@ -460,11 +441,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 			token.Name, err))
 	}
 
-	// The newly created token cannot have the same name as the token which
-	// authenticated the request.
+	// The newly created token is not the request token
 	newToken.Status.Current = false
 
-	// users don't care about the hashed value
+	// users don't care about the hashed value, just the secret
+	// here is the only place the secret is returned and disclosed.
 	newToken.Status.TokenHash = ""
 	newToken.Status.TokenValue = tokenValue
 
@@ -897,7 +878,7 @@ func userMatchOrDefault(name string, token *ext.Token) bool {
 // token, and returns a proper interface hiding the differences from the caller.
 // It is public because it is of use to other parts of rancher, not just here.
 func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
-	// checking for a norman token first, as it is the currently more common
+	// checking for a v3 Token first, as it is the currently more common
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
 	// cache.
@@ -905,7 +886,7 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		return v3token, nil
 	}
 
-	// not a norman token, now check for ext token
+	// not a v3 Token, now check for ext token
 	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
 		return ext, nil
 	}
@@ -930,7 +911,6 @@ type hashHandler interface {
 // information (user name, principal id, auth provider) from the store. This
 // makes these operations mockable for store testing.
 type authHandler interface {
-	ProviderAndPrincipal(ctx context.Context, store *SystemStore) (string, string, error)
 	SessionID(ctx context.Context) string
 	UserName(ctx context.Context, store *SystemStore) (string, error)
 }
@@ -1004,24 +984,6 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, 
 	}
 
 	return userName, nil
-}
-
-// ProviderAndPrincipal hides the details of extracting the auth provider and
-// principal id for the authenticated token from the request context. It uses
-// the provided store to fetch the detailed token data.
-func (tp *tokenAuth) ProviderAndPrincipal(ctx context.Context, store *SystemStore) (string, string, error) {
-	tokenID, err := SessionID(ctx)
-	if err != nil {
-		return "", "", err
-	}
-
-	token, err := store.Fetch(tokenID)
-	if err != nil {
-		// Well, an invalid token has invalid data
-		return "", "", fmt.Errorf("error fetching token %s: %w", tokenID, err)
-	}
-
-	return token.GetAuthProvider(), token.GetUserPrincipalID(), nil
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
@@ -1112,12 +1074,10 @@ func ListOptionMerge(user string, options *metav1.ListOptions) (metav1.ListOptio
 // secretFromToken converts the token argument into the equivalent secrets to
 // store in k8s.
 func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations map[string]string) (*corev1.Secret, error) {
-	// inject default on creation
-	ttl := token.Spec.TTL
-	if ttl == 0 {
-		ttl = ThirtyDays
-		// pass back to caller (Create)
-		token.Spec.TTL = ttl
+	// user principal
+	principalBytes, err := json.Marshal(token.Spec.UserPrincipal)
+	if err != nil {
+		return nil, err
 	}
 
 	// annotations -- encode and store into a data field. on reading decode
@@ -1136,11 +1096,11 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 		return nil, err
 	}
 
-	// labels again -- for proper filtering and searching the referenced
-	// user id, and the kind of the token are placed into labels of the
-	// backing secret -- the keys for these labels are part of the public
-	// API. This may have to be merged with labels set on the secrets by
-	// other apps with access to the secrets.
+	// labels again -- for proper filtering and searching both referenced
+	// user id and kind of the token are placed into labels of the backing
+	// secret -- the keys for these labels are part of the public API. This
+	// may have to be merged with labels set on the secrets by other apps
+	// with access to the secrets.
 	backendLabels := oldBackendLabels
 	if backendLabels == nil {
 		backendLabels = map[string]string{}
@@ -1155,6 +1115,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 		name = ""
 	}
 
+	// base structure
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    TokenNamespace,
@@ -1167,40 +1128,35 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 		Data:       make(map[string][]byte),
 	}
 
-	// system
+	// system information
 	secret.StringData[FieldUID] = string(token.ObjectMeta.UID)
 	secret.StringData[FieldLabels] = string(labelBytes)
 	secret.StringData[FieldAnnotations] = string(annotationBytes)
 
-	// spec
-	enabled := token.Spec.Enabled == nil || *token.Spec.Enabled
+	// spec values
+	// inject default on creation
+	ttl := token.Spec.TTL
+	if ttl == 0 {
+		ttl = ThirtyDays
+		// pass back to caller (Create)
+		token.Spec.TTL = ttl
+	}
 
-	secret.StringData[FieldUserID] = token.Spec.UserID
-	secret.StringData[FieldTTL] = fmt.Sprintf("%d", ttl)
-	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", enabled)
 	secret.StringData[FieldDescription] = token.Spec.Description
+	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", token.Spec.Enabled == nil || *token.Spec.Enabled)
 	secret.StringData[FieldKind] = token.Spec.Kind
-	secret.StringData[FieldPrincipalID] = token.Spec.PrincipalID
+	secret.StringData[FieldPrincipal] = string(principalBytes)
+	secret.StringData[FieldTTL] = fmt.Sprintf("%d", ttl)
+	secret.StringData[FieldUserID] = token.Spec.UserID
 
+	// status elements
 	lastUsedAsString := ""
 	if token.Status.LastUsedAt != nil {
 		lastUsedAsString = token.Status.LastUsedAt.Format(time.RFC3339)
 	}
-
-	// status
+	secret.StringData[FieldLastUsedAt] = lastUsedAsString
 	secret.StringData[FieldHash] = token.Status.TokenHash
 	secret.StringData[FieldLastUpdateTime] = token.Status.LastUpdateTime
-	secret.StringData[FieldLastUsedAt] = lastUsedAsString
-
-	// Note:
-	// - While the derived expiration data is not stored, the user-related information is.
-	// - The expiration data is computed trivially from spec and resource data.
-	// - Getting the user-related information on the other hand is expensive.
-	// - It is better to cache it in the backing secret
-
-	secret.StringData[FieldAuthProvider] = token.Status.AuthProvider
-	secret.StringData[FieldDisplayName] = token.Status.DisplayName
-	secret.StringData[FieldUserName] = token.Status.UserName
 
 	return secret, nil
 }
@@ -1222,18 +1178,41 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 		},
 	}
 
-	token.Spec.Description = string(secret.Data[FieldDescription])
-	token.Spec.Kind = string(secret.Data[FieldKind])
+	// system - kubernetes uid
+	if token.ObjectMeta.UID = types.UID(string(secret.Data[FieldUID])); token.ObjectMeta.UID == "" {
+		return token, fmt.Errorf("kube uid missing")
+	}
 
-	token.Status.DisplayName = string(secret.Data[FieldDisplayName])
-	token.Status.UserName = string(secret.Data[FieldUserName])
+	// system - annotations - decode the field and place into the token
+	if err := json.Unmarshal(secret.Data[FieldLabels], &token.Labels); err != nil {
+		return token, err
+	}
 
-	userId := string(secret.Data[FieldUserID])
+	// system - labels - decode the fields and place into the token
+	if err := json.Unmarshal(secret.Data[FieldAnnotations], &token.Annotations); err != nil {
+		return token, err
+	}
+
+	// spec - user id, required
 	if token.Spec.UserID = string(secret.Data[FieldUserID]); token.Spec.UserID == "" {
 		return token, fmt.Errorf("user id missing")
 	}
 
-	// spec
+	// spec - user principal, required
+	if err := json.Unmarshal(secret.Data[FieldPrincipal], &token.Spec.UserPrincipal); err != nil {
+		return token, err
+	}
+	if token.Spec.UserPrincipal.Name == "" {
+		return token, fmt.Errorf("principal id missing")
+	}
+	if token.Spec.UserPrincipal.Provider == "" {
+		return token, fmt.Errorf("auth provider missing")
+	}
+
+	// spec - optional elements
+	token.Spec.Description = string(secret.Data[FieldDescription])
+	token.Spec.Kind = string(secret.Data[FieldKind])
+
 	enabled, err := strconv.ParseBool(string(secret.Data[FieldEnabled]))
 	if err != nil {
 		return token, err
@@ -1250,28 +1229,13 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 	token.Spec.TTL = ttl
 
+	// status information
 	if token.Status.TokenHash = string(secret.Data[FieldHash]); token.Status.TokenHash == "" {
 		return token, fmt.Errorf("token hash missing")
 	}
 
-	authProvider := string(secret.Data[FieldAuthProvider])
-	if authProvider == "" {
-		return token, fmt.Errorf("auth provider missing")
-	}
-	token.Status.AuthProvider = authProvider
-
 	if token.Status.LastUpdateTime = string(secret.Data[FieldLastUpdateTime]); token.Status.LastUpdateTime == "" {
 		return token, fmt.Errorf("last update time missing")
-	}
-
-	principalID := string(secret.Data[FieldPrincipalID])
-	if principalID == "" {
-		return token, fmt.Errorf("principal id missing")
-	}
-	token.Spec.PrincipalID = principalID
-
-	if token.ObjectMeta.UID = types.UID(string(secret.Data[FieldUID])); token.ObjectMeta.UID == "" {
-		return token, fmt.Errorf("kube uid missing")
 	}
 
 	var lastUsedAt *metav1.Time
@@ -1288,16 +1252,6 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 
 	if err := setExpired(token); err != nil {
 		return token, fmt.Errorf("failed to set expiration information: %w", err)
-	}
-
-	// annotations - decode the field and place into the token
-	if err := json.Unmarshal(secret.Data[FieldLabels], &token.Labels); err != nil {
-		return token, err
-	}
-
-	// labels - decode the fields and place into the token
-	if err := json.Unmarshal(secret.Data[FieldAnnotations], &token.Annotations); err != nil {
-		return token, err
 	}
 
 	return token, nil

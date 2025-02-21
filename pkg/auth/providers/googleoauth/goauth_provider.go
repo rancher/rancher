@@ -388,7 +388,7 @@ func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, to
 	if principalType == userType {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = g.isThisUserMe(token, princ)
+			princ.Me = g.isThisUserMe(token.GetUserPrincipal(), princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -399,10 +399,10 @@ func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, to
 	return princ
 }
 
-func (g *googleOauthProvider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
-	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
-		me.GetUserName() == other.LoginName &&
-		me.GetUserPrincipalType() == other.PrincipalType
+func (g *googleOauthProvider) isThisUserMe(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail string, jsonCredentials []byte, accessTokenSource oauth2.TokenSource) (*admin.Service, error) {
@@ -432,10 +432,6 @@ func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail
 
 func (g *googleOauthProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
-}
-
-func (g *googleOauthProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 // IsDisabledProvider checks if the Google auth provider is currently disabled in Rancher.

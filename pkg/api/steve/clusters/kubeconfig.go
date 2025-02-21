@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
@@ -95,7 +94,7 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		AuthProvider:  authToken.GetAuthProvider(),
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
-		UserPrincipal: providers.GetUserPrincipal(authToken),
+		UserPrincipal: authToken.GetUserPrincipal(),
 	}
 
 	return k.userMgr.EnsureToken(input)
