@@ -160,10 +160,11 @@ func (g *GenOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
-			princ.Me = g.IsThisUserMe(token, princ)
+			princ.Me = g.IsThisUserMe(token.GetUserPrincipal(), princ)
 			if princ.Me {
-				princ.LoginName = token.GetUserName()
-				princ.DisplayName = token.GetUserDisplayName()
+				tokenPrincipal := token.GetUserPrincipal()
+				princ.LoginName = tokenPrincipal.LoginName
+				princ.DisplayName = tokenPrincipal.DisplayName
 			}
 		}
 	} else {

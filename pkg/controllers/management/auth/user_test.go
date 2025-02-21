@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -275,6 +276,12 @@ func TestUpdated(t *testing.T) {
 				mockUserManager.EXPECT().
 					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
 					Return(nil)
+				principalBytes, _ := json.Marshal(v3.Principal{
+					ObjectMeta:  metav1.ObjectMeta{Name: "world"},
+					Provider:    "somebody",
+					LoginName:   "hello",
+					DisplayName: "myself",
+				})
 				scache.EXPECT().
 					List("cattle-tokens", gomock.Any()).
 					Return([]*v1.Secret{
@@ -284,17 +291,14 @@ func TestUpdated(t *testing.T) {
 							},
 							Data: map[string][]byte{
 								exttokens.FieldAnnotations:    []byte("null"),
-								exttokens.FieldAuthProvider:   []byte("somebody"),
-								exttokens.FieldDisplayName:    []byte("myself"),
 								exttokens.FieldEnabled:        []byte("true"),
 								exttokens.FieldHash:           []byte("kla9jkdmj"),
 								exttokens.FieldKind:           []byte(exttokens.IsLogin),
 								exttokens.FieldLabels:         []byte("null"),
 								exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-								exttokens.FieldPrincipalID:    []byte("world"),
+								exttokens.FieldPrincipal:      principalBytes,
 								exttokens.FieldTTL:            []byte("4000"),
 								exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
-								exttokens.FieldUserName:       []byte("hello"),
 								exttokens.FieldUserID:         []byte("testuser"),
 							},
 						},
@@ -340,24 +344,27 @@ func TestUpdated(t *testing.T) {
 
 						return s, nil
 					})
+				principalBytes, _ := json.Marshal(v3.Principal{
+					ObjectMeta:  metav1.ObjectMeta{Name: "world"},
+					Provider:    "somebody",
+					LoginName:   "hello",
+					DisplayName: "myself",
+				})
 				theTokenSecret := v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testuser-token",
 					},
 					Data: map[string][]byte{
 						exttokens.FieldAnnotations:    []byte("null"),
-						exttokens.FieldAuthProvider:   []byte("somebody"),
-						exttokens.FieldDisplayName:    []byte("myself"),
 						exttokens.FieldEnabled:        []byte("true"),
 						exttokens.FieldHash:           []byte("kla9jkdmj"),
 						exttokens.FieldKind:           []byte(""),
 						exttokens.FieldLabels:         []byte("null"),
 						exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-						exttokens.FieldPrincipalID:    []byte("world"),
+						exttokens.FieldPrincipal:      principalBytes,
 						exttokens.FieldTTL:            []byte("4000"),
 						exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
 						exttokens.FieldUserID:         []byte("testuser"),
-						exttokens.FieldUserName:       []byte("hello"),
 					},
 				}
 				scache.EXPECT().

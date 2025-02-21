@@ -325,10 +325,11 @@ func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token a
 	if principalType == s.userType {
 		princ.PrincipalType = common.UserPrincipalType
 		if token != nil {
-			princ.Me = s.isThisUserMe(token, princ)
+			tokenPrincipal := token.GetUserPrincipal()
+			princ.Me = s.isThisUserMe(tokenPrincipal, princ)
 			if princ.Me {
-				princ.LoginName = token.GetUserName()
-				princ.DisplayName = token.GetUserDisplayName()
+				princ.LoginName = tokenPrincipal.LoginName
+				princ.DisplayName = tokenPrincipal.DisplayName
 			}
 		}
 	} else {
@@ -411,9 +412,9 @@ func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 	return p, nil
 }
 
-func (s *Provider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
-	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
-		me.GetUserPrincipalType() == other.PrincipalType
+func (s *Provider) isThisUserMe(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (s *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -515,10 +516,6 @@ func (s *Provider) hasLdapGroupSearch() bool {
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
-}
-
-func (s *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 // IsDisabledProvider checks if the SAML auth provider is currently disabled in Rancher.

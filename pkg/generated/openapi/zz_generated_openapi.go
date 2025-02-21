@@ -205,9 +205,16 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
-					"PrincipalID": {
+					"userPrincipal": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PrincipalID is the id of the user in the auth provider used. By default that is the principal who owns the token making the request creating this token. Currently this default is enforced, i.e. using a different principle is rejected as forbidden.",
+							Description: "UserPrincipal holds the information about the ext auth provider managed user (principal) owning the token.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"),
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -215,7 +222,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"description": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Human readable description.",
+							Description: "Human readable free-form description of the token. For example, its purpose.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -235,17 +242,12 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind describes the nature of the token. The value \"session\" indicates a login/session token. Any other value, including the empty string, which is the default, stands for some kind of derived token.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 				},
+				Required: []string{"userPrincipal"},
 			},
 		},
+		Dependencies: []string{
+			"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"},
 	}
 }
 
@@ -294,30 +296,6 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 							Format:      "",
 						},
 					},
-					"authProvider": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AuthProvider names the auth provider managing the user owning the token.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"DisplayName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DisplayName is the display name of the User owning the token.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"UserName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "UserName is the regular name of the User owning the token.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"lastUpdateTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "LastUpdateTime provides the time of the last change to the token",
@@ -333,7 +311,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"current", "expired", "expiresAt", "authProvider", "DisplayName", "UserName", "lastUpdateTime"},
+				Required: []string{"current", "expired", "expiresAt", "lastUpdateTime"},
 			},
 		},
 		Dependencies: []string{

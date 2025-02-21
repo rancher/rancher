@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -152,7 +151,7 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 		AuthProvider:  authToken.GetAuthProvider(),
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
-		UserPrincipal: providers.GetUserPrincipal(authToken),
+		UserPrincipal: authToken.GetUserPrincipal(),
 	}, nil
 }
 

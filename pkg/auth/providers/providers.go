@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/rancher/norman/types"
-	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
@@ -25,7 +24,6 @@ import (
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -204,37 +202,6 @@ func AuthenticateUser(ctx context.Context, input interface{}, providerName strin
 	return Providers[providerName].AuthenticateUser(ctx, input)
 }
 
-// GetUserPrincipal is a helper to return a principal structure for any
-// token. It is a last resort for the places where using specific methods to get
-// targeted information from the token is not possible. That is pretty much
-// whereever norman code absolutely expects to have and pass a full principal
-// structure around.
-func GetUserPrincipal(token accessor.TokenAccessor) v3.Principal {
-	switch token.(type) {
-	case *v3.Token:
-		return token.(*v3.Token).UserPrincipal
-	case *ext.Token:
-		e := token.(*ext.Token)
-		uName := e.GetUserName()
-		pID := e.GetUserPrincipalID()
-		return v3.Principal{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: pID,
-			},
-			DisplayName:   e.GetUserDisplayName(),
-			LoginName:     uName,
-			Provider:      e.GetAuthProvider(),
-			PrincipalType: e.GetUserPrincipalType(),
-			ExtraInfo: map[string]string{
-				common.UserAttributePrincipalID: pID,
-				common.UserAttributeUserName:    uName,
-			},
-		}
-	}
-	// should not reach this code
-	return v3.Principal{}
-}
-
 func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (v3.Principal, error) {
 	principal, err := Providers[myToken.GetAuthProvider()].GetPrincipal(principalID, myToken)
 
@@ -283,10 +250,6 @@ func RefetchGroupPrincipals(principalID string, providerName string, secret stri
 
 func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
 	return Providers[providerName].GetUserExtraAttributes(userPrincipal)
-}
-
-func GetUserExtraAttributesFromToken(providerName string, token accessor.TokenAccessor) map[string][]string {
-	return Providers[providerName].GetUserExtraAttributesFromToken(token)
 }
 
 func IsDisabledProvider(providerName string) (bool, error) {
