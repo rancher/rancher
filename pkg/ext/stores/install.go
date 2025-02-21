@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -27,7 +26,7 @@ func InstallStores(server *steveext.ExtensionAPIServer, wranglerContext *wrangle
 	err := server.Install(
 		tokens.PluralName,
 		tokens.GVK,
-		tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer()))
+		tokens.NewFromWrangler(wranglerContext))
 	if err != nil {
 		return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
 	}
