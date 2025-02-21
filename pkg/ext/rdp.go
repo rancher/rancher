@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -109,15 +110,6 @@ func GetOrCreateRDPConnectSecret(secretController corecontrollers.SecretControll
 }
 
 func DeleteRDPConnectSecret(secretController corecontrollers.SecretController) error {
-	_, err := secretController.Get(namespace.System, apiExtSecretName, v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	err = secretController.Delete(namespace.System, apiExtSecretName, &v1.DeleteOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	err := secretController.Delete(namespace.System, apiExtSecretName, &v1.DeleteOptions{})
+	return client.IgnoreNotFound(err)
 }
