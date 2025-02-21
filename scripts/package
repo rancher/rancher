@@ -51,7 +51,7 @@ echo
 cd ../bin
 
 if [ ! -d $CHART_REPO_DIR ]; then
-    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/chiukapoor/charts $CHART_REPO_DIR
+    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
 fi
 
 if [ ${ARCH} == amd64 ]; then

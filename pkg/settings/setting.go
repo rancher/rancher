@@ -120,7 +120,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "v1.32-rancher")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.11")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
@@ -154,7 +154,7 @@ var (
 
 	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
 	// debug purposes.
-	ChartDefaultURL = NewSetting("chart-default-url", "https://github.com/chiukapoor/charts")
+	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
 	// DisableInactiveUserAfter is the duration a user can be inactive after which it's disabled by the user retention process.
 	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
 	// DisableInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
