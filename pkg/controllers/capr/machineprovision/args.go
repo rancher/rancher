@@ -12,12 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/drivers"
-	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -31,6 +25,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+
+	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 )
 
 const (
@@ -145,7 +147,8 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		if err != nil {
 			return driverArgs{}, err
 		}
-		cmd = append(cmd, toArgs(driver, args, rancherCluster.Status.ClusterName)...)
+
+		cmd = append(cmd, toArgs(driver, args, rancherCluster)...)
 	} else {
 		// We're passing the `--update-config` flag here along with driver-specific flags to tell Rancher Machine
 		// to reload the driver-specific flags we pass via envvars. They need to be reloaded to account for cases
@@ -275,9 +278,9 @@ func addAwsClusterOwnedTag(args map[string]any, clusterID string) {
 	}
 }
 
-func toArgs(driverName string, args map[string]any, clusterID string) (cmd []string) {
+func toArgs(driverName string, args map[string]any, cluster *rancherv1.Cluster) (cmd []string) {
 	if driverName == "amazonec2" {
-		addAwsClusterOwnedTag(args, clusterID)
+		addAwsClusterOwnedTag(args, cluster.Status.ClusterName)
 	}
 
 	for k, v := range args {
@@ -315,6 +318,10 @@ func toArgs(driverName string, args map[string]any, clusterID string) (cmd []str
 		convert.ToString(args["securityGroup"]) != "rancher-nodes" &&
 		args["securityGroupReadonly"] == nil {
 		cmd = append(cmd, "--amazonec2-security-group-readonly")
+	}
+
+	if driverName == "harvester" {
+		cmd = append(cmd, fmt.Sprintf("--harvester-cluster-name=%s", cluster.Name))
 	}
 
 	sort.Strings(cmd)
