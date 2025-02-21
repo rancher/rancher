@@ -39,8 +39,9 @@ const (
 
 var (
 	primaryImages = map[string]string{
-		chart.WebhookChartName:          "rancher/rancher-webhook",
-		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
+		chart.WebhookChartName:           "rancher/rancher-webhook",
+		chart.ProvisioningCAPIChartName:  "rancher/mirrored-cluster-api-controller",
+		chart.RemoteDialerProxyChartName: "rancher/remotedialer-proxy",
 	}
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookVersion.Name:               {},
@@ -157,8 +158,9 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
-			ReleaseNamespace: namespace.System,
-			ChartName:        chart.RemoteDialerProxyChartName,
+			ReleaseNamespace:    namespace.System,
+			ChartName:           chart.RemoteDialerProxyChartName,
+			ExactVersionSetting: settings.RemoteDialerProxyVersion,
 			Values: func() map[string]interface{} {
 				secret, err := ext.GetOrCreateRDPConnectSecret(h.secrets)
 				if err != nil {
@@ -167,9 +169,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 
 				return map[string]interface{}{
 					"service": map[string]interface{}{
-						"secret":    secret,
-						"httpsPort": 5555,
-						"peerPort":  6666,
+						"secret": secret,
 					},
 				}
 			},
