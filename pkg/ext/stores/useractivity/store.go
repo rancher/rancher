@@ -51,6 +51,7 @@ var GVK = schema.GroupVersionKind{
 	Version: GV.Version,
 	Kind:    "UserActivity",
 }
+
 var GVR = schema.GroupVersionResource{
 	Group:    GV.Group,
 	Version:  GV.Version,
@@ -92,7 +93,7 @@ func (s *Store) Destroy() {
 }
 
 // Create implements [rest.Creator]
-// Create sets the LastActivity and CurrentTimeout fields on the UserActivity object
+// Create sets the Status fields on the UserActivity object
 // provided by the user within the request.
 func (s *Store) Create(ctx context.Context,
 	obj runtime.Object,
@@ -128,11 +129,13 @@ func (s *Store) Create(ctx context.Context,
 		return nil, apierrors.NewBadRequest("can't retrieve token with empty string")
 	}
 
+	// retrieve auth token
 	authToken, err := s.tokenCache.Get(authTokenID)
 	if err != nil {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
 	}
 
+	// retrieve activity token
 	activityToken, err := s.tokenCache.Get(objUserActivity.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -142,10 +145,12 @@ func (s *Store) Create(ctx context.Context,
 		}
 	}
 
+	// verify auth and activity token has the same auth provider
 	if authToken.AuthProvider != activityToken.AuthProvider {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, objUserActivity.Name))
 	}
 
+	// verify auth and activity token has the same auth user principal
 	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, objUserActivity.Name))
 	}
