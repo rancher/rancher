@@ -1,3 +1,5 @@
+// tokens implements the store for the new public API token resources, also
+// known as ext tokens.
 package tokens
 
 import (
@@ -19,7 +21,6 @@ import (
 	extcore "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/utils/strings/slices"
@@ -60,7 +60,6 @@ const (
 	FieldTTL            = "ttl"
 	FieldUID            = "kube-uid"
 	FieldUserID         = "user-id"
-	// FieldIdleTimeout = "idle-timeout"	FUTURE ((USER ACTIVITY))
 
 	SingularName = "token"
 	PluralName   = SingularName + "s"
@@ -85,8 +84,6 @@ var GVR = schema.GroupVersionResource{
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 
-// ////////////////////////////////////////////////////////////////////////////////
-
 // Store is the interface to the token store seen by the extension API and
 // users. Wrapped around a SystemStore it performs the necessary checks to
 // ensure that Users have only access to the tokens they are permitted to.
@@ -98,36 +95,29 @@ type Store struct {
 // +k8s:deepcopy-gen=false
 
 // SystemStore is the interface to the token store used internally by other
-// parts of rancher. It does not perform any kind of permission checks, and
-// operates with admin authority, except where told to not to. IOW it generally
-// has access to all the tokens, in all ways.
+// parts of Rancher. It does not perform any kind of permission checks, and
+// operates with admin authority, except where it is told to not to. In other
+// words, it generally has access to all the tokens, in all ways.
 type SystemStore struct {
-	namespaceClient   v1.NamespaceClient // access to namespaces
-	initialized       bool               // flag is set when this store ensured presence of the backing namespace
-	secretClient      v1.SecretClient
-	secretCache       v1.SecretCache
-	userClient        v3.UserCache
-	normanTokenClient v3.TokenCache // ProviderAndPrincipal extraction
-
-	authorizer authorizer.Authorizer
-
-	timer  timeHandler // subsystem for timestamp generation
-	hasher hashHandler // subsystem for generation and hashing of secret values
-	auth   authHandler // subsystem for user retrieval from context
+	initialized     bool               // flag. set when this store ensured presence of the backing namespace
+	namespaceClient v1.NamespaceClient // access to namespaces.
+	secretClient    v1.SecretClient    // direct access to the backing secrets
+	secretCache     v1.SecretCache     // cached access to the backing secrets
+	userClient      v3.UserCache       // cached access to the v3.Users
+	v3TokenClient   v3.TokenCache      // cached access to v3.Tokens. See Fetch, ProviderAndPrincipal extraction.
+	timer           timeHandler        // access to timestamp generation
+	hasher          hashHandler        // access to generation and hashing of secret values
+	auth            authHandler        // access to user retrieval from context
 }
-
-// ////////////////////////////////////////////////////////////////////////////////
-// store contruction methods
 
 // NewFromWrangler is a convenience function for creating a token store.
 // It initializes the returned store from the provided wrangler context.
-func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
+func NewFromWrangler(wranglerContext *wrangler.Context) *Store {
 	return New(
 		wranglerContext.Core.Namespace(),
 		wranglerContext.Core.Secret(),
 		wranglerContext.Mgmt.User(),
 		wranglerContext.Mgmt.Token().Cache(),
-		authorizer,
 		NewTimeHandler(),
 		NewHashHandler(),
 		NewAuthHandler(),
@@ -143,22 +133,20 @@ func New(
 	secretClient v1.SecretController,
 	userClient v3.UserController,
 	tokenClient v3.TokenCache,
-	authorizer authorizer.Authorizer,
 	timer timeHandler,
 	hasher hashHandler,
 	auth authHandler,
 ) *Store {
 	tokenStore := Store{
 		SystemStore: SystemStore{
-			namespaceClient:   namespaceClient,
-			secretClient:      secretClient,
-			secretCache:       secretClient.Cache(),
-			userClient:        userClient.Cache(),
-			normanTokenClient: tokenClient,
-			authorizer:        authorizer,
-			timer:             timer,
-			hasher:            hasher,
-			auth:              auth,
+			namespaceClient: namespaceClient,
+			secretClient:    secretClient,
+			secretCache:     secretClient.Cache(),
+			userClient:      userClient.Cache(),
+			v3TokenClient:   tokenClient,
+			timer:           timer,
+			hasher:          hasher,
+			auth:            auth,
 		},
 	}
 	return &tokenStore
@@ -191,74 +179,47 @@ func NewSystem(
 	hasher hashHandler,
 	auth authHandler,
 ) *SystemStore {
-	// BEWARE: no authorizer set. this means that (internal) system stores
-	// cannot create tokens limited to a cluster, as they are unable to
-	// check if the user has access to that cluster. It will panic if you
-	// try.
-	//
-	// NOTE: on the other side, so far all uses of system stores in other
-	// places of rancher do not create tokens at all.
 	tokenStore := SystemStore{
-		namespaceClient:   namespaceClient,
-		secretClient:      secretClient,
-		secretCache:       secretClient.Cache(),
-		userClient:        userClient.Cache(),
-		normanTokenClient: tokenClient,
-		timer:             timer,
-		hasher:            hasher,
-		auth:              auth,
+		namespaceClient: namespaceClient,
+		secretClient:    secretClient,
+		secretCache:     secretClient.Cache(),
+		userClient:      userClient.Cache(),
+		v3TokenClient:   tokenClient,
+		timer:           timer,
+		hasher:          hasher,
+		auth:            auth,
 	}
 	return &tokenStore
 }
 
-// ////////////////////////////////////////////////////////////////////////////////
-// Required interfaces:
-// - [rest.GroupVersionKindProvider],
-// - [rest.Scoper],
-// - [rest.SingularNameProvider], and
-// - [rest.Storage]
-
-// GroupVersionKind implements [rest.GroupVersionKindProvider]
+// GroupVersionKind implements [rest.GroupVersionKindProvider], a required interface.
 func (t *Store) GroupVersionKind(_ schema.GroupVersion) schema.GroupVersionKind {
 	return GVK
 }
 
-// NamespaceScoped implements [rest.Scoper]
+// NamespaceScoped implements [rest.Scoper], a required interface.
 func (t *Store) NamespaceScoped() bool {
 	return false
 }
 
-// GetSingularName implements [rest.SingularNameProvider]
+// GetSingularName implements [rest.SingularNameProvider], a required interface.
 func (t *Store) GetSingularName() string {
 	return SingularName
 }
 
-// New implements [rest.Storage]
+// New implements [rest.Storage], a required interface.
 func (t *Store) New() runtime.Object {
 	obj := &ext.Token{}
 	obj.GetObjectKind().SetGroupVersionKind(GVK)
 	return obj
 }
 
-// Destroy implements [rest.Storage]
+// Destroy implements [rest.Storage], a required interface.
 func (t *Store) Destroy() {
 }
 
-// ////////////////////////////////////////////////////////////////////////////////
-// Optional interfaces -- All implemented, supporting all regular k8s verbs
-// - [x] create:           [rest.Creater]
-// - [x] delete:           [rest.GracefulDeleter]
-// - -- deletecollection: [rest.CollectionDeleter]
-// - [x] get:              [rest.Getter]
-// - [x] list:             [rest.Lister]
-// -    patch:            [rest.Patcher] (this is Getter + Updater)
-// - [x] update:           [rest.Updater]
-// - [x] watch:            [rest.Watcher]
-
-// The interface methods mostly delegate to the actual store methods, with some
-// general method-dependent boilerplate behaviour before and/or after.
-
-// Create implements [rest.Creator]
+// Create implements [rest.Creator], the interface to support the `create`
+// verb. Delegates to the actual store method after some generic boilerplate.
 func (t *Store) Create(
 	ctx context.Context,
 	obj runtime.Object,
@@ -281,7 +242,9 @@ func (t *Store) Create(
 	return t.create(ctx, objToken, options)
 }
 
-// Delete implements [rest.GracefulDeleter]
+// Delete implements [rest.GracefulDeleter], the interface to support the
+// `delete` verb. Delegates to the actual store method after some generic
+// boilerplate.
 func (t *Store) Delete(
 	ctx context.Context,
 	name string,
@@ -310,7 +273,8 @@ func (t *Store) Delete(
 	return obj, true, nil
 }
 
-// Get implements [rest.Getter]
+// Get implements [rest.Getter], the interface to support the `get` verb.
+// Simply delegates to the actual store method.
 func (t *Store) Get(
 	ctx context.Context,
 	name string,
@@ -318,14 +282,15 @@ func (t *Store) Get(
 	return t.get(ctx, name, options)
 }
 
-// NewList implements [rest.Lister]
+// NewList implements [rest.Lister], the interface to support the `list` verb.
 func (t *Store) NewList() runtime.Object {
 	objList := &ext.TokenList{}
 	objList.GetObjectKind().SetGroupVersionKind(GVK)
 	return objList
 }
 
-// List implements [rest.Lister]
+// List implements [rest.Lister], the interface to support the `list` verb.
+// Simply delegates to the actual store method.
 func (t *Store) List(
 	ctx context.Context,
 	internaloptions *metainternalversion.ListOptions) (runtime.Object, error) {
@@ -336,7 +301,7 @@ func (t *Store) List(
 	return t.list(ctx, options)
 }
 
-// ConvertToTable implements [rest.Lister]
+// ConvertToTable implements [rest.Lister], the interface to support the `list` verb.
 func (t *Store) ConvertToTable(
 	ctx context.Context,
 	object runtime.Object,
@@ -346,7 +311,7 @@ func (t *Store) ConvertToTable(
 		GVR.GroupResource())
 }
 
-// Update implements [rest.Updater]
+// Update implements [rest.Updater], the interface to support the `update` verb.
 func (t *Store) Update(
 	ctx context.Context,
 	name string,
@@ -360,7 +325,7 @@ func (t *Store) Update(
 		t.get, t.create, t.update)
 }
 
-// Watch implements [rest.Watcher]
+// Watch implements [rest.Watcher], the interface to support the `watch` verb.
 func (t *Store) Watch(
 	ctx context.Context,
 	internaloptions *metainternalversion.ListOptions) (watch.Interface, error) {
@@ -371,9 +336,7 @@ func (t *Store) Watch(
 	return t.watch(ctx, options)
 }
 
-// ////////////////////////////////////////////////////////////////////////////////
-// Actual K8s verb implementations
-
+// create implements the core resource creation for tokens
 func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
 	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
@@ -421,24 +384,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, apierrors.NewBadRequest("User provided token hash is not permitted")
 	}
 
-	// Get derived User information for the token.
-	//
-	// NOTE: The creation process is not given `AuthProvider`, `User-` and `GroupPrincipals`.
-	// ..... This information has to be retrieved from somewhere else in the system.
-	// ..... This is in contrast to the Norman tokens who get this information either
-	// ..... as part of the Login process, or by copying the information out of the
-	// ..... base token the new one is derived from. None of that is possible here.
-	//
-	// The token store gets the necessary information (auth provider and
-	// principal id) from the extras of the user stored in the context.
-	//
-	// The `UserPrincipal` data is filled in part from the above, and in
-	// part from the associated `User`s fields.
-	//
-	// `ProviderInfo` is not supported. Norman tokens have it as legacy fallback to hold the
-	// `access_token` data managed by OIDC-based auth providers. The actual primary storage for
-	// this is actually a regular k8s Secret associated with the User.
-
 	user, err := t.userClient.Get(token.Spec.UserID)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve user %s: %w",
@@ -467,7 +412,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	}
 
 	// Generate secret and its hash
-
 	tokenValue, hashedValue, err := t.hasher.MakeAndHashSecret()
 	if err != nil {
 		return nil, err
@@ -487,7 +431,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 			token.Name, err))
 	}
 
-	// Abort, user does not wish to actually change anything.
+	// Return early, user does not wish to actually change anything.
 	if dryRun {
 		return token, nil
 	}
@@ -527,6 +471,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
+// delete implements the core resource destruction for tokens
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
 	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
@@ -550,6 +495,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
 }
 
+// get implements the core resource retrieval for tokens
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
 	sessionID := t.auth.SessionID(ctx)
 
@@ -573,7 +519,6 @@ func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions
 func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*ext.Token, error) {
 	// Core token retrieval from backing secrets
 	// We try to go through the fast cache as much as we can.
-
 	var err error
 	var currentSecret *corev1.Secret
 	empty := metav1.GetOptions{}
@@ -582,10 +527,9 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 	} else {
 		currentSecret, err = t.secretClient.Get(TokenNamespace, name, *options)
 	}
-
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, err
+			return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", name, err))
 	}
@@ -599,6 +543,7 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 	return token, nil
 }
 
+// list implements the core resource listing of tokens
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
 	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
@@ -614,12 +559,10 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 // internal call invoked by other parts of Rancher
 func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	// As internal call this method can use the cache of secrets.
-	// Query the cache, with proper label selector
-	quest := labels.Set(map[string]string{
+	// Query the cache using a proper label selector
+	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
 		UserIDLabel: userName,
-	}).AsSelector()
-	secrets, err := t.secretCache.List(TokenNamespace, quest)
-
+	}).AsSelector())
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for user %s: %w", userName, err))
 	}
@@ -632,15 +575,12 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 			continue
 		}
 
-		// Note: We do not care about `Current` in the caller, so no
-		// code here to set that field properly.
 		tokens = append(tokens, *token)
 	}
 
-	list := ext.TokenList{
+	return &ext.TokenList{
 		Items: tokens,
-	}
-	return &list, nil
+	}, nil
 }
 
 func (t *SystemStore) list(user, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
@@ -672,19 +612,18 @@ func (t *SystemStore) list(user, sessionID string, options *metav1.ListOptions) 
 		}
 
 		// Filtering for users is done already, see above where the options are set up and/or merged.
-
 		token.Status.Current = token.Name == sessionID
 		tokens = append(tokens, *token)
 	}
-	list := ext.TokenList{
+	return &ext.TokenList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: secrets.ResourceVersion,
 		},
 		Items: tokens,
-	}
-	return &list, nil
+	}, nil
 }
 
+// update implements the core resource updating/modification of tokens
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
 	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
@@ -711,7 +650,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, err
+			return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w",
 			token.Name, err))
@@ -723,7 +662,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	}
 
 	if token.ObjectMeta.UID != currentToken.ObjectMeta.UID {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kube uuid",
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kubernetes UID",
 			token.Name))
 	}
 
@@ -737,11 +676,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 			token.Name))
 	}
 
-	// Work on the time to live (TTL) value is a bit more complicated. Even
-	// the owning user is not allowed to extend the TTL, only keep or shrink
-	// it. Only the system itself is allowed to perform an extension. Note
-	// that nothing currently makes use of that.
-
+	// It is not allowed to extend the TTL.
 	if !fullPermission {
 		if token.Spec.TTL > currentToken.Spec.TTL {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to extend time-to-live",
@@ -786,16 +721,11 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	return newToken, nil
 }
 
-// FUTURE ((USER ACTIVITY)) modify and fill in as required by the field type.
-// func (t *SystemTokenStore) UpdateIdleTimeout(name string, now time.Time) error {
-// }
-
+// UpdateLastUsedAt patches the last-used-at information of the token.
+// Called during authentication.
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	// Operate directly on the backend secret holding the token
-
-	nowStr := now.Format(time.RFC3339)
-	nowEncoded := base64.StdEncoding.EncodeToString([]byte(nowStr))
-
+	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
 	patch, err := json.Marshal([]struct {
 		Op    string `json:"op"`
 		Path  string `json:"path"`
@@ -813,6 +743,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	return err
 }
 
+// watch implements the core resource watcher for tokens
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	user, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
@@ -962,17 +893,16 @@ func userMatchOrDefault(name string, token *ext.Token) bool {
 }
 
 // Fetch is a convenience function for retrieving a token by name, regardless of
-// type. I.e. this function auto-detects if the referenced token is
-// norman/legacy, or ext, and returns a proper interface hiding the differences
-// from the caller. It is public because it is of use to other parts of rancher,
-// not just here.
+// type. I.e. this function auto-detects if the referenced token is a v3 or ext
+// token, and returns a proper interface hiding the differences from the caller.
+// It is public because it is of use to other parts of rancher, not just here.
 func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	// checking for a norman token first, as it is the currently more common
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
 	// cache.
-	if norman, err := t.normanTokenClient.Get(tokenID); err == nil {
-		return norman, nil
+	if v3token, err := t.v3TokenClient.Get(tokenID); err == nil {
+		return v3token, nil
 	}
 
 	// not a norman token, now check for ext token
@@ -983,28 +913,20 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	return nil, fmt.Errorf("unable to fetch unknown token %s", tokenID)
 }
 
-// ////////////////////////////////////////////////////////////////////////////////
-// Support interfaces for testability.
-
-// Note: Review the interfaces and implementations below when we have more than
-// just the token store, to consider generalization for sharing across stores.
-
-// Mockable interfaces for permission checking, secret generation and hashing, and timing
-
-// timeHandler is an interface hiding the details of timestamp generation from
+// timeHandler is a helper interface hiding the details of timestamp generation from
 // the store. This makes the operation mockable for store testing.
 type timeHandler interface {
 	Now() string
 }
 
-// hashHandler is an interface hiding the details of secret generation and
+// hashHandler is a helper interface hiding the details of secret generation and
 // hashing from the store. This makes these operations mockable for store
 // testing.
 type hashHandler interface {
 	MakeAndHashSecret() (string, string, error)
 }
 
-// authHandler is an interface hiding the details of retrieving token auth
+// authHandler is a helper interface hiding the details of retrieving token auth
 // information (user name, principal id, auth provider) from the store. This
 // makes these operations mockable for store testing.
 type authHandler interface {
@@ -1096,7 +1018,7 @@ func (tp *tokenAuth) ProviderAndPrincipal(ctx context.Context, store *SystemStor
 	token, err := store.Fetch(tokenID)
 	if err != nil {
 		// Well, an invalid token has invalid data
-		return "", "", fmt.Errorf("context contains invalid provider/principal data")
+		return "", "", fmt.Errorf("error fetching token %s: %w", tokenID, err)
 	}
 
 	return token.GetAuthProvider(), token.GetUserPrincipalID(), nil
@@ -1144,37 +1066,32 @@ func SessionID(ctx context.Context) (string, error) {
 	return tokenID, nil
 }
 
-// Internal supporting functionality
-
-// ListOptionMerge merges external filter options with the internal filter (for
-// the current user).  A non-error empty result indicates that the options
+// ListOptionMerge merges any external filter options with the internal filter
+// (for the current user).  A non-error empty result indicates that the options
 // specified a filter which cannot match anything.  I.e. the calling user
 // requests a filter for a different user than itself.
 func ListOptionMerge(user string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
 
-	quest := labels.Set(map[string]string{
+	userIDSelector := labels.Set(map[string]string{
 		UserIDLabel: user,
 	})
 	empty := metav1.ListOptions{}
 	if options == nil || *options == empty {
-		// No external filter to contend with, just set the internal
-		// filter.
+		// No external filter to contend with, just set the internal filter.
 		localOptions = metav1.ListOptions{
-			LabelSelector: quest.AsSelector().String(),
+			LabelSelector: userIDSelector.AsSelector().String(),
 		}
 	} else {
-		// We have to contend with an external filter, and merge ours
-		// into it.
+		// We have to contend with an external filter, and merge ours into it.
 		localOptions = *options
-		callerQuest, err := labels.ConvertSelectorToLabelsMap(localOptions.LabelSelector)
+		callerSelector, err := labels.ConvertSelectorToLabelsMap(localOptions.LabelSelector)
 		if err != nil {
 			return localOptions, err
 		}
-		if callerQuest.Has(UserIDLabel) {
-			// The external filter does filter for user as, possible
-			// conflict.
-			if callerQuest[UserIDLabel] != user {
+		if callerSelector.Has(UserIDLabel) {
+			// The external filter does filter for a user, possible conflict.
+			if callerSelector[UserIDLabel] != user {
 				// It asks for a user other than the current.
 				// We can bail now, with an empty result, as
 				// nothing can match.
@@ -1185,7 +1102,7 @@ func ListOptionMerge(user string, options *metav1.ListOptions) (metav1.ListOptio
 		} else {
 			// The external filter has nothing about the user.
 			// We can simply add the internal filter.
-			localOptions.LabelSelector = labels.Merge(callerQuest, quest).AsSelector().String()
+			localOptions.LabelSelector = labels.Merge(callerSelector, userIDSelector).AsSelector().String()
 		}
 	}
 
@@ -1206,7 +1123,6 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	// annotations -- encode and store into a data field. on reading decode
 	// that field.  this fully separates the annotations on the tokens from
 	// the annotations on the backing secrets.
-
 	annotationBytes, err := json.Marshal(token.Annotations)
 	if err != nil {
 		return nil, err
@@ -1215,7 +1131,6 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	// labels -- encode and store into a data field. on reading decode that
 	// field.  this fully separates the user-visible labels on the tokens
 	// from the labels on the backing secrets.
-
 	labelBytes, err := json.Marshal(token.Labels)
 	if err != nil {
 		return nil, err
@@ -1226,7 +1141,6 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	// backing secret -- the keys for these labels are part of the public
 	// API. This may have to be merged with labels set on the secrets by
 	// other apps with access to the secrets.
-
 	backendLabels := oldBackendLabels
 	if backendLabels == nil {
 		backendLabels = map[string]string{}
@@ -1278,9 +1192,6 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldLastUpdateTime] = token.Status.LastUpdateTime
 	secret.StringData[FieldLastUsedAt] = lastUsedAsString
 
-	// FUTURE ((USER ACTIVITY)) change as required by the field type
-	// secret.StringData[FieldIdleTimeout] = fmt.Sprintf("%d", token.Status.IdleTimeout)
-
 	// Note:
 	// - While the derived expiration data is not stored, the user-related information is.
 	// - The expiration data is computed trivially from spec and resource data.
@@ -1302,8 +1213,8 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	// See the token store `Delete` (marker **) for where this is important.
 	token := &ext.Token{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "Token",
-			APIVersion: "ext.cattle.io/v1",
+			Kind:       GVK.Kind,
+			APIVersion: GV.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              secret.Name,
@@ -1318,10 +1229,9 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	token.Status.UserName = string(secret.Data[FieldUserName])
 
 	userId := string(secret.Data[FieldUserID])
-	if userId == "" {
+	if token.Spec.UserID = string(secret.Data[FieldUserID]); token.Spec.UserID == "" {
 		return token, fmt.Errorf("user id missing")
 	}
-	token.Spec.UserID = userId
 
 	// spec
 	enabled, err := strconv.ParseBool(string(secret.Data[FieldEnabled]))
@@ -1340,24 +1250,9 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 	token.Spec.TTL = ttl
 
-	// FUTURE ((USER ACTIVITY)) change as required by the field type
-	//
-	// BEWARE. Depending on releases made this code may have to handle
-	// rancher instances containing ext tokens without idle information,
-	// without crashing. I.e. insert a default when the information is not
-	// present, instead of returning an error.
-	//
-	// idle, err := strconv.ParseInt(string(secret.Data[FieldIdleTimeout]), 10, 64)
-	// if err != nil {
-	// 	return token, err
-	// }
-	// token.Status.IdleTimeout = idle
-
-	tokenHash := string(secret.Data[FieldHash])
-	if tokenHash == "" {
+	if token.Status.TokenHash = string(secret.Data[FieldHash]); token.Status.TokenHash == "" {
 		return token, fmt.Errorf("token hash missing")
 	}
-	token.Status.TokenHash = tokenHash
 
 	authProvider := string(secret.Data[FieldAuthProvider])
 	if authProvider == "" {
@@ -1365,11 +1260,9 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 	token.Status.AuthProvider = authProvider
 
-	lastUpdateTime := string(secret.Data[FieldLastUpdateTime])
-	if lastUpdateTime == "" {
+	if token.Status.LastUpdateTime = string(secret.Data[FieldLastUpdateTime]); token.Status.LastUpdateTime == "" {
 		return token, fmt.Errorf("last update time missing")
 	}
-	token.Status.LastUpdateTime = lastUpdateTime
 
 	principalID := string(secret.Data[FieldPrincipalID])
 	if principalID == "" {
@@ -1377,11 +1270,9 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 	token.Spec.PrincipalID = principalID
 
-	kubeUID := string(secret.Data[FieldUID])
-	if kubeUID == "" {
+	if token.ObjectMeta.UID = types.UID(string(secret.Data[FieldUID])); token.ObjectMeta.UID == "" {
 		return token, fmt.Errorf("kube uid missing")
 	}
-	token.ObjectMeta.UID = types.UID(kubeUID)
 
 	var lastUsedAt *metav1.Time
 	lastUsedAsString := string(secret.Data[FieldLastUsedAt])
@@ -1399,12 +1290,12 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 		return token, fmt.Errorf("failed to set expiration information: %w", err)
 	}
 
-	// annotations, labels - decode the respective fields and place them into the token
-
+	// annotations - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldLabels], &token.Labels); err != nil {
 		return token, err
 	}
 
+	// labels - decode the fields and place into the token
 	if err := json.Unmarshal(secret.Data[FieldAnnotations], &token.Annotations); err != nil {
 		return token, err
 	}
@@ -1423,18 +1314,8 @@ func setExpired(token *ext.Token) error {
 	}
 
 	expiresAt := token.ObjectMeta.CreationTimestamp.Add(time.Duration(token.Spec.TTL) * time.Millisecond)
-	isExpired := time.Now().After(expiresAt)
-
-	eAt, err := metav1.NewTime(expiresAt).MarshalJSON()
-	if err != nil {
-		return err
-	}
-
-	// note: The marshalling puts quotes around the string. strip them
-	// before handing this to the token and yaml adding another layer
-	// of quotes around such a string
-	token.Status.ExpiresAt = string(eAt[1 : len(eAt)-1])
-	token.Status.Expired = isExpired
+	token.Status.Expired = time.Now().After(expiresAt)
+	token.Status.ExpiresAt = expiresAt.Format(time.RFC3339)
 	return nil
 }
 
@@ -1444,11 +1325,11 @@ func setExpired(token *ext.Token) error {
 // secrets holding tokens. See `secretFromToken` above.
 func ensureNameOrGenerateName(token *ext.Token) error {
 	// NOTE: When both name and generateName are set the generateName has precedence
-
 	if token.ObjectMeta.GenerateName != "" {
 		token.ObjectMeta.Name = ""
 		return nil
 	}
+
 	if token.ObjectMeta.Name != "" {
 		return nil
 	}
