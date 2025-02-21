@@ -367,7 +367,7 @@ func SanitizeAttr(attr string) string {
 	return invalidIdentifierChars.ReplaceAllString(attr, "")
 }
 
-// IsValidAttr returns true is the given attribute name conforms with
+// IsValidAttr returns true if the given attribute name conforms with
 // either numeric OID or short name format.
 func IsValidAttr(attr string) bool {
 	if shortNameRegex.MatchString(attr) {
