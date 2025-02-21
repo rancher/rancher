@@ -270,7 +270,7 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	if principalType == "user" {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = l.isThisUserMe(token, princ)
+			princ.Me = l.isThisUserMe(token.GetUserPrincipal(), princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -370,10 +370,10 @@ func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*v
 
 }
 
-func (l *Provider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
-	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
-		me.GetUserName() == other.LoginName &&
-		me.GetUserPrincipalType() == other.PrincipalType
+func (l *Provider) isThisUserMe(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (l *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
@@ -475,10 +475,6 @@ func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrin
 
 func (l *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
-}
-
-func (l *Provider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 // IsDisabledProvider checks if the local auth provider is currently disabled in Rancher.

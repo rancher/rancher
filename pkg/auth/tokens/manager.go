@@ -730,8 +730,9 @@ func (m *Manager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []
 
 	hitProvider := false
 	if attribs != nil {
+		tokenProvider := token.GetAuthProvider()
 		for provider, y := range attribs.GroupPrincipals {
-			if provider == token.GetAuthProvider() {
+			if provider == tokenProvider {
 				hitProvider = true
 				groups = append(groups, y.Items...)
 			}

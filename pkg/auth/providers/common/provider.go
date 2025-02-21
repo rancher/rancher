@@ -37,11 +37,6 @@ type AuthProvider interface {
 	// GetUserExtraAttributes retrieves the extra attributes from the specified principal.
 	// Used during login, to create the login token.
 	GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string
-	// GetUserExtraAttributesFromToken retrieves the extra attributes from
-	// the specified token.  It uses the token accessor interface to
-	// retrieve the data of the principal hidden in the token for this. Used
-	// during authentication when verifying tokens.
-	GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string
 	IsDisabledProvider() (bool, error)
 
 	// LogoutAll implements the "logout-all" action for the provider, if supported. If

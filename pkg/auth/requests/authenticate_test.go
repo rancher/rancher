@@ -2,6 +2,7 @@ package requests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -51,10 +52,9 @@ func (r *fakeUserRefresher) reset() {
 }
 
 type fakeProvider struct {
-	name                                string
-	disabled                            bool
-	getUserExtraAttributesFunc          func(v3.Principal) map[string][]string
-	getUserExtraAttributesFromTokenFunc func(token accessor.TokenAccessor) map[string][]string
+	name                       string
+	disabled                   bool
+	getUserExtraAttributesFunc func(v3.Principal) map[string][]string
 }
 
 func (p *fakeProvider) IsDisabledProvider() (bool, error) {
@@ -109,17 +109,6 @@ func (p *fakeProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 	return map[string][]string{
 		common.UserAttributePrincipalID: {userPrincipal.Name},
 		common.UserAttributeUserName:    {userPrincipal.LoginName},
-	}
-}
-
-func (p *fakeProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	if p.getUserExtraAttributesFromTokenFunc != nil {
-		return p.getUserExtraAttributesFromTokenFunc(token)
-	}
-
-	return map[string][]string{
-		common.UserAttributePrincipalID: {token.GetUserPrincipalID()},
-		common.UserAttributeUserName:    {token.GetUserName()},
 	}
 }
 
@@ -400,15 +389,12 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("fill extra from the user if unable to get from neither userattribute nor provider", func(t *testing.T) {
 		oldUserAttributeExtra := userAttribute.ExtraByProvider
 		oldFakeProviderGetUserExtraAttributesFunc := fakeProvider.getUserExtraAttributesFunc
-		oldFakeProviderGetUserExtraAttributesFromTokenFunc := fakeProvider.getUserExtraAttributesFromTokenFunc
 		defer func() {
 			userAttribute.ExtraByProvider = oldUserAttributeExtra
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
-			fakeProvider.getUserExtraAttributesFromTokenFunc = oldFakeProviderGetUserExtraAttributesFromTokenFunc
 		}()
 		userAttribute.ExtraByProvider = nil
 		fakeProvider.getUserExtraAttributesFunc = func(userPrincipal v3.Principal) map[string][]string { return map[string][]string{} }
-		fakeProvider.getUserExtraAttributesFromTokenFunc = func(token accessor.TokenAccessor) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
@@ -461,8 +447,8 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	})
 
 	t.Run("don't check provider if not specified in the token", func(t *testing.T) {
-		oldRokenAuthProvider := token.AuthProvider
-		defer func() { token.AuthProvider = oldRokenAuthProvider }()
+		oldTokenAuthProvider := token.AuthProvider
+		defer func() { token.AuthProvider = oldTokenAuthProvider }()
 		token.AuthProvider = ""
 
 		userRefresher.reset()
@@ -675,19 +661,23 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			CreationTimestamp: metav1.NewTime(now),
 		},
 		Spec: ext.TokenSpec{
-			UserID:      userID,
-			TTL:         57600000,
-			Kind:        exttokenstore.IsLogin,
-			Enabled:     pointer.Bool(true),
-			PrincipalID: userPrincipalID,
+			UserID:  userID,
+			TTL:     57600000,
+			Kind:    exttokenstore.IsLogin,
+			Enabled: pointer.Bool(true),
+			UserPrincipal: v3.Principal{
+				ObjectMeta:  metav1.ObjectMeta{Name: userPrincipalID},
+				Provider:    fakeProvider.name,
+				LoginName:   user.Username,
+				DisplayName: user.DisplayName,
+			},
 		},
 		Status: ext.TokenStatus{
 			TokenHash:      tokenHash,
-			AuthProvider:   fakeProvider.name,
-			UserName:       user.Username,
 			LastUpdateTime: "13:00",
 		},
 	}
+	principalBytes, _ := json.Marshal(token.Spec.UserPrincipal)
 	tokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "token-v2rcx",
@@ -695,18 +685,15 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		},
 		Data: map[string][]byte{
 			exttokenstore.FieldAnnotations:    []byte("null"),
-			exttokenstore.FieldAuthProvider:   []byte(fakeProvider.name),
-			exttokenstore.FieldDisplayName:    []byte(user.DisplayName),
 			exttokenstore.FieldEnabled:        []byte("true"),
 			exttokenstore.FieldHash:           []byte(tokenHash),
 			exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
 			exttokenstore.FieldLabels:         []byte("null"),
 			exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-			exttokenstore.FieldPrincipalID:    []byte(userPrincipalID),
+			exttokenstore.FieldPrincipal:      principalBytes,
 			exttokenstore.FieldTTL:            []byte("57600000"),
 			exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
 			exttokenstore.FieldUserID:         []byte(userID),
-			exttokenstore.FieldUserName:       []byte(user.Username),
 		},
 	}
 
@@ -937,15 +924,12 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	t.Run("fill extra from the user if unable to get from neither userattribute nor provider", func(t *testing.T) {
 		oldUserAttributeExtra := userAttribute.ExtraByProvider
 		oldFakeProviderGetUserExtraAttributesFunc := fakeProvider.getUserExtraAttributesFunc
-		oldFakeProviderGetUserExtraAttributesFromTokenFunc := fakeProvider.getUserExtraAttributesFromTokenFunc
 		defer func() {
 			userAttribute.ExtraByProvider = oldUserAttributeExtra
 			fakeProvider.getUserExtraAttributesFunc = oldFakeProviderGetUserExtraAttributesFunc
-			fakeProvider.getUserExtraAttributesFromTokenFunc = oldFakeProviderGetUserExtraAttributesFromTokenFunc
 		}()
 		userAttribute.ExtraByProvider = nil
 		fakeProvider.getUserExtraAttributesFunc = func(userPrincipal v3.Principal) map[string][]string { return map[string][]string{} }
-		fakeProvider.getUserExtraAttributesFromTokenFunc = func(token accessor.TokenAccessor) map[string][]string { return map[string][]string{} }
 
 		userRefresher.reset()
 
@@ -999,9 +983,9 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	})
 
 	t.Run("don't check provider if not specified in the token", func(t *testing.T) {
-		oldRokenAuthProvider := token.Status.AuthProvider
-		defer func() { token.Status.AuthProvider = oldRokenAuthProvider }()
-		token.Status.AuthProvider = ""
+		oldTokenAuthProvider := token.Spec.UserPrincipal.Provider
+		defer func() { token.Spec.UserPrincipal.Provider = oldTokenAuthProvider }()
+		token.Spec.UserPrincipal.Provider = ""
 
 		userRefresher.reset()
 
@@ -1135,11 +1119,14 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	})
 
 	t.Run("auth provider doesn't exist", func(t *testing.T) {
-		oldProvider := tokenSecret.Data["auth-provider"]
+		oldPrincipal := tokenSecret.Data[exttokenstore.FieldPrincipal]
 		defer func() {
-			tokenSecret.Data["auth-provider"] = oldProvider
+			tokenSecret.Data[exttokenstore.FieldPrincipal] = oldPrincipal
 		}()
-		tokenSecret.Data["auth-provider"] = []byte("foo")
+		var up v3.Principal
+		json.Unmarshal(tokenSecret.Data[exttokenstore.FieldPrincipal], &up)
+		up.Provider = "foo"
+		tokenSecret.Data[exttokenstore.FieldPrincipal], _ = json.Marshal(up)
 
 		userRefresher.reset()
 

@@ -399,7 +399,7 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token acces
 	if principalType == userType {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = g.isThisUserMe(token, princ)
+			princ.Me = g.isThisUserMe(token.GetUserPrincipal(), princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -411,10 +411,10 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token acces
 	return princ
 }
 
-func (g *ghProvider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
-	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
-		me.GetUserName() == other.LoginName &&
-		me.GetUserPrincipalType() == other.PrincipalType
+func (g *ghProvider) isThisUserMe(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -432,10 +432,6 @@ func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPr
 
 func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
-}
-
-func (g *ghProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 // IsDisabledProvider checks if the GitHub auth provider is currently disabled in Rancher.

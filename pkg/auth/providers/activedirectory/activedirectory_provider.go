@@ -143,7 +143,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
-				if p.isThisUserMe(myToken, principal) {
+				if p.isThisUserMe(myToken.GetUserPrincipal(), principal) {
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
@@ -170,16 +170,16 @@ func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccess
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	if p.isThisUserMe(token, *principal) {
+	if p.isThisUserMe(token.GetUserPrincipal(), *principal) {
 		principal.Me = true
 	}
 	return *principal, err
 }
 
-func (p *adProvider) isThisUserMe(me accessor.TokenAccessor, other v3.Principal) bool {
-	return me.GetUserPrincipalID() == other.ObjectMeta.Name &&
-		me.GetUserName() == other.LoginName &&
-		me.GetUserPrincipalType() == other.PrincipalType
+func (p *adProvider) isThisUserMe(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
@@ -256,10 +256,6 @@ func (p *adProvider) getDNAndScopeFromPrincipalID(principalID string) (string, s
 
 func (p *adProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
-}
-
-func (p *adProvider) GetUserExtraAttributesFromToken(token accessor.TokenAccessor) map[string][]string {
-	return common.GetCommonUserExtraAttributesFromToken(token)
 }
 
 type LoginDisabledError struct{}
