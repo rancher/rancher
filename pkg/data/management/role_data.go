@@ -80,8 +80,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	userRole := addUserRules(rb.addRole("User", "user"))
 	userRole.
 		// standard permissions for regular users, on their tokens
-		// BEWARE: The ext token store applies additional restrictions.
-		// In other words, each User can see and manipulate only their own tokens, and no other.
+		// Note: The ext token store applies additional restrictions.
+		// A user can see and manipulate only their own tokens.
 		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("get", "list", "watch", "create", "delete", "update", "patch").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
@@ -90,8 +90,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	rb.addRole("User Base", "user-base").
 		// standard permissions for regular users, on their tokens
-		// BEWARE: The ext token store applies additional restrictions.
-		// In other words, each User can see and manipulate only their own tokens, and no other.
+		// Note: The ext token store applies additional restrictions.
+		// A user can see and manipulate only their own tokens.
 		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("get", "list", "watch", "create", "delete", "update", "patch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").

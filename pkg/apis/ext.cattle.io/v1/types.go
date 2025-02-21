@@ -82,9 +82,6 @@ type TokenStatus struct {
 	LastUsedAt *metav1.Time `json:"lastUsedAt,omitempty"`
 }
 
-// FUTURE ((USER ACTIVITY)) Add above -- IdleTimeout provides the timeout used by the user activity monitoring.
-// IdleTimeout ... `json:"idleTimeout,omitempty"`
-
 // Implement the TokenAccessor interface
 
 func (t *Token) GetName() string {
