@@ -185,7 +185,6 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				if err != nil {
 					return map[string]interface{}{}
 				}
-
 				return map[string]interface{}{
 					"service": map[string]interface{}{
 						"secret": secret,
