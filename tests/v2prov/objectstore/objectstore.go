@@ -79,7 +79,7 @@ func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQ
 	})
 	if err == nil {
 		clients.OnClose(func() {
-			clients.Core.Secret().Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
+			_ = clients.Core.Secret().Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
 		})
 		return secret, nil
 	} else if apierrors.IsAlreadyExists(err) {
@@ -121,7 +121,7 @@ func createCredSecret(clients *clients.Clients, namespace, objectStore string) (
 	})
 	if err == nil {
 		clients.OnClose(func() {
-			clients.Core.Secret().Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
+			_ = clients.Core.Secret().Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
 		})
 		return secret, nil
 	} else if apierrors.IsAlreadyExists(err) {
@@ -145,7 +145,7 @@ func createCloudCredentialSecret(clients *clients.Clients, namespace, name strin
 		return clients.Core.Secret().Get(namespace, name, metav1.GetOptions{})
 	} else if err == nil {
 		clients.OnClose(func() {
-			clients.Core.Secret().Delete(namespace, name, &metav1.DeleteOptions{})
+			_ = clients.Core.Secret().Delete(namespace, name, &metav1.DeleteOptions{})
 		})
 	}
 	return cc, err
@@ -173,7 +173,7 @@ func createHelperConfigmap(clients *clients.Clients, namespace, objectStore, buc
 		return clients.Core.ConfigMap().Get(namespace, objectStoreHelperCMName, metav1.GetOptions{})
 	} else if err == nil {
 		clients.OnClose(func() {
-			clients.Core.ConfigMap().Delete(cm.Namespace, cm.Name, &metav1.DeleteOptions{})
+			_ = clients.Core.ConfigMap().Delete(cm.Namespace, cm.Name, &metav1.DeleteOptions{})
 		})
 	}
 	return cm, err
@@ -191,7 +191,7 @@ func createService(clients *clients.Clients, namespace, objectStore string) (*co
 				Protocol:    corev1.ProtocolTCP,
 				AppProtocol: &[]string{"https"}[0],
 				Port:        9000,
-				TargetPort:  intstr.FromInt(9000),
+				TargetPort:  intstr.FromInt32(9000),
 			}},
 			Selector: map[string]string{
 				"app": objectStore,
@@ -206,7 +206,7 @@ func createService(clients *clients.Clients, namespace, objectStore string) (*co
 	}
 
 	clients.OnClose(func() {
-		clients.Core.Service().Delete(svc.Namespace, svc.Name, &metav1.DeleteOptions{})
+		_ = clients.Core.Service().Delete(svc.Namespace, svc.Name, &metav1.DeleteOptions{})
 	})
 
 	err = wait.Object(clients.Ctx, clients.Core.Service().Watch, svc, func(obj runtime.Object) (bool, error) {
@@ -342,7 +342,7 @@ func getPod(clients *clients.Clients, namespace, objectStore string) (*corev1.Po
 		return clients.Core.Pod().Get(namespace, objectStore, metav1.GetOptions{})
 	} else if err == nil {
 		clients.OnClose(func() {
-			clients.Core.Pod().Delete(pod.Namespace, pod.Name, &metav1.DeleteOptions{})
+			_ = clients.Core.Pod().Delete(pod.Namespace, pod.Name, &metav1.DeleteOptions{})
 		})
 	}
 	return pod, err
