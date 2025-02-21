@@ -2,11 +2,16 @@ package snapshotbackpopulate
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
+	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
+	k3scontrollers "github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
@@ -16,346 +21,376 @@ import (
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/name"
-	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 var (
-	configMapNames = map[string]bool{
-		"k3s-etcd-snapshots":  true,
-		"rke2-etcd-snapshots": true,
-	}
 	InvalidKeyChars = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
 )
 
 const (
-	StorageAnnotationKey              = "etcdsnapshot.rke.io/storage"
-	SnapshotNameKey                   = "etcdsnapshot.rke.io/snapshot-file-name"
-	SnapshotBackpopulateReconciledKey = "etcdsnapshot.rke.io/snapshotbackpopulate-reconciled"
-	StorageS3                         = "s3"
-	StorageLocal                      = "local"
+	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
+)
+
+type Storage string
+
+const (
+	S3    Storage = "s3"
+	Local Storage = "local"
 )
 
 type handler struct {
-	clusterName       string
-	clusterNamespace  string
-	clusterCache      provisioningcontrollers.ClusterCache
-	clusters          provisioningcontrollers.ClusterClient
-	etcdSnapshotCache rkev1controllers.ETCDSnapshotCache
-	etcdSnapshots     rkev1controllers.ETCDSnapshotClient
-	machineCache      capicontrollers.MachineCache
-	activeConfigMap   string
-	v1ClusterName     string
+	clusterName                string
+	clusterCache               provisioningcontrollers.ClusterCache
+	controlPlaneCache          rkev1controllers.RKEControlPlaneCache
+	etcdSnapshotCache          rkev1controllers.ETCDSnapshotCache
+	etcdSnapshotController     rkev1controllers.ETCDSnapshotController
+	machineCache               capicontrollers.MachineCache
+	capiClusterCache           capicontrollers.ClusterCache
+	etcdSnapshotFileController k3scontrollers.ETCDSnapshotFileController
+	etcdSnapshotFileCache      k3scontrollers.ETCDSnapshotFileCache
 }
 
 // Register sets up the v2provisioning snapshot backpopulate controller. This controller is responsible for monitoring
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
 func Register(ctx context.Context, userContext *config.UserContext) {
 	h := handler{
-		clusterName:       userContext.ClusterName,
-		clusterCache:      userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
-		clusters:          userContext.Management.Wrangler.Provisioning.Cluster(),
-		etcdSnapshotCache: userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
-		etcdSnapshots:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
-		machineCache:      userContext.Management.Wrangler.CAPI.Machine().Cache(),
+		clusterName:                userContext.ClusterName,
+		clusterCache:               userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
+		controlPlaneCache:          userContext.Management.Wrangler.RKE.RKEControlPlane().Cache(),
+		etcdSnapshotCache:          userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
+		etcdSnapshotController:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
+		machineCache:               userContext.Management.Wrangler.CAPI.Machine().Cache(),
+		capiClusterCache:           userContext.Management.Wrangler.CAPI.Cluster().Cache(),
+		etcdSnapshotFileController: userContext.K3s.V1().ETCDSnapshotFile(),
+		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
 	}
 
-	userContext.Core.ConfigMaps("kube-system").Controller().AddHandler(ctx, "snapshotbackpopulate", h.OnChange)
-	relatedresource.Watch(ctx, "snapshot-reconcile-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if snapshot, ok := obj.(*rkev1.ETCDSnapshot); ok && snapshot.Spec.ClusterName == h.v1ClusterName && h.activeConfigMap != "" {
-			return []relatedresource.Key{{
-				Namespace: "kube-system",
-				Name:      h.activeConfigMap,
-			}}, nil
-		}
-		return nil, nil
-	}, userContext.Core.ConfigMaps("kube-system").Controller(), userContext.Management.Wrangler.RKE.ETCDSnapshot())
+	userContext.Management.Wrangler.RKE.ETCDSnapshot().OnChange(ctx, "snapshotcleanup", h.OnUpstreamChange)
+	userContext.K3s.V1().ETCDSnapshotFile().OnChange(ctx, "snapshotbackpopulate", h.OnDownstreamChange)
 }
 
-func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Object, error) {
-	if configMap == nil {
+// OnUpstreamChange will check if the downstream snapshot CR exists for a given snapshot, and if it does not the local
+// representation is summarily deleted.
+func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
+	if snapshot == nil {
 		return nil, nil
 	}
 
-	if configMap.Namespace != "kube-system" || !configMapNames[configMap.Name] {
-		return configMap, nil
+	cluster, err := h.getCluster()
+	if err != nil {
+		return snapshot, err
 	}
 
-	if h.activeConfigMap == "" {
-		h.activeConfigMap = configMap.Name
+	if snapshot.Namespace != cluster.Namespace {
+		return snapshot, nil
 	}
 
+	logPrefix := getLogPrefix(cluster)
+
+	controlPlane, err := h.controlPlaneCache.Get(cluster.Namespace, cluster.Name)
+	if err != nil {
+		return snapshot, err
+	}
+
+	// if controlplane is currently performing a restore, reconciling snapshots will be postponed until post restore
+	if controlPlane.Spec.ETCDSnapshotRestore != nil && controlPlane.Status.ETCDSnapshotRestore != nil &&
+		controlPlane.Spec.ETCDSnapshotRestore.Generation != controlPlane.Status.ETCDSnapshotRestore.Generation {
+		h.etcdSnapshotController.EnqueueAfter(snapshot.Namespace, snapshot.Name, 1*time.Minute)
+		return snapshot, nil
+	}
+
+	// Only delete snapshots if the annotation is present: this will allow users to manually create snapshot objects during a DR scenario
+	if snapshot.Annotations == nil || snapshot.Annotations[capr.SnapshotNameAnnotation] == "" {
+		logrus.Debugf("%s Local snapshot %s will not be deleted due to missing annotation %s", logPrefix, snapshot.Name, capr.SnapshotNameAnnotation)
+		return snapshot, nil
+	}
+
+	_, err = h.etcdSnapshotFileController.Get(snapshot.Annotations[capr.SnapshotNameAnnotation], metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		// If the downstream snapshot does not exist in the downstream cluster, delete the local version
+		return nil, h.etcdSnapshotController.Delete(snapshot.Namespace, snapshot.Name, &metav1.DeleteOptions{})
+	} else if err != nil {
+		return snapshot, err
+	}
+	return snapshot, nil
+}
+
+func (h *handler) OnDownstreamChange(_ string, snapshot *k3s.ETCDSnapshotFile) (*k3s.ETCDSnapshotFile, error) {
+	if snapshot == nil {
+		return nil, nil
+	}
+
+	cluster, err := h.getCluster()
+	if err != nil {
+		return snapshot, err
+	}
+
+	logPrefix := getLogPrefix(cluster)
+
+	if cluster.DeletionTimestamp != nil {
+		logrus.Debugf("%s skipping snapshot reconcile as cluster is being deleted", logPrefix)
+		return snapshot, nil
+	}
+
+	if snapshot.DeletionTimestamp != nil {
+		logrus.Infof("%s Downstream snapshot %s was deleted, deleting local snapshot representation", logPrefix, snapshot.Name)
+		upstreamSnapshots, err := h.getSnapshotsFromSnapshotFile(cluster, snapshot)
+		if err != nil {
+			return snapshot, err
+		}
+		for _, upstreamSnapshot := range upstreamSnapshots {
+			logrus.Infof("%s Deleting local snapshot %s", logPrefix, upstreamSnapshot.Name)
+			err := h.etcdSnapshotController.Delete(upstreamSnapshot.Namespace, upstreamSnapshot.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				logrus.Errorf("%s error deleting snapshot %s: %v", logPrefix, upstreamSnapshot.Name, err)
+			}
+
+		}
+		return snapshot, nil
+	}
+
+	controlPlane, err := h.controlPlaneCache.Get(cluster.Namespace, cluster.Name)
+	if err != nil {
+		return snapshot, err
+	}
+
+	// if controlplane is currently performing a restore, reconciling snapshots will be postponed until post restore
+	if controlPlane.Spec.ETCDSnapshotRestore != nil && controlPlane.Status.ETCDSnapshotRestore != nil &&
+		controlPlane.Spec.ETCDSnapshotRestore.Generation != controlPlane.Status.ETCDSnapshotRestore.Generation {
+		logrus.Debugf("%s skipping snapshot reconcile as cluster is being restored", logPrefix)
+		h.etcdSnapshotFileController.EnqueueAfter(snapshot.Name, 1*time.Minute)
+		return snapshot, nil
+	}
+
+	capiCluster, err := capr.GetCAPIClusterFromLabel(controlPlane, h.capiClusterCache)
+	if err != nil {
+		return snapshot, err
+	}
+
+	logrus.Infof("%s processing snapshot %s", logPrefix, snapshot.Name)
+
+	var machine *capi.Machine
+
+	// get upstream snapshot object
+	// if upstream snapshot object does not exist, create it
+	upstreamSnapshots, err := h.getSnapshotsFromSnapshotFile(cluster, snapshot)
+	if err != nil {
+		return snapshot, err
+	}
+
+	if len(upstreamSnapshots) == 0 {
+		storage := S3
+		if snapshot.Spec.S3 == nil {
+			storage = Local
+			machine, err = h.getMachineFromNode(snapshot.Spec.NodeName, cluster)
+			if err != nil {
+				return snapshot, err
+			}
+		}
+		// create snapshot
+		name := name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(snapshot.Spec.SnapshotName, "-")), string(storage))
+		upstream := rkev1.NewETCDSnapshot(cluster.Namespace, name, rkev1.ETCDSnapshot{})
+		upstream, err = updateSnapshot(upstream, snapshot, cluster, capiCluster, machine)
+		if err != nil {
+			return snapshot, err
+		}
+
+		_, err = h.etcdSnapshotController.Create(upstream)
+		return snapshot, err
+	} else if len(upstreamSnapshots) > 1 {
+		logrus.Warnf("%s Multiple snapshots objects found for snapshot %s", logPrefix, snapshot.Name)
+		for _, upstreamSnapshot := range upstreamSnapshots {
+			logrus.Infof("%s Deleting snapshot object %s", logPrefix, upstreamSnapshot.Name)
+			err = h.etcdSnapshotController.Delete(upstreamSnapshot.Namespace, upstreamSnapshot.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				logrus.Errorf("%s error deleting snapshot %s: %v", logPrefix, upstreamSnapshot.Name, err)
+			}
+		}
+		// re-enqueue to ensure the correct snapshot is regenerated
+		h.etcdSnapshotFileController.Enqueue(snapshot.Name)
+		return snapshot, nil
+	}
+
+	upstreamSnapshot := upstreamSnapshots[0]
+	if snapshot.Spec.S3 == nil {
+		machine, err = h.getMachineByID(upstreamSnapshot.Labels[capr.MachineIDLabel], cluster)
+		if err != nil {
+			return snapshot, err
+		}
+	}
+
+	// generate patch
+	generated, err := updateSnapshot(upstreamSnapshot.DeepCopy(), snapshot, cluster, capiCluster, machine)
+	if err != nil {
+		return snapshot, err
+	}
+
+	original, err := json.Marshal(upstreamSnapshot)
+	if err != nil {
+		return snapshot, err
+	}
+
+	target, err := json.Marshal(generated)
+	if err != nil {
+		return snapshot, err
+	}
+
+	patch, err := jsonpatch.CreateMergePatch(original, target)
+	if err != nil {
+		return snapshot, err
+	}
+
+	_, err = h.etcdSnapshotController.Patch(upstreamSnapshot.Namespace, upstreamSnapshot.Name, types.MergePatchType, patch)
+	return snapshot, err
+}
+
+func updateSnapshot(upstream *rkev1.ETCDSnapshot, snapshot *k3s.ETCDSnapshotFile, cluster *provv1.Cluster, capiCluster *capi.Cluster, machine *capi.Machine) (*rkev1.ETCDSnapshot, error) {
+	// create snapshot
+	b, err := json.Marshal(&snapshot.Spec.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := base64.StdEncoding.EncodeToString(b)
+	message := ""
+	if snapshot.Status.Error != nil && snapshot.Status.Error.Message != nil {
+		message = *snapshot.Status.Error.Message
+	}
+
+	size := int64(0)
+	if snapshot.Status.Size != nil {
+		size, _ = snapshot.Status.Size.AsInt64()
+	}
+
+	status := ""
+	if snapshot.Status.ReadyToUse != nil && *snapshot.Status.ReadyToUse {
+		status = "successful"
+	} else {
+		status = "failed"
+	}
+
+	storage := Local
+	if snapshot.Spec.S3 != nil {
+		storage = S3
+	}
+
+	var s3 *rkev1.ETCDSnapshotS3
+	var owner metav1.OwnerReference
+	if storage == Local {
+		owner, err = capr.ToOwnerReference(machine)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		owner, err = capr.ToOwnerReference(capiCluster)
+		if err != nil {
+			return nil, err
+		}
+		s3 = &rkev1.ETCDSnapshotS3{
+			Endpoint:      snapshot.Spec.S3.Endpoint,
+			EndpointCA:    snapshot.Spec.S3.EndpointCA,
+			SkipSSLVerify: snapshot.Spec.S3.SkipSSLVerify,
+			Bucket:        snapshot.Spec.S3.Bucket,
+			Region:        snapshot.Spec.S3.Region,
+			Folder:        snapshot.Spec.S3.Prefix,
+		}
+	}
+	if upstream.Labels == nil {
+		upstream.Labels = map[string]string{}
+	}
+	upstream.Labels[capr.ClusterNameLabel] = cluster.Name
+	if machine != nil {
+		upstream.Labels[capr.MachineIDLabel] = machine.Labels[capr.MachineIDLabel]
+	}
+	if snapshot.Spec.NodeName != "s3" {
+		upstream.Labels[capr.NodeNameLabel] = snapshot.Spec.NodeName
+	}
+
+	if upstream.Annotations == nil {
+		upstream.Annotations = map[string]string{}
+	}
+	upstream.Annotations[StorageAnnotationKey] = string(storage)
+	upstream.Annotations[capr.SnapshotNameAnnotation] = snapshot.Name
+
+	upstream.OwnerReferences = []metav1.OwnerReference{owner}
+
+	upstream.Spec.ClusterName = cluster.Name
+	upstream.SnapshotFile = rkev1.ETCDSnapshotFile{
+		Name:      snapshot.Spec.SnapshotName,
+		Location:  snapshot.Spec.Location,
+		Metadata:  metadata,
+		Message:   message,
+		NodeName:  snapshot.Spec.NodeName,
+		CreatedAt: snapshot.Status.CreationTime,
+		Size:      size,
+		Status:    status,
+		S3:        s3,
+	}
+
+	return upstream, nil
+}
+
+// getCluster returns the provisioning cluster associated with the current userContext.
+func (h *handler) getCluster() (*provv1.Cluster, error) {
 	clusters, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.clusterName)
 	if err != nil || len(clusters) != 1 {
-		return configMap, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.clusterName, err)
+		return nil, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.clusterName, err)
 	}
+	return clusters[0], nil
+}
 
-	cluster := clusters[0]
-
-	if h.v1ClusterName == "" {
-		h.v1ClusterName = cluster.Name
-	}
-
-	logrus.Infof("[snapshotbackpopulate] rkecluster %s/%s: processing configmap %s/%s", cluster.Namespace, cluster.Name, configMap.Namespace, configMap.Name)
-
-	actualEtcdSnapshots := h.configMapToSnapshots(configMap, cluster)
-
-	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capr.ClusterNameLabel, cluster.Name))
+// getSnapshotsFromSnapshotFile returns all snapshots objects for the given cluster for the downstream snapshotfile object.
+// During normal operation, this will return either 0 snapshots, indicating that the snapshot has not been reconciled yet,
+// or 1 snapshot. While multiple snapshots being returned is possible via user intervention via manually editing snapshots,
+// this is an edge case and results in all local snapshot objects being deleted and the downstream snapshot being
+// re-enqueued for regeneration.
+func (h *handler) getSnapshotsFromSnapshotFile(cluster *provv1.Cluster, snapshotFile *k3s.ETCDSnapshotFile) ([]*rkev1.ETCDSnapshot, error) {
+	snapshots, err := h.etcdSnapshotCache.GetByIndex(cluster2.ByETCDSnapshotName, fmt.Sprintf("%s-%s-%s", cluster.Namespace, cluster.Name, snapshotFile.Name))
 	if err != nil {
-		return configMap, err
+		return nil, err
 	}
+	return snapshots, nil
+}
 
-	currentEtcdSnapshots, err := h.etcdSnapshotCache.List(cluster.Namespace, ls)
+// getMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func (h *handler) getMachineFromNode(nodeName string, cluster *provv1.Cluster) (*capi.Machine, error) {
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterNameLabel, cluster.Name))
 	if err != nil {
-		return configMap, fmt.Errorf("error while listing existing etcd snapshots for cluster %s: %w", cluster.Name, err)
+		return nil, err
 	}
-
-	// currentEtcdSnapshotsToKeep is a map of etcd snapshots snapshot objects we have retrieved from the management cluster.
-	currentEtcdSnapshotsToKeep := map[string]*rkev1.ETCDSnapshot{}
-
-	// iterate over the current etcd snapshots objects retrieved from the management cluster
-	// if snapshot object is not found in the etcd snapshot configmap, mark it missing. if it is a local snapshot
-	// and no machine can be found for it, go ahead and delete it.
-	// if the snapshot object is found in the configmap, add it to the currentEtcdSnapshotsToKeep for reconciliation
-	for _, existingSnapshotCR := range currentEtcdSnapshots {
-		storageLocation, ok := existingSnapshotCR.GetAnnotations()[StorageAnnotationKey]
-		if !ok {
-			storageLocation = StorageLocal
-			if existingSnapshotCR.SnapshotFile.NodeName == StorageS3 {
-				storageLocation = StorageS3
-			}
-		}
-		snapshotKey := existingSnapshotCR.SnapshotFile.Name + storageLocation
-		// check to see if the snapshot CR we have is found in the etcd-snapshots configmap, and if it is not found in the configmap, mark it as missing
-		if _, ok := actualEtcdSnapshots[snapshotKey]; !ok {
-			// the snapshot custom resource we are processing does not exist in the configmap
-			if storageLocation != StorageS3 {
-				// check to make sure the machine actually exists for the snapshot
-				var listSuccessful bool
-				var machine *capi.Machine
-
-				if existingSnapshotCR.Labels[capr.MachineIDLabel] == "" {
-					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s was missing machine ID label: %s", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, capr.MachineIDLabel)
-					// If the machineID label was not set, fall back to looking up the machine by node name, as this may be a snapshot from an earlier version of Rancher that created local snapshots using the snapshotbackpopulate controller, which means the snapshot should not have the machine ID label.
-					listSuccessful, machine, err = capr.GetMachineFromNode(h.machineCache, existingSnapshotCR.SnapshotFile.NodeName, cluster)
-				} else {
-					listSuccessful, machine, err = capr.GetMachineByID(h.machineCache, existingSnapshotCR.Labels[capr.MachineIDLabel], cluster.Namespace, cluster.Name)
-				}
-				if listSuccessful && machine == nil && err != nil {
-					// delete the CR because we don't have a corresponding machine for it
-					logrus.Infof("[snapshotbackpopulate] rkecluster %s/%s: deleting snapshot %s as corresponding machine (ID: %s) was not found", cluster.Namespace, cluster.Name, existingSnapshotCR.Name, existingSnapshotCR.Labels[capr.MachineIDLabel])
-					if err := h.etcdSnapshots.Delete(existingSnapshotCR.Namespace, existingSnapshotCR.Name, &metav1.DeleteOptions{}); err != nil {
-						if !apierrors.IsNotFound(err) {
-							return configMap, err
-						}
-					}
-					continue
-				}
-			}
-			// indicate that it should be OK to delete the etcd snapshot object
-			// don't delete the snapshots here because our configmap can be outdated. we will reconcile based on the system-agent output via the periodic output
-			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating status missing=true on etcd snapshot %s/%s as it was not found in the actual snapshot config map", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name)
-			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: etcd snapshot was %s/%s: %v", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, existingSnapshotCR)
-			existingSnapshotCR = existingSnapshotCR.DeepCopy()
-			existingSnapshotCR.Status.Missing = true // a missing snapshot indicates that it was not found in the (rke2|k3s)-etcd-snapshots configmap. This could potentially be a transient situation after an etcd snapshot restore to an older/newer datastore, when new snapshots have not been taken.
-			if existingSnapshotCR, err = h.etcdSnapshots.UpdateStatus(existingSnapshotCR); err != nil && !apierrors.IsNotFound(err) {
-				return configMap, fmt.Errorf("rkecluster %s/%s: error while setting status missing=true on etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, err)
-			}
-			continue
-		}
-		currentEtcdSnapshotsToKeep[snapshotKey] = existingSnapshotCR
+	machines, err := h.machineCache.List(cluster.Namespace, ls)
+	if err != nil {
+		return nil, err
 	}
-
-	// iterate over the snapshots that are listed in the downstream cluster configmap
-	// if the snapshot is found in the list of snapshots objects that exist in the management cluster, check to see if the etcdsnapshot object needs to be reconciled with more accurate information.
-	// if the snapshot is not found in the list of snapshot objects that exist in the management cluster and the snapshot is an S3 snapshot, create it in the management cluster.
-	for snapshotKey, cmGeneratedSnapshot := range actualEtcdSnapshots {
-		if snapshot, ok := currentEtcdSnapshotsToKeep[snapshotKey]; ok {
-			// the snapshot CR exists in the management cluster. check to see if the configmap data needs to be set on the snapshot.
-			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: checking to see if etcdsnapshot %s/%s needs to be updated", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: comparing etcd snapshot %s/%s: %v : %v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, cmGeneratedSnapshot, snapshot)
-			snapshot = snapshot.DeepCopy()
-			var updated bool
-			if !equality.Semantic.DeepEqual(snapshot.SnapshotFile, cmGeneratedSnapshot.SnapshotFile) {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s SnapshotFile contents differed from configmap", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-				originalSnapshotFile := snapshot.SnapshotFile
-				snapshot.SnapshotFile = cmGeneratedSnapshot.SnapshotFile
-				if originalSnapshotFile.Metadata != "" && snapshot.SnapshotFile.Metadata == "" {
-					snapshot.SnapshotFile.Metadata = originalSnapshotFile.Metadata
-				}
-				if originalSnapshotFile.Message != "" && snapshot.SnapshotFile.Message == "" {
-					snapshot.SnapshotFile.Message = originalSnapshotFile.Message
-				}
-				if !equality.Semantic.DeepEqual(snapshot.SnapshotFile, originalSnapshotFile) {
-					updated = true
-					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s SnapshotFile contents were different, triggering update", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-					logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s SnapshotFile contents %v vs %v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, originalSnapshotFile, snapshot.SnapshotFile)
-				}
-			}
-			if snapshot.Spec.ClusterName != cmGeneratedSnapshot.Spec.ClusterName {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s clusterName did not match %s vs %s", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, snapshot.Spec.ClusterName, cmGeneratedSnapshot.Spec.ClusterName)
-				snapshot.Spec.ClusterName = cmGeneratedSnapshot.Spec.ClusterName
-				updated = true
-			}
-			if labelsUpdated := reconcileStringMaps(snapshot.Labels, cmGeneratedSnapshot.Labels, []string{capr.ClusterNameLabel, capr.NodeNameLabel, capr.MachineIDLabel}); labelsUpdated {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s labels did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-				updated = true
-			}
-			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey, StorageAnnotationKey, SnapshotBackpopulateReconciledKey}); annotationsUpdated {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s annotations did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-				updated = true
-			}
-			if updated {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating etcdsnapshot %s/%s", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-				snapshot, err = h.etcdSnapshots.Update(snapshot)
-				if err != nil {
-					return configMap, fmt.Errorf("rkecluster %s/%s: error while updating etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, err)
-				}
-			}
-			if snapshot.Status.Missing {
-				// if we get to this point and the snapshot object missing status is true, reset it to false as we know it is no longer missing.
-				snapshot.Status.Missing = false
-				// the kube-apiserver only accepts status updates on deliberate subresource status updates which is why we have to double-call an update here if the missing is set incorrectly
-				if _, err := h.etcdSnapshots.UpdateStatus(snapshot); err != nil && !apierrors.IsNotFound(err) {
-					return configMap, fmt.Errorf("rkecluster %s/%s: error while setting status missing=false on etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, err)
-				}
-			}
-		} else {
-			// create the snapshot in the mgmt cluster if it is an s3 snapshot
-			// we only create S3 snapshots in the snapshotbackpopulate controller.
-			// local snapshots are created by the `plansecret` controller based on real output of the snapshot data, and then updated by this controller.
-			if cmGeneratedSnapshot.SnapshotFile.NodeName != "s3" {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: not creating etcd snapshot %s/%s as it is on a local node", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
-				continue
-			}
-			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: creating s3 etcd snapshot %s/%s as it differed from the actual snapshot config map", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
-			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: creating s3 etcd snapshot %s/%s: %v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
-			_, err = h.etcdSnapshots.Create(&cmGeneratedSnapshot)
-			if err != nil {
-				if apierrors.IsAlreadyExists(err) {
-					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: duplicate snapshot found when creating s3 snapshot %s/%s", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
-					continue
-				}
-				logrus.Errorf("rkecluster %s/%s: error while creating s3 etcd snapshot %s/%s: %s", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, err.Error())
-			}
+	for _, machine := range machines {
+		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
+			return machine, nil
 		}
 	}
-	return configMap, nil
+	return nil, fmt.Errorf("unable to find node %s in machines", nodeName)
 }
 
-func reconcileStringMaps(input map[string]string, new map[string]string, keys []string) bool {
-	var updated bool
-	for _, key := range keys {
-		if input[key] == "" && new[key] != "" {
-			input[key] = new[key]
-			updated = true
-		}
+// getMachineByID attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func (h *handler) getMachineByID(machineID string, cluster *provv1.Cluster) (*capi.Machine, error) {
+	machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{
+		capr.ClusterNameLabel: cluster.Name,
+		capr.MachineIDLabel:   machineID,
+	}))
+	if err != nil {
+		return nil, err
 	}
-	return updated
-}
-
-// configMapToSnapshots parses the given configmap and returns a map of etcd snapshots. The snapshotbackpopulate controller will only create snapshots from this map that are located in S3.
-// The snapshots will have 2 or 3 labels, 2 if they are S3 snapshots (cluster name and node name), and 3 if they are local snapshots. They will always have 2 annotations.
-func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *provv1.Cluster) map[string]rkev1.ETCDSnapshot {
-	result := map[string]rkev1.ETCDSnapshot{}
-	for k, v := range configMap.Data {
-		file := &snapshotFile{}
-		if err := json.Unmarshal([]byte(v), file); err != nil {
-			logrus.Errorf("rkecluster %s/%s: invalid non-json value in %s/%s for key %s: %v", cluster.Namespace, cluster.Name, configMap.Namespace, configMap.Name, k, err)
-			continue
-		}
-		snapshot := rkev1.ETCDSnapshot{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cluster.Namespace,
-				Labels: map[string]string{
-					capr.ClusterNameLabel: cluster.Name,
-					capr.NodeNameLabel:    file.NodeName,
-				},
-				Annotations: map[string]string{
-					SnapshotNameKey:                   file.Name,
-					StorageAnnotationKey:              StorageLocal,
-					SnapshotBackpopulateReconciledKey: "true",
-				},
-				OwnerReferences: []metav1.OwnerReference{},
-			},
-			Spec: rkev1.ETCDSnapshotSpec{
-				ClusterName: cluster.Name,
-			},
-			SnapshotFile: rkev1.ETCDSnapshotFile{
-				Name:      file.Name,
-				Location:  file.Location,
-				Metadata:  file.Metadata,
-				Message:   file.Message,
-				NodeName:  file.NodeName,
-				CreatedAt: file.CreatedAt,
-				Size:      file.Size,
-				Status:    file.Status,
-			},
-		}
-		fileSuffix := StorageLocal
-		if file.S3 != nil {
-			// if the snapshot is an S3 snapshot, set the corresponding S3-related figures.
-			fileSuffix = StorageS3
-			snapshot.SnapshotFile.S3 = &rkev1.ETCDSnapshotS3{
-				Endpoint:      file.S3.Endpoint,
-				EndpointCA:    file.S3.EndpointCA,
-				SkipSSLVerify: file.S3.SkipSSLVerify,
-				Bucket:        file.S3.Bucket,
-				Region:        file.S3.Region,
-				Folder:        file.S3.Folder,
-			}
-			snapshot.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion:         cluster.APIVersion,
-				Kind:               cluster.Kind,
-				Name:               cluster.Name,
-				UID:                cluster.UID,
-				Controller:         &[]bool{true}[0],
-				BlockOwnerDeletion: &[]bool{true}[0],
-			}}
-			snapshot.Annotations[StorageAnnotationKey] = StorageS3
-		} else {
-			listSuccessful, machine, err := capr.GetMachineFromNode(h.machineCache, file.NodeName, cluster)
-			if listSuccessful && err != nil {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: error getting machine from node (%s) for snapshot (%s/%s): %v", cluster.Namespace, cluster.Name, file.NodeName, snapshot.Namespace, snapshot.Name, err)
-			} else if listSuccessful && machine != nil && machine.Labels[capr.MachineIDLabel] == "" {
-				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: machine (%s/%s) for snapshot %s on node: %s had empty Machine ID label", cluster.Namespace, cluster.Name, machine.Namespace, machine.Name, file.Name, file.NodeName)
-			} else {
-				snapshot.Labels[capr.MachineIDLabel] = machine.Labels[capr.MachineIDLabel]
-			}
-		}
-		snapshot.Name = name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(snapshot.SnapshotFile.Name, "-")), fileSuffix)
-		result[snapshot.SnapshotFile.Name+fileSuffix] = snapshot
+	if len(machines) != 1 {
+		return nil, fmt.Errorf("unable to find machine by ID %s for cluster %s", machineID, cluster.Name)
 	}
-	return result
+	return machines[0], nil
 }
 
-type s3Config struct {
-	Endpoint      string `json:"endpoint,omitempty"`
-	EndpointCA    string `json:"endpointCA,omitempty"`
-	SkipSSLVerify bool   `json:"skipSSLVerify,omitempty"`
-	Bucket        string `json:"bucket,omitempty"`
-	Region        string `json:"region,omitempty"`
-	Folder        string `json:"folder,omitempty"`
-}
-
-// snapshotFile represents a single snapshot and it's
-// metadata, and is used to unmarshal snapshot data from
-// the downstream config map.
-type snapshotFile struct {
-	Name      string       `json:"name"`
-	Location  string       `json:"location,omitempty"`
-	NodeName  string       `json:"nodeName,omitempty"`
-	Metadata  string       `json:"metadata,omitempty"`
-	Message   string       `json:"message,omitempty"`
-	CreatedAt *metav1.Time `json:"createdAt,omitempty"`
-	Size      int64        `json:"size,omitempty"`
-	Status    string       `json:"status,omitempty"`
-	S3        *s3Config    `json:"s3Config,omitempty"`
+func getLogPrefix(cluster *provv1.Cluster) string {
+	return fmt.Sprintf("[snapshotbackpopulate] rkecluster %s/%s:", cluster.Namespace, cluster.Name)
 }

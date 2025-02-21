@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
@@ -39,7 +40,10 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	if features.RKE2.Enabled() {
 		// Just register the snapshot controller if the cluster is administrated by rancher.
 		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
-			snapshotbackpopulate.Register(ctx, cluster)
+			if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+				cluster.K3s = k3s.New(cluster.ControllerFactory)
+				snapshotbackpopulate.Register(ctx, cluster)
+			}
 		}
 
 		machinerole.Register(ctx, cluster)
