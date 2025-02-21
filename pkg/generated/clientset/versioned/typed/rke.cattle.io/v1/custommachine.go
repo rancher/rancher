@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type CustomMachinesGetter interface {
 
 // CustomMachineInterface has methods to work with CustomMachine resources.
 type CustomMachineInterface interface {
-	Create(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.CreateOptions) (*v1.CustomMachine, error)
-	Update(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.UpdateOptions) (*v1.CustomMachine, error)
+	Create(ctx context.Context, customMachine *rkecattleiov1.CustomMachine, opts metav1.CreateOptions) (*rkecattleiov1.CustomMachine, error)
+	Update(ctx context.Context, customMachine *rkecattleiov1.CustomMachine, opts metav1.UpdateOptions) (*rkecattleiov1.CustomMachine, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.UpdateOptions) (*v1.CustomMachine, error)
+	UpdateStatus(ctx context.Context, customMachine *rkecattleiov1.CustomMachine, opts metav1.UpdateOptions) (*rkecattleiov1.CustomMachine, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.CustomMachine, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.CustomMachineList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rkecattleiov1.CustomMachine, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*rkecattleiov1.CustomMachineList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CustomMachine, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rkecattleiov1.CustomMachine, err error)
 	CustomMachineExpansion
 }
 
 // customMachines implements CustomMachineInterface
 type customMachines struct {
-	*gentype.ClientWithList[*v1.CustomMachine, *v1.CustomMachineList]
+	*gentype.ClientWithList[*rkecattleiov1.CustomMachine, *rkecattleiov1.CustomMachineList]
 }
 
 // newCustomMachines returns a CustomMachines
 func newCustomMachines(c *RkeV1Client, namespace string) *customMachines {
 	return &customMachines{
-		gentype.NewClientWithList[*v1.CustomMachine, *v1.CustomMachineList](
+		gentype.NewClientWithList[*rkecattleiov1.CustomMachine, *rkecattleiov1.CustomMachineList](
 			"custommachines",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.CustomMachine { return &v1.CustomMachine{} },
-			func() *v1.CustomMachineList { return &v1.CustomMachineList{} }),
+			func() *rkecattleiov1.CustomMachine { return &rkecattleiov1.CustomMachine{} },
+			func() *rkecattleiov1.CustomMachineList { return &rkecattleiov1.CustomMachineList{} },
+		),
 	}
 }
