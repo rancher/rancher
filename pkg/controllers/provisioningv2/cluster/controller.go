@@ -2,6 +2,8 @@ package cluster
 
 import (
 	"context"
+	"fmt"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"regexp"
 	"strconv"
 	"strings"
@@ -40,8 +42,10 @@ import (
 )
 
 const (
-	ByCluster                 = "by-cluster"
-	ByCloudCred               = "by-cloud-cred"
+	ByCluster          = "by-cluster"
+	ByCloudCred        = "by-cloud-cred"
+	ByETCDSnapshotName = "by-etcd-snapshot-name"
+
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	administratedAnn          = "provisioning.cattle.io/administrated"
 	mgmtClusterNameAnn        = "provisioning.cattle.io/management-cluster-name"
@@ -150,6 +154,23 @@ func Register(
 func RegisterIndexers(config *wrangler.Context) {
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
+	if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+		config.RKE.ETCDSnapshot().Cache().AddIndexer(ByETCDSnapshotName, byETCDSnapshotName)
+	}
+}
+
+func ETCDSnapshotKey(obj *rkev1.ETCDSnapshot) string {
+	return fmt.Sprintf("%s-%s-%s", obj.Namespace, obj.Labels[capr.ClusterNameLabel], obj.Annotations[capr.SnapshotNameAnnotation])
+}
+
+func byETCDSnapshotName(obj *rkev1.ETCDSnapshot) ([]string, error) {
+	if obj.Annotations == nil || obj.Annotations[capr.SnapshotNameAnnotation] == "" {
+		return nil, nil
+	}
+	if obj.Labels == nil || obj.Labels[capr.ClusterNameLabel] == "" {
+		return nil, nil
+	}
+	return []string{ETCDSnapshotKey(obj)}, nil
 }
 
 func byClusterIndex(obj *v1.Cluster) ([]string, error) {
