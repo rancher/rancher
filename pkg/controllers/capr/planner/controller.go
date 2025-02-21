@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"errors"
+	"github.com/rancher/wrangler/v3/pkg/condition"
 	"strings"
 	"time"
 
@@ -18,6 +19,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+)
+
+var (
+	capiScalingUpCondition   = condition.Cond("ScalingUp")
+	capiScalingDownCondition = condition.Cond("ScalingDown")
+	capiRollingOutCondition  = condition.Cond("RollingOut")
 )
 
 type handler struct {
@@ -83,6 +90,31 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *caprplann
 func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cp.Namespace, cp.Name)
 	if !cp.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
+	// With the upcoming CAPI v1beta2, status objects were changed to add new fields and conditions. Unfortunately, for
+	// clusters without machine deployments or machine pools, the controlplane MUST have the `ScalingUp`, `ScalingDown`,
+	// and `RollingOut` conditions. See https://github.com/kubernetes-sigs/cluster-api/issues/11820.
+	scalingUpFound := false
+	scalingDownFound := false
+	rollingOutFound := false
+
+	for _, cond := range status.Conditions {
+		if cond.Type == string(capiScalingUpCondition) {
+			scalingUpFound = true
+		} else if cond.Type == string(capiScalingDownCondition) {
+			scalingDownFound = true
+		} else if cond.Type == string(capiRollingOutCondition) {
+			rollingOutFound = true
+		}
+	}
+
+	if !scalingUpFound || !scalingDownFound || !rollingOutFound {
+		logrus.Debugf("[planner] rkecluster %s/%s: setting CAPI v1beta2 conditions", cp.Namespace, cp.Name)
+		capiScalingUpCondition.False(&status)
+		capiScalingDownCondition.False(&status)
+		capiRollingOutCondition.False(&status)
 		return status, nil
 	}
 
