@@ -18,7 +18,7 @@ type UserActivity struct {
 }
 
 type UserActivityStatus struct {
-	// CurrentTimeout is the timestamp at which the idle timer expires, invalidating the Token and session.
+	// ExpiresAt is the timestamp at which the idle timer expires, invalidating the Token and session.
 	// It is calculated by adding the
 	// auth-user-session-idle-ttl-minutes attribute to the time
 	// the request is made.
