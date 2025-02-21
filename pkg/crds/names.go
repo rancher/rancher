@@ -64,7 +64,6 @@ func CAPICRDs() []string {
 		"machinedeployments.cluster.x-k8s.io",
 		"machinesets.cluster.x-k8s.io",
 		"clusters.cluster.x-k8s.io",
-		"machinepools.cluster.x-k8s.io",
 		"machinedrainrules.cluster.x-k8s.io",
 	}
 }

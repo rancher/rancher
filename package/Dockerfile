@@ -132,7 +132,7 @@ ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERS
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.32.0-k3s1 \
+COPY --from=rancher/k3s:v1.32.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
