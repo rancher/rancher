@@ -6,29 +6,39 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	datamanagement "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/features"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
 type handler struct {
 	featuresClient       managementv3.FeatureClient
+	featureEnqueue       func(string, time.Duration)
 	tokensLister         managementv3.TokenCache
 	tokenEnqueue         func(string, time.Duration)
-	nodeDriverController managementv3.NodeDriverController
+	nodeDriverController normanv3.NodeDriverInterface
+	managementContext    *config.ManagementContext
 }
 
-func Register(ctx context.Context, wContext *wrangler.Context) {
+func Register(ctx context.Context, management *config.ManagementContext, wContext *wrangler.Context) {
 	h := handler{
 		featuresClient:       wContext.Mgmt.Feature(),
+		featureEnqueue:       wContext.Mgmt.Feature().EnqueueAfter,
 		tokensLister:         wContext.Mgmt.Token().Cache(),
 		tokenEnqueue:         wContext.Mgmt.Token().EnqueueAfter,
-		nodeDriverController: wContext.Mgmt.NodeDriver(),
+		nodeDriverController: management.Management.NodeDrivers(""),
+		managementContext:    management,
 	}
 	wContext.Mgmt.Feature().OnChange(ctx, "feature-handler", h.sync)
 }
@@ -48,7 +58,7 @@ func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	}
 
 	if obj.Name == features.Harvester.Name() {
-		return obj, h.toggleHarvesterNodeDriver(obj.Name)
+		return obj, h.syncHarvesterNodeDriver(obj)
 	}
 
 	if obj.Name == features.HarvesterBaremetalContainerWorkload.Name() {
@@ -94,15 +104,36 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 	return nil
 }
 
-func (h *handler) toggleHarvesterNodeDriver(harvester string) error {
-	if val := features.GetFeatureByName(harvester).Enabled(); val {
-		m, err := h.nodeDriverController.Cache().Get(harvester)
-		if err != nil {
-			return err
+// syncHarvesterNodeDriver ensures that the Harvester node driver is disabled
+// when the Harvester feature is disabled and that the node driver is enabled,
+// when the Harvester feature is enabled - provided that the node driver
+// exists. If it doesn't exist, the node driver is created.
+func (h *handler) syncHarvesterNodeDriver(feature *v3.Feature) error {
+	if feature.Spec.Value == nil {
+		logrus.Debugf("feature %s contains nil value", feature.Name)
+		return nil
+	}
+
+	driver, err := h.nodeDriverController.Controller().Lister().Get("", datamanagement.HarvesterDriver)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return datamanagement.AddHarvesterMachineDriver(h.managementContext)
 		}
-		m.Spec.Active = val
-		_, err = h.nodeDriverController.Update(m)
+		h.featureEnqueue(feature.Name, 10*time.Second)
 		return err
+	}
+
+	if driver.Spec.Active == *feature.Spec.Value {
+		return nil
+	}
+
+	driver = driver.DeepCopy()
+	driver.Spec.Active = *feature.Spec.Value
+
+	logrus.Infof("updating node driver %s", driver.Name)
+	_, err = h.nodeDriverController.Update(driver)
+	if err != nil {
+		h.featureEnqueue(feature.Name, 10*time.Second)
 	}
 	return nil
 }
