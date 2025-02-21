@@ -8,11 +8,11 @@ import (
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/sirupsen/logrus"
 
 	extensionsfleet "github.com/rancher/shepherd/extensions/fleet"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
-	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -143,15 +143,11 @@ func VerifyGitRepo(client *rancher.Client, gitRepoID, k8sClusterID, steveCluster
 			return true, errors.New(gitRepo.State.Message)
 		}
 
-		if status.Summary.NotReady > 0 || status.Summary.DesiredReady == 0 {
-			return false, nil
+		if gitStatus.Summary.NotReady == 0 && gitStatus.ReadyClusters == gitStatus.Summary.DesiredReady {
+			return true, nil
 		}
 
-		if gitStatus.Summary.NotReady > 0 || gitStatus.Summary.DesiredReady == 0 || gitStatus.ReadyClusters == 0 {
-			return false, nil
-		}
-
-		return true, nil
+		return false, nil
 	})
 	if err != nil {
 		return err
