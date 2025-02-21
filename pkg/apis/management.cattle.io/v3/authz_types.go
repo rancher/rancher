@@ -229,6 +229,10 @@ type GlobalRoleBinding struct {
 	// +optional
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 
+	// UserPrincipalName is the name of the user principal subject to be bound. Immutable.
+	// +optional
+	UserPrincipalName string `json:"userPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
+
 	// GlobalRoleName is the name of the Global Role that the subject will be bound to. Immutable.
 	// +kubebuilder:validation:Required
 	GlobalRoleName string `json:"globalRoleName" norman:"required,noupdate,type=reference[globalRole]"`

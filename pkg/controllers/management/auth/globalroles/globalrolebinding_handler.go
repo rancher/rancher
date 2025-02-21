@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -16,6 +17,7 @@ import (
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
@@ -48,6 +50,12 @@ const (
 	failedToCreateFleetLabels                  = "FailedToCreateFleetLabels"
 	failedToListRoleBindings                   = "FailedToListRoleBindings"
 	failedToPurgeInvalidNamespacedRoleBindings = "FailedToPurgeInvalidNamespacedRoleBindings"
+
+	grbHasNoSubject    = "GRBHasNoSubject"
+	subjectReconciled  = "SubjectReconciled"
+	subjectExists      = "SubjectExists"
+	failedToGetUser    = "FailedToGetUser"
+	failedToCreateUser = "FailedToCreateUser"
 )
 
 var (
@@ -84,6 +92,8 @@ func newGlobalRoleBindingLifecycle(management *config.ManagementContext, cluster
 		roleLister:              management.RBAC.Roles("").Controller().Lister(),
 		roleBindings:            management.RBAC.RoleBindings(""),
 		roleBindingLister:       management.RBAC.RoleBindings("").Controller().Lister(),
+		userManager:             management.UserManager,
+		userLister:              management.Management.Users("").Controller().Lister(),
 		fleetPermissionsHandler: newFleetWorkspaceBindingHandler(management),
 		status:                  status.NewStatus(),
 	}
@@ -124,29 +134,39 @@ type globalRoleBindingLifecycle struct {
 	roleBindingLister       rbacv1.RoleBindingLister
 	fleetPermissionsHandler fleetPermissionsHandler
 	status                  *status.Status
+	userManager             user.Manager
+	userLister              v3.UserLister
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	localConditions := []metav1.Condition{}
+	obj, err := grb.reconcileSubject(obj, &localConditions)
+
 	returnError := errors.Join(
+		err,
 		grb.reconcileClusterPermissions(obj, &localConditions),
 		grb.reconcileGlobalRoleBinding(obj, &localConditions),
 		grb.reconcileNamespacedRoleBindings(obj, &localConditions),
 		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj, &localConditions),
 		grb.updateStatus(obj, localConditions),
 	)
+
 	return obj, returnError
 }
 
 func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	localConditions := []metav1.Condition{}
+	obj, err := grb.reconcileSubject(obj, &localConditions)
+
 	returnError := errors.Join(
+		err,
 		grb.reconcileClusterPermissions(obj, &localConditions),
 		grb.reconcileGlobalRoleBinding(obj, &localConditions),
 		grb.reconcileNamespacedRoleBindings(obj, &localConditions),
 		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj, &localConditions),
 		grb.updateStatus(obj, localConditions),
 	)
+
 	return obj, returnError
 }
 
@@ -203,6 +223,47 @@ func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBind
 		return fmt.Errorf("errors deleting admin global role binding: %v", allErrors)
 	}
 	return nil
+}
+
+func (grb *globalRoleBindingLifecycle) reconcileSubject(binding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) (*v3.GlobalRoleBinding, error) {
+	condition := metav1.Condition{Type: subjectReconciled}
+	if binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
+		grb.status.AddCondition(localConditions, condition, subjectExists, nil)
+		return binding, nil
+	}
+
+	if binding.UserPrincipalName != "" && binding.UserName == "" {
+		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
+		user, err := grb.userManager.EnsureUser(binding.UserPrincipalName, displayName)
+		if err != nil {
+			grb.status.AddCondition(localConditions, condition, failedToCreateUser, err)
+			return binding, err
+		}
+
+		binding.UserName = user.Name
+		grb.status.AddCondition(localConditions, condition, subjectExists, nil)
+		return binding, nil
+	}
+
+	if binding.UserPrincipalName == "" && binding.UserName != "" {
+		u, err := grb.userLister.Get("", binding.UserName)
+		if err != nil {
+			grb.status.AddCondition(localConditions, condition, failedToGetUser, err)
+			return binding, err
+		}
+
+		for _, p := range u.PrincipalIDs {
+			if strings.HasSuffix(p, binding.UserName) {
+				binding.UserPrincipalName = p
+				break
+			}
+		}
+		grb.status.AddCondition(localConditions, condition, subjectExists, nil)
+		return binding, nil
+	}
+
+	grb.status.AddCondition(localConditions, condition, grbHasNoSubject, errors.New("GRB has no subject"))
+	return binding, fmt.Errorf("GlobalRoleBinding %v has no subject", binding.Name)
 }
 
 // reconcileClusterPermissions grants permissions for the binding in all downstream (non-local) clusters. Will also
@@ -450,7 +511,6 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 		grb.status.AddCondition(localConditions, condition, failedToGetGlobalRole, err)
 		return fmt.Errorf("unable to get globalRole %s: %w", globalRoleBinding.GlobalRoleName, err)
 	}
-
 	roleBindingUIDs := map[types.UID]struct{}{}
 
 	for ns := range gr.NamespacedRules {
