@@ -42,8 +42,6 @@ import (
 	"github.com/rancher/rancher/pkg/ui"
 	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/remotedialer/forward"
-	"github.com/rancher/remotedialer/proxyclient"
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
@@ -200,17 +198,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	portForwarder, err := forward.New(restConfig, wranglerContext.Core.Pod(), namespace.System, "app=api-extension", []string{"5555:5555"})
-	if err != nil {
-		logrus.Fatal(err)
+	if err := ext.RDPStart(ctx, restConfig, wranglerContext); err != nil {
+		return nil, err
 	}
-
-	remoteDialerProxyClient, err := proxyclient.New(ctx, "api-extension", namespace.System, "api-extension-ca-name", "api-extension-tls-name", wranglerContext.Core.Secret(), portForwarder)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-
-	remoteDialerProxyClient.Run(ctx)
 
 	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext)
 	if err != nil {

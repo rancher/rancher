@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -69,6 +70,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		clusterCache:     wContext.Mgmt.Cluster().Cache(),
 		plan:             wContext.Plan.Plan(),
 		planCache:        wContext.Plan.Plan().Cache(),
+		secrets:          wContext.Core.Secret(),
 		chartsConfig:     chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
 		registryOverride: registryOverride,
 	}
@@ -95,6 +97,7 @@ type handler struct {
 	deployment       deploymentControllers.DeploymentController
 	deploymentCache  deploymentControllers.DeploymentCache
 	clusterRepo      catalogcontrollers.ClusterRepoController
+	secrets          corecontrollers.SecretController
 	chartsConfig     chart.RancherConfigGetter
 	clusterCache     mgmtcontrollers.ClusterCache
 	plan             plancontrolers.PlanController
@@ -176,16 +179,26 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ReleaseNamespace: namespace.System,
 			ChartName:        chart.RemoteDialerProxyChartName,
 			Values: func() map[string]interface{} {
-
-				values := map[string]interface{}{}
-				values["service"] = map[string]interface{}{
-					"httpsPort": 5555,
-					"peerPort":  6666,
+				secret, err := ext.GetOrCreateRDPConnectSecret(h.secrets)
+				if err != nil {
+					return map[string]interface{}{}
 				}
 
-				return values
+				return map[string]interface{}{
+					"service": map[string]interface{}{
+						"secret":    secret,
+						"httpsPort": 5555,
+						"peerPort":  6666,
+					},
+				}
 			},
-			Enabled:         func() bool { return true },
+			Enabled: func() bool {
+				if ext.RDPEnabled() {
+					// do not deploy RDP in downstream cluster
+					return !features.MCMAgent.Enabled()
+				}
+				return false
+			},
 			Uninstall:       false,
 			RemoveNamespace: false,
 		},
