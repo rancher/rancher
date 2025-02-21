@@ -227,8 +227,7 @@ func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBind
 
 func (grb *globalRoleBindingLifecycle) reconcileSubject(binding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) (*v3.GlobalRoleBinding, error) {
 	condition := metav1.Condition{Type: subjectReconciled}
-
-	if binding.UserPrincipalName != "" && binding.UserName != "" {
+	if binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		grb.status.AddCondition(localConditions, condition, subjectExists, nil)
 		return binding, nil
 	}
