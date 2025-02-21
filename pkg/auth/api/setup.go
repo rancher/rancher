@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
@@ -27,11 +28,14 @@ func Setup(ctx context.Context, clusterRouter requests.ClusterRouter, scaledCont
 }
 
 func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
+	extTokenStore := exttokenstore.NewSystemFromWrangler(management.Wrangler)
+
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	handler := &user.Handler{
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
 		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
+		ExtTokenStore:            extTokenStore,
 	}
 
 	schema.Formatter = handler.UserFormatter

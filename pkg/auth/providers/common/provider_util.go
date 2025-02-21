@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -43,4 +44,17 @@ func stringToK8sTimeHookFunc() mapstructure.DecodeHookFunc {
 		stdTime, err := time.Parse(time.RFC3339, data.(string))
 		return metav1.Time{Time: stdTime}, err
 	}
+}
+
+// GetCommonUserExtraAttributes is a helper containing the default
+// implementation of the `GetUserExtraAttributes` provider interface method.
+func GetCommonUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+	extras := make(map[string][]string)
+	if userPrincipal.Name != "" {
+		extras[UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
 }
