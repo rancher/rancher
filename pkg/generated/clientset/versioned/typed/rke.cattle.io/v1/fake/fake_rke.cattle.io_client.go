@@ -29,27 +29,27 @@ type FakeRkeV1 struct {
 }
 
 func (c *FakeRkeV1) CustomMachines(namespace string) v1.CustomMachineInterface {
-	return &FakeCustomMachines{c, namespace}
+	return newFakeCustomMachines(c, namespace)
 }
 
 func (c *FakeRkeV1) ETCDSnapshots(namespace string) v1.ETCDSnapshotInterface {
-	return &FakeETCDSnapshots{c, namespace}
+	return newFakeETCDSnapshots(c, namespace)
 }
 
 func (c *FakeRkeV1) RKEBootstraps(namespace string) v1.RKEBootstrapInterface {
-	return &FakeRKEBootstraps{c, namespace}
+	return newFakeRKEBootstraps(c, namespace)
 }
 
 func (c *FakeRkeV1) RKEBootstrapTemplates(namespace string) v1.RKEBootstrapTemplateInterface {
-	return &FakeRKEBootstrapTemplates{c, namespace}
+	return newFakeRKEBootstrapTemplates(c, namespace)
 }
 
 func (c *FakeRkeV1) RKEClusters(namespace string) v1.RKEClusterInterface {
-	return &FakeRKEClusters{c, namespace}
+	return newFakeRKEClusters(c, namespace)
 }
 
 func (c *FakeRkeV1) RKEControlPlanes(namespace string) v1.RKEControlPlaneInterface {
-	return &FakeRKEControlPlanes{c, namespace}
+	return newFakeRKEControlPlanes(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

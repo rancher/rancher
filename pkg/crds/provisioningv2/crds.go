@@ -21,6 +21,7 @@ var (
 		"MachineDeployment":  true,
 		"MachineSet":         true,
 		"Cluster":            true,
+		"MachineDrainRule":   true,
 	}
 
 	//go:embed capi-crds.yaml capi-webhooks.yaml

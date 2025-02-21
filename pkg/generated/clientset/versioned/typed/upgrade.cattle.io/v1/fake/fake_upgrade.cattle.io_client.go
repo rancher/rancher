@@ -29,7 +29,7 @@ type FakeUpgradeV1 struct {
 }
 
 func (c *FakeUpgradeV1) Plans(namespace string) v1.PlanInterface {
-	return &FakePlans{c, namespace}
+	return newFakePlans(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

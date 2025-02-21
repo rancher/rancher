@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	catalogcattleiov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,33 +37,34 @@ type AppsGetter interface {
 
 // AppInterface has methods to work with App resources.
 type AppInterface interface {
-	Create(ctx context.Context, app *v1.App, opts metav1.CreateOptions) (*v1.App, error)
-	Update(ctx context.Context, app *v1.App, opts metav1.UpdateOptions) (*v1.App, error)
+	Create(ctx context.Context, app *catalogcattleiov1.App, opts metav1.CreateOptions) (*catalogcattleiov1.App, error)
+	Update(ctx context.Context, app *catalogcattleiov1.App, opts metav1.UpdateOptions) (*catalogcattleiov1.App, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, app *v1.App, opts metav1.UpdateOptions) (*v1.App, error)
+	UpdateStatus(ctx context.Context, app *catalogcattleiov1.App, opts metav1.UpdateOptions) (*catalogcattleiov1.App, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.App, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.AppList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*catalogcattleiov1.App, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*catalogcattleiov1.AppList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.App, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *catalogcattleiov1.App, err error)
 	AppExpansion
 }
 
 // apps implements AppInterface
 type apps struct {
-	*gentype.ClientWithList[*v1.App, *v1.AppList]
+	*gentype.ClientWithList[*catalogcattleiov1.App, *catalogcattleiov1.AppList]
 }
 
 // newApps returns a Apps
 func newApps(c *CatalogV1Client, namespace string) *apps {
 	return &apps{
-		gentype.NewClientWithList[*v1.App, *v1.AppList](
+		gentype.NewClientWithList[*catalogcattleiov1.App, *catalogcattleiov1.AppList](
 			"apps",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.App { return &v1.App{} },
-			func() *v1.AppList { return &v1.AppList{} }),
+			func() *catalogcattleiov1.App { return &catalogcattleiov1.App{} },
+			func() *catalogcattleiov1.AppList { return &catalogcattleiov1.AppList{} },
+		),
 	}
 }
