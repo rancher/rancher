@@ -87,7 +87,7 @@ jobs:
       - name: KDM data
         run: |
           mkdir -p bin
-          curl -sLf https://raw.githubusercontent.com/chiukapoor/kontainer-driver-metadata/refs/heads/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data/data.json > bin/data.json
+          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
       ## Helm Setup end
       - name: Set up Go
         uses: actions/setup-go@v5
