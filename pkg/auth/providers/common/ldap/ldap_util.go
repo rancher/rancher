@@ -324,24 +324,57 @@ func NewDefaultSearchRequest(baseDN, filter string, scope int, attributes []stri
 	)
 }
 
-// According to RFC4512, attribute names (descriptors) should adhere to the following syntax
-// descr = keystring
-// keystring = leadkeychar *keychar
-// leadkeychar = ALPHA
-// keychar = ALPHA / DIGIT / HYPHEN
-// See https://datatracker.ietf.org/doc/html/rfc4512#section-1.4
+// According to RFC4512 https://datatracker.ietf.org/doc/html/rfc4512#section-1.4
+// Object identifiers (OIDs) [X.680] are represented in LDAP using a
+// dot-decimal format conforming to the ABNF:
+//
+//	numericoid = number 1*( DOT number )
+//
+// Short names, also known as descriptors, are used as more readable
+// aliases for object identifiers.  Short names are case insensitive and
+// conform to the ABNF:
+//
+//	descr = keystring
+//
+// Where either an object identifier or a short name may be specified,
+// the following production is used:
+//
+//	oid = descr / numericoid
+//
+// Where
+//
+//	descr = keystring
+//	keystring = leadkeychar *keychar
+//	leadkeychar = ALPHA
+//	keychar = ALPHA / DIGIT / HYPHEN
+//	number  = DIGIT / ( LDIGIT 1*DIGIT )
+//
+//	ALPHA   = %x41-5A / %x61-7A   ; "A"-"Z" / "a"-"z"
+//	DIGIT   = %x30 / LDIGIT       ; "0"-"9"
+//	LDIGIT  = %x31-39             ; "1"-"9"
+//	HYPHEN  = %x2D ; hyphen ("-")
+//	DOT     = %x2E ; period (".")
 var (
-	numHyphenPrefix   = regexp.MustCompile(`^[0-9\-]`)
-	notAlphaNumHyphen = regexp.MustCompile(`[^a-zA-Z0-9\-]`)
-	validAttr         = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-]*$`)
+	invalidIdentifierChars = regexp.MustCompile(`[^a-zA-Z0-9\-.]`)
+	shortNameRegex         = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-]*$`)
+	oidRegex               = regexp.MustCompile(`^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))*$`)
 )
 
-// SanitizeAttr removes all invalid character from the LDAP attribute name.
+// SanitizeAttr removes all invalid characters from the LDAP attribute name
+// regardless of whether it produces a valid LDAP identifier or not.
+// The main purpose is to prevent LDAP injections.
 func SanitizeAttr(attr string) string {
-	return numHyphenPrefix.ReplaceAllString(notAlphaNumHyphen.ReplaceAllString(attr, ""), "")
+	return invalidIdentifierChars.ReplaceAllString(attr, "")
 }
 
-// IsValidAttr returns true is the given attribute name conforms with the syntax defined in RFC4512.
+// IsValidAttr returns true is the given attribute name conforms with
+// either numeric OID or short name format.
 func IsValidAttr(attr string) bool {
-	return validAttr.MatchString(attr)
+	if shortNameRegex.MatchString(attr) {
+		return true
+	}
+	if oidRegex.MatchString(attr) {
+		return true
+	}
+	return false
 }
