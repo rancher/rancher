@@ -6,6 +6,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	"sync"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
-	"github.com/rancher/rancher/pkg/generated/controllers/k3s.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2"

@@ -116,13 +116,6 @@ func main() {
 					capi.Cluster{},
 				},
 			},
-			"k3s.cattle.io": {
-				Types: []interface{}{
-					"./pkg/apis/k3s.cattle.io/v1",
-				},
-				GenerateTypes:   true,
-				GenerateClients: true,
-			},
 
 			// This package is not a CRD but types from the extension API server.
 			"ext.cattle.io": {

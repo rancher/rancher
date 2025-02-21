@@ -3,8 +3,8 @@ package managementuser
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/generated/controllers/k3s.cattle.io"
 
+	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
