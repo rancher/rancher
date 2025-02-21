@@ -63,11 +63,17 @@ func Test_Operation_SetB_MP_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 					{
 						EtcdRole: true,
 						Quantity: &defaults.One,
+						MachineDeploymentAnnotations: map[string]string{
+							"machine.cluster.x-k8s.io/exclude-node-draining": "true",
+						},
 					},
 					{
 						ControlPlaneRole: true,
 						WorkerRole:       true,
 						Quantity:         &defaults.One,
+						MachineDeploymentAnnotations: map[string]string{
+							"machine.cluster.x-k8s.io/exclude-node-draining": "true",
+						},
 					},
 				},
 			},

@@ -145,17 +145,7 @@ dump_rancher_logs()
   cat /tmp/rancher.log | gzip | base64 -w 0
   echo -e "\n-----RANCHER-LOG-DUMP-END-----"
 }
-
-dump_capi_logs() 
-{
-  echo "CAPI logs were"
-  echo -e "-----CAPI-LOG-DUMP-START-----"
-  kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml logs -n cattle-provisioning-capi-system $(kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pods -n cattle-provisioning-capi-system -l cluster.x-k8s.io/provider=cluster-api -o jsonpath='{.items[0].metadata.name}') | gzip | base64 -w 0
-  echo -e "\n-----CAPI-LOG-DUMP-END-----"
-}
-
 export -f dump_rancher_logs
-export -f dump_capi_logs
 
 push_cattle_agent_image()
 {
@@ -244,6 +234,5 @@ echo Running provisioning-tests $RUNARG
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
      dump_rancher_logs
-     dump_capi_logs
      exit 1
 }
