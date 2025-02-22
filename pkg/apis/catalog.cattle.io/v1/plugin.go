@@ -34,6 +34,8 @@ type UIPluginEntry struct {
 	Version string `json:"version,omitempty"`
 	// Endpoint from where to fetch the contents of the plugin.
 	Endpoint string `json:"endpoint,omitempty"`
+	// CompressedEndpoint link to a targz file that contains the content of the plugin.
+	CompressedEndpoint string `json:"compressedEndpoint,omitempty"`
 	// NoCache a flag that tells if the plugin should be cached or not.
 	// Defaults to false.
 	// +kubebuilder:default:=false
