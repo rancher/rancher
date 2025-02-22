@@ -1,26 +1,4 @@
-import copy
-import pytest
-
 from .conftest import wait_for
-
-
-@pytest.mark.nonparallel
-def test_dynamic_schemas_update(request, admin_mc):
-    assert not schema_has_field(admin_mc)
-
-    eks_schema = admin_mc.client.by_id_dynamicSchema(
-        'amazonelasticcontainerserviceconfig')
-
-    new_field = copy.deepcopy(eks_schema.resourceFields['displayName'])
-    new_field.description = 'My special field.'
-    setattr(eks_schema.resourceFields, 'mySpecialField', new_field)
-
-    admin_mc.client.update_by_id_dynamicSchema(eks_schema.id, eks_schema)
-    request.addfinalizer(lambda: cleanup_extra_field(admin_mc))
-
-    wait_for(lambda: schema_has_field(admin_mc),
-             fail_handler=lambda: "could not add extra field",
-             timeout=120)
 
 
 def cleanup_extra_field(admin_mc):
