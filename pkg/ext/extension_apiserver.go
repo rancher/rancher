@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/dynamiclistener"
+	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -147,37 +149,38 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		}),
 	}
 
+	config := dynamiclistener.Config{
+		CN: fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace),
+		RegenerateCerts: func() bool {
+			_, err := wranglerContext.Core.Secret().Get(Namespace, CertName, metav1.GetOptions{})
+			return apierrors.IsNotFound(err)
+		},
+	}
+
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
 	var ln net.Listener
 
 	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
-		sniProvider, err := NewSNIProviderForCname(
-			"imperative-api-sni-provider",
-			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
-			wranglerContext.Core.Secret(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
-		}
-
-		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
-
-		go func() {
-			if err := sniProvider.Run(ctx.Done()); err != nil {
-				logrus.Errorf("sni provider failed: %s", err)
-			}
-		}()
-
 		// Only need to listen on localhost because that port will be reached
 		// from a remotedialer tunnel on localhost
-		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
 		}
 
+		sniProvider := NewStore("imperative-api-sni-provider", []string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)})
+		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
+
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
+
+		store := kubernetes.New(ctx, coreGetterFactory(wranglerContext), Namespace, CertName, sniProvider)
+
+		ln, _, err = dynamiclistener.NewListenerWithChain(ln, store, nil, nil, config)
+		if err != nil {
+			return nil, err
+		}
 
 		if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
