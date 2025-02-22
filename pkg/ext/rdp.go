@@ -84,7 +84,7 @@ func GetOrCreateRDPConnectSecret(secretController corecontrollers.SecretControll
 	}
 
 	if err != nil {
-		logrus.Errorf("RDPClient: error reading connect secret: %s, will attempt to create new one...")
+		logrus.Errorf("RDPClient: error reading connect secret: %s, will attempt to create new one...", err.Error())
 	}
 
 	secretValue, err := randomtoken.Generate()

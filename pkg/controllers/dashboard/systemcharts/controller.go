@@ -176,23 +176,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
-		{
-			ReleaseNamespace:    namespace.System,
-			ChartName:           chart.RemoteDialerProxyChartName,
-			ExactVersionSetting: settings.RemoteDialerProxyVersion,
-			Values: func() map[string]interface{} {
-				return map[string]interface{}{}
-			},
-			Enabled: func() bool {
-				if ext.RDPEnabled() {
-					// do not deploy RDP in downstream cluster
-					return !features.MCMAgent.Enabled()
-				}
-				return false
-			},
-			Uninstall:       false,
-			RemoveNamespace: false,
-		},
+
 		{
 			ReleaseNamespace:    namespace.System,
 			ChartName:           chart.WebhookChartName,
@@ -336,6 +320,23 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					toUninstall, !versionManagementEnabled, noManagedPlan)
 				return toUninstall
 			}(),
+		},
+		{
+			ReleaseNamespace:    namespace.System,
+			ChartName:           chart.RemoteDialerProxyChartName,
+			ExactVersionSetting: settings.RemoteDialerProxyVersion,
+			Values: func() map[string]interface{} {
+				return map[string]interface{}{}
+			},
+			Enabled: func() bool {
+				if ext.RDPEnabled() {
+					// do not deploy RDP in downstream cluster
+					return !features.MCMAgent.Enabled()
+				}
+				return false
+			},
+			Uninstall:       false,
+			RemoveNamespace: false,
 		},
 	}
 }
