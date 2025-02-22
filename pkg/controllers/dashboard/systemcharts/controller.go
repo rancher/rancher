@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -44,8 +45,9 @@ const (
 
 var (
 	primaryImages = map[string]string{
-		chart.WebhookChartName:          "rancher/rancher-webhook",
-		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
+		chart.WebhookChartName:           "rancher/rancher-webhook",
+		chart.ProvisioningCAPIChartName:  "rancher/mirrored-cluster-api-controller",
+		chart.RemoteDialerProxyChartName: "rancher/remotedialer-proxy",
 	}
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookVersion.Name:               {},
@@ -66,6 +68,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		deployment:       wContext.Apps.Deployment(),
 		deploymentCache:  wContext.Apps.Deployment().Cache(),
 		clusterRepo:      wContext.Catalog.ClusterRepo(),
+		secrets:          wContext.Core.Secret(),
 		clusterCache:     wContext.Mgmt.Cluster().Cache(),
 		plan:             wContext.Plan.Plan(),
 		planCache:        wContext.Plan.Plan().Cache(),
@@ -95,6 +98,7 @@ type handler struct {
 	deployment       deploymentControllers.DeploymentController
 	deploymentCache  deploymentControllers.DeploymentCache
 	clusterRepo      catalogcontrollers.ClusterRepoController
+	secrets          corecontrollers.SecretController
 	chartsConfig     chart.RancherConfigGetter
 	clusterCache     mgmtcontrollers.ClusterCache
 	plan             plancontrolers.PlanController
@@ -315,6 +319,23 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					toUninstall, !versionManagementEnabled, noManagedPlan)
 				return toUninstall
 			}(),
+		},
+		{
+			ReleaseNamespace:    namespace.System,
+			ChartName:           chart.RemoteDialerProxyChartName,
+			ExactVersionSetting: settings.RemoteDialerProxyVersion,
+			Values: func() map[string]interface{} {
+				return map[string]interface{}{}
+			},
+			Enabled: func() bool {
+				if ext.RDPEnabled() {
+					// do not deploy RDP in downstream cluster
+					return !features.MCMAgent.Enabled()
+				}
+				return false
+			},
+			Uninstall:       false,
+			RemoveNamespace: false,
 		},
 	}
 }
