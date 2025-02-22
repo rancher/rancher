@@ -344,6 +344,7 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -406,6 +407,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// remotedialer-proxy
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					map[string]interface{}{},
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -422,6 +434,7 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.ImportedClusterVersionManagement.Set("false")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -461,6 +474,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// remotedialer-proxy
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					map[string]interface{}{},
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
@@ -486,6 +510,7 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.ImportedClusterVersionManagement.Set("false")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -529,6 +554,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// remotedialer-proxy
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					map[string]interface{}{},
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				// system-upgrade-controller
 				// nothing to do in this case
 
@@ -548,6 +584,7 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -607,6 +644,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// remotedialer-proxy
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					map[string]interface{}{},
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -623,6 +671,7 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RancherWebhookVersion.Set("2.0.1")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.1")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -697,6 +746,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
+				// remotedialer-proxy
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.1",
+					map[string]interface{}{},
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -714,6 +774,7 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				features.MCM.Set(true)
 
 				// rancher-webhook
@@ -770,6 +831,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 					"2.0.0",
 					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// remotedialer-proxy
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.1",
+					map[string]interface{}{},
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)

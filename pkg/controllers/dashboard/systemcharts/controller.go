@@ -176,7 +176,6 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
-
 		{
 			ReleaseNamespace:    namespace.System,
 			ChartName:           chart.WebhookChartName,
