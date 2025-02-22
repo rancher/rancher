@@ -38,6 +38,32 @@ const (
 	Namespace         = "cattle-system"
 )
 
+var _ net.Listener = &blockingListener{}
+
+type blockingListener struct {
+	stopChan chan struct{}
+}
+
+func NewBlockingListener() net.Listener {
+	return &blockingListener{
+		stopChan: make(chan struct{}),
+	}
+}
+
+func (d *blockingListener) Accept() (net.Conn, error) {
+	<-d.stopChan
+	return nil, fmt.Errorf("listener is closed")
+}
+
+func (d *blockingListener) Addr() net.Addr {
+	return nil
+}
+
+func (d *blockingListener) Close() error {
+	close(d.stopChan)
+	return nil
+}
+
 func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceController, caBundle []byte) error {
 	port := int32(Port)
 	desired := &apiregv1.APIService{
@@ -143,6 +169,8 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	}
 
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
+	var ln net.Listener
+
 	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
@@ -151,7 +179,6 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
 			wranglerContext.Core.Secret(),
 		)
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
 		}
@@ -163,6 +190,13 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 				logrus.Errorf("sni provider failed: %s", err)
 			}
 		}()
+
+		// Only need to listen on localhost because that port will be reached
+		// from a remotedialer tunnel on localhost
+		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
+		}
 
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
 
@@ -179,18 +213,14 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	} else {
 		logrus.Info("deleting imperative extension apiserver resources")
 
+		ln = NewBlockingListener()
+
 		if err := CleanupExtensionAPIServer(wranglerContext); err != nil {
 			return nil, fmt.Errorf("failed to clean up extension api resources: %w", err)
 		}
 	}
 
 	scheme := wrangler.Scheme
-	// Only need to listen on localhost because that port will be reached
-	// from a remotedialer tunnel on localhost
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
-	}
 
 	authenticator := steveext.NewUnionAuthenticator(authenticators...)
 
