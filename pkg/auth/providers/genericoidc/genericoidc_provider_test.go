@@ -135,7 +135,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 			principalID: "genericoidc_user://1234567",
 			token: ext.Token{
 				Spec: ext.TokenSpec{
-					UserPrincipal: v3.Principal{
+					UserPrincipal: ext.TokenPrincipal{
 						ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://1234567"},
 						Provider:      Name,
 						DisplayName:   "Test User",
