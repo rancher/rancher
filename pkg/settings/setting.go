@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	RancherVersionDev                 = "2.10.99"
+	RancherVersionDev                 = "2.11.99"
 	DefaultMaxUIPluginFileSizeInBytes = 30 * 1024 * 1024 // 30MB
 	AgentTLSModeStrict                = "strict"
 	AgentTLSModeSystemStore           = "system-store"
