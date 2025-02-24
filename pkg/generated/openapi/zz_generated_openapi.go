@@ -92,7 +92,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivity(ref common.ReferenceCallback) c
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "User Activity",
+				Description: "UserActivity keeps track about the user activity on the UI. If the user doens't perform one or more actions for a while (eg: cursor move, key presse, tab focus), this will logout the user from its session.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
