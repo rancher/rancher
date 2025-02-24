@@ -215,6 +215,7 @@ func expireToken(token *v3.Token) *v3.Token {
 }
 
 func TestIsIdleExpired(t *testing.T) {
+    t.Parallel()
 	type args struct {
 		token            v3.Token
 		lastTimeActivity metav1.Time
