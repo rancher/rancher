@@ -189,7 +189,7 @@ func (s *Store) Create(ctx context.Context,
 		}
 		_, err = s.tokens.Patch(activityToken.GetName(), types.JSONPatchType, patch)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to patch token: %w", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to store activityLastSeenAt to token %s: %w", activityToken.GetName(), err))
 		}
 	}
 
