@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer/forward"
@@ -26,42 +27,42 @@ const (
 )
 
 func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wrangler.Context) error {
-	if RDPEnabled() {
-		portForwarder, err := forward.New(
-			restConfig,
-			wranglerContext.Core.Pod(),
-			namespace.System,
-			"app=api-extension",
-			[]string{"5555:5555"})
-
-		if err != nil {
-			return err
-		}
-
-		connectSecret, err := GetOrCreateRDPConnectSecret(wranglerContext.Core.Secret())
-		if err != nil {
-			return err
-		}
-
-		remoteDialerProxyClient, err := proxyclient.New(
-			ctx,
-			connectSecret,
-			namespace.System,
-			certSecretName,
-			certServerName,
-			wranglerContext.Core.Secret(),
-			portForwarder)
-
-		if err != nil {
-			return err
-		}
-
-		remoteDialerProxyClient.Run(ctx)
-
-		return nil
+	if !features.ImperativeApiExtension.Enabled() || !RDPEnabled() {
+		return DeleteRDPConnectSecret(wranglerContext.Core.Secret())
 	}
 
-	return DeleteRDPConnectSecret(wranglerContext.Core.Secret())
+	portForwarder, err := forward.New(
+		restConfig,
+		wranglerContext.Core.Pod(),
+		namespace.System,
+		"app=api-extension",
+		[]string{"5555:5555"})
+
+	if err != nil {
+		return err
+	}
+
+	connectSecret, err := GetOrCreateRDPConnectSecret(wranglerContext.Core.Secret())
+	if err != nil {
+		return err
+	}
+
+	remoteDialerProxyClient, err := proxyclient.New(
+		ctx,
+		connectSecret,
+		namespace.System,
+		certSecretName,
+		certServerName,
+		wranglerContext.Core.Secret(),
+		portForwarder)
+
+	if err != nil {
+		return err
+	}
+
+	remoteDialerProxyClient.Run(ctx)
+
+	return nil
 }
 
 func RDPEnabled() bool {
