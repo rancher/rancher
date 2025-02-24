@@ -331,11 +331,12 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				return values
 			},
 			Enabled: func() bool {
-				if ext.RDPEnabled() {
-					// do not deploy RDP in downstream cluster
-					return !features.MCMAgent.Enabled()
+				// do not deploy RDP in downstream cluster
+				if features.MCMAgent.Enabled() {
+					return false
 				}
-				return false
+
+				return features.ImperativeApiExtension.Enabled() && ext.RDPEnabled()
 			},
 			Uninstall:       false,
 			RemoveNamespace: false,
