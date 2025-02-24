@@ -123,6 +123,10 @@ func (s *Store) Create(ctx context.Context,
 	if objUserActivity.Name == "" {
 		return nil, apierrors.NewBadRequest("name is required")
 	}
+	// ensure generate name is not used
+	if objUserActivity.GenerateName != "" {
+		return nil, apierrors.NewBadRequest("name generation is not allowed")
+	}
 
 	// retrieve auth token
 	authToken, err := s.tokenCache.Get(authTokenID)
@@ -159,12 +163,6 @@ func (s *Store) Create(ctx context.Context,
 
 	// check if it's a dry-run
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
-
-	// ensure generate name is not used
-	if objUserActivity.GenerateName != "" {
-		return nil, apierrors.NewBadRequest("name generation is not allowed")
-	}
-	// ensure the token specified in the UserActivity is the same
 
 	// once validated the request, we can define the lastActivity time.
 	newIdleTimeout := metav1.Time{
