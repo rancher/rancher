@@ -183,12 +183,12 @@ func TestApply(t *testing.T) {
 			return len(raw.Items)
 		}
 
-		assert.Equal(t, 0, countServices)
+		assert.Equal(t, 0, countServices())
 
 		metrics, err := Apply(context.TODO(), "continue-migration", statusClient, dynamicset, changes.ApplyOptions{}, test.NewFakeMapper())
 		require.NoError(t, err)
 
-		assert.Equal(t, 2, countServices)
+		assert.Equal(t, 2, countServices())
 		wantMetrics := &changes.ApplyMetrics{Create: 2}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
@@ -320,26 +320,28 @@ func (t testMigration) Name() string {
 
 func (t testMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
 	return &MigrationChanges{
-		Changes: []changes.ResourceChange{
+		Changes: []ChangeSet{
 			{
-				Operation: changes.OperationPatch,
-				Patch: &changes.PatchChange{
-					ResourceRef: changes.ResourceReference{
-						ObjectRef: types.NamespacedName{
-							Name:      "test-svc",
-							Namespace: "default",
+				{
+					Operation: changes.OperationPatch,
+					Patch: &changes.PatchChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name:      "test-svc",
+								Namespace: "default",
+							},
+							Resource: "services",
+							Version:  "v1",
 						},
-						Resource: "services",
-						Version:  "v1",
-					},
-					Operations: []changes.PatchOperation{
-						{
-							Operation: "replace",
-							Path:      "/spec/ports/0/targetPort",
-							Value:     9371,
+						Operations: []changes.PatchOperation{
+							{
+								Operation: "replace",
+								Path:      "/spec/ports/0/targetPort",
+								Value:     9371,
+							},
 						},
+						Type: changes.PatchApplicationJSON,
 					},
-					Type: changes.PatchApplicationJSON,
 				},
 			},
 		},
@@ -376,11 +378,13 @@ func (t testDeleteMigration) Changes(ctx context.Context, _ changes.Interface, _
 	}
 
 	return &MigrationChanges{
-		Changes: []changes.ResourceChange{
+		Changes: []ChangeSet{
 			{
-				Operation: changes.OperationDelete,
-				Delete: &changes.DeleteChange{
-					ResourceRef: secretRef,
+				{
+					Operation: changes.OperationDelete,
+					Delete: &changes.DeleteChange{
+						ResourceRef: secretRef,
+					},
 				},
 			},
 		},
@@ -397,12 +401,14 @@ func (m testCreateMigration) Name() string {
 
 func (m testCreateMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
 	return &MigrationChanges{
-		Changes: []changes.ResourceChange{
+		Changes: []ChangeSet{
 			{
-				Operation: changes.OperationCreate,
-				Create: &changes.CreateChange{
-					Resource: test.ToUnstructured(m.t,
-						newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, testSecretData)),
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(m.t,
+							newSecret(types.NamespacedName{Name: "test-secret", Namespace: "cattle-secrets"}, testSecretData)),
+					},
 				},
 			},
 		},
@@ -465,7 +471,7 @@ func (m testContinueMigration) Changes(ctx context.Context, client changes.Inter
 		},
 	}
 
-	return &MigrationChanges{Continue: string(newContinue), Changes: changes}, nil
+	return &MigrationChanges{Continue: string(newContinue), Changes: []ChangeSet{changes}}, nil
 }
 
 // TODO: Move this to the test package

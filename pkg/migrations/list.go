@@ -30,10 +30,20 @@ type MigrationOptions struct {
 	Limit int64
 }
 
+// ChangeSet is a set of ResourceChanges that are considered to be an
+// error-boundary when applying changes.
+//
+// An error applying a ResourceChange from a ChangeSet indicates that the
+// ChangeSet should fail, but that the application process should continue with
+// the next ChangeSet.
+//
+// A migration is represented as a set of ChangeSets.
+type ChangeSet []changes.ResourceChange
+
 // MigrationChanges represents the calculated changes to apply to the cluster.
 type MigrationChanges struct {
 	Continue string
-	Changes  []changes.ResourceChange
+	Changes  []ChangeSet
 }
 
 // Migration implementations can be registered with the system.

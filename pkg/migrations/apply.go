@@ -62,13 +62,15 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 			return nil, errors.Join(fmt.Errorf("calculating changes for migration %q: %w", name, err), migrationStatus.SetStatusFor(ctx, name, status))
 		}
 
-		// TODO Should this retry?
-		applyMetrics, err := changes.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
-		if err != nil {
-			applyErr = errors.Join(applyErr, err)
-		}
+		for _, changeset := range migrationChanges.Changes {
+			// TODO Should this retry?
+			applyMetrics, err := changes.ApplyChanges(ctx, client, changeset, options, mapper)
+			if err != nil {
+				applyErr = errors.Join(applyErr, err)
+			}
 
-		combinedMetrics = combinedMetrics.Combine(applyMetrics)
+			combinedMetrics = combinedMetrics.Combine(applyMetrics)
+		}
 		migrationContinue = migrationChanges.Continue
 		if migrationContinue == "" {
 			break
