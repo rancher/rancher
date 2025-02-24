@@ -122,7 +122,7 @@ func (s *Store) Create(ctx context.Context,
 	}
 	// retrieve token information
 	if objUserActivity.Name == "" {
-		return nil, apierrors.NewBadRequest("can't retrieve token with empty string")
+		return nil, apierrors.NewBadRequest("name is required")
 	}
 
 	// retrieve auth token
