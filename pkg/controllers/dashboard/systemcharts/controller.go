@@ -325,7 +325,10 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ChartName:           chart.RemoteDialerProxyChartName,
 			ExactVersionSetting: settings.RemoteDialerProxyVersion,
 			Values: func() map[string]interface{} {
-				return map[string]interface{}{}
+				values := map[string]interface{}{}
+				// add priority class value
+				h.setPriorityClass(values, chart.RemoteDialerProxyChartName)
+				return values
 			},
 			Enabled: func() bool {
 				if ext.RDPEnabled() {

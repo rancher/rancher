@@ -337,7 +337,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
@@ -408,12 +408,20 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					"remotedialer-proxy",
 					"",
 					"2.0.0",
-					map[string]interface{}{},
+					expectedRDPValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
@@ -427,7 +435,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster with imported-cluster-version-managements disabled",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -479,12 +487,20 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					"remotedialer-proxy",
 					"",
 					"2.0.0",
-					map[string]interface{}{},
+					expectedRDPValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
@@ -502,7 +518,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster with imported-cluster-version-managements disabled and with existing plans",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
@@ -555,12 +571,20 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					"remotedialer-proxy",
 					"",
 					"2.0.0",
-					map[string]interface{}{},
+					expectedRDPValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
@@ -577,7 +601,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with config cache errors",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(6)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
@@ -645,12 +669,19 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					"remotedialer-proxy",
 					"",
 					"2.0.0",
-					map[string]interface{}{},
+					expectedRDPValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
@@ -664,7 +695,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with image override",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(6)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
@@ -747,14 +778,24 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher-test.io/rancher/remotedialer-proxy",
+					},
+				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					"remotedialer-proxy",
 					"",
 					"2.0.1",
-					map[string]interface{}{},
+					expectedRDPValues,
 					gomock.AssignableToTypeOf(false),
-					"",
+					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
 				// rancher-operator
@@ -767,7 +808,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with webhook values",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(6)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
@@ -836,12 +877,20 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					"remotedialer-proxy",
 					"",
 					"2.0.1",
-					map[string]interface{}{},
+					expectedRDPValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
