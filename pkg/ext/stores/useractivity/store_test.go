@@ -87,6 +87,9 @@ func TestStoreCreate(t *testing.T) {
 					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "token-12345",
+							Labels: map[string]string{
+								TokenKind: "session",
+							},
 						},
 						AuthProvider:  "oidc",
 						UserPrincipal: v3.Principal{},
@@ -100,7 +103,7 @@ func TestStoreCreate(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, time.UTC)).String(),
+					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, &time.Location{})).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -218,6 +221,9 @@ func TestStoreCreate(t *testing.T) {
 					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "token-12345",
+							Labels: map[string]string{
+								TokenKind: "session",
+							},
 						},
 						AuthProvider:  "oidc",
 						UserPrincipal: v3.Principal{},
@@ -229,7 +235,7 @@ func TestStoreCreate(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, time.UTC)).String(),
+					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, &time.Location{})).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -301,6 +307,9 @@ func TestStoreGet(t *testing.T) {
 				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3Legacy.Token{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "token-12345",
+						Labels: map[string]string{
+							TokenKind: "session",
+						},
 					},
 					UserID: "admin",
 					ActivityLastSeenAt: &v1.Time{
