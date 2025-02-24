@@ -168,7 +168,7 @@ func (s *Store) Create(ctx context.Context,
 	newIdleTimeout := metav1.Time{
 		Time: lastActivity.Add(time.Minute * time.Duration(idleTimeout)).UTC(),
 	}
-	objUserActivity.Status.ExpiresAt = newIdleTimeout.String()
+	objUserActivity.Status.ExpiresAt = newIdleTimeout.Time.Format(time.RFC3339)
 
 	// if it's not a dry-run, commit the changes
 	if !dryRun {
