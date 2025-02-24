@@ -2,8 +2,11 @@ package plansecret
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"time"
 
 	"github.com/rancher/rancher/pkg/capr"
@@ -74,6 +77,36 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 		}
 	}
 
+	node, err := planner.SecretToNode(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	if purgePeriodicInstructionOutput(node) {
+		if len(node.PeriodicOutput) == 0 {
+			// special case for when there are no remaining periodic instructions
+			secret.Data["applied-periodic-output"] = []byte{}
+		} else {
+			input, err := json.Marshal(node.PeriodicOutput)
+			if err != nil {
+				return nil, err
+			}
+
+			var output bytes.Buffer
+
+			gz := gzip.NewWriter(&output)
+			if _, err = gz.Write(input); err != nil {
+				return nil, err
+			}
+			if err = gz.Close(); err != nil {
+				return nil, err
+			}
+
+			secret.Data["applied-periodic-output"] = output.Bytes()
+		}
+		secretChanged = true
+	}
+
 	if secretChanged {
 		// don't return the secret at this point, we want to attempt to update the machine status later on
 		secret, err = h.secrets.Update(secret)
@@ -112,6 +145,33 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 	logrus.Debugf("[plansecret] %s/%s: rv: %s: Reconciling machine PlanApplied condition to nil", secret.Namespace, secret.Name, secret.ResourceVersion)
 	err = h.reconcileMachinePlanAppliedCondition(secret, nil)
 	return secret, err
+}
+
+// purgePeriodicInstructionOutput will parse the node plan and remove the periodic output for instructions which are no
+// longer present in the current plan. Returns "" when the entire list is removed, otherwise it returns the json blob of
+// remaining keys gzipped for setting the "applied-periodic-output". Returns nil only when the "applied-periodic-output"
+// key is not to be overwritten. This function modifies the node plan in place.
+func purgePeriodicInstructionOutput(node *plan.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	// if old periodic instructions are within the plan, remove them
+	knownInstructions := map[string]struct{}{}
+	for _, p := range node.Plan.PeriodicInstructions {
+		knownInstructions[p.Name] = struct{}{}
+	}
+
+	removed := false
+	for n := range node.PeriodicOutput {
+		if _, ok := knownInstructions[n]; !ok {
+			// remove from periodic output
+			delete(node.PeriodicOutput, n)
+			removed = true
+		}
+	}
+
+	return removed
 }
 
 func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, planAppliedErr error) error {
