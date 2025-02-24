@@ -48,23 +48,39 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 
 	// TODO Loop while migrationChanges.Continue != ""
 	// TODO Introduce some sort of delay - can be configured by the migration?
-	migrationChanges, err := migration.Changes(ctx, changes.ClientFrom(client), MigrationOptions{})
-	if err != nil {
-		status := MigrationStatus{
-			Errors: err.Error(),
+	migrationContinue := ""
+	var applyErr error
+	start := time.Now()
+	combinedMetrics := &changes.ApplyMetrics{}
+	for {
+		migrationChanges, err := migration.Changes(ctx, changes.ClientFrom(client), MigrationOptions{Continue: migrationContinue})
+		if err != nil {
+			status := MigrationStatus{
+				Errors: err.Error(),
+			}
+			// TODO Log the error?
+			return nil, errors.Join(fmt.Errorf("calculating changes for migration %q: %w", name, err), migrationStatus.SetStatusFor(ctx, name, status))
 		}
-		// TODO Log the error?
-		return nil, errors.Join(fmt.Errorf("calculating changes for migration %q: %w", name, err), migrationStatus.SetStatusFor(ctx, name, status))
+
+		// TODO Should this retry?
+		applyMetrics, err := changes.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
+		if err != nil {
+			applyErr = errors.Join(applyErr, err)
+		}
+
+		combinedMetrics = combinedMetrics.Combine(applyMetrics)
+		migrationContinue = migrationChanges.Continue
+		if migrationContinue == "" {
+			break
+		}
 	}
 
-	// TODO Should this retry?
-	start := time.Now()
-	metrics, applyErr := changes.ApplyChanges(ctx, client, migrationChanges.Changes, options, mapper)
 	status := MigrationStatus{
 		AppliedAt: time.Now(),
-		Metrics:   metrics,
+		Metrics:   combinedMetrics,
 	}
-	logger.WithFields(metricsToFields(metrics)).
+
+	logger.WithFields(metricsToFields(combinedMetrics)).
 		WithFields(logrus.Fields{"duration": time.Since(start)}).
 		Info("migration ended")
 
@@ -72,7 +88,7 @@ func Apply(ctx context.Context, name string, migrationStatus MigrationStatusClie
 		status.Errors = applyErr.Error()
 	}
 
-	return metrics, errors.Join(applyErr, migrationStatus.SetStatusFor(ctx, name, status))
+	return combinedMetrics, errors.Join(applyErr, migrationStatus.SetStatusFor(ctx, name, status))
 }
 
 func metricsToFields(m *changes.ApplyMetrics) logrus.Fields {

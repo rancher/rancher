@@ -13,19 +13,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// BatchedMigration is a simple example that supports the Continue mechanism.
-type BatchedMigration struct {
+// batchedMigration is a simple example that supports the Continue mechanism.
+type batchedMigration struct {
 }
 
 // Name implements the Migration interface.
-func (t BatchedMigration) Name() string {
+func (t batchedMigration) Name() string {
 	return "batched-migration"
 }
 
 // Changes implements the Migration interface.
 //
-// It counts up to 5.
-func (t BatchedMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
+// It counts up to 2.
+func (t batchedMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
 	var migrationContinue struct {
 		Start int64 `json:"start"`
 	}

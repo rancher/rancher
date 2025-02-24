@@ -2,7 +2,10 @@ package migrations
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"testing"
 	"time"
 
@@ -162,7 +165,7 @@ func TestApply(t *testing.T) {
 	})
 
 	t.Run("apply all batches of migrations", func(t *testing.T) {
-		Register(example.batchedMigration{})
+		Register(testContinueMigration{t, 2, "test-ns"})
 		t.Cleanup(func() {
 			knownMigrations = nil
 		})
@@ -170,13 +173,27 @@ func TestApply(t *testing.T) {
 		dynamicset := newFakeDynamicClient(t)
 		statusClient := NewStatusClient(clientset.CoreV1())
 
-		_, err := Apply(context.TODO(), "test-failing-migration", statusClient, dynamicset, changes.ApplyOptions{}, test.NewFakeMapper())
-		require.ErrorContains(t, err, "this is a failing migration")
+		countServices := func() int {
+			raw, err := dynamicset.Resource(schema.GroupVersionResource{
+				Version:  "v1",
+				Resource: "services",
+			}).Namespace("test-ns").List(context.TODO(), metav1.ListOptions{})
+			require.NoError(t, err)
 
-		status, err := statusClient.StatusFor(context.TODO(), "test-failing-migration")
-		assert.EqualExportedValues(t, &MigrationStatus{Errors: "this is a failing migration"}, status)
+			return len(raw.Items)
+		}
+
+		assert.Equal(t, 0, countServices)
+
+		metrics, err := Apply(context.TODO(), "continue-migration", statusClient, dynamicset, changes.ApplyOptions{}, test.NewFakeMapper())
+		require.NoError(t, err)
+
+		assert.Equal(t, 2, countServices)
+		wantMetrics := &changes.ApplyMetrics{Create: 2}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
 	})
-
 }
 
 func TestApplyUnappliedMigrations(t *testing.T) {
@@ -390,6 +407,65 @@ func (m testCreateMigration) Changes(ctx context.Context, _ changes.Interface, _
 			},
 		},
 	}, nil
+}
+
+// creates corev1.Services in the configured namespace.
+// returns a Continue value in the returned MigrationChanges up to the
+// count times.
+type testContinueMigration struct {
+	t *testing.T
+	// count is the number of continues
+	count int64
+	// namespace is the namespace to create services in.
+	namespace string
+}
+
+// Name implements the Migration interface.
+func (m testContinueMigration) Name() string {
+	return "continue-migration"
+}
+
+// Changes implements the Migration interface.
+//
+// It will return a continue value twice.
+func (m testContinueMigration) Changes(ctx context.Context, client changes.Interface, opts MigrationOptions) (*MigrationChanges, error) {
+	var migrationContinue struct {
+		Start int64 `json:"start"`
+	}
+	if opts.Continue != "" {
+		err := json.Unmarshal([]byte(opts.Continue), &migrationContinue)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	log.Printf("migrationContinue = %#v", migrationContinue)
+
+	svc := test.NewService(func(svc *corev1.Service) {
+		svc.Namespace = m.namespace
+		svc.Name = fmt.Sprintf("test-%v", migrationContinue.Start)
+	})
+
+	migrationContinue.Start += 1
+	newContinue, err := json.Marshal(migrationContinue)
+	if err != nil {
+		return nil, err
+	}
+	if migrationContinue.Start == m.count {
+		newContinue = nil
+	}
+
+	uns := test.ToUnstructured(m.t, svc)
+	changes := []changes.ResourceChange{
+		{
+			Operation: changes.OperationCreate,
+			Create: &changes.CreateChange{
+				Resource: uns,
+			},
+		},
+	}
+
+	return &MigrationChanges{Continue: string(newContinue), Changes: changes}, nil
 }
 
 // TODO: Move this to the test package

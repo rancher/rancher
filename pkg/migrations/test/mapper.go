@@ -13,6 +13,11 @@ func NewFakeMapper() *meta.DefaultRESTMapper {
 		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"},
 		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secret"},
 		meta.RESTScopeNamespace)
+	mapper.AddSpecific(
+		schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"},
+		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"},
+		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "service"},
+		meta.RESTScopeNamespace)
 
 	return mapper
 }
