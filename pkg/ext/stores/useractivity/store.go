@@ -26,6 +26,7 @@ import (
 const (
 	SingularName             = "useractivity"
 	GroupCattleAuthenticated = "system:cattle:authenticated"
+	TokenKind                = "authn.management.cattle.io/kind"
 )
 
 var timeNow = func() time.Time {
@@ -144,6 +145,11 @@ func (s *Store) Create(ctx context.Context,
 		}
 	}
 
+	// verify auth and activity token have the same userID
+	if authToken.UserID != activityToken.UserID {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different users", authTokenID, objUserActivity.Name))
+	}
+
 	// verify auth and activity token has the same auth provider
 	if authToken.AuthProvider != activityToken.AuthProvider {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, objUserActivity.Name))
@@ -152,6 +158,11 @@ func (s *Store) Create(ctx context.Context,
 	// verify auth and activity token has the same auth user principal
 	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, objUserActivity.Name))
+	}
+
+	// verify activity token is of the expected kind
+	if activityToken.Labels[TokenKind] != "session" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", objUserActivity.Name))
 	}
 
 	// set when last activity happened
@@ -228,14 +239,24 @@ func (s *Store) Get(ctx context.Context,
 		}
 	}
 
-	// verify auth and activity token has the same auth provider
+	// verify auth and activity token have the same userID
+	if authToken.UserID != activityToken.UserID {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different users", authTokenID, name))
+	}
+
+	// verify auth and activity token have the same auth provider
 	if authToken.AuthProvider != activityToken.AuthProvider {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, name))
 	}
 
-	// verify auth and activity token has the same auth user principal
+	// verify auth and activity token have the same auth user principal
 	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, name))
+	}
+
+	// verify activity token is of the expected kind
+	if activityToken.Labels[TokenKind] != "session" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", name))
 	}
 
 	// crafting UserActivity from requested Token name.
