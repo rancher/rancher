@@ -8,7 +8,9 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// User Activity
+// UserActivity keeps track about the user activity on the UI.
+// If the user doens't perform one or more actions for a while (eg: cursor move, key presse, tab focus),
+// this will logout the user from its session.
 type UserActivity struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
