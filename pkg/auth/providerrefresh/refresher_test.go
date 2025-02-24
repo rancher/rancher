@@ -134,7 +134,7 @@ func Test_refreshAttributes(t *testing.T) {
 		Spec: ext.TokenSpec{
 			UserID: "user-abcde",
 			Kind:   exttokens.IsLogin,
-			UserPrincipal: v3.Principal{
+			UserPrincipal: ext.TokenPrincipal{
 				ObjectMeta: metav1.ObjectMeta{Name: "local://user-abcde"},
 				Provider:   providers.LocalProvider,
 				LoginName:  "admin",
@@ -176,7 +176,7 @@ func Test_refreshAttributes(t *testing.T) {
 		Spec: ext.TokenSpec{
 			UserID: "user-abcde",
 			Kind:   "",
-			UserPrincipal: v3.Principal{
+			UserPrincipal: ext.TokenPrincipal{
 				ObjectMeta: metav1.ObjectMeta{Name: "shibboleth_user://user1"},
 				Provider:   saml.ShibbolethName,
 				LoginName:  "user1",
