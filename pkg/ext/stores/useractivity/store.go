@@ -52,11 +52,7 @@ var GVK = schema.GroupVersionKind{
 	Kind:    "UserActivity",
 }
 
-var GVR = schema.GroupVersionResource{
-	Group:    GV.Group,
-	Version:  GV.Version,
-	Resource: PluralName,
-}
+var GVR = ext.SchemeGroupVersion.WithResource(ext.UserActivityResourceName)
 
 func New(wranglerCtx *wrangler.Context) *Store {
 	return &Store{
