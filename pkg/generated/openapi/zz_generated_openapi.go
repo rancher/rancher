@@ -31,6 +31,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 	return map[string]common.OpenAPIDefinition{
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token":              schema_pkg_apis_extcattleio_v1_Token(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenList":          schema_pkg_apis_extcattleio_v1_TokenList(ref),
+		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal":     schema_pkg_apis_extcattleio_v1_TokenPrincipal(ref),
+		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipalList": schema_pkg_apis_extcattleio_v1_TokenPrincipalList(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec":          schema_pkg_apis_extcattleio_v1_TokenSpec(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus":        schema_pkg_apis_extcattleio_v1_TokenStatus(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity":       schema_pkg_apis_extcattleio_v1_UserActivity(ref),
@@ -191,6 +193,162 @@ func schema_pkg_apis_extcattleio_v1_TokenList(ref common.ReferenceCallback) comm
 	}
 }
 
+func schema_pkg_apis_extcattleio_v1_TokenPrincipal(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenPrincipal contains the data about the user principal owning the token.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"displayName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisplayName is the human readable name/description of the principal.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"loginName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LoginName is the account name of the principal in the managing auth provider.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"profilePicture": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProfilePicture is an url to a picture to use when displaying the principal.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"profileURL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProfileURL is not used by the system",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"principalType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PrincipalType is the kind of principal. Legal values are \"user\" and \"group\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"me": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Me is a virtual flag for use with the dashboard.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"memberOf": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MemberOf is a virtual flag for use with the dashboard.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"provider": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Provider is the name of the auth provider managing the principal",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"extraInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExtraInfo contains additional information about the principal.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_TokenPrincipalList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TokenPrincipalList is a list of TokenPrincipal resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"metadata", "items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
 func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -209,7 +367,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "UserPrincipal holds the information about the ext auth provider managed user (principal) owning the token.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"),
+							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal"),
 						},
 					},
 					"kind": {
@@ -247,7 +405,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3.Principal"},
+			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal"},
 	}
 }
 

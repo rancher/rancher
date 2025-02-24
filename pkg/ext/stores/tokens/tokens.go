@@ -391,7 +391,21 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
-	token.Spec.UserPrincipal = requestToken.GetUserPrincipal()
+
+	rtPrincipal := requestToken.GetUserPrincipal()
+	token.Spec.UserPrincipal = ext.TokenPrincipal{
+		TypeMeta:       rtPrincipal.TypeMeta,
+		ObjectMeta:     rtPrincipal.ObjectMeta,
+		DisplayName:    rtPrincipal.DisplayName,
+		LoginName:      rtPrincipal.LoginName,
+		ProfilePicture: rtPrincipal.ProfilePicture,
+		ProfileURL:     rtPrincipal.ProfileURL,
+		PrincipalType:  rtPrincipal.PrincipalType,
+		Me:             rtPrincipal.Me,
+		MemberOf:       rtPrincipal.MemberOf,
+		Provider:       rtPrincipal.Provider,
+		ExtraInfo:      rtPrincipal.ExtraInfo,
+	}
 
 	// Generate a secret and its hash
 	tokenValue, hashedValue, err := t.hasher.MakeAndHashSecret()

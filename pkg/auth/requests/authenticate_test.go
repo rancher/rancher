@@ -665,7 +665,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			TTL:     57600000,
 			Kind:    exttokenstore.IsLogin,
 			Enabled: pointer.Bool(true),
-			UserPrincipal: v3.Principal{
+			UserPrincipal: ext.TokenPrincipal{
 				ObjectMeta:  metav1.ObjectMeta{Name: userPrincipalID},
 				Provider:    fakeProvider.name,
 				LoginName:   user.Username,

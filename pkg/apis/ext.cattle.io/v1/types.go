@@ -52,7 +52,7 @@ type TokenSpec struct {
 	UserID string `json:"userID,omitempty"`
 	// UserPrincipal holds the information about the ext auth provider
 	// managed user (principal) owning the token.
-	UserPrincipal apiv3.Principal `json:"userPrincipal""`
+	UserPrincipal TokenPrincipal `json:"userPrincipal""`
 	// Kind describes the nature of the token. The value "session" indicates
 	// a login/session token. Any other value, including the empty string,
 	// which is the default, stands for some kind of derived token.
@@ -69,6 +69,36 @@ type TokenSpec struct {
 	// enabled token.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TokenPrincipal contains the data about the user principal owning the token.
+type TokenPrincipal struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// DisplayName is the human readable name/description of the principal.
+	// +optional
+	DisplayName string `json:"displayName,omitempty"`
+	// LoginName is the account name of the principal in the managing auth provider.
+	LoginName string `json:"loginName,omitempty"`
+	// ProfilePicture is an url to a picture to use when displaying the principal.
+	// +optional
+	ProfilePicture string `json:"profilePicture,omitempty"`
+	// ProfileURL is not used by the system
+	// +optional
+	ProfileURL string `json:"profileURL,omitempty"`
+	// PrincipalType is the kind of principal. Legal values are "user" and "group".
+	PrincipalType string `json:"principalType,omitempty"`
+	// Me is a virtual flag for use with the dashboard.
+	Me bool `json:"me,omitempty"`
+	// MemberOf is a virtual flag for use with the dashboard.
+	MemberOf bool `json:"memberOf,omitempty"`
+	// Provider is the name of the auth provider managing the principal
+	Provider string `json:"provider,omitempty"`
+	// ExtraInfo contains additional information about the principal.
+	ExtraInfo map[string]string `json:"extraInfo,omitempty"`
 }
 
 // TokenStatus contains system information about the Token.
@@ -122,7 +152,19 @@ func (t *Token) GetAuthProvider() string {
 	return t.Spec.UserPrincipal.Provider
 }
 func (t *Token) GetUserPrincipal() apiv3.Principal {
-	return t.Spec.UserPrincipal
+	return apiv3.Principal{
+		TypeMeta:       t.Spec.UserPrincipal.TypeMeta,
+		ObjectMeta:     t.Spec.UserPrincipal.ObjectMeta,
+		DisplayName:    t.Spec.UserPrincipal.DisplayName,
+		LoginName:      t.Spec.UserPrincipal.LoginName,
+		ProfilePicture: t.Spec.UserPrincipal.ProfilePicture,
+		ProfileURL:     t.Spec.UserPrincipal.ProfileURL,
+		PrincipalType:  t.Spec.UserPrincipal.PrincipalType,
+		Me:             t.Spec.UserPrincipal.Me,
+		MemberOf:       t.Spec.UserPrincipal.MemberOf,
+		Provider:       t.Spec.UserPrincipal.Provider,
+		ExtraInfo:      t.Spec.UserPrincipal.ExtraInfo,
+	}
 }
 
 func (t *Token) GetGroupPrincipals() []apiv3.Principal {

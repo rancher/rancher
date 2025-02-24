@@ -30,7 +30,7 @@ var (
 	// use for disabled tokens
 
 	// properSecret is the backend secret matching the properToken
-	properPrincipal = v3.Principal{
+	properPrincipal = ext.TokenPrincipal{
 		ObjectMeta:  metav1.ObjectMeta{Name: "world"},
 		Provider:    "somebody",
 		DisplayName: "myself",

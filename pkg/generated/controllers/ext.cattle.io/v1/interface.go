@@ -32,6 +32,7 @@ func init() {
 
 type Interface interface {
 	Token() TokenController
+	TokenPrincipal() TokenPrincipalController
 	UserActivity() UserActivityController
 }
 
@@ -47,6 +48,10 @@ type version struct {
 
 func (v *version) Token() TokenController {
 	return generic.NewController[*v1.Token, *v1.TokenList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Token"}, "tokens", true, v.controllerFactory)
+}
+
+func (v *version) TokenPrincipal() TokenPrincipalController {
+	return generic.NewController[*v1.TokenPrincipal, *v1.TokenPrincipalList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "TokenPrincipal"}, "tokenprincipals", true, v.controllerFactory)
 }
 
 func (v *version) UserActivity() UserActivityController {
