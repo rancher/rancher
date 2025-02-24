@@ -25,7 +25,6 @@ import (
 
 const (
 	SingularName             = "useractivity"
-	PluralName               = "useractivities"
 	GroupCattleAuthenticated = "system:cattle:authenticated"
 )
 
