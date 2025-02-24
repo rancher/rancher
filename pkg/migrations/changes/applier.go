@@ -33,14 +33,6 @@ type ApplyOptions struct {
 	DryRun bool
 }
 
-// ApplyMetrics reports the number of changes during the process.
-type ApplyMetrics struct {
-	Create int64
-	Delete int64
-	Patch  int64
-	Errors int64
-}
-
 // PatchOperation describes a JSON Patch operation.
 type PatchOperation struct {
 	Operation string `json:"op"`

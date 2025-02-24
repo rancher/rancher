@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	migrations.Register(limitedMigration{})
+	// migrations.Register(limitedMigration{})
 }
 
 type limitedMigration struct {

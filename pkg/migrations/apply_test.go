@@ -160,6 +160,23 @@ func TestApply(t *testing.T) {
 		status, err := statusClient.StatusFor(context.TODO(), "test-failing-migration")
 		assert.EqualExportedValues(t, &MigrationStatus{Errors: "this is a failing migration"}, status)
 	})
+
+	t.Run("apply all batches of migrations", func(t *testing.T) {
+		Register(example.batchedMigration{})
+		t.Cleanup(func() {
+			knownMigrations = nil
+		})
+		clientset := fake.NewClientset()
+		dynamicset := newFakeDynamicClient(t)
+		statusClient := NewStatusClient(clientset.CoreV1())
+
+		_, err := Apply(context.TODO(), "test-failing-migration", statusClient, dynamicset, changes.ApplyOptions{}, test.NewFakeMapper())
+		require.ErrorContains(t, err, "this is a failing migration")
+
+		status, err := statusClient.StatusFor(context.TODO(), "test-failing-migration")
+		assert.EqualExportedValues(t, &MigrationStatus{Errors: "this is a failing migration"}, status)
+	})
+
 }
 
 func TestApplyUnappliedMigrations(t *testing.T) {

@@ -13,20 +13,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func init() {
-	migrations.Register(batchedMigration{})
-}
-
-type batchedMigration struct {
+// BatchedMigration is a simple example that supports the Continue mechanism.
+type BatchedMigration struct {
 }
 
 // Name implements the Migration interface.
-func (t batchedMigration) Name() string {
+func (t BatchedMigration) Name() string {
 	return "batched-migration"
 }
 
 // Changes implements the Migration interface.
-func (t batchedMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
+//
+// It counts up to 5.
+func (t BatchedMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
 	var migrationContinue struct {
 		Start int64 `json:"start"`
 	}
@@ -67,14 +66,6 @@ func (t batchedMigration) Changes(ctx context.Context, client changes.Interface,
 	return &migrations.MigrationChanges{Continue: string(newContinue), Changes: changes}, nil
 }
 
-func toUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
-	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	return &unstructured.Unstructured{Object: raw}, nil
-}
 func toUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
 	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
