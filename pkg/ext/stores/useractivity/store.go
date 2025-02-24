@@ -166,10 +166,6 @@ func (s *Store) Create(ctx context.Context,
 		return nil, apierrors.NewBadRequest("name generation is not allowed")
 	}
 	// ensure the token specified in the UserActivity is the same
-	// we are using to do the request.
-	if activityToken.Name != objUserActivity.Name {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("token name mismatch: have %s - expected %s", activityToken.Name, objUserActivity.Name))
-	}
 
 	// once validated the request, we can define the lastActivity time.
 	newIdleTimeout := metav1.Time{
