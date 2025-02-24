@@ -6,42 +6,44 @@ import (
 	"reflect"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var operationalAttrList = []string{"1.1", "+", "*"}
 
-func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin, config *v3.LdapConfig, caPool *x509.CertPool) (v3.Principal, []v3.Principal, error) {
+func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, config *v3.LdapConfig) (v3.Principal, []v3.Principal, error) {
 	logrus.Debug("Now generating Ldap token")
 
-	username := credential.Username
-	password := credential.Password
-
-	if password == "" {
+	if credentials.Password == "" {
 		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
 	}
 
-	serviceAccountPassword := config.ServiceAccountPassword
-	serviceAccountUserName := config.ServiceAccountDistinguishedName
-	err := ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
+	err := ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
 	if err != nil {
 		return v3.Principal{}, nil, err
 	}
 
-	logrus.Debug("Binding username password")
+	if config.UserLoginFilter != "" {
+		// Make sure user login filter contains a valid LDAP query expression
+		// before interpolating it into the search filter.
+		if _, err = ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.InvalidOption, "invalid userLoginFilter")
+		}
+	}
 
 	filter := fmt.Sprintf(
-		"(&(%v=%v)(%v=%v))",
-		ObjectClass, config.UserObjectClass,
-		config.UserLoginAttribute, ldapv3.EscapeFilter(username),
+		"(&(%s=%s)(%s=%s)%s)",
+		ObjectClass,
+		ldap.SanitizeAttr(config.UserObjectClass),
+		ldap.SanitizeAttr(config.UserLoginAttribute),
+		ldapv3.EscapeFilter(credentials.Username),
+		config.UserLoginFilter,
 	)
 
 	searchRequest := ldap.NewWholeSubtreeSearchRequest(
@@ -51,27 +53,29 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 	)
 
 	result, err := lConn.Search(searchRequest)
+	if err == nil {
+		if nEntries := len(result.Entries); nEntries < 1 {
+			err = fmt.Errorf("cannot locate user information for %s", searchRequest.Filter)
+		} else if nEntries > 1 {
+			err = fmt.Errorf("ldap user search found more than one result")
+		}
+	}
 	if err != nil {
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
+		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
 	}
 
-	if len(result.Entries) < 1 {
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
-	} else if len(result.Entries) > 1 {
-		return v3.Principal{}, nil, fmt.Errorf("ldap user search found more than one result")
-	}
-
-	userDN := result.Entries[0].DN //userDN is externalID
-	err = lConn.Bind(userDN, password)
+	logrus.Debug("Binding username password")
+	userDN := result.Entries[0].DN // userDN is externalID
+	err = lConn.Bind(userDN, credentials.Password)
 	if err != nil {
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
-			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed: invalid credentials")
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
 		}
 		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
 	if config.SearchUsingServiceAccount {
-		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
+		err = ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
 		if err != nil {
 			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 		}
@@ -79,7 +83,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 
 	searchOpRequest := ldap.NewWholeSubtreeSearchRequest(
 		userDN,
-		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
+		fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.UserObjectClass)),
 		operationalAttrList,
 	)
 
@@ -109,19 +113,21 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 }
 
 func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult, opResult *ldapv3.SearchResult, config *v3.LdapConfig, lConn ldapv3.Client) (v3.Principal, []v3.Principal, error) {
-	var groupPrincipals []v3.Principal
-	var userPrincipal v3.Principal
-	var nonDupGroupPrincipals []v3.Principal
-	var userScope, groupScope string
-	var nestedGroupPrincipals []v3.Principal
-	var freeipaNonEntrydnApproach bool
+	var (
+		groupPrincipals           []v3.Principal
+		userPrincipal             v3.Principal
+		nonDupGroupPrincipals     []v3.Principal
+		userScope, groupScope     string
+		nestedGroupPrincipals     []v3.Principal
+		freeipaNonEntrydnApproach bool
+	)
 
 	groupMap := make(map[string]bool)
 	entry := result.Entries[0]
 	userAttributes := entry.Attributes
 
 	if !p.permissionCheck(userAttributes, config) {
-		return v3.Principal{}, nil, fmt.Errorf("Permission denied")
+		return v3.Principal{}, nil, fmt.Errorf("permission denied")
 	}
 
 	logrus.Debugf("getPrincipals: user attributes: %v ", userAttributes)
@@ -149,42 +155,44 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 	userPrincipal = *user
 	userDN := result.Entries[0].DN
 
-	if len(userMemberAttribute) > 0 {
-		for i := 0; i < len(userMemberAttribute); i += 50 {
-			batchGroupDN := userMemberAttribute[i:min(i+50, len(userMemberAttribute))]
-			filter := fmt.Sprintf("(%v=%v)", ObjectClass, config.GroupObjectClass)
-			query := "(|"
-			for _, gdn := range batchGroupDN {
-				query += fmt.Sprintf("(%v=%v)", config.GroupDNAttribute, ldapv3.EscapeFilter(gdn))
-			}
-			query += ")"
-			query = fmt.Sprintf("(&%v%v)", filter, query)
-			// Pulling user's groups
-			logrus.Debugf("Ldap: Query for pulling user's groups: %v", query)
-			userMemberGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
-			groupPrincipals = append(groupPrincipals, userMemberGroupPrincipals...)
-			if err != nil {
-				return userPrincipal, groupPrincipals, err
-			}
+	for i := 0; i < len(userMemberAttribute); i += 50 {
+		batchGroupDN := userMemberAttribute[i:min(i+50, len(userMemberAttribute))]
+		filter := fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass))
+		query := "(|"
+		for _, gdn := range batchGroupDN {
+			query += fmt.Sprintf("(%s=%s)", config.GroupDNAttribute, ldapv3.EscapeFilter(gdn))
+		}
+		query += ")"
+		query = fmt.Sprintf("(&%s%s)", filter, query)
+		// Pulling user's groups
+		logrus.Debugf("Ldap: Query for pulling user's groups: %s", query)
+		userMemberGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
+		groupPrincipals = append(groupPrincipals, userMemberGroupPrincipals...)
+		if err != nil {
+			return userPrincipal, groupPrincipals, err
 		}
 	}
 
-	opEntry := opResult.Entries[0]
-	opAttributes := opEntry.Attributes
-
 	groupMemberUserAttribute := entry.GetAttributeValues(config.GroupMemberUserAttribute)
 	if len(groupMemberUserAttribute) == 0 {
-		for _, attr := range opAttributes {
+		for _, attr := range opResult.Entries[0].Attributes {
 			if attr.Name == config.GroupMemberUserAttribute {
 				groupMemberUserAttribute = attr.Values
+				break
 			}
 		}
 	}
 
 	if len(groupMemberUserAttribute) > 0 {
-		query := fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(groupMemberUserAttribute[0]), ObjectClass, config.GroupObjectClass)
+		query := fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ldap.SanitizeAttr(config.GroupMemberMappingAttribute),
+			ldapv3.EscapeFilter(groupMemberUserAttribute[0]),
+			ObjectClass,
+			ldap.SanitizeAttr(config.GroupObjectClass),
+		)
 		newGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
-		//deduplicate groupprincipals get from userMemberAttribute
+		// Deduplicate groupprincipals get from userMemberAttribute
 		nonDupGroupPrincipals = ldap.FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals, groupPrincipals, nonDupGroupPrincipals)
 		groupPrincipals = append(groupPrincipals, nonDupGroupPrincipals...)
 		if err != nil {
@@ -199,11 +207,18 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 		// so we derive nested membership using the logic we have for openldap
 		logrus.Debugf("EntryDN attribute not returned, retrieving group membership using the member attribute")
 		// didn't get the entrydn as expected, so use query with member attribute and manually gather nested group
-		query := fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(userDN), ObjectClass, config.GroupObjectClass)
+		query := fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ldap.SanitizeAttr(config.GroupMemberMappingAttribute),
+			ldapv3.EscapeFilter(userDN),
+			ObjectClass,
+			ldap.SanitizeAttr(config.GroupObjectClass),
+		)
 		groupPrincipals, err = p.searchLdap(query, groupScope, config, lConn)
 		if err != nil {
 			return userPrincipal, groupPrincipals, err
 		}
+
 		logrus.Debugf("Retrieved following groups using member attribute: %v", groupPrincipals)
 		freeipaNonEntrydnApproach = true
 	}
@@ -246,10 +261,9 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 	var search *ldapv3.SearchRequest
 	var filter string
 	if (scope != p.userScope) && (scope != p.groupScope) {
-		return nil, fmt.Errorf("Invalid scope")
+		return nil, fmt.Errorf("invalid scope")
 	}
 
-	var attributes []*ldapv3.AttributeTypeAndValue
 	var attribs []*ldapv3.EntryAttribute
 	object, err := ldapv3.ParseDN(distinguishedName)
 	if err != nil {
@@ -258,25 +272,24 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 
 	for _, rdns := range object.RDNs {
 		for _, attr := range rdns.Attributes {
-			attributes = append(attributes, attr)
 			entryAttr := ldapv3.NewEntryAttribute(attr.Type, []string{attr.Value})
 			attribs = append(attribs, entryAttr)
 		}
 	}
 
 	if !ldap.IsType(attribs, scope) && !p.permissionCheck(attribs, config) {
-		logrus.Errorf("Failed to get object %v", distinguishedName)
+		logrus.Errorf("Failed to get object %s", distinguishedName)
 		return nil, nil
 	}
 
 	entityType := strings.Split(scope, "_")[1]
 	if strings.EqualFold("user", entityType) {
-		filter = fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass)
+		filter = fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.UserObjectClass))
 	} else {
-		filter = fmt.Sprintf("(%v=%v)", ObjectClass, config.GroupObjectClass)
+		filter = fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass))
 	}
 
-	logrus.Debugf("Query for getPrincipal(%v): %v", distinguishedName, filter)
+	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
 
 	lConn, err := ldap.Connect(config, caPool)
 	if err != nil {
@@ -305,7 +318,7 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 
 			return principal, nil
 		}
-		return nil, fmt.Errorf("Error in ldap bind: %v", err)
+		return nil, fmt.Errorf("Error in ldap bind: %w", err)
 	}
 
 	var attrs []string
@@ -324,22 +337,22 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 	result, err := lConn.Search(search)
 	if err != nil {
 		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == 32 {
-			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%v not found", distinguishedName))
+			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%s not found", distinguishedName))
 		}
-		return nil, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), httperror.ServerError, "Internal server error")
+		return nil, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %s %s: %v", search.BaseDN, filter, err), httperror.ServerError, "Internal server error")
 	}
 
 	if len(result.Entries) < 1 {
-		return nil, fmt.Errorf("No identities can be retrieved")
+		return nil, fmt.Errorf("no identities can be retrieved")
 	} else if len(result.Entries) > 1 {
-		return nil, fmt.Errorf("More than one result found")
+		return nil, fmt.Errorf("more than one result found")
 	}
 
 	entry := result.Entries[0]
 	entryAttributes := entry.Attributes
 
 	if !p.permissionCheck(entry.Attributes, config) {
-		return nil, fmt.Errorf("Permission denied")
+		return nil, fmt.Errorf("permission denied")
 	}
 
 	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
@@ -350,7 +363,6 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 }
 
 func (p *ldapProvider) searchPrincipals(name, principalType string, config *v3.LdapConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
-	name = ldapv3.EscapeFilter(name)
 	var principals []v3.Principal
 
 	if principalType == "" || principalType == "user" {
@@ -373,32 +385,55 @@ func (p *ldapProvider) searchPrincipals(name, principalType string, config *v3.L
 }
 
 func (p *ldapProvider) searchUser(name string, config *v3.LdapConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
+	if config.UserSearchFilter != "" {
+		// Make sure user search filter contains a valid LDAP query expression
+		// before interpolating it into the search filter.
+		if _, err := ldapv3.CompileFilter(config.UserSearchFilter); err != nil {
+			return nil, fmt.Errorf("invalid user search filter")
+		}
+	}
+
 	srchAttributes := strings.Split(config.UserSearchAttribute, "|")
-	query := fmt.Sprintf("(&(%v=%v)", ObjectClass, config.UserObjectClass)
+	query := fmt.Sprintf("(&(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.UserObjectClass))
 	srchAttrs := "(|"
 	for _, attr := range srchAttributes {
 		if attr == "uidNumber" {
-			// specific integer match, can't use wildcard
-			srchAttrs += fmt.Sprintf("(%v=%v)", attr, name)
+			// Specific integer match, can't use the wildcard.
+			srchAttrs += fmt.Sprintf("(%s=%s)", ldapv3.EscapeFilter(attr), ldapv3.EscapeFilter(name))
 		} else {
-			srchAttrs += fmt.Sprintf("(%v=%v*)", attr, name)
+			srchAttrs += fmt.Sprintf("(%s=%s*)", ldapv3.EscapeFilter(attr), ldapv3.EscapeFilter(name))
 		}
 	}
-	// The user search filter will be added as another and clause
-	// and is expected to follow ldap syntax and enclosed in parenthesis
+	// The user search filter will be added as another clause
+	// and is expected to follow ldap syntax and enclosed in parentheses.
 	query += srchAttrs + ")" + config.UserSearchFilter + ")"
 	logrus.Debugf("%s searchUser query: %s", p.providerName, query)
 	return p.searchLdap(query, p.userScope, config, lConn)
 }
 
 func (p *ldapProvider) searchGroup(name string, config *v3.LdapConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
-	searchFmt := config.GroupSearchAttribute + "=*%s*"
-	if config.GroupSearchAttribute == "gidNumber" {
-		// specific integer match, can't use wildcard
-		searchFmt = config.GroupSearchAttribute + "=%s"
+	if config.GroupSearchFilter != "" {
+		// Make sure group search filter contains a valid LDAP query expression
+		// before interpolating it into the search filter.
+		if _, err := ldapv3.CompileFilter(config.GroupSearchFilter); err != nil {
+			return nil, fmt.Errorf("invalid group search filter")
+		}
 	}
 
-	query := "(&(" + ObjectClass + "=" + config.GroupObjectClass + ")(" + fmt.Sprintf(searchFmt, name) + ")" + config.GroupSearchFilter + ")"
+	searchFmt := ldap.SanitizeAttr(config.GroupSearchAttribute) + "=*%s*"
+	if config.GroupSearchAttribute == "gidNumber" {
+		// Specific integer match, can't use the wildcard.
+		searchFmt = ldap.SanitizeAttr(config.GroupSearchAttribute) + "=%s"
+	}
+
+	query := fmt.Sprintf(
+		"(&(%s=%s)(%s)%s)",
+		ObjectClass,
+		ldap.SanitizeAttr(config.GroupObjectClass),
+		fmt.Sprintf(searchFmt, ldapv3.EscapeFilter(name)),
+		config.GroupSearchFilter,
+	)
+
 	logrus.Debugf("%s searchGroup query: %s scope: %s", p.providerName, query, p.groupScope)
 	return p.searchLdap(query, p.groupScope, config, lConn)
 }
@@ -430,14 +465,14 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountDistinguishedName, "")
 	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
 	if err != nil {
-		return nil, fmt.Errorf("Error %v in ldap bind", err)
+		return nil, fmt.Errorf("ldap: error binding service account: %w", err)
 	}
 
 	results, err := lConn.SearchWithPaging(search, 1000)
 	if err != nil {
 		ldapErr, ok := reflect.ValueOf(err).Interface().(*ldapv3.Error)
 		if ok && ldapErr.ResultCode != ldapv3.LDAPResultNoSuchObject {
-			return []v3.Principal{}, fmt.Errorf("When searching ldap, Failed to search: %s, error: %#v", query, err)
+			return []v3.Principal{}, fmt.Errorf("ldap: error searching for query %s:, error: %w", query, err)
 		}
 	}
 
@@ -496,9 +531,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 	}
 	defer lConn.Close()
 
-	serviceAccountPassword := config.ServiceAccountPassword
-	serviceAccountUserName := config.ServiceAccountDistinguishedName
-	err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
+	err = ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +543,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 
 	searchRequest := ldap.NewBaseObjectSearchRequest(
 		distinguishedName,
-		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
+		fmt.Sprintf("(%s=%s)", ObjectClass, config.UserObjectClass),
 		config.GetUserSearchAttributes(ObjectClass),
 	)
 
@@ -519,17 +552,17 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 		return nil, errors.New("no access")
 	}
 
-	if len(result.Entries) < 1 {
+	if nEntries := len(result.Entries); nEntries < 1 {
 		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
-	} else if len(result.Entries) > 1 {
-		return nil, fmt.Errorf("ldap user search found more than one result")
+	} else if nEntries > 1 {
+		return nil, fmt.Errorf("ldap: user search found more than one result")
 	}
 
 	userDN := result.Entries[0].DN //userDN is externalID
 
 	searchOpRequest := ldap.NewBaseObjectSearchRequest(
 		userDN,
-		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
+		fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.UserObjectClass)),
 		operationalAttrList,
 	)
 	opResult, err := lConn.Search(searchOpRequest)

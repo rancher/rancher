@@ -37,6 +37,7 @@ const (
 	ActiveDirectoryConfigFieldUserDisabledBitMask          = "userDisabledBitMask"
 	ActiveDirectoryConfigFieldUserEnabledAttribute         = "userEnabledAttribute"
 	ActiveDirectoryConfigFieldUserLoginAttribute           = "userLoginAttribute"
+	ActiveDirectoryConfigFieldUserLoginFilter              = "userLoginFilter"
 	ActiveDirectoryConfigFieldUserNameAttribute            = "userNameAttribute"
 	ActiveDirectoryConfigFieldUserObjectClass              = "userObjectClass"
 	ActiveDirectoryConfigFieldUserSearchAttribute          = "userSearchAttribute"
@@ -80,6 +81,7 @@ type ActiveDirectoryConfig struct {
 	UserDisabledBitMask          int64             `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute         string            `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
 	UserLoginAttribute           string            `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
+	UserLoginFilter              string            `json:"userLoginFilter,omitempty" yaml:"userLoginFilter,omitempty"`
 	UserNameAttribute            string            `json:"userNameAttribute,omitempty" yaml:"userNameAttribute,omitempty"`
 	UserObjectClass              string            `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`
 	UserSearchAttribute          string            `json:"userSearchAttribute,omitempty" yaml:"userSearchAttribute,omitempty"`
