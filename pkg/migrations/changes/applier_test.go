@@ -611,7 +611,7 @@ func TestApplyChanges(t *testing.T) {
 
 		k8sClient := newFakeClient(testScheme, svc)
 		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
-		require.ErrorContains(t, err, `failed to apply Patch change - applying patch: Unexpected kind: modify`)
+		require.ErrorContains(t, err, `failed to apply Patch change - applying patch: decoding patch: invalid operation`)
 		wantMetrics := &ApplyMetrics{Patch: 1, Errors: 1}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)

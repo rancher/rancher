@@ -21,13 +21,15 @@ func TestMigrationBatches(t *testing.T) {
 
 	want := &migrations.MigrationChanges{
 		Continue: "{\"start\":1}",
-		Changes: []changes.ResourceChange{
+		Changes: []migrations.ChangeSet{
 			{
-				Operation: changes.OperationCreate,
-				Create: &changes.CreateChange{
-					Resource: test.ToUnstructured(t, test.NewService(func(s *corev1.Service) {
-						s.Name = "test-0"
-					})),
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(t, test.NewService(func(s *corev1.Service) {
+							s.Name = "test-0"
+						})),
+					},
 				},
 			},
 		},
@@ -39,13 +41,15 @@ func TestMigrationBatches(t *testing.T) {
 
 	want = &migrations.MigrationChanges{
 		// No Continue
-		Changes: []changes.ResourceChange{
+		Changes: []migrations.ChangeSet{
 			{
-				Operation: changes.OperationCreate,
-				Create: &changes.CreateChange{
-					Resource: test.ToUnstructured(t, test.NewService(func(s *corev1.Service) {
-						s.Name = "test-1"
-					})),
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(t, test.NewService(func(s *corev1.Service) {
+							s.Name = "test-1"
+						})),
+					},
 				},
 			},
 		},

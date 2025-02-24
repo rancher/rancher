@@ -49,7 +49,7 @@ func (t namespaceMigration) Changes(ctx context.Context, client changes.Interfac
 		}
 	}
 
-	return &migrations.MigrationChanges{Changes: changes}, nil
+	return &migrations.MigrationChanges{Changes: []migrations.ChangeSet{changes}}, nil
 }
 
 func patchForNS(ns corev1.Namespace) changes.ResourceChange {

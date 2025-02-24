@@ -11,6 +11,7 @@ import (
 	"time"
 
 	// importing to setup migrations
+	"github.com/rancher/rancher/pkg/migrations/changes"
 	_ "github.com/rancher/rancher/pkg/migrations/sample"
 
 	"github.com/Masterminds/semver/v3"
@@ -38,7 +39,6 @@ import (
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/migrations"
-	"github.com/rancher/rancher/pkg/migrations/descriptive"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -645,7 +645,7 @@ func applyAllMigrations(ctx context.Context, cfg *rest.Config) error {
 
 	cache := memory.NewMemCacheClient(clientset.Discovery())
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
-	applied, err := migrations.ApplyUnappliedMigrations(ctx, migrations.NewStatusClient(clientset.CoreV1()), dynClient, descriptive.ApplyOptions{}, mapper)
+	applied, err := migrations.ApplyUnappliedMigrations(ctx, migrations.NewStatusClient(clientset.CoreV1()), dynClient, changes.ApplyOptions{}, mapper)
 	if err != nil {
 		return fmt.Errorf("applying all migrations on startup: %w", err)
 	}

@@ -65,25 +65,27 @@ func TestMigrationChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &migrations.MigrationChanges{
-		Changes: []changes.ResourceChange{
+		Changes: []migrations.ChangeSet{
 			{
-				Operation: changes.OperationPatch,
-				Patch: &changes.PatchChange{
-					ResourceRef: changes.ResourceReference{
-						ObjectRef: types.NamespacedName{
-							Name: "p-5djc7",
+				{
+					Operation: changes.OperationPatch,
+					Patch: &changes.PatchChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name: "p-5djc7",
+							},
+							Resource: "namespaces",
+							Version:  "v1",
 						},
-						Resource: "namespaces",
-						Version:  "v1",
-					},
-					Operations: []changes.PatchOperation{
-						{
-							Operation: "add",
-							Path:      "/metadata/labels/example.com~1migration",
-							Value:     "migrated",
+						Operations: []changes.PatchOperation{
+							{
+								Operation: "add",
+								Path:      "/metadata/labels/example.com~1migration",
+								Value:     "migrated",
+							},
 						},
+						Type: changes.PatchApplicationJSON,
 					},
-					Type: changes.PatchApplicationJSON,
 				},
 			},
 		},

@@ -89,7 +89,7 @@ func (t preferencesMigration) Changes(ctx context.Context, client changes.Interf
 		return nil, migrationErr
 	}
 
-	return &migrations.MigrationChanges{Changes: resourceChanges}, nil
+	return &migrations.MigrationChanges{Changes: []migrations.ChangeSet{resourceChanges}}, nil
 }
 
 // Combine a set of preferences by user returning a map with the combined

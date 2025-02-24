@@ -89,7 +89,7 @@ func (t restrictedAdminMigration) Changes(ctx context.Context, client changes.In
 		return nil, migrationErr
 	}
 
-	return &migrations.MigrationChanges{Changes: resourceChanges}, nil
+	return &migrations.MigrationChanges{Changes: []migrations.ChangeSet{resourceChanges}}, nil
 }
 
 func newGlobalRoleBinding(username, rolename string) *v3.GlobalRoleBinding {

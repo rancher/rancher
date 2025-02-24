@@ -46,7 +46,6 @@ func TestApply(t *testing.T) {
 		clientset := fake.NewClientset()
 
 		metrics, err := Apply(context.TODO(), "test-failing-migration", NewStatusClient(clientset.CoreV1()), newFakeDynamicClient(t), changes.ApplyOptions{}, nil)
-
 		require.ErrorContains(t, err, `calculating changes for migration "test-failing-migration": this is a failing migration`)
 
 		require.Nil(t, metrics)
@@ -190,6 +189,26 @@ func TestApply(t *testing.T) {
 
 		assert.Equal(t, 2, countServices())
 		wantMetrics := &changes.ApplyMetrics{Create: 2}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
+	})
+
+	t.Run("apply changesets", func(t *testing.T) {
+		Register(testChangeSetMigration{t})
+		t.Cleanup(func() {
+			knownMigrations = nil
+		})
+		clientset := fake.NewClientset()
+		dynamicset := newFakeDynamicClient(t)
+		statusClient := NewStatusClient(clientset.CoreV1())
+
+		metrics, err := Apply(context.TODO(), "changesets-migration", statusClient, dynamicset, changes.ApplyOptions{}, test.NewFakeMapper())
+		want := "failed to apply Create change - creating resource: secrets \"test-secret1\" already exists\n" +
+			"failed to apply Create change - creating resource: secrets \"test-secret2\" already exists"
+		assert.Equal(t, want, err.Error())
+
+		wantMetrics := &changes.ApplyMetrics{Create: 4, Errors: 2}
 		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 		}
@@ -472,6 +491,55 @@ func (m testContinueMigration) Changes(ctx context.Context, client changes.Inter
 	}
 
 	return &MigrationChanges{Continue: string(newContinue), Changes: []ChangeSet{changes}}, nil
+}
+
+type testChangeSetMigration struct {
+	t *testing.T
+}
+
+func (m testChangeSetMigration) Name() string {
+	return "changesets-migration"
+}
+
+func (m testChangeSetMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+	return &MigrationChanges{
+		Changes: []ChangeSet{
+			{
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(m.t,
+							newSecret(types.NamespacedName{Name: "test-secret1", Namespace: "cattle-secrets"}, testSecretData)),
+					},
+				},
+				// This will fail because the secret already exists (see above).
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(m.t,
+							newSecret(types.NamespacedName{Name: "test-secret1", Namespace: "cattle-secrets"}, testSecretData)),
+					},
+				},
+			},
+			{
+				// Again this will fail because the secret already exists (see above).
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(m.t,
+							newSecret(types.NamespacedName{Name: "test-secret2", Namespace: "cattle-secrets"}, testSecretData)),
+					},
+				},
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(m.t,
+							newSecret(types.NamespacedName{Name: "test-secret2", Namespace: "cattle-secrets"}, testSecretData)),
+					},
+				},
+			},
+		},
+	}, nil
 }
 
 // TODO: Move this to the test package

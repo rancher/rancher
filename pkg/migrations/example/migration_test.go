@@ -22,26 +22,28 @@ func TestMigrationChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &migrations.MigrationChanges{
-		Changes: []changes.ResourceChange{
+		Changes: []migrations.ChangeSet{
 			{
-				Operation: changes.OperationPatch,
-				Patch: &changes.PatchChange{
-					ResourceRef: changes.ResourceReference{
-						ObjectRef: types.NamespacedName{
-							Name:      "test-svc",
-							Namespace: "default",
+				{
+					Operation: changes.OperationPatch,
+					Patch: &changes.PatchChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name:      "test-svc",
+								Namespace: "default",
+							},
+							Resource: "services",
+							Version:  "v1",
 						},
-						Resource: "services",
-						Version:  "v1",
-					},
-					Operations: []changes.PatchOperation{
-						{
-							Operation: "replace",
-							Path:      "/spec/ports/0/targetPort",
-							Value:     9371,
+						Operations: []changes.PatchOperation{
+							{
+								Operation: "replace",
+								Path:      "/spec/ports/0/targetPort",
+								Value:     9371,
+							},
 						},
+						Type: changes.PatchApplicationJSON,
 					},
-					Type: changes.PatchApplicationJSON,
 				},
 			},
 		},

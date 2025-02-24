@@ -2,7 +2,6 @@ package preferences
 
 import (
 	"context"
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,101 +33,92 @@ func TestMigrationChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &migrations.MigrationChanges{
-		Changes: []changes.ResourceChange{
+		Changes: []migrations.ChangeSet{
 			{
-				Operation: changes.OperationCreate,
-				Create: &changes.CreateChange{
-					Resource: test.ToUnstructured(t,
-						&corev1.ConfigMap{
-							TypeMeta: metav1.TypeMeta{
-								Kind:       "ConfigMap",
-								APIVersion: "v1",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "user-d7tv1-preferences",
-								Namespace: "user-d7tv1",
-							},
-							Data: map[string]string{
-								"locale": "en-gb",
-							},
-						}),
-				},
-			},
-			{
-				Operation: changes.OperationDelete,
-				Delete: &changes.DeleteChange{
-					ResourceRef: changes.ResourceReference{
-						ObjectRef: types.NamespacedName{
-							Name:      preference1.Name,
-							Namespace: preference1.Namespace,
-						},
-						Group:    "management.cattle.io",
-						Resource: "preferences",
-						Version:  "v3",
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(t,
+							&corev1.ConfigMap{
+								TypeMeta: metav1.TypeMeta{
+									Kind:       "ConfigMap",
+									APIVersion: "v1",
+								},
+								ObjectMeta: metav1.ObjectMeta{
+									Name:      "user-d7tv1-preferences",
+									Namespace: "user-d7tv1",
+								},
+								Data: map[string]string{
+									"locale": "en-gb",
+								},
+							}),
 					},
 				},
-			},
-			{
-				Operation: changes.OperationCreate,
-				Create: &changes.CreateChange{
-					Resource: test.ToUnstructured(t,
-						&corev1.ConfigMap{
-							TypeMeta: metav1.TypeMeta{
-								Kind:       "ConfigMap",
-								APIVersion: "v1",
+				{
+					Operation: changes.OperationDelete,
+					Delete: &changes.DeleteChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name:      preference1.Name,
+								Namespace: preference1.Namespace,
 							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "user-xn8mf-preferences",
-								Namespace: "user-xn8mf",
-							},
-							Data: map[string]string{
-								"locale":        "en-us",
-								"seen-whatsnew": "dev",
-							},
-						}),
-				},
-			},
-			{
-				Operation: changes.OperationDelete,
-				Delete: &changes.DeleteChange{
-					ResourceRef: changes.ResourceReference{
-						ObjectRef: types.NamespacedName{
-							Name:      preference2.Name,
-							Namespace: preference2.Namespace,
+							Group:    "management.cattle.io",
+							Resource: "preferences",
+							Version:  "v3",
 						},
-						Group:    "management.cattle.io",
-						Resource: "preferences",
-						Version:  "v3",
 					},
 				},
-			},
-			{
-				Operation: changes.OperationDelete,
-				Delete: &changes.DeleteChange{
-					ResourceRef: changes.ResourceReference{
-						ObjectRef: types.NamespacedName{
-							Name:      preference3.Name,
-							Namespace: preference3.Namespace,
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(t,
+							&corev1.ConfigMap{
+								TypeMeta: metav1.TypeMeta{
+									Kind:       "ConfigMap",
+									APIVersion: "v1",
+								},
+								ObjectMeta: metav1.ObjectMeta{
+									Name:      "user-xn8mf-preferences",
+									Namespace: "user-xn8mf",
+								},
+								Data: map[string]string{
+									"locale":        "en-us",
+									"seen-whatsnew": "dev",
+								},
+							}),
+					},
+				},
+				{
+					Operation: changes.OperationDelete,
+					Delete: &changes.DeleteChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name:      preference2.Name,
+								Namespace: preference2.Namespace,
+							},
+							Group:    "management.cattle.io",
+							Resource: "preferences",
+							Version:  "v3",
 						},
-						Group:    "management.cattle.io",
-						Resource: "preferences",
-						Version:  "v3",
+					},
+				},
+				{
+					Operation: changes.OperationDelete,
+					Delete: &changes.DeleteChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name:      preference3.Name,
+								Namespace: preference3.Namespace,
+							},
+							Group:    "management.cattle.io",
+							Resource: "preferences",
+							Version:  "v3",
+						},
 					},
 				},
 			},
 		},
 	}
-
-	sort.Slice(result.Changes, func(i, j int) bool {
-		switch {
-		case result.Changes[i].Create != nil && result.Changes[j].Create != nil:
-			return result.Changes[i].Create.Resource.GetName() < result.Changes[j].Create.Resource.GetName()
-		case result.Changes[i].Delete != nil && result.Changes[j].Delete != nil:
-			return result.Changes[i].Delete.ResourceRef.ObjectRef.String() < result.Changes[j].Delete.ResourceRef.ObjectRef.String()
-		default:
-			return false
-		}
-	})
 
 	assert.Equal(t, want, result)
 }

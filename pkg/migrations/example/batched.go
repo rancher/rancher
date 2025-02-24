@@ -63,7 +63,9 @@ func (t batchedMigration) Changes(ctx context.Context, client changes.Interface,
 		},
 	}
 
-	return &migrations.MigrationChanges{Continue: string(newContinue), Changes: changes}, nil
+	return &migrations.MigrationChanges{
+		Continue: string(newContinue), Changes: []migrations.ChangeSet{changes},
+	}, nil
 }
 
 func toUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {

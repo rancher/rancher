@@ -50,5 +50,5 @@ func (t limitedMigration) Changes(ctx context.Context, client changes.Interface,
 
 	// TODO: This could populate the continue.
 
-	return &migrations.MigrationChanges{Changes: allChanges}, nil
+	return &migrations.MigrationChanges{Changes: []migrations.ChangeSet{allChanges}}, nil
 }

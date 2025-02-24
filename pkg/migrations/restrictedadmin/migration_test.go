@@ -33,34 +33,36 @@ func TestMigrationChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &migrations.MigrationChanges{
-		Changes: []changes.ResourceChange{
+		Changes: []migrations.ChangeSet{
 			{
-				Operation: changes.OperationCreate,
-				Create: &changes.CreateChange{
-					Resource: test.ToUnstructured(t,
-						&v3.GlobalRoleBinding{
-							TypeMeta: metav1.TypeMeta{
-								Kind:       "GlobalRoleBinding",
-								APIVersion: "management.cattle.io/v3",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								GenerateName: "grb-",
-							},
-							GlobalRoleName: "restricted-admin-replacement",
-							UserName:       userName,
-						}),
+				{
+					Operation: changes.OperationCreate,
+					Create: &changes.CreateChange{
+						Resource: test.ToUnstructured(t,
+							&v3.GlobalRoleBinding{
+								TypeMeta: metav1.TypeMeta{
+									Kind:       "GlobalRoleBinding",
+									APIVersion: "management.cattle.io/v3",
+								},
+								ObjectMeta: metav1.ObjectMeta{
+									GenerateName: "grb-",
+								},
+								GlobalRoleName: "restricted-admin-replacement",
+								UserName:       userName,
+							}),
+					},
 				},
-			},
-			{
-				Operation: changes.OperationDelete,
-				Delete: &changes.DeleteChange{
-					ResourceRef: changes.ResourceReference{
-						ObjectRef: types.NamespacedName{
-							Name: restrictedGRB.Name,
+				{
+					Operation: changes.OperationDelete,
+					Delete: &changes.DeleteChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name: restrictedGRB.Name,
+							},
+							Group:    "management.cattle.io",
+							Resource: "globalrolebindings",
+							Version:  "v3",
 						},
-						Group:    "management.cattle.io",
-						Resource: "globalrolebindings",
-						Version:  "v3",
 					},
 				},
 			},
