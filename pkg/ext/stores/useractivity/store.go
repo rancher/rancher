@@ -244,7 +244,8 @@ func (s *Store) Get(ctx context.Context,
 	// crafting UserActivity from requested Token name.
 	ua := &ext.UserActivity{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			CreationTimestamp: activityToken.CreationTimestamp,
+			Name:              name,
 		},
 		Status: ext.UserActivityStatus{},
 	}
