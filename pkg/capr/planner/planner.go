@@ -1126,13 +1126,6 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 		}
 	}
 
-	if isEtcd(entry) {
-		// insert a dummy snapshot delete command to force the server to reconcile it's snapshot list
-		nodePlan, err = p.addEtcdSnapshotListRefreshPeriodicInstruction(nodePlan, controlPlane)
-		if err != nil {
-			return nodePlan, joinedTo, err
-		}
-	}
 	return nodePlan, joinedTo, nil
 }
 

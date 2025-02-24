@@ -146,21 +146,6 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 	return nodePlan, nil
 }
 
-func (p *Planner) addEtcdSnapshotListRefreshPeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
-	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, plan.PeriodicInstruction{
-		Name:    "etcd-snapshot-list-refresh",
-		Command: "sh",
-		Args: []string{
-			"-c",
-			fmt.Sprintf("%s etcd-snapshot delete _SNAPSHOT_REFRESH_TRIGGER_ > /dev/null 2>&1",
-				capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
-		},
-		PeriodSeconds: 600,
-	})
-	return nodePlan, nil
-
-}
-
 // generateManifestRemovalInstruction generates a rm -rf command for the manifests of a server. This was created in response to https://github.com/rancher/rancher/issues/41174
 func generateManifestRemovalInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (bool, plan.OneTimeInstruction) {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
