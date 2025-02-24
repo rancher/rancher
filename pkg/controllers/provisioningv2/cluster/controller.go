@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
