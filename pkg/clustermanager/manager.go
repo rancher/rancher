@@ -23,6 +23,7 @@ import (
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -32,10 +33,7 @@ import (
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/semaphore"
-	raw "google.golang.org/api/container/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -347,7 +345,7 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 			}
 			if cluster.Status.Driver == "googleKubernetesEngine" && cluster.Spec.GenericEngineConfig != nil {
 				cred, _ := (*cluster.Spec.GenericEngineConfig)["credential"].(string)
-				rt, err = Oauth2Transport(context.RunContext, rt, cred)
+				rt, err = gke.Oauth2Transport(context.RunContext, rt, cred)
 				if err != nil {
 					logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 				}
@@ -357,23 +355,6 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 	}
 
 	return rc, nil
-}
-
-func Oauth2Transport(ctx context.Context, rt http.RoundTripper, credentials string) (http.RoundTripper, error) {
-	ts, err := GetTokenSource(ctx, credentials)
-	if err != nil {
-		return rt, fmt.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
-	}
-
-	return &oauth2.Transport{Source: ts, Base: rt}, nil
-}
-
-func GetTokenSource(ctx context.Context, credential string) (oauth2.TokenSource, error) {
-	ts, err := google.CredentialsFromJSON(ctx, []byte(credential), raw.CloudPlatformScope)
-	if err != nil {
-		return nil, err
-	}
-	return ts.TokenSource, nil
 }
 
 func nameIgnoringTLSDialer(dialer dialer.Dialer, caBytes []byte) (func(string, string) (net.Conn, error), error) {
