@@ -35,7 +35,7 @@ const (
 )
 
 // upgradeLocalCluster is a function to upgrade a local cluster.
-func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, containerImage string) {
+func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster) {
 	clusterObject, err := extensionscluster.GetClusterIDByName(client, cluster.Name)
 	require.NoError(u.T(), err)
 
@@ -82,8 +82,13 @@ func upgradeLocalCluster(u *suite.Suite, testName string, client *rancher.Client
 }
 
 // upgradeDownstreamCluster is a function to upgrade a downstream cluster.
-func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, nodeSelector map[string]string, containerImage string) {
+func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.Client, clusterName string, testConfig *clusters.ClusterConfig, cluster upgradeinput.Cluster, nodeSelector map[string]string) {
 	var isRKE1 = false
+
+	if cluster.VersionToUpgrade == "" {
+		u.T().Skip(u.T(), cluster.VersionToUpgrade, "Kubernetes version to upgrade is not provided, skipping the test")
+	}
+	testConfig.KubernetesVersion = cluster.VersionToUpgrade
 
 	clusterObject, _, _ := extensionscluster.GetProvisioningClusterByName(client, clusterName, namespace)
 	if clusterObject == nil {
@@ -95,7 +100,6 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 		clusterResp, err := client.Management.Cluster.ByID(clusterObject)
 		require.NoError(u.T(), err)
 
-		testConfig.KubernetesVersion = cluster.ProvisioningInput.RKE1KubernetesVersions[0]
 		testName += "RKE1 cluster from " + clusterResp.RancherKubernetesEngineConfig.Version + " to " + testConfig.KubernetesVersion
 	} else {
 		clusterID, err := extensionscluster.GetV1ProvisioningClusterByName(client, clusterName)
@@ -109,17 +113,13 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 		require.NoError(u.T(), err)
 
 		if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
-			testConfig.KubernetesVersion = cluster.ProvisioningInput.RKE2KubernetesVersions[0]
 			testName += "RKE2 cluster from " + updatedCluster.Spec.KubernetesVersion + " to " + testConfig.KubernetesVersion
 		} else if strings.Contains(updatedCluster.Spec.KubernetesVersion, "k3s") {
-			testConfig.KubernetesVersion = cluster.ProvisioningInput.K3SKubernetesVersions[0]
 			testName += "K3S cluster from " + updatedCluster.Spec.KubernetesVersion + " to " + testConfig.KubernetesVersion
 		}
 	}
 
 	u.Run(testName, func() {
-		createPreUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest, nodeSelector, containerImage)
-
 		if isRKE1 {
 			upgradedCluster, err := upgradeRKE1Cluster(u.T(), client, cluster, testConfig)
 			require.NoError(u.T(), err)
@@ -137,8 +137,6 @@ func upgradeDownstreamCluster(u *suite.Suite, testName string, client *rancher.C
 
 			provisioning.VerifyCluster(u.T(), client, testConfig, upgradedCluster)
 		}
-
-		createPostUpgradeWorkloads(u.T(), client, clusterName, cluster.FeaturesToTest)
 	})
 }
 
@@ -229,7 +227,7 @@ func waitForLocalClusterUpgrade(client *rancher.Client, clusterName string) erro
 		return false, nil
 	})
 
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
