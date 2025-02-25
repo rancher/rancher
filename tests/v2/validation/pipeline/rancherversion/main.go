@@ -34,10 +34,6 @@ type RancherK8sVersions struct {
 var (
 	rancherVersion            = os.Getenv("RANCHER_VERSION")
 	rancherVersionToUpgrade   = os.Getenv("RANCHER_VERSION_TO_UPGRADE")
-	communityBaseURL          = "https://github.com/rancher/rancher/releases/download/" + rancherVersion + "/rancher-images.txt"
-	communityBaseURLToUpgrade = "https://github.com/rancher/rancher/releases/download/" + rancherVersionToUpgrade + "/rancher-images.txt"
-	primeRelease              = true
-	primeReleaseToUpgrade     = false
 )
 
 const (
@@ -54,6 +50,11 @@ func main() {
 	var err error
 	urlb := baseURL + "index.html"
 
+	communityBaseURL          := "https://github.com/rancher/rancher/releases/download/" + rancherVersion + "/rancher-images.txt"
+	communityBaseURLToUpgrade := "https://github.com/rancher/rancher/releases/download/" + rancherVersionToUpgrade + "/rancher-images.txt"
+	primeRelease              := true
+	primeReleaseToUpgrade     := false
+	
 	rancherChartVersion, err := extractRancherVersion(urlb, rancherVersion)
 	if err != nil {
 		return
