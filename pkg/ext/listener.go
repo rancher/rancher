@@ -22,6 +22,7 @@ func NewBlockingListener() net.Listener {
 func (l *blockingListener) Accept() (net.Conn, error) {
 	l.stopMu.RLock()
 	if l.stopChan == nil {
+		l.stopMu.RUnlock()
 		return nil, fmt.Errorf("listener is closed")
 	}
 	l.stopMu.RUnlock()
