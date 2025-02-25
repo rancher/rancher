@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -145,24 +146,9 @@ func (s *Store) Create(ctx context.Context,
 		}
 	}
 
-	// verify auth and activity token have the same userID
-	if authToken.UserID != activityToken.UserID {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different users", authTokenID, objUserActivity.Name))
-	}
-
-	// verify auth and activity token has the same auth provider
-	if authToken.AuthProvider != activityToken.AuthProvider {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, objUserActivity.Name))
-	}
-
-	// verify auth and activity token has the same auth user principal
-	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, objUserActivity.Name))
-	}
-
-	// verify activity token is of the expected kind
-	if activityToken.Labels[TokenKind] != "session" {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", objUserActivity.Name))
+	// validate activity token
+	if err = validateActivityToken(authToken, activityToken); err != nil {
+		return nil, err
 	}
 
 	// set when last activity happened
@@ -239,24 +225,9 @@ func (s *Store) Get(ctx context.Context,
 		}
 	}
 
-	// verify auth and activity token have the same userID
-	if authToken.UserID != activityToken.UserID {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different users", authTokenID, name))
-	}
-
-	// verify auth and activity token have the same auth provider
-	if authToken.AuthProvider != activityToken.AuthProvider {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", authTokenID, name))
-	}
-
-	// verify auth and activity token have the same auth user principal
-	if authToken.UserPrincipal.Name != activityToken.UserPrincipal.Name {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", authTokenID, name))
-	}
-
-	// verify activity token is of the expected kind
-	if activityToken.Labels[TokenKind] != "session" {
-		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", name))
+	// validate activity token
+	if err = validateActivityToken(authToken, activityToken); err != nil {
+		return nil, err
 	}
 
 	// crafting UserActivity from requested Token name.
@@ -315,4 +286,27 @@ func first(values []string) string {
 		return values[0]
 	}
 	return ""
+}
+
+func validateActivityToken(auth, activity *v3Legacy.Token) error {
+	// verify auth and activity token have the same userID
+	if auth.UserID != activity.UserID {
+		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different users", auth.Name, activity.Name))
+	}
+
+	// verify auth and activity token has the same auth provider
+	if auth.AuthProvider != activity.AuthProvider {
+		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", auth.Name, activity.Name))
+	}
+
+	// verify auth and activity token has the same auth user principal
+	if auth.UserPrincipal.Name != activity.UserPrincipal.Name {
+		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", auth.Name, activity.Name))
+	}
+
+	// verify activity token is of the expected kind
+	if activity.Labels[TokenKind] != "session" {
+		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", activity.Name))
+	}
+	return nil
 }
