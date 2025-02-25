@@ -8,5 +8,6 @@ if [ -n "$(git status --porcelain)" ]; then
     echo
     echo "The following generated files did differ after regeneration:"
     git status --porcelain
+    git diff
     exit 1
 fi
