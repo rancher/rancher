@@ -83,72 +83,43 @@ node {
             println "AWS_S3_REGION: ${AWS_S3_REGION}"
 
         }
-        if  (!(env.HA_CLEANUP.toBoolean())) {
-          stage('Run Module Test') {
-            try {
-              sh """
-                docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
-                /root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} --jsonfile ${testResultsJSON} -- -timeout=${timeout} -v ${params.TEST_CASE};
-                if [ -f ${rootPath}reporter ]; then ${rootPath}reporter; fi"
-              """
-            } catch(err) {
-                echo 'Test run had failures. Collecting results...'
-            }
+        stage('Run Module Test') {
+          try {
+            sh """
+              docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
+              /root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} --jsonfile ${testResultsJSON} -- -timeout=${timeout} -v ${params.TEST_CASE};
+              if [ -f ${rootPath}reporter ]; then ${rootPath}reporter; fi"
+            """
+          } catch(err) {
+              echo 'Test run had failures. Collecting results...'
           }
-          stage('Upload tf files to S3 bucket'){
-            try{
-                sh "docker cp ${testContainer}:/root/ ./"
-                sh "ls -lR"
-                script {
-                  sh """
-                      if ls $TERRAFORM_DIR/. 1> /dev/null 2>&1; then
-                          echo "Terraform files found, starting upload."
-                      else
-                          echo "No Terraform files found!"
-                          exit 1
-                      fi
-                        docker run --rm \
-                          -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                          -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                          -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
-                          -v $TERRAFORM_DIR/:/root/terraform/ \
-                          amazon/aws-cli \
-                          s3 cp /root/terraform/. s3://$AWS_S3_BUCKET/terraform/ --recursive
-                      """
-                  }
-              }catch(err){
-                  echo "Unable to get the output: ${err}"
-                }
-           }
-        }else{
-          stage('Cleanup setup'){
+        }
+        stage('Upload tf files to S3 bucket'){
+          try{
+              sh "docker cp ${testContainer}:/root/ ./"
+              sh "ls -lR"
               script {
                 sh """
-                    docker volume create $terraformVolume
-
-                    docker run --name $s3Container \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
-                    -v $terraformVolume:/terraform-files  \
-                    amazon/aws-cli \
-                    s3 cp s3://$AWS_S3_BUCKET/terraform/ /terraform-files --recursive
-
-                    docker run --rm -t -v $terraformVolume:/terraform-files --name $testContainer ${imageName} \
-                    sh -c "ls -lR /terraform-files && terraform -chdir=/terraform-files init && terraform -chdir=/terraform-files destroy -auto-approve"
-
-                    docker run --rm \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
-                    amazon/aws-cli \
-                    s3 rm s3://$AWS_S3_BUCKET/terraform/ --recursive
-
-                    docker rm $testContainer
-                    docker volume rm $terraformVolume
-                 """   
+                    if ls $TERRAFORM_DIR/. 1> /dev/null 2>&1; then
+                        echo "Terraform files found, starting upload."
+                    else
+                        echo "No Terraform files found!"
+                        exit 1
+                    fi
+                      docker run --rm \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
+                        -v $TERRAFORM_DIR/:/root/terraform/ \
+                        amazon/aws-cli \
+                        s3 cp /root/terraform/. s3://$AWS_S3_BUCKET/terraform/ --recursive
+                    """
+                }
+            }catch(err){
+                echo "Unable to get the output: ${err}"
+                sh "docker rm ${testContainer}"
               }
-           }
-        }
+              sh "docker rm ${testContainer}"         
+          }
     }
 }
