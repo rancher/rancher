@@ -683,22 +683,13 @@ func FormatWindowsEnvVar(envVar corev1.EnvVar, isPlanVariable bool) string {
 	return fmt.Sprintf("%s=%s", envVar.Name, envVar.Value)
 }
 
-func ToOwnerReference(obj runtime.Object) (metav1.OwnerReference, error) {
-	objectMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return metav1.OwnerReference{}, err
-	}
-	typeMeta, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return metav1.OwnerReference{}, err
-	}
-
+func ToOwnerReference(typeMeta metav1.TypeMeta, objectMeta metav1.ObjectMeta) metav1.OwnerReference {
 	return metav1.OwnerReference{
-		APIVersion:         typeMeta.GetAPIVersion(),
-		Kind:               typeMeta.GetKind(),
-		Name:               objectMeta.GetName(),
-		UID:                objectMeta.GetUID(),
+		APIVersion:         typeMeta.APIVersion,
+		Kind:               typeMeta.Kind,
+		Name:               objectMeta.Name,
+		UID:                objectMeta.UID,
 		Controller:         &[]bool{true}[0],
 		BlockOwnerDeletion: &[]bool{true}[0],
-	}, nil
+	}
 }

@@ -160,7 +160,7 @@ func RegisterIndexers(config *wrangler.Context) {
 }
 
 func ETCDSnapshotKey(obj *rkev1.ETCDSnapshot) string {
-	return fmt.Sprintf("%s-%s-%s", obj.Namespace, obj.Labels[capr.ClusterNameLabel], obj.Annotations[capr.SnapshotNameAnnotation])
+	return fmt.Sprintf("%s/%s/%s", obj.Namespace, obj.Labels[capr.ClusterNameLabel], obj.Annotations[capr.SnapshotNameAnnotation])
 }
 
 func byETCDSnapshotName(obj *rkev1.ETCDSnapshot) ([]string, error) {
