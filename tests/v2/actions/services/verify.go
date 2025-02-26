@@ -2,17 +2,27 @@ package services
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
+	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	extensionClusters "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/ingresses"
+	"github.com/rancher/shepherd/extensions/kubectl"
+	"github.com/rancher/shepherd/extensions/sshkeys"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -83,4 +93,100 @@ func VerifyAWSLoadBalancer(t *testing.T, client *rancher.Client, serviceLB *v1.S
 		return isIngressAccessible, nil
 	})
 	require.NoError(t, err)
+}
+
+// VerifyClusterIP is a helper function that verifies the cluster is able to connect to the cluster ip service by ssh shell
+func VerifyClusterIP(client *rancher.Client, clusterName string, clusterID string, serviceID string, path string, content string) error {
+	steveClient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
+	serviceResp, err := steveClient.SteveType(ServiceSteveType).ByID(serviceID)
+	if err != nil {
+		return err
+	}
+
+	logrus.Info("Getting the cluster IP")
+	newService := &corev1.Service{}
+	err = steveV1.ConvertToK8sType(serviceResp.JSONResp, newService)
+	if err != nil {
+		return err
+	}
+
+	clusterIP := newService.Spec.ClusterIP
+
+	logrus.Infof("Getting the node using the label [%v]", clusters.LabelWorker)
+	query, err := url.ParseQuery(clusters.LabelWorker)
+	if err != nil {
+		return err
+	}
+
+	nodeList, err := steveClient.SteveType("node").List(query)
+	if err != nil {
+		return err
+	}
+
+	provisioningClusterID, err := extensionClusters.GetV1ProvisioningClusterByName(client, clusterName)
+	if err != nil {
+		return err
+	}
+
+	cluster, err := client.Steve.SteveType(extensionClusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
+	if err != nil {
+		return err
+	}
+
+	newCluster := &provv1.Cluster{}
+	err = steveV1.ConvertToK8sType(cluster, newCluster)
+	if err != nil {
+		return err
+	}
+
+	firstMachine := nodeList.Data[0]
+
+	logrus.Info("Getting the node IP")
+	newNode := &corev1.Node{}
+	err = steveV1.ConvertToK8sType(firstMachine.JSONResp, newNode)
+	if err != nil {
+		return err
+	}
+
+	log := ""
+	if strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") || strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
+		_, stevecluster, err := extensionClusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+		if err != nil {
+			return err
+		}
+
+		sshUser, err := sshkeys.GetSSHUser(client, stevecluster)
+		if err != nil {
+			return err
+		}
+
+		sshNode, err := sshkeys.GetSSHNodeFromMachine(client, sshUser, &firstMachine)
+		if err != nil {
+			return err
+		}
+
+		logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
+
+		log, err = sshNode.ExecuteCommand(fmt.Sprintf("curl %s:%s", clusterIP, path))
+		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+			return err
+		}
+	} else {
+		logrus.Infof("Comand %s", fmt.Sprintf("curl %s:%s", clusterIP, path))
+
+		execCmd := []string{"curl", fmt.Sprintf("%s:%s", clusterIP, path)}
+		log, err = kubectl.Command(client, nil, clusterID, execCmd, "")
+		if err != nil {
+			return err
+		}
+	}
+
+	if strings.Contains(log, content) {
+		return nil
+	}
+	return errors.New("Unable to connect to the cluster")
 }
