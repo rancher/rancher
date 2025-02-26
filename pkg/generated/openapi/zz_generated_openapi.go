@@ -92,7 +92,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivity(ref common.ReferenceCallback) c
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "UserActivity keeps track about the user activity on the UI. If the user doens't perform one or more actions for a while (eg: cursor move, key presse, tab focus), this will logout the user from its session.",
+				Description: "UserActivity keeps tracks user activity in the UI. If the user doesn't perform certain actions for a while e.g. cursor moved, key pressed, etc., this will lead to the user being logged out of the session.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -117,7 +117,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivity(ref common.ReferenceCallback) c
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status contains system information about the useractivity.",
+							Description: "Status is the most recently observed status of the UserActivity.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus"),
 						},
@@ -184,11 +184,12 @@ func schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref common.ReferenceCallb
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "UserActivityStatus defines the most recently observed status of the UserActivity.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"expiresAt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpiresAt is the timestamp at which the idle timer expires, invalidating the Token and session. It is calculated by adding the auth-user-session-idle-ttl-minutes attribute to the time the request is made.",
+							Description: "ExpiresAt is the timestamp at which the user's session expires if it stays idle, invalidating the corresponding session token. It is calculated by adding the duration specified in the auth-user-session-idle-ttl-minutes setting to the time of the request.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
