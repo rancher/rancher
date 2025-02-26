@@ -19,6 +19,7 @@ type UserActivity struct {
 	Status UserActivityStatus `json:"status"`
 }
 
+// UserActivityStatus defines the most recently observed status of the UserActivity.
 type UserActivityStatus struct {
 	// ExpiresAt is the timestamp at which the idle timer expires, invalidating the Token and session.
 	// It is calculated by adding the
