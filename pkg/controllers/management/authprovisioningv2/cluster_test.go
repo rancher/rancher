@@ -75,25 +75,36 @@ func TestOnCluster(t *testing.T) {
 		prtbMock      func() mgmtcontrollers.ProjectRoleTemplateBindingController
 		expectedErr   error
 	}{
-		"no rke doesn't enqueue CRTBs": {
+		"no rke enqueue CRTBs and PRTBs": {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
 					Labels: map[string]string{
 						kubernetesprovider.ProviderKey: providers.K3s,
 					},
 				},
 			},
-			crtbCacheMock: func(_ string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
-				return fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+				mock.EXPECT().List(clusterName, labels.Everything()).Return(crtbs, nil)
+				return mock
 			},
 			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
-				return fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				for _, crtb := range crtbs {
+					mock.EXPECT().Enqueue(crtb.Namespace, crtb.Name)
+				}
+				return mock
 			},
 			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
-				return fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+				mock := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+				mock.EXPECT().List("", labels.Everything()).Return(prtbs, nil)
+				return mock
 			},
 			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
-				return fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+				mock := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+				mock.EXPECT().Enqueue(prtbInCluster.Namespace, prtbInCluster.Name)
+				return mock
 			},
 			expectedErr: nil,
 		},
