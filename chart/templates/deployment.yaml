@@ -83,6 +83,7 @@ spec:
           protocol: TCP
 {{- end}}
 # This port is a temporary workaround until https://github.com/rancher/rancher/issues/47091 is resolved
+# We're turning this into a feature in rancher/pull/49181
 {{- if .Values.imperativeExtensionApi.enabled }}
         - containerPort: 6666
           hostPort: 6666
@@ -157,6 +158,8 @@ spec:
         - name: CATTLE_IMPERATIVE_API_EXTENSION
           value: "true"
 {{- end }}
+        - name: IMPERATIVE_API_DIRECT
+          value: "true"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}

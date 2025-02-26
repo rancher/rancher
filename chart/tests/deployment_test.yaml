@@ -50,6 +50,8 @@ tests:
         value: NAMESPACE
       - name: CATTLE_PEER_SERVICE
         value: RELEASE-NAME-rancher
+      - name: IMPERATIVE_API_DIRECT
+        value: "true"
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
   - equal:

@@ -27,6 +27,9 @@ const (
 
 	// SystemUpgradeControllerChartName name of the chart system-upgrade-controller
 	SystemUpgradeControllerChartName = "system-upgrade-controller"
+
+	// RemoteDialerProxyChartName name of the remotedialer-proxy
+	RemoteDialerProxyChartName = "remotedialer-proxy"
 )
 
 var errKeyNotFound = errors.New("key not found")

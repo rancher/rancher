@@ -2,6 +2,7 @@ package systemcharts
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -45,6 +46,7 @@ var (
 	originalSUCVersion                     = settings.SystemUpgradeControllerChartVersion.Get()
 	originalImportedVersionManagement      = settings.ImportedClusterVersionManagement.Get()
 	originalMCM                            = features.MCM.Enabled()
+	originalImperativeAPI                  = features.ImperativeApiExtension.Enabled()
 	originalMCMAgent                       = features.MCMAgent.Enabled()
 	originalManagedSystemUpgradeController = features.ManagedSystemUpgradeController.Enabled()
 	sucDeployment                          = &appsv1.Deployment{
@@ -337,13 +339,15 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -406,6 +410,25 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -415,13 +438,184 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster with imported-cluster-version-managements disabled",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.ImportedClusterVersionManagement.Set("false")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				mocks.manager.EXPECT().Uninstall(namespace.System, chart.SystemUpgradeControllerChartName).Return(nil)
+				mocks.manager.EXPECT().Remove(namespace.System, chart.SystemUpgradeControllerChartName)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in local cluster with imported-cluster-version-managements disabled and with existing plans",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
+				features.ImperativeApiExtension.Set(true)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.ImportedClusterVersionManagement.Set("false")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				// nothing to do in this case
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in local cluster with imperative API disabled",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
+				features.ImperativeApiExtension.Set(false)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.ImportedClusterVersionManagement.Set("false")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -466,8 +660,7 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// system-upgrade-controller
-				mocks.manager.EXPECT().Uninstall(namespace.System, chart.SystemUpgradeControllerChartName).Return(nil)
-				mocks.manager.EXPECT().Remove(namespace.System, chart.SystemUpgradeControllerChartName)
+				// nothing to do in this case
 
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
@@ -475,17 +668,20 @@ func Test_ChartInstallation(t *testing.T) {
 			},
 		},
 		{
-			name: "normal installation in local cluster with imported-cluster-version-managements disabled and with existing plans",
+			name: "normal installation in local cluster with imperative API enabled but RDP disabled",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
+				features.ImperativeApiExtension.Set(true)
+				os.Setenv("IMPERATIVE_API_DIRECT", "true")
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.ImportedClusterVersionManagement.Set("false")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -541,13 +737,15 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with config cache errors",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(6)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -607,6 +805,24 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.0",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -616,13 +832,15 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with image override",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(6)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.1")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.1")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -697,6 +915,27 @@ func Test_ChartInstallation(t *testing.T) {
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher-test.io/rancher/remotedialer-proxy",
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.1",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"rancher-test.io/"+settings.ShellImage.Get(),
+				).Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -707,13 +946,15 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with webhook values",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(6)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				features.MCM.Set(true)
 
 				// rancher-webhook
@@ -774,6 +1015,25 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					"remotedialer-proxy",
+					"",
+					"2.0.1",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -783,11 +1043,13 @@ func Test_ChartInstallation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// reset setting to default values before each test
+			os.Setenv("IMPERATIVE_API_DIRECT", "")
 			_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
 			_ = settings.RancherProvisioningCAPIVersion.Set(originalCAPIVersion)
 			_ = settings.SystemUpgradeControllerChartVersion.Set(originalSUCVersion)
 			_ = settings.ImportedClusterVersionManagement.Set(originalImportedVersionManagement)
 			features.MCM.Set(originalMCM)
+			features.ImperativeApiExtension.Set(originalImperativeAPI)
 			features.MCMAgent.Set(originalMCMAgent)
 			features.ManagedSystemUpgradeController.Set(originalManagedSystemUpgradeController)
 
