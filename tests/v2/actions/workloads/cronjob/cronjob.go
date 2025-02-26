@@ -2,18 +2,18 @@ package cronjob
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
+	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/cronjobs"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
-	unstruc "github.com/rancher/shepherd/extensions/unstructured"
-	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/wait"
-	v1 "k8s.io/api/batch/v1"
+	"github.com/rancher/shepherd/pkg/wrangler"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -21,89 +21,70 @@ const (
 	nginxImageName = "public.ecr.aws/docker/library/nginx"
 )
 
-var CronJobGroupVersionResource = schema.GroupVersionResource{
-	Group:    "batch",
-	Version:  "v1",
-	Resource: "cronjobs",
+// CreateCronJob is a helper to create a cronjob in a namespace
+func CreateCronJob(client *rancher.Client, clusterID, namespaceName, schedule string, podTemplate corev1.PodTemplateSpec, watchCronJob bool) (*batchv1.CronJob, error) {
+	var ctx *wrangler.Context
+	var err error
+
+	if clusterID != "local" {
+		ctx, err = client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get downstream context: %w", err)
+		}
+	} else {
+		ctx = client.WranglerContext
+	}
+
+	cronJobTemplate := NewCronJobTemplate(namespaceName, schedule, podTemplate)
+	createdCronJob, err := ctx.Batch.CronJob().Create(cronJobTemplate)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create job: %w", err)
+	}
+
+	if watchCronJob {
+		err = WatchAndWaitCronJob(client, clusterID, namespaceName, createdCronJob)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return createdCronJob, nil
 }
 
-// CreateCronjob is a helper to create a cronjob
-func CreateCronjob(client *rancher.Client, clusterID, namespaceName string, schedule string, template corev1.PodTemplateSpec) (*v1.CronJob, error) {
-	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
-	if err != nil {
-		return nil, err
-	}
-
-	cronjobName := namegen.AppendRandomString("testcronjob")
-	var limit int32 = 10
-
-	template.Spec.RestartPolicy = corev1.RestartPolicyNever
-	cronJobTemplate := &v1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cronjobName,
-			Namespace: namespaceName,
-		},
-		Spec: v1.CronJobSpec{
-			JobTemplate: v1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: namespaceName,
-				},
-				Spec: v1.JobSpec{
-					Template: template,
-				},
-			},
-			Schedule:                   schedule,
-			ConcurrencyPolicy:          v1.ForbidConcurrent,
-			FailedJobsHistoryLimit:     &limit,
-			SuccessfulJobsHistoryLimit: &limit,
-		},
-	}
-
-	cronJobResource := dynamicClient.Resource(CronJobGroupVersionResource).Namespace(namespaceName)
-
-	unstructuredResp, err := cronJobResource.Create(context.TODO(), unstruc.MustToUnstructured(cronJobTemplate), metav1.CreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	newCronjob := &v1.CronJob{}
-	err = scheme.Scheme.Convert(unstructuredResp, newCronjob, unstructuredResp.GroupVersionKind())
-	if err != nil {
-		return nil, err
-	}
-
-	return newCronjob, err
-}
-
-// WatchAndWaitCronjob is a helper to watch and wait cronjob
-func WatchAndWaitCronjob(client *rancher.Client, clusterID, namespaceName string, cronJobTemplate *v1.CronJob) error {
+// WatchAndWaitCronJob is a helper to watch and wait for cronjob to be active
+func WatchAndWaitCronJob(client *rancher.Client, clusterID, namespaceName string, cronJob *batchv1.CronJob) error {
 	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
 	if err != nil {
 		return err
 	}
 
-	cronJobResource := dynamicClient.Resource(CronJobGroupVersionResource).Namespace(namespaceName)
+	cronJobResource := dynamicClient.Resource(cronjobs.CronJobGroupVersionResource).Namespace(namespaceName)
 
-	watchCronjobInterface, err := cronJobResource.Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + cronJobTemplate.Name,
+	watchCronJobInterface, err := cronJobResource.Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cronJob.Name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {
 		return err
 	}
 
-	return wait.WatchWait(watchCronjobInterface, func(event watch.Event) (ready bool, err error) {
-		cronjobUnstructured := event.Object.(*unstructured.Unstructured)
-		cronjob := &v1.CronJob{}
+	return wait.WatchWait(watchCronJobInterface, func(event watch.Event) (bool, error) {
+		cronJobUnstructured, ok := event.Object.(*unstructured.Unstructured)
+		if !ok {
+			return false, fmt.Errorf("failed to cast to unstructured object")
+		}
 
-		err = scheme.Scheme.Convert(cronjobUnstructured, cronjob, cronjobUnstructured.GroupVersionKind())
+		cronJob := &batchv1.CronJob{}
+		err := scheme.Scheme.Convert(cronJobUnstructured, cronJob, cronJobUnstructured.GroupVersionKind())
 		if err != nil {
 			return false, err
 		}
 
-		if len(cronjob.Status.Active) > 0 {
+		if len(cronJob.Status.Active) > 0 {
 			return true, nil
 		}
+
 		return false, nil
 	})
 }
