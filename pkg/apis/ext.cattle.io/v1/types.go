@@ -15,7 +15,7 @@ type UserActivity struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Status contains system information about the useractivity.
+	// Status is the most recently observed status of the UserActivity.
 	Status UserActivityStatus `json:"status"`
 }
 
