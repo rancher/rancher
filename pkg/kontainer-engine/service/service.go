@@ -18,6 +18,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/aks"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/eks"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	kubeimport "github.com/rancher/rancher/pkg/kontainer-engine/drivers/import"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
@@ -27,6 +30,8 @@ import (
 
 const (
 	ListenAddress                           = "127.0.0.1:"
+	GoogleKubernetesEngineDriverName        = "googlekubernetesengine"
+	AzureKubernetesServiceDriverName        = "azurekubernetesservice"
 	AmazonElasticContainerServiceDriverName = "amazonelasticcontainerservice"
 	ImportDriverName                        = "import"
 	RancherKubernetesEngineDriverName       = "rancherkubernetesengine"
@@ -34,8 +39,11 @@ const (
 
 var (
 	Drivers = map[string]types.Driver{
-		ImportDriverName:                  kubeimport.NewDriver(),
-		RancherKubernetesEngineDriverName: rke.NewDriver(),
+		GoogleKubernetesEngineDriverName:        gke.NewDriver(),
+		AzureKubernetesServiceDriverName:        aks.NewDriver(),
+		AmazonElasticContainerServiceDriverName: eks.NewDriver(),
+		ImportDriverName:                        kubeimport.NewDriver(),
+		RancherKubernetesEngineDriverName:       rke.NewDriver(),
 	}
 )
 
@@ -473,7 +481,7 @@ func portOnly(address string) (string, error) {
 	}
 
 	if portNum < 1 || portNum > 65535 {
-		return "", errors.Wrap(fmt.Errorf("invalid port [%s], port range is between 1 and 65535", port), portParseErr.Error())
+		return "", errors.Wrap(fmt.Errorf(fmt.Sprintf("invalid port [%s], port range is between 1 and 65535", port)), portParseErr.Error())
 	}
 
 	return port, nil
