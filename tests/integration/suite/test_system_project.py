@@ -57,7 +57,10 @@ def test_system_namespaces_assigned(admin_cc):
     if operatorNamespace in system_namespaces_names:
         system_namespaces_names.remove(operatorNamespace)
 
-    assert initial_system_namespaces.issubset(system_namespaces_names)
+    assert initial_system_namespaces.issubset(system_namespaces_names), \
+        f"""{system_namespaces_names}
+        is not subset of
+        {initial_system_namespaces}"""
 
 
 def test_system_project_cant_be_deleted(admin_mc, admin_cc):
