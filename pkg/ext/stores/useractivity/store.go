@@ -37,7 +37,7 @@ var timeNow = func() time.Time {
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 type Store struct {
-	tokens     v3.TokenController
+	tokens     v3.TokenClient
 	tokenCache v3.TokenCache
 	userCache  v3.UserCache
 }
