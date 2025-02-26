@@ -10,11 +10,12 @@ import (
 	"time"
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionClusters "github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/ingresses"
 	"github.com/rancher/shepherd/extensions/kubectl"
@@ -29,7 +30,6 @@ import (
 const (
 	active              = "active"
 	noSuchHostSubString = "no such host"
-	labelWorker         = "labelSelector=node-role.kubernetes.io/worker=true"
 )
 
 // VerifyService waits for a service to be ready in the downstream cluster
@@ -96,7 +96,12 @@ func VerifyAWSLoadBalancer(t *testing.T, client *rancher.Client, serviceLB *v1.S
 }
 
 // VerifyClusterIP is a helper function that verifies the cluster is able to connect to the cluster ip service by ssh shell
-func VerifyClusterIP(client *rancher.Client, clusterName string, clusterID string, steveClient *steveV1.Client, serviceID string, path string, content string) error {
+func VerifyClusterIP(client *rancher.Client, clusterName string, clusterID string, serviceID string, path string, content string) error {
+	steveClient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
 	serviceResp, err := steveClient.SteveType(ServiceSteveType).ByID(serviceID)
 	if err != nil {
 		return err
@@ -111,8 +116,8 @@ func VerifyClusterIP(client *rancher.Client, clusterName string, clusterID strin
 
 	clusterIP := newService.Spec.ClusterIP
 
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
+	logrus.Infof("Getting the node using the label [%v]", clusters.LabelWorker)
+	query, err := url.ParseQuery(clusters.LabelWorker)
 	if err != nil {
 		return err
 	}
@@ -122,12 +127,12 @@ func VerifyClusterIP(client *rancher.Client, clusterName string, clusterID strin
 		return err
 	}
 
-	provisioningClusterID, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
+	provisioningClusterID, err := extensionClusters.GetV1ProvisioningClusterByName(client, clusterName)
 	if err != nil {
 		return err
 	}
 
-	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
+	cluster, err := client.Steve.SteveType(extensionClusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
 	if err != nil {
 		return err
 	}
@@ -149,7 +154,7 @@ func VerifyClusterIP(client *rancher.Client, clusterName string, clusterID strin
 
 	log := ""
 	if strings.Contains(newCluster.Spec.KubernetesVersion, "rke2") || strings.Contains(newCluster.Spec.KubernetesVersion, "k3s") {
-		_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+		_, stevecluster, err := extensionClusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
 		if err != nil {
 			return err
 		}

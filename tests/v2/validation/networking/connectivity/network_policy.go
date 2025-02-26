@@ -10,12 +10,13 @@ import (
 	"strings"
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/tests/v2/actions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/ssh"
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/clusters"
+	extensionClusters "github.com/rancher/shepherd/extensions/clusters"
 	kubeapinodes "github.com/rancher/shepherd/extensions/kubeapi/nodes"
 	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/workloads"
@@ -31,7 +32,6 @@ const (
 	pingPodProjectName     = "ping-project"
 	containerName          = "test1"
 	containerImage         = "ranchertest/mytestcontainer"
-	labelWorker            = "labelSelector=node-role.kubernetes.io/worker=true"
 	kubeSystemNamespace    = "kube-system"
 	cloudControllerManager = "aws-cloud-controller-manager"
 )
@@ -120,12 +120,12 @@ func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, erro
 		return false, err
 	}
 
-	provisioningClusterID, err := clusters.GetV1ProvisioningClusterByName(client, client.RancherConfig.ClusterName)
+	provisioningClusterID, err := extensionClusters.GetV1ProvisioningClusterByName(client, client.RancherConfig.ClusterName)
 	if err != nil {
 		return false, err
 	}
 
-	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
+	cluster, err := client.Steve.SteveType(extensionClusters.ProvisioningSteveResourceType).ByID(provisioningClusterID)
 	if err != nil {
 		return false, err
 	}
@@ -166,8 +166,8 @@ func isCloudManagerEnabled(client *rancher.Client, clusterID string) (bool, erro
 
 // validateLoadBalancer is a helper function that verifies the cluster is able to connect to the load balancer
 func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) error {
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
+	logrus.Infof("Getting the node using the label [%v]", clusters.LabelWorker)
+	query, err := url.ParseQuery(clusters.LabelWorker)
 	if err != nil {
 		return err
 	}
@@ -201,8 +201,8 @@ func validateLoadBalancer(client *rancher.Client, clusterID string, steveClient 
 
 // validateHostPortSSH is a helper function that verifies the cluster is able to connect to the node host port by ssh shell
 func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName string, steveClient *steveV1.Client, hostPort int, workloadName string) error {
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
+	logrus.Infof("Getting the node using the label [%v]", clusters.LabelWorker)
+	query, err := url.ParseQuery(clusters.LabelWorker)
 	if err != nil {
 		return err
 	}
@@ -222,7 +222,7 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 
 		nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeInternalIP)
 
-		sshNode, err := ssh.CreateSSH(client, steveClient, clusterName, clusterID)
+		sshNode, err := ssh.CreateSSHNode(client, clusterName, clusterID)
 		if err != nil {
 			return err
 		}
@@ -247,8 +247,8 @@ func validateHostPortSSH(client *rancher.Client, clusterID string, clusterName s
 
 // validateNodePort is a helper function that verifies the cluster is able to connect to the node port by job service
 func validateNodePort(client *rancher.Client, clusterID string, steveClient *steveV1.Client, nodePort int, workloadName string) error {
-	logrus.Infof("Getting the node using the label [%v]", labelWorker)
-	query, err := url.ParseQuery(labelWorker)
+	logrus.Infof("Getting the node using the label [%v]", clusters.LabelWorker)
+	query, err := url.ParseQuery(clusters.LabelWorker)
 	if err != nil {
 		return err
 	}

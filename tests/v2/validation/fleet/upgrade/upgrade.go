@@ -1,4 +1,4 @@
-package update
+package upgrade
 
 import (
 	"fmt"
@@ -17,6 +17,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
+)
+
+const (
+	sshPublickey  = "ssh-publickey"
+	sshPrivatekey = "ssh-privatekey"
 )
 
 func gitPushCommit(client *rancher.Client, sshNode *nodes.Node, repoName string) error {
@@ -40,7 +45,7 @@ func gitPushCommit(client *rancher.Client, sshNode *nodes.Node, repoName string)
 	return err
 }
 
-func createFleetGitRepo(client *rancher.Client, sshNode *nodes.Node, repoName string, namespaceName string, clusterName string, clusterID string, secretName string) (*v1.SteveAPIObject, error) {
+func createLocalFleetGitRepo(client *rancher.Client, sshNode *nodes.Node, repoName string, namespaceName string, clusterName string, clusterID string, secretName string) (*v1.SteveAPIObject, error) {
 
 	gitSSHRepo := fmt.Sprintf(fmt.Sprintf("%s@%s:/home/%s/%s", sshNode.SSHUser, sshNode.PublicIPAddress, sshNode.SSHUser, repoName))
 
@@ -78,7 +83,8 @@ func createFleetGitRepo(client *rancher.Client, sshNode *nodes.Node, repoName st
 	return repoObject, nil
 }
 
-func verifyGitCommit(client *rancher.Client, commit string, repoObjectID string) error {
+func verifyNewGitCommit(client *rancher.Client, oldCommit string, repoObjectID string) error {
+	logrus.Info("Checking Fleet Git Commit has been updated")
 	backoff := kwait.Backoff{
 		Duration: 1 * time.Second,
 		Factor:   1.1,
@@ -98,27 +104,27 @@ func verifyGitCommit(client *rancher.Client, commit string, repoObjectID string)
 			return true, err
 		}
 
-		return commit != newGitStatus.Commit, nil
+		return oldCommit != newGitStatus.Commit, nil
 	})
 	return err
 }
 
-func createFleetSSHSecret(client *rancher.Client, privateKey string) (string, error) {
-	key, err := ssh.ParsePrivateKey([]byte(privateKey))
+func createFleetSSHSecret(client *rancher.Client, privateKey []byte) (string, error) {
+	key, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
 		return "", err
 	}
 
 	keyData := map[string][]byte{
-		"ssh-publickey":  []byte(key.PublicKey().Marshal()),
-		"ssh-privatekey": []byte(privateKey),
+		sshPublickey:  []byte(key.PublicKey().Marshal()),
+		sshPrivatekey: privateKey,
 	}
 
 	secretName := namegenerator.AppendRandomString("fleet-ssh")
 	secretTemplate := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: "fleet-default",
+			Namespace: fleet.Namespace,
 		},
 		Data: keyData,
 		Type: corev1.SecretTypeSSHAuth,
