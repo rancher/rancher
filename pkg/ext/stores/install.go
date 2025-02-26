@@ -23,7 +23,7 @@ func InstallStores(server *steveext.ExtensionAPIServer, wranglerContext *wrangle
 
 	logrus.Infof("Installing ext token store")
 	extv1.AddToScheme(scheme)
-	err := server.Install(
+	err = server.Install(
 		tokens.PluralName,
 		tokens.GVK,
 		tokens.NewFromWrangler(wranglerContext))
