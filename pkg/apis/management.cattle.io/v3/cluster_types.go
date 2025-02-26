@@ -151,7 +151,7 @@ type ClusterSpec struct {
 	Internal                            bool                        `json:"internal" norman:"nocreate,noupdate"`
 	K3sConfig                           *K3sConfig                  `json:"k3sConfig,omitempty"`
 	Rke2Config                          *Rke2Config                 `json:"rke2Config,omitempty"`
-	ImportedConfig                      *ImportedConfig             `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
+	ImportedConfig                      *ImportedConfig             `json:"importedConfig,omitempty"`
 	GoogleKubernetesEngineConfig        *MapStringInterface         `json:"googleKubernetesEngineConfig,omitempty"`
 	AzureKubernetesServiceConfig        *MapStringInterface         `json:"azureKubernetesServiceConfig,omitempty"`
 	AmazonElasticContainerServiceConfig *MapStringInterface         `json:"amazonElasticContainerServiceConfig,omitempty"`
