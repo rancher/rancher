@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/feature"
 	"github.com/rancher/rancher/pkg/features"
+	mcm "github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/stretchr/testify/assert"
@@ -61,8 +62,11 @@ func (s *FeatureTestSuite) SetupSuite() {
 	s.wranglerContext, err = wrangler.NewContext(s.ctx, nil, restCfg)
 	assert.NoError(s.T(), err)
 
+	scaledContext, _, _, err := mcm.BuildScaledContext(s.ctx, s.wranglerContext, &mcm.Options{})
+
+	management, err := scaledContext.NewManagementContext()
 	// Register the feature controller
-	feature.Register(s.ctx, s.wranglerContext)
+	feature.Register(s.ctx, management, s.wranglerContext)
 
 	// Create and start the feature controller factory
 	cf := s.wranglerContext.ControllerFactory.ForResourceKind(schema.GroupVersionResource{
