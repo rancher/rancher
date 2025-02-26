@@ -308,5 +308,10 @@ func validateActivityToken(auth, activity *v3Legacy.Token) error {
 	if activity.Labels[TokenKind] != "session" {
 		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", activity.Name))
 	}
+
+	if activity.Enabled != nil && !*activity.Enabled {
+		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is disabled", activity.Name))
+	}
+
 	return nil
 }
