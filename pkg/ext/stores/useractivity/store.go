@@ -179,7 +179,7 @@ func (s *Store) Create(ctx context.Context,
 			Value: newIdleTimeout,
 		}})
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("%w", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to marshall patch data: %w", err))
 		}
 		_, err = s.tokens.Patch(activityToken.GetName(), types.JSONPatchType, patch)
 		if err != nil {
