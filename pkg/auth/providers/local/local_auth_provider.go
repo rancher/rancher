@@ -270,7 +270,7 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	if principalType == "user" {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = l.isThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -368,12 +368,6 @@ func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*v
 	}
 	return localUsers, localGroups, err
 
-}
-
-func (l *Provider) isThisUserMe(me, other v3.Principal) bool {
-	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
-		me.LoginName == other.LoginName &&
-		me.PrincipalType == other.PrincipalType
 }
 
 func (l *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {

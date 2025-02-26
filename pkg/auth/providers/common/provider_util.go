@@ -58,3 +58,12 @@ func GetCommonUserExtraAttributes(userPrincipal v3.Principal) map[string][]strin
 	}
 	return extras
 }
+
+// SamePrincipal compares two principals for strong equality. This is true when
+// the types, login and resource name match.
+func SamePrincipal(me, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
+
+}
