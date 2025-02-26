@@ -399,7 +399,7 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token acces
 	if principalType == userType {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = g.isThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -409,12 +409,6 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token acces
 	}
 
 	return princ
-}
-
-func (g *ghProvider) isThisUserMe(me, other v3.Principal) bool {
-	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
-		me.LoginName == other.LoginName &&
-		me.PrincipalType == other.PrincipalType
 }
 
 func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {

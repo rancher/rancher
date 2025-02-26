@@ -388,7 +388,7 @@ func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, to
 	if principalType == userType {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = g.isThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
@@ -397,12 +397,6 @@ func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, to
 		}
 	}
 	return princ
-}
-
-func (g *googleOauthProvider) isThisUserMe(me, other v3.Principal) bool {
-	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
-		me.LoginName == other.LoginName &&
-		me.PrincipalType == other.PrincipalType
 }
 
 func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail string, jsonCredentials []byte, accessTokenSource oauth2.TokenSource) (*admin.Service, error) {
