@@ -166,7 +166,7 @@ var (
 	ImperativeApiExtension = newFeature(
 		"imperative-api-extension",
 		"Enable imperative API extension as a k8s aggregation layer as proxy to the kube apiserver",
-		false,
+		true,
 		false,
 		true)
 )
