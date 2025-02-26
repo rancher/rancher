@@ -143,7 +143,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
-				if p.isThisUserMe(myToken.GetUserPrincipal(), principal) {
+				if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
@@ -170,16 +170,10 @@ func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccess
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	if p.isThisUserMe(token.GetUserPrincipal(), *principal) {
+	if common.SamePrincipal(token.GetUserPrincipal(), *principal) {
 		principal.Me = true
 	}
 	return *principal, err
-}
-
-func (p *adProvider) isThisUserMe(me, other v3.Principal) bool {
-	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
-		me.LoginName == other.LoginName &&
-		me.PrincipalType == other.PrincipalType
 }
 
 func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
