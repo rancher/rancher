@@ -8,13 +8,12 @@ import (
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3Norman "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
@@ -26,9 +25,9 @@ func TestStoreCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
-	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3Legacy.Token](ctrl)
-	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
+	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3Norman.User](ctrl)
 
 	uas := &Store{
 		tokens:     mockTokenControllerFake,
@@ -61,7 +60,7 @@ func TestStoreCreate(t *testing.T) {
 					},
 				}),
 				obj: &ext.UserActivity{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
 					},
 				},
@@ -70,36 +69,36 @@ func TestStoreCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				gomock.InOrder(
-					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
-						ObjectMeta: v1.ObjectMeta{
+					mockUserCacheFake.EXPECT().Get("admin").Return(&v3Norman.User{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "admin",
 						},
 					}, nil),
 
-					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
-						ObjectMeta: v1.ObjectMeta{
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3.Token{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: v3Norman.Principal{},
 					}, nil),
 
-					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
-						ObjectMeta: v1.ObjectMeta{
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3.Token{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 							Labels: map[string]string{
 								TokenKind: "session",
 							},
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: v3Norman.Principal{},
 					}, nil),
 
-					mockTokenControllerFake.EXPECT().Patch("token-12345", types.JSONPatchType, gomock.Any()).Return(&v3Legacy.Token{}, nil),
+					mockTokenControllerFake.EXPECT().Patch("token-12345", types.JSONPatchType, gomock.Any()).Return(&v3.Token{}, nil),
 				)
 			},
 			want: &ext.UserActivity{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
@@ -119,7 +118,7 @@ func TestStoreCreate(t *testing.T) {
 					},
 				}),
 				obj: &ext.UserActivity{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
 					},
 				},
@@ -147,7 +146,7 @@ func TestStoreCreate(t *testing.T) {
 					},
 				}),
 				obj: &ext.UserActivity{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
 					},
 				},
@@ -156,26 +155,26 @@ func TestStoreCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				gomock.InOrder(
-					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
-						ObjectMeta: v1.ObjectMeta{
+					mockUserCacheFake.EXPECT().Get("admin").Return(&v3Norman.User{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "admin",
 						},
 					}, nil),
 
-					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
-						ObjectMeta: v1.ObjectMeta{
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3.Token{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: v3Norman.Principal{},
 					}, nil),
 
-					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
-						ObjectMeta: v1.ObjectMeta{
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3.Token{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 						},
 						AuthProvider:  "local",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: v3Norman.Principal{},
 					}, nil),
 				)
 			},
@@ -193,45 +192,45 @@ func TestStoreCreate(t *testing.T) {
 					},
 				}),
 				obj: &ext.UserActivity{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
 					},
 				},
 				validateFunc: nil,
-				options: &v1.CreateOptions{
+				options: &metav1.CreateOptions{
 					DryRun: []string{metav1.DryRunAll},
 				},
 			},
 			mockSetup: func() {
 				gomock.InOrder(
-					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
-						ObjectMeta: v1.ObjectMeta{
+					mockUserCacheFake.EXPECT().Get("admin").Return(&v3Norman.User{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "admin",
 						},
 					}, nil),
 
-					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
-						ObjectMeta: v1.ObjectMeta{
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3.Token{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: v3Norman.Principal{},
 					}, nil),
 
-					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3Legacy.Token{
-						ObjectMeta: v1.ObjectMeta{
+					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&v3.Token{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 							Labels: map[string]string{
 								TokenKind: "session",
 							},
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: v3Norman.Principal{},
 					}, nil),
 				)
 			},
 			want: &ext.UserActivity{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
@@ -271,9 +270,9 @@ func TestStoreCreate(t *testing.T) {
 
 func TestStoreGet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3Legacy.Token, *v3Legacy.TokenList](ctrl)
-	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3Legacy.Token](ctrl)
-	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
+	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3Norman.User](ctrl)
 	uas := &Store{
 		tokens:     mockTokenControllerFake,
 		tokenCache: mockTokenCacheFake,
@@ -304,24 +303,24 @@ func TestStoreGet(t *testing.T) {
 				name: "token-12345",
 			},
 			mockSetup: func() {
-				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3Legacy.Token{
-					ObjectMeta: v1.ObjectMeta{
+				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
 						Labels: map[string]string{
 							TokenKind: "session",
 						},
 					},
 					UserID: "admin",
-					ActivityLastSeenAt: &v1.Time{
+					ActivityLastSeenAt: &metav1.Time{
 						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
 					},
 				}, nil).AnyTimes()
 				mockUserCacheFake.EXPECT().Get(gomock.Any()).Return(
-					&v3Legacy.User{}, nil,
+					&v3.User{}, nil,
 				)
 			},
 			want: &ext.UserActivity{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
@@ -359,9 +358,9 @@ func TestStoreGet(t *testing.T) {
 				name: "ua_user1_token-12345",
 			},
 			mockSetup: func() {
-				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3Legacy.Token{
+				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&v3.Token{
 					UserID: "token-12345",
-					ActivityLastSeenAt: &v1.Time{
+					ActivityLastSeenAt: &metav1.Time{
 						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
 					},
 				}, nil).AnyTimes()
@@ -373,7 +372,7 @@ func TestStoreGet(t *testing.T) {
 	for _, tt := range tests {
 		tt.mockSetup()
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := uas.Get(tt.args.ctx, tt.args.name, &v1.GetOptions{})
+			got, err := uas.Get(tt.args.ctx, tt.args.name, &metav1.GetOptions{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store.get() error = %v, wantErr %v", err, tt.wantErr)
 				return
