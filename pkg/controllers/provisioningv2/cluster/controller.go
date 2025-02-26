@@ -252,8 +252,8 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 
 		if cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass != nil {
 			provCluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v1.PriorityClassSpec{
-				Value:      cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
-				Preemption: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Preemption,
+				Value:            cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
+				PreemptionPolicy: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.PreemptionPolicy,
 			}
 		}
 	}
@@ -457,8 +457,8 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 
 		if cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass != nil {
 			spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v3.PriorityClassSpec{
-				Value:      cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
-				Preemption: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Preemption,
+				Value:            cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
+				PreemptionPolicy: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.PreemptionPolicy,
 			}
 		}
 	}
