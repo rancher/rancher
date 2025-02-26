@@ -1,27 +1,22 @@
 package plansecret
 
 import (
-	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
-	"strings"
+	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"time"
 
-	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
-	sb "github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
@@ -47,29 +42,13 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.Core.Secret().OnChange(ctx, "plan-secret", h.OnChange)
 }
 
-func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
+func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, error) {
 	if secret == nil || secret.Type != capr.SecretTypeMachinePlan || len(secret.Data) == 0 {
 		return secret, nil
 	}
+	var err error
 
 	logrus.Debugf("[plansecret] reconciling secret %s/%s", secret.Namespace, secret.Name)
-
-	node, err := planner.SecretToNode(secret)
-	if err != nil {
-		return secret, err
-	}
-
-	if v, ok := node.PeriodicOutput["etcd-snapshot-list-local"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 {
-		if err := h.reconcileEtcdSnapshotList(secret, false, v.Stdout); err != nil {
-			logrus.Errorf("[plansecret] error reconciling local snapshot list for secret %s/%s: %v", secret.Namespace, secret.Name, err)
-		}
-	}
-
-	if v, ok := node.PeriodicOutput["etcd-snapshot-list-s3"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 && secret.Labels[capr.InitNodeLabel] == "true" {
-		if err := h.reconcileEtcdSnapshotList(secret, true, v.Stdout); err != nil {
-			logrus.Errorf("[plansecret] error reconciling S3 snapshot list for secret %s/%s: %v", secret.Namespace, secret.Name, err)
-		}
-	}
 
 	appliedChecksum := string(secret.Data["applied-checksum"])
 	failedChecksum := string(secret.Data["failed-checksum"])
@@ -96,6 +75,36 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 			secret.Annotations[capr.PlanProbesPassedAnnotation] = time.Now().UTC().Format(time.RFC3339)
 			secretChanged = true
 		}
+	}
+
+	node, err := planner.SecretToNode(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	if purgePeriodicInstructionOutput(node) {
+		if len(node.PeriodicOutput) == 0 {
+			// special case for when there are no remaining periodic instructions
+			secret.Data["applied-periodic-output"] = []byte{}
+		} else {
+			input, err := json.Marshal(node.PeriodicOutput)
+			if err != nil {
+				return nil, err
+			}
+
+			var output bytes.Buffer
+
+			gz := gzip.NewWriter(&output)
+			if _, err = gz.Write(input); err != nil {
+				return nil, err
+			}
+			if err = gz.Close(); err != nil {
+				return nil, err
+			}
+
+			secret.Data["applied-periodic-output"] = output.Bytes()
+		}
+		secretChanged = true
 	}
 
 	if secretChanged {
@@ -136,6 +145,33 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	logrus.Debugf("[plansecret] %s/%s: rv: %s: Reconciling machine PlanApplied condition to nil", secret.Namespace, secret.Name, secret.ResourceVersion)
 	err = h.reconcileMachinePlanAppliedCondition(secret, nil)
 	return secret, err
+}
+
+// purgePeriodicInstructionOutput will parse the node plan and remove the periodic output for instructions which are no
+// longer present in the current plan. Returns "" when the entire list is removed, otherwise it returns the json blob of
+// remaining keys gzipped for setting the "applied-periodic-output". Returns nil only when the "applied-periodic-output"
+// key is not to be overwritten. This function modifies the node plan in place.
+func purgePeriodicInstructionOutput(node *plan.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	// if old periodic instructions are within the plan, remove them
+	knownInstructions := map[string]struct{}{}
+	for _, p := range node.Plan.PeriodicInstructions {
+		knownInstructions[p.Name] = struct{}{}
+	}
+
+	removed := false
+	for n := range node.PeriodicOutput {
+		if _, ok := knownInstructions[n]; !ok {
+			// remove from periodic output
+			delete(node.PeriodicOutput, n)
+			removed = true
+		}
+	}
+
+	return removed
 }
 
 func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, planAppliedErr error) error {
@@ -179,179 +215,4 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 	}
 
 	return err
-}
-
-func machineOwnerRef(machine capi.Machine) metav1.OwnerReference {
-	return metav1.OwnerReference{
-		APIVersion:         machine.APIVersion,
-		Kind:               machine.Kind,
-		Name:               machine.Name,
-		UID:                machine.UID,
-		Controller:         &[]bool{true}[0],
-		BlockOwnerDeletion: &[]bool{true}[0],
-	}
-}
-
-func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, listStdout []byte) error {
-	cnl := secret.Labels[capr.ClusterNameLabel]
-	if len(cnl) == 0 {
-		return fmt.Errorf("node secret did not have label %s", capr.ClusterNameLabel)
-	}
-
-	machineName, ok := secret.Labels[capr.MachineNameLabel]
-	if !ok {
-		return fmt.Errorf("did not find machine label on secret %s/%s", secret.Namespace, secret.Name)
-	}
-
-	ls := labels.SelectorFromSet(map[string]string{
-		capr.ClusterNameLabel: cnl,
-		capr.NodeNameLabel:    "s3",
-	})
-
-	var machine *capi.Machine
-	var machineID string
-	var err error
-
-	if !s3 {
-		machine, err = h.machinesCache.Get(secret.Namespace, machineName)
-		if err != nil {
-			return err
-		}
-		if machine.Labels[capr.MachineIDLabel] != "" {
-			machineID = machine.Labels[capr.MachineIDLabel]
-			ls = labels.SelectorFromSet(map[string]string{
-				capr.ClusterNameLabel: cnl,
-				capr.MachineIDLabel:   machine.Labels[capr.MachineIDLabel],
-			})
-		} else {
-			return fmt.Errorf("error finding machine ID for machine %s/%s", machine.Namespace, machine.Name)
-		}
-	}
-
-	etcdSnapshotsOnNode := outputToEtcdSnapshots(cnl, listStdout)
-
-	etcdSnapshots, err := h.etcdSnapshotsCache.List(secret.Namespace, ls)
-	if err != nil {
-		return err
-	}
-
-	// indexedEtcdSnapshots is a map of etcd snapshots that already exist in the management cluster
-	indexedEtcdSnapshots := map[string]*v1.ETCDSnapshot{}
-
-	for _, v := range etcdSnapshots {
-		if _, ok := etcdSnapshotsOnNode[v.Name]; !ok && v.Status.Missing {
-			// delete the etcd snapshot as it is missing
-			logrus.Infof("[plansecret] Deleting etcd snapshot %s/%s", v.Namespace, v.Name)
-			if err := h.etcdSnapshotsClient.Delete(v.Namespace, v.Name, &metav1.DeleteOptions{}); err != nil {
-				return err
-			}
-		}
-		indexedEtcdSnapshots[v.Name] = v
-	}
-
-	if !s3 && machine.Status.NodeRef != nil {
-		for k, v := range etcdSnapshotsOnNode {
-			if _, ok := indexedEtcdSnapshots[k]; !ok {
-				// create the etcdsnapshot object as it was not in the list of etcdsnapshots and not an S3 snapshot
-				snapshot := v1.ETCDSnapshot{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: secret.Namespace,
-						Labels: map[string]string{
-							capr.ClusterNameLabel: cnl,
-							capr.MachineIDLabel:   machineID,
-						},
-						Annotations: map[string]string{
-							sb.SnapshotNameKey:      v.Name,
-							sb.StorageAnnotationKey: sb.StorageLocal,
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							machineOwnerRef(*machine),
-						},
-					},
-					Spec: v1.ETCDSnapshotSpec{
-						ClusterName: cnl,
-					},
-					SnapshotFile: v1.ETCDSnapshotFile{
-						Name:     v.Name,
-						Location: v.Location,
-						NodeName: machine.Status.NodeRef.Name,
-					},
-				}
-				snapshot.Name = name.SafeConcatName(cnl, snapshot.SnapshotFile.Name, sb.StorageLocal)
-				logrus.Debugf("[plansecret] machine %s/%s: creating etcd snapshot %s for cluster %s", machine.Namespace, machine.Name, snapshot.Name, cnl)
-				_, err = h.etcdSnapshotsClient.Create(&snapshot)
-				if err != nil && !apierrors.IsAlreadyExists(err) {
-					return fmt.Errorf("error while creating etcd snapshot: %w", err)
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-type snapshot struct {
-	Name     string
-	Location string
-	Size     string
-	Created  string
-	S3       bool
-}
-
-func outputToEtcdSnapshots(clusterName string, collectedOutput []byte) map[string]*snapshot {
-	scanner := bufio.NewScanner(bytes.NewBuffer(collectedOutput))
-	snapshots := make(map[string]*snapshot)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if s := strings.Fields(line); len(s) == 3 || len(s) == 4 {
-			switch len(s) {
-			case 3:
-				if strings.ToLower(s[0]) == "name" &&
-					strings.ToLower(s[1]) == "size" &&
-					strings.ToLower(s[2]) == "created" {
-					continue
-				}
-			case 4:
-				if strings.ToLower(s[0]) == "name" &&
-					strings.ToLower(s[1]) == "location" &&
-					strings.ToLower(s[2]) == "size" &&
-					strings.ToLower(s[3]) == "created" {
-					continue
-				}
-			}
-			ss, err := generateEtcdSnapshotFromListOutput(line)
-			if err != nil {
-				logrus.Errorf("error parsing etcd snapshot output (%s) to etcd snapshot: %v", line, err)
-				continue
-			}
-			suffix := "local"
-			if ss.S3 {
-				suffix = "s3"
-			}
-			snapshots[fmt.Sprintf("%s-%s-%s", clusterName, ss.Name, suffix)] = ss
-		}
-	}
-	return snapshots
-}
-
-func generateEtcdSnapshotFromListOutput(input string) (*snapshot, error) {
-	snapshotData := strings.Fields(input)
-	switch len(snapshotData) {
-	case 3:
-		return &snapshot{
-			Name:    strings.ToLower(sb.InvalidKeyChars.ReplaceAllString(snapshotData[0], "-")),
-			Size:    snapshotData[1],
-			Created: snapshotData[2],
-			S3:      true,
-		}, nil
-	case 4:
-		return &snapshot{
-			Name:     strings.ToLower(sb.InvalidKeyChars.ReplaceAllString(snapshotData[0], "-")),
-			Location: snapshotData[1],
-			Size:     snapshotData[2],
-			Created:  snapshotData[3],
-			S3:       false,
-		}, nil
-	}
-	return nil, fmt.Errorf("input (%s) did not have 3 or 4 fields", input)
 }

@@ -146,36 +146,6 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 	return nodePlan, nil
 }
 
-func (p *Planner) addEtcdSnapshotListLocalPeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
-	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, plan.PeriodicInstruction{
-		Name:    "etcd-snapshot-list-local",
-		Command: "sh",
-		Args: []string{
-			"-c",
-			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-			fmt.Sprintf("%s etcd-snapshot list --etcd-s3=false 2>/dev/null",
-				capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
-		},
-		PeriodSeconds: 600,
-	})
-	return nodePlan, nil
-}
-
-func (p *Planner) addEtcdSnapshotListS3PeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
-	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, plan.PeriodicInstruction{
-		Name:    "etcd-snapshot-list-s3",
-		Command: "sh",
-		Args: []string{
-			"-c",
-			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-			fmt.Sprintf("%s etcd-snapshot list --etcd-s3 2>/dev/null",
-				capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
-		},
-		PeriodSeconds: 600,
-	})
-	return nodePlan, nil
-}
-
 // generateManifestRemovalInstruction generates a rm -rf command for the manifests of a server. This was created in response to https://github.com/rancher/rancher/issues/41174
 func generateManifestRemovalInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (bool, plan.OneTimeInstruction) {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)

@@ -98,6 +98,7 @@ require (
 	github.com/docker/go-connections v0.5.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v5.9.11+incompatible
+	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-ldap/ldap/v3 v3.4.1
@@ -110,6 +111,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
+	github.com/k3s-io/api v0.1.0
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/microsoft/kiota-abstractions-go v1.7.0
@@ -227,7 +229,6 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
