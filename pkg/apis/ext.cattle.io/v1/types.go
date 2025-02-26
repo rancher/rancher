@@ -21,10 +21,8 @@ type UserActivity struct {
 
 // UserActivityStatus defines the most recently observed status of the UserActivity.
 type UserActivityStatus struct {
-	// ExpiresAt is the timestamp at which the idle timer expires, invalidating the Token and session.
-	// It is calculated by adding the
-	// auth-user-session-idle-ttl-minutes attribute to the time
-	// the request is made.
+	// ExpiresAt is the timestamp at which the user's session expires if it stays idle, invalidating the corresponding session token.
+	// It is calculated by adding the duration specified in the auth-user-session-idle-ttl-minutes setting to the time of the request.
 	// +optional
 	ExpiresAt string `json:"expiresAt"`
 }
