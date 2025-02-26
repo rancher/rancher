@@ -442,7 +442,7 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	// aggregate every inherited role template
 	for _, roleTemplateName := range rt.RoleTemplateNames {
 		labelSelector := metav1.LabelSelector{
-			MatchLabels: map[string]string{aggregationLabel: nameTransformer(roleTemplateName)},
+			MatchLabels: map[string]string{aggregationLabel: AggregatedClusterRoleNameFor(nameTransformer(roleTemplateName))},
 		}
 		roleTemplateLabels = append(roleTemplateLabels, labelSelector)
 	}

@@ -618,3 +618,72 @@ func TestAreClusterRolesSame(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildAggregatingClusterRole(t *testing.T) {
+	nameTransformer := func(s string) string { return s + "-transform" }
+	tests := []struct {
+		name string
+		rt   *v3.RoleTemplate
+		want *rbacv1.ClusterRole
+	}{
+		{
+			name: "no inheritance",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
+			},
+			want: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt-transform-aggregator",
+					Labels: map[string]string{
+						"management.cattle.io/aggregates": "test-rt-transform-aggregator",
+					},
+					Annotations: map[string]string{
+						"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+					},
+				},
+				AggregationRule: &rbacv1.AggregationRule{
+					ClusterRoleSelectors: []metav1.LabelSelector{
+						{
+							MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-transform"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "with inheritance",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
+				RoleTemplateNames: []string{"rt1", "rt2"},
+			},
+			want: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt-transform-aggregator",
+					Labels: map[string]string{
+						"management.cattle.io/aggregates": "test-rt-transform-aggregator",
+					},
+					Annotations: map[string]string{
+						"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+					},
+				},
+				AggregationRule: &rbacv1.AggregationRule{
+					ClusterRoleSelectors: []metav1.LabelSelector{
+						{MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-transform"}},
+						{MatchLabels: map[string]string{"management.cattle.io/aggregates": "rt1-transform-aggregator"}},
+						{MatchLabels: map[string]string{"management.cattle.io/aggregates": "rt2-transform-aggregator"}},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildAggregatingClusterRole(tt.rt, nameTransformer)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

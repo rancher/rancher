@@ -66,6 +66,11 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
+	// Handle cluster role bindings for special permissions.
+	if err := p.reconcileClusterRoleBindings(prtb); err != nil {
+		return nil, err
+	}
+
 	if err := p.reconcileBindings(prtb); err != nil {
 		return nil, err
 	}
@@ -85,11 +90,6 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	subject, err := rbac.BuildSubjectFromRTB(prtb)
 	if err != nil {
-		return err
-	}
-
-	// Handle cluster role bindings for special permissions.
-	if err := p.reconcileClusterRoleBindings(prtb); err != nil {
 		return err
 	}
 

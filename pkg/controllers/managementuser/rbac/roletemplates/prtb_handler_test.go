@@ -281,7 +281,6 @@ func Test_prtbHandler_reconcileBindings(t *testing.T) {
 			name: "error checking if role template is external",
 			prtb: defaultPRTB.DeepCopy(),
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errNotFound)
 				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			wantErr: true,
@@ -290,7 +289,7 @@ func Test_prtbHandler_reconcileBindings(t *testing.T) {
 			name: "error getting namespaces",
 			prtb: defaultPRTB.DeepCopy(),
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errNotFound).Times(2)
+				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errNotFound)
 				c.nsController.EXPECT().List(namespaceListOptions).Return(nil, errDefault)
 			},
 			wantErr: true,
@@ -299,7 +298,7 @@ func Test_prtbHandler_reconcileBindings(t *testing.T) {
 			name: "error creating role binding",
 			prtb: defaultPRTB.DeepCopy(),
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errNotFound).Times(2)
+				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errNotFound)
 				c.nsController.EXPECT().List(namespaceListOptions).Return(&corev1.NamespaceList{
 					Items: []corev1.Namespace{
 						{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
@@ -316,7 +315,7 @@ func Test_prtbHandler_reconcileBindings(t *testing.T) {
 			name: "create role binding in multiple namespaces",
 			prtb: defaultPRTB.DeepCopy(),
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errNotFound).Times(2)
+				c.rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(nil, errNotFound)
 				c.nsController.EXPECT().List(namespaceListOptions).Return(&corev1.NamespaceList{
 					Items: []corev1.Namespace{
 						{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
