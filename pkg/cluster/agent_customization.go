@@ -280,7 +280,7 @@ func GetDesiredPodDisruptionBudgetValues(cluster *v3.Cluster) (string, string) {
 	return "", "0"
 }
 
-// GetDesiredPriorityClassValueAndPreemption returns the Priority Class Priority value and Preemption setting
+// GetDesiredPriorityClassValueAndPreemption returns the Priority Class Priority value and PreemptionPolicy setting
 // if configured in the agent SchedulingCustomization field.
 func GetDesiredPriorityClassValueAndPreemption(cluster *v3.Cluster) (int, string) {
 	if cluster == nil {
@@ -297,8 +297,8 @@ func GetDesiredPriorityClassValueAndPreemption(cluster *v3.Cluster) (int, string
 	}
 
 	var PCPreemption string
-	if agentCustomization.PriorityClass.Preemption != nil {
-		PCPreemption = string(*agentCustomization.PriorityClass.Preemption)
+	if agentCustomization.PriorityClass.PreemptionPolicy != nil {
+		PCPreemption = string(*agentCustomization.PriorityClass.PreemptionPolicy)
 	}
 
 	return agentCustomization.PriorityClass.Value, PCPreemption

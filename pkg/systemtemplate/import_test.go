@@ -157,8 +157,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 						ClusterAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
 							SchedulingCustomization: &apimgmtv3.AgentSchedulingCustomization{
 								PriorityClass: &apimgmtv3.PriorityClassSpec{
-									Value:      123456,
-									Preemption: &preemption,
+									Value:            123456,
+									PreemptionPolicy: &preemption,
 								},
 								PodDisruptionBudget: &apimgmtv3.PodDisruptionBudgetSpec{
 									MinAvailable: "1",
@@ -209,8 +209,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 						ClusterAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
 							SchedulingCustomization: &apimgmtv3.AgentSchedulingCustomization{
 								PriorityClass: &apimgmtv3.PriorityClassSpec{
-									Value:      123456,
-									Preemption: &preemption,
+									Value:            123456,
+									PreemptionPolicy: &preemption,
 								},
 								PodDisruptionBudget: &apimgmtv3.PodDisruptionBudgetSpec{
 									MinAvailable: "1",

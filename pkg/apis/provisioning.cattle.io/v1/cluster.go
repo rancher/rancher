@@ -49,8 +49,8 @@ type AgentSchedulingCustomization struct {
 }
 
 type PriorityClassSpec struct {
-	Value      int                  `json:"value,omitempty"`
-	Preemption *v1.PreemptionPolicy `json:"preemption,omitempty"`
+	Value            int                  `json:"value,omitempty"`
+	PreemptionPolicy *v1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 type PodDisruptionBudgetSpec struct {

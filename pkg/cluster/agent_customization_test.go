@@ -52,14 +52,14 @@ func TestAgentCustomization_getPriorityClassValueAndPreemption(t *testing.T) {
 			expectedPreemption: "",
 		},
 		{
-			name: "Only PC Preemption is configured",
+			name: "Only PC PreemptionPolicy is configured",
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase: v3.ClusterSpecBase{
 						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
 							SchedulingCustomization: &v3.AgentSchedulingCustomization{
 								PriorityClass: &v3.PriorityClassSpec{
-									Preemption: &neverPreemptionPolicy,
+									PreemptionPolicy: &neverPreemptionPolicy,
 								},
 							},
 						},
@@ -77,8 +77,8 @@ func TestAgentCustomization_getPriorityClassValueAndPreemption(t *testing.T) {
 						ClusterAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
 							SchedulingCustomization: &v3.AgentSchedulingCustomization{
 								PriorityClass: &v3.PriorityClassSpec{
-									Value:      12345,
-									Preemption: &neverPreemptionPolicy,
+									Value:            12345,
+									PreemptionPolicy: &neverPreemptionPolicy,
 								},
 							},
 						},
@@ -396,8 +396,8 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 							OverrideResourceRequirements: testClusterAgentResourceReq,
 							SchedulingCustomization: &v3.AgentSchedulingCustomization{
 								PriorityClass: &v3.PriorityClassSpec{
-									Value:      123456,
-									Preemption: &neverPreemptionPolicy,
+									Value:            123456,
+									PreemptionPolicy: &neverPreemptionPolicy,
 								},
 								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
 									MinAvailable: "1",
@@ -413,8 +413,8 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 				OverrideResourceRequirements: testClusterAgentResourceReq,
 				SchedulingCustomization: &v3.AgentSchedulingCustomization{
 					PriorityClass: &v3.PriorityClassSpec{
-						Value:      123456,
-						Preemption: &neverPreemptionPolicy,
+						Value:            123456,
+						PreemptionPolicy: &neverPreemptionPolicy,
 					},
 					PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
 						MinAvailable: "1",
@@ -432,8 +432,8 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 						OverrideResourceRequirements: testClusterAgentResourceReq,
 						SchedulingCustomization: &v3.AgentSchedulingCustomization{
 							PriorityClass: &v3.PriorityClassSpec{
-								Value:      123456,
-								Preemption: &neverPreemptionPolicy,
+								Value:            123456,
+								PreemptionPolicy: &neverPreemptionPolicy,
 							},
 							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
 								MinAvailable: "1",
@@ -449,8 +449,8 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 							OverrideResourceRequirements: testClusterAgentResourceReq,
 							SchedulingCustomization: &v3.AgentSchedulingCustomization{
 								PriorityClass: &v3.PriorityClassSpec{
-									Value:      654321,
-									Preemption: &neverPreemptionPolicy,
+									Value:            654321,
+									PreemptionPolicy: &neverPreemptionPolicy,
 								},
 								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
 									MinAvailable: "2",
@@ -466,8 +466,8 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 				OverrideResourceRequirements: testClusterAgentResourceReq,
 				SchedulingCustomization: &v3.AgentSchedulingCustomization{
 					PriorityClass: &v3.PriorityClassSpec{
-						Value:      654321,
-						Preemption: &neverPreemptionPolicy,
+						Value:            654321,
+						PreemptionPolicy: &neverPreemptionPolicy,
 					},
 					PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
 						MinAvailable: "2",
@@ -485,8 +485,8 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 						OverrideResourceRequirements: testClusterAgentResourceReq,
 						SchedulingCustomization: &v3.AgentSchedulingCustomization{
 							PriorityClass: &v3.PriorityClassSpec{
-								Value:      123456,
-								Preemption: &neverPreemptionPolicy,
+								Value:            123456,
+								PreemptionPolicy: &neverPreemptionPolicy,
 							},
 							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
 								MinAvailable: "1",
@@ -512,8 +512,8 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 						OverrideResourceRequirements: testClusterAgentResourceReq,
 						SchedulingCustomization: &v3.AgentSchedulingCustomization{
 							PriorityClass: &v3.PriorityClassSpec{
-								Value:      123456,
-								Preemption: &neverPreemptionPolicy,
+								Value:            123456,
+								PreemptionPolicy: &neverPreemptionPolicy,
 							},
 							PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
 								MinAvailable: "1",
