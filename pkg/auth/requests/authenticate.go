@@ -308,7 +308,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 				return nil, ErrMustAuthenticate
 			}
 			return nil, errors.Wrapf(ErrMustAuthenticate,
-				"failed to retrieve auth token, error: %#v", err)
+				"failed to retrieve auth token, error: %v", err)
 		}
 		if _, err := extVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
 			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
@@ -359,14 +359,14 @@ func extVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, er
 	}
 
 	// Ext token always has a hash. Only a hash.
-	hasher, err := hashers.GetHasherForHash(storedToken.Status.TokenHash)
+	hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
 	if err != nil {
 		logrus.Errorf("unable to get a hasher for token with error %v", err)
 		return http.StatusInternalServerError,
-			fmt.Errorf("unable to verify hash '%s'", storedToken.Status.TokenHash)
+			fmt.Errorf("unable to verify hash '%s'", storedToken.Status.Hash)
 	}
 
-	if err := hasher.VerifyHash(storedToken.Status.TokenHash, tokenKey); err != nil {
+	if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
 		logrus.Errorf("VerifyHash failed with error: %v", err)
 		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
