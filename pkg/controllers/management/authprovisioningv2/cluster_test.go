@@ -67,81 +67,16 @@ func TestOnCluster(t *testing.T) {
 	}
 	err := errors.NewBadRequest("error")
 
-	tests := map[string]struct {
+	type testCase struct {
 		cluster       *v1.Cluster
 		crtbCacheMock func(string) mgmtcontrollers.ClusterRoleTemplateBindingCache
 		crtbMock      func() mgmtcontrollers.ClusterRoleTemplateBindingController
 		prtbCacheMock func(string) mgmtcontrollers.ProjectRoleTemplateBindingCache
 		prtbMock      func() mgmtcontrollers.ProjectRoleTemplateBindingController
 		expectedErr   error
-	}{
-		"no rke enqueue CRTBs and PRTBs": {
-			cluster: &v1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster",
-					Labels: map[string]string{
-						kubernetesprovider.ProviderKey: providers.K3s,
-					},
-				},
-			},
-			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().List(clusterName, labels.Everything()).Return(crtbs, nil)
-				return mock
-			},
-			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
-				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
-				for _, crtb := range crtbs {
-					mock.EXPECT().Enqueue(crtb.Namespace, crtb.Name)
-				}
-				return mock
-			},
-			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
-				mock.EXPECT().List("", labels.Everything()).Return(prtbs, nil)
-				return mock
-			},
-			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
-				mock := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
-				mock.EXPECT().Enqueue(prtbInCluster.Namespace, prtbInCluster.Name)
-				return mock
-			},
-			expectedErr: nil,
-		},
-		"rke enqueue CRTBs and PRTBs": {
-			cluster: &v1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster",
-					Labels: map[string]string{
-						kubernetesprovider.ProviderKey: providers.RKE,
-					},
-				},
-			},
-			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				mock.EXPECT().List(clusterName, labels.Everything()).Return(crtbs, nil)
-				return mock
-			},
-			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
-				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
-				for _, crtb := range crtbs {
-					mock.EXPECT().Enqueue(crtb.Namespace, crtb.Name)
-				}
-				return mock
-			},
-			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
-				mock := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
-				mock.EXPECT().List("", labels.Everything()).Return(prtbs, nil)
-				return mock
-			},
-			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
-				mock := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
-				mock.EXPECT().Enqueue(prtbInCluster.Namespace, prtbInCluster.Name)
-				return mock
-			},
+	}
 
-			expectedErr: nil,
-		},
+	tests := map[string]testCase{
 		"rke enqueue CRTBs error": {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -196,6 +131,46 @@ func TestOnCluster(t *testing.T) {
 			},
 			expectedErr: err,
 		},
+	}
+
+	perDistroCases := map[string]string{
+		"rke enqueue CRTBs and PRTBs":     providers.RKE,
+		"non-rke enqueue CRTBs and PRTBs": providers.K3s,
+	}
+	for name, distro := range perDistroCases {
+		tests[name] = testCase{
+			cluster: &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+					Labels: map[string]string{
+						kubernetesprovider.ProviderKey: distro,
+					},
+				},
+			},
+			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+				mock.EXPECT().List(clusterName, labels.Everything()).Return(crtbs, nil)
+				return mock
+			},
+			crtbMock: func() mgmtcontrollers.ClusterRoleTemplateBindingController {
+				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+				for _, crtb := range crtbs {
+					mock.EXPECT().Enqueue(crtb.Namespace, crtb.Name)
+				}
+				return mock
+			},
+			prtbCacheMock: func(_ string) mgmtcontrollers.ProjectRoleTemplateBindingCache {
+				mock := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+				mock.EXPECT().List("", labels.Everything()).Return(prtbs, nil)
+				return mock
+			},
+			prtbMock: func() mgmtcontrollers.ProjectRoleTemplateBindingController {
+				mock := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+				mock.EXPECT().Enqueue(prtbInCluster.Namespace, prtbInCluster.Name)
+				return mock
+			},
+			expectedErr: nil,
+		}
 	}
 
 	for name, test := range tests {
