@@ -109,6 +109,56 @@ func verifyNewGitCommit(client *rancher.Client, oldCommit string, repoObjectID s
 	return err
 }
 
+func verifyRepoUpdate(client *rancher.Client, repoObjectID string) error {
+	backoff := kwait.Backoff{
+		Duration: 1 * time.Millisecond,
+		Factor:   1,
+		Jitter:   1,
+		Steps:    500,
+	}
+
+	err := kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		gitRepo, err := client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(repoObjectID)
+		if err != nil {
+			return true, err
+		}
+
+		newGitRepo := &v1alpha1.GitRepo{}
+		err = steveV1.ConvertToK8sType(gitRepo, newGitRepo)
+		if err != nil {
+			return true, err
+		}
+
+		return newGitRepo.Status.Summary.WaitApplied == 1, nil
+	})
+	return err
+}
+
+func verifyRepoPause(client *rancher.Client, repoObjectID string, isPaused bool) error {
+	backoff := kwait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   1,
+		Jitter:   1,
+		Steps:    10,
+	}
+
+	err := kwait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		gitRepo, err := client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(repoObjectID)
+		if err != nil {
+			return true, err
+		}
+
+		newGitRepo := &v1alpha1.GitRepo{}
+		err = steveV1.ConvertToK8sType(gitRepo, newGitRepo)
+		if err != nil {
+			return true, err
+		}
+
+		return newGitRepo.Spec.Paused == isPaused, nil
+	})
+	return err
+}
+
 func createFleetSSHSecret(client *rancher.Client, privateKey []byte) (string, error) {
 	key, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -134,12 +135,20 @@ func (u *UpgradeTestSuite) TestGitRepoForceUpdate() {
 	gitRepo := &v1alpha1.GitRepo{}
 	err = steveV1.ConvertToK8sType(lastRepoObject, gitRepo)
 	require.NoError(u.T(), err)
+	require.NotEmpty(u.T(), gitRepo.Status.Conditions)
 
-	previousPollingTime := gitRepo.Status.LastPollingTime
+	previousUpdateTime, err := time.Parse(time.RFC3339, gitRepo.Status.Conditions[0].LastUpdateTime)
+	require.NoError(u.T(), err)
+
 	previousCommit := gitRepo.Status.Commit
+	gitRepo.Status.UpdateGeneration++
+	gitRepo.Spec.ForceSyncGeneration++
 
 	u.T().Log("Updating Fleet Repo")
 	_, err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).Update(lastRepoObject, gitRepo)
+	require.NoError(u.T(), err)
+
+	err = verifyRepoUpdate(u.client, repoObject.ID)
 	require.NoError(u.T(), err)
 
 	log.Info("Getting Last GitRepo")
@@ -149,8 +158,12 @@ func (u *UpgradeTestSuite) TestGitRepoForceUpdate() {
 	gitRepo = &v1alpha1.GitRepo{}
 	err = steveV1.ConvertToK8sType(lastRepoObject, gitRepo)
 	require.NoError(u.T(), err)
+	require.NotEmpty(u.T(), gitRepo.Status.Conditions)
 
-	require.True(u.T(), previousPollingTime.After(gitRepo.Status.LastPollingTime.Time))
+	lastUpdateTime, err := time.Parse(time.RFC3339, gitRepo.Status.Conditions[0].LastUpdateTime)
+	require.NoError(u.T(), err)
+
+	require.True(u.T(), previousUpdateTime.Before(lastUpdateTime))
 	require.Equal(u.T(), previousCommit, gitRepo.Status.Commit)
 
 	u.T().Log("Verifying the Fleet GitRepo")
@@ -187,22 +200,46 @@ func (u *UpgradeTestSuite) TestPauseFleetRepo() {
 	repoObject, err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).Update(lastRepoObject, gitRepo)
 	require.NoError(u.T(), err)
 
+	err = verifyRepoPause(u.client, repoObject.ID, true)
+	require.NoError(u.T(), err)
+
 	log.Info("Fetching latest fleetGitRepo object")
 	lastRepoObject, err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(repoObject.ID)
 	require.NoError(u.T(), err)
 
-	log.Info("Checking last GitRepo was not updated")
+	log.Info("Checking last GitRepo Paused")
 	lastGitRepo := &v1alpha1.GitRepo{}
 	err = steveV1.ConvertToK8sType(lastRepoObject, lastGitRepo)
+	require.NoError(u.T(), err)
 	require.True(u.T(), lastGitRepo.Spec.Paused)
+	require.NotEmpty(u.T(), gitRepo.Status.Conditions)
+
+	previousUpdateTime, err := time.Parse(time.RFC3339, gitRepo.Status.Conditions[0].LastUpdateTime)
 	require.NoError(u.T(), err)
 
 	err = gitPushCommit(u.client, u.sshNode, repoName)
 	require.NoError(u.T(), err)
 
+	log.Info("Fetching latest fleetGitRepo object")
+	lastRepoObject, err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(repoObject.ID)
+	require.NoError(u.T(), err)
+
+	log.Info("Checking last GitRepo was not updated")
+	lastGitRepo = &v1alpha1.GitRepo{}
+	err = steveV1.ConvertToK8sType(lastRepoObject, lastGitRepo)
+	require.NoError(u.T(), err)
+	require.NotEmpty(u.T(), gitRepo.Status.Conditions)
+
+	lastUpdateTime, err := time.Parse(time.RFC3339, gitRepo.Status.Conditions[0].LastUpdateTime)
+	require.NoError(u.T(), err)
+	require.Equal(u.T(), lastUpdateTime, previousUpdateTime)
+
 	u.T().Log("Unpausing Fleet Repo")
 	lastGitRepo.Spec.Paused = false
 	repoObject, err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).Update(repoObject, lastGitRepo)
+	require.NoError(u.T(), err)
+
+	err = verifyRepoPause(u.client, repoObject.ID, false)
 	require.NoError(u.T(), err)
 
 	u.T().Log("Verifying the Fleet Repo")
@@ -211,6 +248,16 @@ func (u *UpgradeTestSuite) TestPauseFleetRepo() {
 
 	err = verifyNewGitCommit(u.client, gitRepo.Status.Commit, repoObject.ID)
 	require.NoError(u.T(), err)
+
+	log.Info("Checking last GitRepo was not updated")
+	lastGitRepo = &v1alpha1.GitRepo{}
+	err = steveV1.ConvertToK8sType(lastRepoObject, lastGitRepo)
+	require.NoError(u.T(), err)
+	require.NotEmpty(u.T(), gitRepo.Status.Conditions)
+
+	lastUpdateTime, err = time.Parse(time.RFC3339, gitRepo.Status.Conditions[0].LastUpdateTime)
+	require.NoError(u.T(), err)
+	require.Equal(u.T(), lastUpdateTime, previousUpdateTime)
 }
 
 func TestUpgradeTestSuite(t *testing.T) {
