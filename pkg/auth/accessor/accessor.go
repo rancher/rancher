@@ -11,7 +11,7 @@ import (
 // `pkg/apis/management.cattle.io/v3/authn_types.go`, and imperative in file
 // `pkg/apis/ext.cattle.io/v1/types.go`
 type TokenAccessor interface {
-	// GetName returns the kube resource name of the token.
+	// GetName returns the resource name of the token.
 	GetName() string
 	// GetIsEnabled returns a boolean flag indicating if the token is
 	// enabled or not.

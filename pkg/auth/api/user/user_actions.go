@@ -118,10 +118,8 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 		return err
 	}
 
-	// session tokens expire on password change. A TTL of 1 millisecond is used to triggere
-	// immediate expiration. note: A TTL of 0 is not suitable, this triggers the TTL default of
-	// 30 days.
-
+	// Session tokens expire on password change. A TTL of 1 millisecond is used to trigger immediate expiration.
+	//  Note: A TTL of 0 can't be used as it defaults to 30 days.
 	objs, err := h.ExtTokenStore.ListForUser(userID)
 	if err != nil {
 		return fmt.Errorf("error getting ext tokens for user %s: %v", userID, err)

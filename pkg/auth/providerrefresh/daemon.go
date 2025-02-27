@@ -21,9 +21,7 @@ var (
 )
 
 func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
-
 	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
-
 	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
 	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
 	ref = &refresher{

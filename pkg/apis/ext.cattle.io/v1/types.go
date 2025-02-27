@@ -31,18 +31,18 @@ type UserActivityStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Token instances are used to authenticate requests made against the Rancher backend.
+// Token is used to authenticate requests to Rancher.
 type Token struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec contains the user-accessible configuration of the token.
+	// Spec is the desired state of the Token.
 	Spec TokenSpec `json:"spec"`
-	// Status contains system information about the token.
+	// Status is the most recently observed status of the Token.
 	Status TokenStatus `json:"status"`
 }
 
-// TokenSpec contains the user-specifiable parts of the Token.
+// TokenSpec defines the desired state of the Token.
 type TokenSpec struct {
 	// UserID is the kube resource id of the user owning the token. By
 	// default that is the user who owned the token making the request
@@ -101,27 +101,21 @@ type TokenPrincipal struct {
 	ExtraInfo map[string]string `json:"extraInfo,omitempty"`
 }
 
-// TokenStatus contains system information about the Token.
+// TokenStatus defines the most recently observed status of the Token.
 type TokenStatus struct {
 	// TokenValue is the access key. It is shown only on token creation and not saved.
 	TokenValue string `json:"tokenValue,omitempty"`
 	// TokenHash is the hash of the TokenValue.
 	TokenHash string `json:"tokenHash,omitempty"`
-	// Current is a boolean flag. It is set to true for a token returned by
-	// a get, list, or watch request, when the token is the token which
-	// authenticated that request. All other tokens returned by the request,
-	// if any, will have this flag set to false.
+	// Current indicates whether the token was used to authenticate the current request.
 	Current bool `json:"current"`
-	// Expired is a boolean flag. True indicates that the token has exceeded
-	// its time to live, as counted from the Token's creation.
+	// Expired indicates whether the token has exceeded its TTL.
 	Expired bool `json:"expired"`
-	// ExpiresAt provides the time when the token expires. This field is set
-	// to the empty string if the token does not expire at all.
+	// ExpiresAt is the token's expiration timestamp or an empty string if the token doesn't expire.
 	ExpiresAt string `json:"expiresAt"`
-	// LastUpdateTime provides the time of the last change to the token
+	// LastUpdateTime is the timestamp of the last change to the token.
 	LastUpdateTime string `json:"lastUpdateTime"`
-	// LastUsedAt provides the last time the token was used in a request, at
-	// second granularity.
+	// LastUsedAt is the timestamp of the last time the token was used to authenticate.
 	LastUsedAt *metav1.Time `json:"lastUsedAt,omitempty"`
 }
 
@@ -168,12 +162,12 @@ func (t *Token) GetUserPrincipal() apiv3.Principal {
 }
 
 func (t *Token) GetGroupPrincipals() []apiv3.Principal {
-	// Not supported. Legacy in v3 Tokens. Shed by ext tokens.
+	// Not supported by ext tokens.
 	return []apiv3.Principal{}
 }
 
 func (t *Token) GetProviderInfo() map[string]string {
-	// Not supported. Legacy in v3 tokens. Shed by ext tokens.
+	// Not supported by ext tokens.
 	return map[string]string{}
 }
 
