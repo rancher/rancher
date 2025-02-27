@@ -529,11 +529,11 @@ func UpdateGroupCacheSize(size string) {
 
 	i, err := strconv.Atoi(size)
 	if err != nil {
-		logrus.Errorf("error parsing azure-group-cache-size, skipping update %v", err)
+		logrus.Errorf("Error parsing azure-group-cache-size, skipping update %v", err)
 		return
 	}
 	if i < 0 {
-		logrus.Error("azure-group-cache-size must be >= 0, skipping update")
+		logrus.Error("Azure-group-cache-size must be >= 0, skipping update")
 		return
 	}
 	clients.GroupCache.Resize(i)

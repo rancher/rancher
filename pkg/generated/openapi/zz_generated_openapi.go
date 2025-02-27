@@ -98,7 +98,7 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Token instances are used to authenticate requests made against the Rancher backend.",
+				Description: "Token is used to authenticate requests to Rancher.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -123,14 +123,14 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec contains the user-accessible configuration of the token.",
+							Description: "Spec is the desired state of the Token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status contains system information about the token.",
+							Description: "Status is the most recently observed status of the Token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus"),
 						},
@@ -353,7 +353,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TokenSpec contains the user-specifiable parts of the Token.",
+				Description: "TokenSpec defines the desired state of the Token.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"userID": {
@@ -413,26 +413,26 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TokenStatus contains system information about the Token.",
+				Description: "TokenStatus defines the most recently observed status of the Token.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"tokenValue": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TokenValue is the access key. It is shown only on token creation and not saved.",
+							Description: "Value is the access key. It is shown only on token creation and not saved.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"tokenHash": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TokenHash is the hash of the TokenValue.",
+							Description: "Hash is the hash of the Value.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"current": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Current is a boolean flag. It is set to true for a token returned by a get, list, or watch request, when the token is the token which authenticated that request. All other tokens returned by the request, if any, will have this flag set to false.",
+							Description: "Current indicates whether the token was used to authenticate the current request.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -440,7 +440,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"expired": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expired is a boolean flag. True indicates that the token has exceeded its time to live, as counted from the Token's creation.",
+							Description: "Expired indicates whether the token has exceeded its TTL.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -448,7 +448,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"expiresAt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpiresAt provides the time when the token expires. This field is set to the empty string if the token does not expire at all.",
+							Description: "ExpiresAt is the token's expiration timestamp or an empty string if the token doesn't expire.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -456,7 +456,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"lastUpdateTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "LastUpdateTime provides the time of the last change to the token",
+							Description: "LastUpdateTime is the timestamp of the last change to the token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -464,7 +464,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					},
 					"lastUsedAt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "LastUsedAt provides the last time the token was used in a request, at second granularity.",
+							Description: "LastUsedAt is the timestamp of the last time the token was used to authenticate.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},

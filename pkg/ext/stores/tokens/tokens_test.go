@@ -92,8 +92,8 @@ var (
 			UserPrincipal: properPrincipal,
 		},
 		Status: ext.TokenStatus{
-			TokenValue:     "",
-			TokenHash:      "kla9jkdmj",
+			Value:          "",
+			Hash:           "kla9jkdmj",
 			Expired:        true,
 			ExpiresAt:      "0001-01-01T00:00:04Z",
 			LastUpdateTime: "13:00:05",
@@ -1173,8 +1173,8 @@ func Test_Store_Create(t *testing.T) {
 			},
 			rtok: func() *ext.Token {
 				copy := properToken.DeepCopy()
-				copy.Status.TokenHash = ""
-				copy.Status.TokenValue = "94084kdlafj43"
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
 				return copy
 			}(),
 		},
@@ -2218,8 +2218,8 @@ func Test_SystemStore_Get(t *testing.T) {
 					UserPrincipal: properPrincipal,
 				},
 				Status: ext.TokenStatus{
-					TokenValue:     "",
-					TokenHash:      "kla9jkdmj",
+					Value:          "",
+					Hash:           "kla9jkdmj",
 					Expired:        true,
 					ExpiresAt:      "0001-01-01T00:00:04Z",
 					LastUpdateTime: "13:00:05",

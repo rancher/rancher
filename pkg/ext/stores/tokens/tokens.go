@@ -414,7 +414,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	}
 
 	token.Status = ext.TokenStatus{
-		TokenHash:      hashedValue,
+		Hash:           hashedValue,
 		LastUpdateTime: t.timer.Now(),
 	}
 
@@ -460,8 +460,8 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	// users don't care about the hashed value, just the secret
 	// here is the only place the secret is returned and disclosed.
-	newToken.Status.TokenHash = ""
-	newToken.Status.TokenValue = tokenValue
+	newToken.Status.Hash = ""
+	newToken.Status.Value = tokenValue
 
 	return newToken, nil
 }
@@ -534,7 +534,7 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 	}
 
 	token.Status.Current = token.Name == sessionID
-	token.Status.TokenValue = ""
+	token.Status.Value = ""
 	return token, nil
 }
 
@@ -682,7 +682,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	// Keep the status of the resource unchanged, never store a token value, etc.
 	// IOW changes to display name, login name, etc. are all ignored without a peep.
 	token.Status = currentToken.Status
-	token.Status.TokenValue = ""
+	token.Status.Value = ""
 	// Refresh time of last update to current.
 	token.Status.LastUpdateTime = t.timer.Now()
 
@@ -712,7 +712,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	}
 
 	newToken.Status.Current = newToken.Name == sessionID
-	newToken.Status.TokenValue = ""
+	newToken.Status.Value = ""
 	return newToken, nil
 }
 
@@ -1169,7 +1169,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 		lastUsedAsString = token.Status.LastUsedAt.Format(time.RFC3339)
 	}
 	secret.StringData[FieldLastUsedAt] = lastUsedAsString
-	secret.StringData[FieldHash] = token.Status.TokenHash
+	secret.StringData[FieldHash] = token.Status.Hash
 	secret.StringData[FieldLastUpdateTime] = token.Status.LastUpdateTime
 
 	return secret, nil
@@ -1244,7 +1244,7 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	token.Spec.TTL = ttl
 
 	// status information
-	if token.Status.TokenHash = string(secret.Data[FieldHash]); token.Status.TokenHash == "" {
+	if token.Status.Hash = string(secret.Data[FieldHash]); token.Status.Hash == "" {
 		return token, fmt.Errorf("token hash missing")
 	}
 

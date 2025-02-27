@@ -335,7 +335,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 				case *ext.Token:
 					err = r.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
 				default:
-					err = fmt.Errorf("Unable to delete token of unknown type %T", token)
+					err = fmt.Errorf("unable to delete token of unknown type %T", token)
 				}
 				if err != nil {
 					if apierrors.IsNotFound(err) {
@@ -366,7 +366,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			extToken.Spec.Enabled = pointer.Bool(false)
 			r.extTokenStore.Update(extToken, &metav1.UpdateOptions{})
 		default:
-			err = fmt.Errorf("Unable to update token of unknown type %T", token)
+			err = fmt.Errorf("unable to update token of unknown type %T", token)
 		}
 		if err != nil {
 			return nil, err

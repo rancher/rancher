@@ -103,10 +103,10 @@ type TokenPrincipal struct {
 
 // TokenStatus defines the most recently observed status of the Token.
 type TokenStatus struct {
-	// TokenValue is the access key. It is shown only on token creation and not saved.
-	TokenValue string `json:"tokenValue,omitempty"`
-	// TokenHash is the hash of the TokenValue.
-	TokenHash string `json:"tokenHash,omitempty"`
+	// Value is the access key. It is shown only on token creation and not saved.
+	Value string `json:"tokenValue,omitempty"`
+	// Hash is the hash of the Value.
+	Hash string `json:"tokenHash,omitempty"`
 	// Current indicates whether the token was used to authenticate the current request.
 	Current bool `json:"current"`
 	// Expired indicates whether the token has exceeded its TTL.

@@ -673,7 +673,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			},
 		},
 		Status: ext.TokenStatus{
-			TokenHash:      tokenHash,
+			Hash:           tokenHash,
 			LastUpdateTime: "13:00",
 		},
 	}
@@ -1153,12 +1153,12 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 	})
 
 	t.Run("failed to verify token: mismatched 1", func(t *testing.T) {
-		oldTokenHash := tokenSecret.Data["hash"]
+		oldTokenHash := tokenSecret.Data[exttokenstore.FieldHash]
 		defer func() {
-			tokenSecret.Data["hash"] = oldTokenHash
+			tokenSecret.Data[exttokenstore.FieldHash] = oldTokenHash
 		}()
 		misHash, _ := hashers.GetHasher().CreateHash("fkajdl;afjdlk;jaiopp;djvk")
-		tokenSecret.Data["hash"] = []byte(misHash)
+		tokenSecret.Data[exttokenstore.FieldHash] = []byte(misHash)
 
 		userRefresher.reset()
 
