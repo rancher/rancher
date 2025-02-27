@@ -128,7 +128,9 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 		for i := len(tags) - 1; i >= 0; i-- {
 			existingTags[tags[i]] = true
 			// Check if the tag is a valid semver version or not. If yes, then proceed.
-			semverTag, err := version.NewVersion(tags[i])
+			// Change underscore (_) back to plus (+) same as Helm does
+			// See https://github.com/helm/helm/issues/10166
+			semverTag, err := version.NewVersion(strings.ReplaceAll(tags[i], "_", "+"))
 			if err != nil {
 				// skipping the tag since it is not semver
 				continue
