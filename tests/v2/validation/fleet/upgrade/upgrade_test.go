@@ -242,22 +242,27 @@ func (u *UpgradeTestSuite) TestPauseFleetRepo() {
 	err = verifyRepoPause(u.client, repoObject.ID, false)
 	require.NoError(u.T(), err)
 
+	log.Info("Fetching latest fleetGitRepo object")
+	lastRepoObject, err = u.client.Steve.SteveType(extensionsfleet.FleetGitRepoResourceType).ByID(repoObject.ID)
+	require.NoError(u.T(), err)
+
+	log.Info("Checking last GitRepo was not updated and unpaused")
+	lastGitRepo = &v1alpha1.GitRepo{}
+	err = steveV1.ConvertToK8sType(lastRepoObject, lastGitRepo)
+	require.NoError(u.T(), err)
+	require.True(u.T(), gitRepo.Spec.Paused)
+	require.NotEmpty(u.T(), gitRepo.Status.Conditions)
+
+	lastUpdateTime, err = time.Parse(time.RFC3339, gitRepo.Status.Conditions[0].LastUpdateTime)
+	require.NoError(u.T(), err)
+	require.Equal(u.T(), lastUpdateTime, previousUpdateTime)
+
 	u.T().Log("Verifying the Fleet Repo")
 	err = fleet.VerifyGitRepo(u.client, repoObject.ID, u.cluster.ID, fmt.Sprintf("%s/%s", fleet.Namespace, u.clusterName))
 	require.NoError(u.T(), err)
 
 	err = verifyNewGitCommit(u.client, gitRepo.Status.Commit, repoObject.ID)
 	require.NoError(u.T(), err)
-
-	log.Info("Checking last GitRepo was not updated")
-	lastGitRepo = &v1alpha1.GitRepo{}
-	err = steveV1.ConvertToK8sType(lastRepoObject, lastGitRepo)
-	require.NoError(u.T(), err)
-	require.NotEmpty(u.T(), gitRepo.Status.Conditions)
-
-	lastUpdateTime, err = time.Parse(time.RFC3339, gitRepo.Status.Conditions[0].LastUpdateTime)
-	require.NoError(u.T(), err)
-	require.Equal(u.T(), lastUpdateTime, previousUpdateTime)
 }
 
 func TestUpgradeTestSuite(t *testing.T) {
