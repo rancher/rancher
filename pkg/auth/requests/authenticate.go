@@ -89,7 +89,6 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	_ = tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
-	// Rancher Backend direct Ext Token Access via in-built custom handler store instance
 	extTokenStore := exttokenstore.NewSystemFromWrangler(mgmtCtx.Wrangler)
 
 	return &tokenAuthenticator{
@@ -219,10 +218,8 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	if err := func() error {
-		// patching is done specific to the underlying token type.
 		switch token.(type) {
 		case *v3.Token:
-			// norman legacy token
 			patch, err := json.Marshal([]struct {
 				Op    string `json:"op"`
 				Path  string `json:"path"`
@@ -239,7 +236,6 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 			_, err = a.tokenClient.Patch(token.GetName(), types.JSONPatchType, patch)
 			return err
 		case *ext.Token:
-			// ext token
 			return a.extTokenStore.UpdateLastUsedAt(token.GetName(), now)
 		}
 		return fmt.Errorf("unknown token type")
@@ -322,7 +318,6 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	}
 
 	// Process legacy norman/v3 token
-
 	objs, err := a.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -357,14 +352,13 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
 func extVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
-	invalidAuthTokenErr := errors.New("Invalid auth token value")
+	invalidAuthTokenErr := errors.New("invalid token")
 
 	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
 		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
 
 	// Ext token always has a hash. Only a hash.
-
 	hasher, err := hashers.GetHasherForHash(storedToken.Status.TokenHash)
 	if err != nil {
 		logrus.Errorf("unable to get a hasher for token with error %v", err)

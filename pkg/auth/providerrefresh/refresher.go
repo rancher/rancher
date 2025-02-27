@@ -184,8 +184,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	// Merge the separate lists into a unified set
-
-	allTokens := []accessor.TokenAccessor{}
+	allTokens := make([]accessor.TokenAccessor, 0, len(allV3Tokens)+len(allExtTokens.Items))
 	for _, token := range allV3Tokens {
 		allTokens = append(allTokens, token)
 	}
@@ -195,7 +194,6 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	// split into derived versus login tokens, filter for the user
-
 	for providerName := range providers.ProviderNames {
 		loginTokens[providerName] = []accessor.TokenAccessor{}
 		derivedTokens[providerName] = []accessor.TokenAccessor{}

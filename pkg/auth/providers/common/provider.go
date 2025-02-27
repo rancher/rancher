@@ -24,7 +24,7 @@ const (
 	GroupPrincipalType = "group"
 )
 
-// AuthProvider is the interface used to hide the provider differences from the rest of the system.
+// AuthProvider allows to authenticate a user and search for user and group principals.
 type AuthProvider interface {
 	GetName() string
 	AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error)
