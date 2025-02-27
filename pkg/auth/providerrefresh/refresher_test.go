@@ -23,9 +23,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	ktypes "k8s.io/apimachinery/pkg/types"
 )
 
 func Test_refreshAttributes(t *testing.T) {
+	var tokenUpdateCalled bool
+	var tokenDeleteCalled bool
+
 	// common structures
 
 	userLocal := v3.User{
@@ -260,6 +264,59 @@ func Test_refreshAttributes(t *testing.T) {
 			AnyTimes()
 	}
 
+	eTokenSetupLocalPatch := func(
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		scache *fake.MockCacheInterface[*corev1.Secret]) {
+		secrets.EXPECT().
+			Patch("cattle-tokens",
+				"user-abcde-login-local",
+				ktypes.JSONPatchType,
+				[]byte(`[{"op":"replace","path":"/data/enabled","value":"ZmFsc2U="}]`)).
+			DoAndReturn(func(ns, name string, pt ktypes.PatchType, patch []byte, subresources ...string) (*corev1.Secret, error) {
+				tokenUpdateCalled = true
+				return nil, nil
+			}).
+			AnyTimes()
+		secrets.EXPECT().
+			Patch("cattle-tokens",
+				"user-abcde-derived-local",
+				ktypes.JSONPatchType,
+				[]byte(`[{"op":"replace","path":"/data/enabled","value":"ZmFsc2U="}]`)).
+			DoAndReturn(func(ns, name string, pt ktypes.PatchType, patch []byte, subresources ...string) (*corev1.Secret, error) {
+				tokenUpdateCalled = true
+				return nil, nil
+			}).
+			AnyTimes()
+		scache.EXPECT().
+			List("cattle-tokens", gomock.Any()).
+			Return([]*corev1.Secret{
+				&eLoginSecretLocal,
+				&eDerivedSecretLocal,
+			}, nil).
+			AnyTimes()
+	}
+
+	eTokenSetupDerivedLocalPatch := func(
+		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		scache *fake.MockCacheInterface[*corev1.Secret]) {
+		secrets.EXPECT().
+			Patch("cattle-tokens",
+				gomock.Any(),
+				ktypes.JSONPatchType,
+				[]byte(`[{"op":"replace","path":"/data/enabled","value":"ZmFsc2U="}]`)).
+			DoAndReturn(func(ns, name string, pt ktypes.PatchType, patch []byte, subresources ...string) (*corev1.Secret, error) {
+				tokenUpdateCalled = true
+				return nil, nil
+			}).
+			AnyTimes()
+		scache.EXPECT().
+			List("cattle-tokens", gomock.Any()).
+			Return([]*corev1.Secret{
+				&eDerivedSecretLocal,
+			}, nil).
+			AnyTimes()
+	}
+
 	eTokenSetupDerivedShibboleth := func(
 		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 		scache *fake.MockCacheInterface[*corev1.Secret]) {
@@ -300,7 +357,7 @@ func Test_refreshAttributes(t *testing.T) {
 			want:        &wantNoExtra,
 			eTokenSetup: eTokenSetupEmpty,
 		},
-		// from here on out test cases are pairs testing the same thing, one each for legacy and ext tokens
+		// from here on out test cases are pairs testing the same thing, one each for v3 and ext tokens
 		{
 			name:        "local user with login token",
 			user:        &userLocal,
@@ -353,7 +410,7 @@ func Test_refreshAttributes(t *testing.T) {
 			eTokens:     []*ext.Token{&eDerivedTokenLocal},
 			enabled:     false,
 			want:        &wantNoExtra,
-			eTokenSetup: eTokenSetupDerivedLocal,
+			eTokenSetup: eTokenSetupDerivedLocalPatch,
 		},
 		{
 			name:        "user with login and derived tokens",
@@ -408,7 +465,7 @@ func Test_refreshAttributes(t *testing.T) {
 			attribs:          &attribsIn,
 			eTokens:          []*ext.Token{&eLoginTokenLocal, &eDerivedTokenLocal},
 			want:             &wantNoExtra,
-			eTokenSetup:      eTokenSetupLocal,
+			eTokenSetup:      eTokenSetupLocalPatch,
 			providerDisabled: true,
 			deleted:          true,
 			enabled:          false,
@@ -445,8 +502,8 @@ func Test_refreshAttributes(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tokenUpdateCalled := false
-		tokenDeleteCalled := false
+		tokenUpdateCalled = false
+		tokenDeleteCalled = false
 		t.Run(tt.name, func(t *testing.T) {
 			providers.Providers = map[string]common.AuthProvider{
 				providers.LocalProvider: &mockLocalProvider{
@@ -467,7 +524,7 @@ func Test_refreshAttributes(t *testing.T) {
 
 			// standard capture of delete and update events. See
 			// also the `tokens` interface used by the refresher
-			// below, same thing for the legacy tokens.
+			// below, same thing for the v3 tokens.
 			secrets.EXPECT().
 				Update(gomock.Any()).
 				DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {

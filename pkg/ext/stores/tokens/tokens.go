@@ -738,6 +738,27 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	return err
 }
 
+// Disable patches the enabled flag of the token.
+// Called by refreshAttributes.
+func (t *SystemStore) Disable(name string) error {
+	// Operate directly on the backend secret holding the token
+	patch, err := json.Marshal([]struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}{{
+		Op:    "replace",
+		Path:  "/data/" + FieldEnabled,
+		Value: base64.StdEncoding.EncodeToString([]byte("false")),
+	}})
+	if err != nil {
+		return err
+	}
+
+	_, err = t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
+}
+
 // watch implements the core resource watcher for tokens
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	user, err := t.auth.UserName(ctx, &t.SystemStore)
