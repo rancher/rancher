@@ -362,9 +362,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			v3Token.Enabled = pointer.Bool(false)
 			_, err = r.tokenMGR.UpdateToken(v3Token)
 		case *ext.Token:
-			extToken := token.(*ext.Token).DeepCopy()
-			extToken.Spec.Enabled = pointer.Bool(false)
-			r.extTokenStore.Update(extToken, &metav1.UpdateOptions{})
+			err = r.extTokenStore.Disable(token.GetName())
 		default:
 			err = fmt.Errorf("unable to update token of unknown type %T", token)
 		}
