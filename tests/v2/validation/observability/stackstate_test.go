@@ -31,17 +31,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	project                 = "management.cattle.io.project"
-	rancherPartnerCharts    = "rancher-partner-charts"
-	systemProject           = "System"
-	localCluster            = "local"
-	stackStateConfigFileKey = "stackstateConfigs"
-	uiExtensionsRepo        = "https://github.com/rancher/ui-plugin-charts"
-	uiGitBranch             = "main"
-	rancherUIPlugins        = "rancher-ui-plugins"
-)
-
 type StackStateTestSuite struct {
 	suite.Suite
 	client                        *rancher.Client
@@ -100,7 +89,7 @@ func (ss *StackStateTestSuite) SetupSuite() {
 	log.Info("Node driver installed with stackstate extensions ui to whitelist stackstate URL")
 
 	crdsExists, err := ss.client.Steve.SteveType(observability.ApiExtenisonsCRD).ByID(observability.ObservabilitySteveType)
-	if crdsExists == nil && strings.Contains(err.Error(), "Not Found") {
+	if crdsExists == nil && err != nil && strings.Contains(err.Error(), "Not Found") {
 		err = observability.InstallStackstateCRD(ss.client)
 		log.Info("Installed stackstate CRD")
 	}
