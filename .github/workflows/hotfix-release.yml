@@ -1,12 +1,11 @@
-name: build-docker-images
-on: 
+name: Hotfix Release
+on:
   push:
     branches:
       - "main"
       - "release/v*"
     tags:
-      - "v*"
-      - "!v*-hotfix*"
+      - "v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -717,3 +716,4 @@ jobs:
         shell: bash
         run: |
           curl -X POST ${{ env.WEBHOOK_URL }} -d '{"tag": "${{ env.TAG }}","status": "${{ env.STATUS }}","commit_url": "${{ env.COMMIT_URL }}","workflow_url": "${{ env.WORKFLOW_URL }}"}'
+
