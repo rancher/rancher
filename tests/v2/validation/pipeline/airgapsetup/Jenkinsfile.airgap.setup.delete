@@ -1,21 +1,13 @@
 #!groovy
 node {
-  def homePath = pwd() + "/"
-  def rootPath = "/root/go/src/github.com/rancher/tfp-automation/"
   def TERRAFORM_DIR = './root/go/src/github.com/rancher/tfp-automation/modules/airgap'
-  def testsDir = "github.com/rancher/tfp-automation/tests/${env.TEST_PACKAGE}"
   def job_name = "${JOB_NAME}"
   if (job_name.contains('/')) { 
     job_names = job_name.split('/')
     job_name = job_names[job_names.size() - 1] 
   }
   def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
-  def imageName = "tfp-automation-validation-${job_name}${env.BUILD_NUMBER}"
-  def testResultsOut = "results.xml"
-  def testResultsJSON = "results.json"
-  def envFile = ".env"
-  def config = env.CONFIG
-  def testPackage = env.TEST_PACKAGE?.trim()
+  def imageName = "tfp-automation-cleanup-${job_name}${env.BUILD_NUMBER}"
   def terraformVolume = "s3_data"
 
   def branch = "${env.BRANCH}"
@@ -26,10 +18,6 @@ node {
   def repo = scm.userRemoteConfigs
   if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
     repo = [[url: "${env.REPO}"]]
-  }
-  def timeout = "${env.TIMEOUT}"
-  if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
-        timeout = "${env.TIMEOUT}" 
   }
   def s3Config = env.AWS_S3_BUCKET_CONFIG
 
@@ -55,38 +43,30 @@ node {
         stage('Setup'){
             sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
             sh returnStdout:true, script: 'chmod a+x ./yq'
-
-            println "AWS s3 config ${s3Config}"
             
             AWS_ACCESS_KEY_ID = sh (
                   script: "echo '${s3Config}' | ./yq '.accessKey'",
                   returnStdout: true
                 ).trim()
-            println "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
 
             AWS_SECRET_ACCESS_KEY = sh (
                   script: "echo '${s3Config}' | ./yq '.secretKey'",
                   returnStdout: true
                 ).trim()
-            
-            println "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}"
-            
+                      
             AWS_S3_BUCKET = sh (
                   script: "echo '${s3Config}' | ./yq '.s3Bucket'",
                   returnStdout: true
-                ).trim()
-                
-            println "AWS_S3_BUCKET: ${AWS_S3_BUCKET}"
+                ).trim()     
 
             AWS_S3_REGION =    sh (
                   script: "echo '${s3Config}' | ./yq '.s3BucketRegion'",
                   returnStdout: true
                 ).trim()
-            println "AWS_S3_REGION: ${AWS_S3_REGION}"
-
         }
 
         stage('Cleanup setup'){
+          try{
             script {
             sh """
                 docker volume create $terraformVolume
@@ -108,11 +88,14 @@ node {
                 -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
                 amazon/aws-cli \
                 s3 rm s3://$AWS_S3_BUCKET/terraform/ --recursive
-
-                docker rm $s3Container
-                docker volume rm $terraformVolume
                 """   
             }
+          }catch{
+            sh "docker rm $s3Container"
+            sh  "docker volume rm $terraformVolume"            
+          }
+            sh "docker rm $s3Container"
+            sh  "docker volume rm $terraformVolume"
         }
     }
 }

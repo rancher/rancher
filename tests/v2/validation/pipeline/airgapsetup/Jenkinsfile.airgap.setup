@@ -66,14 +66,11 @@ node {
         stage('Setup'){
             sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
             sh returnStdout:true, script: 'chmod a+x ./yq'
-
-            println "AWS s3 config ${s3Config}"
             
             AWS_S3_BUCKET = sh (
                   script: "echo '${s3Config}' | ./yq '.s3Bucket'",
                   returnStdout: true
                 ).trim()
-                
             println "AWS_S3_BUCKET: ${AWS_S3_BUCKET}"
 
             AWS_S3_REGION =    sh (
@@ -83,7 +80,7 @@ node {
             println "AWS_S3_REGION: ${AWS_S3_REGION}"
 
         }
-        stage('Run Module Test') {
+        stage('Run Terraform Setup Test') {
           try {
             sh """
               docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
@@ -92,12 +89,13 @@ node {
             """
           } catch(err) {
               echo 'Test run had failures. Collecting results...'
+              sh "docker rm ${testContainer}"
           }
+          sh "docker rm ${testContainer}"
         }
         stage('Upload tf files to S3 bucket'){
           try{
               sh "docker cp ${testContainer}:/root/ ./"
-              sh "ls -lR"
               script {
                 sh """
                     if ls $TERRAFORM_DIR/. 1> /dev/null 2>&1; then
