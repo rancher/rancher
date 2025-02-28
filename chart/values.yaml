@@ -211,3 +211,33 @@ webhook: ""
 # helm values to use when installing the fleet chart.
 # helm values set here will override all other global values used when installing the fleet chart.
 fleet: ""
+
+# Create a dynamic manifests via values:
+extraObjects: []
+# - apiVersion: "networking.k8s.io/v1"
+#   kind: NetworkPolicy
+#   metadata:
+#     name: allow-https-444-to-rancher
+#     namespace: your-namespace  # Change to the appropriate namespace
+#   spec:
+#     podSelector:
+#       matchLabels:
+#         app: rancher  # Selects pods labeled with "app: rancher"
+#     policyTypes:
+#       - Ingress  # Controls inbound traffic to the selected pods
+#     ingress:
+#       - ports:
+#           - protocol: TCP
+#             port: 444  # Allows only TCP traffic on port 444 (custom HTTPS port)
+#     # Since no other ingress rules are defined, all other traffic is denied by default.
+# - apiVersion: "networking.k8s.io/v1"
+#   kind: NetworkPolicy
+#   metadata:
+#     name: rancher-deny-ingress
+#     namespace: cattle-system
+#   spec:
+#     podSelector:
+#       matchLabels:
+#         app: rancher
+#     policyTypes:
+#       - Ingress
