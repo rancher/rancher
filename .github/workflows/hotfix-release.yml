@@ -18,83 +18,8 @@ jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
   build-publish-chart:
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
     needs: [push-images]
-    permissions:
-      contents: read
-      id-token: write
-    concurrency:
-      # if it is a tag run, use a default group to avoid concurrent runs, if it isn't use a unique group to allow concurrent runs
-      group: ${{ contains(github.ref, 'tags/') && 'build-chart-tag' || format('build-chart-{0}', github.job) }}
-      # instead of cancelling other runs, wait until they are finished
-      cancel-in-progress: false
-    env:
-      ARCH: amd64
-    steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git jq awk aws-cli
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Tag Env Variables
-        uses: ./.github/actions/setup-tag-env
-      - name: install yq
-        uses: ./.github/actions/install-yq
-        with:
-          arch: ${{ env.ARCH }}
-      - id: env 
-        name: Setup Dependencies Env Variables
-        uses: ./.github/actions/setup-build-env
-      - name: Install Helm dependencies
-        env:
-          HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
-          HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
-        run: |
-          curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
-          mv /tmp/helm /usr/bin/helm_v3 && \
-          chmod +x /usr/bin/helm_v3
-          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
-      - name: Build
-        run: ./scripts/chart/build chart
-      - name: Validate
-        run: ./scripts/chart/validate
-      - name: Test
-        run: ./scripts/chart/test
-      - name: Package
-        run: ./scripts/chart/package
-      - name: Upload chart
-        uses: actions/upload-artifact@v4
-        with:
-          name: chart
-          path: ./bin/chart/*
-          if-no-files-found: error
-          retention-days: 4
-          overwrite: true
-      - name: Load Secrets from Vault
-        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
-      - name: Authenticate with Google Cloud
-        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ env.GOOGLE_AUTH }}
-      - name: Upload
-        if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-        uses: google-github-actions/upload-cloud-storage@v2
-        with:
-          destination: releases.rancher.com/server-charts
-          path: ./bin/chart
-          parent: false
-          process_gcloudignore: false
-          predefinedAcl: publicRead
-          headers: |-
-            cache-control: public,no-cache,proxy-revalidate
+    uses: ./.github/workflows/build-publish-chart.yml
   build-server:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
