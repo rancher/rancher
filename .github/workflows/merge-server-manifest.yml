@@ -27,12 +27,12 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Create manifest list and push
         run: |
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/rancher:${{ env.TAG }} ${{ env.REGISTRY }}/rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/rancher:${{ env.TAG }}-arm64
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-arm64
       - name: Create head manifest list and push
         run: |
           if [[ "${{ github.ref_name }}" == release/v* ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
-            docker buildx imagetools create -t ${{ env.REGISTRY }}/rancher:${{ env.HEAD_TAG }} ${{ env.REGISTRY }}/rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/rancher:${{ env.TAG }}-arm64
+            docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.HEAD_TAG }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-arm64
           fi
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/rancher:${{ env.TAG }}
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}

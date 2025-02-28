@@ -39,7 +39,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: rancher
+          images: ${{ github.repository_owner }}/rancher
           flavor: |
             latest=false
       - name: Set up QEMU
@@ -60,8 +60,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" ${{ env.REGISTRY }}/rancher:${{ env.TAG }}
-          docker push ${{ env.REGISTRY }}/rancher:${{ env.TAG }}
+          docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
+          docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
       - name: Build agent
         id: build
         uses: docker/build-push-action@v5
@@ -75,7 +75,7 @@ jobs:
             "REGISTRY=${{ env.REGISTRY }}"
             "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
             "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_PROVISIONING_CAPI_VERSION }}"
-          tags: rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
+          tags: ${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
           context: .
           platforms: "${{ matrix.os }}/${{ env.ARCH }}"
           file: ./package/Dockerfile.agent
@@ -84,7 +84,7 @@ jobs:
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: "rancher-agent-${{ matrix.os }}-${{ env.ARCH }}"
+          name: "${{ github.repository_owner }}/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
           if-no-files-found: error
           retention-days: 4

@@ -70,7 +70,7 @@ jobs:
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
+          name: "${{ github.repository_owner }}/rancher-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
           if-no-files-found: error
           retention-days: 4

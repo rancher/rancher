@@ -29,6 +29,6 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Build Windows Server Image
         run: |
-          docker build -t ${{ env.REGISTRY }}/rancher-agent:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
-          docker push ${{ env.REGISTRY }}/rancher-agent:${{ env.TAG }}-windows-${{ matrix.version }}
+          docker build -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+          docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-${{ matrix.version }}
         shell: bash
