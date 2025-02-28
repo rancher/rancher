@@ -8,12 +8,9 @@ on:
       - "v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
-  REPOSITORY_OWNER: ${{ github.repository_owner }}
-  IMAGE: ${{ github.repository_owner }}/rancher
-  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
-  IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  REGISTRY: "docker.io"
-  GH_CLI_VERSION: 2.61.0
+  REGISTRY: "stgregistry.suse.com"
+  DOCKERIO_REGISTRY: "docker.io"
+  AWS_DEFAULT_REGION: "us-east-1"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -50,100 +47,3 @@ jobs:
     uses: ./.github/workflows/merge-installer-manifest.yml
   create-images-files:
     uses: ./.github/workflows/create-images-files.yml
-  docker-image-digests:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
-    needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
-    permissions:
-      contents: write
-      id-token: write
-    env:
-      ARTIFACTS_BASE_DIR: "dist"
-      LINUX_AMD64_FILE: "rancher-images-digests-linux-amd64.txt"
-      LINUX_ARM64_FILE: "rancher-images-digests-linux-arm64.txt"
-      WINDOWS_2019_FILE: "rancher-images-digests-windows-ltsc2019.txt"
-      WINDOWS_2022_FILE: "rancher-images-digests-windows-ltsc2022.txt"
-      CHECKSUM_FILE: "images-digests-sha256sum.txt"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y aws-cli wget jq awk
-      - name: install gh
-        shell: bash
-        run: |
-          mkdir -p /tmp/gh
-          curl -fsL https://github.com/cli/cli/releases/download/v${{ env.GH_CLI_VERSION }}/gh_${{ env.GH_CLI_VERSION }}_linux_amd64.tar.gz | tar xvzf - --strip-components=1 -C /tmp/gh
-          mv /tmp/gh/bin/gh /usr/bin/gh
-          chmod +x /usr/bin/gh
-      - name: Setup Environment Variables
-        uses: ./.github/actions/setup-tag-env
-      - name: Setup ecm-distro-tools
-        uses: rancher/ecm-distro-tools@v0.47.0
-      - name: Create base dir
-        shell: bash
-        run: mkdir -p "$ARTIFACTS_BASE_DIR"
-      - name: Generate linux docker digests
-        shell: bash
-        run: |
-          export LINUX_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-images.txt
-          release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${LINUX_IMAGES_URL}" --output-file "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE"
-          cp "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE" "$ARTIFACTS_BASE_DIR/$LINUX_ARM64_FILE"
-      - name: Generate windows docker digests
-        shell: bash
-        run: |
-          export WINDOWS_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-windows-images.txt
-          release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${WINDOWS_IMAGES_URL}" --output-file "$ARTIFACTS_BASE_DIR/$WINDOWS_2019_FILE"
-          cp "$ARTIFACTS_BASE_DIR/$WINDOWS_2019_FILE" "$ARTIFACTS_BASE_DIR/$WINDOWS_2022_FILE"
-      - name: Generate sha256sum file
-        shell: bash
-        env:
-          ARTIFACTS_TYPE: "digests"
-        run: scripts/artifacts-hashes.sh
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
-      - name: Create App Token
-        uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
-      - name: Upload digests
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE" --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$LINUX_ARM64_FILE" --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2019_FILE" --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2022_FILE" --clobber
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
-  notify-release:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
-    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests, merge-installer-manifest]
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL
-      - name: Send notification
-        env:
-          TAG: ${{ github.ref_name }}
-          STATUS: "Completed ✅"
-          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
-          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        shell: bash
-        run: |
-          curl -X POST ${{ env.WEBHOOK_URL }} -d '{"tag": "${{ env.TAG }}","status": "${{ env.STATUS }}","commit_url": "${{ env.COMMIT_URL }}","workflow_url": "${{ env.WORKFLOW_URL }}"}'
-
