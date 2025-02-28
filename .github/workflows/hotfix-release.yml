@@ -1,9 +1,6 @@
 name: Hotfix Release
 on:
   push:
-    branches:
-      - "main"
-      - "release/v*"
     tags:
       - "v*-hotfix*"
 env:
@@ -35,10 +32,10 @@ jobs:
     uses: ./.github/workflows/push-images.yml
   merge-server-manifest:
     needs: [push-images]
-    uses: ./.github/workflows/merge-server-mainfest.yml
+    uses: ./.github/workflows/merge-server-manifest.yml
   merge-agent-manifest:
     needs: [push-images, build-agent-windows]
-    uses: ./.github/workflows/merge-agent-mainfest.yml
+    uses: ./.github/workflows/merge-agent-manifest.yml
   build-installer:
     needs: [build-publish-chart, merge-server-manifest]
     uses: ./.github/workflows/build-installer.yml
