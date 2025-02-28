@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -116,19 +115,6 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 	user, err = h.UserClient.Update(user)
 	if err != nil {
 		return err
-	}
-
-	// Session tokens expire on password change. A TTL of 1 millisecond is used to trigger immediate expiration.
-	//  Note: A TTL of 0 can't be used as it defaults to 30 days.
-	objs, err := h.ExtTokenStore.ListForUser(userID)
-	if err != nil {
-		return fmt.Errorf("error getting ext tokens for user %s: %v", userID, err)
-	}
-	for _, token := range objs.Items {
-		if !token.GetIsDerived() {
-			token.Spec.TTL = 1
-			h.ExtTokenStore.Update(&token, &v1.UpdateOptions{})
-		}
 	}
 
 	return nil
