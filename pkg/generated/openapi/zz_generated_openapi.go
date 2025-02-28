@@ -32,7 +32,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token":              schema_pkg_apis_extcattleio_v1_Token(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenList":          schema_pkg_apis_extcattleio_v1_TokenList(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal":     schema_pkg_apis_extcattleio_v1_TokenPrincipal(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipalList": schema_pkg_apis_extcattleio_v1_TokenPrincipalList(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec":          schema_pkg_apis_extcattleio_v1_TokenSpec(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus":        schema_pkg_apis_extcattleio_v1_TokenStatus(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity":       schema_pkg_apis_extcattleio_v1_UserActivity(ref),
@@ -200,24 +199,12 @@ func schema_pkg_apis_extcattleio_v1_TokenPrincipal(ref common.ReferenceCallback)
 				Description: "TokenPrincipal contains the data about the user principal owning the token.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"kind": {
+					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Description: "Name is the name unique to the authentication provider.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"displayName": {
@@ -293,59 +280,9 @@ func schema_pkg_apis_extcattleio_v1_TokenPrincipal(ref common.ReferenceCallback)
 						},
 					},
 				},
+				Required: []string{"name"},
 			},
 		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_pkg_apis_extcattleio_v1_TokenPrincipalList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "TokenPrincipalList is a list of TokenPrincipal resources",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"metadata", "items"},
-			},
-		},
-		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 

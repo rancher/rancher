@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/requests/mocks"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
@@ -214,9 +215,9 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 				secrets.EXPECT().Cache().Return(scache)
-				principalBytes, _ := json.Marshal(v3.Principal{
-					ObjectMeta: metav1.ObjectMeta{Name: "local://kubeconfig-u-user5zfww"},
-					Provider:   "local",
+				principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+					Name:     "local://kubeconfig-u-user5zfww",
+					Provider: "local",
 				})
 				scache.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww").
@@ -418,9 +419,9 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 				secrets.EXPECT().Cache().Return(scache)
-				principalBytes, _ := json.Marshal(v3.Principal{
-					ObjectMeta: metav1.ObjectMeta{Name: "local://kubeconfig-u-user5zfww"},
-					Provider:   "local",
+				principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+					Name:     "local://kubeconfig-u-user5zfww",
+					Provider: "local",
 				})
 				scache.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww").

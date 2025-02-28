@@ -4,12 +4,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -135,7 +135,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 			token: ext.Token{
 				Spec: ext.TokenSpec{
 					UserPrincipal: ext.TokenPrincipal{
-						ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://1234567"},
+						Name:          "genericoidc_user://1234567",
 						Provider:      Name,
 						DisplayName:   "Test User",
 						LoginName:     "1234567",

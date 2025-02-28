@@ -44,23 +44,6 @@ func NewToken(namespace, name string, obj Token) *Token {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// TokenPrincipalList is a list of TokenPrincipal resources
-type TokenPrincipalList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []TokenPrincipal `json:"items"`
-}
-
-func NewTokenPrincipal(namespace, name string, obj TokenPrincipal) *TokenPrincipal {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("TokenPrincipal").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // UserActivityList is a list of UserActivity resources
 type UserActivityList struct {
 	metav1.TypeMeta `json:",inline"`
