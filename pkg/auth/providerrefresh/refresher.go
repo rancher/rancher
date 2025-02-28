@@ -356,13 +356,13 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	for _, token := range derivedTokenList {
 		// Update is type-dependent
 		var err error
-		switch token.(type) {
+		switch t := token.(type) {
 		case *v3.Token:
-			v3Token := token.(*v3.Token).DeepCopy()
+			v3Token := t.DeepCopy()
 			v3Token.Enabled = pointer.Bool(false)
 			_, err = r.tokenMGR.UpdateToken(v3Token)
 		case *ext.Token:
-			err = r.extTokenStore.Disable(token.GetName())
+			err = r.extTokenStore.Disable(t.GetName())
 		default:
 			err = fmt.Errorf("unable to update token of unknown type %T", token)
 		}
