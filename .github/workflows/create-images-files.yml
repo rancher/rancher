@@ -9,7 +9,6 @@ jobs:
       id-token: write
     env:
       REGISTRY: ""
-      CHECKSUM_FILE: "sha256sum.txt"
       ARTIFACTS_BASE_DIR: "bin"
       AWS_DEFAULT_REGION: "us-east-1"
     steps:
@@ -80,7 +79,7 @@ jobs:
 
           ./scripts/artifacts-hashes.sh ./dist
 
-          artifacts+=("$CHECKSUM_FILE")
+          artifacts+=("sha256sum.txt")
 
           for artifact in "${artifacts[@]}"; do
             aws s3 cp "./dist/$artifact" "s3://prime-artifacts/rancher/${{ env.TAG }}/$artifact"
