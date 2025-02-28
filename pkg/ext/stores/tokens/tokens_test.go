@@ -31,7 +31,7 @@ var (
 
 	// properSecret is the backend secret matching the properToken
 	properPrincipal = ext.TokenPrincipal{
-		ObjectMeta:  metav1.ObjectMeta{Name: "world"},
+		Name:        "world",
 		Provider:    "somebody",
 		DisplayName: "myself",
 		LoginName:   "hello",
@@ -1623,7 +1623,7 @@ func Test_SystemStore_Update(t *testing.T) {
 				auth *MockauthHandler) {
 
 				reduced := properSecret.DeepCopy()
-				var up v3.Principal
+				var up ext.TokenPrincipal
 				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
 				up.Provider = ""
 				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
@@ -1668,7 +1668,7 @@ func Test_SystemStore_Update(t *testing.T) {
 				auth *MockauthHandler) {
 
 				reduced := properSecret.DeepCopy()
-				var up v3.Principal
+				var up ext.TokenPrincipal
 				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
 				up.Name = ""
 				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
@@ -2126,7 +2126,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			name: "part-filled secret (no auth provider)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				reduced := properSecret.DeepCopy()
-				var up v3.Principal
+				var up ext.TokenPrincipal
 				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
 				up.Provider = ""
 				reduced.Data[FieldPrincipal], _ = json.Marshal(up)
@@ -2160,7 +2160,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			name: "part-filled secret (no principal id)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				reduced := properSecret.DeepCopy()
-				var up v3.Principal
+				var up ext.TokenPrincipal
 				json.Unmarshal(reduced.Data[FieldPrincipal], &up)
 				up.Name = ""
 				reduced.Data[FieldPrincipal], _ = json.Marshal(up)

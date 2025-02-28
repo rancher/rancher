@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	fakes "github.com/rancher/rancher/pkg/controllers/management/auth/fakes"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 )
 
@@ -276,8 +278,8 @@ func TestUpdated(t *testing.T) {
 				mockUserManager.EXPECT().
 					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
 					Return(nil)
-				principalBytes, _ := json.Marshal(v3.Principal{
-					ObjectMeta:  metav1.ObjectMeta{Name: "world"},
+				principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+					Name:        "world",
 					Provider:    "somebody",
 					LoginName:   "hello",
 					DisplayName: "myself",
@@ -332,20 +334,13 @@ func TestUpdated(t *testing.T) {
 				mockUserManager.EXPECT().
 					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
 					Return(nil)
-				// Fake current time
-				support.EXPECT().Now().Return("this is a fake now")
-				secrets.EXPECT().
-					Update(gomock.Any()).
-					DoAndReturn(func(s *v1.Secret) (*v1.Secret, error) {
-						// copy data over for the regen done by the token store
-						for k, v := range s.StringData {
-							s.Data[k] = []byte(v)
-						}
-
-						return s, nil
-					})
-				principalBytes, _ := json.Marshal(v3.Principal{
-					ObjectMeta:  metav1.ObjectMeta{Name: "world"},
+				secrets.EXPECT().Patch("cattle-tokens", "testuser-token",
+					k8stypes.JSONPatchType,
+					[]byte(`[{"op":"replace","path":"/data/enabled","value":"ZmFsc2U="}]`)).
+					Return(nil, nil).
+					AnyTimes()
+				principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+					Name:        "world",
 					Provider:    "somebody",
 					LoginName:   "hello",
 					DisplayName: "myself",

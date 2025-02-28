@@ -394,8 +394,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	rtPrincipal := requestToken.GetUserPrincipal()
 	token.Spec.UserPrincipal = ext.TokenPrincipal{
-		TypeMeta:       rtPrincipal.TypeMeta,
-		ObjectMeta:     rtPrincipal.ObjectMeta,
+		Name:           rtPrincipal.ObjectMeta.Name,
 		DisplayName:    rtPrincipal.DisplayName,
 		LoginName:      rtPrincipal.LoginName,
 		ProfilePicture: rtPrincipal.ProfilePicture,

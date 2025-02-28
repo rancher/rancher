@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/pointer"
 )
 
 type userLifecycle struct {
@@ -184,16 +183,15 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 
 		for _, token := range extTokens {
 			if token.GetIsDerived() {
-				// Non-login token. Only disable it
+				// Non-login tokens are disabled
 				logrus.Infof("[%v] Disabling ext token %v for user %v",
 					userController, token.GetName(), token.GetUserID())
-				token.Spec.Enabled = pointer.Bool(false)
-				_, err := l.extTokenStore.Update(token, &metav1.UpdateOptions{})
+				err := l.extTokenStore.Disable(token.GetName())
 				if err != nil {
 					return nil, fmt.Errorf("error updating ext token: %v", err)
 				}
 			} else {
-				// Login token. Delete it.
+				// Login tokens are deleted.
 				logrus.Infof("[%v] Deleting token %v for user %v",
 					userController, token.GetName(), token.GetUserID())
 				err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})

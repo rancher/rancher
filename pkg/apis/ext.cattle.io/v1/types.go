@@ -71,13 +71,10 @@ type TokenSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // TokenPrincipal contains the data about the user principal owning the token.
 type TokenPrincipal struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Name is the name unique to the authentication provider.
+	Name string `json:"name"`
 	// DisplayName is the human readable name/description of the principal.
 	// +optional
 	DisplayName string `json:"displayName,omitempty"`
@@ -122,7 +119,7 @@ type TokenStatus struct {
 // Implement the TokenAccessor interface
 
 func (t *Token) GetName() string {
-	return t.ObjectMeta.Name
+	return t.Name
 }
 
 func (t *Token) GetIsEnabled() bool {
@@ -147,8 +144,8 @@ func (t *Token) GetAuthProvider() string {
 }
 func (t *Token) GetUserPrincipal() apiv3.Principal {
 	return apiv3.Principal{
-		TypeMeta:       t.Spec.UserPrincipal.TypeMeta,
-		ObjectMeta:     t.Spec.UserPrincipal.ObjectMeta,
+		TypeMeta:       metav1.TypeMeta{},
+		ObjectMeta:     metav1.ObjectMeta{Name: t.Spec.UserPrincipal.Name},
 		DisplayName:    t.Spec.UserPrincipal.DisplayName,
 		LoginName:      t.Spec.UserPrincipal.LoginName,
 		ProfilePicture: t.Spec.UserPrincipal.ProfilePicture,

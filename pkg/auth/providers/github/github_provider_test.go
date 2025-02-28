@@ -340,7 +340,7 @@ func TestSearchPrincipalsExt(t *testing.T) {
 	token := ext.Token{
 		Spec: ext.TokenSpec{
 			UserPrincipal: ext.TokenPrincipal{
-				ObjectMeta:    metav1.ObjectMeta{Name: "github_user://9253000"},
+				Name:          "github_user://9253000",
 				LoginName:     "developer",
 				PrincipalType: "user",
 			},
