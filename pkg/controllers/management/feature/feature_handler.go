@@ -58,6 +58,9 @@ func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	}
 
 	if obj.Name == features.Harvester.Name() {
+		if err = h.syncHarvesterBaremetalContainerWorkloadFeature(obj); err != nil {
+			return obj, err
+		}
 		return obj, h.syncHarvesterNodeDriver(obj)
 	}
 
@@ -134,6 +137,27 @@ func (h *handler) syncHarvesterNodeDriver(feature *v3.Feature) error {
 	_, err = h.nodeDriverController.Update(driver)
 	if err != nil {
 		h.featureEnqueue(feature.Name, 10*time.Second)
+	}
+	return nil
+}
+
+// syncHarvesterBaremetalContainerWorkloadFeature ensures that the Harvester
+// baremetal container workload feature is disabled when the Harvester feature
+// is disabled.
+func (h *handler) syncHarvesterBaremetalContainerWorkloadFeature(feat *v3.Feature) error {
+	if feat.Spec.Value != nil && !*feat.Spec.Value {
+		baremetal, err := h.featuresClient.Get(features.HarvesterBaremetalContainerWorkload.Name(), metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		update := baremetal.DeepCopy()
+		*update.Spec.Value = false
+		if !reflect.DeepEqual(baremetal, update) {
+			if _, err = h.featuresClient.Update(update); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
