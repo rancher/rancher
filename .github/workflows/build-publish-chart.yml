@@ -14,6 +14,7 @@ jobs:
       cancel-in-progress: false
     env:
       ARCH: amd64
+      AWS_DEFAULT_REGION: "us-east-1"
     steps:
       - name: install dependencies
         shell: bash

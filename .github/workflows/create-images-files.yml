@@ -11,6 +11,8 @@ jobs:
       REGISTRY: ""
       CHECKSUM_FILE: "sha256sum.txt"
       ARTIFACTS_BASE_DIR: "bin"
+    env:
+      AWS_DEFAULT_REGION: "us-east-1"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
