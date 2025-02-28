@@ -27,6 +27,10 @@ const (
 )
 
 func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wrangler.Context) error {
+	if features.MCMAgent.Enabled() {
+		return nil
+	}
+
 	if !RDPEnabled() {
 		return DeleteRDPConnectSecret(wranglerContext.Core.Secret())
 	}
@@ -66,10 +70,6 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 }
 
 func RDPEnabled() bool {
-	if features.MCMAgent.Enabled() {
-		return false
-	}
-
 	if !features.ImperativeApiExtension.Enabled() {
 		return false
 	}
