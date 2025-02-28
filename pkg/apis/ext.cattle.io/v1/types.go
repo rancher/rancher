@@ -63,6 +63,7 @@ type TokenSpec struct {
 	Description string `json:"description, omitempty"`
 	// TTL is the time-to-live of the token, in milliseconds.
 	// The default, 30 days, is indicated by the value `0`.
+	// Setting a value < 0 indicates that the token should not expire.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an
