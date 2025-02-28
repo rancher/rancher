@@ -44,125 +44,12 @@ jobs:
     uses: ./.github/workflows/merge-agent-mainfest.yml
   build-installer:
     needs: [build-publish-chart, merge-server-manifest]
+    uses: ./.github/workflows/build-installer.yml
   merge-installer-manifest:
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     needs: [build-installer]
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Environment Variables
-        uses: ./.github/actions/setup-tag-env
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_INSTALLER }}
-          flavor: |
-            latest=false
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
-      - name: Create manifest list and push
-        run: |
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
-          if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }} ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
-          fi
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}
+    uses: ./.github/workflows/merge-installer-manifest.yml
   create-images-files:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      contents: write
-      id-token: write
-    env:
-      REGISTRY: ""
-      CHECKSUM_FILE: "sha256sum.txt"
-      ARTIFACTS_BASE_DIR: "bin"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Environment Variables
-        uses: ./.github/actions/setup-tag-env
-      - id: env 
-        name: Setup Dependencies Env Variables
-        uses: ./.github/actions/setup-build-env
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '${{ steps.env.outputs.GO_VERSION }}'
-      - name: Download data.json
-        run: |
-          mkdir -p bin
-          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
-          cp ./bin/data.json ./bin/rancher-data.json
-      - name: Create k3s images file
-        uses: ./.github/actions/k3s-images
-        with:
-          k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
-      - name: Create files
-        run: |
-          mkdir -p $HOME/bin
-          touch $HOME/bin/rancher-rke-k8s-versions.txt
-      - name: Create components and images files
-        shell: bash
-        run: ./scripts/create-components-images-files.sh
-      - name: Move rke-k8s version file
-        run: mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
-      - name: Create App Token
-        uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
-      - name: Generate sha256sum
-        shell: bash
-        env:
-          ARTIFACTS_TYPE: "components"
-        run: scripts/artifacts-hashes.sh
-      - name: Add release notes
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          NOTES=$(cat bin/rancher-components.txt)
-          gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
-      - name: Upload artifacts to bucket
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          set -ex
-
-          source scripts/artifacts-list.sh
-
-          if (( ${#ARTIFACTS[@]} == 0 ));then
-            >&2 echo "missing ARTIFACTS env var"
-            exit 1
-          fi
-          for artifact in "${ARTIFACTS[@]}"; do
-            gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$artifact" --clobber
-          done
-
-          gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
+    uses: ./.github/workflows/create-images-files.yml
   docker-image-digests:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
