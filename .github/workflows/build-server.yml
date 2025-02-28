@@ -33,7 +33,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ github.repository_owner }}/rancher
           flavor: |
             latest=false
       - name: Set up QEMU
@@ -61,7 +61,7 @@ jobs:
             "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_PROVISIONING_CAPI_VERSION }}"
             "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
             "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
-          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ env.ARCH }}
+          tags: ${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
           context: .
           platforms: "${{ matrix.os }}/${{ env.ARCH }}"
           file: ./package/Dockerfile
@@ -70,7 +70,7 @@ jobs:
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: "${{ github.repository_owner }}/rancher-${{ matrix.os }}-${{ env.ARCH }}"
+          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
           if-no-files-found: error
           retention-days: 4

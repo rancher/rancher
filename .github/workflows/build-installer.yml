@@ -13,6 +13,7 @@ jobs:
       id-token: write
     env:
       ARCH: ${{ matrix.arch }}
+      REGISTRY: "stgregistry.suse.com"
     steps:
       - name: Environment variables
         shell: bash
@@ -28,20 +29,21 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: rancher
+          images: ${{ github.repository_owner}}/rancher
           flavor: |
             latest=false
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
       - name: Docker Registry Login
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
