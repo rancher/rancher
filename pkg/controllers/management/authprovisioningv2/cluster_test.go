@@ -8,6 +8,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	wranglerrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -69,19 +70,34 @@ func TestOnCluster(t *testing.T) {
 
 	tests := map[string]struct {
 		cluster       *v1.Cluster
+		roleCacheMock func(*v1.Cluster) wranglerrbacv1.RoleCache
+		roleMock      func() wranglerrbacv1.RoleController
 		crtbCacheMock func(string) mgmtcontrollers.ClusterRoleTemplateBindingCache
 		crtbMock      func() mgmtcontrollers.ClusterRoleTemplateBindingController
 		prtbCacheMock func(string) mgmtcontrollers.ProjectRoleTemplateBindingCache
 		prtbMock      func() mgmtcontrollers.ProjectRoleTemplateBindingController
 		expectedErr   error
 	}{
-		"no rke doesn't enqueue CRTBs": {
+		"role exists, don't enqueue CRTBs nor PRTBs": {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
 					Labels: map[string]string{
-						kubernetesprovider.ProviderKey: providers.K3s,
+						kubernetesprovider.ProviderKey: providers.K3s, // distro is irrelevant here
 					},
 				},
+			},
+			roleCacheMock: func(cluster *v1.Cluster) wranglerrbacv1.RoleCache {
+				mock := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
+				mock.EXPECT().Get(cluster.Namespace, clusterViewName(cluster)).
+					Return(&rbacv1.Role{}, nil)
+				return mock
+			},
+			roleMock: func() wranglerrbacv1.RoleController {
+				mock := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+				mock.EXPECT().Update(gomock.Any())
+
+				return mock
 			},
 			crtbCacheMock: func(_ string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
 				return fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
@@ -97,14 +113,26 @@ func TestOnCluster(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"rke enqueue CRTBs and PRTBs": {
+		"no role, enqueue CRTBs and PRTBs": {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 					Labels: map[string]string{
-						kubernetesprovider.ProviderKey: providers.RKE,
+						kubernetesprovider.ProviderKey: providers.K3s, // distro is irrelevant here
 					},
 				},
+			},
+			roleCacheMock: func(cluster *v1.Cluster) wranglerrbacv1.RoleCache {
+				mock := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
+				mock.EXPECT().Get(cluster.Namespace, clusterViewName(cluster)).
+					Return(&rbacv1.Role{}, errors.NewNotFound(schema.GroupResource{}, ""))
+				return mock
+			},
+			roleMock: func() wranglerrbacv1.RoleController {
+				mock := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+				mock.EXPECT().Create(gomock.Any())
+
+				return mock
 			},
 			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
 				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
@@ -128,7 +156,6 @@ func TestOnCluster(t *testing.T) {
 				mock.EXPECT().Enqueue(prtbInCluster.Namespace, prtbInCluster.Name)
 				return mock
 			},
-
 			expectedErr: nil,
 		},
 		"rke enqueue CRTBs error": {
@@ -138,6 +165,18 @@ func TestOnCluster(t *testing.T) {
 						kubernetesprovider.ProviderKey: providers.RKE,
 					},
 				},
+			},
+			roleCacheMock: func(cluster *v1.Cluster) wranglerrbacv1.RoleCache {
+				mock := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
+				mock.EXPECT().Get(cluster.Namespace, clusterViewName(cluster)).
+					Return(&rbacv1.Role{}, errors.NewNotFound(schema.GroupResource{}, ""))
+				return mock
+			},
+			roleMock: func() wranglerrbacv1.RoleController {
+				mock := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+				mock.EXPECT().Create(gomock.Any())
+
+				return mock
 			},
 			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
 				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
@@ -162,6 +201,18 @@ func TestOnCluster(t *testing.T) {
 						kubernetesprovider.ProviderKey: providers.RKE,
 					},
 				},
+			},
+			roleCacheMock: func(cluster *v1.Cluster) wranglerrbacv1.RoleCache {
+				mock := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
+				mock.EXPECT().Get(cluster.Namespace, clusterViewName(cluster)).
+					Return(&rbacv1.Role{}, errors.NewNotFound(schema.GroupResource{}, ""))
+				return mock
+			},
+			roleMock: func() wranglerrbacv1.RoleController {
+				mock := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+				mock.EXPECT().Create(gomock.Any())
+
+				return mock
 			},
 			crtbCacheMock: func(clusterName string) mgmtcontrollers.ClusterRoleTemplateBindingCache {
 				mock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
@@ -191,17 +242,13 @@ func TestOnCluster(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			roleCacheMock := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
-			roleCacheMock.EXPECT().Get(test.cluster.Namespace, clusterViewName(test.cluster)).Return(&rbacv1.Role{}, errors.NewNotFound(schema.GroupResource{}, ""))
-			roleControllerMock := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
-			roleControllerMock.EXPECT().Create(gomock.Any())
 			h := handler{
 				clusterRoleTemplateBindings:          test.crtbCacheMock(test.cluster.Name),
 				clusterRoleTemplateBindingController: test.crtbMock(),
 				projectRoleTemplateBindings:          test.prtbCacheMock(test.cluster.Name),
 				projectRoleTemplateBindingController: test.prtbMock(),
-				roleCache:                            roleCacheMock,
-				roleController:                       roleControllerMock,
+				roleCache:                            test.roleCacheMock(test.cluster),
+				roleController:                       test.roleMock(),
 			}
 
 			_, err := h.OnCluster("", test.cluster)
