@@ -56,32 +56,17 @@ jobs:
         run: |
           set -ex
 
-          artifacts=(
-            "rancher-components.txt"
-            "rancher-data.json"
-            "rancher-images-origins.txt"
-            "rancher-images-sources.txt"
-            "rancher-images.txt"
-            "rancher-load-images.ps1"
-            "rancher-load-images.sh"
-            "rancher-mirror-to-rancher-org.ps1"
-            "rancher-mirror-to-rancher-org.sh"
-            "rancher-rke-k8s-versions.txt"
-            "rancher-save-images.ps1"
-            "rancher-save-images.sh"
-            "rancher-windows-images-sources.txt"
-            "rancher-windows-images.txt"
-          )
+          source scripts/artifacts-list.sh
 
-          for artifact in "${artifacts[@]}"; do
+          for artifact in "${ARTIFACTS[@]}"; do
             mv "./bin/$artifact" "./dist/$artifact"
           done
 
           ./scripts/artifacts-hashes.sh ./dist
 
-          artifacts+=("sha256sum.txt")
+          ARTIFACTS+=("sha256sum.txt")
 
-          for artifact in "${artifacts[@]}"; do
+          for artifact in "${ARTIFACTS[@]}"; do
             aws s3 cp "./dist/$artifact" "s3://prime-artifacts/rancher/${{ env.TAG }}/$artifact"
           done
       - name: Build artifacts index
