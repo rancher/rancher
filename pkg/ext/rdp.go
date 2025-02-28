@@ -31,7 +31,7 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 		return nil
 	}
 
-	if !RDPEnabled() {
+	if !features.ImperativeApiExtension.Enabled() || !RDPEnabled() {
 		return DeleteRDPConnectSecret(wranglerContext.Core.Secret())
 	}
 
@@ -70,10 +70,6 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 }
 
 func RDPEnabled() bool {
-	if !features.ImperativeApiExtension.Enabled() {
-		return false
-	}
-
 	switch os.Getenv(rdpEnabledEnvVar) {
 	case "true":
 		return false
