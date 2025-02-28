@@ -62,7 +62,7 @@ jobs:
             "VERSION=${{ env.TAG }}"
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
-            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+            "RANCHER_REPO=${{ github.repository_owner }}"
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-${{ env.ARCH }}
           context: .
           platforms: "${{ matrix.os }}/${{ env.ARCH }}"
