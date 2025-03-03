@@ -119,13 +119,18 @@ func TestStoreNew(t *testing.T) {
 func TestStoreUserFrom(t *testing.T) {
 	t.Parallel()
 
+	systemAdmin := "system:admin"
+	rancherAdmin := "user-2p7w6"
+	rancherUser := "u-s857n"
+
 	ctrl := gomock.NewController(t)
-	existingUserID := "user-2p7w6"
 	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
 		switch name {
-		case existingUserID:
-			return &v3.User{}, nil
+		case rancherAdmin, rancherUser:
+			return &v3.User{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+			}, nil
 		case "error":
 			return nil, fmt.Errorf("some error")
 		default:
@@ -135,71 +140,69 @@ func TestStoreUserFrom(t *testing.T) {
 
 	store := &Store{
 		userCache: userCache,
+		authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			switch a.GetUser().GetName() {
+			case systemAdmin, rancherAdmin:
+				return authorizer.DecisionAllow, "", nil
+			default:
+				return authorizer.DecisionDeny, "", nil
+			}
+		}),
 	}
 
-	t.Run("valid authenticated user", func(t *testing.T) {
-		t.Parallel()
-
-		userInfo, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name:   existingUserID,
-			Groups: []string{GroupCattleAuthenticated},
+	t.Run("global admin", func(t *testing.T) {
+		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "system:admin",
 		}))
 		require.NoError(t, err)
 		assert.NotNil(t, userInfo)
-		assert.Equal(t, existingUserID, userInfo.GetName())
-		assert.Contains(t, userInfo.GetGroups(), GroupCattleAuthenticated)
+		assert.Equal(t, systemAdmin, userInfo.GetName())
+		assert.True(t, isAdmin)
+		assert.False(t, isRancherUser)
 	})
 
-	t.Run("no user info", func(t *testing.T) {
-		t.Parallel()
-
-		userInfo, err := store.userFrom(context.Background())
-		require.Error(t, err)
-		assert.True(t, apierrors.IsInternalError(err))
-		assert.Nil(t, userInfo)
-	})
-
-	t.Run("not a Rancher user", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "system:admin",
+	t.Run("rancher admin", func(t *testing.T) {
+		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: rancherAdmin,
 		}))
-		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
+		require.NoError(t, err)
+		assert.NotNil(t, userInfo)
+		assert.Equal(t, rancherAdmin, userInfo.GetName())
+		assert.True(t, isAdmin)
+		assert.True(t, isRancherUser)
 	})
 
-	t.Run("user not authenticated with Rancher", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name:   existingUserID,
-			Groups: []string{"system:authenticated"},
+	t.Run("rancher user", func(t *testing.T) {
+		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: rancherUser,
 		}))
-		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
+		require.NoError(t, err)
+		assert.NotNil(t, userInfo)
+		assert.Equal(t, rancherUser, userInfo.GetName())
+		assert.False(t, isAdmin)
+		assert.True(t, isRancherUser)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name:   "non-existent",
-			Groups: []string{GroupCattleAuthenticated},
+		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "not-found",
 		}))
+		require.NoError(t, err)
+		assert.NotNil(t, userInfo)
+		assert.False(t, isAdmin)
+		assert.False(t, isRancherUser)
+	})
+
+	t.Run("no user info", func(t *testing.T) {
+		_, _, _, err := store.userFrom(context.Background())
 		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
 	})
 
 	t.Run("error retrieving user", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name:   "error",
-			Groups: []string{GroupCattleAuthenticated},
+		_, _, _, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "error",
 		}))
 		require.Error(t, err)
-		assert.True(t, apierrors.IsInternalError(err))
 	})
 }
 
