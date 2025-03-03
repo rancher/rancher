@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"slices"
 	"strings"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
@@ -101,32 +100,36 @@ func (s *Store) New() runtime.Object {
 }
 
 // userFrom is a helper that extracts and validates the user info from the request's context.
-func (s *Store) userFrom(ctx context.Context) (k8suser.Info, error) {
+func (s *Store) userFrom(ctx context.Context) (k8suser.Info, bool, bool, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
-		return nil, apierrors.NewInternalError(fmt.Errorf("missing user info"))
+		return nil, false, false, fmt.Errorf("missing user info")
 	}
 
-	userName := userInfo.GetName()
-
-	if strings.Contains(userName, ":") { // E.g. system:admin
-		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
-	}
-
-	if !slices.Contains(userInfo.GetGroups(), GroupCattleAuthenticated) {
-		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
-	}
-
-	_, err := s.userCache.Get(userName)
+	decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
+		User:            userInfo,
+		Verb:            "*",
+		Resource:        "*",
+		ResourceRequest: true,
+	})
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s not found", userName))
-		}
-
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
+		return nil, false, false, err
 	}
 
-	return userInfo, nil
+	isAdmin := decision == authorizer.DecisionAllow
+
+	isRancherUser := false
+
+	if name := userInfo.GetName(); !strings.Contains(name, ":") { // E.g. system:admin
+		_, err := s.userCache.Get(name)
+		if err == nil {
+			isRancherUser = true
+		} else if !apierrors.IsNotFound(err) {
+			return nil, false, false, fmt.Errorf("error getting user %s: %w", name, err)
+		}
+	}
+
+	return userInfo, isAdmin, isRancherUser, nil
 }
 
 // Create implements [rest.Creater]
@@ -136,9 +139,13 @@ func (s *Store) Create(
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions,
 ) (runtime.Object, error) {
-	userInfo, err := s.userFrom(ctx)
+	userInfo, _, isRancherUser, err := s.userFrom(ctx)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+	}
+
+	if !isRancherUser {
+		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userInfo.GetName()))
 	}
 
 	extras := userInfo.GetExtra()
@@ -346,31 +353,47 @@ func (s *Store) createTokenInput(kubeConfigID, userName string, authToken *apiv3
 	}
 }
 
+func tokenSelector(isAdmin bool, userID, tokenID string) (labels.Selector, error) {
+	kindReq, err := labels.NewRequirement(tokens.TokenKindLabel, selection.Equals, []string{"kubeconfig"})
+	if err != nil {
+		return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKindLabel, err)
+	}
+	selector := labels.NewSelector().Add(*kindReq)
+
+	if tokenID != "" {
+		idReq, err := labels.NewRequirement(tokens.TokenKubeconfigIDLabel, selection.Equals, []string{tokenID})
+		if err != nil {
+			return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKubeconfigIDLabel, err)
+		}
+		selector = selector.Add(*idReq)
+	}
+
+	if !isAdmin {
+		userIDReq, err := labels.NewRequirement(tokens.UserIDLabel, selection.Equals, []string{userID})
+		if err != nil {
+			return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.UserIDLabel, err)
+		}
+		selector = selector.Add(*userIDReq)
+	}
+
+	return selector, nil
+}
+
 // Get implements [rest.Getter]
 func (s *Store) Get(
 	ctx context.Context,
 	name string,
 	_ *metav1.GetOptions, // Ignored because kubeconfig is an ephemeral resource.
 ) (runtime.Object, error) {
-	userInfo, err := s.userFrom(ctx)
+	userInfo, isAdmin, _, err := s.userFrom(ctx)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
 	}
 
-	kindReq, err := labels.NewRequirement(tokens.TokenKindLabel, selection.Equals, []string{"kubeconfig"})
+	selector, err := tokenSelector(isAdmin, userInfo.GetName(), name)
 	if err != nil {
-		return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKindLabel, err)
+		return nil, apierrors.NewInternalError(err)
 	}
-	userIDReq, err := labels.NewRequirement(tokens.UserIDLabel, selection.Equals, []string{userInfo.GetName()})
-	if err != nil {
-		return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.UserIDLabel, err)
-	}
-	idReq, err := labels.NewRequirement(tokens.TokenKubeconfigIDLabel, selection.Equals, []string{name})
-	if err != nil {
-		return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKubeconfigIDLabel, err)
-	}
-
-	selector := labels.NewSelector().Add(*kindReq).Add(*userIDReq).Add(*idReq)
 
 	tokenList, err := s.tokenCache.List(selector)
 	if err != nil {
@@ -386,7 +409,7 @@ func (s *Store) Get(
 
 	return &ext.Kubeconfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              tokenList[0].Name,
+			Name:              name,
 			CreationTimestamp: tokenList[0].CreationTimestamp,
 		},
 	}, nil
@@ -402,20 +425,16 @@ func (s *Store) List(
 	ctx context.Context,
 	_ *metainternalversion.ListOptions, // Ignored because kubeconfig is an ephemeral resource.
 ) (runtime.Object, error) {
-	userInfo, err := s.userFrom(ctx)
+	userInfo, isAdmin, _, err := s.userFrom(ctx)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
 	}
 
-	kindReq, err := labels.NewRequirement(tokens.TokenKindLabel, selection.Equals, []string{"kubeconfig"})
+	allTokens := ""
+	selector, err := tokenSelector(isAdmin, userInfo.GetName(), allTokens)
 	if err != nil {
-		return nil, fmt.Errorf("error creating selector requirement: %w", err)
+		return nil, apierrors.NewInternalError(err)
 	}
-	userIDReq, err := labels.NewRequirement(tokens.UserIDLabel, selection.Equals, []string{userInfo.GetName()})
-	if err != nil {
-		return nil, fmt.Errorf("error creating selector requirement: %w", err)
-	}
-	selector := labels.NewSelector().Add(*kindReq).Add(*userIDReq)
 
 	tokenList, err := s.tokenCache.List(selector)
 	if err != nil {
@@ -438,7 +457,6 @@ func (s *Store) List(
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              kubeConfigID,
 				CreationTimestamp: token.CreationTimestamp,
-				ResourceVersion:   token.ResourceVersion,
 			},
 		})
 	}
@@ -461,25 +479,15 @@ func (s *Store) Delete(
 	_ rest.ValidateObjectFunc, // Ignored because kubeconfig is an ephemeral resource.
 	options *metav1.DeleteOptions,
 ) (runtime.Object, bool, error) {
-	userInfo, err := s.userFrom(ctx)
+	userInfo, isAdmin, _, err := s.userFrom(ctx)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
 	}
 
-	kindReq, err := labels.NewRequirement(tokens.TokenKindLabel, selection.Equals, []string{"kubeconfig"})
+	selector, err := tokenSelector(isAdmin, userInfo.GetName(), name)
 	if err != nil {
-		return nil, false, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKindLabel, err)
+		return nil, false, apierrors.NewInternalError(err)
 	}
-	userIDReq, err := labels.NewRequirement(tokens.UserIDLabel, selection.Equals, []string{userInfo.GetName()})
-	if err != nil {
-		return nil, false, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.UserIDLabel, err)
-	}
-	idReq, err := labels.NewRequirement(tokens.TokenKubeconfigIDLabel, selection.Equals, []string{name})
-	if err != nil {
-		return nil, false, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKubeconfigIDLabel, err)
-	}
-
-	selector := labels.NewSelector().Add(*kindReq).Add(*userIDReq).Add(*idReq)
 
 	tokenList, err := s.tokenCache.List(selector)
 	if err != nil {
