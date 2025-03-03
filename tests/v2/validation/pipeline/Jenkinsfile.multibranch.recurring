@@ -114,9 +114,10 @@ node {
                     }
                     def configYaml = readFile(file: "${configPath}")
                     def goValidationParams = [
-                        text(name: 'CONFIG', value: configYaml),
+                        string(name: 'REPO', value: "${rancherRepo}"),
                         string(name: 'BRANCH', value: "${releaseBranchTagMap[testTag]}"),
                         string(name: 'TEST_RUN_NAME', value: "${testTag}-${env.TEST_RUN_NAME}"),
+                        text(name: 'CONFIG', value: configYaml),
                       ]
 
                       jobs["$testTag-test-validation"] = { build job: recurringRunJob, parameters: goValidationParams }
