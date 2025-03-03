@@ -517,15 +517,26 @@ def create_project_client(request):
     cluster = clusters[0]
     create_kubeconfig(cluster)
     namespace["cluster"] = cluster
-    if len(admin_client.list_catalog(name="test-catalog")) == 0:
-        catalog = admin_client.create_catalog(
-            name="test-catalog",
-            baseType="catalog",
-            branch=catalogBranch,
-            kind="helm",
-            url=catalogUrl)
-        catalog = wait_for_catalog_active(admin_client, catalog)
 
+    client = get_cluster_client_for_token_v1(
+        cluster["id"], USER_TOKEN
+    )
+
+    if len(client.list_catalog_cattle_io_clusterrepo(id="test-catalog")) == 0:
+        catalog = {
+            "id": "test-catalog",
+            "metadata": {
+                "name": "test-catalog"
+            },
+            "spec": {
+                "url": catalogUrl,
+                "enabled": True,
+                "gitRepo": catalogUrl,
+                "gitBranch": catalogBranch
+            }
+        }
+        created_catalog = client.create_catalog_cattle_io_clusterrepo(catalog)
+        wait_for_clusterrepo_catalog_active(client, created_catalog)
 
 def create_project_resources():
     cluster = namespace["cluster"]

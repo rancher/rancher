@@ -2135,6 +2135,24 @@ def wait_for_catalog_active(client, catalog, timeout=DEFAULT_CATALOG_TIMEOUT):
     return catalog
 
 
+def wait_for_clusterrepo_catalog_active(client, catalog, timeout=DEFAULT_CATALOG_TIMEOUT):
+    time.sleep(2)
+    catalog_data = client.list_catalog_cattle_io_clusterrepo(name=catalog["metadata"]["name"])
+    print(catalog_data)
+    start = time.time()
+    assert len(catalog_data["data"]) >= 1, "Cannot find catalog"
+    catalog = catalog_data["data"][0]
+    while catalog["status"]["state"] != "active":
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to active")
+        time.sleep(.5)
+        catalog_data = client.list_catalog_cattle_io_clusterrepo(name=catalog["metadata"]["name"])
+        assert len(catalog_data["data"]) >= 1
+        catalog = catalog_data["data"][0]
+    return catalog
+
+
 def readDataFile(data_dir, name):
     fname = os.path.join(data_dir, name)
     print("File: " + fname)
