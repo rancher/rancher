@@ -18,7 +18,7 @@ node {
       jobName = jobNames[jobNames.size() - 1] 
     }
 
-    def branch = "release/v2.9"
+    def branch = "main"
     def recurringRunJob = (jobName =~ /(go-recurring-[a-z]+)/)[0][1]
     recurringRunJob = "${recurringRunJob}-job"
 
@@ -26,7 +26,6 @@ node {
       branch = "${env.BRANCH}"
     }
 
-    def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
     if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
       rancherRepo = "${env.REPO}"
     }
