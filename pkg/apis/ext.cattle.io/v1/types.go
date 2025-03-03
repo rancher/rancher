@@ -52,7 +52,7 @@ type TokenSpec struct {
 	UserID string `json:"userID,omitempty"`
 	// UserPrincipal holds the information about the ext auth provider
 	// managed user (principal) owning the token.
-	UserPrincipal TokenPrincipal `json:"userPrincipal""`
+	UserPrincipal TokenPrincipal `json:"userPrincipal"`
 	// Kind describes the nature of the token. The value "session" indicates
 	// a login/session token. Any other value, including the empty string,
 	// which is the default, stands for some kind of derived token.
@@ -60,7 +60,7 @@ type TokenSpec struct {
 	Kind string `json:"kind"`
 	// Human readable free-form description of the token. For example, its purpose.
 	// +optional
-	Description string `json:"description, omitempty"`
+	Description string `json:"description,omitempty"`
 	// TTL is the time-to-live of the token, in milliseconds.
 	// The default, 30 days, is indicated by the value `0`.
 	// Setting a value < 0 indicates that the token should not expire.
