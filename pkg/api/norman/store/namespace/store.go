@@ -2,7 +2,9 @@ package namespace
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
@@ -15,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/resourcequota"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/utils"
+	"github.com/sirupsen/logrus"
 )
 
 const quotaField = "resourceQuota"
@@ -127,9 +130,16 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 	}
 
 	// validate resource quota
+	now := time.Now()
+	rid := uuid.New()
+	logrus.Debugf("namespacestore: %v getting project lock for %v", rid, projectID)
 	mu := resourcequota.GetProjectLock(projectID)
 	mu.Lock()
-	defer mu.Unlock()
+	logrus.Debugf("namespacestore: %v project lock acquired for %s in %v", rid, projectID, time.Since(now))
+	defer func() {
+		mu.Unlock()
+		logrus.Debugf("namespacestore: %v project lock released for %v after %v", rid, projectID, time.Since(now))
+	}()
 
 	var nsLimits []*v32.ResourceQuotaLimit
 	var namespaces []clusterclient.Namespace
