@@ -210,6 +210,10 @@ func getListener(wranglerContext *wrangler.Context, store dynamiclistener.TLSSto
 		},
 	}
 
+	factory := SandboxFactory{
+		host: config.CN,
+	}
+
 	certs, key, err := getOrCreateCertKey(wranglerContext.Core.Secret(), config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create cert and key: %w", err)
@@ -219,6 +223,13 @@ func getListener(wranglerContext *wrangler.Context, store dynamiclistener.TLSSto
 	if err != nil {
 		return nil, err
 	}
+
+	setter, ok := ln.(dynamiclistener.SetFactory)
+	if !ok {
+		return nil, fmt.Errorf("listener does not implement dynamiclistener.SetFactory")
+	}
+
+	setter.SetFactory(&factory)
 
 	return ln, nil
 }
