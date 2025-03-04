@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/access"
@@ -20,6 +21,7 @@ import (
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -252,9 +254,15 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if err != nil {
 		return err
 	}
+
+	now := time.Now()
+	logrus.Debugf("projectstore: getting project lock for %v", id)
 	mu := resourcequota.GetProjectLock(id)
 	mu.Lock()
-	defer mu.Unlock()
+	defer func() {
+		logrus.Debugf("projectstore: releasing project lock for %v after %v", id, time.Since(now))
+		mu.Unlock()
+	}()
 
 	namespacesCount, err := s.getNamespacesCount(apiContext, project)
 	if err != nil {
@@ -294,10 +302,13 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 		return 0, err
 	}
 
+	now := time.Now()
+	logrus.Debugf("projectstore: querying namespaces for project %s from cluster %s", project.ID, project.ClusterID)
 	namespaces, err := clusterContext.Core.Namespaces("").List(metav1.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
+	logrus.Debugf("projectstore: completed namespaces for project %s from cluster %s (%d) in %v", project.ID, project.ClusterID, len(namespaces.Items), time.Since(now))
 	count := 0
 	for _, n := range namespaces.Items {
 		if n.Annotations == nil {

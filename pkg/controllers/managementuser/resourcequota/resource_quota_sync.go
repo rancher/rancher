@@ -344,9 +344,14 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 	}
 
 	// validate resource quota
+	now := time.Now()
+	logrus.Debugf("resourcequota: getting project lock for %v", projectID)
 	mu := validate.GetProjectLock(projectID)
 	mu.Lock()
-	defer mu.Unlock()
+	defer func() {
+		logrus.Debugf("resourcequota: releasing project lock for %v after %v", projectID, time.Since(now))
+		mu.Unlock()
+	}()
 
 	// Get other namespaces' limits.
 	nsLimits, err := c.getNamespacesLimits(ns, projectID)
