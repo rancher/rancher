@@ -139,10 +139,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 
 func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	harvesterDriverVersion := "v1.0.1"
+	harvesterDriverVersion := "v1.0.2"
 	harvesterDriverChecksums := map[string]string{
-		"amd64": "d5b3439b936e311655e5eba940fc76e95afa4d401aeed7aafee67a0e59763901",
-		"arm64": "d0be35f80af31cebe6a7b36c632afa0359eddf153c6d66c790b3618e0f0c29fe",
+		"amd64": "a238768f343e9f6fa2403219a02311f9d52a5b72d39bf74a6ecd99e90d6f5c4c",
+		"arm64": "4c18edc9e9fcaa4870481efc4d218a6be69e35a4f9243896ca3a1e3b7dcdd789",
 	}
 
 	harvesterDriverURL := fmt.Sprintf("https://github.com/harvester/docker-machine-driver-harvester/releases/download/%s/docker-machine-driver-harvester-%s.tar.gz",
