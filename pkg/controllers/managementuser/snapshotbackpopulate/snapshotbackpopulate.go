@@ -271,6 +271,7 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 			logrus.Errorf("rkecluster %s/%s: invalid non-json value in %s/%s for key %s: %v", cluster.Namespace, cluster.Name, configMap.Namespace, configMap.Name, k, err)
 			continue
 		}
+		file.NodeName = strings.ToLower(file.NodeName)
 		snapshot := rkev1.ETCDSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
