@@ -1,15 +1,13 @@
 package machinepools
 
 import (
-	"github.com/rancher/shepherd/pkg/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	AzureKind                              = "AzureConfig"
-	AzurePoolType                          = "rke-machine-config.cattle.io.azureconfig"
-	AzureResourceConfig                    = "azureconfigs"
-	AzureMachineConfigConfigurationFileKey = "azureMachineConfigs"
+	AzureKind           = "AzureConfig"
+	AzurePoolType       = "rke-machine-config.cattle.io.azureconfig"
+	AzureResourceConfig = "azureconfigs"
 )
 
 type AzureMachineConfigs struct {
@@ -45,12 +43,9 @@ type AzureMachineConfig struct {
 
 // NewAzureMachineConfig is a constructor to set up rke-machine-config.cattle.io.azureconfig. It returns an *unstructured.Unstructured
 // that CreateMachineConfig uses to created the rke-machine-config
-func NewAzureMachineConfig(generatedPoolName, namespace string) []unstructured.Unstructured {
-	var azureMachineConfigs AzureMachineConfigs
-	config.LoadConfig(AzureMachineConfigConfigurationFileKey, &azureMachineConfigs)
+func NewAzureMachineConfig(machineConfigs MachineConfigs, generatedPoolName, namespace string) []unstructured.Unstructured {
 	var multiConfig []unstructured.Unstructured
-
-	for _, azureMachineConfig := range azureMachineConfigs.AzureMachineConfig {
+	for _, azureMachineConfig := range machineConfigs.AzureMachineConfigs.AzureMachineConfig {
 		machineConfig := unstructured.Unstructured{}
 		machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
 		machineConfig.SetKind(AzureKind)
@@ -61,7 +56,7 @@ func NewAzureMachineConfig(generatedPoolName, namespace string) []unstructured.U
 		machineConfig.Object["diskSize"] = azureMachineConfig.DiskSize
 		machineConfig.Object["dns"] = azureMachineConfig.DNS
 		machineConfig.Object["location"] = azureMachineConfig.Location
-		machineConfig.Object["environment"] = azureMachineConfigs.Environment
+		machineConfig.Object["environment"] = machineConfigs.AzureMachineConfigs.Environment
 		machineConfig.Object["faultDomainCount"] = azureMachineConfig.FaultDomainCount
 		machineConfig.Object["image"] = azureMachineConfig.Image
 		machineConfig.Object["managedDisks"] = azureMachineConfig.ManagedDisks
@@ -88,12 +83,10 @@ func NewAzureMachineConfig(generatedPoolName, namespace string) []unstructured.U
 }
 
 // GetAzureMachineRoles returns a list of roles from the given machineConfigs
-func GetAzureMachineRoles() []Roles {
-	var azureMachineConfigs AzureMachineConfigs
-	config.LoadConfig(AzureMachineConfigConfigurationFileKey, &azureMachineConfigs)
+func GetAzureMachineRoles(machineConfigs MachineConfigs) []Roles {
 	var allRoles []Roles
 
-	for _, azureMachineConfig := range azureMachineConfigs.AzureMachineConfig {
+	for _, azureMachineConfig := range machineConfigs.AzureMachineConfigs.AzureMachineConfig {
 		allRoles = append(allRoles, azureMachineConfig.Roles)
 	}
 
