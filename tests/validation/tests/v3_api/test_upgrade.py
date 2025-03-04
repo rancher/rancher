@@ -511,7 +511,6 @@ def create_validate_wokloads_with_secret():
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
     client = get_user_client()
-    admin_client = get_admin_client()
     clusters = client.list_cluster(name=cluster_name).data
     assert len(clusters) == 1
     cluster = clusters[0]
@@ -535,8 +534,8 @@ def create_project_client(request):
                 "gitBranch": catalogBranch
             }
         }
-        created_catalog = client.create_catalog_cattle_io_clusterrepo(catalog)
-        wait_for_clusterrepo_catalog_active(client, created_catalog)
+        catalog_data = client.create_catalog_cattle_io_clusterrepo(catalog)
+        wait_for_clusterrepo_catalog_active(client, catalog_data)
 
 def create_project_resources():
     cluster = namespace["cluster"]
@@ -721,20 +720,33 @@ def wait_for_ready_nodes():
 
 def create_and_validate_catalog_app():
     cluster = namespace["cluster"]
-    p_client = namespace['p_client']
+
     ns = create_ns(get_cluster_client_for_token(cluster, USER_TOKEN),
                    cluster, namespace["project"], ns_name=app_ns)
-    print(pre_upgrade_externalId)
-    app = p_client.create_app(
-        answers=get_defaut_question_answers(get_user_client(),
-                                            pre_upgrade_externalId),
-        externalId=pre_upgrade_externalId,
-        name=app_create_name,
-        projectId=namespace["project"].id,
-        prune=False,
-        targetNamespace=ns.id
+
+    client = get_cluster_client_for_token_v1(
+        cluster["id"], USER_TOKEN
     )
-    validate_catalog_app(app.name, pre_upgrade_externalId)
+        
+    app = {
+        "metadata": {
+            "name": app_create_name,
+            "namespace": ns.name
+        },
+        "spec": {
+            "chart": {
+                "metadata": {
+                    "name": "mysql",
+                    "version": "1.3.1"
+                }
+            },
+            "name": "test-catalog"
+        }
+    }
+    
+    app_data =  client.create_catalog_cattle_io_app(app)
+    wait_for_catalog_app_active(client, app_data)
+    
 
 
 def modify_catalog_app():
