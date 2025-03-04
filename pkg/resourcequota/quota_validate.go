@@ -1,6 +1,7 @@
 package resourcequota
 
 import (
+	"runtime/pprof"
 	"sync"
 	"time"
 
@@ -16,14 +17,30 @@ var (
 	projectLockCache = cache.NewLRUExpireCache(1000)
 )
 
-func GetProjectLock(projectID string) *sync.Mutex {
+type projectLock struct {
+	*sync.Mutex
+}
+
+var projectLockProfile = pprof.NewProfile("project.Lock")
+
+func (p *projectLock) Lock() {
+	p.Mutex.Lock()
+	projectLockProfile.Add(p.Mutex, 2)
+}
+
+func (p *projectLock) Unlock() {
+	projectLockProfile.Remove(p.Mutex)
+	p.Mutex.Unlock()
+}
+
+func GetProjectLock(projectID string) sync.Locker {
 	val, ok := projectLockCache.Get(projectID)
 	if !ok {
 		projectLockCache.Add(projectID, &sync.Mutex{}, time.Hour)
 		val, _ = projectLockCache.Get(projectID)
 	}
 	mu := val.(*sync.Mutex)
-	return mu
+	return &projectLock{mu}
 }
 
 func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, error) {
