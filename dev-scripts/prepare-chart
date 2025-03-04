@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -e
+
+DEV_SCRIPT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+SCRIPT_DIR=$(realpath "$DEV_SCRIPT_DIR/../scripts")
+
+echo "Dev-Script: Prepare Rancher Chart"
+
+source "$SCRIPT_DIR/version"
+
+test_image="$REPO/rancher"
+
+echo "Preparing Rancher Chart for release: ${CHART_VERSION}"
+
+sed -i -e "s/%VERSION%/${CHART_VERSION}/g" ./chart/Chart.yaml
+sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" ./chart/Chart.yaml
+sed -i -e "s@%POST_DELETE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
+sed -i -e "s/%POST_DELETE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
