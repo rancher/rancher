@@ -475,11 +475,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 // delete implements the core resource destruction for tokens
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
-	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
+	user, isAdmin, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return err
 	}
-	if !isRancherUser || !userMatch(user, token) {
+	if !isAdmin && (!isRancherUser || !userMatch(user, token)) {
 		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
