@@ -26,7 +26,7 @@ func InstallStores(server *steveext.ExtensionAPIServer, wranglerContext *wrangle
 	err = server.Install(
 		tokens.PluralName,
 		tokens.GVK,
-		tokens.NewFromWrangler(wranglerContext))
+		tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer()))
 	if err != nil {
 		return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
 	}

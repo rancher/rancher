@@ -130,12 +130,14 @@ func (mr *MockauthHandlerMockRecorder) SessionID(ctx any) *gomock.Call {
 }
 
 // UserName mocks base method.
-func (m *MockauthHandler) UserName(ctx context.Context, store *SystemStore) (string, error) {
+func (m *MockauthHandler) UserName(ctx context.Context, store *SystemStore) (string, bool, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UserName", ctx, store)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(bool)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
 }
 
 // UserName indicates an expected call of UserName.

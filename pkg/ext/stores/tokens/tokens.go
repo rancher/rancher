@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -96,6 +96,7 @@ type Store struct {
 // operates with admin authority, except where it is told to not to. In other
 // words, it generally has access to all the tokens, in all ways.
 type SystemStore struct {
+	authorizer      authorizer.Authorizer
 	initialized     bool               // flag. set when this store ensured presence of the backing namespace
 	namespaceClient v1.NamespaceClient // access to namespaces.
 	secretClient    v1.SecretClient    // direct access to the backing secrets
@@ -109,8 +110,9 @@ type SystemStore struct {
 
 // NewFromWrangler is a convenience function for creating a token store.
 // It initializes the returned store from the provided wrangler context.
-func NewFromWrangler(wranglerContext *wrangler.Context) *Store {
+func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
 	return New(
+		authorizer,
 		wranglerContext.Core.Namespace(),
 		wranglerContext.Core.Secret(),
 		wranglerContext.Mgmt.User(),
@@ -126,6 +128,7 @@ func NewFromWrangler(wranglerContext *wrangler.Context) *Store {
 // that it is recommended to use the NewFromWrangler convenience function
 // instead.
 func New(
+	authorizer authorizer.Authorizer,
 	namespaceClient v1.NamespaceClient,
 	secretClient v1.SecretController,
 	userClient v3.UserController,
@@ -136,6 +139,7 @@ func New(
 ) *Store {
 	tokenStore := Store{
 		SystemStore: SystemStore{
+			authorizer:      authorizer,
 			namespaceClient: namespaceClient,
 			secretClient:    secretClient,
 			secretCache:     secretClient.Cache(),
@@ -335,11 +339,15 @@ func (t *Store) Watch(
 
 // create implements the core resource creation for tokens
 func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
-	user, err := t.auth.UserName(ctx, &t.SystemStore)
+	userName, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
-	if !userMatchOrDefault(user, token) {
+	if !isRancherUser {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("user %s is not a Rancher user", userName))
+	}
+	if !userMatchOrDefault(userName, token) {
 		return nil, apierrors.NewBadRequest("unable to create token for other user")
 	}
 	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options)
@@ -467,11 +475,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 // delete implements the core resource destruction for tokens
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
-	user, err := t.auth.UserName(ctx, &t.SystemStore)
+	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
-		return apierrors.NewInternalError(err)
+		return err
 	}
-	if !userMatch(user, token) {
+	if !isRancherUser || !userMatch(user, token) {
 		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
@@ -491,19 +499,21 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 
 // get implements the core resource retrieval for tokens
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
-	sessionID := t.auth.SessionID(ctx)
-
-	// note: have to get token first before we can check for a user mismatch
-	token, err := t.SystemStore.Get(name, sessionID, options)
+	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := t.auth.UserName(ctx, &t.SystemStore)
+	// note: have to get token first before we can check for a user mismatch
+	token, err := t.SystemStore.Get(name, t.auth.SessionID(ctx), options)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
-	if !userMatch(user, token) {
+
+	if isAdmin {
+		return token, nil
+	}
+	if !userMatch(userName, token) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
@@ -539,14 +549,12 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 
 // list implements the core resource listing of tokens
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
-	user, err := t.auth.UserName(ctx, &t.SystemStore)
+	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
 
-	sessionID := t.auth.SessionID(ctx)
-
-	return t.SystemStore.list(user, sessionID, options)
+	return t.SystemStore.list(isAdmin, userName, t.auth.SessionID(ctx), options)
 }
 
 // ListForUser returns the set of token owned by the named user. It is an
@@ -577,10 +585,10 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
-func (t *SystemStore) list(user, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
+func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
-	localOptions, err := ListOptionMerge(user, options)
+	localOptions, err := ListOptionMerge(isAdmin, userName, options)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
 	}
@@ -619,11 +627,11 @@ func (t *SystemStore) list(user, sessionID string, options *metav1.ListOptions) 
 
 // update implements the core resource updating/modification of tokens
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
-	user, err := t.auth.UserName(ctx, &t.SystemStore)
+	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
-	if !userMatch(user, token) {
+	if !isRancherUser || !userMatch(user, token) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
@@ -760,9 +768,9 @@ func (t *SystemStore) Disable(name string) error {
 
 // watch implements the core resource watcher for tokens
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
-	user, err := t.auth.UserName(ctx, &t.SystemStore)
+	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
 
 	// the channel to the consumer is given a bit of slack, allowing the
@@ -772,7 +780,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		ch: make(chan watch.Event, 100),
 	}
 
-	localOptions, err := ListOptionMerge(user, options)
+	localOptions, err := ListOptionMerge(isAdmin, userName, options)
 	if err != nil {
 		return nil,
 			apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w",
@@ -946,7 +954,7 @@ type hashHandler interface {
 // makes these operations mockable for store testing.
 type authHandler interface {
 	SessionID(ctx context.Context) string
-	UserName(ctx context.Context, store *SystemStore) (string, error)
+	UserName(ctx context.Context, store *SystemStore) (string, bool, bool, error)
 }
 
 // Standard implementations for the above interfaces.
@@ -991,33 +999,41 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 	return tokenValue, hashedValue, nil
 }
 
-// UserName hides the details of extracting a user name from the request context
-func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, error) {
+// UserName hides the details of extracting a user name and its permission
+// status from the request context
+func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, bool, bool, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
-		return "", fmt.Errorf("context has no user info")
+		return "", false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
 	}
 
-	userName := userInfo.GetName()
-
-	if strings.Contains(userName, ":") { // E.g. system:admin
-		return "", apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
-	}
-
-	if !slices.Contains(userInfo.GetGroups(), GroupCattleAuthenticated) {
-		return "", apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s is not a Rancher user", userName))
-	}
-
-	_, err := store.userClient.Get(userName)
+	decision, _, err := store.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
+		User:            userInfo,
+		Verb:            "*",
+		Resource:        "*",
+		ResourceRequest: true,
+	})
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return "", apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("user %s not found", userName))
-		}
-
-		return "", apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
+		return "", false, false, err
 	}
+	isAdmin := decision == authorizer.DecisionAllow
 
-	return userName, nil
+	isRancherUser := false
+	userName := userInfo.GetName()
+	if !strings.Contains(userName, ":") { // E.g. system:admin
+		// potentially a rancher user
+		_, err := store.userClient.Get(userName)
+		if err == nil {
+			// definitely a rancher user
+			isRancherUser = true
+		} else if !apierrors.IsNotFound(err) {
+			// some general error
+			return "", false, false,
+				apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
+		} // else: not a rancher user, may still be an admin
+	} // else: some system user, not a rancher user, may still be an admin
+
+	return userName, isAdmin, isRancherUser, nil
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
@@ -1066,11 +1082,17 @@ func SessionID(ctx context.Context) (string, error) {
 // (for the current user).  A non-error empty result indicates that the options
 // specified a filter which cannot match anything.  I.e. the calling user
 // requests a filter for a different user than itself.
-func ListOptionMerge(user string, options *metav1.ListOptions) (metav1.ListOptions, error) {
+func ListOptionMerge(isAdmin bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
 
+	// for admins we do not impose any additional restrictions over the requested
+	if isAdmin {
+		return *options, nil
+	}
+
+	// for non-admins we additionally filter the result for their own tokens
 	userIDSelector := labels.Set(map[string]string{
-		UserIDLabel: user,
+		UserIDLabel: userName,
 	})
 	empty := metav1.ListOptions{}
 	if options == nil || *options == empty {
@@ -1087,7 +1109,7 @@ func ListOptionMerge(user string, options *metav1.ListOptions) (metav1.ListOptio
 		}
 		if callerSelector.Has(UserIDLabel) {
 			// The external filter does filter for a user, possible conflict.
-			if callerSelector[UserIDLabel] != user {
+			if callerSelector[UserIDLabel] != userName {
 				// It asks for a user other than the current.
 				// We can bail now, with an empty result, as
 				// nothing can match.
