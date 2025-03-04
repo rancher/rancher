@@ -174,7 +174,7 @@ spec:
       {{- if .AppendTolerations }}
 {{ .AppendTolerations | indent 6 }}
       {{- end }}
-      {{ if .EnablePriorityClass }}
+      {{- if .EnablePriorityClass }}
       priorityClassName: cattle-cluster-agent-priority-class
       {{- end }}
       containers:
@@ -546,7 +546,7 @@ kind: PriorityClass
 metadata:
   name: cattle-cluster-agent-priority-class
 value: {{ .PriorityClassValue }}
-{{ if .PreemptionPolicy }}
+{{- if .PreemptionPolicy }}
 preemptionPolicy: {{ .PreemptionPolicy }}
 {{- end }}
 description: {{ .Description }}
