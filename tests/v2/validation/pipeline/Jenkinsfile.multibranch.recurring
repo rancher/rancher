@@ -18,7 +18,7 @@ node {
       jobName = jobNames[jobNames.size() - 1] 
     }
 
-    def branch = "release/v2.9"
+    def branch = "main"
     def recurringRunJob = (jobName =~ /(go-recurring-[a-z]+)/)[0][1]
     recurringRunJob = "${recurringRunJob}-job"
 
@@ -26,7 +26,6 @@ node {
       branch = "${env.BRANCH}"
     }
 
-    def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
     if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
       rancherRepo = "${env.REPO}"
     }
@@ -115,9 +114,10 @@ node {
                     }
                     def configYaml = readFile(file: "${configPath}")
                     def goValidationParams = [
-                        text(name: 'CONFIG', value: configYaml),
+                        string(name: 'REPO', value: "${rancherRepo}"),
                         string(name: 'BRANCH', value: "${releaseBranchTagMap[testTag]}"),
                         string(name: 'TEST_RUN_NAME', value: "${testTag}-${env.TEST_RUN_NAME}"),
+                        text(name: 'CONFIG', value: configYaml),
                       ]
 
                       jobs["$testTag-test-validation"] = { build job: recurringRunJob, parameters: goValidationParams }
