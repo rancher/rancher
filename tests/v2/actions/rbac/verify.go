@@ -43,13 +43,7 @@ func VerifyRoleBindingsForUser(t *testing.T, user *management.User, adminClient 
 			userRoleBindings = append(userRoleBindings, rb.Name)
 		}
 	}
-
-	switch role {
-	case ClusterOwner, ClusterMember:
-		assert.Equal(t, 1, len(userRoleBindings))
-	case ProjectOwner, ProjectMember:
-		assert.Equal(t, 2, len(userRoleBindings))
-	}
+	assert.Equal(t, 1, len(userRoleBindings))
 }
 
 // VerifyUserCanListCluster validates a user with the required global permissions are able to/not able to list the clusters in rancher server
