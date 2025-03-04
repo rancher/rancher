@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 set -e
 
+function is_gnu_sed(){
+  sed --version >/dev/null 2>&1
+}
+
+function sed_i_wrapper(){
+  if is_gnu_sed; then
+    $(which sed) "$@"
+  else
+    a=()
+    for b in "$@"; do
+      [[ $b == '-i' ]] && a=("${a[@]}" "$b" "") || a=("${a[@]}" "$b")
+    done
+    $(which sed) "${a[@]}"
+  fi
+}
+
+
 DEV_SCRIPT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 SCRIPT_DIR=$(realpath "$DEV_SCRIPT_DIR/../scripts")
 
@@ -12,7 +29,7 @@ test_image="$REPO/rancher"
 
 echo "Preparing Rancher Chart for release: ${CHART_VERSION}"
 
-sed -i -e "s/%VERSION%/${CHART_VERSION}/g" ./chart/Chart.yaml
-sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" ./chart/Chart.yaml
-sed -i -e "s@%POST_DELETE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
-sed -i -e "s/%POST_DELETE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
+sed_i_wrapper -i -e "s/%VERSION%/${CHART_VERSION}/g" ./chart/Chart.yaml
+sed_i_wrapper -i -e "s/%APP_VERSION%/${APP_VERSION}/g" ./chart/Chart.yaml
+sed_i_wrapper -i -e "s@%POST_DELETE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
+sed_i_wrapper -i -e "s/%POST_DELETE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
