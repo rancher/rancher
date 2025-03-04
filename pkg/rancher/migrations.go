@@ -3,6 +3,7 @@ package rancher
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/settings"
 	"strconv"
 	"strings"
 	"time"
@@ -105,7 +106,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 
 // runPreflightMigrations runs migrations that are required *before* dashboard controllers are allowed to start.
 func runPreflightMigrations(wranglerContext *wrangler.Context) error {
-	if err := versionTombstone(wranglerContext.Core.ConfigMap()); err != nil {
+	if err := versionTombstone(wranglerContext.Core.ConfigMap(), settings.ServerVersion.Get()); err != nil {
 		return err
 	}
 	return nil
@@ -147,7 +148,7 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 	return err
 }
 
-func versionTombstone(configMapController controllerv1.ConfigMapController) error {
+func versionTombstone(configMapController controllerv1.ConfigMapController, currentVersion string) error {
 	cm, err := getConfigMap(configMapController, rancherVersionTombstoneConfig)
 	if err != nil || cm == nil {
 		return err
@@ -155,12 +156,12 @@ func versionTombstone(configMapController controllerv1.ConfigMapController) erro
 
 	validate := false
 
-	if rancherversion.Version == "dev" {
+	if currentVersion == "dev" {
 		logrus.Debugf("Development environment detected, skipping tombstone validation.")
-	} else if !semver.IsValid(rancherversion.Version) {
-		logrus.Errorf("Rancher version %s is not semver compliant, skipping tombstone validation.", rancherversion.Version)
-	} else if semver.Prerelease(rancherversion.Version) != "" {
-		logrus.Infof("Rancher version %s detected as prerelease, skipping tombstone validation.", rancherversion.Version)
+	} else if !semver.IsValid(currentVersion) {
+		logrus.Errorf("Rancher version %s is not semver compliant, skipping tombstone validation.", currentVersion)
+	} else if semver.Prerelease(currentVersion) != "" {
+		logrus.Infof("Rancher version %s detected as prerelease, skipping tombstone validation.", currentVersion)
 	} else {
 		validate = true
 	}
@@ -172,15 +173,15 @@ func versionTombstone(configMapController controllerv1.ConfigMapController) erro
 			// Hotfixes count as previous versions, and alpha/rc versions are assumed to be at your own risk.
 			// If users want to downgrade to consume a hotfix, they should not be prevented.
 		} else if semver.Prerelease(lastVersion) != "" {
-			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation.", rancherversion.Version)
-		} else if semver.Compare(lastVersion, rancherversion.Version) == 1 {
+			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation.", currentVersion)
+		} else if semver.Compare(lastVersion, currentVersion) == 1 {
 			logrus.Errorf("Detected Rancher downgrade from %s to %s. In order to perform a rollback of Rancher, use the Rancher Backup Restore Operator. If a suitable backup is unavailable, version tombstone validation can be temporarily disabled by deleting the %s config map in the cattle-system namespace.",
-				lastVersion, rancherversion.Version, rancherVersionTombstoneConfig)
+				lastVersion, currentVersion, rancherVersionTombstoneConfig)
 			return ErrTombstoneValidation
 		}
 	}
 
-	cm.Data[rancherVersionKey] = rancherversion.Version
+	cm.Data[rancherVersionKey] = currentVersion
 	return createOrUpdateConfigMap(configMapController, cm)
 }
 
