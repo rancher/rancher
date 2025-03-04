@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"golang.org/x/crypto/bcrypt"
@@ -36,6 +37,7 @@ type Handler struct {
 	UserClient               v3.UserInterface
 	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
 	UserAuthRefresher        providerrefresh.UserAuthRefresher
+	ExtTokenStore            *exttokenstore.SystemStore
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
