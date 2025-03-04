@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
@@ -23,6 +24,8 @@ import (
 var (
 	profileAddress = "localhost:6060"
 	kubeConfig     string
+
+	mutexProfileFraction int
 )
 
 func main() {
@@ -146,6 +149,13 @@ func main() {
 			Usage:       "Address to listen on for profiling",
 			Destination: &profileAddress,
 		},
+		cli.IntFlag{
+			Name:        "mutex-profile-fraction",
+			EnvVar:      "MUTEX_PROFILE_FRACTION",
+			Value:       1000,
+			Usage:       "(debug) Value for runtime.SetMutexProfileFraction",
+			Destination: &mutexProfileFraction,
+		},
 		cli.StringFlag{
 			Name:        "features",
 			EnvVar:      "CATTLE_FEATURES",
@@ -158,6 +168,8 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		// enable profiler
 		if profileAddress != "" {
+			runtime.SetMutexProfileFraction(mutexProfileFraction)
+			runtime.SetBlockProfileRate(mutexProfileFraction)
 			go func() {
 				log.Println(http.ListenAndServe(profileAddress, nil))
 			}()
