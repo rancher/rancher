@@ -145,7 +145,7 @@ require (
 	github.com/rancher/remotedialer v0.4.4-rc.2
 	github.com/rancher/rke v1.8.0-rc.3
 	github.com/rancher/shepherd v0.0.0-20241213222351-98e341c77d0b
-	github.com/rancher/steve v0.5.8
+	github.com/rancher/steve v0.5.9
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.2.0-rc.3
@@ -278,7 +278,7 @@ require (
 	modernc.org/libc v1.61.13 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.8.2 // indirect
-	modernc.org/sqlite v1.35.0 // indirect
+	modernc.org/sqlite v1.36.0 // indirect
 )
 
 require (
