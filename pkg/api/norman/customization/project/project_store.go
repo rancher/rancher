@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -256,15 +257,17 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	}
 
 	now := time.Now()
-	logrus.Debugf("projectstore: getting project lock for %v", id)
+	rid := uuid.New()
+	logrus.Debugf("projectstore: %v getting project lock for %v", rid, id)
 	mu := resourcequota.GetProjectLock(id)
 	mu.Lock()
+	logrus.Debugf("projectstore: %v project lock acquired for %s in %v", rid, id, time.Since(now))
 	defer func() {
-		logrus.Debugf("projectstore: releasing project lock for %v after %v", id, time.Since(now))
 		mu.Unlock()
+		logrus.Debugf("projectstore: %v project lock released for %v after %v", rid, id, time.Since(now))
 	}()
 
-	namespacesCount, err := s.getNamespacesCount(apiContext, project)
+	namespacesCount, err := s.getNamespacesCount(apiContext, project, rid)
 	if err != nil {
 		return err
 	}
@@ -286,7 +289,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	return nil
 }
 
-func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project mgmtclient.Project) (int, error) {
+func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project mgmtclient.Project, rid uuid.UUID) (int, error) {
 	cluster, err := s.clusterLister.Get("", project.ClusterID)
 	if err != nil {
 		return 0, err
@@ -303,12 +306,14 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 	}
 
 	now := time.Now()
-	logrus.Debugf("projectstore: querying namespaces for project %s from cluster %s", project.ID, project.ClusterID)
+	logrus.Debugf("projectstore: %v querying namespaces for project %s from cluster %s",
+		rid, project.ID, project.ClusterID)
 	namespaces, err := clusterContext.Core.Namespaces("").List(metav1.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
-	logrus.Debugf("projectstore: completed namespaces for project %s from cluster %s (%d) in %v", project.ID, project.ClusterID, len(namespaces.Items), time.Since(now))
+	logrus.Debugf("projectstore: %v completed namespaces for project %s from cluster %s (%d) in %v",
+		rid, project.ID, project.ClusterID, len(namespaces.Items), time.Since(now))
 	count := 0
 	for _, n := range namespaces.Items {
 		if n.Annotations == nil {

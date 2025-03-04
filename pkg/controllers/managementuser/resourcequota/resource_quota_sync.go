@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -345,12 +346,14 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 
 	// validate resource quota
 	now := time.Now()
-	logrus.Debugf("resourcequota: getting project lock for %v", projectID)
+	rid := uuid.New()
+	logrus.Debugf("resourcequota: %v getting project lock for %v", rid, projectID)
 	mu := validate.GetProjectLock(projectID)
 	mu.Lock()
+	logrus.Debugf("resourcequota: %v project lock acquired for %s in %v", rid, projectID, time.Since(now))
 	defer func() {
-		logrus.Debugf("resourcequota: releasing project lock for %v after %v", projectID, time.Since(now))
 		mu.Unlock()
+		logrus.Debugf("resourcequota: %v project lock released for %v after %v", rid, projectID, time.Since(now))
 	}()
 
 	// Get other namespaces' limits.
