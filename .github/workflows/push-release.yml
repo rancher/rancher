@@ -633,12 +633,12 @@ jobs:
         env:
           ARTIFACTS_TYPE: "components"
         run: scripts/artifacts-hashes.sh
-      - name: Add release notes
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          NOTES=$(cat bin/rancher-components.txt)
-          gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
+      # - name: Add release notes
+      #   env:
+      #     GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      #   run: |
+      #     NOTES=$(cat bin/rancher-components.txt)
+      #     gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
