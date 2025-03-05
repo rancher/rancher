@@ -3,14 +3,67 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 )
 
 const (
-	setPermissionsWindowsScriptPath = "%s/windows/set-permissions.ps1"
+	windowsIdempotentActionScript = `
+param (
+    [Parameter(Position=0)]
+    [String]
+    $Key,
 
-	setPermissionsWindowsScript = `
+    [Parameter(Position=1)]
+    [String]
+    $TargetHash,
+
+    [Parameter(Position=2)]
+    [String]
+    $HashedCommand,
+
+    [Parameter(Position=3)]
+    [String]
+    $Command,
+
+    [Parameter(Position=4)]
+    [String]
+    $CAPRDir,
+
+    [Parameter(Position=5, ValueFromRemainingArguments)]
+    [String[]]
+    $Args
+)
+
+$ErrorActionPreference = 'Stop'
+$dataRoot = "$CAPRDir/idempotence/$Key/$HashedCommand/$TargetHash"
+$attemptFile = "$dataRoot/last-attempt"
+$currentAttempt = (Get-Content $attemptFile -ErrorAction Ignore)
+
+if (($null -eq $currentAttempt) -or ($currentAttempt -eq "")) {
+	$currentAttempt = "-1"
+}
+
+if ($currentAttempt -ne $env:CATTLE_AGENT_ATTEMPT_NUMBER) {
+	if (-not (Test-Path $dataRoot)) {
+		New-Item -Type Directory $dataRoot
+	}
+
+	Set-Content -Path $attemptFile -Value $env:CATTLE_AGENT_ATTEMPT_NUMBER
+
+  	$joinedArgs = $Args -join ' '
+	$fullCommand = ($Command + " '" + $joinedArgs + "'") 
+
+	Invoke-Expression $fullCommand
+
+} else { 
+	Write-Host "action has already been reconciled to the target hash $TargetHash at attempt $currentAttempt"
+}
+`
+
+	setPermissionsWindowsScriptPath = "%s/windows/set-permissions.ps1"
+	setPermissionsWindowsScript     = `
 function Set-RestrictedPermissions {
     [CmdletBinding()]
     param (
@@ -161,3 +214,53 @@ var (
 			"c:\\var\\lib\\rancher\\capr")},
 	}
 )
+
+func windowsIdempotentActionScriptPath() string {
+	// note: custom data directory paths are not currently respected by Windows nodes
+	return "c:\\var\\lib\\rancher\\capr\\idempotence\\idempotent.ps1"
+}
+
+// windowsIdempotentRestartInstructions generates an idempotent restart instruction for the given Windows service.
+// identifier is expected to be a unique key for tracking, and value should be something like the generation of the attempt
+// (and is what we track to determine whether we should run the instruction or not).
+func windowsIdempotentRestartInstructions(identifier, value, service string) []plan.OneTimeInstruction {
+	return []plan.OneTimeInstruction{
+		windowsIdempotentInstruction(
+			identifier+"-restart",
+			value,
+			"restart-service",
+			[]string{
+				service,
+			},
+			[]string{},
+		),
+	}
+}
+
+// idempotentInstruction generates an idempotent action instruction that will execute the given command + args exactly once using PowerShell.
+// It works by running a script that writes the given "value" to a file at /var/lib/rancher/capr/idempotence/<identifier>/<hashedCommand>/<targetHash>,
+// and checks this file to determine if it needs to run the instruction again. Notably, `identifier` must be a valid relative path.
+// The command provided must be a valid PowerShell expression which can be parsed by Invoke-Expression. Passing an executable as the command
+// (such as powershell.exe) may result in error suppression. Due to how PowerShell handles arguments when executing commands via InvokeExpression,
+// care must be taken to ensure that certain escape characters (such as ') do not interfere with how arguments are built and passed to InvokeExpression.
+// Reference windowsIdempotentActionScript for more information as to how command arguments are crafted and passed to InvokeExpression.
+func windowsIdempotentInstruction(identifier, value, command string, args []string, env []string) plan.OneTimeInstruction {
+	hashedCommand := PlanHash([]byte(command))
+	hashedValue := PlanHash([]byte(value))
+
+	return plan.OneTimeInstruction{
+		Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
+		Command: "powershell.exe",
+		Args: append([]string{
+			windowsIdempotentActionScriptPath(),
+			strings.ToLower(identifier),
+			hashedValue,
+			hashedCommand,
+			command,
+			// note: custom data directory paths are not currently respected by Windows nodes
+			"c:\\var\\lib\\rancher\\capr",
+		},
+			args...),
+		Env: env,
+	}
+}
