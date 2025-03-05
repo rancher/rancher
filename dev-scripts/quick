@@ -7,7 +7,7 @@ set -x
 
 # variables
 COMMIT=$(git rev-parse --short HEAD)
-TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.yml)-${COMMIT}}"
+TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.yml)-${COMMIT}}-head"
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
 REPO="${REPO:-rancher}"
