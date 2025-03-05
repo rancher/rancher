@@ -64,6 +64,11 @@ func main() {
 
 		initFeatures()
 
+		err := clean.UnusedCattleCredentials()
+		if err != nil {
+			logrus.Fatal(err)
+		}
+
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
