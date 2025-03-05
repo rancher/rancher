@@ -44,31 +44,51 @@ contexts:
 current-context: "{{.ClusterName}}"
 `
 
-	basicTemplateText = `apiVersion: v1
+	multiClusterTemplateText = `apiVersion: v1
 kind: Config
 clusters:
-- name: "{{.ClusterName}}"
+{{- range .Clusters}}
+- name: "{{.Name}}"
   cluster:
-    server: "https://{{.Host}}"
-    api-version: v1
+    server: "{{.Server}}"
+{{- if ne .Cert "" }}
+    certificate-authority-data: "{{.Cert}}"
+{{- end }}
+{{- end}}
 
 users:
-- name: "{{.User}}"
+{{- range .Users}}
+- name: "{{.Name}}"
   user:
-    username: "{{.Username}}"
-    password: "{{.Password}}"
+{{- if .Token }}
+    token: "{{.Token}}"
+{{ else }}
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+        - token
+        - --server={{.Host}}
+        - --user={{.Name}}
+{{- if ne .ClusterID "" }}
+        - --cluster={{.ClusterID}}
+{{- end }}
+      command: rancher
+{{- end }}
+{{- end }}
 
 contexts:
-- name: "{{.ClusterName}}"
+{{- range .Contexts}}
+- name: "{{.Name}}"
   context:
     user: "{{.User}}"
-    cluster: "{{.ClusterName}}"
+    cluster: "{{.Cluster}}"
+{{- end}}
 
-current-context: "{{.ClusterName}}"
+current-context: "{{.CurrentContext}}"
 `
 )
 
 var (
-	basicTemplate = template.Must(template.New("basicTemplate").Parse(basicTemplateText))
-	tokenTemplate = template.Must(template.New("tokenTemplate").Parse(tokenTemplateText))
+	tokenTemplate        = template.Must(template.New("tokenTemplate").Parse(tokenTemplateText))
+	multiClusterTemplate = template.Must(template.New("multiClusterTemplate").Parse(multiClusterTemplateText))
 )
