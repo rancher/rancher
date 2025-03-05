@@ -21,7 +21,7 @@ node {
     def testRunConfig = "testrunconfig.yaml"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
-    def branch = "release/v2.8"
+    def branch = "main"
     def corralBranch = "main"
     def config = env.CONFIG
     def rancherToken = ""
@@ -37,12 +37,10 @@ node {
       corralBranch = "${env.RANCHER_CORRAL_PACKAGES_REPO_BRANCH}"
     }
 
-    def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
     if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
       rancherRepo = "${env.REPO}"
     }
 
-    def corralRepo = scm.getUserRemoteConfigs()[1].getUrl()
     if ("${env.RANCHER_CORRAL_PACKAGES_REPO_URL}" != "null" && "${env.RANCHER_CORRAL_PACKAGES_REPO_URL}" != "") {
       corralRepo = "${env.RANCHER_CORRAL_PACKAGES_REPO_URL}"
     }
