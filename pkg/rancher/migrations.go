@@ -3,6 +3,7 @@ package rancher
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,7 @@ const (
 	migrateRKEClusterState                          = "migraterkeclusterstate"
 	migrateSystemAgentVarDirToDataDirectory         = "migratesystemagentvardirtodatadirectory"
 	migrateHarvesterCloudCredentialExpirationConfig = "migrateharvestercloudcredentialexpiration"
+	migrateImportedClusterManagedFields             = "migrateimportedclustermanagedfields"
 	rancherVersionTombstoneConfig                   = "rancherversion"
 	rancherVersionKey                               = "rancherVersion"
 	projectsCreatedKey                              = "projectsCreated"
@@ -58,9 +60,13 @@ const (
 	rkeClustersAnnotatedForMigrationKey             = "rkeClustersAnnotatedForMigration"
 	systemAgentVarDirMigratedKey                    = "systemAgentVarDirMigrated"
 	harvesterCloudCredentialExpirationMigratedKey   = "harvesterCloudCredentialExpirationMigrated"
+	importedClusterManagedFieldsMigratedKey         = "importedClusterManagedFieldsMigrated"
 )
 
-var ErrTombstoneValidation = errors.New("version tombstone validation failed")
+var (
+	ErrTombstoneValidation = errors.New("version tombstone validation failed")
+	mgmtNameRegexp         = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+)
 
 func runMigrations(wranglerContext *wrangler.Context) error {
 	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
@@ -100,7 +106,11 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	return migrateRKEClusterStates(wranglerContext)
+	if err := migrateRKEClusterStates(wranglerContext); err != nil {
+		return err
+	}
+
+	return migrateImportedClusterFields(wranglerContext)
 }
 
 // runPreflightMigrations runs migrations that are required *before* dashboard controllers are allowed to start.
@@ -733,6 +743,51 @@ func migrateHarvesterCloudCredentialExpiration(w *wrangler.Context) error {
 	}
 
 	cm.Data[harvesterCloudCredentialExpirationMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+// migrateImportedClusterFields will update fields on clusters.management.cattle.io/v3 for imported clusters,
+// fields will no longer be set by clusters.provisioning.cattle.io/v1 ensuring management cluster
+// remains the source of truth for imported clusters.
+func migrateImportedClusterFields(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateImportedClusterManagedFields)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[importedClusterManagedFieldsMigratedKey] == "true" {
+		return nil
+	}
+
+	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range provClusters.Items {
+		if mgmtNameRegexp.MatchString(cluster.Name) || cluster.Spec.RKEConfig != nil {
+			// run only for non-legacy imported clusters
+			continue
+		}
+		mgmtCluster, err := w.Mgmt.Cluster().Get(cluster.Status.ClusterName, metav1.GetOptions{})
+		if k8serror.IsNotFound(err) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		clusterCopy := mgmtCluster.DeepCopy()
+		// clusterDeploy controller uses GetDesiredAgentImage(mgmtCluster), customizable using Spec.DesiredAgentImage
+		clusterCopy.Spec.DesiredAgentImage = ""
+		// clusterDeploy controller uses GetDesiredAuthImage(mgmtCluster), customizable using Spec.DesiredAuthImage
+		clusterCopy.Spec.DesiredAuthImage = ""
+		// managed by Spec.ImportedConfig.PrivateRegistryURL for imported clusters
+		clusterCopy.Spec.ClusterSecrets.PrivateRegistryURL = ""
+		if _, err := w.Mgmt.Cluster().Update(clusterCopy); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[importedClusterManagedFieldsMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
