@@ -149,7 +149,14 @@ func WindowsCheck(driver string) bool {
 }
 
 func MachineStateSecretName(machineName string) string {
-	return name.SafeConcatName(machineName, "machine", "state")
+	// considered not limiting this to 253 and creating an error at runtime - if this warning is showing up hopefully it'll get noticed.
+	fullName := strings.Join([]string{machineName, "machine", "state"}, "-")
+	if len(fullName) > 253 {
+		logrus.Warnf("[%s] machine-state secret too long for backup-restore-operator", machineName)
+		return name.Limit(fullName, 253)
+	}
+
+	return fullName
 }
 
 func GetMachineByOwner(machineCache capicontrollers.MachineCache, obj metav1.Object) (*capi.Machine, error) {
