@@ -1,7 +1,6 @@
 package configserver
 
 import (
-	"bytes"
 	"net/http"
 	"sort"
 
@@ -24,34 +23,38 @@ func (r *RKE2ConfigServer) connectClusterAgentYAML(rw http.ResponseWriter, req *
 		return
 	}
 
-	tokens, err := r.clusterTokenCache.GetByIndex(tokenIndex, token)
+	clusterTokens, err := r.clusterTokenCache.GetByIndex(tokenIndex, token)
 	if err != nil {
 		http.Error(rw, "unauthorized", http.StatusUnauthorized)
 		logrus.Errorf("[rke2configserver] error retrieving cluster token by index: %v", err)
 		return
 	}
 
-	if len(tokens) == 0 {
+	if len(clusterTokens) == 0 {
 		logrus.Errorf("[rke2configserver] no tokens found in index")
 		http.Error(rw, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	mgmtCluster, err := r.mgmtClusterCache.Get(tokens[0].ObjClusterName())
+	sort.Slice(clusterTokens, func(i, j int) bool {
+		return clusterTokens[i].Name < clusterTokens[j].Name
+	})
+
+	mgmtCluster, err := r.mgmtClusterCache.Get(clusterTokens[0].ObjClusterName())
 	if err != nil {
 		logrus.Errorf("[rke2configserver] error retrieving management cluster for cluster registration token: %v", err)
 		http.Error(rw, "unknown", http.StatusInternalServerError)
 		return
 	}
 
-	provisioningClusters, err := r.provisioningClusterCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, tokens[0].ObjClusterName())
+	provisioningClusters, err := r.provisioningClusterCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, clusterTokens[0].ObjClusterName())
 	if err != nil {
 		logrus.Errorf("[rke2configserver] error retrieving provisioning cluster: %v", err)
 		http.Error(rw, "unknown", http.StatusInternalServerError)
 		return
 	}
-	// ensure this is a v2prov cluster
 
+	// ensure this is a v2prov cluster
 	if len(provisioningClusters) != 1 {
 		logrus.Errorf("[rke2configserver] multiple provisioning clusters found")
 		http.Error(rw, "unknown", http.StatusInternalServerError)
@@ -95,11 +98,7 @@ func (r *RKE2ConfigServer) connectClusterAgentYAML(rw http.ResponseWriter, req *
 		return
 	}
 
-	clusterAgentTemplate := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(clusterAgentTemplate, systemtemplate.GetDesiredAgentImage(mgmtCluster),
-		systemtemplate.GetDesiredAuthImage(mgmtCluster),
-		mgmtCluster.Name, token, serverURL, mgmtCluster.Spec.WindowsPreferedCluster, capr.PreBootstrap(mgmtCluster),
-		mgmtCluster, systemtemplate.GetDesiredFeatures(mgmtCluster), taints, r.secretsCache)
+	clusterAgentTemplate, err := systemtemplate.ForCluster(mgmtCluster, token, taints, r.secretsCache)
 	if err != nil {
 		logrus.Errorf("[rke2configserver] error encountered rendering cluster-agent manifest: %v", err)
 		http.Error(rw, "unable to render manifest", http.StatusInternalServerError)
@@ -107,7 +106,7 @@ func (r *RKE2ConfigServer) connectClusterAgentYAML(rw http.ResponseWriter, req *
 	}
 
 	rw.Header().Set("Content-Type", "text/plain")
-	_, err = rw.Write(clusterAgentTemplate.Bytes())
+	_, err = rw.Write(clusterAgentTemplate)
 	if err != nil {
 		logrus.Errorf("[rke2configserver] error while writing cluster agent YAML manifest: %v", err)
 	}
