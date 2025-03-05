@@ -85,7 +85,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "f387ffed57f8bef4182249e6ddfaa8a7caa2167574ccfcb94a60a72528a0bfc6",
+				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -120,7 +120,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "f387ffed57f8bef4182249e6ddfaa8a7caa2167574ccfcb94a60a72528a0bfc6",
+				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -169,7 +169,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "f387ffed57f8bef4182249e6ddfaa8a7caa2167574ccfcb94a60a72528a0bfc6",
+				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -221,7 +221,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "b8849aec1a2218e3df1810005f160cfa00c7a56bb45a5af94b26fe2e66e5d544",
+				"cattle-cluster-agent": "2093af1547b1eef8b22527ecb1590fe3302c3287b317e0aed3e268ff2a6dc0df",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -264,7 +264,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "79855b99fa6625b021f5f750fa1fa2a520b1b6f7478188257eb1d842f60c74dc",
+				"cattle-cluster-agent": "48868d8d72bfe924be0eb248def83f78088c68f91e12cd2b67116e6d448d889a",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
