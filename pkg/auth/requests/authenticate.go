@@ -307,11 +307,11 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			if apierrors.IsNotFound(err) {
 				return nil, ErrMustAuthenticate
 			}
-			return nil, errors.Wrapf(ErrMustAuthenticate,
-				"failed to retrieve auth token, error: %v", err)
+			return nil, fmt.Errorf("failed to retrieve auth token, error: %v: %w",
+				err, ErrMustAuthenticate)
 		}
 		if _, err := extVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
+			return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
 		}
 
 		return storedToken, nil

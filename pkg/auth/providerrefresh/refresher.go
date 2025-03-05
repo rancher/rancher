@@ -189,8 +189,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		allTokens = append(allTokens, token)
 	}
 	for _, eToken := range allExtTokens.Items {
-		ex := eToken
-		allTokens = append(allTokens, &ex)
+		allTokens = append(allTokens, &eToken)
 	}
 
 	// split into derived versus login tokens, filter for the user
