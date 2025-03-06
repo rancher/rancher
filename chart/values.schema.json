@@ -30,6 +30,19 @@
       "type": "string",
       "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.pullPolicy` instead.",
       "deprecated": true
+    },
+    "service": {
+      "type": "object",
+      "description": "The default rancher service configuration",
+      "properties": {
+        "type": {
+          "type": ["string", "null"],
+          "enum": ["ClusterIP", "LoadBalancer", "NodePort", "", null]
+        },
+        "disableHTTP": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "required": [],
