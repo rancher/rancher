@@ -138,6 +138,10 @@ func (in *TokenStatus) DeepCopyInto(out *TokenStatus) {
 		in, out := &in.LastUsedAt, &out.LastUsedAt
 		*out = (*in).DeepCopy()
 	}
+	if in.LastActivitySeen != nil {
+		in, out := &in.LastActivitySeen, &out.LastActivitySeen
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

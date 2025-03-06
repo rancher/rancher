@@ -405,6 +405,12 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
+					"lastActivitySeen": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastActivitySeen is the timestamp of the last time user activity (mouse movement, interaction, ...) was reported for the token.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 				Required: []string{"current", "expired", "expiresAt", "lastUpdateTime"},
 			},
