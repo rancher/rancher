@@ -152,7 +152,7 @@ func (h *handler) syncHarvesterBaremetalContainerWorkloadFeature(feat *v3.Featur
 		}
 
 		update := baremetal.DeepCopy()
-		*update.Spec.Value = false
+		update.Spec.Value = func() *bool { v := false; return &v }()
 		if !reflect.DeepEqual(baremetal, update) {
 			if _, err = h.featuresClient.Update(update); err != nil {
 				return err
