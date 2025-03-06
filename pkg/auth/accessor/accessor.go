@@ -39,4 +39,8 @@ type TokenAccessor interface {
 	GetGroupPrincipals() []v3.Principal
 	// GetLastUsedAt returns the time of the token's last use.
 	GetLastUsedAt() *metav1.Time
+	// GetLastActivitySeen returns the time of the last recorded activity for the token
+	GetLastActivitySeen() *metav1.Time
+	// GetCreationTime returns the creation time of the token
+	GetCreationTime() metav1.Time
 }

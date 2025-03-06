@@ -175,3 +175,11 @@ func (t *Token) GetProviderInfo() map[string]string {
 func (t *Token) GetLastUsedAt() *metav1.Time {
 	return t.Status.LastUsedAt
 }
+
+func (t *Token) GetLastActivitySeen() *metav1.Time {
+	return t.Status.LastActivitySeen
+}
+
+func (t *Token) GetCreationTime() metav1.Time {
+	return t.CreationTimestamp
+}
