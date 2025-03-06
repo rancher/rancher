@@ -94,9 +94,7 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 			return fmt.Errorf("error fetching feature %s: %w", features.Harvester.Name(), err)
 		}
 		harvesterFeatureCopy := harvesterFeature.DeepCopy()
-		if harvesterFeatureCopy.Spec.Value == nil || !*harvesterFeatureCopy.Spec.Value {
-			harvesterFeatureCopy.Spec.Value = &[]bool{true}[0]
-		}
+		harvesterFeatureCopy.SetValue(true)
 		if !reflect.DeepEqual(harvesterFeature, harvesterFeatureCopy) {
 			if _, err := h.featuresClient.Update(harvesterFeatureCopy); err != nil {
 				return fmt.Errorf("error updating Harvester feature %s: %w", obj.Name, err)
@@ -152,7 +150,7 @@ func (h *handler) syncHarvesterBaremetalContainerWorkloadFeature(feat *v3.Featur
 		}
 
 		update := baremetal.DeepCopy()
-		update.Spec.Value = func() *bool { v := false; return &v }()
+		update.SetValue(false)
 		if !reflect.DeepEqual(baremetal, update) {
 			if _, err = h.featuresClient.Update(update); err != nil {
 				return err
