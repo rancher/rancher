@@ -63,12 +63,15 @@ ingress:
   # options: true, false
   enabled: true
   includeDefaultExtraAnnotations: true
+  # If you change the service port to 443, you will also need to add appropriate HTTPS configs to `extraAnnotations`.
+  # For example, when using ingress-nginx add: `nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"`
   extraAnnotations: {}
   ingressClassName: ""
   # Certain ingress controllers will require the pathType or path to be set to a different value.
   pathType: ImplementationSpecific
   path: "/"
-  # backend port number
+  # Backend port number; should use either: 80, or 443.
+  # Must use 443 when `service.disableHTTP` is set to true.
   servicePort: 80
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
@@ -85,7 +88,8 @@ ingress:
 service:
   type: ""
   annotations: {}
-  # an optional security setting that disables the HTTP port of the service
+  # An optional security setting to disables the HTTP port of the rancher service
+  # When set true, you must also set `ingress.servicePort` to 443 and the appropriate ingress annotation to use HTTPS
   disableHTTP: false
 
 ### LetsEncrypt config ###
