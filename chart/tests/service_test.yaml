@@ -55,6 +55,7 @@ tests:
 - it: should define disable HTTP port when disableHTTP is true
   set:
     service.disableHTTP: true
+    ingress.servicePort: 443
   asserts:
     - equal:
         path: spec.ports[0].name
