@@ -81,7 +81,7 @@ func enableRKE2IfClustersExist(feature *v3.Feature, featuresClient managementv3.
 	for _, c := range clusters.Items {
 		if imported.IsAdministratedByProvisioningCluster(&c) {
 			feature = feature.DeepCopy()
-			feature.Spec.Value = &[]bool{true}[0]
+			feature.SetValue(true)
 			feature.Status.LockedValue = feature.Spec.Value
 
 			_, err = featuresClient.Update(feature)
