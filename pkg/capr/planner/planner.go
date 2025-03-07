@@ -1058,11 +1058,22 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 
 		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
 
-		idempotentScriptFile := plan.File{
-			Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
-			Path:    idempotentActionScriptPath(controlPlane),
-			Dynamic: true,
-			Minor:   true,
+		var idempotentScriptFile plan.File
+
+		if isOnlyWindowsWorker(entry) {
+			idempotentScriptFile = plan.File{
+				Content: base64.StdEncoding.EncodeToString([]byte(windowsIdempotentActionScript)),
+				Path:    windowsIdempotentActionScriptPath(),
+				Dynamic: true,
+				Minor:   true,
+			}
+		} else {
+			idempotentScriptFile = plan.File{
+				Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
+				Path:    idempotentActionScriptPath(controlPlane),
+				Dynamic: true,
+				Minor:   true,
+			}
 		}
 
 		nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
