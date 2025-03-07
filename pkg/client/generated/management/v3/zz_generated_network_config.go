@@ -5,6 +5,7 @@ const (
 	NetworkConfigFieldAciNetworkProvider     = "aciNetworkProvider"
 	NetworkConfigFieldCalicoNetworkProvider  = "calicoNetworkProvider"
 	NetworkConfigFieldCanalNetworkProvider   = "canalNetworkProvider"
+	NetworkConfigFieldEnableBrNetfilter      = "enableBrNetfilter"
 	NetworkConfigFieldFlannelNetworkProvider = "flannelNetworkProvider"
 	NetworkConfigFieldMTU                    = "mtu"
 	NetworkConfigFieldNodeSelector           = "nodeSelector"
@@ -19,6 +20,7 @@ type NetworkConfig struct {
 	AciNetworkProvider     *AciNetworkProvider      `json:"aciNetworkProvider,omitempty" yaml:"aciNetworkProvider,omitempty"`
 	CalicoNetworkProvider  *CalicoNetworkProvider   `json:"calicoNetworkProvider,omitempty" yaml:"calicoNetworkProvider,omitempty"`
 	CanalNetworkProvider   *CanalNetworkProvider    `json:"canalNetworkProvider,omitempty" yaml:"canalNetworkProvider,omitempty"`
+	EnableBrNetfilter      *bool                    `json:"enableBrNetfilter,omitempty" yaml:"enableBrNetfilter,omitempty"`
 	FlannelNetworkProvider *FlannelNetworkProvider  `json:"flannelNetworkProvider,omitempty" yaml:"flannelNetworkProvider,omitempty"`
 	MTU                    int64                    `json:"mtu,omitempty" yaml:"mtu,omitempty"`
 	NodeSelector           map[string]string        `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
