@@ -261,13 +261,17 @@ func TestCreateCluster(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                string
-		cluster             *provv1.Cluster
-		status              provv1.ClusterStatus
-		cachedClusters      map[string]*apimgmtv3.Cluster
-		expectedLen         int
-		expectedLabels      map[string]string
-		expectedAnnotations map[string]string
+		name                 string
+		cluster              *provv1.Cluster
+		status               provv1.ClusterStatus
+		cachedClusters       map[string]*apimgmtv3.Cluster
+		nodes                []corev1.Node
+		cpTaintsLabel        string
+		expectedLen          int
+		expectedLabels       map[string]string
+		expectedAnnotations  map[string]string
+		expectedTolerations  []corev1.Toleration
+		expectedErrorMessage string
 	}{
 		{
 			name: "creates only cluster when external",
@@ -295,6 +299,113 @@ func TestCreateCluster(t *testing.T) {
 						Internal:           false,
 					},
 				),
+			},
+			nodes: []corev1.Node{
+				{
+					Spec: corev1.NodeSpec{
+						Taints: []corev1.Taint{
+							{
+								Key:    "key_taint1",
+								Value:  "value_taint1",
+								Effect: corev1.TaintEffectNoSchedule,
+							},
+							{
+								Key:    "key_taint2",
+								Value:  "value_taint2",
+								Effect: corev1.TaintEffectPreferNoSchedule,
+							},
+						},
+					},
+				},
+			},
+			cpTaintsLabel: "node-role.kubernetes.io/control-plane=true",
+			// external cluster have no CP taints added to tolerations
+			expectedTolerations: []corev1.Toleration{},
+			expectedLen:         1, // cluster only
+			expectedLabels: map[string]string{
+				"management.cattle.io/cluster-name":         "cluster-name",
+				"management.cattle.io/cluster-display-name": "cluster-name",
+				"cluster-group": "cluster-group-name",
+			},
+		},
+		{
+			name: "creates only cluster when external extra tolerations",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "cluster-name",
+				ClientSecretName: "client-secret-name",
+			},
+
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						Internal:           false,
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
+								AppendTolerations: []corev1.Toleration{
+									{
+										Key:      "key1",
+										Value:    "value1",
+										Effect:   corev1.TaintEffectPreferNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
+									{
+										Key:      "key2",
+										Value:    "value2",
+										Effect:   corev1.TaintEffectNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
+								},
+							},
+						},
+					},
+				),
+			},
+			nodes: []corev1.Node{
+				{
+					Spec: corev1.NodeSpec{
+						Taints: []corev1.Taint{
+							{
+								Key:    "key_taint1",
+								Value:  "value_taint1",
+								Effect: corev1.TaintEffectNoSchedule,
+							},
+							{
+								Key:    "key_taint2",
+								Value:  "value_taint2",
+								Effect: corev1.TaintEffectPreferNoSchedule,
+							},
+						},
+					},
+				},
+			},
+			cpTaintsLabel: "node-role.kubernetes.io/control-plane=true",
+			// external cluster have no CP taints added to tolerations
+			expectedTolerations: []corev1.Toleration{
+				{
+					Key:      "key1",
+					Value:    "value1",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "key2",
+					Value:    "value2",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
 			},
 			expectedLen: 1, // cluster only
 			expectedLabels: map[string]string{
@@ -329,7 +440,8 @@ func TestCreateCluster(t *testing.T) {
 					},
 				),
 			},
-			expectedLen: 2, // cluster and cluster group
+			cpTaintsLabel: "node-role.kubernetes.io/control-plane=true",
+			expectedLen:   2, // cluster and cluster group
 			expectedLabels: map[string]string{
 				"management.cattle.io/cluster-name":         "local-cluster",
 				"management.cattle.io/cluster-display-name": "local-cluster",
@@ -394,54 +506,248 @@ func TestCreateCluster(t *testing.T) {
 				"test-annotation-key": "test-value",
 			},
 		},
+		{
+			name: "creates internal cluster and cluster group with cp tolerations, cp label 1",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-cluster",
+					Namespace: "fleet-local",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "local-cluster",
+				ClientSecretName: "local-kubeconfig",
+			},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"local-cluster": newMgmtCluster(
+					"local-cluster",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-local",
+						Internal:           true,
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
+								AppendTolerations: []corev1.Toleration{
+									{
+										Key:      "extraKey1",
+										Value:    "extraValue1",
+										Effect:   corev1.TaintEffectPreferNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
+								},
+							},
+						},
+					},
+				),
+			},
+			nodes: []corev1.Node{
+				{
+					Spec: corev1.NodeSpec{
+						Taints: []corev1.Taint{
+							{
+								Key:    "key_taint1",
+								Value:  "value_taint1",
+								Effect: corev1.TaintEffectNoSchedule,
+							},
+							{
+								Key:    "key_taint2",
+								Value:  "value_taint2",
+								Effect: corev1.TaintEffectPreferNoSchedule,
+							},
+						},
+					},
+				},
+			},
+			cpTaintsLabel: "node-role.kubernetes.io/control-plane=true",
+			expectedTolerations: []corev1.Toleration{
+				{
+					Key:      "key_taint2",
+					Value:    "value_taint2",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "key_taint1",
+					Value:    "value_taint1",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "extraKey1",
+					Value:    "extraValue1",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+			},
+			expectedLen: 2, // cluster and cluster group
+			expectedLabels: map[string]string{
+				"management.cattle.io/cluster-name":         "local-cluster",
+				"management.cattle.io/cluster-display-name": "local-cluster",
+				"name":          "local",
+				"cluster-group": "cluster-group-name",
+			},
+		},
+		{
+			name: "creates internal cluster and cluster group with cp tolerations, cp label 2",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-cluster",
+					Namespace: "fleet-local",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "local-cluster",
+				ClientSecretName: "local-kubeconfig",
+			},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"local-cluster": newMgmtCluster(
+					"local-cluster",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-local",
+						Internal:           true,
+					},
+				),
+			},
+			nodes: []corev1.Node{
+				{
+					Spec: corev1.NodeSpec{
+						Taints: []corev1.Taint{
+							{
+								Key:    "key_taint1",
+								Value:  "value_taint1",
+								Effect: corev1.TaintEffectNoSchedule,
+							},
+							{
+								Key:    "key_taint2",
+								Value:  "value_taint2",
+								Effect: corev1.TaintEffectPreferNoSchedule,
+							},
+						},
+					},
+				},
+			},
+			cpTaintsLabel: "node-role.kubernetes.io/controlplane=true",
+			expectedTolerations: []corev1.Toleration{
+				{
+					Key:      "key_taint2",
+					Value:    "value_taint2",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "key_taint1",
+					Value:    "value_taint1",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+			},
+			expectedLen: 2, // cluster and cluster group
+			expectedLabels: map[string]string{
+				"management.cattle.io/cluster-name":         "local-cluster",
+				"management.cattle.io/cluster-display-name": "local-cluster",
+				"name":          "local",
+				"cluster-group": "cluster-group-name",
+			},
+		},
+		{
+			name: "error when calling nodes List",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-cluster",
+					Namespace: "fleet-local",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "local-cluster",
+				ClientSecretName: "local-kubeconfig",
+			},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"local-cluster": newMgmtCluster(
+					"local-cluster",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-local",
+						Internal:           true,
+					},
+				),
+			},
+			cpTaintsLabel:        "return-an-error",
+			expectedErrorMessage: "failed to list control plane nodes: node list error",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			h.clustersCache = newClusterCache(t, ctrl, tt.cachedClusters)
+			h.nodesController = newFakeNodesController(t, ctrl, tt.nodes, tt.cpTaintsLabel)
 
 			objs, _, err := h.createCluster(tt.cluster, tt.status)
 
-			if objs == nil {
-				t.Errorf("Expected non-nil objs: %v", err)
-			}
+			if tt.expectedErrorMessage != "" {
+				require.NotNil(t, err)
+				require.Equal(t, err.Error(), tt.expectedErrorMessage)
+			} else {
+				require.Nil(t, err)
 
-			if err != nil {
-				t.Errorf("Expected nil err")
-			}
-
-			if len(objs) != tt.expectedLen {
-				t.Errorf("Expected %d objects, got %d", tt.expectedLen, len(objs))
-			}
-
-			foundCluster := false
-			for _, obj := range objs {
-				cluster, ok := obj.(*fleet.Cluster)
-
-				if !ok {
-					continue
+				if objs == nil {
+					t.Errorf("Expected non-nil objs: %v", err)
 				}
 
-				if cluster.Name != tt.cluster.Name || cluster.Namespace != tt.cluster.Namespace {
-					continue
+				if err != nil {
+					t.Errorf("Expected nil err")
 				}
 
-				foundCluster = true
+				if len(objs) != tt.expectedLen {
+					t.Errorf("Expected %d objects, got %d", tt.expectedLen, len(objs))
+				}
 
-				require.Equal(t, tt.expectedLabels, cluster.Labels)
+				foundCluster := false
+				for _, obj := range objs {
+					cluster, ok := obj.(*fleet.Cluster)
 
-				if len(tt.expectedAnnotations) == 0 {
-					require.Empty(t, cluster.Annotations)
-				} else {
-					require.Equal(t, tt.expectedAnnotations, cluster.Annotations)
+					if !ok {
+						continue
+					}
+
+					if cluster.Name != tt.cluster.Name || cluster.Namespace != tt.cluster.Namespace {
+						continue
+					}
+
+					foundCluster = true
+
+					require.Equal(t, tt.expectedLabels, cluster.Labels)
+
+					if len(tt.expectedAnnotations) == 0 {
+						require.Empty(t, cluster.Annotations)
+					} else {
+						require.Equal(t, tt.expectedAnnotations, cluster.Annotations)
+					}
+
+					if len(tt.expectedTolerations) == 0 {
+						require.Empty(t, cluster.Spec.AgentTolerations)
+					} else {
+						require.ElementsMatch(t, tt.expectedTolerations, cluster.Spec.AgentTolerations)
+					}
+				}
+
+				if !foundCluster {
+					t.Errorf("Did not find expected cluster %v among created objects %v", tt.cluster, objs)
 				}
 			}
-
-			if !foundCluster {
-				t.Errorf("Did not find expected cluster %v among created objects %v", tt.cluster, objs)
-			}
-
 		})
 	}
 }
@@ -479,30 +785,19 @@ func newClusterCache(t *testing.T, ctrl *gomock.Controller, clusters map[string]
 	return clusterCache
 }
 
-// newSecretsCache returns a mock secrets cache.
-func newSecretsCache(t *testing.T, ctrl *gomock.Controller, namespace string, secrets map[string]*corev1.Secret) *fake.MockCacheInterface[*corev1.Secret] {
+// implements corecontrollers.NodeController List
+func newFakeNodesController(t *testing.T, ctrl *gomock.Controller, nodes []corev1.Node, labelSelector string) corecontrollers.NodeController {
 	t.Helper()
-	secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-	secretCache.EXPECT().Get(namespace, "local-kubeconfig").
-		Return(
-			&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "local-kubeconfig",
-				},
-				Data: map[string][]byte{},
-			}, nil).
-		AnyTimes()
-	return secretCache
-}
-
-// newSecretsController returns a mock secrets controller.
-func newSecretsController(
-	t *testing.T,
-	namespace string,
-	updatedSecret *corev1.Secret,
-) corecontrollers.SecretController {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-
-	return fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	nodesController := fake.NewMockNonNamespacedControllerInterface[*corev1.Node, *corev1.NodeList](ctrl)
+	nodesController.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*corev1.NodeList, error) {
+		switch labelSelector {
+		case opts.LabelSelector:
+			return &corev1.NodeList{Items: nodes}, nil
+		case "return-an-error":
+			return nil, fmt.Errorf("node list error")
+		default:
+			return &corev1.NodeList{}, nil
+		}
+	}).AnyTimes()
+	return nodesController
 }
