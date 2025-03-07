@@ -1,0 +1,119 @@
+#!groovy
+node {
+  def homePath = pwd() + "/"
+  def rootPath = "/root/go/src/github.com/rancher/tfp-automation/"
+  def TERRAFORM_DIR = './root/go/src/github.com/rancher/tfp-automation/modules/airgap'
+  def testsDir = "github.com/rancher/tfp-automation/tests/${env.TEST_PACKAGE}"
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+  def imageName = "tfp-automation-validation-${job_name}${env.BUILD_NUMBER}"
+  def testResultsOut = "results.xml"
+  def testResultsJSON = "results.json"
+  def envFile = ".env"
+  def config = env.CONFIG
+  def testPackage = env.TEST_PACKAGE?.trim()
+  def terraformVolume = "s3_data"
+
+  def branch = "${env.BRANCH}"
+  if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
+        branch = "${env.BRANCH}"
+  }
+  def s3Container = "${job_name}${env.BUILD_NUMBER}_s3_file_download"
+  def repo = scm.userRemoteConfigs
+  if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+    repo = [[url: "${env.REPO}"]]
+  }
+  def timeout = "${env.TIMEOUT}"
+  if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
+        timeout = "${env.TIMEOUT}" 
+  }
+  def s3Config = env.AWS_S3_BUCKET_CONFIG
+
+
+  withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: 'RANCHER_LINODE_ACCESSKEY'),
+                    string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                    string(credentialsId: 'AWS_SSH_KEY_NAME', variable: 'AWS_SSH_KEY_NAME'),
+                    string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
+      stage('Checkout') {
+              deleteDir()
+              checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${branch}"]],
+                        extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                        userRemoteConfigs: repo
+                      ])
+            }
+        stage('Configure and Build') {
+          config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+          config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+
+          writeFile file: 'config.yml', text: config
+
+          def decoded = new String(env.AWS_SSH_PEM_KEY.decodeBase64())
+          writeFile file: 'key.pem', text: decoded
+          
+          env.CATTLE_TEST_CONFIG=rootPath+'config.yml'
+
+          sh "./configure.sh"
+          sh "./build.sh"
+        }
+        stage('Setup'){
+            sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
+            sh returnStdout:true, script: 'chmod a+x ./yq'
+            
+            AWS_S3_BUCKET = sh (
+                  script: "echo '${s3Config}' | ./yq '.s3Bucket'",
+                  returnStdout: true
+                ).trim()
+            AWS_S3_REGION =    sh (
+                  script: "echo '${s3Config}' | ./yq '.s3BucketRegion'",
+                  returnStdout: true
+                ).trim()
+        }
+        stage('Run Terraform Setup Test') {
+          try {
+            sh """
+              docker run --name ${testContainer} -t -v ${homePath}key.pem:${rootPath}key.pem --env-file ${envFile} ${imageName} sh -c "
+              /root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} --jsonfile ${testResultsJSON} -- -timeout=${timeout} -v ${params.TEST_CASE};
+              if [ -f ${rootPath}reporter ]; then ${rootPath}reporter; fi"
+            """
+          } catch(err) {
+              echo 'Test run had failures. Collecting results...'
+              sh "docker rm ${testContainer}"
+          }
+          sh "docker rm ${testContainer}"
+        }
+        stage('Upload tf files to S3 bucket'){
+          try{
+              sh "docker cp ${testContainer}:/root/ ./"
+              script {
+                sh """
+                    if ls $TERRAFORM_DIR/. 1> /dev/null 2>&1; then
+                        echo "Terraform files found, starting upload."
+                    else
+                        echo "No Terraform files found!"
+                        exit 1
+                    fi
+                      docker run --rm \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        -e AWS_DEFAULT_REGION=$AWS_S3_REGION \
+                        -v $TERRAFORM_DIR/:/root/terraform/ \
+                        amazon/aws-cli \
+                        s3 cp /root/terraform/. s3://$AWS_S3_BUCKET/terraform/ --recursive
+                    """
+                }
+            }catch(err){
+                echo "Unable to get the output: ${err}"
+                sh "docker rm ${testContainer}"
+              }
+              sh "docker rm ${testContainer}"         
+          }
+    }
+}
