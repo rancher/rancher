@@ -2,6 +2,7 @@ package fleetcluster
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -17,12 +18,14 @@ import (
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -51,6 +54,7 @@ type handler struct {
 	clustersCache     v3.ClusterCache
 	hostGetter        ClusterHostGetter
 	secretsController corecontrollers.SecretController
+	nodesController   corecontrollers.NodeController
 	fleetClusters     fleetcontrollers.ClusterController
 	apply             apply.Apply
 	getPrivateRepoURL func(*provv1.Cluster, *apimgmtv3.Cluster) string
@@ -68,6 +72,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		clustersCache:     clients.Mgmt.Cluster().Cache(),
 		hostGetter:        fleetHostGetter{},
 		secretsController: clients.Core.Secret(),
+		nodesController:   clients.Core.Node(),
 		fleetClusters:     clients.Fleet.Cluster(),
 		apply:             clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 	}
@@ -96,6 +101,36 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	clients.Mgmt.Cluster().OnChange(ctx, "fleet-cluster-assign", h.assignWorkspace)
 	clients.Fleet.Cluster().OnChange(ctx, "fleet-local-agent-migration", h.ensureAgentMigrated)
+}
+
+// addCpTaintsToTolerations gets the list of control plane nodes and adds their taints to the given tolerations.
+func (h *handler) addCpTaintsToTolerations(tolerations []corev1.Toleration) ([]corev1.Toleration, error) {
+	cpList, err := h.nodesController.List(metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/control-plane=true"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list control plane nodes: %w", err)
+	}
+	if len(cpList.Items) == 0 {
+		cpList, err = h.nodesController.List(metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/controlplane=true"})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list control plane nodes: %w", err)
+		}
+	}
+	var allTaints []corev1.Taint
+	for _, cp := range cpList.Items {
+		toAdd, _ := taints.GetToDiffTaints(allTaints, cp.Spec.Taints)
+		for _, taint := range toAdd {
+			allTaints = append(allTaints, taint)
+		}
+	}
+	for _, taint := range allTaints {
+		tolerations = append(tolerations, corev1.Toleration{
+			Key:      taint.Key,
+			Operator: corev1.TolerationOpEqual,
+			Effect:   taint.Effect,
+			Value:    taint.Value,
+		})
+	}
+	return tolerations, nil
 }
 
 func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
@@ -173,6 +208,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	agentNamespace := ""
 	clientSecret := status.ClientSecretName
 
+	tolerations := mgmtcluster.GetFleetAgentTolerations(mgmtCluster)
 	objs := []runtime.Object{}
 	if mgmtCluster.Spec.Internal {
 		// When not running inside a cluster (which may happen in local dev setups), do not populate API server
@@ -196,6 +232,12 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 				},
 			},
 		})
+
+		// adds control plane tains to tolerations to local cluster
+		tolerations, err = h.addCpTaintsToTolerations(tolerations)
+		if err != nil {
+			return nil, status, err
+		}
 	}
 
 	agentAffinity, err := mgmtcluster.GetFleetAgentAffinity(mgmtCluster)
@@ -216,7 +258,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			AgentEnvVars:              mgmtCluster.Spec.AgentEnvVars,
 			AgentNamespace:            agentNamespace,
 			PrivateRepoURL:            h.getPrivateRepoURL(cluster, mgmtCluster),
-			AgentTolerations:          mgmtcluster.GetFleetAgentTolerations(mgmtCluster),
+			AgentTolerations:          tolerations,
 			AgentAffinity:             agentAffinity,
 			AgentResources:            mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
 		},
