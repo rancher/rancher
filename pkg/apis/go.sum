@@ -88,8 +88,8 @@ github.com/rancher/eks-operator v1.10.3-rc.1 h1:nIKJRIA9tlNzipAA//W3PYkmKlQGPIS8
 github.com/rancher/eks-operator v1.10.3-rc.1/go.mod h1:Ag/r+iyBSMIOB6mGiVCpoPMc6ovygAfXAfbDQ/xlp/c=
 github.com/rancher/fleet/pkg/apis v0.11.3 h1:/7XKf66hr+CgBrfPFtg97V4dVhOoQSxAxZJqND469Fw=
 github.com/rancher/fleet/pkg/apis v0.11.3/go.mod h1:kWdjnTs14K8pinSAFb3votOgoEUHhAZ0onLIw9Tv404=
-github.com/rancher/gke-operator v1.10.2 h1:EFIQSJb2sUKSiPbumqddHKMbnvZQBUVBb/s2E5TBGi4=
-github.com/rancher/gke-operator v1.10.2/go.mod h1:FzzxEcHzyModIFLqz7gRUL4PrjLV4EuHRbvdW6HlH4s=
+github.com/rancher/gke-operator v1.10.3-rc.1 h1:IlrnX4PltKXfB+q34dlEMYqcb+O8bkaQbiDUzjEOxEE=
+github.com/rancher/gke-operator v1.10.3-rc.1/go.mod h1:aUS7f8+srk+qGuKxPYutiPKTvkFKQ4d8bq0ORRE/gbs=
 github.com/rancher/lasso v0.2.0 h1:0YaprDYRZNMQoG9/308ZI+oxvof2JUjo9rYT2It38L8=
 github.com/rancher/lasso v0.2.0/go.mod h1:stR7zYyew1IOnKYV5vFx1kXX5/pUoKeo5K5c78qAdV8=
 github.com/rancher/norman v0.4.1 h1:RGHaPiSFZZmvBIK9SKZAeTeyXHcVG8fQ/W0UID7WhAE=
@@ -131,8 +131,8 @@ golang.org/x/net v0.0.0-20200226121028-0de0cce0169b/go.mod h1:z5CRVTTTmAJ677TzLL
 golang.org/x/net v0.0.0-20201021035429-f5854403a974/go.mod h1:sp8m0HH+o8qH0wwXwYZr8TS3Oi6o0r6Gce1SSxlDquU=
 golang.org/x/net v0.35.0 h1:T5GQRQb2y08kTAByq9L4/bz8cipCdA8FbRTXewonqY8=
 golang.org/x/net v0.35.0/go.mod h1:EglIi67kWsHKlRzzVMUD93VMSWGFOMSZgxFjparz1Qk=
-golang.org/x/oauth2 v0.25.0 h1:CY4y7XT9v0cRI9oupztF8AgiIu99L/ksR/Xp/6jrZ70=
-golang.org/x/oauth2 v0.25.0/go.mod h1:XYTD2NtWslqkgxebSiOHnXEap4TF09sJSc7H1sXbhtI=
+golang.org/x/oauth2 v0.26.0 h1:afQXWNNaeC4nvZ0Ed9XvCCzXM6UHJG7iCg0W4fPqSBE=
+golang.org/x/oauth2 v0.26.0/go.mod h1:XYTD2NtWslqkgxebSiOHnXEap4TF09sJSc7H1sXbhtI=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
