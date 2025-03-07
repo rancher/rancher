@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -147,37 +148,23 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		}),
 	}
 
-	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
 	var ln net.Listener
+	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
+	var err error
 
 	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
-		sniProvider, err := NewSNIProviderForCname(
-			"imperative-api-sni-provider",
-			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
-			wranglerContext.Core.Secret(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
-		}
-
+		sniProvider := NewStore("imperative-api-sni-provider", []string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)})
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
-
-		go func() {
-			if err := sniProvider.Run(ctx.Done()); err != nil {
-				logrus.Errorf("sni provider failed: %s", err)
-			}
-		}()
-
-		// Only need to listen on localhost because that port will be reached
-		// from a remotedialer tunnel on localhost
-		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
-		}
-
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
+
+		store := kubernetes.New(ctx, coreGetterFactory(wranglerContext), Namespace, CertName, sniProvider)
+
+		ln, err = getListener(wranglerContext, store)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get listener: %w", err)
+		}
 
 		if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
