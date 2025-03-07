@@ -387,6 +387,7 @@ func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 
 // GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
 func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
+	nodeName = strings.ToLower(nodeName)
 	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterNameLabel, cluster.Name))
 	if err != nil {
 		return false, nil, err
