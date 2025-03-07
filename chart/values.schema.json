@@ -30,9 +30,55 @@
       "type": "string",
       "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.pullPolicy` instead.",
       "deprecated": true
+    },
+    "service": {
+      "type": "object",
+      "description": "The default rancher service configuration",
+      "properties": {
+        "type": {
+          "type": ["string", "null"],
+          "enum": ["ClusterIP", "LoadBalancer", "NodePort", "", null]
+        },
+        "disableHTTP": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "description": "The default rancher ingress configuration",
+      "properties": {
+        "servicePort": {
+          "type": "number",
+          "enum": [443, 80]
+        }
+      }
     }
   },
   "required": [],
   "title": "Rancher Chart Values",
-  "type": "object"
+  "type": "object",
+  "if": {
+    "properties": {
+      "service": {
+        "properties": {
+          "disableHTTP": {
+            "const": true
+          }
+        }
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "ingress": {
+        "properties": {
+          "servicePort": {
+            "const": 443,
+            "errorMessage": "ingress.servicePort must be 443 when service.disableHTTP is true."
+          }
+        }
+      }
+    }
+  }
 }
