@@ -12,6 +12,7 @@ import (
 
 const (
 	PriorityClassName        = "cattle-cluster-agent-priority-class"
+	PriorityClassKind        = "priorityclass"
 	PodDisruptionBudgetName  = "cattle-cluster-agent-pod-disruption-budget"
 	PriorityClassDescription = "Rancher managed Priority Class for the cattle-cluster-agent"
 )
