@@ -116,6 +116,22 @@ func Drain(ctx context.Context, kubeConfig *clientcmdapi.Config, nodeName string
 	return output, fmt.Sprint(cmd.Stderr), err
 }
 
+func GetNonNamespacedResource(kubeConfig *clientcmdapi.Config, resourceKind, resourceName string) ([]byte, error) {
+	kubeConfigFile, err := writeKubeConfig(kubeConfig)
+	defer cleanup(kubeConfigFile)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("kubectl",
+		"--kubeconfig",
+		kubeConfigFile.Name(),
+		"get",
+		resourceKind,
+		resourceName,
+	)
+	return runWithHTTP2(cmd)
+}
+
 func cleanup(files ...*os.File) {
 	for _, file := range files {
 		if file == nil {
