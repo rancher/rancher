@@ -405,3 +405,34 @@ func TestFormatWindowsEnvVar(t *testing.T) {
 		})
 	}
 }
+
+func TestMachineStateSecretName(t *testing.T) {
+	tests := []struct {
+		name           string
+		machineName    string
+		expectedOutput string
+	}{
+		{
+			name:           "Simple machine name",
+			machineName:    "machine1",
+			expectedOutput: "machine1-machine-state",
+		},
+		{
+			name:           "Kind of long machine name",
+			machineName:    "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
+			expectedOutput: "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename-machine-state",
+		},
+		{
+			name:           "Extremely long machine name",
+			machineName:    "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
+			expectedOutput: "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename-c9508",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MachineStateSecretName(tt.machineName)
+			assert.Equal(t, tt.expectedOutput, result)
+		})
+	}
+}
