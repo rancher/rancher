@@ -91,10 +91,10 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
-		AuthProvider:  authToken.GetAuthProvider(),
+		AuthProvider:  authToken.AuthProvider,
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
-		UserPrincipal: authToken.GetUserPrincipal(),
+		UserPrincipal: authToken.UserPrincipal,
 	}
 
 	return k.userMgr.EnsureToken(input)

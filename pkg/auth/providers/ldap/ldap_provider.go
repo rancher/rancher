@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -108,11 +107,11 @@ func IsNotConfigured(err error) bool {
 	return errors.Is(err, ErrorNotConfigured{})
 }
 
-func (p *ldapProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *ldapProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }
 
-func (p *ldapProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *ldapProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }
 
@@ -166,7 +165,7 @@ func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) 
 }
 
 // searchKey can be user PrincipalID e.g. shibboleth_user://username with principalType of group for group search by user
-func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
+func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -190,11 +189,11 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
-				if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
+				if p.isThisUserMe(myToken.UserPrincipal, principal) {
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
-				if p.isMemberOf(myToken.GetGroupPrincipals(), principal) {
+				if p.isMemberOf(myToken.GroupPrincipals, principal) {
 					principal.MemberOf = true
 				}
 			}
@@ -204,7 +203,7 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 	return principals, nil
 }
 
-func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (p *ldapProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		if IsNotConfigured(err) {
@@ -229,10 +228,17 @@ func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAcce
 		return v3.Principal{}, err
 	}
 
-	if common.SamePrincipal(token.GetUserPrincipal(), *principal) {
+	if p.isThisUserMe(token.UserPrincipal, *principal) {
 		principal.Me = true
 	}
 	return *principal, err
+}
+
+func (p *ldapProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
+	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
+		return true
+	}
+	return false
 }
 
 func (p *ldapProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) bool {
@@ -416,7 +422,14 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 }
 
 func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
-	return common.GetCommonUserExtraAttributes(userPrincipal)
+	extras := make(map[string][]string)
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
 }
 
 // IsDisabledProvider checks if the LDAP auth provider is currently disabled in Rancher.

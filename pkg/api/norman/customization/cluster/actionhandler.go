@@ -148,10 +148,10 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
-		AuthProvider:  authToken.GetAuthProvider(),
+		AuthProvider:  authToken.AuthProvider,
 		TTL:           defaultTokenTTL,
 		Randomize:     true,
-		UserPrincipal: authToken.GetUserPrincipal(),
+		UserPrincipal: authToken.UserPrincipal,
 	}, nil
 }
 

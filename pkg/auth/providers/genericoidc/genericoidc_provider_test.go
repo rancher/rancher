@@ -4,12 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -108,7 +106,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 		}
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := g.GetPrincipal(test.principalID, &test.token)
+			got, err := g.GetPrincipal(test.principalID, test.token)
 			if (err != nil) != test.wantErr {
 				t.Errorf("GetPrincipal() error = %v, wantErr %v", err, test.wantErr)
 				return
@@ -116,82 +114,6 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 			if !reflect.DeepEqual(got, test.want) {
 				t.Errorf("GetPrincipal() got = %v, want %v", got, test.want)
 			}
-		})
-	}
-}
-
-func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
-	tests := []struct {
-		name        string
-		principalID string
-		token       ext.Token
-		want        v3.Principal
-		wantErr     bool
-	}{
-		// Note: ext tokens do not have `Me` information. current/other not distinguishable.
-		{
-			name:        "fetch principal",
-			principalID: "genericoidc_user://1234567",
-			token: ext.Token{
-				Spec: ext.TokenSpec{
-					UserPrincipal: ext.TokenPrincipal{
-						Name:          "genericoidc_user://1234567",
-						Provider:      Name,
-						DisplayName:   "Test User",
-						LoginName:     "1234567",
-						PrincipalType: "user",
-					},
-				},
-			},
-			want: v3.Principal{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "genericoidc_user://1234567",
-				},
-				DisplayName:   "Test User",
-				LoginName:     "1234567",
-				PrincipalType: "user",
-				Provider:      Name,
-				Me:            true,
-			},
-			wantErr: false,
-		},
-		{
-			name:        "fetch principal token is nil",
-			principalID: "genericoidc_user://9876543",
-			want: v3.Principal{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "genericoidc_user://9876543",
-				},
-				DisplayName:   "9876543",
-				LoginName:     "9876543",
-				PrincipalType: "user",
-				Me:            false,
-				Provider:      Name,
-			},
-			wantErr: false,
-		},
-		{
-			name:        "fetch principal called with empty principal",
-			principalID: "",
-			want:        v3.Principal{},
-			wantErr:     true,
-		},
-	}
-	for _, test := range tests {
-		test := test
-		g := &GenOIDCProvider{
-			oidc.OpenIDCProvider{
-				Name: Name,
-				Type: client.GenericOIDCConfigType,
-			},
-		}
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := g.GetPrincipal(test.principalID, &test.token)
-			assert.Equal(t, test.wantErr, err != nil)
-			assert.Equal(t, test.want, got)
 		})
 	}
 }
@@ -288,20 +210,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &v3.Token{})
-			if err != nil {
-				t.Errorf("SearchPrincipals() returned an error: %v", err)
-			}
-
-			if !reflect.DeepEqual(result, test.expected) {
-				t.Errorf("SearchPrincipals() returned %+v, expected %+v", result, test.expected)
-			}
-		})
-
-		// And same behaviour for ext tokens
-		t.Run(test.name+", ext", func(t *testing.T) {
-			t.Parallel()
-			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &ext.Token{})
+			result, err := g.SearchPrincipals(test.searchValue, test.principalType, v3.Token{})
 			if err != nil {
 				t.Errorf("SearchPrincipals() returned an error: %v", err)
 			}

@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util2 "github.com/rancher/rancher/pkg/auth/util"
@@ -34,8 +33,8 @@ const (
 )
 
 type tokensManager interface {
-	GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
-	IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool
+	GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error)
+	IsMemberOf(token v3.Token, group v3.Principal) bool
 	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
 	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
 }
@@ -68,11 +67,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	return provider
 }
 
-func (g *ghProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *ghProvider) LogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }
 
-func (g *ghProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *ghProvider) Logout(apiContext *types.APIContext, token *v3.Token) error {
 	return nil
 }
 
@@ -282,7 +281,7 @@ func (g *ghProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	return groupPrincipals, nil
 }
 
-func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -291,12 +290,12 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token acc
 		return principals, err
 	}
 
-	accessToken, err := g.tokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
+	accessToken, err := g.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
-		accessToken = token.GetProviderInfo()["access_token"]
+		accessToken = token.ProviderInfo["access_token"]
 	}
 
 	accts, err := g.githubClient.searchUsers(searchKey, principalType, accessToken, config)
@@ -309,7 +308,7 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token acc
 		if pType == "organization" {
 			pType = orgType
 		}
-		p := g.toPrincipal(pType, acct, token)
+		p := g.toPrincipal(pType, acct, &token)
 		principals = append(principals, p)
 	}
 
@@ -321,7 +320,7 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token acc
 		}
 
 		for _, acct := range teamAccts {
-			p := g.toPrincipal(teamType, acct, token)
+			p := g.toPrincipal(teamType, acct, &token)
 			principals = append(principals, p)
 		}
 	}
@@ -335,18 +334,18 @@ const (
 	orgType  = "org"
 )
 
-func (g *ghProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	config, err := g.getConfig()
 	if err != nil {
 		return v3.Principal{}, err
 	}
 
-	accessToken, err := g.tokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
+	accessToken, err := g.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return v3.Principal{}, err
 		}
-		accessToken = token.GetProviderInfo()["access_token"]
+		accessToken = token.ProviderInfo["access_token"]
 	}
 	// parsing id to get the external id and type. id looks like github_[user|org|team]://12345
 	var externalID string
@@ -377,11 +376,11 @@ func (g *ghProvider) GetPrincipal(principalID string, token accessor.TokenAccess
 		return v3.Principal{}, fmt.Errorf("cannot get the github account due to invalid externalIDType %v", principalType)
 	}
 
-	princ := g.toPrincipal(principalType, acct, token)
+	princ := g.toPrincipal(principalType, acct, &token)
 	return princ, nil
 }
 
-func (g *ghProvider) toPrincipal(principalType string, acct Account, token accessor.TokenAccessor) v3.Principal {
+func (g *ghProvider) toPrincipal(principalType string, acct Account, token *v3.Token) v3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Login
@@ -399,16 +398,22 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token acces
 	if principalType == userType {
 		princ.PrincipalType = "user"
 		if token != nil {
-			princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
+			princ.Me = g.isThisUserMe(token.UserPrincipal, princ)
 		}
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
-			princ.MemberOf = g.tokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = g.tokenMGR.IsMemberOf(*token, princ)
 		}
 	}
 
 	return princ
+}
+
+func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -425,7 +430,14 @@ func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPr
 }
 
 func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
-	return common.GetCommonUserExtraAttributes(userPrincipal)
+	extras := make(map[string][]string)
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
 }
 
 // IsDisabledProvider checks if the GitHub auth provider is currently disabled in Rancher.

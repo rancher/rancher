@@ -31,7 +31,6 @@ func init() {
 }
 
 type Interface interface {
-	Token() TokenController
 	UserActivity() UserActivityController
 }
 
@@ -43,10 +42,6 @@ func New(controllerFactory controller.SharedControllerFactory) Interface {
 
 type version struct {
 	controllerFactory controller.SharedControllerFactory
-}
-
-func (v *version) Token() TokenController {
-	return generic.NewController[*v1.Token, *v1.TokenList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Token"}, "tokens", true, v.controllerFactory)
 }
 
 func (v *version) UserActivity() UserActivityController {

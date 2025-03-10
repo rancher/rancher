@@ -3,7 +3,7 @@ package requests
 import (
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/auth/accessor"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
 func Chain(auths ...Authenticator) Authenticator {
@@ -28,7 +28,7 @@ func (c *chainedAuth) Authenticate(req *http.Request) (*AuthenticatorResponse, e
 	}, nil
 }
 
-func (c *chainedAuth) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
+func (c *chainedAuth) TokenFromRequest(req *http.Request) (*v3.Token, error) {
 	var lastErr error
 	for _, auth := range c.auths {
 		t, err := auth.TokenFromRequest(req)
