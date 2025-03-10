@@ -10,9 +10,11 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,10 +31,16 @@ func TestStoreCreate(t *testing.T) {
 	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
 	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 
+	secrets := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	users := wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+	users.EXPECT().Cache().Return(nil)
+	secrets.EXPECT().Cache().Return(nil)
+	store := exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+
 	uas := &Store{
-		tokens:     mockTokenControllerFake,
-		tokenCache: mockTokenCacheFake,
-		userCache:  mockUserCacheFake,
+		tokens:        mockTokenControllerFake,
+		userCache:     mockUserCacheFake,
+		extTokenStore: store,
 	}
 
 	type args struct {
@@ -273,10 +281,17 @@ func TestStoreGet(t *testing.T) {
 	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
 	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+
+	secrets := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	users := wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+	users.EXPECT().Cache().Return(nil)
+	secrets.EXPECT().Cache().Return(nil)
+	store := exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+
 	uas := &Store{
-		tokens:     mockTokenControllerFake,
-		tokenCache: mockTokenCacheFake,
-		userCache:  mockUserCacheFake,
+		tokens:        mockTokenControllerFake,
+		userCache:     mockUserCacheFake,
+		extTokenStore: store,
 	}
 	contextBG := context.Background()
 	type args struct {

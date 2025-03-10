@@ -115,6 +115,9 @@ type TokenStatus struct {
 	LastUpdateTime string `json:"lastUpdateTime"`
 	// LastUsedAt is the timestamp of the last time the token was used to authenticate.
 	LastUsedAt *metav1.Time `json:"lastUsedAt,omitempty"`
+	// LastActivitySeen is the timestamp of the last time user activity
+	// (mouse movement, interaction, ...) was reported for the token.
+	LastActivitySeen *metav1.Time `json:"lastActivitySeen,omitempty"`
 }
 
 // Implement the TokenAccessor interface
@@ -171,4 +174,12 @@ func (t *Token) GetProviderInfo() map[string]string {
 
 func (t *Token) GetLastUsedAt() *metav1.Time {
 	return t.Status.LastUsedAt
+}
+
+func (t *Token) GetLastActivitySeen() *metav1.Time {
+	return t.Status.LastActivitySeen
+}
+
+func (t *Token) GetCreationTime() metav1.Time {
+	return t.CreationTimestamp
 }
