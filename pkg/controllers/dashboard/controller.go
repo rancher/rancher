@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"context"
-
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
@@ -14,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/mcmagent"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/sccregistration"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
@@ -75,6 +75,10 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 		if err != nil {
 			return err
 		}
+	}
+
+	if features.RancherSCCRegistrationExtension.Enabled() {
+		sccregistration.Register(ctx, wrangler)
 	}
 
 	return nil
