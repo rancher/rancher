@@ -1,6 +1,8 @@
 package crds
 
-import "github.com/rancher/rancher/pkg/features"
+import (
+	"github.com/rancher/rancher/pkg/features"
+)
 
 // RequiredCRDs returns a list of CRD to install based on enabled features.
 func RequiredCRDs() []string {
@@ -29,6 +31,12 @@ func RequiredCRDs() []string {
 	if features.UIExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
+
+	if features.RancherSCCRegistrationExtension.Enabled() {
+		// TODO: init the SCC registration components
+		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
+	}
+
 	return requiredCRDS
 }
 
@@ -168,6 +176,11 @@ func UIPluginsCRD() []string {
 	return []string{
 		"uiplugins.catalog.cattle.io",
 	}
+}
+
+// SCCRegistrationCRDs returns a list of required CRD names needed for SCC Registration features
+func SCCRegistrationCRDs() []string {
+	return []string{}
 }
 
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
