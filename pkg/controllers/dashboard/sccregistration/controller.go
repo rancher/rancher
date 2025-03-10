@@ -9,6 +9,7 @@ import (
 func Register(
 	ctx context.Context,
 	wContext *wrangler.Context,
-) {
+) error {
 	logrus.Info("Enable SCC registration related stuffs..")
+	return nil
 }

@@ -78,7 +78,10 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 	}
 
 	if features.RancherSCCRegistrationExtension.Enabled() {
-		sccregistration.Register(ctx, wrangler)
+		err := sccregistration.Register(ctx, wrangler)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
