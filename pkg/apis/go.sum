@@ -87,8 +87,8 @@ github.com/prometheus/common v0.55.0 h1:KEi6DK7lXW/m7Ig5i47x0vRzuBsHuvJdi5ee6Y3G
 github.com/prometheus/common v0.55.0/go.mod h1:2SECS4xJG1kd8XF9IcM1gMX6510RAEL65zxzNImwdc8=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
-github.com/rancher/aks-operator v1.9.6 h1:/4bpP6TJhoQIL8Za5z4eoykqdvaPCg0HKzzbDljjvI8=
-github.com/rancher/aks-operator v1.9.6/go.mod h1:8ByGLiEachmkw+qxjphOqtPi9ia1t1PWktGtN2keRXM=
+github.com/rancher/aks-operator v1.9.7-rc.1 h1:GaBQxKS4s/ocQ/RuzRAmRZ9OovIhnoOjuFjgVCPL0P8=
+github.com/rancher/aks-operator v1.9.7-rc.1/go.mod h1:lQoPxeuERq4Ox9Yg3DrXTaxlpLVNgIoNmh0XPOjBbho=
 github.com/rancher/eks-operator v1.9.7-rc.1 h1:wEhUFCSnXWyoN39xbiNmGObOyv8gHxnXx0ibcbAUF04=
 github.com/rancher/eks-operator v1.9.7-rc.1/go.mod h1:yChSXPEi5JBFHNRcU7kFKTL0mIgmBvNQDFgHbKTvR0A=
 github.com/rancher/fleet/pkg/apis v0.10.8 h1:EE24ZFrSZBVACvPiaVmZUt3neV2+CPB8k/nx89ByCUk=
