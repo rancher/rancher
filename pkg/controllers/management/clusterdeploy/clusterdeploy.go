@@ -286,13 +286,18 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	return false
 }
 
+// managePodDisruptionBudget compares the apimgmtv3.Cluster status and spec to determine if the pod disruption budget
+// configuration has been removed. If the configuration has been removed, a kubeConfig will be generated and used to
+// delete the downstream object. The updated pod disruption budget will be recreated when applying the agent manifest in deployAgent.
+// This is required to ensure that unwanted pod disruption budgets are not left behind in downstream clusters, as simply omitting
+// the object from the agent manifest does not guarantee that the object will be removed.
 func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) error {
 	_, pdbDeleted := util.AgentSchedulingPodDisruptionBudgetChanged(cluster)
 	if !pdbDeleted {
 		return nil
 	}
 
-	logrus.Debugf("Removing Pod Disruption Budget for %s", cluster.Name)
+	logrus.Debugf("clusterDeploy: Removing Pod Disruption Budget for %s", cluster.Name)
 
 	pdbYaml, err := systemtemplate.PodDisruptionBudgetTemplate(cluster)
 	if err != nil {
@@ -322,13 +327,17 @@ func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) e
 	return nil
 }
 
+// managePriorityClass compares the apimgmtv3.Cluster status and spec to determine if the priority class configuration has changed.
+// If the priority class configuration has not been updated, the function will exit early and return false booleans and a nil error. If a change is detected,
+// a kubeConfig will be generated, the downstream priority class will be deleted and recreated, and a boolean indicating the type of update will be returned.
+// If the priority class is being created or deleted, the agent deployment manifest must update the priorityClassName field accordingly.
 func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, bool, bool, error) {
 	pcChanged, pcCreated, pcRemovedFromCluster := util.AgentSchedulingPriorityClassChanged(cluster)
 	if !pcChanged && !pcRemovedFromCluster && !pcCreated {
 		return pcChanged, pcCreated, pcRemovedFromCluster, nil
 	}
 
-	logrus.Debugf("Updating Priority Class for %s: pcChanged [%t], pcCreated [%t], pcRemoved [%t]", cluster.Name, pcChanged, pcCreated, pcRemovedFromCluster)
+	logrus.Debugf("clusterDeploy: Updating Priority Class for %s: pcChanged [%t], pcCreated [%t], pcRemoved [%t]", cluster.Name, pcChanged, pcCreated, pcRemovedFromCluster)
 
 	pcYaml, err := systemtemplate.PriorityClassTemplate(cluster)
 	if err != nil {
@@ -364,6 +373,47 @@ func (cd *clusterDeploy) managePriorityClass(cluster *apimgmtv3.Cluster) (bool, 
 	}
 
 	return pcChanged, pcCreated, pcRemovedFromCluster, nil
+}
+
+// ensurePriorityClass inspects the apimgmtv3.Cluster object to determine if a priority class should exist in the downstream cluster.
+// If the priority class has been configured on the cluster object, the provided kubeConfig will be used to query the object in the downstream cluster.
+// If the downstream object is missing, it will be recreated using the priority class configuration set on the apimgmtv3.Cluster object.
+// A boolean is returned to indicate if the priority class exists on the downstream cluster, as well as any errors encountered.
+func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeConfig *clientcmdapi.Config) (bool, error) {
+	pcEnabled, _ := util.AgentSchedulingCustomizationEnabled(cluster)
+	if !pcEnabled {
+		return false, nil
+	}
+
+	schedulingStatus := util.GetAgentSchedulingCustomizationStatus(cluster)
+	if schedulingStatus == nil || schedulingStatus.PriorityClass == nil {
+		return false, nil
+	}
+
+	logrus.Debugf("clusterDeploy: deployAgent: ensuring that downstream priority class exists for [%s]", cluster.Name)
+
+	out, err := kubectl.GetNonNamespacedResource(kubeConfig, util.PriorityClassKind, util.PriorityClassName)
+	if err == nil {
+		return true, nil
+	}
+
+	if strings.Contains(string(out), "Error from server (NotFound)") {
+		if rancherFeatures.ClusterAgentSchedulingCustomization.Enabled() {
+			logrus.Debugf("clusterDeploy: deployAgent: recreating downstream priority class for [%s]", cluster.Name)
+			pcYaml, err := systemtemplate.PriorityClassTemplate(cluster)
+			if err != nil {
+				return false, fmt.Errorf("clusterDeploy: could not create priority class yaml: %w", err)
+			}
+			_, err = kubectl.Apply(pcYaml, kubeConfig)
+			if err != nil {
+				return false, fmt.Errorf("clusterDeploy: failed to recreate priority class: %w", err)
+			}
+		}
+
+		return true, nil
+	}
+
+	return false, fmt.Errorf("clusterDeploy: error encountered querying downstream priority class: %w", err)
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
@@ -413,7 +463,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		logrus.Debugf("clusterDeploy: deployAgent: restarting rollout of cattle-cluster-agent deployment to apply updated priority class value")
 		output, err := kubectl.RestartRolloutWithNamespace("cattle-system", "deployment/cattle-cluster-agent", kubeConfig)
 		if err != nil {
-			logrus.Errorf("failed to rollout cattle-cluster-agent deployment: %s: %v", output, err)
+			logrus.Errorf("clusterDeploy: failed to rollout cattle-cluster-agent deployment: %s: %v", output, err)
 			return err
 		}
 		util.UpdateAppliedAgentDeploymentCustomization(cluster)
@@ -422,8 +472,19 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	logrus.Tracef("clusterDeploy: deployAgent: detected a change in desired cluster agent manifest")
 
+	// pcChanged and pcCreated indicate that 'managePriorityClass' function has recently recreated
+	// the downstream PC, so there is no need to check a second time.
+	pcExists := pcChanged || pcCreated
+	if !pcExists {
+		pcExists, err = cd.ensurePriorityClass(cluster, kubeConfig)
+		if err != nil {
+			logrus.Errorf("clusterDeploy: deployAgent: failed to ensure priority class exists for cluster [%s]: %v", cluster.Name, err)
+			return err
+		}
+	}
+
 	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, pcChanged || pcCreated)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, pcExists)
 		if err != nil {
 			return cluster, err
 		}
