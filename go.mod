@@ -134,7 +134,7 @@ require (
 	github.com/rancher/dynamiclistener v0.6.0
 	github.com/rancher/eks-operator v1.9.7-rc.1
 	github.com/rancher/fleet/pkg/apis v0.10.8
-	github.com/rancher/gke-operator v1.9.6
+	github.com/rancher/gke-operator v1.9.7-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.1
 	github.com/rancher/machine v0.15.0-rancher125
@@ -157,7 +157,7 @@ require (
 	golang.org/x/crypto v0.33.0
 	golang.org/x/mod v0.23.0
 	golang.org/x/net v0.35.0
-	golang.org/x/oauth2 v0.25.0
+	golang.org/x/oauth2 v0.26.0
 	golang.org/x/sync v0.11.0
 	golang.org/x/text v0.22.0
 	google.golang.org/api v0.196.0
