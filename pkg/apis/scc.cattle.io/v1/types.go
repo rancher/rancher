@@ -6,6 +6,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +genclient
+// +kubebuilder:skipversion
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 const (
 	RegistrationRequestConditionUnprocessed condition.Cond = "Unprocessed"
 	RegistrationRequestConditionReady       condition.Cond = "Ready"
