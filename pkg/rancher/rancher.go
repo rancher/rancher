@@ -253,6 +253,13 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil
 	})
 
+	if features.RancherSCCRegistrationExtension.Enabled() {
+		// TODO: init the SCC registration components
+	} else {
+		logrus.Debug("Rancher SCC Registration extension is not enabled.")
+		// TODO: consider other paths to take when not registered
+	}
+
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
 			auditFilter),
