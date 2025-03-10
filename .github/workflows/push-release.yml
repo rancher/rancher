@@ -1,11 +1,12 @@
 name: build-docker-images
-on: 
+on:
   push:
     branches:
       - "main"
       - "release/v*"
     tags:
       - "v*"
+      - "!v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
