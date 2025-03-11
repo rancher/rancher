@@ -180,7 +180,10 @@ func UIPluginsCRD() []string {
 
 // SCCRegistrationCRDs returns a list of required CRD names needed for SCC Registration features
 func SCCRegistrationCRDs() []string {
-	return []string{}
+	return []string{
+		"registrationrequest.scc.cattle.io",
+		"registration.scc.cattle.io",
+	}
 }
 
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
