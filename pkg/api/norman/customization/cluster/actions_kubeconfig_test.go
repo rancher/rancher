@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	v3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
@@ -261,7 +260,7 @@ type fakeAuthenticator struct {
 	err   error
 }
 
-func (f *fakeAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
+func (f *fakeAuthenticator) TokenFromRequest(req *http.Request) (*apimgmtv3.Token, error) {
 	if f.err != nil {
 		return nil, f.err
 	}

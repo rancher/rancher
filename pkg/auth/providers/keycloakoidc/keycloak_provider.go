@@ -9,7 +9,6 @@ import (
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -51,7 +50,7 @@ func (k *keyCloakOIDCProvider) GetName() string {
 	return Name
 }
 
-func (k *keyCloakOIDCProvider) newClient(config *v32.OIDCConfig, token accessor.TokenAccessor) (*KeyCloakClient, error) {
+func (k *keyCloakOIDCProvider) newClient(config *v32.OIDCConfig, token v3.Token) (*KeyCloakClient, error) {
 	// creating context for new client and for refreshing oauth token if needed
 	ctx, err := oidc.AddCertKeyToContext(context.Background(), config.Certificate, config.PrivateKey)
 	if err != nil {
@@ -74,7 +73,7 @@ func (k *keyCloakOIDCProvider) newClient(config *v32.OIDCConfig, token accessor.
 	return keyCloakClient, err
 }
 
-func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
@@ -93,13 +92,13 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 		return principals, err
 	}
 	for _, acct := range accts {
-		p := k.toPrincipal(acct.Type, acct, token)
+		p := k.toPrincipal(acct.Type, acct, &token)
 		principals = append(principals, p)
 	}
 	return principals, nil
 }
 
-func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, token accessor.TokenAccessor) v3.Principal {
+func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, token *v3.Token) v3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Username
@@ -115,19 +114,19 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
-			princ.Me = k.IsThisUserMe(token.GetUserPrincipal(), princ)
+			princ.Me = k.IsThisUserMe(token.UserPrincipal, princ)
 		}
 	} else {
 		princ.PrincipalType = GroupType
 		princ.ObjectMeta = metav1.ObjectMeta{Name: k.GetName() + "_" + principalType + "://" + acct.Name}
 		if token != nil {
-			princ.MemberOf = k.TokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = k.TokenMGR.IsMemberOf(*token, princ)
 		}
 	}
 	return princ
 }
 
-func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	config, err := k.GetOIDCConfig()
 	if err != nil {
 		return v3.Principal{}, err
@@ -152,13 +151,13 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.T
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	princ := k.toPrincipal(principalType, acct, token)
+	princ := k.toPrincipal(principalType, acct, &token)
 	return princ, err
 }
 
-func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oauthConfig oauth2.Config, token accessor.TokenAccessor) (*oauth2.Token, error) {
+func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oauthConfig oauth2.Config, token v3.Token) (*oauth2.Token, error) {
 	var oauthToken *oauth2.Token
-	storedOauthToken, err := k.TokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
+	storedOauthToken, err := k.TokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
 	if err := json.Unmarshal([]byte(storedOauthToken), &oauthToken); err != nil {
 		return oauthToken, err
 	}
@@ -166,7 +165,7 @@ func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oau
 		if !apierrors.IsNotFound(err) {
 			return oauthToken, err
 		}
-		oauthToken.AccessToken = token.GetProviderInfo()["access_token"]
+		oauthToken.AccessToken = token.ProviderInfo["access_token"]
 	}
 	// Valid will return false if access token is expired
 	if !oauthToken.Valid() {
@@ -180,7 +179,7 @@ func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oau
 	}
 
 	if !reflect.DeepEqual(oauthToken, reusedToken) {
-		k.UpdateToken(reusedToken, token.GetUserID())
+		k.UpdateToken(reusedToken, token.UserID)
 	}
 	return reusedToken, nil
 }

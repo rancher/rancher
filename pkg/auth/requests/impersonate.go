@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/rancher/rancher/pkg/auth/util"
-	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -21,14 +21,14 @@ import (
 )
 
 type ImpersonatingAuth struct {
-	extTokenStore *exttokenstore.SystemStore
-	sar           sar.SubjectAccessReview
+	sar        sar.SubjectAccessReview
+	tokenCache v3.TokenCache
 }
 
 func NewImpersonatingAuth(wranglerContext *wrangler.Context, sar sar.SubjectAccessReview) *ImpersonatingAuth {
 	return &ImpersonatingAuth{
-		extTokenStore: exttokenstore.NewSystemFromWrangler(wranglerContext),
-		sar:           sar,
+		tokenCache: wranglerContext.Mgmt.Token().Cache(),
+		sar:        sar,
 	}
 }
 
@@ -107,14 +107,13 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 					switch requestTokenID := reqExtras[common.ExtraRequestTokenID]; len(requestTokenID) {
 					case 0: // Nothing to do.
 					case 1:
-						token, err := i.extTokenStore.Fetch(requestTokenID[0])
+						token, err := i.tokenCache.Get(requestTokenID[0])
 						if err != nil {
 							util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error getting request token: %w", err))
 							return
 						}
-						if token.GetUserID() != reqUser {
-							util.WriteError(rw, http.StatusForbidden,
-								fmt.Errorf("request token user does not match impersonation user"))
+						if token.UserID != reqUser {
+							util.WriteError(rw, http.StatusForbidden, fmt.Errorf("request token user does not match impersonation user"))
 							return
 						}
 					default:

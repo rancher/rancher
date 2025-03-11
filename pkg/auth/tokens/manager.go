@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -24,9 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
-
 	"github.com/sirupsen/logrus"
-
 	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,11 +99,11 @@ type Manager struct {
 type (
 	// LogoutAllFunc is the signature of the callback function to invoke when
 	// processing the norman action `logoutAll`.
-	LogoutAllFunc func(apiContext *types.APIContext, token accessor.TokenAccessor) error
+	LogoutAllFunc func(apiContext *types.APIContext, token *v3.Token) error
 
 	// LogoutFunc is the signature of the callback function to invoke when
 	// processing the norman action `logout`.
-	LogoutFunc func(apiContext *types.APIContext, token accessor.TokenAccessor) error
+	LogoutFunc func(apiContext *types.APIContext, token *v3.Token) error
 
 	// Note: We use callback functions to link the token manager to the SAML
 	// providers at runtime because a static function call set at compile time
@@ -531,7 +528,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 	return m.UpdateSecret(userID, provider, secret)
 }
 
-func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
+func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error) {
 	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
@@ -542,7 +539,7 @@ func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []acc
 	}
 
 	for _, token := range fallbackTokens {
-		secret := token.GetProviderInfo()["access_token"]
+		secret := token.ProviderInfo["access_token"]
 		if secret != "" {
 			return secret, nil
 		}
@@ -719,20 +716,19 @@ func (m *Manager) UpdateToken(token *v3.Token) (*v3.Token, error) {
 	return m.updateToken(token)
 }
 
-func (m *Manager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []v3.Principal {
+func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal {
 	var groups []v3.Principal
 
-	attribs, err := m.userAttributeLister.Get("", token.GetUserID())
+	attribs, err := m.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.GetUserID(), err)
+		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.UserID, err)
 		// if err is not nil, then attribs will be. So, below code will handle it
 	}
 
 	hitProvider := false
 	if attribs != nil {
-		tokenProvider := token.GetAuthProvider()
 		for provider, y := range attribs.GroupPrincipals {
-			if provider == tokenProvider {
+			if provider == token.AuthProvider {
 				hitProvider = true
 				groups = append(groups, y.Items...)
 			}
@@ -741,17 +737,17 @@ func (m *Manager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []
 
 	// fallback to legacy token groupPrincipals
 	if !hitProvider {
-		groups = append(groups, token.GetGroupPrincipals()...)
+		groups = append(groups, token.GroupPrincipals...)
 	}
 
 	return groups
 }
 
-func (m *Manager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
-	attribs, err := m.userAttributeLister.Get("", token.GetUserID())
+func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
+	attribs, err := m.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v",
-			token.GetUserID(), group.Name, group.DisplayName, err)
+		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v", token.UserID,
+			group.Name, group.DisplayName, err)
 		// if err not nil, then attribs will be nil. So, below code will handle it
 	}
 
@@ -767,8 +763,8 @@ func (m *Manager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) b
 	}
 
 	// fallback to legacy token groupPrincipals
-	if _, ok := hitProviders[token.GetAuthProvider()]; !ok {
-		for _, principal := range token.GetGroupPrincipals() {
+	if _, ok := hitProviders[token.AuthProvider]; !ok {
+		for _, principal := range token.GroupPrincipals {
 			groups[principal.Name] = true
 		}
 	}
