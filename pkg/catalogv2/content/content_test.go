@@ -123,8 +123,8 @@ func TestFilterReleasesSemver(t *testing.T) {
 		},
 		{
 			"rancher version out of range comparison with `~` style comparison",
-			"~2.5.040", //equivalent to >= 2.5.0, < 2.6.0
-			"v2.5.039",
+			"~2.5.40", //equivalent to >= 2.5.0, < 2.6.0
+			"v2.5.39",
 			false,
 		},
 		{
