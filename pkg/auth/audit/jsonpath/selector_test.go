@@ -81,7 +81,6 @@ func TestSelectChild(t *testing.T) {
 			Expected: true,
 			Consumed: 1,
 		},
-
 		{
 			Name: "Simple Index Range Selector No Match [0]",
 			Selector: selectChild{
@@ -230,7 +229,6 @@ func TestSelectChild(t *testing.T) {
 			Expected: true,
 			Consumed: 2,
 		},
-
 		{
 			Name: "Wildcard Identifier Match Child",
 			Selector: selectChild{
@@ -261,6 +259,40 @@ func TestSelectChild(t *testing.T) {
 			Expected: true,
 			Consumed: 2,
 		},
+		{
+			Name: "Union Selector No Match",
+			Selector: selectChild{
+				union: []string{"grandchild", "greatgrandchild"},
+			},
+			Path: PathBuilder{}.WithChildNode("parent").WithChildNode("child").Build(),
+		},
+		{
+			Name: "Union Selector Has Match",
+			Selector: selectChild{
+				union: []string{"child", "parent"},
+			},
+			Path:     PathBuilder{}.WithChildNode("parent").Build(),
+			Expected: true,
+			Consumed: 1,
+		},
+		{
+			Name: "Index Union No Match",
+			Selector: selectChild{
+				r: &indexRange{
+					union: []int{2, 4},
+				},
+			},
+			Path: PathBuilder{}.WithChildNode("child").WithIndexNode(1, make([]string, 10)).Build(),
+		},
+		{
+			Name: "Index Union Has Match",
+			Selector: selectChild{
+				r: &indexRange{
+					union: []int{2, 4},
+				},
+			},
+			Path: PathBuilder{}.WithChildNode("child").WithIndexNode(2, make([]string, 10)).Build(),
+		},
 	}
 
 	for _, c := range cases {
@@ -286,7 +318,7 @@ func TestRecursiveDescent(t *testing.T) {
 			Name: "No Select Empty Path",
 			Selector: selectRecursiveDescent{
 				inner: selectChild{
-					identifier: "noi-exist",
+					identifier: "no-exist",
 				},
 			},
 			Path: PathBuilder{}.WithRootNode().WithChildNode("parent").WithChildNode("child").WithChildNode("grandchild").WithChildNode("greatgrandchild").Build(),
