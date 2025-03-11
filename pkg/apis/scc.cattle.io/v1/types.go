@@ -6,10 +6,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient
-// +kubebuilder:skipversion
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 const (
 	RegistrationRequestConditionUnprocessed condition.Cond = "Unprocessed"
 	RegistrationRequestConditionReady       condition.Cond = "Ready"
@@ -21,6 +17,10 @@ const (
 	RegistrationConditionTimeout            condition.Cond = "Timeout"
 	RegistrationConditionFailed             condition.Cond = "Failed"
 )
+
+// +genclient
+// +kubebuilder:skipversion
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type RegistrationRequest struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -39,6 +39,10 @@ type RegistrationRequestStatus struct {
 	Conditions         []genericcondition.GenericCondition `json:"conditions,omitempty"`
 	RequestProcessedTS string                              `json:"requestProcessedTS"`
 }
+
+// +genclient
+// +kubebuilder:skipversion
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Registration struct {
 	metav1.TypeMeta   `json:",inline"`
