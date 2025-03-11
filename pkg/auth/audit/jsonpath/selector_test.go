@@ -156,11 +156,25 @@ func TestSelectChild(t *testing.T) {
 			Consumed: 2,
 		},
 		{
-			Name: "Index Range Selector Start [:-1]",
+			Name: "Index Range Selector [-2]",
 			Selector: selectChild{
+				identifier: "child",
+				r: &indexRange{
+					start: ptr.To(-2),
+				},
+			},
+			Path:     PathBuilder{}.WithChildNode("child").WithIndexNode(8, make([]string, 10)).Build(),
+			Expected: true,
+			Consumed: 2,
+		},
+		{
+			Name: "Index Range Selector [:-1]",
+			Selector: selectChild{
+				identifier: "child",
 				r: &indexRange{
 					start: ptr.To(0),
 					end:   ptr.To(-1),
+					step:  ptr.To(1),
 				},
 			},
 			Path:     PathBuilder{}.WithChildNode("child").WithIndexNode(9, make([]string, 10)).Build(),
@@ -168,19 +182,23 @@ func TestSelectChild(t *testing.T) {
 			Consumed: 2,
 		},
 		{
-			Name: "Index Range Selector Start [:-1]",
+			Name: "Index Range Selector 7 Matches [-3:-1]",
 			Selector: selectChild{
+				identifier: "child",
 				r: &indexRange{
-					end: ptr.To(-1),
+					start: ptr.To(-3),
+					end:   ptr.To(-1),
+					step:  ptr.To(1),
 				},
 			},
-			Path:     PathBuilder{}.WithChildNode("child").WithIndexNode(9, make([]string, 10)).Build(),
+			Path:     PathBuilder{}.WithChildNode("child").WithIndexNode(7, make([]string, 10)).Build(),
 			Expected: true,
 			Consumed: 2,
 		},
 		{
 			Name: "Index Range Selector Start With Step [:-1:2]",
 			Selector: selectChild{
+				identifier: "child",
 				r: &indexRange{
 					start: ptr.To(0),
 					end:   ptr.To(-1),
