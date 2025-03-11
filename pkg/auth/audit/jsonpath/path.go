@@ -54,6 +54,7 @@ func (b PathBuilder) WithIndexNode(index uint, value any) PathBuilder {
 			slices.Clone(b.inner),
 			node{
 				index: ptr.To(int(index)),
+				value: value,
 			},
 		),
 	}

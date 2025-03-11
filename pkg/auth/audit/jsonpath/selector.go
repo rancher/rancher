@@ -34,6 +34,7 @@ func (s selectRootElement) Select(p Path) (int, bool) {
 	return 1, true
 }
 
+// todo: rename this to subscript
 type indexRange struct {
 	start *int
 	end   *int
@@ -78,7 +79,18 @@ func (c selectChild) matchNodeIndexRange(n node) bool {
 		return slices.Contains(c.r.union, *n.index)
 
 	case c.r.start != nil && c.r.end == nil:
-		return *n.index == *c.r.start
+		start := *c.r.start
+
+		if start < 0 {
+			if reflect.ValueOf(n.value).Kind() != reflect.Slice {
+				return false
+			}
+
+			sliceLen := reflect.ValueOf(n.value).Len()
+			start = sliceLen - -start%sliceLen
+		}
+
+		return *n.index == start
 
 	case c.r.start != nil && c.r.end != nil && c.r.step != nil:
 		if reflect.ValueOf(n.value).Kind() != reflect.Slice {
@@ -96,7 +108,7 @@ func (c selectChild) matchNodeIndexRange(n node) bool {
 		}
 
 		if end < 0 {
-			end = sliceLen - -end%sliceLen
+			end = sliceLen - -end%sliceLen + 1
 		}
 
 		if end > sliceLen || *n.index < start || *n.index >= end {
