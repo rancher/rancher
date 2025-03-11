@@ -3,6 +3,7 @@ package capr
 import (
 	corev1 "k8s.io/api/core/v1"
 	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -406,33 +407,42 @@ func TestFormatWindowsEnvVar(t *testing.T) {
 	}
 }
 
-func TestMachineStateSecretName(t *testing.T) {
+func TestPlannerSecretNameGenerators(t *testing.T) {
+	generators := []func(string) string{
+		PlanSecretFromBootstrapName,
+		RKEStateSecretName,
+		MachineStateSecretName,
+	}
+
+	matcher := regexp.MustCompile("(machine-state|rke-state|machine-plan)$")
+
 	tests := []struct {
-		name           string
-		machineName    string
-		expectedOutput string
+		name              string
+		machineName       string
+		correctlyAppended bool
 	}{
 		{
-			name:           "Simple machine name",
-			machineName:    "machine1",
-			expectedOutput: "machine1-machine-state",
+			name:              "Simple machine name",
+			machineName:       "machine1",
+			correctlyAppended: true,
 		},
 		{
-			name:           "Kind of long machine name",
-			machineName:    "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
-			expectedOutput: "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename-machine-state",
+			name:              "Kind of long machine name",
+			machineName:       "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
+			correctlyAppended: true,
 		},
 		{
-			name:           "Extremely long machine name",
-			machineName:    "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
-			expectedOutput: "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename-c9508",
+			name:              "Extremely long machine name",
+			machineName:       "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
+			correctlyAppended: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := MachineStateSecretName(tt.machineName)
-			assert.Equal(t, tt.expectedOutput, result)
+			for _, f := range generators {
+				assert.Equal(t, matcher.MatchString(f(tt.machineName)), tt.correctlyAppended)
+			}
 		})
 	}
 }

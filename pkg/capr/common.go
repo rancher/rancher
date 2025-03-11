@@ -342,8 +342,26 @@ func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretControl
 	return secret, true, nil
 }
 
-func PlanSecretFromBootstrapName(bootstrapName string) string {
-	return name.SafeConcatName(bootstrapName, "machine", "plan")
+func PlanSecretFromBootstrapName(clusterName string) string {
+	// considered not limiting this to 253 and creating an error at runtime - if this warning is showing up hopefully it'll get noticed.
+	fullName := strings.Join([]string{clusterName, "machine", "plan"}, "-")
+	if len(fullName) > 253 {
+		logrus.Warnf("[%s] machine-plan secret too long for backup-restore-operator", clusterName)
+		return name.Limit(fullName, 253)
+	}
+
+	return fullName
+}
+
+func RKEStateSecretName(clusterName string) string {
+	// considered not limiting this to 253 and creating an error at runtime - if this warning is showing up hopefully it'll get noticed.
+	fullName := strings.Join([]string{clusterName, "rke", "state"}, "-")
+	if len(fullName) > 253 {
+		logrus.Warnf("[%s] rke-state secret too long for backup-restore-operator", clusterName)
+		return name.Limit(fullName, 253)
+	}
+
+	return fullName
 }
 
 func DoRemoveAndUpdateStatus(obj metav1.Object, doRemove func() (string, error), enqueueAfter func(string, string, time.Duration)) error {
