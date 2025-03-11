@@ -6,6 +6,8 @@ package wrangler
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
+	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"net"
 	"net/http"
 	"sync"
@@ -135,6 +137,7 @@ type Context struct {
 	CRD                 crdv1.Interface
 	K8s                 *kubernetes.Clientset
 	Plan                plancontrolers.Interface
+	SCC                 sccv1.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -164,6 +167,7 @@ type Context struct {
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
+	sccReg       *scc.Factory
 
 	started bool
 }
@@ -365,6 +369,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
+	scc, err := scc.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	k8s, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
@@ -456,6 +465,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
 		Plan:                    plan.Upgrade().V1(),
+		SCC:                     scc.Scc().V1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -472,6 +482,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rke:          rke,
 		rbac:         rbac,
 		plan:         plan,
+		sccReg:       scc,
 	}
 
 	return wContext, nil
