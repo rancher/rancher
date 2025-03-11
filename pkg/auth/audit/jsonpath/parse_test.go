@@ -8,7 +8,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestParseDotNotation(t *testing.T) {
+func TestParse(t *testing.T) {
 	type testcase struct {
 		Name     string
 		Input    string
@@ -192,6 +192,60 @@ func TestParseDotNotation(t *testing.T) {
 			},
 		},
 		{
+			Name:  "With Simple Identifier Union",
+			Input: "$.[a,b,c].child",
+			Expected: JSONPath{
+				selectors: []selector{
+					selectRootElement{},
+					selectChild{union: []string{"a", "b", "c"}},
+					selectChild{identifier: "child"},
+				},
+			},
+		},
+		{
+			Name:  "With Index Union",
+			Input: "$.parent[2,4].child",
+			Expected: JSONPath{
+				selectors: []selector{
+					selectRootElement{},
+					selectChild{identifier: "parent", r: &indexRange{union: []int{2, 4}}},
+					selectChild{identifier: "child"},
+				},
+			},
+		},
+		{
+			Name:  "With Union and Bracket Notation",
+			Input: "$.[a,b,c]['child']",
+			Expected: JSONPath{
+				selectors: []selector{
+					selectRootElement{},
+					selectChild{union: []string{"a", "b", "c"}},
+					selectChild{identifier: "child"},
+				},
+			},
+		},
+		{
+			Name:  "With Union and Range",
+			Input: "$.[a,b,c][0:10].child",
+			Expected: JSONPath{
+				selectors: []selector{
+					selectRootElement{},
+					selectChild{union: []string{"a", "b", "c"}, r: &indexRange{start: ptr.To(0), end: ptr.To(10)}},
+					selectChild{identifier: "child"},
+				},
+			},
+		},
+		{
+			Name:  "With Empty Identifier Union",
+			Input: "$.[].child",
+			Err:   fmt.Errorf("failed to parse child selector: expected at least one union option"),
+		},
+		{
+			Name:  "With Non Alphabetic Option",
+			Input: "$.[?,!].child",
+			Err:   fmt.Errorf("failed to parse child selector: only characters in range A-Za-z_- are allowed in union options but found '?'"),
+		},
+		{
 			Name:  "With Missing Dot",
 			Input: "$parent.child",
 			Err:   fmt.Errorf("unexpected character 'p'"),
@@ -209,22 +263,22 @@ func TestParseDotNotation(t *testing.T) {
 		{
 			Name:  "With Unescapped Open Bracket",
 			Input: "$.with[bracket.child",
-			Err:   fmt.Errorf("failed to parse child selector: failed to parse index range: failed to parse range start: failed to parse integer: strconv.Atoi: parsing \"bracket.chil\": invalid syntax"),
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: failed to parse range start: failed to parse integer: strconv.Atoi: parsing \"bracket.chil\": invalid syntax"),
 		},
 		{
 			Name:  "With Invalid Index",
 			Input: "$.parent[a].child",
-			Err:   fmt.Errorf("failed to parse child selector: failed to parse index range: failed to parse range start: failed to parse integer: strconv.Atoi: parsing \"a\": invalid syntax"),
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: failed to parse range start: failed to parse integer: strconv.Atoi: parsing \"a\": invalid syntax"),
 		},
 		{
 			Name:  "With Invalid Index Range End",
 			Input: "$.parent[:a].child",
-			Err:   fmt.Errorf("failed to parse child selector: failed to parse index range: failed to parse range end: failed to parse integer: strconv.Atoi: parsing \"a\": invalid syntax"),
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: failed to parse index range: failed to parse range end: failed to parse integer: strconv.Atoi: parsing \"a\": invalid syntax"),
 		},
 		{
 			Name:  "With Invalid Index Range Step",
 			Input: "$.parent[::a].child",
-			Err:   fmt.Errorf("failed to parse child selector: failed to parse index range: failed to parse range step: failed to parse integer: strconv.Atoi: parsing \"a\": invalid syntax"),
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: failed to parse index range: failed to parse range step: failed to parse integer: strconv.Atoi: parsing \"a\": invalid syntax"),
 		},
 		{
 			Name:  "With Unfullfilled Backslash in Bracket",
@@ -256,6 +310,31 @@ func TestParseDotNotation(t *testing.T) {
 			Input: "$['parent'",
 			Err:   fmt.Errorf("failed to parse child selector: single quotes must be escapped in bracket notation"),
 		},
+		{
+			Name:  "With Missing End Bracket in Wildcard Index Range",
+			Input: "$.parent[*",
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: expected \"]\" but none"),
+		},
+		{
+			Name:  "With Missing End Bracket at JSONPath End",
+			Input: "$.parent[",
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: expected ']' but none"),
+		},
+		{
+			Name:  "With Extra Number in Index Range",
+			Input: "$.parent[0:10:3:4].child",
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: failed to parse index range: expected \"]\" but found :"),
+		},
+		{
+			Name:  "With No Int After Comma in Index Union",
+			Input: "$.parent[0,].child",
+			Err:   fmt.Errorf("failed to parse child selector: failed to parse subscript: failed to parse index union: index unions options may not be empty"),
+		},
+		{
+			Name:  "With No Chars after Comma in Union",
+			Input: "$.[a,,].child",
+			Err:   fmt.Errorf("failed to parse child selector: union options may not be empty"),
+		},
 	}
 
 	for _, c := range cases {
@@ -264,7 +343,7 @@ func TestParseDotNotation(t *testing.T) {
 			if c.Err == nil && err != nil {
 				t.Fatalf("unexpected error from Parse: %s", err)
 			} else if c.Err != nil && err == nil {
-				t.Fatalf("expected error '%s' from parse but foud <nil>", c.Err)
+				t.Fatalf("expected error '%s' from parse but found <nil>", c.Err)
 			} else if c.Err != nil && err != nil {
 				assert.Equal(t, c.Err, err)
 			}
