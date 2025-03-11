@@ -1,7 +1,9 @@
 package jsonpath
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 
 	"k8s.io/utils/ptr"
 )
@@ -19,6 +21,27 @@ type node struct {
 
 // path represents a real path to a field in a JSON object.
 type Path []node
+
+func (p Path) String() string {
+	if len(p) == 0 {
+		return rootNodeBody
+	}
+
+	var builder strings.Builder
+	for _, n := range p {
+		if n.identifier != nil {
+			if *n.identifier == rootNodeBody {
+				builder.WriteString(rootNodeBody)
+			} else {
+				builder.WriteString(fmt.Sprintf("['%s']", *n.identifier))
+			}
+		} else if n.index != nil {
+			builder.WriteString(fmt.Sprintf("[%d]", *n.index))
+		}
+	}
+
+	return builder.String()
+}
 
 type PathBuilder struct {
 	inner Path
