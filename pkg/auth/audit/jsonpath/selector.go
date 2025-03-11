@@ -1,6 +1,9 @@
 package jsonpath
 
-import "reflect"
+import (
+	"reflect"
+	"slices"
+)
 
 type selector interface {
 	// Select checks a path for Matching values and returns how many Path nodes were consumed finding a match. Some selectors like selectChild need more context to understand if a node matches, and therefore need the
@@ -36,16 +39,19 @@ type indexRange struct {
 	end   *int
 	step  *int
 
+	union []int
+
 	isWildcard bool
 }
 
-// todo: what happesn for $.*[*]
+// todo: we'll probably want to split this into separate selectors for each of identifier, wildcard, indexRange, and unions
 type selectChild struct {
 	identifier string
 
 	isWildcard bool
 
-	r *indexRange
+	r     *indexRange
+	union []string
 }
 
 func (c selectChild) matchNodeIdentifier(n node) bool {
@@ -67,6 +73,9 @@ func (c selectChild) matchNodeIndexRange(n node) bool {
 
 	case c.r.isWildcard:
 		return true
+
+	case len(c.r.union) > 0:
+		return slices.Contains(c.r.union, *n.index)
 
 	case c.r.start != nil && c.r.end == nil:
 		return *n.index == *c.r.start
@@ -106,6 +115,14 @@ func (c selectChild) Select(p Path) (int, bool) {
 	}
 
 	node := p[0]
+
+	if len(c.union) > 0 {
+		if slices.Contains(c.union, *node.identifier) {
+			return 1, true
+		}
+
+		return 0, false
+	}
 
 	if !c.matchNodeIdentifier(node) {
 		return 0, false
