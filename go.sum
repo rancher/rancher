@@ -2444,8 +2444,8 @@ github.com/rancher/eks-operator v1.11.0-rc.4 h1:kJHQNpVdtdDsmyNa5pcm6fPSjAcXWaYe
 github.com/rancher/eks-operator v1.11.0-rc.4/go.mod h1:7G0kfoUs7qKMVgBdmeL/Mci7moV7OnyPkeX2MIvEBV8=
 github.com/rancher/fleet/pkg/apis v0.12.0-alpha.2.0.20250307143218-68772e96751c h1:cx3LEri76psvAsAW6T4OYjN5WMr8cnTF877yu6c0p4k=
 github.com/rancher/fleet/pkg/apis v0.12.0-alpha.2.0.20250307143218-68772e96751c/go.mod h1:vX+tAHHSYpDJ2P9nwsolY7d6ujvtP0dJ+WqtIjxk61s=
-github.com/rancher/gke-operator v1.11.0-rc.2 h1:6uohg1FzkM1qQ+wDEIjWqt74qyvy1rAvpLkfaV7Zt5s=
-github.com/rancher/gke-operator v1.11.0-rc.2/go.mod h1:a6OTHbCb+J3TNqqOnXwQ7Ld3pYZ8MU9I5KQMotEjuvs=
+github.com/rancher/gke-operator v1.11.0-rc.4 h1:qAPcdvxF27jeejOye9ZT0xMv2+eMp0BoHGwiuiYG88M=
+github.com/rancher/gke-operator v1.11.0-rc.4/go.mod h1:a6OTHbCb+J3TNqqOnXwQ7Ld3pYZ8MU9I5KQMotEjuvs=
 github.com/rancher/helm/v3 v3.17.0-rancher1 h1:CAitia3a0jagclTn+QACzpoV8s5fU52xNmfDP77FMUA=
 github.com/rancher/helm/v3 v3.17.0-rancher1/go.mod h1:Mo7eGyKPPHlS0Ml67W8z/lbkox/gD9Xt1XpD6bxvZZA=
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
@@ -2497,8 +2497,9 @@ github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTE
 github.com/rogpeppe/go-internal v1.8.0/go.mod h1:WmiCO8CzOY8rg0OYDC4/i/2WRWAB6poM+XZ2dLUbcbE=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
-github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
+github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
+github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/rs/xid v1.2.1 h1:mhH9Nq+C1fY2l1XIpgxIiUOfNpRBYH1kKcr+qfKgjRc=
 github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
 github.com/rubenv/sql-migrate v1.7.1 h1:f/o0WgfO/GqNuVg+6801K/KW3WdDSupzSjDYODmiUq4=
