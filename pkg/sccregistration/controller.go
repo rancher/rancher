@@ -10,6 +10,14 @@ func Register(
 	ctx context.Context,
 	wContext *wrangler.Context,
 ) error {
-	logrus.Info("Enable SCC registration related stuffs..")
+	h := &handler{
+		ctx,
+	}
+	wContext.Catalog
+
 	return nil
+}
+
+type handler struct {
+	ctx context.Context
 }
