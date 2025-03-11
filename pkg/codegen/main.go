@@ -117,7 +117,8 @@ func main() {
 					// All structs with an embedded ObjectMeta field will be picked up
 					"./pkg/apis/scc.cattle.io/v1",
 				},
-				GenerateTypes: true,
+				GenerateTypes:   true,
+				GenerateClients: true,
 			},
 			// This package is not a CRD but types from the extension API server.
 			"ext.cattle.io": {
