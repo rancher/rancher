@@ -13,12 +13,12 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/mcmagent"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/sccregistration"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/sccregistration"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/needacert"
 )

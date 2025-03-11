@@ -3,7 +3,6 @@ package sccregistration
 import (
 	"context"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/sirupsen/logrus"
 )
 
 func Register(
@@ -13,7 +12,8 @@ func Register(
 	h := &handler{
 		ctx,
 	}
-	wContext.Catalog
+
+	wContext.Mgmt
 
 	return nil
 }
