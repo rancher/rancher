@@ -20,7 +20,6 @@ type Redactor interface {
 	Redact(*log) error
 }
 
-// todo: we can probably combine the regex slices into a single regex for better performance
 type policyRedactor struct {
 	headers []*regexp.Regexp
 	paths   []*jsonpath.JSONPath
