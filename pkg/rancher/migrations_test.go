@@ -14,24 +14,23 @@ import (
 
 func TestVersionTombstone(t *testing.T) {
 	tests := []struct {
-		name           string
-		currentVersion string
-		expectError    bool
-		expected       map[string]string
-		setup          func(*testing.T, *v1.ConfigMap, *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], *fake.MockCacheInterface[*v1.ConfigMap])
+		name        string
+		expectError bool
+		expected    map[string]string
+		setup       func(*v1.ConfigMap, *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], *fake.MockCacheInterface[*v1.ConfigMap])
 	}{
 		{
 			name:        "error config map",
 			expectError: true,
-			setup: func(_ *testing.T, _ *v1.ConfigMap, _ *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			setup: func(_ *v1.ConfigMap, _ *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(nil, errors.New("error getting config map"))
 			},
 		},
 		{
-			name:           "dev version",
-			currentVersion: "dev",
-			expectError:    false,
-			setup: func(t *testing.T, _ *v1.ConfigMap, _ *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			name:        "dev version",
+			expectError: false,
+			setup: func(_ *v1.ConfigMap, _ *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+				rancherversion.Version = "dev"
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(&v1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: cattleNamespace,
@@ -42,13 +41,13 @@ func TestVersionTombstone(t *testing.T) {
 			},
 		},
 		{
-			name:           "no last version",
-			currentVersion: "v2.11.0",
-			expectError:    false,
+			name:        "no last version",
+			expectError: false,
 			expected: map[string]string{
 				rancherVersionKey: "v2.11.0",
 			},
-			setup: func(t *testing.T, cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			setup: func(cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+				rancherversion.Version = "v2.11.0"
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(&v1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: cattleNamespace,
@@ -63,13 +62,13 @@ func TestVersionTombstone(t *testing.T) {
 			},
 		},
 		{
-			name:           "invalid version",
-			currentVersion: "not-a-version",
-			expectError:    false,
+			name:        "invalid version",
+			expectError: false,
 			expected: map[string]string{
 				rancherVersionKey: "not-a-version",
 			},
-			setup: func(t *testing.T, cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			setup: func(cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+				rancherversion.Version = "not-a-version"
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(&v1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: cattleNamespace,
@@ -84,13 +83,13 @@ func TestVersionTombstone(t *testing.T) {
 			},
 		},
 		{
-			name:           "prerelease version",
-			currentVersion: "v2.11.0-alpha1",
-			expectError:    false,
+			name:        "prerelease version",
+			expectError: false,
 			expected: map[string]string{
 				rancherVersionKey: "v2.11.0-alpha1",
 			},
-			setup: func(t *testing.T, cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			setup: func(cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+				rancherversion.Version = "v2.11.0-alpha1"
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(&v1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: cattleNamespace,
@@ -105,13 +104,13 @@ func TestVersionTombstone(t *testing.T) {
 			},
 		},
 		{
-			name:           "last version invalid",
-			currentVersion: "v2.11.0",
-			expectError:    false,
+			name:        "last version invalid",
+			expectError: false,
 			expected: map[string]string{
 				rancherVersionKey: "v2.11.0",
 			},
-			setup: func(t *testing.T, cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			setup: func(cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+				rancherversion.Version = "v2.11.0"
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(&v1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       cattleNamespace,
@@ -129,13 +128,13 @@ func TestVersionTombstone(t *testing.T) {
 			},
 		},
 		{
-			name:           "last version pre-release",
-			currentVersion: "v2.11.0",
-			expectError:    false,
+			name:        "last version pre-release",
+			expectError: false,
 			expected: map[string]string{
 				rancherVersionKey: "v2.11.0",
 			},
-			setup: func(t *testing.T, cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			setup: func(cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+				rancherversion.Version = "v2.11.0"
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(&v1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       cattleNamespace,
@@ -153,10 +152,10 @@ func TestVersionTombstone(t *testing.T) {
 			},
 		},
 		{
-			name:           "last version lesser",
-			currentVersion: "v2.10.0",
-			expectError:    true,
-			setup: func(t *testing.T, cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+			name:        "last version lesser",
+			expectError: true,
+			setup: func(cm *v1.ConfigMap, controller *fake.MockControllerInterface[*v1.ConfigMap, *v1.ConfigMapList], cache *fake.MockCacheInterface[*v1.ConfigMap]) {
+				rancherversion.Version = "v2.10.0"
 				cache.EXPECT().Get(cattleNamespace, rancherVersionTombstoneConfig).Return(&v1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       cattleNamespace,
@@ -184,11 +183,8 @@ func TestVersionTombstone(t *testing.T) {
 				return obj, nil
 			}).AnyTimes()
 
-			tt.setup(t, cm, configMapController, configMapCache)
-			if tt.currentVersion != "" {
-				rancherversion.Version = tt.currentVersion
-			}
-			err := versionTombstone(configMapController, tt.currentVersion)
+			tt.setup(cm, configMapController, configMapCache)
+			err := versionTombstone(configMapController)
 			if err == nil && tt.expectError {
 				t.Errorf("versionTombstone should return error")
 			} else if err != nil && !tt.expectError {
