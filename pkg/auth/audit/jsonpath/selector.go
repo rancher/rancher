@@ -34,8 +34,7 @@ func (s selectRootElement) Select(p Path) (int, bool) {
 	return 1, true
 }
 
-// todo: rename this to subscript
-type indexRange struct {
+type subscript struct {
 	start *int
 	end   *int
 	step  *int
@@ -45,14 +44,11 @@ type indexRange struct {
 	isWildcard bool
 }
 
-// todo: we'll probably want to split this into separate selectors for each of identifier, wildcard, indexRange, and unions
 type selectChild struct {
 	identifier string
-
 	isWildcard bool
-
-	r     *indexRange
-	union []string
+	subscript  *subscript
+	union      []string
 }
 
 func (c selectChild) matchNodeIdentifier(n node) bool {
@@ -72,14 +68,14 @@ func (c selectChild) matchNodeIndexRange(n node) bool {
 	case n.index == nil:
 		return false
 
-	case c.r.isWildcard:
+	case c.subscript.isWildcard:
 		return true
 
-	case len(c.r.union) > 0:
-		return slices.Contains(c.r.union, *n.index)
+	case len(c.subscript.union) > 0:
+		return slices.Contains(c.subscript.union, *n.index)
 
-	case c.r.start != nil && c.r.end == nil:
-		start := *c.r.start
+	case c.subscript.start != nil && c.subscript.end == nil:
+		start := *c.subscript.start
 
 		if start < 0 {
 			if reflect.ValueOf(n.value).Kind() != reflect.Slice {
@@ -92,16 +88,16 @@ func (c selectChild) matchNodeIndexRange(n node) bool {
 
 		return *n.index == start
 
-	case c.r.start != nil && c.r.end != nil && c.r.step != nil:
+	case c.subscript.start != nil && c.subscript.end != nil && c.subscript.step != nil:
 		if reflect.ValueOf(n.value).Kind() != reflect.Slice {
 			return false
 		}
 
 		sliceLen := reflect.ValueOf(n.value).Len()
 
-		start := *c.r.start
-		end := *c.r.end
-		step := *c.r.step
+		start := *c.subscript.start
+		end := *c.subscript.end
+		step := *c.subscript.step
 
 		if start < 0 {
 			start = sliceLen - -start%sliceLen
@@ -144,7 +140,7 @@ func (c selectChild) Select(p Path) (int, bool) {
 		return 0, false
 	}
 
-	if c.r == nil {
+	if c.subscript == nil {
 		return 1, true
 	}
 
