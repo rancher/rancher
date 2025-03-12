@@ -2,6 +2,7 @@ package useractivity
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -92,8 +93,86 @@ func TestStoreCreate(t *testing.T) {
 						AuthProvider:  "oidc",
 						UserPrincipal: v3.Principal{},
 					}, nil),
-
-					mockTokenControllerFake.EXPECT().Patch("token-12345", types.JSONPatchType, gomock.Any()).Return(&apiv3.Token{}, nil),
+					mockTokenControllerFake.EXPECT().
+						Patch("token-12345", types.JSONPatchType, gomock.Any()).
+						Return(&apiv3.Token{}, nil),
+				)
+			},
+			want: &ext.UserActivity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "token-12345",
+				},
+				Status: ext.UserActivityStatus{
+					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, &time.Location{})).Format(time.RFC3339),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid useractivity is created, ext token",
+			args: args{
+				ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
+					Name:   "admin",
+					Groups: []string{GroupCattleAuthenticated},
+					Extra: map[string][]string{
+						common.ExtraRequestTokenID: {"token-12345"},
+					},
+				}),
+				obj: &ext.UserActivity{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "token-12345",
+					},
+				},
+				validateFunc: nil,
+				options:      nil,
+			},
+			mockSetup: func() {
+				ePrincipal := ext.TokenPrincipal{
+					Name:        "world",
+					Provider:    "oidc",
+					DisplayName: "",
+					LoginName:   "hello",
+				}
+				ePrincipalBytes, _ := json.Marshal(ePrincipal)
+				eSecret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "token-12345",
+					},
+					Data: map[string][]byte{
+						exttokenstore.FieldAnnotations:    []byte("null"),
+						exttokenstore.FieldDescription:    []byte(""),
+						exttokenstore.FieldEnabled:        []byte("true"),
+						exttokenstore.FieldHash:           []byte("kla9jkdmj"),
+						exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+						exttokenstore.FieldLabels:         []byte("null"),
+						exttokenstore.FieldLastUpdateTime: []byte("13:00:05"),
+						exttokenstore.FieldPrincipal:      ePrincipalBytes,
+						exttokenstore.FieldTTL:            []byte("4000"),
+						exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+						exttokenstore.FieldUserID:         []byte("lkajdlksjlkds"),
+					},
+				}
+				gomock.InOrder(
+					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+					mockTokenCacheFake.EXPECT().Get("token-12345").
+						Return(nil, fmt.Errorf("some error")),
+					scache.EXPECT().
+						Get("cattle-tokens", "token-12345").
+						Return(&eSecret, nil),
+					mockTokenCacheFake.EXPECT().Get("token-12345").
+						Return(nil, fmt.Errorf("some error")),
+					scache.EXPECT().
+						Get("cattle-tokens", "token-12345").
+						Return(&eSecret, nil),
+					secrets.EXPECT().Patch("cattle-tokens", "token-12345", types.JSONPatchType, gomock.Any()).
+						DoAndReturn(func(space, name string, pt types.PatchType, data []byte, subresources ...any) (*ext.Token, error) {
+							// patchData = data
+							return nil, nil
+						}).Times(1),
 				)
 			},
 			want: &ext.UserActivity{
@@ -338,6 +417,65 @@ func TestStoreGet(t *testing.T) {
 				mockUserCacheFake.EXPECT().Get(gomock.Any()).Return(
 					&apiv3.User{}, nil,
 				)
+			},
+			want: &ext.UserActivity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "token-12345",
+				},
+				Status: ext.UserActivityStatus{
+					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid useractivity retrieved, ext token",
+			args: args{
+				ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
+					Name:   "admin",
+					Groups: []string{GroupCattleAuthenticated},
+					Extra: map[string][]string{
+						common.ExtraRequestTokenID: {"token-12345"},
+					},
+				}),
+				name: "token-12345",
+			},
+			mockSetup: func() {
+				ePrincipal := ext.TokenPrincipal{
+					Name:        "world",
+					Provider:    "oidc",
+					DisplayName: "",
+					LoginName:   "hello",
+				}
+				ePrincipalBytes, _ := json.Marshal(ePrincipal)
+				eSecret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "token-12345",
+					},
+					Data: map[string][]byte{
+						exttokenstore.FieldAnnotations:      []byte("null"),
+						exttokenstore.FieldDescription:      []byte(""),
+						exttokenstore.FieldEnabled:          []byte("true"),
+						exttokenstore.FieldHash:             []byte("kla9jkdmj"),
+						exttokenstore.FieldKind:             []byte(exttokenstore.IsLogin),
+						exttokenstore.FieldLabels:           []byte("null"),
+						exttokenstore.FieldLastUpdateTime:   []byte("13:00:05"),
+						exttokenstore.FieldPrincipal:        ePrincipalBytes,
+						exttokenstore.FieldTTL:              []byte("4000"),
+						exttokenstore.FieldUID:              []byte("2905498-kafld-lkad"),
+						exttokenstore.FieldUserID:           []byte("lkajdlksjlkds"),
+						exttokenstore.FieldLastActivitySeen: []byte("2025-01-31T16:44:00Z"),
+					},
+				}
+
+				mockTokenCacheFake.EXPECT().Get(gomock.Any()).
+					Return(nil, fmt.Errorf("some error")).
+					AnyTimes()
+				scache.EXPECT().Get("cattle-tokens", gomock.Any()).
+					Return(&eSecret, nil).
+					AnyTimes()
+				mockUserCacheFake.EXPECT().Get(gomock.Any()).
+					Return(&apiv3.User{}, nil)
 			},
 			want: &ext.UserActivity{
 				ObjectMeta: metav1.ObjectMeta{
