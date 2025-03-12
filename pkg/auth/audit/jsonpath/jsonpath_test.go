@@ -87,7 +87,7 @@ func TestJsonPathSet(t *testing.T) {
 			JSONPath: &JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(1), end: ptr.To(3), step: ptr.To(1)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(1), end: ptr.To(3), step: ptr.To(1)}},
 				},
 			},
 			Object: map[string]any{
