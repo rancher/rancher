@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"slices"
 	"strings"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/audit/jsonpath"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,31 +21,29 @@ type Redactor interface {
 }
 
 // todo: we can probably combine the regex slices into a single regex for better performance
-type redactor struct {
+type policyRedactor struct {
 	headers []*regexp.Regexp
-	paths   []string
-	keys    []*regexp.Regexp
+	paths   []*jsonpath.JSONPath
 }
 
-func NewRedactor(redaction auditlogv1.Redaction) (*redactor, error) {
+func NewRedactor(redaction auditlogv1.Redaction) (*policyRedactor, error) {
 	headers, err := compileRegexes(redaction.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile headers regexes: %w", err)
 	}
 
-	keys, err := compileRegexes(redaction.Keys)
+	paths, err := parsePaths(redaction.Paths)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile keys regexes: %w", err)
+		return nil, fmt.Errorf("failed to parse paths: %w", err)
 	}
 
-	return &redactor{
+	return &policyRedactor{
 		headers: headers,
-		paths:   redaction.Paths,
-		keys:    keys,
+		paths:   paths,
 	}, nil
 }
 
-func (r *redactor) redactHeaders(headers http.Header) {
+func (r *policyRedactor) redactHeaders(headers http.Header) {
 	if headers == nil {
 		return
 	}
@@ -57,53 +55,15 @@ func (r *redactor) redactHeaders(headers http.Header) {
 	}
 }
 
-func (r *redactor) redactSlice(path string, slice []any) {
-	for i, value := range slice {
-		switch value := value.(type) {
-		case map[string]any:
-			r.redactMap(path, value)
-		case string:
-			// best effort attempt to redact sensitive information in slices containing command arguments.
-			// For example, ["command", "login", "--token", "sensitive_info"] should be redacted to ["command", "login", "--token", "[redacted]"
-			if strings.HasPrefix(value, "--") && matchesAny(value, r.keys) {
-				if len(slice) > i+1 {
-					slice[i+1] = redacted
-				}
-			}
-		}
-	}
-}
-
-func (r *redactor) redactMap(path string, body map[string]any) {
-	for key, value := range body {
-		nextPath := strings.Join([]string{path, key}, ".")
-
-		if slices.Contains(r.paths, nextPath) {
-			body[key] = redacted
-			continue
-		}
-
-		if matchesAny(key, r.keys) {
-			body[key] = redacted
-			continue
-		}
-
-		switch value := value.(type) {
-		case map[string]any:
-			r.redactMap(nextPath, value)
-		case []any:
-			r.redactSlice(nextPath+"[]", value)
-		}
-	}
-}
-
 // Redact redacts fields and headers which match the
-func (r *redactor) Redact(log *log) error {
+func (r *policyRedactor) Redact(log *log) error {
 	r.redactHeaders(log.RequestHeader)
 	r.redactHeaders(log.ResponseHeader)
 
-	r.redactMap("", log.unmarshalledRequestBody)
-	r.redactMap("", log.unmarshalledResponseBody)
+	for _, path := range r.paths {
+		path.Set(log.unmarshalledRequestBody, redacted)
+		path.Set(log.unmarshalledResponseBody, redacted)
+	}
 
 	return nil
 }
@@ -213,4 +173,49 @@ func redactSecret(log *log) error {
 	}
 
 	return nil
+}
+
+func redactSlice(patterns []*regexp.Regexp, s []any) {
+	for i, v := range s {
+		switch v := v.(type) {
+		case map[string]any:
+			redactMap(patterns, v)
+		case string:
+			// best effort attempt to redact sensitive information in slices containing command arguments.
+			// For example, ["command", "login", "--token", "sensitive_info"] should be redacted to ["command", "login", "--token", "[redacted]"
+			if strings.HasPrefix(v, "--") && matchesAny(v, patterns) {
+				if len(s) > i+1 {
+					s[i+1] = redacted
+				}
+			}
+		}
+	}
+}
+
+func redactMap(patterns []*regexp.Regexp, m map[string]any) {
+	for k, v := range m {
+		if matchesAny(k, patterns) {
+			m[k] = redacted
+		}
+
+		switch v := v.(type) {
+		case map[string]any:
+			redactMap(patterns, v)
+		case []any:
+			redactSlice(patterns, v)
+		}
+	}
+}
+
+func regexRedactor(patterns []string) (Redactor, error) {
+	regexes, err := compileRegexes(patterns)
+	if err != nil {
+		return nil, err
+	}
+
+	return RedactFunc(func(log *log) error {
+		redactMap(regexes, log.unmarshalledRequestBody)
+		redactMap(regexes, log.unmarshalledResponseBody)
+		return nil
+	}), nil
 }
