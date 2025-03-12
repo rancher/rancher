@@ -85,7 +85,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Simple Index Range Selector No Match [0]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(1),
 				},
 			},
@@ -95,7 +95,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Simple Index Range Selector Match [0]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 				},
 			},
@@ -107,7 +107,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector No Match [0:3]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 					end:   ptr.To(3),
 					step:  ptr.To(1),
@@ -119,7 +119,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector Match End of [0:3]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 					end:   ptr.To(3),
 					step:  ptr.To(1),
@@ -133,7 +133,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector Match Start of [0:3]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 					end:   ptr.To(3),
 					step:  ptr.To(1),
@@ -147,7 +147,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector [-1]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(-1),
 				},
 			},
@@ -159,7 +159,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector [-2]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(-2),
 				},
 			},
@@ -171,7 +171,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector [:-1]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 					end:   ptr.To(-1),
 					step:  ptr.To(1),
@@ -185,7 +185,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector 7 Matches [-3:-1]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(-3),
 					end:   ptr.To(-1),
 					step:  ptr.To(1),
@@ -199,7 +199,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector Start With Step [:-1:2]",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 					end:   ptr.To(-1),
 					step:  ptr.To(2),
@@ -213,7 +213,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Wildcard Index Range Selector Match 100",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					isWildcard: true,
 				},
 			},
@@ -225,7 +225,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector No Match Stepped Index",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 					end:   ptr.To(10),
 					step:  ptr.To(2),
@@ -237,7 +237,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Index Range Selector Match Stepped Index",
 			Selector: selectChild{
 				identifier: "child",
-				r: &indexRange{
+				subscript: &subscript{
 					start: ptr.To(0),
 					end:   ptr.To(10),
 					step:  ptr.To(2),
@@ -269,7 +269,7 @@ func TestSelectChild(t *testing.T) {
 			Name: "Wildcard Identifier Wildcard Index Range Selector Match 100",
 			Selector: selectChild{
 				isWildcard: true,
-				r: &indexRange{
+				subscript: &subscript{
 					isWildcard: true,
 				},
 			},
@@ -296,7 +296,7 @@ func TestSelectChild(t *testing.T) {
 		{
 			Name: "Index Union No Match",
 			Selector: selectChild{
-				r: &indexRange{
+				subscript: &subscript{
 					union: []int{2, 4},
 				},
 			},
@@ -305,7 +305,7 @@ func TestSelectChild(t *testing.T) {
 		{
 			Name: "Index Union Has Match",
 			Selector: selectChild{
-				r: &indexRange{
+				subscript: &subscript{
 					union: []int{2, 4},
 				},
 			},
