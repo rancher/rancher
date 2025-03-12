@@ -8,18 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	headerRedactor, _ = NewRedactor(auditlogv1.Redaction{
-		Headers: []string{"password"},
-	})
-	pathRedactor, _ = NewRedactor(auditlogv1.Redaction{
-		Paths: []string{".toplevel.inner", ".words[].baz"},
-	})
-	keyRedactor, _ = NewRedactor(auditlogv1.Redaction{
-		Keys: []string{"foo|ba[rz]"},
-	})
-)
-
 func sampleLog() log {
 	return log{
 		RequestHeader: map[string][]string{
@@ -35,10 +23,25 @@ func sampleLog() log {
 	}
 }
 
-func TestRedactor(t *testing.T) {
+func TestPolicyRedactor(t *testing.T) {
+	headerRedactor, err := NewRedactor(auditlogv1.Redaction{
+		Headers: []string{"password"},
+	})
+	assert.NoError(t, err)
+
+	pathRedactor, err := NewRedactor(auditlogv1.Redaction{
+		Paths: []string{"$.toplevel.inner", "$.words[*].baz"},
+	})
+	assert.NoError(t, err)
+
+	keyRedactor, err := NewRedactor(auditlogv1.Redaction{
+		Paths: []string{"$..[foo,bar,baz]"},
+	})
+	assert.NoError(t, err)
+
 	type testCase struct {
 		Name     string
-		Redactor *redactor
+		Redactor *policyRedactor
 		Input    log
 		Expected log
 	}
