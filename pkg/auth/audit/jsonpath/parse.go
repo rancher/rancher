@@ -48,11 +48,11 @@ func parseInt(path []byte, value int) (int, int, error) {
 	return i, n, nil
 }
 
-func parseIndexRange(path []byte, start int) (int, *indexRange, error) {
+func parseIndexRange(path []byte, start int) (int, *subscript, error) {
 	var i int
 
 	if path[0] == ']' {
-		return 1, &indexRange{start: &start, end: ptr.To(-1)}, nil
+		return 1, &subscript{start: &start, end: ptr.To(-1)}, nil
 	}
 
 	consumed, end, err := parseInt(path[i:], -1)
@@ -63,7 +63,7 @@ func parseIndexRange(path []byte, start int) (int, *indexRange, error) {
 	i += consumed
 
 	if path[i] == ']' {
-		return i + 1, &indexRange{start: &start, end: &end}, nil
+		return i + 1, &subscript{start: &start, end: &end}, nil
 	} else if path[i] != ':' {
 		i++
 		return 0, nil, fmt.Errorf("expected \":\" but found %c", path[i])
@@ -81,13 +81,13 @@ func parseIndexRange(path []byte, start int) (int, *indexRange, error) {
 		return 0, nil, fmt.Errorf("expected \"]\" but found %c", path[i])
 	}
 
-	return i + 1, &indexRange{start: &start, end: &end, step: &step}, nil
+	return i + 1, &subscript{start: &start, end: &end, step: &step}, nil
 }
 
-func parseIndexUnion(path []byte, start int) (int, *indexRange, error) {
+func parseIndexUnion(path []byte, start int) (int, *subscript, error) {
 	var i int
 
-	r := &indexRange{
+	r := &subscript{
 		union: []int{start},
 	}
 
@@ -117,7 +117,7 @@ func parseIndexUnion(path []byte, start int) (int, *indexRange, error) {
 	return i + 1, r, nil
 }
 
-func parseIdentifierSubscript(path []byte) (int, *indexRange, error) {
+func parseIdentifierSubscript(path []byte) (int, *subscript, error) {
 	if len(path) == 0 || path[0] != '[' || bytes.HasPrefix(path, []byte{'[', '\''}) {
 		return 0, nil, nil
 	}
@@ -137,7 +137,7 @@ func parseIdentifierSubscript(path []byte) (int, *indexRange, error) {
 			return 0, nil, fmt.Errorf("expected \"]\" but found %c", path[i+1])
 		}
 
-		return i + 2, &indexRange{isWildcard: true}, nil
+		return i + 2, &subscript{isWildcard: true}, nil
 	}
 
 	consumed, start, err := parseInt(path[1:], 0)
@@ -149,7 +149,7 @@ func parseIdentifierSubscript(path []byte) (int, *indexRange, error) {
 
 	switch path[i] {
 	case ']':
-		return i + 1, &indexRange{start: &start}, nil
+		return i + 1, &subscript{start: &start}, nil
 	case ':':
 		consumed, r, err := parseIndexRange(path[i+1:], start)
 		if err != nil {
@@ -216,7 +216,7 @@ func parseChildSelectorBracketNotation(path []byte) (int, selector, error) {
 	var err error
 	var consumed int
 
-	consumed, s.r, err = parseIdentifierSubscript(path[i:])
+	consumed, s.subscript, err = parseIdentifierSubscript(path[i:])
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to parse subscript: %v", err)
 	}
@@ -254,7 +254,7 @@ func parseChildSelectorDotNotation(path []byte) (int, selector, error) {
 	var err error
 	var consumed int
 
-	consumed, s.r, err = parseIdentifierSubscript(path[i:])
+	consumed, s.subscript, err = parseIdentifierSubscript(path[i:])
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to parse subscript: %v", err)
 	}
@@ -318,7 +318,7 @@ func parseChildUnion(path []byte) (int, selector, error) {
 	var err error
 	var consumed int
 
-	consumed, s.r, err = parseIdentifierSubscript(path[i:])
+	consumed, s.subscript, err = parseIdentifierSubscript(path[i:])
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to parse subscript: %v", err)
 	}

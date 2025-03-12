@@ -57,7 +57,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(0), end: ptr.To(10)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(0), end: ptr.To(10)}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -79,7 +79,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(0)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(0)}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -90,7 +90,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(0), end: ptr.To(-1)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(0), end: ptr.To(-1)}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -101,7 +101,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(0), end: ptr.To(10)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(0), end: ptr.To(10)}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -112,7 +112,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(0), end: ptr.To(10)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(0), end: ptr.To(10)}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -123,7 +123,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(0), end: ptr.To(10), step: ptr.To(3)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(0), end: ptr.To(10), step: ptr.To(3)}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -134,7 +134,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{start: ptr.To(0), end: ptr.To(-1), step: ptr.To(1)}},
+					selectChild{identifier: "parent", subscript: &subscript{start: ptr.To(0), end: ptr.To(-1), step: ptr.To(1)}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -145,7 +145,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{isWildcard: true}},
+					selectChild{identifier: "parent", subscript: &subscript{isWildcard: true}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -208,7 +208,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{identifier: "parent", r: &indexRange{union: []int{2, 4}}},
+					selectChild{identifier: "parent", subscript: &subscript{union: []int{2, 4}}},
 					selectChild{identifier: "child"},
 				},
 			},
@@ -230,7 +230,7 @@ func TestParse(t *testing.T) {
 			Expected: JSONPath{
 				selectors: []selector{
 					selectRootElement{},
-					selectChild{union: []string{"a", "b", "c"}, r: &indexRange{start: ptr.To(0), end: ptr.To(10)}},
+					selectChild{union: []string{"a", "b", "c"}, subscript: &subscript{start: ptr.To(0), end: ptr.To(10)}},
 					selectChild{identifier: "child"},
 				},
 			},
