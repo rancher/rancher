@@ -326,6 +326,28 @@ func parseChildUnion(path []byte) (int, selector, error) {
 	return i + consumed, s, nil
 }
 
+func parseRecursiveDescent(path []byte) (int, selector, error) {
+	var s selector
+	var consumed int
+	var err error
+
+	if path[0] == '[' {
+		consumed, s, err = parseChildUnion(path)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to parse child selector: %v", err)
+		}
+	} else {
+		consumed, s, err = parseChildSelectorDotNotation(path)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to parse child selector: %v", err)
+		}
+	}
+
+	return consumed, selectRecursiveDescent{
+		inner: s,
+	}, nil
+}
+
 func Parse(path string) (*JSONPath, error) {
 	jsonPath := &JSONPath{}
 	pathBytes := []byte(path)
@@ -349,15 +371,13 @@ func Parse(path string) (*JSONPath, error) {
 
 			jsonPath.selectors = append(jsonPath.selectors, s)
 		case bytes.HasPrefix(pathBytes[i:], []byte{'.', '.'}):
-			consumed, s, err := parseChildSelectorDotNotation(pathBytes[i+2:])
+			consumed, s, err := parseRecursiveDescent(pathBytes[i+2:])
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse child selector: %v", err)
 			}
 			i += consumed + 2
 
-			jsonPath.selectors = append(jsonPath.selectors, selectRecursiveDescent{
-				inner: s,
-			})
+			jsonPath.selectors = append(jsonPath.selectors, s)
 		case pathBytes[i] == '.':
 			var s selector
 			var err error
