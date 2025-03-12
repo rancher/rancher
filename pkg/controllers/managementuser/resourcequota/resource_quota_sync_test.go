@@ -12,6 +12,111 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+func TestCompleteLimit(t *testing.T) {
+	type input struct {
+		existingValues *v32.ContainerResourceLimit
+		defaultValues  *v32.ContainerResourceLimit
+	}
+
+	type expected struct {
+		expected *v32.ContainerResourceLimit
+		err      error
+	}
+
+	testCases := []struct {
+		name     string
+		input    input
+		expected expected
+	}{
+		{
+			name: "limits not set in project",
+			input: input{
+				existingValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				defaultValues: &v32.ContainerResourceLimit{},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "limits set in project - namespace setting equal values",
+			input: input{
+				existingValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				defaultValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+			},
+			expected: expected{
+				expected: nil,
+				err:      nil,
+			},
+		},
+		{
+			name: "limits set in project - namespace setting lower values",
+			input: input{
+				existingValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "800m",
+					LimitsMemory: "128Mi",
+				},
+				defaultValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					LimitsCPU:    "800m",
+					LimitsMemory: "128Mi",
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "limits set in project - namespace setting higher values",
+			input: input{
+				existingValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "2000m",
+					LimitsMemory: "512Mi",
+				},
+				defaultValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				err: nil,
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := completeLimit(tt.input.existingValues, tt.input.defaultValues)
+			if tt.expected.err != nil {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.Equal(t, tt.expected.expected, res)
+		})
+	}
+}
+
 func TestLimitsChanged(t *testing.T) {
 
 	tests := []struct {

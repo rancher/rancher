@@ -471,6 +471,10 @@ func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.
 		return nil, err
 	}
 
+	if reflect.DeepEqual(existingLimitMap, newLimitMap) {
+		return nil, nil
+	}
+
 	for key, existingValue := range existingLimitMap {
 		existingValueQuantity, err := resource.ParseQuantity(existingValue.(string))
 		if err != nil {
@@ -487,19 +491,13 @@ func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.
 				continue
 			}
 
-			if existingValueQuantity.Cmp(defaultLimitVal) > 0 {
-				newLimitMap[key] = defaultValue
-			} else {
+			if existingValueQuantity.Cmp(defaultLimitVal) < 0 {
 				newLimitMap[key] = existingValue
 			}
 		} else {
 			// if no value is defined in project, we set the proposed value
 			newLimitMap[key] = existingValue
 		}
-	}
-
-	if reflect.DeepEqual(existingLimitMap, newLimitMap) {
-		return nil, nil
 	}
 
 	newLimit := &v32.ContainerResourceLimit{}
