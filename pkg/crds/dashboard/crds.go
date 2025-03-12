@@ -41,11 +41,17 @@ func FeatureCRD() crd.CRD {
 
 func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 	result := []crd.CRD{
+		// source: https://github.com/rancher/system-upgrade-controller/blob/v0.15.2/pkg/upgrade/plan/plan.go#L53-L70
 		newCRD(v1.Plan{}, func(c crd.CRD) crd.CRD {
 			c.GVK.Kind = "Plan"
 			c.GVK.Group = "upgrade.cattle.io"
 			c.GVK.Version = "v1"
-			return c
+			return c.
+				WithStatus().
+				WithCategories("upgrade").
+				WithColumn("Image", ".spec.upgrade.image").
+				WithColumn("Channel", ".spec.channel").
+				WithColumn("Version", ".spec.version")
 		}),
 		newCRD(&uiv1.NavLink{}, func(c crd.CRD) crd.CRD {
 			c.Status = false
