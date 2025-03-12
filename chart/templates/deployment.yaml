@@ -83,7 +83,6 @@ spec:
           protocol: TCP
 {{- end}}
         - containerPort: 6666
-          hostPort: 6666
           protocol: TCP
         args:
 {{- if .Values.debug }}
