@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/audit/jsonpath"
 )
 
 func mergeLogVerbosities(lhs auditlogv1.LogVerbosity, rhs auditlogv1.LogVerbosity) auditlogv1.LogVerbosity {
@@ -83,4 +84,17 @@ func matchesAny(s string, regexes []*regexp.Regexp) bool {
 
 func isLoginRequest(uri string) bool {
 	return strings.Contains(uri, "?action=login")
+}
+
+func parsePaths(paths []string) ([]*jsonpath.JSONPath, error) {
+	compiled := make([]*jsonpath.JSONPath, len(paths))
+	for i, v := range paths {
+		jp, err := jsonpath.Parse(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse jsonpath: %w", err)
+		}
+		compiled[i] = jp
+	}
+
+	return compiled, nil
 }

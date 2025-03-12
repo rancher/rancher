@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"fmt"
 	"strings"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
@@ -17,7 +18,12 @@ var (
 		"Cookie", "Set-Cookie", "X-Api-Set-Cookie-Header",
 	}
 
-	sensitiveBodyFields = []string{"[pP]assword", "[tT]oken", "[kKube][cC]onfig", "credentials", "applicationSecret", "oauthCredential", "serviceAccountCredential", "spKey", "spCert", "certificate", "privateKey"}
+	sensitiveBodyFields = []string{"credentials", "applicationSecret", "oauthCredential", "serviceAccountCredential", "spKey", "spCert", "certificate", "privateKey"}
+)
+
+var (
+	defaultRegex     = ".*([pP]assword|[Kk]ube[Cc]onfig|[Tt]oken).*"
+	defaultRedactors []Redactor
 )
 
 func init() {
@@ -29,6 +35,16 @@ func init() {
 
 			sensitiveBodyFields = append(sensitiveBodyFields, value...)
 		}
+	}
+
+	r, err := regexRedactor([]string{defaultRegex})
+	if err != nil {
+		panic(fmt.Sprintf("failed to create regex redactor: %v", err))
+	}
+
+	defaultRedactors = []Redactor{
+		RedactFunc(redactSecret),
+		r,
 	}
 }
 
@@ -46,8 +62,8 @@ func DefaultPolicies() []auditlogv1.AuditLogPolicy {
 						Headers: []string{
 							strings.Join(sensitiveHeaders, "|"),
 						},
-						Keys: []string{
-							strings.Join(sensitiveBodyFields, "|"),
+						Paths: []string{
+							fmt.Sprintf("$..[%s]", strings.Join(sensitiveBodyFields, ",")),
 						},
 					},
 				},
@@ -61,8 +77,8 @@ func DefaultPolicies() []auditlogv1.AuditLogPolicy {
 				Filters: []auditlogv1.Filter{},
 				AdditionalRedactions: []auditlogv1.Redaction{
 					{
-						Keys: []string{
-							"config",
+						Paths: []string{
+							"$..config",
 						},
 					},
 				},
