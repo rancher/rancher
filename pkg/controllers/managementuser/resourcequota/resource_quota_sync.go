@@ -20,6 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -468,9 +470,31 @@ func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.
 	if err != nil {
 		return nil, err
 	}
-	for key, value := range existingLimitMap {
-		if _, ok := newLimitMap[key]; ok {
-			newLimitMap[key] = value
+
+	for key, existingValue := range existingLimitMap {
+		existingValueQuantity, err := resource.ParseQuantity(existingValue.(string))
+		if err != nil {
+			continue
+		}
+
+		// if we have a value for that (cpu or memory) then we check if this value
+		// is less then (or equal) the one defined in project level:
+		// -- if yes, then we set it
+		// -- if not, we set project value
+		if defaultValue, ok := newLimitMap[key]; ok {
+			defaultLimitVal, err := resource.ParseQuantity(defaultValue.(string))
+			if err != nil {
+				continue
+			}
+
+			if existingValueQuantity.Cmp(defaultLimitVal) > 0 {
+				newLimitMap[key] = defaultValue
+			} else {
+				newLimitMap[key] = existingValue
+			}
+		} else {
+			// if no value is defined in project, we set the proposed value
+			newLimitMap[key] = existingValue
 		}
 	}
 
