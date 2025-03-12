@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/mcuadros/go-version"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -64,8 +63,7 @@ const (
 )
 
 var (
-	ErrTombstoneValidation = errors.New("version tombstone validation failed")
-	mgmtNameRegexp         = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -163,30 +161,20 @@ func versionTombstone(configMapController controllerv1.ConfigMapController) erro
 		return err
 	}
 
-	validate := false
-
-	if rancherversion.Version == "dev" {
-		logrus.Debugf("Development environment detected, skipping tombstone validation.")
-	} else if !semver.IsValid(rancherversion.Version) {
-		logrus.Errorf("Rancher version %s is not semver compliant, skipping tombstone validation.", rancherversion.Version)
-	} else if semver.Prerelease(rancherversion.Version) != "" {
-		logrus.Infof("Rancher version %s detected as prerelease, skipping tombstone validation.", rancherversion.Version)
-	} else {
-		validate = true
+	if !semver.IsValid(rancherversion.Version) {
+		logrus.Errorf("rancher version %s is not semver compliant, skipping tombstone validation", rancherversion.Version)
+		return nil
 	}
 
 	lastVersion := cm.Data[rancherVersionKey]
-	if lastVersion != "" && validate {
+	if lastVersion != "" {
 		if !semver.IsValid(lastVersion) {
-			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation.", lastVersion)
-			// Hotfixes count as previous versions, and alpha/rc versions are assumed to be at your own risk.
-			// If users want to downgrade to consume a hotfix, they should not be prevented.
-		} else if semver.Prerelease(lastVersion) != "" {
-			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation.", rancherversion.Version)
-		} else if semver.Compare(lastVersion, rancherversion.Version) == 1 {
-			logrus.Errorf("Detected Rancher downgrade from %s to %s. In order to perform a rollback of Rancher, use the Rancher Backup Restore Operator. If a suitable backup is unavailable, version tombstone validation can be temporarily disabled by deleting the %s config map in the cattle-system namespace.",
-				lastVersion, rancherversion.Version, rancherVersionTombstoneConfig)
-			return ErrTombstoneValidation
+			logrus.Errorf("Previous Rancher version %s is not semver compliant, skipping tombstone validation", lastVersion)
+			lastVersion = ""
+		}
+		if semver.Compare(lastVersion, rancherversion.Version) == 1 {
+			logrus.Fatalf("Detected Rancher downgrade from %s to %s. In order to perform a rollback of Rancher, use the Rancher Backup Restore Operator. If a suitable backup is unavailable, version tombstone validation can be temporarily disabled by deleting the rancherVersionTombstone config map in the cattle-system namespace.",
+				lastVersion, rancherversion.Version)
 		}
 	}
 
