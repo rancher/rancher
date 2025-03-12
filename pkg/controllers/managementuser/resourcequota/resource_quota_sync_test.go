@@ -4,12 +4,12 @@ import (
 	"reflect"
 	"testing"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
 func TestCompleteLimit(t *testing.T) {
