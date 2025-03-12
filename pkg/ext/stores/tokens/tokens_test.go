@@ -1502,6 +1502,59 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 	})
 }
 
+func Test_SystemStore_UpdateLastActivitySeen(t *testing.T) {
+	t.Run("patch last-activity-seen, ok", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// assemble and configure store from mock clients ...
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+
+		var patchData []byte
+		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
+			DoAndReturn(func(space, name string, pt types.PatchType, data []byte, subresources ...any) (*ext.Token, error) {
+				patchData = data
+				return nil, nil
+			}).Times(1)
+
+		now, nerr := time.Parse(time.RFC3339, "2024-12-06T03:02:01Z")
+		assert.NoError(t, nerr)
+
+		err := store.UpdateLastActivitySeen("atoken", now)
+		assert.NoError(t, err)
+		require.NotEmpty(t, patchData)
+		require.Equal(t,
+			`[{"op":"replace","path":"/data/last-activity-seen","value":"MjAyNC0xMi0wNlQwMzowMjowMVo="}]`,
+			string(patchData))
+	})
+
+	t.Run("patch last-activity-seen, error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// assemble and configure store from mock clients ...
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+
+		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
+			Return(nil, fmt.Errorf("some error")).
+			Times(1)
+
+		now, _ := time.Parse(time.RFC3339, "2024-12-06T03:00:00")
+		err := store.UpdateLastActivitySeen("atoken", now)
+		assert.Equal(t, fmt.Errorf("some error"), err)
+	})
+}
+
 func Test_SystemStore_Update(t *testing.T) {
 	tests := []struct {
 		name       string                // test name
