@@ -27,21 +27,13 @@ func TestStoreCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
-	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
-	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-
-	secrets := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-	users := wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
-	users.EXPECT().Cache().Return(nil)
-	secrets.EXPECT().Cache().Return(nil)
-	store := exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
-
-	uas := &Store{
-		tokens:        mockTokenControllerFake,
-		userCache:     mockUserCacheFake,
-		extTokenStore: store,
-	}
+	var mockTokenControllerFake *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
+	var mockTokenCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.Token]
+	var mockUserCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.User]
+	var secrets *wranglerfake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
+	var scache *wranglerfake.MockCacheInterface[*corev1.Secret]
+	var users *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
+	var store *exttokenstore.SystemStore
 
 	type args struct {
 		ctx          context.Context
@@ -90,7 +82,6 @@ func TestStoreCreate(t *testing.T) {
 						AuthProvider:  "oidc",
 						UserPrincipal: v3.Principal{},
 					}, nil),
-
 					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&apiv3.Token{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
@@ -251,6 +242,25 @@ func TestStoreCreate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Initialize and configure the mocks for each test separately
+
+			mockTokenControllerFake = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+			mockTokenCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
+			mockUserCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+
+			secrets = wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache = wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+			store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+
+			uas := &Store{
+				tokens:        mockTokenControllerFake,
+				userCache:     mockUserCacheFake,
+				extTokenStore: store,
+			}
+
 			// Mock the time function
 			mockNow := time.Date(2025, 2, 1, 8, 54, 0, 0, time.UTC)
 			origTimeNow := timeNow
@@ -278,21 +288,16 @@ func TestStoreCreate(t *testing.T) {
 
 func TestStoreGet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockTokenControllerFake := wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
-	mockTokenCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
-	mockUserCacheFake := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	defer ctrl.Finish()
 
-	secrets := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-	users := wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
-	users.EXPECT().Cache().Return(nil)
-	secrets.EXPECT().Cache().Return(nil)
-	store := exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+	var mockTokenControllerFake *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
+	var mockTokenCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.Token]
+	var mockUserCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.User]
+	var secrets *wranglerfake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
+	var scache *wranglerfake.MockCacheInterface[*corev1.Secret]
+	var users *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
+	var store *exttokenstore.SystemStore
 
-	uas := &Store{
-		tokens:        mockTokenControllerFake,
-		userCache:     mockUserCacheFake,
-		extTokenStore: store,
-	}
 	contextBG := context.Background()
 	type args struct {
 		ctx  context.Context
@@ -385,7 +390,26 @@ func TestStoreGet(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		mockTokenControllerFake = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		mockTokenCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
+		mockUserCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+
+		secrets = wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache = wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+
+		uas := &Store{
+			tokens:        mockTokenControllerFake,
+			userCache:     mockUserCacheFake,
+			extTokenStore: store,
+		}
+
 		tt.mockSetup()
+
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := uas.Get(tt.args.ctx, tt.args.name, &metav1.GetOptions{})
 			if (err != nil) != tt.wantErr {
