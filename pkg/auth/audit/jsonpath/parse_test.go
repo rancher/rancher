@@ -236,6 +236,16 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			Name:  "With Recursive Descent and Union",
+			Input: "$..[a,b,c]",
+			Expected: JSONPath{
+				selectors: []selector{
+					selectRootElement{},
+					selectRecursiveDescent{inner: selectChild{union: []string{"a", "b", "c"}}},
+				},
+			},
+		},
+		{
 			Name:  "With Empty Identifier Union",
 			Input: "$.[].child",
 			Err:   fmt.Errorf("failed to parse child selector: expected at least one union option"),
