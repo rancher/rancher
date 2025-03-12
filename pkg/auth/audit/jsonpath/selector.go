@@ -128,6 +128,10 @@ func (c selectChild) Select(p Path) (int, bool) {
 
 	node := p[0]
 
+	if node.identifier == nil {
+		return 0, false
+	}
+
 	if len(c.union) > 0 {
 		if slices.Contains(c.union, *node.identifier) {
 			return 1, true
