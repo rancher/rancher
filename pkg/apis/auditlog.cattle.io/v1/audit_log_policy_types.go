@@ -26,7 +26,6 @@ type Filter struct {
 type Redaction struct {
 	Headers []string `json:"headers"`
 	Paths   []string `json:"paths"`
-	Keys    []string `json:"keys"`
 }
 
 type Verbosity struct {
