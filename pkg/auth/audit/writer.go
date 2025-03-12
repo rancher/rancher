@@ -179,8 +179,9 @@ func (w *Writer) decompressResponse(log *log) error {
 }
 
 func (w *Writer) Write(log *log) error {
-	redactors := []Redactor{
-		RedactFunc(redactSecret),
+	redactors := []Redactor{}
+	if !w.DisableDefaultPolicies {
+		redactors = append(redactors, defaultRedactors...)
 	}
 
 	verbosity := verbosityForLevel(w.DefaultPolicyLevel)
