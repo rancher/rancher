@@ -90,9 +90,8 @@ type WriterOptions struct {
 type Writer struct {
 	WriterOptions
 
-	// todo: rename this to policies
-	policyMutex sync.RWMutex
-	policy      map[types.NamespacedName]Policy
+	policiesMutex sync.RWMutex
+	policies      map[types.NamespacedName]Policy
 
 	output io.Writer
 }
@@ -101,8 +100,8 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 	w := &Writer{
 		WriterOptions: opts,
 
-		policy: make(map[types.NamespacedName]Policy),
-		output: output,
+		policies: make(map[types.NamespacedName]Policy),
+		output:   output,
 	}
 
 	if !opts.DisableDefaultPolicies {
@@ -187,8 +186,8 @@ func (w *Writer) Write(log *log) error {
 	verbosity := verbosityForLevel(w.DefaultPolicyLevel)
 	action := auditlogv1.FilterActionUnknown
 
-	w.policyMutex.RLock()
-	for _, policy := range w.policy {
+	w.policiesMutex.RLock()
+	for _, policy := range w.policies {
 		switch policy.actionForLog(log) {
 		case auditlogv1.FilterActionAllow:
 			redactors = append(redactors, policy.Redactors...)
@@ -201,7 +200,7 @@ func (w *Writer) Write(log *log) error {
 			}
 		}
 	}
-	w.policyMutex.RUnlock()
+	w.policiesMutex.RUnlock()
 
 	if action == auditlogv1.FilterActionDeny {
 		return nil
@@ -252,24 +251,24 @@ func (w *Writer) UpdatePolicy(policy *auditlogv1.AuditLogPolicy) error {
 		Namespace: policy.Namespace,
 	}
 
-	w.policyMutex.Lock()
-	w.policy[name] = newPolicy
-	w.policyMutex.Unlock()
+	w.policiesMutex.Lock()
+	w.policies[name] = newPolicy
+	w.policiesMutex.Unlock()
 
 	return nil
 }
 
 func (w *Writer) RemovePolicy(policy *auditlogv1.AuditLogPolicy) bool {
-	w.policyMutex.Lock()
-	defer w.policyMutex.Unlock()
+	w.policiesMutex.Lock()
+	defer w.policiesMutex.Unlock()
 
 	name := types.NamespacedName{
 		Name:      policy.Name,
 		Namespace: policy.Namespace,
 	}
 
-	if _, ok := w.policy[name]; ok {
-		delete(w.policy, name)
+	if _, ok := w.policies[name]; ok {
+		delete(w.policies, name)
 		return true
 	}
 
@@ -277,10 +276,10 @@ func (w *Writer) RemovePolicy(policy *auditlogv1.AuditLogPolicy) bool {
 }
 
 func (w *Writer) GetPolicy(namespace string, name string) (Policy, bool) {
-	w.policyMutex.RLock()
-	defer w.policyMutex.RUnlock()
+	w.policiesMutex.RLock()
+	defer w.policiesMutex.RUnlock()
 
-	p, ok := w.policy[types.NamespacedName{Name: name, Namespace: namespace}]
+	p, ok := w.policies[types.NamespacedName{Name: name, Namespace: namespace}]
 
 	return p, ok
 }
