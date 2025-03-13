@@ -347,8 +347,13 @@ func calculateBackoff(clusterRepo *catalog.ClusterRepo, policy retryPolicy) time
 	h.SetSeed(maphash.MakeSeed())
 	rand := rand.New(rand.NewSource(int64(h.Sum64())))
 	temp := float64(policy.MinWait) * math.Pow(2, float64(clusterRepo.Status.NumberOfRetries))
-	// rand.Int63n panics if jitter <= 0
-	jitter := int64(math.Max(1, 2*0.2*temp))
+	if temp > math.MaxInt64 {
+		temp = math.MaxInt64 / 3
+	}
+	jitter := int64(2 * 0.2 * temp)
+	if jitter <= 0 {
+		jitter = 1
+	}
 	backoff := time.Duration(temp*(1-0.2)) + time.Duration(rand.Int63n(jitter))
 	if backoff < policy.MinWait {
 		return policy.MinWait
