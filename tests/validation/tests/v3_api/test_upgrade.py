@@ -763,7 +763,10 @@ def modify_catalog_app():
 
 def validate_catalog_app(app_name, external_id):
     p_client = namespace["p_client"]
-    app = wait_for_app_to_active(p_client, app_name)
+    client = get_cluster_client_for_token_v1(
+        p_client["id"], USER_TOKEN)
+    
+    app = wait_for_catalog_app_active(client, app_name)
     assert app.externalId == external_id, \
         "the version of the app is not correct"
     # check if associated workloads are active
