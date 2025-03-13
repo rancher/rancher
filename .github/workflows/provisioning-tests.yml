@@ -32,7 +32,12 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
           CATTLE_FEATURES: "provisioningprebootstrap=true"
     name: Provisioning tests
-    runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
+    runs-on:
+      - runs-on
+      - spot=false
+      - runner=8cpu-linux-x64
+      - image=legacy-cgroups-for-x64
+      - run-id=${{ github.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
