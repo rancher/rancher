@@ -527,3 +527,72 @@ func TestShouldSkip(t *testing.T) {
 		})
 	}
 }
+func TestCalculateBackoff(t *testing.T) {
+	testCases := []struct {
+		name           string
+		clusterRepo    *catalog.ClusterRepo
+		retryPolicy    retryPolicy
+		expectedErrMsg string
+	}{
+		{
+			name: "Check if retry number is 0",
+			clusterRepo: &catalog.ClusterRepo{
+				Status: catalog.RepoStatus{
+					NumberOfRetries: 0,
+				},
+			},
+			retryPolicy: retryPolicy{
+				MinWait:  10 * time.Second,
+				MaxWait:  30 * time.Minute,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "Check if retry number is 1",
+			clusterRepo: &catalog.ClusterRepo{
+				Status: catalog.RepoStatus{
+					NumberOfRetries: 1,
+				},
+			},
+			retryPolicy: retryPolicy{
+				MinWait:  10 * time.Second,
+				MaxWait:  30 * time.Minute,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "Check if retry number is 2",
+			clusterRepo: &catalog.ClusterRepo{
+				Status: catalog.RepoStatus{
+					NumberOfRetries: 2,
+				},
+			},
+			retryPolicy: retryPolicy{
+				MinWait:  10 * time.Second,
+				MaxWait:  30 * time.Minute,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "Check if retry number is 100",
+			clusterRepo: &catalog.ClusterRepo{
+				Status: catalog.RepoStatus{
+					NumberOfRetries: 100,
+				},
+			},
+			retryPolicy: retryPolicy{
+				MinWait:  10 * time.Second,
+				MaxWait:  30 * time.Minute,
+				MaxRetry: 5,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			backoff := calculateBackoff(testCase.clusterRepo, testCase.retryPolicy)
+			assert.GreaterOrEqual(t, backoff, testCase.retryPolicy.MinWait, "calculateBackoff() = %v, want greater than or equal to 10 seconds", backoff)
+			assert.LessOrEqual(t, backoff, testCase.retryPolicy.MaxWait, "calculateBackoff() = %v, want less than or equal to 30 minutes", backoff)
+		})
+	}
+}
