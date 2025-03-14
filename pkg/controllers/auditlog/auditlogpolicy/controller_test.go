@@ -36,10 +36,8 @@ var (
 						".*[tT]oken.*",
 					},
 					Paths: []string{
-						".some.path.to.value",
-					},
-					Keys: []string{
-						".*[pP]assword.*",
+						"$.some.path.to.value",
+						"$..[Password,password]",
 					},
 				},
 			},
@@ -197,14 +195,14 @@ func TestOnChangeAddInvalidPolicyRedactorHeaderRegex(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestOnChangeAddInvalidPolicyRedactorKeyRegex(t *testing.T) {
+func TestOnChangeAddInvalidPolicyRedactorJSONPath(t *testing.T) {
 	h := setup(t, auditlogv1.LevelMetadata)
 
 	policy := samplePolicy
 	policy.Spec.AdditionalRedactions = []auditlogv1.Redaction{
 		{
-			Keys: []string{
-				"*",
+			Paths: []string{
+				".missing.root",
 			},
 		},
 	}
@@ -215,7 +213,7 @@ func TestOnChangeAddInvalidPolicyRedactorKeyRegex(t *testing.T) {
 	expected := policy
 	expected.Status = auditlogv1.AuditLogPolicyStatus{
 		Condition: auditlogv1.AuditLogPolicyStatusConditionInvalid,
-		Message:   "failed to create policy: failed to create redactor: failed to compile keys regexes: failed to compile regex: error parsing regexp: missing argument to repetition operator: `*`",
+		Message:   "failed to create policy: failed to create redactor: failed to parse paths: failed to parse jsonpath: paths must begin with the root object identifier: '$'",
 	}
 
 	actual, err := h.auditlogpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
@@ -237,7 +235,7 @@ func TestOnChangeAddDisablePolicy(t *testing.T) {
 
 	expected := policy
 	policy.Status = auditlogv1.AuditLogPolicyStatus{
-		Condition: auditlogv1.AuditLogPolicyStatusConditionDisabled,
+		Condition: auditlogv1.AuditLogPolicyStatusConditionInactive,
 	}
 
 	actual, err := h.auditlogpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
@@ -272,7 +270,7 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 
 	expected.Spec.Enabled = false
 	expected.Status = auditlogv1.AuditLogPolicyStatus{
-		Condition: auditlogv1.AuditLogPolicyStatusConditionDisabled,
+		Condition: auditlogv1.AuditLogPolicyStatusConditionInactive,
 	}
 
 	actual, err = h.auditlogpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
@@ -417,7 +415,7 @@ func TestOnRemoveDisabledPolicy(t *testing.T) {
 
 	expected := policy
 	expected.Status = auditlogv1.AuditLogPolicyStatus{
-		Condition: auditlogv1.AuditLogPolicyStatusConditionDisabled,
+		Condition: auditlogv1.AuditLogPolicyStatusConditionInactive,
 	}
 
 	actual, err := h.auditlogpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
