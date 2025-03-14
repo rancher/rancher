@@ -9,8 +9,8 @@ type FilterAction string
 
 const (
 	AuditLogPolicyStatusConditionUnknown  AuditLogPolicyStatusCondition = ""
-	AuditLogPolicyStatusConditionDisabled AuditLogPolicyStatusCondition = "disabled"
 	AuditLogPolicyStatusConditionActive   AuditLogPolicyStatusCondition = "active"
+	AuditLogPolicyStatusConditionInactive AuditLogPolicyStatusCondition = "inactive"
 	AuditLogPolicyStatusConditionInvalid  AuditLogPolicyStatusCondition = "invalid"
 
 	FilterActionUnknown FilterAction = ""
@@ -52,6 +52,7 @@ type LogVerbosity struct {
 // +genclient
 // +kubebuilder:printcolumn:name="Enabled",type=string,JSONPath=`.spec.enabled`
 // +kubebuilder:printcolumn:name="Condition",type=string,JSONPath=`.status.condition`
+// +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AuditLogPolicy struct {
