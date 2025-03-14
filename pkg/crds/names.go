@@ -49,6 +49,7 @@ func BasicCRDs() []string {
 		"preferences.management.cattle.io",
 		"settings.management.cattle.io",
 		"navlinks.ui.cattle.io",
+		"auditlogpolicies.auditlog.cattle.io",
 	}
 }
 
@@ -235,6 +236,7 @@ var MigratedResources = map[string]bool{
 	"nodepools.management.cattle.io":                                  false,
 	"nodes.management.cattle.io":                                      false,
 	"nodetemplates.management.cattle.io":                              false,
+	"oidcclients.management.cattle.io":                                true,
 	"oidcproviders.management.cattle.io":                              false,
 	"openldapproviders.management.cattle.io":                          false,
 	"operations.catalog.cattle.io":                                    false,
@@ -266,5 +268,5 @@ var MigratedResources = map[string]bool{
 	"users.management.cattle.io":                                      false,
 	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
-	"oidcclients.management.cattle.io":                                true,
+	"auditlogpolicies.auditlog.cattle.io":                             true,
 }
