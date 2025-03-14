@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/generated/controllers/auditlog.cattle.io"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/auditlog.cattle.io/v1"
-	"github.com/sirupsen/logrus"
 )
 
 type handler struct {
@@ -25,8 +24,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditLogPolicy) (*auditlo
 		}
 
 		if _, err := h.auditlogpolicy.UpdateStatus(obj); err != nil {
-			logrus.Errorf("could not mark audit log policy '%s/%s' as disabled: %s", obj.Namespace, obj.Name, err)
-			return obj, err
+			return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as disabled: %s", obj.Namespace, obj.Name, err)
 		}
 
 		return obj, nil
@@ -39,8 +37,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditLogPolicy) (*auditlo
 		}
 
 		if _, err := h.auditlogpolicy.UpdateStatus(obj); err != nil {
-			logrus.Errorf("could not mark audit log policy '%s/%s' as invalid: %s", obj.Namespace, obj.Name, err)
-			return obj, err
+			return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as invalid: %s", obj.Namespace, obj.Name, err)
 		}
 
 		return obj, nil
@@ -49,8 +46,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditLogPolicy) (*auditlo
 	obj.Status.Condition = auditlogv1.AuditLogPolicyStatusConditionActive
 	obj.Status.Message = ""
 	if _, err := h.auditlogpolicy.UpdateStatus(obj); err != nil {
-		logrus.Errorf("could not mark audit log policy '%s/%s' as active: %s", obj.Namespace, obj.Name, err)
-		return obj, err
+		return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as active: %s", obj.Namespace, obj.Name, err)
 	}
 
 	return obj, nil
