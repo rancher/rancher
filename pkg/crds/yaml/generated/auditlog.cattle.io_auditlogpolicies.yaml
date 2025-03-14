@@ -90,8 +90,6 @@ spec:
                     type: object
                 required:
                 - level
-                - request
-                - response
                 type: object
             required:
             - enabled
