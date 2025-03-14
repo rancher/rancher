@@ -269,7 +269,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	if opts.AuditLogEnabled {
 		auditController := auditlog.New(wranglerContext.SharedControllerFactory)
-		auditlogcontroller.Register(ctx, auditLogWriter, auditController)
+		if err := auditlogcontroller.Register(ctx, auditLogWriter, auditController); err != nil {
+			return nil, fmt.Errorf("failed to register audit log controller: %w", err)
+		}
 	}
 
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
