@@ -166,7 +166,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
 		takeOwnership := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
 			return repo, err
 		}
 	}
@@ -178,6 +178,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
 			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.RemoteDialerProxyChartName,
 			ChartName:           chart.RemoteDialerProxyChartName,
 			ExactVersionSetting: settings.RemoteDialerProxyVersion,
 			Values: func() map[string]interface{} {
@@ -198,6 +199,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 		},
 		{
 			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.WebhookChartName,
 			ChartName:           chart.WebhookChartName,
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
@@ -220,12 +222,14 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 		},
 		{
 			ReleaseNamespace: "rancher-operator-system",
+			ReleaseName:      "rancher-operator",
 			ChartName:        "rancher-operator",
 			Uninstall:        true,
 			RemoveNamespace:  true,
 		},
 		{
 			ReleaseNamespace:    namespace.ProvisioningCAPINamespace,
+			ReleaseName:         chart.ProvisioningCAPIChartName,
 			ChartName:           chart.ProvisioningCAPIChartName,
 			ExactVersionSetting: settings.RancherProvisioningCAPIVersion,
 			Values: func() map[string]interface{} {
@@ -242,6 +246,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 		},
 		{
 			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.SystemUpgradeControllerChartName,
 			ChartName:           chart.SystemUpgradeControllerChartName,
 			ExactVersionSetting: settings.SystemUpgradeControllerChartVersion,
 			Values: func() map[string]interface{} {
