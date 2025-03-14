@@ -159,16 +159,16 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	ctx := context.Background()
 
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
-	w.Require().NoError(err)
+	w.Require().NoError(err, "error getting \"rancher-charts\" cluster repo")
 	clusterRepo.Spec.GitRepo = "https://github.com/rancher/charts-small-fork"
 	clusterRepo.Spec.GitBranch = "aks-integration-test-working-charts"
 	clusterRepo, err = w.catalogClient.ClusterRepos().Update(ctx, clusterRepo, metav1.UpdateOptions{})
-	w.Require().NoError(err)
+	w.Require().NoError(err, "error updating \"rancher-charts\" cluster repo")
 	downloadTime := clusterRepo.Status.DownloadTime
-	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
+	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime), "error downloading \"rancher-charts\" cluster repo")
 
 	cfgMap, err := w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
-	w.Require().NoError(err)
+	w.Require().NoError(err, fmt.Sprintf("error getting config map %s/%s", clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName))
 	origCfg := cfgMap.DeepCopy()
 
 	// GETTING INDEX FROM CONFIGMAP AND MODIFYING IT
@@ -176,7 +176,12 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-	w.Require().NoError(err)
+	w.Require().NoError(err, fmt.Sprintf("error updating config map %s/%s", clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName))
+	logrus.Infof("configmap %s/%s contents: %s", clusterRepo.Status.IndexConfigMapNamespace,
+		clusterRepo.Status.IndexConfigMapName, func() string {
+			b, _ := json.Marshal(cfgMap)
+			return string(b)
+		}())
 
 	//KWait for config map to be updated
 	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, originalLatestVersion))
@@ -185,10 +190,14 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	w.Require().NoError(w.updateManagementCluster())
 
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
-	w.Require().NoError(err)
+	w.Require().NoError(err, fmt.Sprintf("error waiting for chart deployment %s", "rancher-aks-operator"))
 
-	w.Require().NoError(err)
-	w.Assert().Greater(originalLatestVersion, app.Spec.Chart.Metadata.Version)
+	w.Assert().Greater(originalLatestVersion, app.Spec.Chart.Metadata.Version,
+		fmt.Sprintf("%s chart version should be less than %s, %s", "rancher-aks-operator",
+			app.Spec.Chart.Metadata.Version, func() string {
+				b, _ := json.Marshal(app)
+				return string(b)
+			}()))
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 
@@ -358,15 +367,20 @@ func (w *RancherManagedChartsTest) updateConfigMap(cfgMap *v1.ConfigMap) string 
 	gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
 	w.Require().NoError(err)
 	defer gz.Close()
+
 	data, err := io.ReadAll(gz)
 	w.Require().NoError(err)
+
 	index := &repo.IndexFile{}
 	w.Require().NoError(json.Unmarshal(data, index))
+
 	index.SortEntries()
 	latestVersion := index.Entries["rancher-aks-operator"][0].Version
 	index.Entries["rancher-aks-operator"] = index.Entries["rancher-aks-operator"][1:]
+
 	marshal, err := json.Marshal(index)
 	w.Require().NoError(err)
+
 	var compressedData bytes.Buffer
 	writer := gzip.NewWriter(&compressedData)
 	_, err = writer.Write(marshal)
