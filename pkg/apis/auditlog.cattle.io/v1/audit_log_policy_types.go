@@ -45,8 +45,8 @@ const (
 type LogVerbosity struct {
 	Level Level `json:"level"`
 
-	Request  Verbosity `json:"request"`
-	Response Verbosity `json:"response"`
+	Request  Verbosity `json:"request,omitempty"`
+	Response Verbosity `json:"response,omitempty"`
 }
 
 // +genclient
