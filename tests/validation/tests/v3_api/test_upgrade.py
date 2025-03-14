@@ -762,9 +762,9 @@ def modify_catalog_app():
 
 
 def validate_catalog_app(app_name, external_id):
-    p_client = namespace["p_client"]
+    clusters = namespace["cluster"]
     client = get_cluster_client_for_token_v1(
-        p_client["id"], USER_TOKEN)
+        clusters["id"], USER_TOKEN)
     
     app = wait_for_catalog_app_active(client, app_name)
     assert app.externalId == external_id, \
