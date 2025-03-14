@@ -19,18 +19,18 @@ const (
 )
 
 type Filter struct {
-	Action     FilterAction `json:"action"`
-	RequestURI string       `json:"requestURI"`
+	Action     FilterAction `json:"action,omitempty"`
+	RequestURI string       `json:"requestURI,omitempty"`
 }
 
 type Redaction struct {
-	Headers []string `json:"headers"`
-	Paths   []string `json:"paths"`
+	Headers []string `json:"headers,omitempty"`
+	Paths   []string `json:"paths,omitempty"`
 }
 
 type Verbosity struct {
-	Headers bool `json:"headers"`
-	Body    bool `json:"body"`
+	Headers bool `json:"headers,omitempty"`
+	Body    bool `json:"body,omitempty"`
 }
 
 type Level int
@@ -50,7 +50,8 @@ type LogVerbosity struct {
 }
 
 // +genclient
-// +kubebuilder:skipversion
+// +kubebuilder:printcolumn:name="Enabled",type=string,JSONPath=`.spec.enabled`
+// +kubebuilder:printcolumn:name="Condition",type=string,JSONPath=`.status.condition`
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AuditLogPolicy struct {
@@ -65,9 +66,9 @@ type AuditLogPolicySpec struct {
 	Enabled bool `json:"enabled"`
 
 	// Filters described what are explicitly allowed and denied. Leave empty if all logs should be allowed.
-	Filters              []Filter     `json:"filters"`
-	AdditionalRedactions []Redaction  `json:"additionalRedactions"`
-	Verbosity            LogVerbosity `json:"verbosity"`
+	Filters              []Filter     `json:"filters,omitempty"`
+	AdditionalRedactions []Redaction  `json:"additionalRedactions,omitempty"`
+	Verbosity            LogVerbosity `json:"verbosity,omitempty"`
 }
 
 type AuditLogPolicyStatus struct {
