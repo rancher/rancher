@@ -7,19 +7,21 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types/convert"
+	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientcache "k8s.io/client-go/tools/cache"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/rancher/pkg/utils"
-	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	clientcache "k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -468,14 +470,34 @@ func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.
 	if err != nil {
 		return nil, err
 	}
-	for key, value := range existingLimitMap {
-		if _, ok := newLimitMap[key]; ok {
-			newLimitMap[key] = value
-		}
-	}
 
 	if reflect.DeepEqual(existingLimitMap, newLimitMap) {
 		return nil, nil
+	}
+
+	for key, existingValue := range existingLimitMap {
+		existingValueQuantity, err := resource.ParseQuantity(existingValue.(string))
+		if err != nil {
+			continue
+		}
+
+		// if we have a value for that (cpu or memory) then we check if this value
+		// is less then (or equal) the one defined in project level:
+		// -- if yes, then we set it
+		// -- if not, we set project value
+		if defaultValue, ok := newLimitMap[key]; ok {
+			defaultLimitVal, err := resource.ParseQuantity(defaultValue.(string))
+			if err != nil {
+				continue
+			}
+
+			if existingValueQuantity.Cmp(defaultLimitVal) < 0 {
+				newLimitMap[key] = existingValue
+			}
+		} else {
+			// if no value is defined in project, we set the proposed value
+			newLimitMap[key] = existingValue
+		}
 	}
 
 	newLimit := &v32.ContainerResourceLimit{}
