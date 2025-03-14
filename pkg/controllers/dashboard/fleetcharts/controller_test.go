@@ -81,6 +81,7 @@ func Test_ChartInstallation(t *testing.T) {
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
 					fleetconst.CRDChartName,
+					fleetconst.CRDChartName,
 					exactVersion,
 					"",
 					nil,
@@ -89,6 +90,7 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil).Times(len(stgs))
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
+					fleetconst.ChartName,
 					fleetconst.ChartName,
 					exactVersion,
 					"",
@@ -134,6 +136,7 @@ func Test_ChartInstallation(t *testing.T) {
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
 					fleetconst.CRDChartName,
+					fleetconst.CRDChartName,
 					minVersion,
 					"",
 					nil,
@@ -142,6 +145,7 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil).Times(len(stgs))
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
+					fleetconst.ChartName,
 					fleetconst.ChartName,
 					minVersion,
 					"",
@@ -182,6 +186,7 @@ func Test_ChartInstallation(t *testing.T) {
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
 					fleetconst.CRDChartName,
+					fleetconst.CRDChartName,
 					settings.FleetVersion.Get(),
 					"",
 					nil,
@@ -190,6 +195,7 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil).Times(len(stgs))
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
+					fleetconst.ChartName,
 					fleetconst.ChartName,
 					settings.FleetVersion.Get(),
 					"",
@@ -245,6 +251,7 @@ bootstrap:
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
 					fleetconst.CRDChartName,
+					fleetconst.CRDChartName,
 					exactVersion,
 					"",
 					nil,
@@ -253,6 +260,7 @@ bootstrap:
 				).Return(nil).Times(len(stgs))
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
+					fleetconst.ChartName,
 					fleetconst.ChartName,
 					exactVersion,
 					"",
