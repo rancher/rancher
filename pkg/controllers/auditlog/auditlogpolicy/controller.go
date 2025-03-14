@@ -20,7 +20,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditLogPolicy) (*auditlo
 		h.writer.RemovePolicy(obj)
 
 		obj.Status = auditlogv1.AuditLogPolicyStatus{
-			Condition: auditlogv1.AuditLogPolicyStatusConditionDisabled,
+			Condition: auditlogv1.AuditLogPolicyStatusConditionInactive,
 		}
 
 		if _, err := h.auditlogpolicy.UpdateStatus(obj); err != nil {
