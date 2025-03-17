@@ -11,7 +11,8 @@ import (
 )
 
 type logWriter struct {
-	logs []log
+	rawLogs [][]byte
+	logs    []log
 }
 
 func (w *logWriter) Write(p []byte) (n int, err error) {
@@ -20,6 +21,7 @@ func (w *logWriter) Write(p []byte) (n int, err error) {
 		return 0, err
 	}
 
+	w.rawLogs = append(w.rawLogs, p)
 	w.logs = append(w.logs, l)
 
 	return len(p), nil
@@ -214,4 +216,38 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, logs.logs)
+}
+
+func assertFieldIsValidJson(t *testing.T, obj map[string]any, field string) {
+	t.Helper()
+
+	switch v := obj[field].(type) {
+	case string:
+		assert.True(t, json.Valid([]byte(v)), "field '%s' content '%s' is not valid json", field, v)
+	default:
+		assert.Fail(t, "field %s is not a string", field)
+	}
+}
+
+func TestLogBodiesNotBase64Encoded(t *testing.T) {
+	logs, w := setup(t, WriterOptions{
+		DefaultPolicyLevel:     auditlogv1.LevelRequestResponse,
+		DisableDefaultPolicies: true,
+	})
+
+	log := log{
+		RequestBody:  []byte(`{"password":"password"}`),
+		ResponseBody: []byte(`{"password":"password"}`),
+	}
+
+	err := w.Write(&log)
+	assert.NoError(t, err)
+
+	var v map[string]any
+
+	err = json.Unmarshal(logs.rawLogs[0], &v)
+	assert.NoError(t, err)
+
+	assertFieldIsValidJson(t, v, "requestBody")
+	assertFieldIsValidJson(t, v, "responseBody")
 }
