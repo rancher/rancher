@@ -23,8 +23,8 @@ github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/rancher/norman v0.5.2 h1:rwUKZ0QeVKJEtznhRdNQUMJtKjSoLYbFuPQGXm6xTxw=
-github.com/rancher/norman v0.5.2/go.mod h1:lDO9ylAYBwch9FiYyuuWlYd7+IxgRgh0ioDJBweC7t4=
+github.com/rancher/norman v0.6.0 h1:8CyY9cVcw0L+YYZRGvXHPMENefLaDkmi6vpscrVjXew=
+github.com/rancher/norman v0.6.0/go.mod h1:CQ0/1CoEqbeJXvOXuRQvsmiBd7QIgxZG5IvQFOPAHOg=
 github.com/rancher/wrangler/v3 v3.2.0-rc.3 h1:MySHWLxLLrGrM2sq5YYp7Ol1kQqYt9lvIzjGR50UZ+c=
 github.com/rancher/wrangler/v3 v3.2.0-rc.3/go.mod h1:0C5QyvSrQOff8gQQzpB/L/FF03EQycjR3unSJcKCHno=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
