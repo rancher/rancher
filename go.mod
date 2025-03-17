@@ -130,22 +130,22 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
 	github.com/rancher/aks-operator v1.11.0-rc.5
-	github.com/rancher/apiserver v0.5.2
+	github.com/rancher/apiserver v0.6.0
 	github.com/rancher/backup-restore-operator v1.2.1
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.2-rc.3
 	github.com/rancher/eks-operator v1.11.0-rc.4
-	github.com/rancher/fleet/pkg/apis v0.12.0-alpha.2.0.20250307143218-68772e96751c
+	github.com/rancher/fleet/pkg/apis v0.12.0-beta.2
 	github.com/rancher/gke-operator v1.11.0-rc.4
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.1
 	github.com/rancher/machine v0.15.0-rancher126
-	github.com/rancher/norman v0.5.2
+	github.com/rancher/norman v0.6.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.4-rc.2
 	github.com/rancher/rke v1.8.0-rc.4
 	github.com/rancher/shepherd v0.0.0-20241213222351-98e341c77d0b
-	github.com/rancher/steve v0.5.10
+	github.com/rancher/steve v0.6.1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.2.0-rc.3
@@ -365,7 +365,7 @@ require (
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/matryer/moq v0.3.4 // indirect
+	github.com/matryer/moq v0.5.2 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect

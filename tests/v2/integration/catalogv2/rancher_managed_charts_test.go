@@ -187,8 +187,8 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
 
-	w.Require().NoError(err)
 	w.Assert().Greater(originalLatestVersion, app.Spec.Chart.Metadata.Version)
+
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 
@@ -423,18 +423,6 @@ func (w *RancherManagedChartsTest) resetManagementCluster() {
 	})
 	w.Require().NoError(err)
 	w.cluster = c
-	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		list, err := w.corev1.Secrets("cattle-system").List(context.TODO(), metav1.ListOptions{LabelSelector: "name in (rancher-aks-operator, rancher-aks-operator-crd)"})
-		w.Require().NoError(err)
-		if len(list.Items) == 0 {
-			return true, nil
-		}
-		for _, s := range list.Items {
-			w.Require().NoError(w.corev1.Secrets("cattle-system").Delete(context.Background(), s.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
 }
 
 func (w *RancherManagedChartsTest) updateSetting(name, value string) error {
