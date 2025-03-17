@@ -64,7 +64,7 @@ type ClaimInfo struct {
 	Email             string   `json:"email"`
 	EmailVerified     bool     `json:"email_verified"`
 	Groups            []string `json:"groups"`
-	FullGroupPath     []string `json:"full_group_path"`
+	FullGroupPath     []string `json:"full_group_path"` // GitLab-specific configuration
 	ACR               string   `json:"acr"`
 	Roles             []string `json:"roles"` // AzureAD-specific configuration
 }
