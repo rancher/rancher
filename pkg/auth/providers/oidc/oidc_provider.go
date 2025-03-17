@@ -65,6 +65,7 @@ type ClaimInfo struct {
 	Groups            []string `json:"groups"`
 	FullGroupPath     []string `json:"full_group_path"`
 	ACR               string   `json:"acr"`
+	Roles             []string `json:"roles"` // AzureAD-specific configuration
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -559,6 +560,16 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Princ
 	} else {
 		for _, group := range claimInfo.Groups {
 			groupPrincipal := o.groupToPrincipal(group)
+			groupPrincipal.MemberOf = true
+			groupPrincipals = append(groupPrincipals, groupPrincipal)
+		}
+	}
+
+	// If the claimInfo includes roles, we will treat them like groups
+	// AzureAD, specifically, supports this
+	if len(claimInfo.Roles) > 0 {
+		for _, role := range claimInfo.Roles {
+			groupPrincipal := o.groupToPrincipal(role)
 			groupPrincipal.MemberOf = true
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
