@@ -49,7 +49,7 @@ func BasicCRDs() []string {
 		"preferences.management.cattle.io",
 		"settings.management.cattle.io",
 		"navlinks.ui.cattle.io",
-		"auditlogpolicies.auditlog.cattle.io",
+		"auditpolicies.auditlog.cattle.io",
 	}
 }
 
@@ -268,5 +268,5 @@ var MigratedResources = map[string]bool{
 	"users.management.cattle.io":                                      false,
 	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
-	"auditlogpolicies.auditlog.cattle.io":                             true,
+	"auditpolicies.auditlog.cattle.io":                                true,
 }

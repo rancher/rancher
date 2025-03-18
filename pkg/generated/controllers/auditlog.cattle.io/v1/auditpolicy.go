@@ -19,31 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
-	"github.com/rancher/wrangler/v3/pkg/schemes"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func init() {
-	schemes.Register(v1.AddToScheme)
+// AuditPolicyController interface for managing AuditPolicy resources.
+type AuditPolicyController interface {
+	generic.ControllerInterface[*v1.AuditPolicy, *v1.AuditPolicyList]
 }
 
-type Interface interface {
-	AuditPolicy() AuditPolicyController
+// AuditPolicyClient interface for managing AuditPolicy resources in Kubernetes.
+type AuditPolicyClient interface {
+	generic.ClientInterface[*v1.AuditPolicy, *v1.AuditPolicyList]
 }
 
-func New(controllerFactory controller.SharedControllerFactory) Interface {
-	return &version{
-		controllerFactory: controllerFactory,
-	}
-}
-
-type version struct {
-	controllerFactory controller.SharedControllerFactory
-}
-
-func (v *version) AuditPolicy() AuditPolicyController {
-	return generic.NewController[*v1.AuditPolicy, *v1.AuditPolicyList](schema.GroupVersionKind{Group: "auditlog.cattle.io", Version: "v1", Kind: "AuditPolicy"}, "auditpolicies", true, v.controllerFactory)
+// AuditPolicyCache interface for retrieving AuditPolicy resources in memory.
+type AuditPolicyCache interface {
+	generic.CacheInterface[*v1.AuditPolicy]
 }
