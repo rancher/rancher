@@ -66,26 +66,6 @@ func setup(t *testing.T, level auditlogv1.Level) handler {
 	return h
 }
 
-// todo: add assertions to check that policies were added properlly to the writer
-
-// todo: [DONE] test add enabled policy
-// todo: [DONE] test add invalid policy (filter uri regex)
-// todo: [DONE] test add invalid policy (filter action)
-// todo: [DONE] test add invalid policy (redactor header regex)
-// todo: [DONE] test add invalid policy (redactor key regex)
-// todo: [DONE] test add disabled policy
-// todo: [DONE] test disable active policy
-// todo: test overwrite active policy with active policy
-// todo: [DONE] test overwrite active policy with invalid policy
-// todo: [DONE] test overwrite invalid policy with active policy
-
-// todo: [DONE] test remove active policy
-// todo: [DONE] test remove disabled policy
-// todo: [DONE] test remove invalid policy
-// tood: [DONE] test remove nonexistant policy
-
-// todo: will probably need update all tests to replace slices rather then update inplace
-
 func TestOnChangeAddSimplePolicy(t *testing.T) {
 	h := setup(t, auditlogv1.LevelMetadata)
 
