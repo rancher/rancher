@@ -345,9 +345,9 @@ func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretControl
 func PlanSecretFromBootstrapName(clusterName string) string {
 	// considered not limiting this to 253 and creating an error at runtime - if this warning is showing up hopefully it'll get noticed.
 	fullName := strings.Join([]string{clusterName, "machine", "plan"}, "-")
-	if len(fullName) > 253 {
+	if len(fullName) > 63 {
 		logrus.Warnf("[%s] machine-plan secret too long for backup-restore-operator", clusterName)
-		return name.Limit(fullName, 253)
+		return name.Limit(fullName, 63)
 	}
 
 	return fullName
