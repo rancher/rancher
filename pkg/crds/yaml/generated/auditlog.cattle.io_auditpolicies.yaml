@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
-  name: auditlogpolicies.auditlog.cattle.io
+  name: auditpolicies.auditlog.cattle.io
 spec:
   group: auditlog.cattle.io
   names:
-    kind: AuditLogPolicy
-    listKind: AuditLogPolicyList
-    plural: auditlogpolicies
-    singular: auditlogpolicy
+    kind: AuditPolicy
+    listKind: AuditPolicyList
+    plural: auditpolicies
+    singular: auditpolicy
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -106,4 +106,5 @@ spec:
         type: object
     served: true
     storage: true
-    subresources: {}
+    subresources:
+      status: {}
