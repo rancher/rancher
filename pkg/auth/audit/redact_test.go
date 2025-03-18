@@ -128,9 +128,14 @@ func TestPolicyRedactor(t *testing.T) {
 		},
 	}
 
+	verbosity := auditlogv1.LogVerbosity{
+		Request:  auditlogv1.Verbosity{Headers: true, Body: true},
+		Response: auditlogv1.Verbosity{Headers: true, Body: true},
+	}
+
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			c.Input.prepare()
+			c.Input.prepare(verbosity)
 			err := c.Redactor.Redact(&c.Input)
 
 			actual := c.Input
