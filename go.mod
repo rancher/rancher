@@ -135,7 +135,7 @@ require (
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.2-rc.3
 	github.com/rancher/eks-operator v1.11.0-rc.4
-	github.com/rancher/fleet/pkg/apis v0.12.0-beta.2
+	github.com/rancher/fleet/pkg/apis v0.12.0-rc.2.0.20250318105039-16b5bc1f761a
 	github.com/rancher/gke-operator v1.11.0-rc.4
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.1
@@ -157,9 +157,9 @@ require (
 	github.com/vishvananda/netlink v1.3.1-0.20240905180732-b1ce50cfa9be
 	github.com/vmware/govmomi v0.42.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.35.0
 	golang.org/x/mod v0.23.0
-	golang.org/x/net v0.35.0
+	golang.org/x/net v0.36.0
 	golang.org/x/oauth2 v0.26.0
 	golang.org/x/sync v0.11.0
 	golang.org/x/text v0.22.0
