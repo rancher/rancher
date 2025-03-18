@@ -206,8 +206,7 @@ func (w *Writer) Write(log *log) error {
 		return nil
 	}
 
-	log.applyVerbosity(verbosity)
-	log.prepare()
+	log.prepare(verbosity)
 
 	if err := w.decompressResponse(log); err != nil {
 		return fmt.Errorf("failed to decompress response: %w", err)
