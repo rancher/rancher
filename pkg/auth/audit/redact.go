@@ -75,7 +75,7 @@ func (rf RedactFunc) Redact(log *log) error {
 }
 
 var (
-	secretBaseType = regexp.MustCompile(".\"baseType\":\"([A-Za-z]*[S|s]ecret)\".")
+	secretBaseType = regexp.MustCompile("^[A-Za-z]*[S|s]ecret$")
 )
 
 func redactSingleSecret(secret map[string]any) {
@@ -156,16 +156,25 @@ func redactSecretsFromBody(log *log, body map[string]any) error {
 	return err
 }
 
+func checkForSecretBasetype(k string, v any) bool {
+	s, ok := v.(string)
+	if !ok {
+		return false
+	}
+
+	return k == "baseType" && secretBaseType.MatchString(s)
+}
+
 func redactSecret(log *log) error {
 	var err error
 
-	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.rawRequestBody) {
+	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.RequestBody, checkForSecretBasetype) {
 		if err = redactSecretsFromBody(log, log.RequestBody); err != nil {
 			return err
 		}
 	}
 
-	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.rawRequestBody) {
+	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.RequestBody, checkForSecretBasetype) {
 		if err = redactSecretsFromBody(log, log.ResponseBody); err != nil {
 			return err
 		}
