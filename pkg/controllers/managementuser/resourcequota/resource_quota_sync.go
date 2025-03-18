@@ -457,33 +457,34 @@ func completeQuota(requestedQuota *v32.ResourceQuotaLimit, defaultQuota *v32.Res
 	return toReturn, err
 }
 
-func completeLimit(newLimit *v32.ContainerResourceLimit, defaultLimit *v32.ContainerResourceLimit) (*v32.ContainerResourceLimit, error) {
-	if defaultLimit == nil {
+func completeLimit(nsLimit *v32.ContainerResourceLimit, projectLimit *v32.ContainerResourceLimit) (*v32.ContainerResourceLimit, error) {
+	if projectLimit == nil {
 		return nil, nil
 	}
 
-	newLimitMap, err := convert.EncodeToMap(newLimit)
+	nsLimitMap, err := convert.EncodeToMap(nsLimit)
 	if err != nil {
 		return nil, err
 	}
 
-	defaultLimitMap, err := convert.EncodeToMap(defaultLimit)
+	projectLimitMap, err := convert.EncodeToMap(projectLimit)
 	if err != nil {
 		return nil, err
 	}
 
-	if reflect.DeepEqual(newLimitMap, defaultLimitMap) {
+	if reflect.DeepEqual(nsLimitMap, projectLimitMap) {
 		return nil, nil
 	}
 
-	for key, value := range defaultLimitMap {
-		if _, ok := newLimitMap[key]; !ok {
-			newLimitMap[key] = value
+	// project values are mostly default values
+	for key, value := range projectLimitMap {
+		if _, ok := nsLimitMap[key]; !ok {
+			nsLimitMap[key] = value
 		}
 	}
 
 	resultingLimit := &v32.ContainerResourceLimit{}
-	err = convert.ToObj(newLimitMap, resultingLimit)
+	err = convert.ToObj(nsLimitMap, resultingLimit)
 	return resultingLimit, err
 }
 
