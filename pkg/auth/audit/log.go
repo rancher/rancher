@@ -40,11 +40,11 @@ type log struct {
 	RequestHeader  http.Header `json:"requestHeader,omitempty"`
 	ResponseHeader http.Header `json:"responseHeader,omitempty"`
 
-	RequestBody  []byte `json:"requestBody,omitempty"`
-	ResponseBody []byte `json:"responseBody,omitempty"`
+	RequestBody  map[string]any `json:"requestBody,omitempty"`
+	ResponseBody map[string]any `json:"responseBody,omitempty"`
 
-	unmarshalledRequestBody  map[string]any
-	unmarshalledResponseBody map[string]any
+	rawRequestBody  []byte
+	rawResponseBody []byte
 }
 
 func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp string, respTimestamp string) (*log, error) {
@@ -63,8 +63,7 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 		RequestHeader:  req.Header,
 		ResponseHeader: rw.Header(),
 
-		RequestBody:  nil,
-		ResponseBody: rw.buf.Bytes(),
+		rawResponseBody: rw.buf.Bytes(),
 	}
 
 	contentType := req.Header.Get("Content-Type")
@@ -81,7 +80,7 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 			log.UserLoginName = loginName
 		}
 
-		log.RequestBody = body
+		log.rawRequestBody = body
 	}
 
 	return log, nil
@@ -98,87 +97,33 @@ func (l *log) applyVerbosity(verbosity auditlogv1.LogVerbosity) {
 
 	if !verbosity.Request.Body {
 		l.RequestBody = nil
+		l.rawRequestBody = nil
 	}
 
 	if !verbosity.Response.Body {
 		l.ResponseBody = nil
+		l.rawResponseBody = nil
 	}
 }
 
 func (l *log) prepare() {
-	if l.RequestBody != nil {
-		if err := json.Unmarshal(l.RequestBody, &l.unmarshalledRequestBody); err != nil {
-			l.unmarshalledRequestBody = map[string]any{
+	if l.rawRequestBody != nil {
+		if err := json.Unmarshal(l.rawRequestBody, &l.RequestBody); err != nil {
+			l.RequestBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
 			}
 		}
 
-		l.RequestBody = nil
+		l.rawRequestBody = nil
 	}
 
-	if l.ResponseBody != nil {
-		if err := json.Unmarshal(l.ResponseBody, &l.unmarshalledResponseBody); err != nil {
-			l.unmarshalledResponseBody = map[string]any{
+	if l.rawResponseBody != nil {
+		if err := json.Unmarshal(l.rawResponseBody, &l.ResponseBody); err != nil {
+			l.ResponseBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", err.Error()),
 			}
 		}
 
-		l.ResponseBody = nil
+		l.rawResponseBody = nil
 	}
-}
-
-func (l *log) restore() error {
-	var err error
-
-	if l.unmarshalledRequestBody != nil {
-		if l.RequestBody, err = json.Marshal(l.unmarshalledRequestBody); err != nil {
-			return fmt.Errorf("failed to marshal request body: %w", err)
-		}
-
-		l.unmarshalledRequestBody = nil
-	}
-
-	if l.unmarshalledResponseBody != nil {
-		if l.ResponseBody, err = json.Marshal(l.unmarshalledResponseBody); err != nil {
-			return fmt.Errorf("failed to marshal response body: %w", err)
-		}
-
-		l.unmarshalledResponseBody = nil
-	}
-
-	return nil
-}
-
-// marshalLog marshals the given log to json. Since the default golang json.Marshal encode all []byte fields to base64,
-// we need to make some manual changes to ensure that the log RequestBody and ResponseBody are rendered as plaintext
-// and not base64.
-func marshalLog(l *log) ([]byte, error) {
-	respBody := l.ResponseBody
-	l.ResponseBody = nil
-
-	reqBody := l.RequestBody
-	l.RequestBody = nil
-
-	data, err := json.Marshal(l)
-	if err != nil {
-		return nil, err
-	}
-
-	data = bytes.TrimSuffix(data, []byte("}"))
-
-	buffer := bytes.NewBuffer(data)
-
-	if reqBody != nil {
-		buffer.WriteString(`,"requestBody":`)
-		buffer.Write(reqBody)
-	}
-
-	if respBody != nil {
-		buffer.WriteString(`,"responseBody":`)
-		buffer.Write(respBody)
-	}
-
-	buffer.WriteString("}")
-
-	return buffer.Bytes(), nil
 }

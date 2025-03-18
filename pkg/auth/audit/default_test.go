@@ -204,19 +204,18 @@ func TestDefaultPolicies(t *testing.T) {
 			}
 
 			log := &log{
-				AuditID:     "0123456789",
-				RequestURI:  c.Uri,
-				RequestBody: c.Body,
+				AuditID:        "0123456789",
+				RequestURI:     c.Uri,
+				rawRequestBody: c.Body,
 			}
 
 			err = writer.Write(log)
 			assert.NoError(t, err)
 
-			obj := map[string]any{}
-			err = json.Unmarshal(buffer.Bytes(), &obj)
+			err = json.Unmarshal(buffer.Bytes(), log)
 			assert.NoError(t, err)
 
-			actual := obj["requestBody"].(map[string]any)
+			actual := log.RequestBody
 
 			expected := map[string]any{}
 			err = json.Unmarshal(c.Expected, &expected)
