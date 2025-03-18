@@ -60,8 +60,8 @@ func (r *policyRedactor) Redact(log *log) error {
 	r.redactHeaders(log.ResponseHeader)
 
 	for _, path := range r.paths {
-		path.Set(log.unmarshalledRequestBody, redacted)
-		path.Set(log.unmarshalledResponseBody, redacted)
+		path.Set(log.RequestBody, redacted)
+		path.Set(log.ResponseBody, redacted)
 	}
 
 	return nil
@@ -159,14 +159,14 @@ func redactSecretsFromBody(log *log, body map[string]any) error {
 func redactSecret(log *log) error {
 	var err error
 
-	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.RequestBody) {
-		if err = redactSecretsFromBody(log, log.unmarshalledRequestBody); err != nil {
+	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.rawRequestBody) {
+		if err = redactSecretsFromBody(log, log.RequestBody); err != nil {
 			return err
 		}
 	}
 
-	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.RequestBody) {
-		if err = redactSecretsFromBody(log, log.unmarshalledResponseBody); err != nil {
+	if strings.Contains(log.RequestURI, "secrets") || secretBaseType.Match(log.rawRequestBody) {
+		if err = redactSecretsFromBody(log, log.ResponseBody); err != nil {
 			return err
 		}
 	}
@@ -213,8 +213,8 @@ func regexRedactor(patterns []string) (Redactor, error) {
 	}
 
 	return RedactFunc(func(log *log) error {
-		redactMap(regexes, log.unmarshalledRequestBody)
-		redactMap(regexes, log.unmarshalledResponseBody)
+		redactMap(regexes, log.RequestBody)
+		redactMap(regexes, log.ResponseBody)
 		return nil
 	}), nil
 }
