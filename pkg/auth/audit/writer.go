@@ -159,9 +159,9 @@ func (w *Writer) decompressResponse(log *log) error {
 
 	switch contentType := log.ResponseHeader.Get("Content-Encoding"); contentType {
 	case contentEncodingGZIP:
-		compressed, err = decompressGZIP(log.ResponseBody)
+		compressed, err = decompressGZIP(log.rawResponseBody)
 	case contentEncodingZLib:
-		compressed, err = decompressZLib(log.ResponseBody)
+		compressed, err = decompressZLib(log.rawResponseBody)
 	case "", "none":
 		// not encoded do nothing
 	default:
@@ -172,7 +172,7 @@ func (w *Writer) decompressResponse(log *log) error {
 		return fmt.Errorf("failed to decode response body: %w", err)
 	}
 
-	log.ResponseBody = compressed
+	log.rawResponseBody = compressed
 
 	return nil
 }
@@ -219,11 +219,7 @@ func (w *Writer) Write(log *log) error {
 		}
 	}
 
-	if err := log.restore(); err != nil {
-		return fmt.Errorf("failed to prepare log bodies for redaction: %w", err)
-	}
-
-	data, err := marshalLog(log)
+	data, err := json.Marshal(log)
 	if err != nil {
 		return fmt.Errorf("failed to marshal log: %w", err)
 	}
