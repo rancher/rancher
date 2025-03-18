@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -458,51 +457,34 @@ func completeQuota(requestedQuota *v32.ResourceQuotaLimit, defaultQuota *v32.Res
 	return toReturn, err
 }
 
-func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.ContainerResourceLimit) (*v32.ContainerResourceLimit, error) {
+func completeLimit(newLimit *v32.ContainerResourceLimit, defaultLimit *v32.ContainerResourceLimit) (*v32.ContainerResourceLimit, error) {
 	if defaultLimit == nil {
 		return nil, nil
 	}
-	existingLimitMap, err := convert.EncodeToMap(existingLimit)
-	if err != nil {
-		return nil, err
-	}
-	newLimitMap, err := convert.EncodeToMap(defaultLimit)
+
+	newLimitMap, err := convert.EncodeToMap(newLimit)
 	if err != nil {
 		return nil, err
 	}
 
-	if reflect.DeepEqual(existingLimitMap, newLimitMap) {
+	defaultLimitMap, err := convert.EncodeToMap(defaultLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	if reflect.DeepEqual(newLimitMap, defaultLimitMap) {
 		return nil, nil
 	}
 
-	for key, existingValue := range existingLimitMap {
-		existingValueQuantity, err := resource.ParseQuantity(existingValue.(string))
-		if err != nil {
-			continue
-		}
-
-		// if we have a value for that (cpu or memory) then we check if this value
-		// is less then (or equal) the one defined in project level:
-		// -- if yes, then we set it
-		// -- if not, we set project value
-		if defaultValue, ok := newLimitMap[key]; ok {
-			defaultLimitVal, err := resource.ParseQuantity(defaultValue.(string))
-			if err != nil {
-				continue
-			}
-
-			if existingValueQuantity.Cmp(defaultLimitVal) < 0 {
-				newLimitMap[key] = existingValue
-			}
-		} else {
-			// if no value is defined in project, we set the proposed value
-			newLimitMap[key] = existingValue
+	for key, value := range defaultLimitMap {
+		if _, ok := newLimitMap[key]; !ok {
+			newLimitMap[key] = value
 		}
 	}
 
-	newLimit := &v32.ContainerResourceLimit{}
-	err = convert.ToObj(newLimitMap, newLimit)
-	return newLimit, err
+	resultingLimit := &v32.ContainerResourceLimit{}
+	err = convert.ToObj(newLimitMap, resultingLimit)
+	return resultingLimit, err
 }
 
 // zeroOutResourceQuotaLimit takes a resource quota limit and a list of resources exceeding the quota,
