@@ -3,7 +3,6 @@ package audit
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/audit/jsonpath"
@@ -80,10 +79,6 @@ func matchesAny(s string, regexes []*regexp.Regexp) bool {
 	}
 
 	return false
-}
-
-func isLoginRequest(uri string) bool {
-	return strings.Contains(uri, "?action=login")
 }
 
 func parsePaths(paths []string) ([]*jsonpath.JSONPath, error) {
