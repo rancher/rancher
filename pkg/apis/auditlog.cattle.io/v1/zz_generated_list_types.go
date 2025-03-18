@@ -26,16 +26,16 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AuditLogPolicyList is a list of AuditLogPolicy resources
-type AuditLogPolicyList struct {
+// AuditPolicyList is a list of AuditPolicy resources
+type AuditPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []AuditLogPolicy `json:"items"`
+	Items []AuditPolicy `json:"items"`
 }
 
-func NewAuditLogPolicy(namespace, name string, obj AuditLogPolicy) *AuditLogPolicy {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AuditLogPolicy").ToAPIVersionAndKind()
+func NewAuditPolicy(namespace, name string, obj AuditPolicy) *AuditPolicy {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("AuditPolicy").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

@@ -47,12 +47,12 @@ func TestAllowList(t *testing.T) {
 		DisableDefaultPolicies: true,
 	})
 
-	err := w.UpdatePolicy(&auditlogv1.AuditLogPolicy{
+	err := w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "block-all",
 			Namespace: "default",
 		},
-		Spec: auditlogv1.AuditLogPolicySpec{
+		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
 				{
 					Action:     auditlogv1.FilterActionDeny,
@@ -71,12 +71,12 @@ func TestAllowList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
 
-	err = w.UpdatePolicy(&auditlogv1.AuditLogPolicy{
+	err = w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "allow-secrets",
 			Namespace: "default",
 		},
-		Spec: auditlogv1.AuditLogPolicySpec{
+		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
 				{
 					Action:     auditlogv1.FilterActionAllow,
@@ -120,12 +120,12 @@ func TestBlockList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
 
-	err = w.UpdatePolicy(&auditlogv1.AuditLogPolicy{
+	err = w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "allow-secrets",
 			Namespace: "default",
 		},
-		Spec: auditlogv1.AuditLogPolicySpec{
+		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
 				{
 					Action:     auditlogv1.FilterActionDeny,
@@ -155,22 +155,22 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 		DisableDefaultPolicies: true,
 	})
 
-	w.UpdatePolicy(&auditlogv1.AuditLogPolicy{
+	w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "set-higher-default-verbosity",
 		},
-		Spec: auditlogv1.AuditLogPolicySpec{
+		Spec: auditlogv1.AuditPolicySpec{
 			Verbosity: auditlogv1.LogVerbosity{
 				Level: auditlogv1.LevelRequest,
 			},
 		},
 	})
 
-	w.UpdatePolicy(&auditlogv1.AuditLogPolicy{
+	w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "set-higher-custom-default-verbosity-for-specific-url",
 		},
-		Spec: auditlogv1.AuditLogPolicySpec{
+		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
 				{
 					Action:     auditlogv1.FilterActionAllow,

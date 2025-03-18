@@ -43,7 +43,7 @@ func (p Policy) actionForLog(log *log) auditlogv1.FilterAction {
 	return auditlogv1.FilterActionDeny
 }
 
-func PolicyFromAuditLogPolicy(policy *auditlogv1.AuditLogPolicy) (Policy, error) {
+func PolicyFromAuditPolicy(policy *auditlogv1.AuditPolicy) (Policy, error) {
 	newPolicy := Policy{
 		Filters:   make([]*Filter, len(policy.Spec.Filters)),
 		Redactors: make([]Redactor, len(policy.Spec.AdditionalRedactions)),
@@ -240,8 +240,8 @@ func (w *Writer) Write(log *log) error {
 	return nil
 }
 
-func (w *Writer) UpdatePolicy(policy *auditlogv1.AuditLogPolicy) error {
-	newPolicy, err := PolicyFromAuditLogPolicy(policy)
+func (w *Writer) UpdatePolicy(policy *auditlogv1.AuditPolicy) error {
+	newPolicy, err := PolicyFromAuditPolicy(policy)
 	if err != nil {
 		return fmt.Errorf("failed to create policy: %w", err)
 	}
@@ -258,7 +258,7 @@ func (w *Writer) UpdatePolicy(policy *auditlogv1.AuditLogPolicy) error {
 	return nil
 }
 
-func (w *Writer) RemovePolicy(policy *auditlogv1.AuditLogPolicy) bool {
+func (w *Writer) RemovePolicy(policy *auditlogv1.AuditPolicy) bool {
 	w.policiesMutex.Lock()
 	defer w.policiesMutex.Unlock()
 
