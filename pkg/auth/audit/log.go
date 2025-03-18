@@ -86,7 +86,7 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 	return log, nil
 }
 
-func (l *log) applyVerbosity(verbosity auditlogv1.LogVerbosity) {
+func (l *log) prepare(verbosity auditlogv1.LogVerbosity) {
 	if !verbosity.Request.Headers {
 		l.RequestHeader = nil
 	}
@@ -95,35 +95,21 @@ func (l *log) applyVerbosity(verbosity auditlogv1.LogVerbosity) {
 		l.ResponseHeader = nil
 	}
 
-	if !verbosity.Request.Body {
-		l.RequestBody = nil
-		l.rawRequestBody = nil
-	}
-
-	if !verbosity.Response.Body {
-		l.ResponseBody = nil
-		l.rawResponseBody = nil
-	}
-}
-
-func (l *log) prepare() {
-	if l.rawRequestBody != nil {
+	if verbosity.Request.Body && l.rawRequestBody != nil {
 		if err := json.Unmarshal(l.rawRequestBody, &l.RequestBody); err != nil {
 			l.RequestBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
 			}
 		}
-
-		l.rawRequestBody = nil
 	}
+	l.rawRequestBody = nil
 
-	if l.rawResponseBody != nil {
+	if verbosity.Response.Body && l.rawResponseBody != nil {
 		if err := json.Unmarshal(l.rawResponseBody, &l.ResponseBody); err != nil {
 			l.ResponseBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", err.Error()),
 			}
 		}
-
-		l.rawResponseBody = nil
 	}
+	l.rawResponseBody = nil
 }
