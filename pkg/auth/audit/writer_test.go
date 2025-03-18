@@ -12,11 +12,11 @@ import (
 
 type logWriter struct {
 	rawLogs [][]byte
-	logs    []log
+	logs    []map[string]any
 }
 
 func (w *logWriter) Write(p []byte) (n int, err error) {
-	l := log{}
+	var l map[string]any
 	if err := json.Unmarshal(p, &l); err != nil {
 		return 0, err
 	}
@@ -29,7 +29,8 @@ func (w *logWriter) Write(p []byte) (n int, err error) {
 
 func setup(t *testing.T, opts WriterOptions) (*logWriter, *Writer) {
 	lw := &logWriter{
-		logs: []log{},
+		rawLogs: [][]byte{},
+		logs:    []map[string]any{},
 	}
 
 	w, err := NewWriter(lw, opts)
@@ -62,7 +63,7 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{}
+	expected := []map[string]any{}
 
 	err = w.Write(&log{
 		RequestURI: "/api/v1/secrets",
@@ -86,9 +87,9 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected = []log{
+	expected = []map[string]any{
 		{
-			RequestURI: "/api/v1/secrets",
+			"requestURI": "/api/v1/secrets",
 		},
 	}
 
@@ -105,10 +106,10 @@ func TestBlockList(t *testing.T) {
 		DisableDefaultPolicies: true,
 	})
 
-	expected := []log{
+	expected := []map[string]any{
 		{
-			RequestURI: "/api/v1/secrets",
-			Method:     http.MethodGet,
+			"requestURI": "/api/v1/secrets",
+			"method":     http.MethodGet,
 		},
 	}
 
@@ -200,33 +201,46 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{
+	expected := []map[string]any{
 		{
-			RequestURI:     "/some/endopint",
-			RequestHeader:  headers,
-			ResponseHeader: headers,
-			RequestBody:    bodyContent,
+			"requestURI": "/some/endopint",
+			"requestHeader": map[string]any{
+				"foo": []any{"bar"},
+				"baz": []any{"qux"},
+			},
+			"responseHeader": map[string]any{
+				"foo": []any{"bar"},
+				"baz": []any{"qux"},
+			},
+			"requestBody": map[string]any{
+				"password": "password",
+			},
 		},
 		{
-			RequestURI:     "/my/endopint",
-			RequestHeader:  headers,
-			ResponseHeader: headers,
-			RequestBody:    bodyContent,
-			ResponseBody:   bodyContent},
+			"requestURI": "/my/endopint",
+			"requestHeader": map[string]any{
+				"foo": []any{"bar"},
+				"baz": []any{"qux"},
+			},
+			"responseHeader": map[string]any{
+				"foo": []any{"bar"},
+				"baz": []any{"qux"},
+			},
+			"requestBody": map[string]any{
+				"password": "password",
+			},
+			"responseBody": map[string]any{
+				"password": "password",
+			},
+		},
 	}
 
 	assert.Equal(t, expected, logs.logs)
 }
 
-func assertFieldIsValidJson(t *testing.T, obj map[string]any, field string) {
+func assertFieldIsObject(t *testing.T, obj map[string]any, field string) {
 	t.Helper()
-
-	switch v := obj[field].(type) {
-	case string:
-		assert.True(t, json.Valid([]byte(v)), "field '%s' content '%s' is not valid json", field, v)
-	default:
-		assert.Fail(t, "field %s is not a string", field)
-	}
+	assert.IsType(t, map[string]any{}, obj[field], "field '%s' is of type '%T' not '%T'", field, obj[field], map[string]any{})
 }
 
 func TestLogBodiesNotBase64Encoded(t *testing.T) {
@@ -236,6 +250,7 @@ func TestLogBodiesNotBase64Encoded(t *testing.T) {
 	})
 
 	log := log{
+		RequestURI:   "/api/some/endpoint",
 		RequestBody:  []byte(`{"password":"password"}`),
 		ResponseBody: []byte(`{"password":"password"}`),
 	}
@@ -248,6 +263,6 @@ func TestLogBodiesNotBase64Encoded(t *testing.T) {
 	err = json.Unmarshal(logs.rawLogs[0], &v)
 	assert.NoError(t, err)
 
-	assertFieldIsValidJson(t, v, "requestBody")
-	assertFieldIsValidJson(t, v, "responseBody")
+	assertFieldIsObject(t, v, "requestBody")
+	assertFieldIsObject(t, v, "responseBody")
 }
