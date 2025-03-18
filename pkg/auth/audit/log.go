@@ -151,3 +151,37 @@ func (l *log) restore() error {
 
 	return nil
 }
+
+// marshalLog marshals the given log to json. Since the default golang json.Marshal encode all []byte fields to base64,
+// we need to make some manual changes to ensure that the log RequestBody and ResponseBody are rendered as plaintext
+// and not base64.
+func marshalLog(l *log) ([]byte, error) {
+	respBody := l.ResponseBody
+	l.ResponseBody = nil
+
+	reqBody := l.RequestBody
+	l.RequestBody = nil
+
+	data, err := json.Marshal(l)
+	if err != nil {
+		return nil, err
+	}
+
+	data = bytes.TrimSuffix(data, []byte("}"))
+
+	buffer := bytes.NewBuffer(data)
+
+	if reqBody != nil {
+		buffer.WriteString(`,"requestBody":`)
+		buffer.Write(reqBody)
+	}
+
+	if respBody != nil {
+		buffer.WriteString(`,"responseBody":`)
+		buffer.Write(respBody)
+	}
+
+	buffer.WriteString("}")
+
+	return buffer.Bytes(), nil
+}
