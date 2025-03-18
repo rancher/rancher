@@ -1,24 +1,18 @@
 package audit
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultPolicies(t *testing.T) {
-	writer, err := NewWriter(io.Discard, WriterOptions{
-		DefaultPolicyLevel: auditlogv1.LevelRequest,
-	})
-	require.NoError(t, err)
-
 	machineDataInput, machineDataWant := []byte("{"), []byte("{")
 	for _, v := range management.DriverData {
 		for key, value := range v {
@@ -198,6 +192,11 @@ func TestDefaultPolicies(t *testing.T) {
 		},
 	}
 
+	buffer := bytes.NewBuffer(nil)
+	writer, err := NewWriter(buffer, WriterOptions{
+		DefaultPolicyLevel: auditlogv1.LevelRequestResponse,
+	})
+
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			if c.Skip {
@@ -205,22 +204,27 @@ func TestDefaultPolicies(t *testing.T) {
 			}
 
 			log := &log{
+				AuditID:     "0123456789",
 				RequestURI:  c.Uri,
 				RequestBody: c.Body,
 			}
 
-			err := writer.Write(log)
+			err = writer.Write(log)
 			assert.NoError(t, err)
 
-			actual := map[string]any{}
-			err = json.Unmarshal(log.RequestBody, &actual)
+			obj := map[string]any{}
+			err = json.Unmarshal(buffer.Bytes(), &obj)
 			assert.NoError(t, err)
+
+			actual := obj["requestBody"].(map[string]any)
 
 			expected := map[string]any{}
 			err = json.Unmarshal(c.Expected, &expected)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
+
+			buffer.Reset()
 		})
 	}
 }
