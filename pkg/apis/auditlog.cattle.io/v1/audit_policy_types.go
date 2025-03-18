@@ -4,14 +4,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type AuditLogPolicyStatusCondition string
+type AuditPolicyStatusCondition string
 type FilterAction string
 
 const (
-	AuditLogPolicyStatusConditionUnknown  AuditLogPolicyStatusCondition = ""
-	AuditLogPolicyStatusConditionActive   AuditLogPolicyStatusCondition = "active"
-	AuditLogPolicyStatusConditionInactive AuditLogPolicyStatusCondition = "inactive"
-	AuditLogPolicyStatusConditionInvalid  AuditLogPolicyStatusCondition = "invalid"
+	AuditPolicyStatusConditionUnknown  AuditPolicyStatusCondition = ""
+	AuditPolicyStatusConditionActive   AuditPolicyStatusCondition = "active"
+	AuditPolicyStatusConditionInactive AuditPolicyStatusCondition = "inactive"
+	AuditPolicyStatusConditionInvalid  AuditPolicyStatusCondition = "invalid"
 
 	FilterActionUnknown FilterAction = ""
 	FilterActionAllow   FilterAction = "allow"
@@ -55,15 +55,15 @@ type LogVerbosity struct {
 // +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type AuditLogPolicy struct {
+type AuditPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AuditLogPolicySpec   `json:"spec"`
-	Status AuditLogPolicyStatus `json:"status,omitempty"`
+	Spec   AuditPolicySpec   `json:"spec"`
+	Status AuditPolicyStatus `json:"status,omitempty"`
 }
 
-type AuditLogPolicySpec struct {
+type AuditPolicySpec struct {
 	Enabled bool `json:"enabled"`
 
 	// Filters described what are explicitly allowed and denied. Leave empty if all logs should be allowed.
@@ -72,7 +72,7 @@ type AuditLogPolicySpec struct {
 	Verbosity            LogVerbosity `json:"verbosity,omitempty"`
 }
 
-type AuditLogPolicyStatus struct {
-	Condition AuditLogPolicyStatusCondition `json:"condition,omitempty"`
-	Message   string                        `json:"message,omitempty"`
+type AuditPolicyStatus struct {
+	Condition AuditPolicyStatusCondition `json:"condition,omitempty"`
+	Message   string                     `json:"message,omitempty"`
 }

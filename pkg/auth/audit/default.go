@@ -49,13 +49,13 @@ func init() {
 }
 
 // DefaultPolicy is the policy deployed by default by rancher and cannot currently be disabled once it is installed.
-func DefaultPolicies() []auditlogv1.AuditLogPolicy {
-	return []auditlogv1.AuditLogPolicy{
+func DefaultPolicies() []auditlogv1.AuditPolicy {
+	return []auditlogv1.AuditPolicy{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "redact-generic-info",
 			},
-			Spec: auditlogv1.AuditLogPolicySpec{
+			Spec: auditlogv1.AuditPolicySpec{
 				Filters: []auditlogv1.Filter{},
 				AdditionalRedactions: []auditlogv1.Redaction{
 					{
@@ -73,7 +73,7 @@ func DefaultPolicies() []auditlogv1.AuditLogPolicy {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "redact-generate-kubeconfig",
 			},
-			Spec: auditlogv1.AuditLogPolicySpec{
+			Spec: auditlogv1.AuditPolicySpec{
 				Filters: []auditlogv1.Filter{},
 				AdditionalRedactions: []auditlogv1.Redaction{
 					{
