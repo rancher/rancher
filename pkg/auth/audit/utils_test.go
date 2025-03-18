@@ -58,3 +58,75 @@ func TestMergePolicyVerbosities(t *testing.T) {
 		})
 	}
 }
+
+func TestHasKey(t *testing.T) {
+	type testCase struct {
+		Name     string
+		Value    any
+		Func     func(string, any) bool
+		Expected bool
+	}
+
+	cases := []testCase{
+		{
+			Name:  "Empty Map Returns False",
+			Value: map[string]any{},
+			Func: func(k string, _ any) bool {
+				return k == "foo"
+			},
+		},
+		{
+			Name:  "Empty Slice Returns False",
+			Value: []any{},
+			Func: func(k string, _ any) bool {
+				return k == "foo"
+			},
+		},
+		{
+			Name:  "Map With Key Returns True",
+			Value: map[string]any{"foo": nil},
+			Func: func(k string, _ any) bool {
+				return k == "foo"
+			},
+			Expected: true,
+		},
+		{
+			Name:  "Map Without Key Returns False",
+			Value: map[string]any{"foo": nil},
+			Func: func(k string, _ any) bool {
+				return k == "bar"
+			},
+			Expected: false,
+		},
+		{
+			Name: "Nested Map With Key Returns True",
+			Value: map[string]any{
+				"foo": map[string]any{
+					"bar": nil,
+				},
+			},
+			Func: func(k string, _ any) bool {
+				return k == "bar"
+			},
+			Expected: true,
+		},
+		{
+			Name: "Map Slice With Key Returns True",
+			Value: []any{
+				map[string]any{"foo": nil},
+				map[string]any{"bar": nil},
+			},
+			Func: func(k string, _ any) bool {
+				return k == "foo"
+			},
+			Expected: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			actual := pairMatches(tc.Value, tc.Func)
+			assert.Equal(t, tc.Expected, actual)
+		})
+	}
+}
