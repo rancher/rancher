@@ -93,3 +93,28 @@ func parsePaths(paths []string) ([]*jsonpath.JSONPath, error) {
 
 	return compiled, nil
 }
+
+func pairMatches(v any, f func(string, any) bool) bool {
+	switch v := v.(type) {
+	case map[string]any:
+		for k, v := range v {
+			if f(k, v) {
+				return true
+			}
+
+			if pairMatches(v, f) {
+				return true
+			}
+		}
+	case []any:
+		for _, v := range v {
+			if pairMatches(v, f) {
+				return true
+			}
+		}
+	default:
+		return false
+	}
+
+	return false
+}

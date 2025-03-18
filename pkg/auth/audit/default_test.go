@@ -39,7 +39,6 @@ func TestDefaultPolicies(t *testing.T) {
 		Uri      string
 		Body     []byte
 		Expected []byte
-		Skip     bool
 	}
 
 	cases := []testCase{
@@ -160,7 +159,6 @@ func TestDefaultPolicies(t *testing.T) {
 			Body:     []byte(`{"type":"collection","data":[{"baseType":"namespacedSecret","creatorId":null,"data":{"testfield":"somesecretencodeddata"},"id":"cattle-system:test","kind":"Opaque"}]}`),
 			Expected: []byte(fmt.Sprintf(`{"type":"collection","data":[{"baseType":"namespacedSecret","creatorId":null,"data":"%s","id":"cattle-system:test","kind":"Opaque"}]}`, redacted)),
 			Uri:      `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name`,
-			Skip:     true,
 		},
 		{
 			Name:     "With kubeconfig from generateKubeconfig action",
@@ -199,10 +197,6 @@ func TestDefaultPolicies(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			if c.Skip {
-				t.Skipf("skipping test '%s'", c.Name)
-			}
-
 			log := &log{
 				AuditID:        "0123456789",
 				RequestURI:     c.Uri,
