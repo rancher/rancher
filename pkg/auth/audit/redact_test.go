@@ -1,7 +1,6 @@
 package audit
 
 import (
-	"fmt"
 	"testing"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
@@ -18,8 +17,8 @@ func sampleLog() log {
 			"password": {"password1234"},
 			"baz":      {"qux"},
 		},
-		RequestBody:  []byte(`{"toplevel":{"inner":{"bottom":"value"},"sibling":"value"}}`),
-		ResponseBody: []byte(`{"words":[{"foo":"bar"},{"baz":"qux"}]}`),
+		rawRequestBody:  []byte(`{"toplevel":{"inner":{"bottom":"value"},"sibling":"value"}}`),
+		rawResponseBody: []byte(`{"words":[{"foo":"bar"},{"baz":"qux"}]}`),
 	}
 }
 
@@ -60,8 +59,17 @@ func TestPolicyRedactor(t *testing.T) {
 					"password": {redacted},
 					"baz":      {"qux"},
 				},
-				RequestBody:  []byte(`{"toplevel":{"inner":{"bottom":"value"},"sibling":"value"}}`),
-				ResponseBody: []byte(`{"words":[{"foo":"bar"},{"baz":"qux"}]}`),
+				RequestBody: map[string]any{
+					"toplevel": map[string]any{
+						"inner": map[string]any{"bottom": "value"}, "sibling": "value",
+					},
+				},
+				ResponseBody: map[string]any{
+					"words": []any{
+						map[string]any{"foo": "bar"},
+						map[string]any{"baz": "qux"},
+					},
+				},
 			},
 		},
 		{
@@ -77,8 +85,18 @@ func TestPolicyRedactor(t *testing.T) {
 					"password": {"password1234"},
 					"baz":      {"qux"},
 				},
-				RequestBody:  []byte(fmt.Sprintf(`{"toplevel":{"inner":"%s","sibling":"value"}}`, redacted)),
-				ResponseBody: []byte(fmt.Sprintf(`{"words":[{"foo":"bar"},{"baz":"%s"}]}`, redacted)),
+				RequestBody: map[string]any{
+					"toplevel": map[string]any{
+						"inner":   redacted,
+						"sibling": "value",
+					},
+				},
+				ResponseBody: map[string]any{
+					"words": []any{
+						map[string]any{"foo": "bar"},
+						map[string]any{"baz": redacted},
+					},
+				},
 			},
 		},
 		{
@@ -94,8 +112,18 @@ func TestPolicyRedactor(t *testing.T) {
 					"password": {"password1234"},
 					"baz":      {"qux"},
 				},
-				RequestBody:  []byte(`{"toplevel":{"inner":{"bottom":"value"},"sibling":"value"}}`),
-				ResponseBody: []byte(fmt.Sprintf(`{"words":[{"foo":"%s"},{"baz":"%[1]s"}]}`, redacted)),
+				RequestBody: map[string]any{
+					"toplevel": map[string]any{
+						"inner":   map[string]any{"bottom": "value"},
+						"sibling": "value",
+					},
+				},
+				ResponseBody: map[string]any{
+					"words": []any{
+						map[string]any{"foo": redacted},
+						map[string]any{"baz": redacted},
+					},
+				},
 			},
 		},
 	}
@@ -104,7 +132,6 @@ func TestPolicyRedactor(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			c.Input.prepare()
 			err := c.Redactor.Redact(&c.Input)
-			c.Input.restore()
 
 			actual := c.Input
 			assert.NoError(t, err)
