@@ -36,7 +36,7 @@ replace (
 require (
 	github.com/rancher/aks-operator v1.11.0-rc.5
 	github.com/rancher/eks-operator v1.11.0-rc.4
-	github.com/rancher/fleet/pkg/apis v0.12.0-beta.2
+	github.com/rancher/fleet/pkg/apis v0.12.0-rc.2.0.20250318105039-16b5bc1f761a
 	github.com/rancher/gke-operator v1.11.0-rc.4
 	github.com/rancher/norman v0.6.0
 	github.com/rancher/rke v1.8.0-rc.4
@@ -85,7 +85,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
