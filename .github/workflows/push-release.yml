@@ -546,6 +546,7 @@ jobs:
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
+      id-token: write
     env:
       REGISTRY: ""
       CHECKSUM_FILE: "sha256sum.txt"
