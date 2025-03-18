@@ -223,7 +223,7 @@ func (w *Writer) Write(log *log) error {
 		return fmt.Errorf("failed to prepare log bodies for redaction: %w", err)
 	}
 
-	data, err := json.Marshal(log)
+	data, err := marshalLog(log)
 	if err != nil {
 		return fmt.Errorf("failed to marshal log: %w", err)
 	}
