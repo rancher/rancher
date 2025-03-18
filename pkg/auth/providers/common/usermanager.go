@@ -41,6 +41,16 @@ const (
 
 func NewUserManagerNoBindings(scaledContext *config.ScaledContext) (user.Manager, error) {
 	userInformer := scaledContext.Wrangler.Mgmt.User().Informer()
+	// registering the same index more than once will cause an error. Since we attempt to register this index in multiple
+	// locations, we need to verify if it has already been registered.
+	if _, ok := userInformer.GetIndexer().GetIndexers()[userByPrincipalIndex]; !ok {
+		userIndexers := map[string]cache.IndexFunc{
+			userByPrincipalIndex: userByPrincipal,
+		}
+		if err := userInformer.AddIndexers(userIndexers); err != nil {
+			return nil, err
+		}
+	}
 
 	return &userManager{
 		users:       scaledContext.Wrangler.Mgmt.User(),
@@ -60,11 +70,15 @@ var backoff = wait.Backoff{
 
 func NewUserManager(scaledContext *config.ScaledContext) (user.Manager, error) {
 	userInformer := scaledContext.Wrangler.Mgmt.User().Informer()
-	userIndexers := map[string]cache.IndexFunc{
-		userByPrincipalIndex: userByPrincipal,
-	}
-	if err := userInformer.AddIndexers(userIndexers); err != nil {
-		return nil, err
+	// registering the same index more than once will cause an error. Since we attempt to register this index in multiple
+	// locations, we need to verify if it has already been registered.
+	if _, ok := userInformer.GetIndexer().GetIndexers()[userByPrincipalIndex]; !ok {
+		userIndexers := map[string]cache.IndexFunc{
+			userByPrincipalIndex: userByPrincipal,
+		}
+		if err := userInformer.AddIndexers(userIndexers); err != nil {
+			return nil, err
+		}
 	}
 
 	crtbInformer := scaledContext.Wrangler.Mgmt.ClusterRoleTemplateBinding().Informer()
