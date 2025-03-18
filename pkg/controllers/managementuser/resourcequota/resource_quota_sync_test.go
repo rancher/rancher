@@ -14,8 +14,8 @@ import (
 
 func TestCompleteLimit(t *testing.T) {
 	type input struct {
-		newValues     *v32.ContainerResourceLimit
-		defaultValues *v32.ContainerResourceLimit
+		nsValues      *v32.ContainerResourceLimit
+		projectValues *v32.ContainerResourceLimit
 	}
 
 	type expected struct {
@@ -31,11 +31,11 @@ func TestCompleteLimit(t *testing.T) {
 		{
 			name: "limits not set in project",
 			input: input{
-				newValues: &v32.ContainerResourceLimit{
+				nsValues: &v32.ContainerResourceLimit{
 					LimitsCPU:    "1000m",
 					LimitsMemory: "256Mi",
 				},
-				defaultValues: &v32.ContainerResourceLimit{},
+				projectValues: &v32.ContainerResourceLimit{},
 			},
 			expected: expected{
 				expected: &v32.ContainerResourceLimit{
@@ -48,11 +48,11 @@ func TestCompleteLimit(t *testing.T) {
 		{
 			name: "limits set in project - namespace setting equal values",
 			input: input{
-				newValues: &v32.ContainerResourceLimit{
+				nsValues: &v32.ContainerResourceLimit{
 					LimitsCPU:    "1000m",
 					LimitsMemory: "256Mi",
 				},
-				defaultValues: &v32.ContainerResourceLimit{
+				projectValues: &v32.ContainerResourceLimit{
 					LimitsCPU:    "1000m",
 					LimitsMemory: "256Mi",
 				},
@@ -65,11 +65,11 @@ func TestCompleteLimit(t *testing.T) {
 		{
 			name: "limits set in namespace and in project",
 			input: input{
-				newValues: &v32.ContainerResourceLimit{
+				nsValues: &v32.ContainerResourceLimit{
 					LimitsCPU:    "1000m",
 					LimitsMemory: "256Mi",
 				},
-				defaultValues: &v32.ContainerResourceLimit{
+				projectValues: &v32.ContainerResourceLimit{
 					LimitsCPU:    "1200m",
 					LimitsMemory: "512Mi",
 				},
@@ -85,11 +85,11 @@ func TestCompleteLimit(t *testing.T) {
 		{
 			name: "limits set in namespace and requests set in project",
 			input: input{
-				newValues: &v32.ContainerResourceLimit{
+				nsValues: &v32.ContainerResourceLimit{
 					LimitsCPU:    "1000m",
 					LimitsMemory: "256Mi",
 				},
-				defaultValues: &v32.ContainerResourceLimit{
+				projectValues: &v32.ContainerResourceLimit{
 					RequestsCPU:    "100m",
 					RequestsMemory: "128Mi",
 				},
@@ -107,11 +107,11 @@ func TestCompleteLimit(t *testing.T) {
 		{
 			name: "requests set in namespace and limits in project",
 			input: input{
-				newValues: &v32.ContainerResourceLimit{
+				nsValues: &v32.ContainerResourceLimit{
 					RequestsCPU:    "100m",
 					RequestsMemory: "128Mi",
 				},
-				defaultValues: &v32.ContainerResourceLimit{
+				projectValues: &v32.ContainerResourceLimit{
 					LimitsCPU:    "1000m",
 					LimitsMemory: "256Mi",
 				},
@@ -129,13 +129,13 @@ func TestCompleteLimit(t *testing.T) {
 		{
 			name: "requests and limits set in both",
 			input: input{
-				newValues: &v32.ContainerResourceLimit{
+				nsValues: &v32.ContainerResourceLimit{
 					RequestsCPU:    "100m",
 					RequestsMemory: "128Mi",
 					LimitsCPU:      "2000m",
 					LimitsMemory:   "1Gi",
 				},
-				defaultValues: &v32.ContainerResourceLimit{
+				projectValues: &v32.ContainerResourceLimit{
 					RequestsCPU:    "200m",
 					RequestsMemory: "256Mi",
 					LimitsCPU:      "1000m",
@@ -152,11 +152,27 @@ func TestCompleteLimit(t *testing.T) {
 				err: nil,
 			},
 		},
+		{
+			name: "project values are null",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+					LimitsCPU:      "2000m",
+					LimitsMemory:   "1Gi",
+				},
+				projectValues: nil,
+			},
+			expected: expected{
+				expected: nil,
+				err:      nil,
+			},
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := completeLimit(tt.input.newValues, tt.input.defaultValues)
+			res, err := completeLimit(tt.input.nsValues, tt.input.projectValues)
 			if tt.expected.err != nil {
 				assert.Error(t, err)
 				return
