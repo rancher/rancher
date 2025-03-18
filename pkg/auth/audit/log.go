@@ -69,22 +69,19 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 
 	contentType := req.Header.Get("Content-Type")
 
-	if isLoginRequest(req.RequestURI) {
-		if methodsWithBody[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
-			// todo: determine if we need this info
-			body, err := io.ReadAll(req.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read request body: %w", err)
-			}
-
-			req.Body = io.NopCloser(bytes.NewBuffer(body))
-
-			if loginName := getUserNameForBasicLogin(body); loginName != "" {
-				log.UserLoginName = loginName
-			}
-
-			log.RequestBody = body
+	if methodsWithBody[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
+
+		req.Body = io.NopCloser(bytes.NewBuffer(body))
+
+		if loginName := getUserNameForBasicLogin(body); loginName != "" {
+			log.UserLoginName = loginName
+		}
+
+		log.RequestBody = body
 	}
 
 	return log, nil
