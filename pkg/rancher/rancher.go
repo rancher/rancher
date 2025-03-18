@@ -27,7 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
-	auditlogcontroller "github.com/rancher/rancher/pkg/controllers/auditlog/auditlogpolicy"
+	auditlogcontroller "github.com/rancher/rancher/pkg/controllers/auditlog/auditpolicy"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
