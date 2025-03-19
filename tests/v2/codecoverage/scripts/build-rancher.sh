@@ -6,7 +6,7 @@ cd $(dirname $0)/../../../../
 source $(dirname $0)/scripts/version
 source $(dirname $0)/scripts/export-config
 
-CATTLE_KDM_BRANCH=dev-v2.9
+CATTLE_KDM_BRANCH=release-v2.9
 
 mkdir -p bin
 
@@ -35,5 +35,5 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags k8s \
    -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS" \
   -o tests/v2/codecoverage/bin \
   ./tests/v2/codecoverage/rancher
- 
+
 curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > tests/v2/codecoverage/bin/data.json

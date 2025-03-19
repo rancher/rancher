@@ -13,7 +13,7 @@ ENV HELM_UNITTEST_VERSION 0.3.2
 ENV K3D_VERSION v5.7.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.9
+ENV CATTLE_KDM_BRANCH=release-v2.9
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
@@ -128,7 +128,7 @@ ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/ro
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
 
-# set up helm unittest - only needs to run on one arch. Needs to run after $HOME has been changed so we can find it later 
+# set up helm unittest - only needs to run on one arch. Needs to run after $HOME has been changed so we can find it later
 RUN if [ "${ARCH}" == "amd64" ]; then \
         helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION}; \
     fi
