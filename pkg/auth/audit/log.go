@@ -95,7 +95,7 @@ func (l *log) prepare(verbosity auditlogv1.LogVerbosity) {
 		l.ResponseHeader = nil
 	}
 
-	if verbosity.Request.Body && l.rawRequestBody != nil {
+	if verbosity.Request.Body && len(l.rawRequestBody) > 0 {
 		if err := json.Unmarshal(l.rawRequestBody, &l.RequestBody); err != nil {
 			l.RequestBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
@@ -104,7 +104,7 @@ func (l *log) prepare(verbosity auditlogv1.LogVerbosity) {
 	}
 	l.rawRequestBody = nil
 
-	if verbosity.Response.Body && l.rawResponseBody != nil {
+	if verbosity.Response.Body && len(l.rawResponseBody) > 0 {
 		if err := json.Unmarshal(l.rawResponseBody, &l.ResponseBody); err != nil {
 			l.ResponseBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", err.Error()),
