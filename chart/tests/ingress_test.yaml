@@ -262,8 +262,6 @@ tests:
     hostname: host.example.com
     service.disableHTTP: true
     ingress.servicePort: 443
-    ingress.extraAnnotations:
-      nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
   asserts:
     - equal:
         path: spec.rules
@@ -291,8 +289,6 @@ tests:
   set:
     hostname: host.example.com
     ingress.servicePort: 443
-    ingress.extraAnnotations:
-      nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
   asserts:
     - equal:
         path: spec.rules
