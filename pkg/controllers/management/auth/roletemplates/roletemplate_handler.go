@@ -7,6 +7,7 @@ import (
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,27 +51,9 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return nil, err
 	}
 
-	var clusterScopedPrivileges, projectScopedPrivileges []rbacv1.PolicyRule
-	if rt.Context == "project" {
-		projectScopedPrivileges = getManagementPlaneRules(rules, projectManagementPlaneResources)
-	} else if rt.Context == "cluster" {
-		clusterScopedPrivileges = getManagementPlaneRules(rules, clusterManagementPlaneResources)
-		projectScopedPrivileges = getManagementPlaneRules(rules, projectManagementPlaneResources)
-	}
-
-	var clusterRoles []*rbacv1.ClusterRole
-	rtName := rbac.ClusterRoleNameFor(rt.Name)
-
-	if len(clusterScopedPrivileges) != 0 {
-		clusterRoles = append(clusterRoles,
-			rbac.BuildClusterRole(rbac.ClusterManagementPlaneClusterRoleNameFor(rtName), rtName, clusterScopedPrivileges),
-			rbac.BuildAggregatingClusterRole(rt, rbac.ClusterManagementPlaneClusterRoleNameFor))
-	}
-
-	if len(projectScopedPrivileges) != 0 {
-		clusterRoles = append(clusterRoles,
-			rbac.BuildClusterRole(rbac.ProjectManagementPlaneClusterRoleNameFor(rtName), rtName, projectScopedPrivileges),
-			rbac.BuildAggregatingClusterRole(rt, rbac.ProjectManagementPlaneClusterRoleNameFor))
+	clusterRoles, err := r.getClusterRoles(rt, rules)
+	if err != nil {
+		return nil, err
 	}
 
 	// Add an owner reference so the cluster role deletion gets handled automatically.
@@ -89,6 +72,66 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 	}
 
 	return rt, nil
+}
+
+// getClusterRoles gets all the management plane cluster roles needed for this RoleTemplate.
+func (r *roleTemplateHandler) getClusterRoles(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule) ([]*rbacv1.ClusterRole, error) {
+
+	var clusterRoles []*rbacv1.ClusterRole
+	if rt.Context == "cluster" {
+		clusterScopedPrivileges := getManagementPlaneRules(rules, clusterManagementPlaneResources)
+
+		clusterManagementClusterRoles, err := r.getManagementClusterRoles(rt, clusterScopedPrivileges, rbac.ClusterManagementPlaneClusterRoleNameFor)
+		if err != nil {
+			return nil, err
+		}
+		clusterRoles = append(clusterRoles, clusterManagementClusterRoles...)
+	}
+
+	projectScopedPrivileges := getManagementPlaneRules(rules, projectManagementPlaneResources)
+	projectManagementClusterRoles, err := r.getManagementClusterRoles(rt, projectScopedPrivileges, rbac.ProjectManagementPlaneClusterRoleNameFor)
+	if err != nil {
+		return nil, err
+	}
+	clusterRoles = append(clusterRoles, projectManagementClusterRoles...)
+
+	return clusterRoles, nil
+}
+
+// getManagementClusterRoles returns the management cluster roles for either cluster or project rules. If the RoleTemplate contains any management rules, it creates a ClusterRole and
+// an aggregating ClusterRole. If the RoleTemplate inherits any other RoleTemplates that contain aggregation, it creates just an aggregating ClusterRole.
+func (r *roleTemplateHandler) getManagementClusterRoles(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule, crNameTransformer func(string) string) ([]*rbacv1.ClusterRole, error) {
+	rtName := rbac.ClusterRoleNameFor(rt.Name)
+	if len(rules) != 0 {
+		return []*rbacv1.ClusterRole{
+			rbac.BuildClusterRole(crNameTransformer(rtName), rtName, rules),
+			rbac.BuildAggregatingClusterRole(rt, crNameTransformer),
+		}, nil
+	} else {
+		ok, err := r.areThereInheritedManagementPlaneRules(rt.RoleTemplateNames, crNameTransformer)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return []*rbacv1.ClusterRole{rbac.BuildAggregatingClusterRole(rt, crNameTransformer)}, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// areThereInheritedManagementPlaneRules checks if a RoleTemplate has inherited management plane rules. It also checks all inherited RoleTemplates if they have
+// any management plane rules.
+func (r *roleTemplateHandler) areThereInheritedManagementPlaneRules(inheritedRoleTemplates []string, crNameTransformer func(string) string) (bool, error) {
+	for _, rt := range inheritedRoleTemplates {
+		_, err := r.crClient.Get(rbac.AggregatedClusterRoleNameFor(crNameTransformer(rt)), metav1.GetOptions{})
+		if err == nil {
+			return true, nil
+		} else if !apierrors.IsNotFound(err) {
+			return false, err
+		}
+	}
+	return false, nil
 }
 
 // getManagementPlaneRules filters a set of rules based on the map passed in. Used to provide special resources that have cluster/project scope.
