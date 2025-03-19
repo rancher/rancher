@@ -28,9 +28,11 @@ var (
 func Test_clusterRolesForRoleTemplate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name   string
-		rt     *v3.RoleTemplate
-		verify func(*testing.T, []*rbacv1.ClusterRole)
+		name                       string
+		rt                         *v3.RoleTemplate
+		setupClusterRoleController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList])
+		verify                     func(*testing.T, []*rbacv1.ClusterRole)
+		wantErr                    bool
 	}{
 		{
 			name: "roletemplates with cluster context creates rules and aggregating clusterroles",
@@ -111,7 +113,7 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 			},
 		},
 		{
-			name: "roletemplates with project context and role template names an extra clusterroles for global resources",
+			name: "roletemplates with project context and an inherited roletemplate with promoted rules creates an extra clusterrole for global resources",
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "myroletemplate",
@@ -128,9 +130,55 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
 					}
 				}
+				if got := roles[0].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
+					t.Errorf("expected promoted aggregation rule not to be empty")
+				}
 				if got := roles[2].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
 					t.Errorf("expected aggregation rule not to be empty")
 				}
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("some-roletemplate-promoted-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+			},
+		},
+		{
+			name: "error getting inherited roletemplate clusterroles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myroletemplate",
+				},
+				Context:           "project",
+				RoleTemplateNames: []string{"some-roletemplate"},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("some-roletemplate-promoted-aggregator", metav1.GetOptions{}).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "roletemplates with project context and an inherited roletemplate with no promoted rules",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myroletemplate",
+				},
+				Context:           "project",
+				RoleTemplateNames: []string{"some-roletemplate"},
+			},
+			verify: func(t *testing.T, roles []*rbacv1.ClusterRole) {
+				if got, want := len(roles), 2; got != want {
+					t.Errorf("expected %d roles but got %d", want, got)
+				}
+				for i, want := range []string{"myroletemplate", "myroletemplate-aggregator"} {
+					if got := roles[i].Name; got != want {
+						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
+					}
+				}
+				if got := roles[1].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
+					t.Errorf("expected aggregation rule not to be empty")
+				}
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("some-roletemplate-promoted-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 			},
 		},
 		{
@@ -184,10 +232,22 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 			},
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := clusterRolesForRoleTemplate(tt.rt)
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			if tt.setupClusterRoleController != nil {
+				tt.setupClusterRoleController(crController)
+			}
+			rth := &roleTemplateHandler{
+				crController: crController,
+			}
+			got, err := rth.clusterRolesForRoleTemplate(tt.rt)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
 			tt.verify(t, got)
 		})
 	}
