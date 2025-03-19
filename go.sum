@@ -1527,8 +1527,8 @@ github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa h1:/qeYlQVf
 github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa/go.mod h1:NP3xboG+t2p+XMnrcrJ/L384Ki0Cp3Pww/X+vm5Jcy0=
 github.com/rancher/remotedialer v0.4.0 h1:T9yC5bFMsZFVQ6rK0dNrRg6rRb6Zr/4vsig8S0IJ7ak=
 github.com/rancher/remotedialer v0.4.0/go.mod h1:Ys004RpJuTLSm+k4aYUCoFiOOad37ubYev3TkOFg/5w=
-github.com/rancher/rke v1.6.8-rc.1 h1:voBjTNovHa5FIAoPfLisZUQF0bFWXsO9fI9xOqI504A=
-github.com/rancher/rke v1.6.8-rc.1/go.mod h1:ZDmcz3aeBsuORheojvGRxUJQS6NKRcpLTPXoY5N2y4c=
+github.com/rancher/rke v1.6.8 h1:/EuzeXidFr2NZonPr+S1w4m7hyvacp0lqyTwaXxUkfI=
+github.com/rancher/rke v1.6.8/go.mod h1:ZDmcz3aeBsuORheojvGRxUJQS6NKRcpLTPXoY5N2y4c=
 github.com/rancher/shepherd v0.0.0-20241217192057-f59684bee167 h1:F40iw7TB6ggjOwIr4m03dVUPYRa2oUHEiQ9isVeB+/4=
 github.com/rancher/shepherd v0.0.0-20241217192057-f59684bee167/go.mod h1:zekxs8n6YwnsX1i58abObrkWDfdA9O3hV8wQATuS+8o=
 github.com/rancher/steve v0.3.1 h1:n1vnTUm/fqE7RTdbohmz3bsDiZOApZ/ucAAJq9QLbj0=
