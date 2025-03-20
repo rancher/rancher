@@ -68,17 +68,19 @@ get_address()
         case $address in
             awslocal)
                 check_aws_metadata
-                echo $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+                echo $(curl -H "X-aws-ec2-metadata-token: $IMD_TOKEN" -s http://169.254.169.254/latest/meta-data/local-ipv4)
                 ;;
             awspublic)
                 check_aws_metadata
                 echo $(curl  -H "X-aws-ec2-metadata-token: $IMD_TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
                 ;;
             doprivate)
+                check_aws_metadata
                 echo $(curl -H "X-aws-ec2-metadata-token: $IMD_TOKEN" -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
                 ;;
             dopublic)
-                echo $(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
+                check_aws_metadata
+                echo $(curl -H "X-aws-ec2-metadata-token: $IMD_TOKEN" -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
                 ;;
             azprivate)
                 echo $(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2017-08-01&format=text")
