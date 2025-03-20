@@ -107,14 +107,14 @@ func (r *roleTemplateHandler) getManagementClusterRoles(rt *v3.RoleTemplate, rul
 			rbac.BuildClusterRole(crNameTransformer(rtName), rtName, rules),
 			rbac.BuildAggregatingClusterRole(rt, crNameTransformer),
 		}, nil
-	} else {
-		ok, err := r.areThereInheritedManagementPlaneRules(rt.RoleTemplateNames, crNameTransformer)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			return []*rbacv1.ClusterRole{rbac.BuildAggregatingClusterRole(rt, crNameTransformer)}, nil
-		}
+	}
+
+	ok, err := r.areThereInheritedManagementPlaneRules(rt.RoleTemplateNames, crNameTransformer)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		return []*rbacv1.ClusterRole{rbac.BuildAggregatingClusterRole(rt, crNameTransformer)}, nil
 	}
 
 	return nil, nil

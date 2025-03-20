@@ -135,9 +135,7 @@ func (rth *roleTemplateHandler) buildPromotedClusterRoles(rt *v3.RoleTemplate) (
 		clusterRoles = append(clusterRoles, rbac.BuildClusterRole(rbac.PromotedClusterRoleNameFor(rt.Name), rt.Name, promotedRules))
 	}
 
-	// It's possible for this role to have no rules if there are no promoted rules in any of the inherited RoleTemplates or in the promoted ClusterRole
-	// but without fetching all those RoleTemplates and looking through their rules, it's not possible to prevent this ahead of time as the Rules in
-	// an aggregating cluster role only get populated at run time
+	// If there are promoted rules or inherited promoted rules, an aggregating cluster role will be what PRTBs bind to.
 	clusterRoles = append(clusterRoles, rbac.BuildAggregatingClusterRole(rt, rbac.PromotedClusterRoleNameFor))
 
 	return clusterRoles, rules, nil
