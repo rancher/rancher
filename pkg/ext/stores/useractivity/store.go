@@ -169,7 +169,7 @@ func (s *Store) Create(ctx context.Context,
 	}
 	objUserActivity.Status.ExpiresAt = newIdleTimeout.Time.Format(time.RFC3339)
 
-	// discard the changes if this is a dr-run
+	// discard the changes if this is a dry-run
 	if dryRun {
 		return objUserActivity, nil
 	}
