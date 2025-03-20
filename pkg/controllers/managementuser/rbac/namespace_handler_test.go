@@ -360,7 +360,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}))
 
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, test.projectName, projectNSVerbToSuffix[test.verb])
-		err := m.createProjectNSRole(roleName, test.verb, test.namespace, test.projectName)
+		err := m.createProjectNSRole(roleName, test.verb, test.namespace, test.projectName, false)
 
 		crMock := m.clusterRoles.(*fakes.ClusterRoleInterfaceMock)
 		calls := crMock.CreateCalls()

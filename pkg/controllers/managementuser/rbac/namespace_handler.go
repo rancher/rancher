@@ -406,7 +406,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 
 			// Create new role
 			if cr == nil {
-				return n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName)
+				return n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName, false)
 			}
 
 			// Check to see if retrieved role has the namespace (small chance cache could have been updated)
@@ -446,7 +446,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 	return nil
 }
 
-func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) error {
+func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string, psaPermission bool) error {
 	roleCli := m.clusterRoles
 
 	cr := &rbacv1.ClusterRole{
@@ -469,6 +469,9 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 	// permissions and one for write. Only the write permission should get the manage-ns verb
 	if verb == projectNSEditVerb {
 		cr = addManageNSPermission(cr, projectName)
+		if psaPermission {
+			cr = addUpdatePSAPermission(cr, projectName)
+		}
 	}
 	_, err := roleCli.Create(cr)
 	return err
