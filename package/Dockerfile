@@ -49,7 +49,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.11
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.11
+ARG CATTLE_KDM_BRANCH=release-v2.11
 ARG VERSION=${VERSION}
 
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
