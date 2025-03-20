@@ -352,7 +352,8 @@ type RoleTemplate struct {
 	// +optional
 	RoleTemplateNames []string `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
 
-	// Administrative field is deprecated and no longer used.
+	// Administrative if false, and context is set to cluster this RoleTemplate will not grant access to "CatalogTemplates" and "CatalogTemplateVersions" for any project in the cluster.
+	// Default is false.
 	// +optional
 	Administrative bool `json:"administrative,omitempty"`
 }
