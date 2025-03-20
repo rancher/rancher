@@ -96,18 +96,17 @@ func (h *tokenHandler) createClusterAuthToken(token *managementv3.Token, hashedV
 	// Create the shadow token, and associated secret. Tear both down in case of trouble.
 	_, err = h.clusterAuthToken.Create(clusterAuthToken)
 	if err == nil {
-		_, errcs := h.clusterSecret.Create(clusterAuthSecret)
-		if errcs != nil {
-			// Best effort at tear down, report issues, do not supercede original issue
-			if errd := h.clusterSecret.Delete(clusterAuthSecret.Name, &metav1.DeleteOptions{}); errd != nil {
-				logrus.Errorf("failed to delete token secret `%s` after creation failure: %s",
-					clusterAuthSecret.Name, errd.Error())
-			}
-			if errd := h.clusterAuthToken.Delete(token.Name, &metav1.DeleteOptions{}); errd != nil {
-				logrus.Errorf("failed to delete token `%s` after creation failure: %s",
-					token.Name, errd.Error())
-			}
-			return errcs
+		_, err = h.clusterSecret.Create(clusterAuthSecret)
+		if err == nil {
+			// full success
+			return nil
+		}
+
+		// token create ok, secret create fail -> drop the incomplete token
+		// best effort at tear down, report issues, do not supercede original issue
+		if errd := h.clusterAuthToken.Delete(token.Name, &metav1.DeleteOptions{}); errd != nil {
+			logrus.Errorf("failed to delete token `%s` after creation failure: %s",
+				token.Name, errd.Error())
 		}
 	}
 	return err
