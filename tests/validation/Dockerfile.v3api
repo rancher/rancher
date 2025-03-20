@@ -51,15 +51,3 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
 # necessary to run if statements using [[ ]]
 SHELL ["/bin/bash", "-c"] 
 
-RUN if [[ -z '$EXTERNAL_ENCODED_VPN' ]] ; then \
-      echo 'no vpn provided' ; \
-    else \
-      apt-get update && apt-get -y install openvpn net-tools && \
-      echo $EXTERNAL_ENCODED_VPN | base64 -d > external.ovpn && \
-      if [[ -z '$VPN_ENCODED_LOGIN' ]] ; then \
-        echo 'no passcode provided' ; \
-      else \
-        echo 'adding passfile' && echo $VPN_ENCODED_LOGIN | base64 -d > passfile && \
-        sed -i 's/auth-user-pass/auth-user-pass passfile/g' external.ovpn; \
-        fi; \
-    fi;
