@@ -10,7 +10,9 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3Legacy "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -37,9 +39,9 @@ var timeNow = func() time.Time {
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 type Store struct {
-	tokens     v3.TokenClient
-	tokenCache v3.TokenCache
-	userCache  v3.UserCache
+	tokens        v3.TokenClient             // direct access for patching of v3 tokens
+	userCache     v3.UserCache               // cached fetch of v3 users
+	extTokenStore *exttokenstore.SystemStore // unified fetch of v3 and ext tokens; patching of ext tokens
 }
 
 var GV = schema.GroupVersion{
@@ -57,9 +59,9 @@ var GVR = ext.SchemeGroupVersion.WithResource(ext.UserActivityResourceName)
 
 func New(wranglerCtx *wrangler.Context) *Store {
 	return &Store{
-		tokens:     wranglerCtx.Mgmt.Token(),
-		tokenCache: wranglerCtx.Mgmt.Token().Cache(),
-		userCache:  wranglerCtx.Mgmt.User().Cache(),
+		tokens:        wranglerCtx.Mgmt.Token(),
+		userCache:     wranglerCtx.Mgmt.User().Cache(),
+		extTokenStore: exttokenstore.NewSystemFromWrangler(wranglerCtx),
 	}
 }
 
@@ -131,13 +133,13 @@ func (s *Store) Create(ctx context.Context,
 	}
 
 	// retrieve auth token
-	authToken, err := s.tokenCache.Get(authTokenID)
+	authToken, err := s.extTokenStore.Fetch(authTokenID)
 	if err != nil {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
 	}
 
 	// retrieve activity token
-	activityToken, err := s.tokenCache.Get(objUserActivity.Name)
+	activityToken, err := s.extTokenStore.Fetch(objUserActivity.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", objUserActivity.Name, err))
@@ -167,8 +169,13 @@ func (s *Store) Create(ctx context.Context,
 	}
 	objUserActivity.Status.ExpiresAt = newIdleTimeout.Time.Format(time.RFC3339)
 
-	// if it's not a dry-run, commit the changes
-	if !dryRun {
+	// discard the changes if this is a dry-run
+	if dryRun {
+		return objUserActivity, nil
+	}
+
+	switch activityToken.(type) {
+	case *v3Legacy.Token:
 		patch, err := json.Marshal([]struct {
 			Op    string `json:"op"`
 			Path  string `json:"path"`
@@ -183,7 +190,14 @@ func (s *Store) Create(ctx context.Context,
 		}
 		_, err = s.tokens.Patch(activityToken.GetName(), types.JSONPatchType, patch)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to store activityLastSeenAt to token %s: %w", activityToken.GetName(), err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to store activityLastSeenAt to token %s: %w",
+				activityToken.GetName(), err))
+		}
+	case *ext.Token:
+		err := s.extTokenStore.UpdateLastActivitySeen(activityToken.GetName(), newIdleTimeout.Time)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to store activityLastSeenAt to ext token %s: %w",
+				activityToken.GetName(), err))
 		}
 	}
 
@@ -210,13 +224,13 @@ func (s *Store) Get(ctx context.Context,
 	}
 
 	// retrieve auth token
-	authToken, err := s.tokenCache.Get(authTokenID)
+	authToken, err := s.extTokenStore.Fetch(authTokenID)
 	if err != nil {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
 	}
 
 	// retrieve activity token
-	activityToken, err := s.tokenCache.Get(name)
+	activityToken, err := s.extTokenStore.Fetch(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", name, err))
@@ -233,14 +247,14 @@ func (s *Store) Get(ctx context.Context,
 	// crafting UserActivity from requested Token name.
 	ua := &ext.UserActivity{
 		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: activityToken.CreationTimestamp,
+			CreationTimestamp: activityToken.GetCreationTime(),
 			Name:              name,
 		},
 		Status: ext.UserActivityStatus{},
 	}
 
-	if activityToken.ActivityLastSeenAt != nil {
-		ua.Status.ExpiresAt = activityToken.ActivityLastSeenAt.String()
+	if lastActivity := activityToken.GetLastActivitySeen(); lastActivity != nil {
+		ua.Status.ExpiresAt = lastActivity.String()
 	} else {
 		ua.Status.ExpiresAt = metav1.Time{}.String()
 	}
@@ -288,29 +302,39 @@ func first(values []string) string {
 	return ""
 }
 
-func validateActivityToken(auth, activity *v3Legacy.Token) error {
+func validateActivityToken(auth, activity accessor.TokenAccessor) error {
 	// verify auth and activity token have the same userID
-	if auth.UserID != activity.UserID {
-		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different users", auth.Name, activity.Name))
+	if auth.GetUserID() != activity.GetUserID() {
+		return apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("request token %s and activity token %s have different users",
+				auth.GetName(), activity.GetName()))
 	}
 
 	// verify auth and activity token has the same auth provider
-	if auth.AuthProvider != activity.AuthProvider {
-		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different auth providers", auth.Name, activity.Name))
+	if auth.GetAuthProvider() != activity.GetAuthProvider() {
+		return apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("request token %s and activity token %s have different auth providers",
+				auth.GetName(), activity.GetName()))
 	}
 
 	// verify auth and activity token has the same auth user principal
-	if auth.UserPrincipal.Name != activity.UserPrincipal.Name {
-		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("request token %s and activity token %s have different user principals", auth.Name, activity.Name))
+	if auth.GetUserPrincipal().Name != activity.GetUserPrincipal().Name {
+		return apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("request token %s and activity token %s have different user principals",
+				auth.GetName(), activity.GetName()))
 	}
 
-	// verify activity token is of the expected kind
-	if activity.Labels[TokenKind] != "session" {
-		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", activity.Name))
+	// verify that activity token is a session token
+	if activity.GetIsDerived() {
+		return apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("activity token %s is not a session token",
+				activity.GetName()))
 	}
 
-	if activity.Enabled != nil && !*activity.Enabled {
-		return apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("activity token %s is disabled", activity.Name))
+	if !activity.GetIsEnabled() {
+		return apierrors.NewForbidden(GVR.GroupResource(), "",
+			fmt.Errorf("activity token %s is disabled",
+				activity.GetName()))
 	}
 
 	return nil

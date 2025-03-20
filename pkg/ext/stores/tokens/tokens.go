@@ -42,21 +42,20 @@ const (
 	KindLabel      = "authn.management.cattle.io/kind"
 	IsLogin        = "session"
 
-	GroupCattleAuthenticated = "system:cattle:authenticated"
-
 	// names of the data fields used by the backing secrets to store token information
-	FieldAnnotations    = "annotations"
-	FieldDescription    = "description"
-	FieldEnabled        = "enabled"
-	FieldHash           = "hash"
-	FieldKind           = "kind"
-	FieldLabels         = "labels"
-	FieldLastUpdateTime = "last-update-time"
-	FieldLastUsedAt     = "last-used-at"
-	FieldPrincipal      = "principal"
-	FieldTTL            = "ttl"
-	FieldUID            = "kube-uid"
-	FieldUserID         = "user-id"
+	FieldAnnotations      = "annotations"
+	FieldDescription      = "description"
+	FieldEnabled          = "enabled"
+	FieldHash             = "hash"
+	FieldKind             = "kind"
+	FieldLabels           = "labels"
+	FieldLastActivitySeen = "last-activity-seen"
+	FieldLastUpdateTime   = "last-update-time"
+	FieldLastUsedAt       = "last-used-at"
+	FieldPrincipal        = "principal"
+	FieldTTL              = "ttl"
+	FieldUID              = "kube-uid"
+	FieldUserID           = "user-id"
 
 	SingularName = "token"
 	PluralName   = SingularName + "s"
@@ -745,6 +744,28 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	return err
 }
 
+// UpdateLastActivitySeen patches the last-activity-seen information of the token.
+// Called from the ext user activity store.
+func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) error {
+	// Operate directly on the backend secret holding the token
+	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
+	patch, err := json.Marshal([]struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}{{
+		Op:    "replace",
+		Path:  "/data/" + FieldLastActivitySeen,
+		Value: nowEncoded,
+	}})
+	if err != nil {
+		return err
+	}
+
+	_, err = t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
+}
+
 // Disable patches the enabled flag of the token.
 // Called by refreshAttributes.
 func (t *SystemStore) Disable(name string) error {
@@ -1206,13 +1227,14 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldUserID] = token.Spec.UserID
 
 	// status elements
-	lastUsedAsString := ""
+	lastUsedAtAsString := ""
 	if token.Status.LastUsedAt != nil {
-		lastUsedAsString = token.Status.LastUsedAt.Format(time.RFC3339)
+		lastUsedAtAsString = token.Status.LastUsedAt.Format(time.RFC3339)
 	}
-	secret.StringData[FieldLastUsedAt] = lastUsedAsString
+	secret.StringData[FieldLastUsedAt] = lastUsedAtAsString
 	secret.StringData[FieldHash] = token.Status.Hash
 	secret.StringData[FieldLastUpdateTime] = token.Status.LastUpdateTime
+	secret.StringData[FieldLastActivitySeen] = ""
 
 	return secret, nil
 }
@@ -1294,23 +1316,37 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 		return token, fmt.Errorf("last update time missing")
 	}
 
-	var lastUsedAt *metav1.Time
-	lastUsedAsString := string(secret.Data[FieldLastUsedAt])
-	if lastUsedAsString != "" {
-		lastUsed, err := time.Parse(time.RFC3339, lastUsedAsString)
-		if err != nil {
-			return token, fmt.Errorf("failed to parse lastUsed data: %w", err)
-		}
-		lastUsedTime := metav1.NewTime(lastUsed)
-		lastUsedAt = &lastUsedTime
-	} // else: empty => lastUsedAt == nil
+	lastUsedAt, err := decodeTime("lastUsedAt", secret.Data[FieldLastUsedAt])
+	if err != nil {
+		return token, err
+	}
 	token.Status.LastUsedAt = lastUsedAt
+
+	lastActivitySeen, err := decodeTime("lastActivitySeen", secret.Data[FieldLastActivitySeen])
+	if err != nil {
+		return token, err
+	}
+	token.Status.LastActivitySeen = lastActivitySeen
 
 	if err := setExpired(token); err != nil {
 		return token, fmt.Errorf("failed to set expiration information: %w", err)
 	}
 
 	return token, nil
+}
+
+// decodeTime parses the byte-slice of the secret into a proper k8s timestamp.
+func decodeTime(label string, timeBytes []byte) (*metav1.Time, error) {
+	if timeAsString := string(timeBytes); timeAsString != "" {
+		time, err := time.Parse(time.RFC3339, timeAsString)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s data: %w", label, err)
+		}
+		kubeTime := metav1.NewTime(time)
+		return &kubeTime, nil
+	} // else: empty => time == nil
+
+	return nil, nil
 }
 
 // setExpired computes the expiration data (isExpired, expiresAt) from token

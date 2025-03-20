@@ -89,6 +89,14 @@ func (t *Token) GetLastUsedAt() *metav1.Time {
 	return t.LastUsedAt
 }
 
+func (t *Token) GetLastActivitySeen() *metav1.Time {
+	return t.ActivityLastSeenAt
+}
+
+func (t *Token) GetCreationTime() metav1.Time {
+	return t.CreationTimestamp
+}
+
 // +genclient
 // +kubebuilder:skipversion
 // +genclient:nonNamespaced
