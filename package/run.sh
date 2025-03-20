@@ -30,6 +30,30 @@ if [ "$CLUSTER_CLEANUP" = true ]; then
     exec agent
 fi
 
+#checking if aws metadata is available or not  # Setting TOKEN as global var to be overwritten and used in get_address func 
+IMD_TOKEN="" 
+check_aws_metadata() 
+{     
+      local IMD=`curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/`
+      if [ $IMD -eq 200 ]
+      then
+        IMD_TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+        echo "TOKEN: $IMD_TOKEN"     
+      elif [ $IMD -eq 403 ]
+      then
+        echo "Error: Aws Instance metadata is disabled"
+        exit 1     
+      elif [ $IMD -eq 401 ]
+      then
+        echo "INFO: Auth error, Instance metatdata version 2 (IMDV2) is set to required: Setting TOKEN Value"
+        IMD_TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+        echo "TOKEN: $IMD_TOKEN"
+      else
+        echo "Error: Unknwon error: Status Code $IMD"
+        exit 1
+      fi
+}
+
 get_address()
 {
     local address=$1
@@ -43,13 +67,15 @@ get_address()
     else
         case $address in
             awslocal)
+                check_aws_metadata
                 echo $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
                 ;;
             awspublic)
-                echo $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+                check_aws_metadata
+                echo $(curl  -H "X-aws-ec2-metadata-token: $IMD_TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
                 ;;
             doprivate)
-                echo $(curl -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
+                echo $(curl -H "X-aws-ec2-metadata-token: $IMD_TOKEN" -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
                 ;;
             dopublic)
                 echo $(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
