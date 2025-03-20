@@ -3,9 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/util/retry"
 	"sort"
-
 	"testing"
 	"time"
 
@@ -20,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
-	corev12 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,35 +25,36 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/util/taints"
 )
 
 var defaultPodTolerations = []v1.Toleration{
 	{
 		Key:      "cattle.io/os",
-		Operator: corev12.TolerationOpEqual,
+		Operator: v1.TolerationOpEqual,
 		Value:    "linux",
 		Effect:   "NoSchedule",
 	},
 	{
 		Key:      "node-role.kubernetes.io/controlplane",
-		Operator: corev12.TolerationOpEqual,
+		Operator: v1.TolerationOpEqual,
 		Value:    "true",
 		Effect:   "NoSchedule",
 	},
 	{
 		Key:      "node-role.kubernetes.io/control-plane",
-		Operator: corev12.TolerationOpExists,
+		Operator: v1.TolerationOpExists,
 		Effect:   "NoSchedule",
 	},
 	{
 		Key:      "node-role.kubernetes.io/etcd",
-		Operator: corev12.TolerationOpExists,
+		Operator: v1.TolerationOpExists,
 		Effect:   "NoExecute",
 	},
 	{
 		Key:      "node.cloudprovider.kubernetes.io/uninitialized",
-		Operator: corev12.TolerationOpEqual,
+		Operator: v1.TolerationOpEqual,
 		Value:    "true",
 		Effect:   "NoSchedule",
 	},
