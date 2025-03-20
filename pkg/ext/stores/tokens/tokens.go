@@ -1227,11 +1227,11 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldUserID] = token.Spec.UserID
 
 	// status elements
-	lastUsedAsString := ""
+	lastUsedAtAsString := ""
 	if token.Status.LastUsedAt != nil {
-		lastUsedAsString = token.Status.LastUsedAt.Format(time.RFC3339)
+		lastUsedAtAsString = token.Status.LastUsedAt.Format(time.RFC3339)
 	}
-	secret.StringData[FieldLastUsedAt] = lastUsedAsString
+	secret.StringData[FieldLastUsedAt] = lastUsedAtAsString
 	secret.StringData[FieldHash] = token.Status.Hash
 	secret.StringData[FieldLastUpdateTime] = token.Status.LastUpdateTime
 	secret.StringData[FieldLastActivitySeen] = ""
@@ -1317,8 +1317,8 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 
 	var lastUsedAt *metav1.Time
-	if lastUsedAsString := string(secret.Data[FieldLastUsedAt]); lastUsedAsString != "" {
-		lastUsed, err := time.Parse(time.RFC3339, lastUsedAsString)
+	if lastUsedAtAsString := string(secret.Data[FieldLastUsedAt]); lastUsedAtAsString != "" {
+		lastUsed, err := time.Parse(time.RFC3339, lastUsedAtAsString)
 		if err != nil {
 			return token, fmt.Errorf("failed to parse lastUsed data: %w", err)
 		}
