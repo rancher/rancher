@@ -1316,26 +1316,16 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 		return token, fmt.Errorf("last update time missing")
 	}
 
-	var lastUsedAt *metav1.Time
-	if lastUsedAtAsString := string(secret.Data[FieldLastUsedAt]); lastUsedAtAsString != "" {
-		lastUsed, err := time.Parse(time.RFC3339, lastUsedAtAsString)
-		if err != nil {
-			return token, fmt.Errorf("failed to parse lastUsed data: %w", err)
-		}
-		lastUsedTime := metav1.NewTime(lastUsed)
-		lastUsedAt = &lastUsedTime
-	} // else: empty => lastUsedAt == nil
+	lastUsedAt, err := decodeTime("lastUsedAt", secret.Data[FieldLastUsedAt])
+	if err != nil {
+		return token, err
+	}
 	token.Status.LastUsedAt = lastUsedAt
 
-	var lastActivitySeen *metav1.Time
-	if lastActivityString := string(secret.Data[FieldLastActivitySeen]); lastActivityString != "" {
-		lastSeen, err := time.Parse(time.RFC3339, lastActivityString)
-		if err != nil {
-			return token, fmt.Errorf("failed to parse lastActivitySeen data: %w", err)
-		}
-		lastSeenTime := metav1.NewTime(lastSeen)
-		lastActivitySeen = &lastSeenTime
-	} // else: empty => lastActivitySeen == nil
+	lastActivitySeen, err := decodeTime("lastActivitySeen", secret.Data[FieldLastActivitySeen])
+	if err != nil {
+		return token, err
+	}
 	token.Status.LastActivitySeen = lastActivitySeen
 
 	if err := setExpired(token); err != nil {
@@ -1343,6 +1333,20 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 
 	return token, nil
+}
+
+// decodeTime parses the byte-slice of the secret into a proper k8s timestamp.
+func decodeTime(label string, timeBytes []byte) (*metav1.Time, error) {
+	if timeAsString := string(timeBytes); timeAsString != "" {
+		time, err := time.Parse(time.RFC3339, timeAsString)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s data: %w", label, err)
+		}
+		kubeTime := metav1.NewTime(time)
+		return &kubeTime, nil
+	} // else: empty => time == nil
+
+	return nil, nil
 }
 
 // setExpired computes the expiration data (isExpired, expiresAt) from token
