@@ -38,11 +38,6 @@ const (
 	clusterNameLabel       = "cluster.cattle.io/name"
 )
 
-var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
-	"catalogtemplates":        true,
-	"catalogtemplateversions": true,
-}
-
 func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *crtbLifecycle) {
 	crbInformer := management.RBAC.ClusterRoleBindings("").Controller().Informer()
 	rbInformer := management.RBAC.RoleBindings("").Controller().Informer()
@@ -558,12 +553,6 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]string{}
 		for resource, apiGroup := range resources {
-			// Adding this check, because we want cluster-owners to have access to catalogtemplates/versions of all projects, but no other cluster roles
-			// need to access catalogtemplates of projects they do not belong to
-			if !role.Administrative && commonClusterAndProjectMgmtPlaneResources[resource] {
-				continue
-
-			}
 			verbs, err := m.checkForManagementPlaneRules(role, resource, apiGroup)
 			if err != nil {
 				return err
