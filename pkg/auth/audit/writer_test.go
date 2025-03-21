@@ -147,8 +147,9 @@ func TestBlockList(t *testing.T) {
 func TestHigherVerbosityForPolicy(t *testing.T) {
 	bodyContent := []byte(`{"password":"password"}`)
 	headers := map[string][]string{
-		"foo": {"bar"},
-		"baz": {"qux"},
+		"foo":          {"bar"},
+		"baz":          {"qux"},
+		"Content-Type": {contentTypeJSON},
 	}
 	logs, w := setup(t, WriterOptions{
 		DefaultPolicyLevel:     auditlogv1.LevelNull,
@@ -242,6 +243,7 @@ func TestCompressedGzip(t *testing.T) {
 	err := w.Write(&log{
 		ResponseHeader: http.Header{
 			"Content-Encoding": []string{contentEncodingGZIP},
+			"Content-Type":     []string{contentTypeJSON},
 		},
 		rawResponseBody: body,
 	})
@@ -251,6 +253,7 @@ func TestCompressedGzip(t *testing.T) {
 		{
 			ResponseHeader: http.Header{
 				"Content-Encoding": []string{contentEncodingGZIP},
+				"Content-Type":     []string{contentTypeJSON},
 			},
 			ResponseBody: map[string]any{
 				"foo": "bar",
@@ -277,6 +280,7 @@ func TestCompressedZLib(t *testing.T) {
 	err := w.Write(&log{
 		ResponseHeader: http.Header{
 			"Content-Encoding": []string{contentEncodingZLib},
+			"Content-Type":     []string{contentTypeJSON},
 		},
 		rawResponseBody: body,
 	})
@@ -286,6 +290,7 @@ func TestCompressedZLib(t *testing.T) {
 		{
 			ResponseHeader: http.Header{
 				"Content-Encoding": []string{contentEncodingZLib},
+				"Content-Type":     []string{contentTypeJSON},
 			},
 			ResponseBody: map[string]any{
 				"foo": "bar",
