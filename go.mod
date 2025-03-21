@@ -135,7 +135,7 @@ require (
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.2-rc.3
 	github.com/rancher/eks-operator v1.11.0-rc.4
-	github.com/rancher/fleet/pkg/apis v0.12.0-rc.4
+	github.com/rancher/fleet/pkg/apis v0.12.0-rc.5
 	github.com/rancher/gke-operator v1.11.0-rc.4
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.1
@@ -148,7 +148,7 @@ require (
 	github.com/rancher/steve v0.5.10
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.2.0-rc.3
+	github.com/rancher/wrangler/v3 v3.2.0
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
