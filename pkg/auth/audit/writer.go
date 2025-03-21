@@ -2,8 +2,6 @@ package audit
 
 import (
 	"bytes"
-	"compress/gzip"
-	"compress/zlib"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,11 +10,6 @@ import (
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"k8s.io/apimachinery/pkg/types"
-)
-
-const (
-	contentEncodingGZIP = "gzip"
-	contentEncodingZLib = "deflate"
 )
 
 var (
@@ -115,68 +108,6 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 	return w, nil
 }
 
-func decompressGZIP(data []byte) ([]byte, error) {
-	gz, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-
-	return decompress(gz)
-}
-
-func decompressZLib(data []byte) ([]byte, error) {
-	zr, err := zlib.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create zlib reader: %w", err)
-	}
-
-	return decompress(zr)
-}
-
-func decompress(readCloser io.ReadCloser) ([]byte, error) {
-	rawData, err := io.ReadAll(readCloser)
-	if err != nil {
-		retErr := fmt.Errorf("failed to read compressed response: %w", err)
-		closeErr := readCloser.Close()
-		if closeErr != nil {
-			// Using %v for close error because you can currently only wrap one error.
-			// The read error is more important to the caller in this instance.
-			retErr = fmt.Errorf("%w; failed to close readCloser: %v", retErr, closeErr)
-		}
-		return nil, retErr
-	}
-
-	if err = readCloser.Close(); err != nil {
-		return rawData, fmt.Errorf("failed to close reader: %w", err)
-	}
-
-	return rawData, nil
-}
-
-func (w *Writer) decompressResponse(log *log) error {
-	var err error
-	var compressed []byte
-
-	switch contentType := log.ResponseHeader.Get("Content-Encoding"); contentType {
-	case contentEncodingGZIP:
-		compressed, err = decompressGZIP(log.rawResponseBody)
-	case contentEncodingZLib:
-		compressed, err = decompressZLib(log.rawResponseBody)
-	case "", "none":
-		// not encoded do nothing
-	default:
-		err = fmt.Errorf("%w '%s' in resopnse header", ErrUnsupportedEncoding, contentType)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to decode response body: %w", err)
-	}
-
-	log.rawResponseBody = compressed
-
-	return nil
-}
-
 func (w *Writer) Write(log *log) error {
 	redactors := []Redactor{}
 	if !w.DisableDefaultPolicies {
@@ -207,10 +138,6 @@ func (w *Writer) Write(log *log) error {
 	}
 
 	log.prepare(verbosity)
-
-	if err := w.decompressResponse(log); err != nil {
-		return fmt.Errorf("failed to decompress response: %w", err)
-	}
 
 	for _, r := range redactors {
 		if err := r.Redact(log); err != nil {

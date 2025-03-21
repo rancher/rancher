@@ -1,6 +1,9 @@
 package audit
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -216,6 +219,76 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 			},
 			ResponseBody: map[string]any{
 				"password": "password",
+			},
+		},
+	}
+
+	assert.Equal(t, expected, logs.logs)
+}
+
+func TestCompressedGzip(t *testing.T) {
+	logs, w := setup(t, WriterOptions{
+		DefaultPolicyLevel:     auditlogv1.LevelRequestResponse,
+		DisableDefaultPolicies: true,
+	})
+
+	buffer := bytes.NewBuffer(nil)
+	compressor := gzip.NewWriter(buffer)
+	compressor.Write([]byte(`{"foo":"bar"}`))
+	compressor.Close()
+
+	body := buffer.Bytes()
+
+	err := w.Write(&log{
+		ResponseHeader: http.Header{
+			"Content-Encoding": []string{contentEncodingGZIP},
+		},
+		rawResponseBody: body,
+	})
+	assert.NoError(t, err)
+
+	expected := []log{
+		{
+			ResponseHeader: http.Header{
+				"Content-Encoding": []string{contentEncodingGZIP},
+			},
+			ResponseBody: map[string]any{
+				"foo": "bar",
+			},
+		},
+	}
+
+	assert.Equal(t, expected, logs.logs)
+}
+
+func TestCompressedZLib(t *testing.T) {
+	logs, w := setup(t, WriterOptions{
+		DefaultPolicyLevel:     auditlogv1.LevelRequestResponse,
+		DisableDefaultPolicies: true,
+	})
+
+	buffer := bytes.NewBuffer(nil)
+	compressor := zlib.NewWriter(buffer)
+	compressor.Write([]byte(`{"foo":"bar"}`))
+	compressor.Close()
+
+	body := buffer.Bytes()
+
+	err := w.Write(&log{
+		ResponseHeader: http.Header{
+			"Content-Encoding": []string{contentEncodingZLib},
+		},
+		rawResponseBody: body,
+	})
+	assert.NoError(t, err)
+
+	expected := []log{
+		{
+			ResponseHeader: http.Header{
+				"Content-Encoding": []string{contentEncodingZLib},
+			},
+			ResponseBody: map[string]any{
+				"foo": "bar",
 			},
 		},
 	}
