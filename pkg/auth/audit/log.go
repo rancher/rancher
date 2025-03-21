@@ -164,7 +164,7 @@ func (l *log) prepare(verbosity auditlogv1.LogVerbosity) {
 		l.ResponseHeader = nil
 	}
 
-	if verbosity.Request.Body && len(l.rawRequestBody) > 0 {
+	if verbosity.Request.Body && l.RequestHeader.Get("Content-Type") == contentTypeJSON && len(l.rawRequestBody) > 0 {
 		if err := json.Unmarshal(l.rawRequestBody, &l.RequestBody); err != nil {
 			l.RequestBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
@@ -173,7 +173,7 @@ func (l *log) prepare(verbosity auditlogv1.LogVerbosity) {
 	}
 	l.rawRequestBody = nil
 
-	if verbosity.Response.Body && len(l.rawResponseBody) > 0 {
+	if verbosity.Response.Body && l.ResponseHeader.Get("Content-Type") == contentTypeJSON && len(l.rawResponseBody) > 0 {
 		if err := l.decompressResponse(); err != nil {
 			l.RequestBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to decompressed reuqest body: %s", err.Error()),
