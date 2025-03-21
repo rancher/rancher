@@ -10,12 +10,14 @@ import (
 func sampleLog() log {
 	return log{
 		RequestHeader: map[string][]string{
-			"password": {"password1234"},
-			"foo":      {"bar"},
+			"password":     {"password1234"},
+			"foo":          {"bar"},
+			"Content-Type": []string{contentTypeJSON},
 		},
 		ResponseHeader: map[string][]string{
-			"password": {"password1234"},
-			"baz":      {"qux"},
+			"password":     {"password1234"},
+			"baz":          {"qux"},
+			"Content-Type": []string{contentTypeJSON},
 		},
 		rawRequestBody:  []byte(`{"toplevel":{"inner":{"bottom":"value"},"sibling":"value"}}`),
 		rawResponseBody: []byte(`{"words":[{"foo":"bar"},{"baz":"qux"}]}`),
@@ -52,12 +54,14 @@ func TestPolicyRedactor(t *testing.T) {
 			Input:    sampleLog(),
 			Expected: log{
 				RequestHeader: map[string][]string{
-					"password": {redacted},
-					"foo":      {"bar"},
+					"password":     {redacted},
+					"foo":          {"bar"},
+					"Content-Type": []string{contentTypeJSON},
 				},
 				ResponseHeader: map[string][]string{
-					"password": {redacted},
-					"baz":      {"qux"},
+					"password":     {redacted},
+					"baz":          {"qux"},
+					"Content-Type": []string{contentTypeJSON},
 				},
 				RequestBody: map[string]any{
 					"toplevel": map[string]any{
@@ -78,12 +82,14 @@ func TestPolicyRedactor(t *testing.T) {
 			Input:    sampleLog(),
 			Expected: log{
 				RequestHeader: map[string][]string{
-					"password": {"password1234"},
-					"foo":      {"bar"},
+					"password":     {"password1234"},
+					"foo":          {"bar"},
+					"Content-Type": []string{contentTypeJSON},
 				},
 				ResponseHeader: map[string][]string{
-					"password": {"password1234"},
-					"baz":      {"qux"},
+					"password":     {"password1234"},
+					"baz":          {"qux"},
+					"Content-Type": []string{contentTypeJSON},
 				},
 				RequestBody: map[string]any{
 					"toplevel": map[string]any{
@@ -105,12 +111,14 @@ func TestPolicyRedactor(t *testing.T) {
 			Input:    sampleLog(),
 			Expected: log{
 				RequestHeader: map[string][]string{
-					"password": {"password1234"},
-					"foo":      {"bar"},
+					"password":     {"password1234"},
+					"foo":          {"bar"},
+					"Content-Type": []string{contentTypeJSON},
 				},
 				ResponseHeader: map[string][]string{
-					"password": {"password1234"},
-					"baz":      {"qux"},
+					"password":     {"password1234"},
+					"baz":          {"qux"},
+					"Content-Type": []string{contentTypeJSON},
 				},
 				RequestBody: map[string]any{
 					"toplevel": map[string]any{
