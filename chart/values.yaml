@@ -9,9 +9,8 @@ topologyKey: kubernetes.io/hostname
 # Audit Logs
 # Source: https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-api-audit-log
 # The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
-# level: Verbosity of logs, 0 to 3. 0 is off, 3 most verbose.
-# Docs: https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-api-audit-log#audit-log-levels
 auditLog:
+  enabled: false
   destination: sidecar
   hostPath: /var/log/rancher/audit/
   level: 0
