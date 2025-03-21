@@ -101,6 +101,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
 		rtLister:            management.Management.RoleTemplates("").Controller().Lister(),
+		prtbLister:          management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
@@ -165,6 +166,7 @@ type managerInterface interface {
 type manager struct {
 	workload            *config.UserContext
 	rtLister            v3.RoleTemplateLister
+	prtbLister          v3.ProjectRoleTemplateBindingLister
 	prtbIndexer         cache.Indexer
 	crtbIndexer         cache.Indexer
 	nsIndexer           cache.Indexer
