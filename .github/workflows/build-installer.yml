@@ -1,0 +1,70 @@
+name: Build installer
+on:
+  workflow_call:
+jobs:
+  build-installer:
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      REGISTRY: "stgregistry.suse.com"
+    steps:
+      - name: Environment variables
+        shell: bash
+        run: |
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ github.repository_owner}}/rancher
+          flavor: |
+            latest=false
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Download chart
+        uses: actions/download-artifact@v4
+        with:
+          name: chart
+          path: ./chart
+      - name: Build and export agent
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          push:  true
+          build-args: |
+            "VERSION=${{ env.TAG }}"
+            "ARCH=${{ matrix.arch }}"
+            "RANCHER_TAG=${{ env.TAG }}"
+            "RANCHER_REPO=${{ github.repository_owner }}"
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-${{ env.ARCH }}
+          context: .
+          platforms: "${{ matrix.os }}/${{ env.ARCH }}"
+          file: ./package/Dockerfile.installer
+          labels: "${{ steps.meta.outputs.labels }}"
