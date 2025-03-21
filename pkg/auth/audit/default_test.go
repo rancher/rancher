@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -37,6 +38,7 @@ func TestDefaultPolicies(t *testing.T) {
 	type testCase struct {
 		Name     string
 		Uri      string
+		Headers  http.Header
 		Body     []byte
 		Expected []byte
 	}
@@ -44,82 +46,98 @@ func TestDefaultPolicies(t *testing.T) {
 	cases := []testCase{
 		{
 			Name:     "password entry",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"password":"fake_password","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"password":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "Password entry",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"Password":"fake_password","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"Password":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "password entry no space",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"password":"whatever you want","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"password":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "Password entry no space",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"Password":"A whole bunch of \"\"}{()","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"Password":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "currentPassword entry",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"currentPassword":"something super secret","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"currentPassword":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "newPassword entry",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"newPassword":"don't share this","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"newPassword":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "Multiple password entries",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"currentPassword":"fake_password","newPassword":"new_fake_password","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"currentPassword":"%s","newPassword":"%[1]s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "No password entries",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"user":"fake_user","user_info":"some information about the user","request_info":"some info about the request"}`),
 			Expected: []byte(`{"user":"fake_user","user_info":"some information about the user","request_info":"some info about the request"}`),
 		},
 		{
 			Name:     "Strategic password examples",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"anotherPassword":"\"password\"","currentPassword":"password\":","newPassword":"newPassword\\\":","shortPassword":"'","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"anotherPassword":"%s","currentPassword":"%[1]s","newPassword":"%[1]s","shortPassword":"%[1]s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "Token entry",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"accessToken":"fake_access_token","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"accessToken":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "Token entry in slice",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"data":[{"accessToken":"fake_access_token","user":"fake_user"}]}`),
 			Expected: []byte(fmt.Sprintf(`{"data":[{"accessToken":"%s","user":"fake_user"}]}`, redacted)),
 		},
 		{
 			Name:     "Token entry in args slice",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"data":{"commands":["--user","user","--token","sometoken"]}}`),
 			Expected: []byte(fmt.Sprintf(`{"data":{"commands":["--user","user","--token","%s"]}}`, redacted)),
 		},
 		{
 			Name:     "Token entry in args slice but is last element of slice",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"data":{"commands":["--user","user","--token"]}}`),
 			Expected: []byte(`{"data":{"commands":["--user","user","--token"]}}`),
 		},
 		{
 			Name:     "With public fields",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"accessKey":"fake_access_key","secretKey":"fake_secret_key","user":"fake_user"}`),
 			Expected: []byte(fmt.Sprintf(`{"accessKey":"fake_access_key","secretKey":"%s","user":"fake_user"}`, redacted)),
 		},
 		{
 			Name:     "With secret data",
+			Uri:      "/secrets",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\","bar":"U3VwZXIgU2VjcmV0IERhdGEK"},"accessToken" :"fake_access_token"}`),
 			Expected: []byte(fmt.Sprintf(`{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":"%s","accessToken" :"%[1]s"}`, redacted)),
-			Uri:      "/secrets",
 		},
 		{
 			Name:     "With secret list data",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"type":"collection","data":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\","bar":"U3VwZXIgU2VjcmV0IERhdGEK"}},{"type":"Opaque","metadata":{"namespace":"default","name":"my secret2"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\","bar":"U3VwZXIgU2VjcmV0IERhdGEK"}}]}`),
 			Expected: []byte(fmt.Sprintf(`{"type":"collection","data":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":"%s"},{"type":"Opaque","metadata":{"namespace":"default","name":"my secret2"},"_type":"Opaque","data":"%[1]s"}]}`, redacted)),
 			Uri:      "/v1/secrets",
@@ -128,63 +146,73 @@ func TestDefaultPolicies(t *testing.T) {
 			// norman transforms some secret subtypes to where their data fields cannot be distinguished from non-sensitive fields.
 			// In this case, all fields aside from id, created, and baseType should be redacted.
 			Name:     "With secret list data but no data field for array elements",
+			Uri:      "/secrets",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"type":"collection","data":[{"id":"p-12345:testsecret","baseType":"secret","type":"Opaque","_type":"Opaque","foo":"something","bar":"something","accessToken":"token"}]}`),
 			Expected: []byte(fmt.Sprintf(`{"data":[{"_type":"%s","accessToken":"%[1]s","bar":"%[1]s","baseType":"secret","foo":"%[1]s","id":"p-12345:testsecret","type":"%[1]s"}],"type":"collection"}`, redacted)),
-			Uri:      "/secrets",
 		},
 		{
 			Name:     "With secret list data from k8s proxy",
+			Uri:      "/k8s/clusters/local/api/v1/secrets?limit=500",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"kind":"SecretList","items":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\","bar":"U3VwZXIgU2VjcmV0IERhdGEK"}}]}`),
 			Expected: []byte(fmt.Sprintf(`{"kind":"SecretList","items":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":"%s"}]}`, redacted)),
-			Uri:      "/k8s/clusters/local/api/v1/secrets?limit=500",
 		},
 		{
 			Name:     "With secret data and wrong URI",
+			Uri:      "/not-secret",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\","bar":"U3VwZXIgU2VjcmV0IERhdGEK"},"accessToken" :"fake_access_token"}`),
 			Expected: []byte(fmt.Sprintf(`{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\","bar":"U3VwZXIgU2VjcmV0IERhdGEK"},"accessToken" :"%s"}`, redacted)),
-			Uri:      "/not-secret",
 		},
 		{
 			Name:     "With nested sensitive information",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"sensitiveData": {"accessToken":"fake_access_token","user":"fake_user"}}`),
 			Expected: []byte(fmt.Sprintf(`{"sensitiveData": {"accessToken":"%s","user":"fake_user"}}`, redacted)),
 		},
 		{
 			Name:     "With all machine driver fields",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     machineDataInput,
 			Expected: machineDataWant,
 		},
 		{
 			Name:     "With no secret uri but secret base type slice",
+			Uri:      `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name`,
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"type":"collection","data":[{"baseType":"namespacedSecret","creatorId":null,"data":{"testfield":"somesecretencodeddata"},"id":"cattle-system:test","kind":"Opaque"}]}`),
 			Expected: []byte(fmt.Sprintf(`{"type":"collection","data":[{"baseType":"namespacedSecret","creatorId":null,"data":"%s","id":"cattle-system:test","kind":"Opaque"}]}`, redacted)),
-			Uri:      `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name`,
 		},
 		{
 			Name:     "With kubeconfig from generateKubeconfig action",
+			Uri:      `/v3/clusters/c-xxxxx?action=generateKubeconfig`,
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"baseType":"generateKubeConfigOutput","config":"apiVersion: v1\nkind: Config\nclusters:\n- name: \"somecluster-rke\"\n  cluster:\n    server: \"https://rancherurl.com/k8s/clusters/c-xxxxx\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  cluster:\n    server: \"https://34.211.205.110:6443\"\n    certificate-authority-data: \"somecadata\"\n\nusers:\n- name: \"somecluster-rke\"\n  user:\n    token: \"kubeconfig-user-12345:sometoken\"\n\n\ncontexts:\n- name: \"somecluster-rke\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke-somecluster-rke1\"\n\ncurrent-context: \"somecluster-rke\"\n","type":"generateKubeConfigOutput"}`),
 			Expected: []byte(fmt.Sprintf(`{"baseType":"generateKubeConfigOutput","config":"%s","type":"generateKubeConfigOutput"}`, redacted)),
-			Uri:      `/v3/clusters/c-xxxxx?action=generateKubeconfig`,
 		},
 		{
 			Name:     "With kubeconfig from connect agent",
+			Uri:      `/v3/connect/agent`,
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"kubeConfig":"apiVersion: v1\nkind: Config\nclusters:\n- name: \"somecluster-rke\"\n  cluster:\n    server: \"https://rancherurl.com/k8s/clusters/c-xxxxx\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  cluster:\n    server: \"https://34.211.205.110:6443\"\n    certificate-authority-data: \"somecadata\"\n\nusers:\n- name: \"somecluster-rke\"\n  user:\n    token: \"kubeconfig-user-12345:sometoken\"\n\n\ncontexts:\n- name: \"somecluster-rke\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke-somecluster-rke1\"\n\ncurrent-context: \"somecluster-rke\"\n","namespace":"testns","secretName":"secret-name"}`),
 			Expected: []byte(fmt.Sprintf(`{"kubeConfig":"%s","namespace":"testns","secretName":"secret-name"}`, redacted)),
-			Uri:      `/v3/connect/agent`,
 		},
 		{
 			Name:     "With kubeconfig from random request",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"kubeConfig":"apiVersion: v1\nkind: Config\nclusters:\n- name: \"somecluster-rke\"\n  cluster:\n    server: \"https://rancherurl.com/k8s/clusters/c-xxxxx\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  cluster:\n    server: \"https://34.211.205.110:6443\"\n    certificate-authority-data: \"somecadata\"\n\nusers:\n- name: \"somecluster-rke\"\n  user:\n    token: \"kubeconfig-user-12345:sometoken\"\n\n\ncontexts:\n- name: \"somecluster-rke\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke-somecluster-rke1\"\n\ncurrent-context: \"somecluster-rke\"\n","namespace":"testns","secretName":"secret-name"}`),
 			Expected: []byte(fmt.Sprintf(`{"kubeConfig":"%s","namespace":"testns","secretName":"secret-name"}`, redacted)),
-			Uri:      `asdf`,
 		},
 		{
 			Name:     "With items from sensitiveBodyFields",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"credentials":"{'fakeCredName': 'fakeCred'}","applicationSecret":"fakeAppSecret","oauthCredential":"fakeOauth","serviceAccountCredential":"fakeSACred","spKey":"fakeSPKey","spCert":"fakeSPCERT","certificate":"fakeCert","privateKey":"fakeKey"}`),
 			Expected: []byte(fmt.Sprintf(`{"credentials":"%s","applicationSecret":"%[1]s","oauthCredential":"%[1]s","serviceAccountCredential":"%[1]s","spKey":"%[1]s","spCert":"%[1]s","certificate":"%[1]s","privateKey":"%[1]s"}`, redacted)),
 		},
 		{
 			Name:     "With malformed input",
+			Headers:  http.Header{"Content-Type": {contentTypeJSON}},
 			Body:     []byte(`{"key":"value","response":}`),
 			Expected: []byte(fmt.Sprintf(`{"%s":"failed to unmarshal request body: invalid character '}' looking for beginning of value"}`, auditLogErrorKey)),
 		},
@@ -200,6 +228,7 @@ func TestDefaultPolicies(t *testing.T) {
 			log := &log{
 				AuditID:        "0123456789",
 				RequestURI:     c.Uri,
+				RequestHeader:  c.Headers,
 				rawRequestBody: c.Body,
 			}
 
