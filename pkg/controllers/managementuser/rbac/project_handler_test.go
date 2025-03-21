@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -55,6 +57,41 @@ func TestCreate(t *testing.T) {
 			},
 		},
 		{
+			name: "basic create with updatepsa permission",
+			wantRoles: []rbacv1.ClusterRole{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "p-123xyz-namespaces-readonly",
+						Annotations: map[string]string{
+							projectNSAnn: "p-123xyz-namespaces-readonly",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "p-123xyz-namespaces-edit",
+						Annotations: map[string]string{
+							projectNSAnn: "p-123xyz-namespaces-edit",
+						},
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups:     []string{"management.cattle.io"},
+							Verbs:         []string{"manage-namespaces"},
+							Resources:     []string{"projects"},
+							ResourceNames: []string{"p-123xyz"},
+						},
+						{
+							APIGroups:     []string{"management.cattle.io"},
+							Resources:     []string{"projects"},
+							Verbs:         []string{"updatepsa"},
+							ResourceNames: []string{"p-123xyz"},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:    "get error",
 			getErr:  fmt.Errorf("unexpected error"),
 			wantErr: false,
@@ -82,6 +119,61 @@ func TestCreate(t *testing.T) {
 			var newCRs []*rbacv1.ClusterRole
 			lifecycle := pLifecycle{
 				m: &manager{
+					prtbLister: &managementFakes.ProjectRoleTemplateBindingListerMock{
+						ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ProjectRoleTemplateBinding, error) {
+							if test.getErr != nil {
+								return nil, test.getErr
+							}
+							return []*v3.ProjectRoleTemplateBinding{
+								&v3.ProjectRoleTemplateBinding{
+									ObjectMeta: metav1.ObjectMeta{
+										Name:      "creator-project-owner",
+										Namespace: projectName,
+									},
+									RoleTemplateName: "project-owner",
+								},
+								&v3.ProjectRoleTemplateBinding{
+									ObjectMeta: metav1.ObjectMeta{
+										Name:      "prtb-12345",
+										Namespace: projectName,
+									},
+									RoleTemplateName: "special-project-role-template",
+								},
+							}, nil
+						},
+					},
+					rtLister: &managementFakes.RoleTemplateListerMock{
+						GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
+							if test.name == "basic create with updatepsa permission" {
+								return &v3.RoleTemplate{
+									ObjectMeta: metav1.ObjectMeta{
+										Name: "special-project-role-template",
+									},
+									Rules: []rbacv1.PolicyRule{
+										{
+											APIGroups:     []string{"management.cattle.io"},
+											Resources:     []string{"projects"},
+											Verbs:         []string{"updatepsa"},
+											ResourceNames: []string{"p-123xyz"},
+										},
+									},
+								}, nil
+							}
+							return &v3.RoleTemplate{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "special-project-role-template",
+								},
+								Rules: []rbacv1.PolicyRule{
+									{
+										APIGroups:     []string{"management.cattle.io"},
+										Resources:     []string{"projects"},
+										Verbs:         []string{"get"}, // using 'get' instead of 'updatepsa'
+										ResourceNames: []string{"p-123xyz"},
+									},
+								},
+							}, nil
+						},
+					},
 					crLister: &fakes.ClusterRoleListerMock{
 						GetFunc: func(namespace string, name string) (*rbacv1.ClusterRole, error) {
 							if test.getErr != nil {
