@@ -125,14 +125,14 @@ func TestCreate(t *testing.T) {
 								return nil, test.getErr
 							}
 							return []*v3.ProjectRoleTemplateBinding{
-								&v3.ProjectRoleTemplateBinding{
+								{
 									ObjectMeta: metav1.ObjectMeta{
 										Name:      "creator-project-owner",
 										Namespace: projectName,
 									},
 									RoleTemplateName: "project-owner",
 								},
-								&v3.ProjectRoleTemplateBinding{
+								{
 									ObjectMeta: metav1.ObjectMeta{
 										Name:      "prtb-12345",
 										Namespace: projectName,
