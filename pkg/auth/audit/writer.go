@@ -227,6 +227,7 @@ func (w *Writer) Write(log *log) error {
 	if err := json.Compact(&buffer, data); err != nil {
 		return fmt.Errorf("failed to compact log: %w", err)
 	}
+	buffer.WriteByte('\n')
 
 	if _, err := w.output.Write(buffer.Bytes()); err != nil {
 		return fmt.Errorf("failed to write log: %w", err)
