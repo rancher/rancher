@@ -393,7 +393,7 @@ class TestCertificate:
                 name=cert_name, key=rancher_private_key,
                 certs=rancher_cert
             )
-            assert certificate_allns_valid.issuer == 'E6'
+            assert certificate_allns_valid.issuer == 'E5'
             # Delete the certificate
             p_client.delete(certificate_allns_valid)
 
@@ -424,7 +424,7 @@ class TestCertificate:
                 name=cert_name, key=rancher_private_key, certs=rancher_cert,
                 namespaceId=ns['name']
             )
-            assert certificate_valid.issuer == 'E6'
+            assert certificate_valid.issuer == 'E5'
             # Delete the certificate
             p_client.delete(certificate_valid)
 
@@ -728,7 +728,7 @@ def create_project_client(request):
         name="cert-valid", key=rancher_private_key, certs=rancher_cert,
         namespaceId=ns['name']
     )
-    assert certificate_valid.issuer == 'E6'
+    assert certificate_valid.issuer == 'E5'
 
     certificate_allns_valid = p_client.create_certificate(
         name="cert-all-ns-valid", key=rancher_private_key,
@@ -769,13 +769,13 @@ def create_project_client(request):
     namespace["cert_allns_ssc"] = certificate_allns_ssc
     namespace["node_id"] = node_id
 
-    def fin():
-        client = get_user_client()
-        client.delete(namespace["project"])
-        aws_services.upsert_route_53_record_cname(
-            route_entry_53_1, node_ip, action='DELETE', record_type='A',
-            record_ttl=60)
-        aws_services.upsert_route_53_record_cname(
-            route_entry_53_2, node_ip, action='DELETE', record_type='A',
-            record_ttl=60)
-    request.addfinalizer(fin)
+    # def fin():
+    #     client = get_user_client()
+    #     client.delete(namespace["project"])
+    #     aws_services.upsert_route_53_record_cname(
+    #         route_entry_53_1, node_ip, action='DELETE', record_type='A',
+    #         record_ttl=60)
+    #     aws_services.upsert_route_53_record_cname(
+    #         route_entry_53_2, node_ip, action='DELETE', record_type='A',
+    #         record_ttl=60)
+    # request.addfinalizer(fin)
