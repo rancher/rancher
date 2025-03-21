@@ -3,6 +3,7 @@ package capr
 import (
 	corev1 "k8s.io/api/core/v1"
 	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -401,6 +402,46 @@ func TestFormatWindowsEnvVar(t *testing.T) {
 			out := FormatWindowsEnvVar(tc.EnvVar, tc.IsPlanVar)
 			if out != tc.ExpectedString {
 				t.Fatalf("Expected %s, got %s", tc.ExpectedString, out)
+			}
+		})
+	}
+}
+
+func TestPlannerSecretNameGenerators(t *testing.T) {
+	generators := []func(string) string{
+		PlanSecretFromBootstrapName,
+		RKEStateSecretName,
+		MachineStateSecretName,
+	}
+
+	matcher := regexp.MustCompile("(machine-state|rke-state|machine-plan)$")
+
+	tests := []struct {
+		name              string
+		machineName       string
+		correctlyAppended bool
+	}{
+		{
+			name:              "Simple machine name",
+			machineName:       "machine1",
+			correctlyAppended: true,
+		},
+		{
+			name:              "Kind of long machine name",
+			machineName:       "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
+			correctlyAppended: true,
+		},
+		{
+			name:              "Extremely long machine name",
+			machineName:       "verylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinenameverylongmachinename",
+			correctlyAppended: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, f := range generators {
+				assert.Equal(t, matcher.MatchString(f(tt.machineName)), tt.correctlyAppended)
 			}
 		})
 	}

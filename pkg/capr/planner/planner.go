@@ -27,7 +27,6 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
@@ -1154,7 +1153,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 		return "", plan.Secret{}, nil
 	}
 
-	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
+	name := capr.RKEStateSecretName(controlPlane.Name)
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name)
 	if apierror.IsNotFound(err) {
 		if !newCluster {
