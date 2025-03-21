@@ -605,6 +605,7 @@ tests:
 - it: doesn't use Rancher pod `resources` on Audit Log sidecar
   set:
     auditLog:
+      enabled: true
       level: 3
     resources:
       requests:
@@ -632,6 +633,7 @@ tests:
 - it: allows `resources` to be defined on Rancher audit log sidecar pod
   set:
     auditLog:
+      enabled: true
       level: 3
       resources:
         requests:
@@ -657,6 +659,7 @@ tests:
 - it: allows different `resources` for Rancher pod and audit log sidecar pod
   set:
     auditLog:
+      enabled: true
       level: 3
       resources:
         requests:
