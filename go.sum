@@ -2444,8 +2444,8 @@ github.com/rancher/dynamiclistener v0.6.2-rc.3 h1:HEF7yvLXJ3HJpV0vlG36F3/U8+KbXh
 github.com/rancher/dynamiclistener v0.6.2-rc.3/go.mod h1:ncmVR7qR8kR1o6xNkTcVS2mZ9WtlljimBilIlNjdyzc=
 github.com/rancher/eks-operator v1.11.0-rc.4 h1:kJHQNpVdtdDsmyNa5pcm6fPSjAcXWaYeKrzD//AN5vg=
 github.com/rancher/eks-operator v1.11.0-rc.4/go.mod h1:7G0kfoUs7qKMVgBdmeL/Mci7moV7OnyPkeX2MIvEBV8=
-github.com/rancher/fleet/pkg/apis v0.12.0-rc.2.0.20250318105039-16b5bc1f761a h1:aTdDNVwIqyBaSHlfoCz3qJkZIc4i9b4CKk6y6WfQRSQ=
-github.com/rancher/fleet/pkg/apis v0.12.0-rc.2.0.20250318105039-16b5bc1f761a/go.mod h1:ejSFE4Tht+dwtp4gGQSx/LDqZcPYfc3AAUo3W1J0Zd8=
+github.com/rancher/fleet/pkg/apis v0.12.0 h1:ZzDB63LFLrtwu0wOMDSrmtboixEnwPnNS4sY0KfCr9M=
+github.com/rancher/fleet/pkg/apis v0.12.0/go.mod h1:aPeCke/1zE63hh4rojpm12hc0tZfwuEn0WXrhM4/PXM=
 github.com/rancher/gke-operator v1.11.0-rc.4 h1:qAPcdvxF27jeejOye9ZT0xMv2+eMp0BoHGwiuiYG88M=
 github.com/rancher/gke-operator v1.11.0-rc.4/go.mod h1:a6OTHbCb+J3TNqqOnXwQ7Ld3pYZ8MU9I5KQMotEjuvs=
 github.com/rancher/helm/v3 v3.17.0-rancher1 h1:CAitia3a0jagclTn+QACzpoV8s5fU52xNmfDP77FMUA=
@@ -2480,8 +2480,8 @@ github.com/rancher/wrangler v0.6.2-0.20200622171942-7224e49a2407/go.mod h1:Nmtml
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
 github.com/rancher/wrangler-api v0.6.1-0.20200515193802-dcf70881b087/go.mod h1:s95VCVHV19b+EUo7BAwwe6nhaDx2/lHu91hxxDHbZs0=
-github.com/rancher/wrangler/v3 v3.2.0-rc.3 h1:MySHWLxLLrGrM2sq5YYp7Ol1kQqYt9lvIzjGR50UZ+c=
-github.com/rancher/wrangler/v3 v3.2.0-rc.3/go.mod h1:0C5QyvSrQOff8gQQzpB/L/FF03EQycjR3unSJcKCHno=
+github.com/rancher/wrangler/v3 v3.2.0 h1:fZmhSOczW+pxAhyOaGG+9xbEwETPGA5gbS0x0Im2zWs=
+github.com/rancher/wrangler/v3 v3.2.0/go.mod h1:0C5QyvSrQOff8gQQzpB/L/FF03EQycjR3unSJcKCHno=
 github.com/redis/go-redis/v9 v9.7.0 h1:HhLSs+B6O021gwzl+locl0zEDnyNkxMtf/Z3NNBMa9E=
 github.com/redis/go-redis/v9 v9.7.0/go.mod h1:f6zhXITC7JUJIlPEiBOTXxJgPLdZcA93GewI7inzyWw=
 github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
