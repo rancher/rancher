@@ -41,7 +41,7 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 		var psa bool
 		// here we ensure that the requisites to add updatepsa rule are met.
 		if suffix == projectNSVerbToSuffix[projectNSEditVerb] {
-			rt, err := p.prtbLookup(project.Name)
+			rt, err := p.rtLookup(project.Name)
 			if err != nil {
 				return project, err
 			}
@@ -58,8 +58,8 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 	return project, err
 }
 
-// prtbLookup retrieves the roletemplate associated with the given project.
-func (p *pLifecycle) prtbLookup(projectName string) (*v32.RoleTemplate, error) {
+// rtLookup retrieves the roletemplate associated with the given project.
+func (p *pLifecycle) rtLookup(projectName string) (*v32.RoleTemplate, error) {
 	prtbs, err := p.m.prtbLister.List(projectName, labels.Everything())
 	if err != nil {
 		return nil, err

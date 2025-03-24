@@ -149,6 +149,7 @@ func TestCreate(t *testing.T) {
 									ObjectMeta: metav1.ObjectMeta{
 										Name: "special-project-role-template",
 									},
+									Context: "project",
 									Rules: []rbacv1.PolicyRule{
 										{
 											APIGroups:     []string{"management.cattle.io"},
@@ -163,6 +164,7 @@ func TestCreate(t *testing.T) {
 								ObjectMeta: metav1.ObjectMeta{
 									Name: "special-project-role-template",
 								},
+								Context: "project",
 								Rules: []rbacv1.PolicyRule{
 									{
 										APIGroups:     []string{"management.cattle.io"},
