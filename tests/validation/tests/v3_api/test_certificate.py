@@ -393,7 +393,7 @@ class TestCertificate:
                 name=cert_name, key=rancher_private_key,
                 certs=rancher_cert
             )
-            assert certificate_allns_valid.issuer == 'E6'
+            assert certificate_allns_valid.issuer == 'E5'
             # Delete the certificate
             p_client.delete(certificate_allns_valid)
 
@@ -424,7 +424,7 @@ class TestCertificate:
                 name=cert_name, key=rancher_private_key, certs=rancher_cert,
                 namespaceId=ns['name']
             )
-            assert certificate_valid.issuer == 'E6'
+            assert certificate_valid.issuer == 'E5'
             # Delete the certificate
             p_client.delete(certificate_valid)
 
@@ -728,7 +728,7 @@ def create_project_client(request):
         name="cert-valid", key=rancher_private_key, certs=rancher_cert,
         namespaceId=ns['name']
     )
-    assert certificate_valid.issuer == 'E6'
+    assert certificate_valid.issuer == 'E5'
 
     certificate_allns_valid = p_client.create_certificate(
         name="cert-all-ns-valid", key=rancher_private_key,
