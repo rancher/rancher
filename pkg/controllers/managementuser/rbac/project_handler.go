@@ -82,6 +82,9 @@ func (p *pLifecycle) prtbLookup(projectName string) (*v32.RoleTemplate, error) {
 	if err != nil {
 		return nil, err
 	}
+	if roleTemplate.Context != "project" {
+		return nil, fmt.Errorf("roletemplate must have context of type 'project'")
+	}
 	return roleTemplate, nil
 }
 
