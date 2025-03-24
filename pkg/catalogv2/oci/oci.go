@@ -126,11 +126,13 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 	tagsFunc := func(tags []string) error {
 		existingTags := make(map[string]bool)
 		for i := len(tags) - 1; i >= 0; i-- {
-			existingTags[tags[i]] = true
-			// Check if the tag is a valid semver version or not. If yes, then proceed.
 			// Change underscore (_) back to plus (+) same as Helm does
 			// See https://github.com/helm/helm/issues/10166
-			semverTag, err := version.NewVersion(strings.ReplaceAll(tags[i], "_", "+"))
+			tag := strings.ReplaceAll(tags[i], "_", "+")
+
+			existingTags[tag] = true
+			// Check if the tag is a valid semver version or not. If yes, then proceed.
+			semverTag, err := version.NewVersion(tag)
 			if err != nil {
 				// skipping the tag since it is not semver
 				continue
@@ -141,13 +143,13 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 			}
 
 			// Add tags into the helm repo index
-			if !indexFile.Has(chartName, tags[i]) {
+			if !indexFile.Has(chartName, tag) {
 				chartVersion := &repo.ChartVersion{
 					Metadata: &chart.Metadata{
-						Version: tags[i],
+						Version: tag,
 						Name:    chartName,
 					},
-					URLs: []string{fmt.Sprintf("oci://%s/%s:%s", ociClient.registry, ociClient.repository, tags[i])},
+					URLs: []string{fmt.Sprintf("oci://%s/%s:%s", ociClient.registry, ociClient.repository, tag)},
 				}
 				indexFile.Entries[chartName] = append(indexFile.Entries[chartName], chartVersion)
 			}
