@@ -11,7 +11,6 @@ import (
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -98,22 +97,6 @@ func isUpdatepsaAllowed(prt *v32.RoleTemplate, projectName string) bool {
 		},
 		prt.Rules...,
 	)
-}
-
-func addUpdatePSAPermission(cr *rbacv1.ClusterRole, projectName string) *rbacv1.ClusterRole {
-	if cr.Rules == nil {
-		cr.Rules = []rbacv1.PolicyRule{}
-	}
-	cr.Rules = append(cr.Rules, rbacv1.PolicyRule{
-		APIGroups:     []string{management.GroupName},
-		Verbs:         []string{updatePSAVerb},
-		Resources:     []string{v32.ProjectResourceName},
-		ResourceNames: []string{projectName},
-	})
-	if cr.Annotations == nil {
-		cr.Annotations = map[string]string{}
-	}
-	return cr
 }
 
 func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {

@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -484,13 +484,29 @@ func addManageNSPermission(clusterRole *rbacv1.ClusterRole, projectName string) 
 	clusterRole.Rules = append(clusterRole.Rules, rbacv1.PolicyRule{
 		APIGroups:     []string{management.GroupName},
 		Verbs:         []string{manageNSVerb},
-		Resources:     []string{apisV3.ProjectResourceName},
+		Resources:     []string{v32.ProjectResourceName},
 		ResourceNames: []string{projectName},
 	})
 	if clusterRole.Annotations == nil {
 		clusterRole.Annotations = map[string]string{}
 	}
 	return clusterRole
+}
+
+func addUpdatePSAPermission(cr *rbacv1.ClusterRole, projectName string) *rbacv1.ClusterRole {
+	if cr.Rules == nil {
+		cr.Rules = []rbacv1.PolicyRule{}
+	}
+	cr.Rules = append(cr.Rules, rbacv1.PolicyRule{
+		APIGroups:     []string{management.GroupName},
+		Verbs:         []string{updatePSAVerb},
+		Resources:     []string{v32.ProjectResourceName},
+		ResourceNames: []string{projectName},
+	})
+	if cr.Annotations == nil {
+		cr.Annotations = map[string]string{}
+	}
+	return cr
 }
 
 func crByNS(obj interface{}) ([]string, error) {
