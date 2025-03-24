@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -59,6 +60,9 @@ const (
 
 	SingularName = "token"
 	PluralName   = SingularName + "s"
+
+	// REGEX for labels
+	labelRegex = "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"
 )
 
 var GV = schema.GroupVersion{
@@ -559,6 +563,11 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 // ListForUser returns the set of token owned by the named user. It is an
 // internal call invoked by other parts of Rancher
 func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
+	matched, _ := regexp.Match(labelRegex, []byte(userName))
+	if !matched {
+		return &ext.TokenList{}, nil
+	}
+
 	// As internal call this method can use the cache of secrets.
 	// Query the cache using a proper label selector
 	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
