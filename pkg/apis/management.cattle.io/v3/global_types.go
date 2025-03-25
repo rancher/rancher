@@ -47,3 +47,9 @@ const (
 	ExperimentalFeatureKey   = "feature.cattle.io/experimental"
 	ExperimentalFeatureValue = "true"
 )
+
+func (f *Feature) SetValue(value bool) {
+	if f.Spec.Value == nil || *f.Spec.Value != value {
+		f.Spec.Value = &[]bool{value}[0]
+	}
+}
