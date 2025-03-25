@@ -230,6 +230,7 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 	}
 
 	userID := storedToken.UserID
+	logrus.Info(fmt.Sprintf("TEST - getTokens - username: %s", userID))
 	set := labels.Set(map[string]string{UserIDLabel: userID})
 	tokenList, err := m.tokensClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {

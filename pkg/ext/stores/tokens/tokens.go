@@ -598,6 +598,7 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
+	logrus.Info(fmt.Sprintf("TEST - list username: %s", userName))
 	localOptions, err := ListOptionMerge(isAdmin, userName, options)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
@@ -812,6 +813,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		ch: make(chan watch.Event, 100),
 	}
 
+	logrus.Info(fmt.Sprintf("TEST  - watch username: %s", userName))
 	localOptions, err := ListOptionMerge(isAdmin, userName, options)
 	if err != nil {
 		return nil,
