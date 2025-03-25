@@ -133,7 +133,7 @@ require (
 	github.com/rancher/apiserver v0.5.2
 	github.com/rancher/backup-restore-operator v1.2.1
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.6.2-rc.3
+	github.com/rancher/dynamiclistener v0.6.2
 	github.com/rancher/eks-operator v1.11.0
 	github.com/rancher/fleet/pkg/apis v0.12.0
 	github.com/rancher/gke-operator v1.11.0
