@@ -587,6 +587,23 @@ func NewNodeTemplate(namespace, name string, obj NodeTemplate) *NodeTemplate {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// OIDCClientList is a list of OIDCClient resources
+type OIDCClientList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []OIDCClient `json:"items"`
+}
+
+func NewOIDCClient(namespace, name string, obj OIDCClient) *OIDCClient {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("OIDCClient").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // OIDCProviderList is a list of OIDCProvider resources
 type OIDCProviderList struct {
 	metav1.TypeMeta `json:",inline"`
