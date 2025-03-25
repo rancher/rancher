@@ -7,6 +7,13 @@ if [ ! -e /run/secrets/kubernetes.io/serviceaccount ] && [ ! -e /dev/kmsg ]; the
     exit 1
 fi
 
+git_dirs=$(find /var/lib/rancher-data/local-catalogs -type d -name '.git')
+echo "Restoring git repositories: "
+for dir in ${git_dirs[@]}; do
+  echo "- ${dir}"
+  cd "${dir}/.." && git checkout HEAD && cd -
+done
+
 #########################################################################################################################################
 # DISCLAIMER                                                                                                                            #
 # Copied from https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/hack/dind#L28-L37                              #
