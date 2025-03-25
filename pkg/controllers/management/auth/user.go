@@ -354,6 +354,7 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 }
 
 func (l *userLifecycle) getExtTokensByUserName(userName string) ([]*ext.Token, error) {
+	logrus.Info("*** getExtTokensByUserName ***")
 	objs, err := l.extTokenStore.ListForUser(userName)
 	if err != nil {
 		return nil, fmt.Errorf("error getting ext tokens for user %s: %v", userName, err)

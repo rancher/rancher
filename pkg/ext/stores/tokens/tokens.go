@@ -22,6 +22,7 @@ import (
 	extcore "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -563,6 +564,7 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 // ListForUser returns the set of token owned by the named user. It is an
 // internal call invoked by other parts of Rancher
 func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
+	logrus.Info(fmt.Sprintf("TEST --- username: %s", userName))
 	matched, _ := regexp.Match(labelRegex, []byte(userName))
 	if !matched {
 		return &ext.TokenList{}, nil

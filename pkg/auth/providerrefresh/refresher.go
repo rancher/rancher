@@ -178,6 +178,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		return nil, err
 	}
 
+	logrus.Info("*** refreshAttributes ***")
 	allExtTokens, err := r.extTokenStore.ListForUser(user.Name)
 	if err != nil {
 		return nil, err
