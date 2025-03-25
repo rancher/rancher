@@ -30,6 +30,9 @@ func (t preferencesMigration) Name() string {
 
 // Changes implements the Migration interface.
 //
+// This combines multiple `v3.Preference` resources into a single ConfigMap for
+// each user.
+//
 // This would be a good example to use the MigrationOption.Continue and
 // per-user ChangeSets.
 func (t preferencesMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {

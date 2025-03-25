@@ -27,6 +27,9 @@ func (t namespaceMigration) Name() string {
 }
 
 // Changes implements the Migration interface.
+//
+// This migration finds all namespaces and adds a simple annotation to the
+// Namespace resource.
 func (t namespaceMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
 	namespaces, err := client.Resource(schema.GroupVersionResource{
 		Resource: "namespaces",
