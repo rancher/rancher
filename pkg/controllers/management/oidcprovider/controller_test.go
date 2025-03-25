@@ -79,7 +79,7 @@ func TestOnChange(t *testing.T) {
 				},
 			},
 			setupMock: func(p *mockParams) {
-				p.secretCache.EXPECT().Get(secretNamespace, fakeOIDCClientName).Return(&v1.Secret{}, nil)
+				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{}, nil)
 			},
 		},
 		"new client secret is created with annotation": {
@@ -96,9 +96,9 @@ func TestOnChange(t *testing.T) {
 			},
 			setupMock: func(p *mockParams) {
 				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
-				p.secretCache.EXPECT().Get(secretNamespace, fakeOIDCClientName).Return(&v1.Secret{
+				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeOIDCClientName,
+						Name:      fakeClientId,
 						Namespace: secretNamespace,
 					},
 					Data: map[string][]byte{
@@ -107,7 +107,7 @@ func TestOnChange(t *testing.T) {
 				}, nil)
 				p.secretClient.EXPECT().Update(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeOIDCClientName,
+						Name:      fakeClientId,
 						Namespace: secretNamespace,
 					},
 					Data: map[string][]byte{
@@ -140,7 +140,7 @@ func TestOnChange(t *testing.T) {
 			},
 			setupMock: func(p *mockParams) {
 				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
-				p.secretCache.EXPECT().Get(secretNamespace, fakeOIDCClientName).Return(&v1.Secret{
+				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeOIDCClientName,
 						Namespace: secretNamespace,
