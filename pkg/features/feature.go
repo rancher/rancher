@@ -173,6 +173,12 @@ var (
 		true,
 		false,
 		true)
+	OIDCProvider = newFeature(
+		"oidc-provider",
+		"Provide an OIDC provider embedded in Rancher. Required to enable SSO in Rancher prime components.",
+		false,
+		false,
+		true)
 )
 
 type Feature struct {
