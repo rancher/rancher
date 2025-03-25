@@ -55,7 +55,7 @@ func TestOnChange(t *testing.T) {
 				patchBytes, _ := json.Marshal(patchData)
 				p.oidcClientCache.EXPECT().List(labels.Everything()).Return(nil, nil)
 				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes).Return(nil, nil)
-				p.secretCache.EXPECT().Get(secretNamespace, fakeOIDCClientName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
 				p.secretClient.EXPECT().Create(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -142,7 +142,7 @@ func TestOnChange(t *testing.T) {
 				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
 				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeOIDCClientName,
+						Name:      fakeClientId,
 						Namespace: secretNamespace,
 					},
 					Data: map[string][]byte{
@@ -151,7 +151,7 @@ func TestOnChange(t *testing.T) {
 				}, nil)
 				p.secretClient.EXPECT().Update(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeOIDCClientName,
+						Name:      fakeClientId,
 						Namespace: secretNamespace,
 					},
 					Data: map[string][]byte{
@@ -182,9 +182,9 @@ func TestOnChange(t *testing.T) {
 				},
 			},
 			setupMock: func(p *mockParams) {
-				p.secretCache.EXPECT().Get(secretNamespace, fakeOIDCClientName).Return(&v1.Secret{
+				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeOIDCClientName,
+						Name:      fakeClientId,
 						Namespace: secretNamespace,
 					},
 					Data: map[string][]byte{
@@ -194,7 +194,7 @@ func TestOnChange(t *testing.T) {
 				}, nil)
 				p.secretClient.EXPECT().Update(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeOIDCClientName,
+						Name:      fakeClientId,
 						Namespace: secretNamespace,
 					},
 					Data: map[string][]byte{

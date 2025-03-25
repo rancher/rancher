@@ -59,7 +59,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		return nil, nil
 	}
 
-	var clientID string
+	clientID := oidcClient.Status.ClientID
 
 	// generate client id
 	if oidcClient.Status.ClientID == "" {
@@ -92,7 +92,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 	}
 
-	k8sSecret, err := c.secretCache.Get(secretNamespace, oidcClient.Status.ClientID)
+	k8sSecret, err := c.secretCache.Get(secretNamespace, clientID)
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
@@ -102,9 +102,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		if err != nil {
 			return nil, err
 		}
-		if oidcClient.Status.ClientID != "" {
-			clientID = oidcClient.Status.ClientID
-		}
+
 		k8sSecret, err = c.secretClient.Create(&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      clientID,
