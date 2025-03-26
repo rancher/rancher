@@ -123,6 +123,12 @@ replicas: 3
 # Set priorityClassName to avoid eviction
 priorityClassName: rancher-critical
 
+# Set additional labels to apply to all resources.
+commonLabels: {}
+
+# Set additional labels to apply on the Rancher pods.
+podLabels: {}
+
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
