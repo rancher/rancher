@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -41,7 +42,10 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 		return nil, nil
 	}
 
-	clusterRoles := clusterRolesForRoleTemplate(rt)
+	clusterRoles, err := rth.clusterRolesForRoleTemplate(rt)
+	if err != nil {
+		return nil, err
+	}
 	for _, cr := range clusterRoles {
 		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
 			return nil, err
@@ -57,13 +61,18 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 }
 
 // clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate using the given rules.
-func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
+func (rth *roleTemplateHandler) clusterRolesForRoleTemplate(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, error) {
 	res := []*rbacv1.ClusterRole{}
 
 	if rt.Context == projectContext {
 		// ClusterRoles for promoted rules
 		var promotedClusterRoles []*rbacv1.ClusterRole
-		promotedClusterRoles, rt.Rules = buildPromotedClusterRoles(rt)
+		var err error
+		promotedClusterRoles, rt.Rules, err = rth.buildPromotedClusterRoles(rt)
+		if err != nil {
+			return nil, err
+		}
+
 		res = append(res, promotedClusterRoles...)
 	}
 
@@ -73,7 +82,7 @@ func clusterRolesForRoleTemplate(rt *v3.RoleTemplate) []*rbacv1.ClusterRole {
 	}
 	res = append(res, rbac.BuildAggregatingClusterRole(rt, rbac.ClusterRoleNameFor))
 
-	return res
+	return res, nil
 }
 
 // OnRemove deletes all ClusterRoles created by the RoleTemplate
@@ -106,14 +115,19 @@ func (rth *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.Rol
 
 // buildPromotedClusterRoles looks for promoted rules in a project role template and creates required promoted cluster roles.
 // It also returns the role template rules with the promoted rules removed.
-func buildPromotedClusterRoles(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, []rbacv1.PolicyRule) {
+func (rth *roleTemplateHandler) buildPromotedClusterRoles(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, []rbacv1.PolicyRule, error) {
 	clusterRoles := []*rbacv1.ClusterRole{}
 
 	promotedRules, rules := extractPromotedRules(rt.Rules)
 
-	// If there are no promoted rules and no inherited RoleTemplates, no need for additional cluster roles
-	if len(promotedRules) == 0 && len(rt.RoleTemplateNames) == 0 {
-		return clusterRoles, rules
+	inheritedPromotedRules, err := rth.areThereInheritedPromotedRules(rt.RoleTemplateNames)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// If there are no promoted rules and no inherited RoleTemplates with promoted rules, no need for additional cluster roles
+	if len(promotedRules) == 0 && !inheritedPromotedRules {
+		return clusterRoles, rules, nil
 	}
 
 	if len(promotedRules) != 0 {
@@ -121,12 +135,23 @@ func buildPromotedClusterRoles(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, []rb
 		clusterRoles = append(clusterRoles, rbac.BuildClusterRole(rbac.PromotedClusterRoleNameFor(rt.Name), rt.Name, promotedRules))
 	}
 
-	// It's possible for this role to have no rules if there are no promoted rules in any of the inherited RoleTemplates or in the promoted ClusterRole
-	// but without fetching all those RoleTemplates and looking through their rules, it's not possible to prevent this ahead of time as the Rules in
-	// an aggregating cluster role only get populated at run time
+	// If there are promoted rules or inherited promoted rules, an aggregating cluster role will be what PRTBs bind to.
 	clusterRoles = append(clusterRoles, rbac.BuildAggregatingClusterRole(rt, rbac.PromotedClusterRoleNameFor))
 
-	return clusterRoles, rules
+	return clusterRoles, rules, nil
+}
+
+// areThereInheritedPromotedRules checks if any of the inherited RoleTemplates contain promoted rules. If none do, return false.
+func (rth *roleTemplateHandler) areThereInheritedPromotedRules(inheritedRoleTemplates []string) (bool, error) {
+	for _, rt := range inheritedRoleTemplates {
+		_, err := rth.crController.Get(rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(rt)), metav1.GetOptions{})
+		if err == nil {
+			return true, nil
+		} else if !apierrors.IsNotFound(err) {
+			return false, err
+		}
+	}
+	return false, nil
 }
 
 var promotedRulesForProjects = map[string]string{
