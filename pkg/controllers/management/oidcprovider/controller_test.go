@@ -2,12 +2,10 @@ package oidcprovider
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/oidc/mocks"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -25,6 +23,7 @@ func TestOnChange(t *testing.T) {
 		fakeOIDCClientName = "client-name"
 		fakeClientId       = "client-id"
 		fakeClientSecret   = "client-secret"
+		fakeOIDCClientUID  = "uid"
 	)
 	type mockParams struct {
 		secretCache     *fake.MockCacheInterface[*v1.Secret]
@@ -43,6 +42,7 @@ func TestOnChange(t *testing.T) {
 			oidcClient: &v3.OIDCClient{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fakeOIDCClientName,
+					UID:  fakeOIDCClientUID,
 				},
 			},
 			setupMock: func(p *mockParams) {
@@ -61,6 +61,14 @@ func TestOnChange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
 						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
 					},
 					StringData: map[string]string{
 						secretKeyPrefix + "1": fakeClientSecret,
@@ -73,6 +81,7 @@ func TestOnChange(t *testing.T) {
 			oidcClient: &v3.OIDCClient{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fakeOIDCClientName,
+					UID:  fakeOIDCClientUID,
 				},
 				Status: v3.OIDCClientStatus{
 					ClientID: fakeClientId,
@@ -86,6 +95,7 @@ func TestOnChange(t *testing.T) {
 			oidcClient: &v3.OIDCClient{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fakeOIDCClientName,
+					UID:  fakeOIDCClientUID,
 					Annotations: map[string]string{
 						createClientSecretAnn: "true",
 					},
@@ -94,12 +104,21 @@ func TestOnChange(t *testing.T) {
 					ClientID: fakeClientId,
 				},
 			},
+
 			setupMock: func(p *mockParams) {
 				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
 				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
 						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
 					},
 					Data: map[string][]byte{
 						secretKeyPrefix + "1": []byte(fakeClientSecret),
@@ -109,6 +128,14 @@ func TestOnChange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
 						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
 					},
 					Data: map[string][]byte{
 						secretKeyPrefix + "1": []byte(fakeClientSecret),
@@ -118,6 +145,7 @@ func TestOnChange(t *testing.T) {
 				p.oidcClient.EXPECT().Update(&v3.OIDCClient{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        fakeOIDCClientName,
+						UID:         fakeOIDCClientUID,
 						Annotations: map[string]string{},
 					},
 					Status: v3.OIDCClientStatus{
@@ -130,6 +158,7 @@ func TestOnChange(t *testing.T) {
 			oidcClient: &v3.OIDCClient{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fakeOIDCClientName,
+					UID:  fakeOIDCClientUID,
 					Annotations: map[string]string{
 						regenerateClientSecretAnn: secretKeyPrefix + "1",
 					},
@@ -144,6 +173,14 @@ func TestOnChange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
 						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
 					},
 					Data: map[string][]byte{
 						secretKeyPrefix + "1": []byte("oldSecret"),
@@ -153,6 +190,14 @@ func TestOnChange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
 						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
 					},
 					Data: map[string][]byte{
 						secretKeyPrefix + "1": []byte(fakeClientSecret),
@@ -161,6 +206,7 @@ func TestOnChange(t *testing.T) {
 				p.oidcClient.EXPECT().Update(&v3.OIDCClient{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        fakeOIDCClientName,
+						UID:         fakeOIDCClientUID,
 						Annotations: map[string]string{},
 					},
 					Status: v3.OIDCClientStatus{
@@ -173,6 +219,7 @@ func TestOnChange(t *testing.T) {
 			oidcClient: &v3.OIDCClient{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fakeOIDCClientName,
+					UID:  fakeOIDCClientUID,
 					Annotations: map[string]string{
 						removeClientSecretAnn: secretKeyPrefix + "1",
 					},
@@ -186,6 +233,14 @@ func TestOnChange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
 						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
 					},
 					Data: map[string][]byte{
 						secretKeyPrefix + "1": []byte(fakeClientSecret),
@@ -196,6 +251,14 @@ func TestOnChange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
 						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
 					},
 					Data: map[string][]byte{
 						secretKeyPrefix + "2": []byte(fakeClientSecret),
@@ -204,6 +267,7 @@ func TestOnChange(t *testing.T) {
 				p.oidcClient.EXPECT().Update(&v3.OIDCClient{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        fakeOIDCClientName,
+						UID:         fakeOIDCClientUID,
 						Annotations: map[string]string{},
 					},
 					Status: v3.OIDCClientStatus{
@@ -242,59 +306,6 @@ func TestOnChange(t *testing.T) {
 				assert.ErrorContains(t, err, test.expectedErr)
 			} else {
 				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestOnRemove(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	oidcClient := v3.OIDCClient{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "oidc-client",
-		},
-		Status: v3.OIDCClientStatus{
-			ClientID: "client-id",
-		},
-	}
-	tests := map[string]struct {
-		secretClient       func() corecontrollers.SecretClient
-		expectedOIDCClient *v3.OIDCClient
-		expectedErr        string
-	}{
-		"remove secret": {
-			secretClient: func() corecontrollers.SecretClient {
-				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl)
-				mock.EXPECT().Delete(secretNamespace, oidcClient.Status.ClientID, &metav1.DeleteOptions{}).Return(nil)
-
-				return mock
-			},
-			expectedOIDCClient: &oidcClient,
-		},
-		"enqueue if can't delete secret": {
-			secretClient: func() corecontrollers.SecretClient {
-				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl)
-				mock.EXPECT().Delete(secretNamespace, oidcClient.Status.ClientID, &metav1.DeleteOptions{}).Return(fmt.Errorf("fake error"))
-
-				return mock
-			},
-			expectedErr: "fake error",
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			c := oidcClientController{
-				secretClient: test.secretClient(),
-			}
-
-			oidcClient, err := c.onRemove("", &oidcClient)
-			if test.expectedErr != "" {
-				assert.ErrorContains(t, err, test.expectedErr)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, test.expectedOIDCClient, oidcClient)
 			}
 		})
 	}
