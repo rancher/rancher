@@ -171,7 +171,7 @@ func Test_Update(t *testing.T) {
 			branch:            "invalidbranch",
 			systemCatalogMode: "",
 			expectedCommit:    "226d544def39de56db210e96d2b0b535badf9bdd",
-			expectedError:     "Could not find remote branch",
+			expectedError:     "Remote branch invalidbranch not found in upstream origin",
 			dir:               fmt.Sprintf("%s/%s", localDir, "cattle-test/small-fork-test/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"),
 		},
 	}
