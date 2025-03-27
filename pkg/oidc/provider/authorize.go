@@ -172,7 +172,7 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 	}
 	token, err := h.tokenCache.Get(tokenName)
 	if err != nil {
-		return nil, fmt.Errorf("can't get token: %v", err)
+		return nil, fmt.Errorf("can't get token: %w", err)
 	}
 	if token.Token != tokenKey {
 		return nil, fmt.Errorf("token doesn't match")
@@ -185,7 +185,7 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 	if token.AuthProvider != "" {
 		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
 		if err != nil {
-			return nil, fmt.Errorf("can't check if auth provider is disabled: %v", err)
+			return nil, fmt.Errorf("can't check if auth provider is disabled: %w", err)
 		}
 		if disabled {
 			return nil, fmt.Errorf("auth provider is disabled")
@@ -194,7 +194,7 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 
 	authUser, err := h.userLister.Get(token.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("can't get user: %v", err)
+		return nil, fmt.Errorf("can't get user: %w", err)
 	}
 
 	if authUser.Enabled != nil && !*authUser.Enabled {

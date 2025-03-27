@@ -247,7 +247,7 @@ func TestAuthEndpoint(t *testing.T) {
 				return req
 			},
 			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=server_error&error_description=error+retreiving+OIDC+client%3A++%22client-id%22+not+found",
+			wantRedirect: fakeRedirectUri + "?error=server_error&error_description=error+retrieving+OIDC+client%3A++%22client-id%22+not+found",
 		},
 		"redirect uri not registed": {
 			mockSetup: func(m mockParams) {

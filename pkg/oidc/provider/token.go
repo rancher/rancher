@@ -439,7 +439,7 @@ func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, ranc
 func (h *tokenHandler) getOIDCClientByClientID(clientID string) (*v3.OIDCClient, error) {
 	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, clientID)
 	if err != nil {
-		return nil, fmt.Errorf("error retreiving OIDC client: %v", err)
+		return nil, fmt.Errorf("error retreiving OIDC client: %w", err)
 	}
 	if len(oidcClients) == 0 {
 		return nil, fmt.Errorf("no OIDC clients found")

@@ -65,7 +65,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		var err error
 		clientID, err = c.generator.GenerateClientID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate clientID: %v", err)
+			return nil, fmt.Errorf("failed to generate clientID: %w", err)
 		}
 
 		clients, err := c.oidcClientCache.List(labels.Everything())

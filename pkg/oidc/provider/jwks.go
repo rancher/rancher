@@ -170,7 +170,7 @@ func getPrivateKeyFromSecretData(name string, privateKeyPEM []byte) (*rsa.Privat
 	}
 	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to parse RSA private key: %v", err)
+		return nil, "", fmt.Errorf("failed to parse RSA private key: %w", err)
 	}
 	return privateKey, strings.TrimSuffix(name, ".pem"), nil
 }
@@ -182,7 +182,7 @@ func getPublicKeyFromSecretData(publicKeyPEM []byte) (*rsa.PublicKey, error) {
 	}
 	pubInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse RSA public key: %v", err)
+		return nil, fmt.Errorf("failed to parse RSA public key: %w", err)
 	}
 	publicKey, ok := pubInterface.(*rsa.PublicKey)
 	if !ok {
