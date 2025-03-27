@@ -94,7 +94,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
 	if err != nil {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.ServerError, fmt.Sprintf("error retreiving OIDC client: %v", err), params.state, w, r)
+		oidcerror.RedirectWithError(params.redirectURI, oidcerror.ServerError, fmt.Sprintf("error retrieving OIDC client: %v", err), params.state, w, r)
 		return
 	}
 	if len(oidcClients) == 0 {
@@ -136,7 +136,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	code, err := h.codeCreator.GenerateCode()
 	if err != nil {
-		logrus.Errorf("[OIDC provider] error genereting code %v", err)
+		logrus.Errorf("[OIDC provider] error generating code %v", err)
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.ServerError, fmt.Sprintf("failed to generate code: %v", err), params.state, w, r)
 		return
 	}

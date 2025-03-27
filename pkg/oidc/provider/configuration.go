@@ -7,9 +7,9 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 )
 
-// OpenIDConfiguration represents response from the .well-known/openid-configuration endoind
+// OpenIDConfiguration represents response from the /.well-known/openid-configuration endpoint
 type OpenIDConfiguration struct {
-	// Issuer the OIDC provider url
+	// Issuer is the OIDC provider url
 	Issuer string `json:"issuer"`
 	// AuthorizationEndpoint is the authorization endpoint
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
