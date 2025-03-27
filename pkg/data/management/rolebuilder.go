@@ -196,6 +196,10 @@ func (r *ruleBuilder) addExternalRule() *ruleBuilder {
 	return r.rb.addExternalRule()
 }
 
+func (r *ruleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilder {
+	return r.rb.addNamespacedRule(namespace)
+}
+
 func (r *ruleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	return r.rb.setRoleTemplateNames(names...)
 }
