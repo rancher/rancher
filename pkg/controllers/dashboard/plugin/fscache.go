@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,35 +70,55 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) erro
 			return nil
 		}
 	}
-	version, err := getVersionFromPackageJSON(fmt.Sprintf("%s/%s", plugin.Endpoint, PackageJSONFilename))
-	if err != nil {
-		return fmt.Errorf("failed to get version from package.json file. Error: %w", err)
-	}
-	cachedVersion, err := semver.NewVersion(plugin.Version)
-	if err != nil {
-		return fmt.Errorf("spec.plugin.version [%s] is not a semver version. Error: %w", plugin.Version, err)
-	}
-	if !cachedVersion.Equal(version) {
-		return fmt.Errorf("plugin [%s] version [%s] does not match version in controller's cache [%s]", plugin.Name, version.String(), cachedVersion.String())
-	}
-	files, err := fetchFilesTxt(fmt.Sprintf("%s/%s", plugin.Endpoint, FilesTxtFilename))
-	if err != nil {
-		return fmt.Errorf("failed to get files.txt file. Error: %w", err)
-	}
-	for _, file := range files {
-		if file == "" {
-			continue
-		}
-		data, err := fetchFile(plugin.Endpoint + "/" + file)
+
+	if plugin.CompressedEndpoint != "" {
+		resp, err := http.Get(plugin.CompressedEndpoint)
 		if err != nil {
-			return fmt.Errorf("failed to fetch file [%s] .Error: %w", file, err)
+			return fmt.Errorf("get request failed for URL [%s]. Error: %w", plugin.CompressedEndpoint, err)
 		}
-		path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("failed to fetch file from URL [%s]. Status code: %d", plugin.CompressedEndpoint, resp.StatusCode)
+		}
+		p, _ := filepathsecure.SecureJoin(FSCacheRootDir, plugin.Name)
+		if err := os.MkdirAll(p, os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create cache directory with path [%s]. Error: %w", p, err)
+		}
+		err = Untar(p, resp.Body)
 		if err != nil {
-			return fmt.Errorf("failed to build file [%s] path for caching. Error: %w", file, err)
+			return fmt.Errorf("failed to untar file: %w", err)
 		}
-		if err := c.Save(data, path); err != nil {
-			logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
+	} else if plugin.Endpoint != "" {
+		version, err := getVersionFromPackageJSON(fmt.Sprintf("%s/%s", plugin.Endpoint, PackageJSONFilename))
+		if err != nil {
+			return fmt.Errorf("failed to get version from package.json file. Error: %w", err)
+		}
+		cachedVersion, err := semver.NewVersion(plugin.Version)
+		if err != nil {
+			return fmt.Errorf("spec.plugin.version [%s] is not a semver version. Error: %w", plugin.Version, err)
+		}
+		if !cachedVersion.Equal(version) {
+			return fmt.Errorf("plugin [%s] version [%s] does not match version in controller's cache [%s]", plugin.Name, version.String(), cachedVersion.String())
+		}
+		files, err := fetchFilesTxt(fmt.Sprintf("%s/%s", plugin.Endpoint, FilesTxtFilename))
+		if err != nil {
+			return fmt.Errorf("failed to get files.txt file. Error: %w", err)
+		}
+		for _, file := range files {
+			if file == "" {
+				continue
+			}
+			data, err := fetchFile(plugin.Endpoint + "/" + file)
+			if err != nil {
+				return fmt.Errorf("failed to fetch file [%s] .Error: %w", file, err)
+			}
+			path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
+			if err != nil {
+				return fmt.Errorf("failed to build file [%s] path for caching. Error: %w", file, err)
+			}
+			if err := c.Save(data, path); err != nil {
+				logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
+			}
 		}
 	}
 
@@ -106,22 +128,80 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) erro
 // SyncWithIndex syncs up entries in the filesystem cache with the index's entries.
 // Entries that aren't in the index, but present in the filesystem cache are deleted
 func (c FSCache) SyncWithIndex(index *SafeIndex, fsCacheFiles []string) error {
+	var errs error
 	for _, file := range fsCacheFiles {
 		logrus.Debugf("syncing index with filesystem cache")
 		chartName, chartVersion, err := getChartNameAndVersion(file)
 		if err != nil {
-			return fmt.Errorf("failed to get chart name and version for file [%s]. Error: %w", file, err)
+			errs = errors.Join(errs, fmt.Errorf("failed to get chart name and version for file [%s]. Error: %w", file, err))
+			continue
 		}
 		_, ok := index.Entries[chartName]
 		if !ok || index.Entries[chartName].Version != chartVersion {
 			err := c.Delete(chartName, chartVersion)
 			if err != nil {
-				return fmt.Errorf("failed to delete cache entry. Error: %w", err)
+				errs = errors.Join(errs, fmt.Errorf("failed to delete cache entry. Error: %w", err))
+				continue
 			}
 		}
 	}
 
-	return nil
+	return errs
+}
+
+// Untar takes a destination path and a reader; a tar reader loops over the tarfile
+// creating the file structure at 'dst' along the way, and writing any files
+func Untar(dst string, r io.Reader) error {
+
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+
+	for {
+		header, err := tr.Next()
+
+		switch {
+
+		case err == io.EOF:
+			return nil
+
+		case err != nil:
+			return err
+
+		case header == nil:
+			continue
+		}
+
+		target := filepath.Join(dst, header.Name)
+
+		switch header.Typeflag {
+
+		// if it's a dir, and it doesn't exist, create it
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
+
+		// if it's a file create it
+		case tar.TypeReg:
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+
+			if _, err := io.Copy(f, tr); err != nil {
+				return err
+			}
+			f.Close()
+
+		default:
+			return fmt.Errorf("unknown type: %b in %s", header.Typeflag, header.Name)
+		}
+	}
 }
 
 // Save takes in data and a path to save it in the filesystem cache
