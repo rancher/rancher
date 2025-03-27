@@ -185,6 +185,7 @@ func Test_Update(t *testing.T) {
 
 			commit, err := Update(tc.secret, tc.namespace, tc.name, tc.gitURL, tc.branch, tc.insecureSkipTLS, tc.caBundle)
 			if tc.expectedError != "" {
+				assert.Nil(t, err)
 				assert.Contains(t, err.Error(), tc.expectedError)
 			} else {
 				assert.NoError(t, err)

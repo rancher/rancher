@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -75,7 +76,10 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 		// We don't report an error unless the branch is invalid
 		// The reason being it would break airgap environments in downstream
 		// cluster. A new issue is created to tackle this in the forthcoming.
-		if strings.Contains(err.Error(), "couldn't find remote ref") || strings.Contains(err.Error(), "Could not find remote branch") {
+		logrus.Info("Error updating bundled catalog: ", err)
+		fmt.Printf("Error updating bundled catalog: %s", err.Error())
+		if strings.Contains(err.Error(), "couldn't find remote ref") || strings.Contains(err.Error(), "Could not find remote branch") ||
+			strings.Contains(err.Error(), fmt.Sprintf("Remote branch %s not found in upstream origin", branch)) {
 			return "", err
 		}
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
