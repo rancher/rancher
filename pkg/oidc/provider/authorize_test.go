@@ -330,7 +330,7 @@ func TestAuthEndpoint(t *testing.T) {
 				assert.Equal(t, test.wantRedirect, rec.Header().Get("Location"))
 			}
 			if test.wantError != "" {
-				assert.Equal(t, test.wantError, strings.TrimSpace(rec.Body.String()))
+				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			}
 		})
 	}

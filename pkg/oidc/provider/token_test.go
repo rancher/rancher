@@ -553,7 +553,7 @@ func TestTokenEndpoint(t *testing.T) {
 			h.tokenEndpoint(rec, test.req())
 
 			if test.wantError != "" {
-				assert.Equal(t, test.wantError, strings.TrimSpace(rec.Body.String()))
+				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			} else {
 				var tokenResponse TokenResponse
 				err := json.Unmarshal(rec.Body.Bytes(), &tokenResponse)

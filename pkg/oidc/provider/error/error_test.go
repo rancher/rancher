@@ -20,7 +20,7 @@ func TestWriteError(t *testing.T) {
 	WriteError(errorMessage, errorDescription, errorCode, rec)
 
 	assert.Equal(t, errorCode, rec.Code)
-	assert.Equal(t, `{"error":"`+errorMessage+`","error_description":"`+errorDescription+`"}`, strings.TrimSpace(rec.Body.String()))
+	assert.JSONEq(t, `{"error":"`+errorMessage+`","error_description":"`+errorDescription+`"}`, strings.TrimSpace(rec.Body.String()))
 }
 
 func TestRedirectWithError(t *testing.T) {

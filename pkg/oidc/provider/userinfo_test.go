@@ -179,7 +179,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 			h.userInfoEndpoint(rec, test.req())
 
 			if test.wantError != "" {
-				assert.Equal(t, test.wantError, strings.TrimSpace(rec.Body.String()))
+				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			} else {
 				var response UserInfoResponse
 				err := json.Unmarshal(rec.Body.Bytes(), &response)

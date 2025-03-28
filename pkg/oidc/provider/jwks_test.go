@@ -100,7 +100,7 @@ func TestJWKSEndpoint(t *testing.T) {
 			h.jwksEndpoint(rec, &http.Request{})
 
 			assert.Equal(t, test.expectedCode, rec.Code)
-			assert.Equal(t, test.expectedBody, strings.TrimSpace(rec.Body.String()))
+			assert.JSONEq(t, test.expectedBody, strings.TrimSpace(rec.Body.String()))
 		})
 	}
 }
