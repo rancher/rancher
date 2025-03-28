@@ -32,6 +32,9 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
 {{- end }}
+{{- if eq (int .Values.ingress.servicePort) 443 }}
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+{{- end }}
 {{- if .Values.ingress.extraAnnotations }}
 {{ toYaml .Values.ingress.extraAnnotations | indent 4 }}
 {{- end }}
