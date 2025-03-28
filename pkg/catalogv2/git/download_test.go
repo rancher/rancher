@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/settings"
 	"os"
 	"testing"
 
@@ -185,7 +186,12 @@ func Test_Update(t *testing.T) {
 
 			commit, err := Update(tc.secret, tc.namespace, tc.name, tc.gitURL, tc.branch, tc.insecureSkipTLS, tc.caBundle)
 			if tc.expectedError != "" {
-				assert.Contains(t, err.Error(), tc.expectedError)
+				if err == nil {
+					assert.Error(t, err, fmt.Sprintf("Expected error containing the following: %s", tc.expectedError))
+					t.Logf("System Catalog Setting: %s", settings.SystemCatalog.Get())
+				} else {
+					assert.Contains(t, err.Error(), tc.expectedError)
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, len(commit), len(tc.expectedCommit))
