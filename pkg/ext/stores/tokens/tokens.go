@@ -1088,9 +1088,15 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, 
 		return "", false, false, err
 	}
 	isAdmin := decision == authorizer.DecisionAllow
-
 	isRancherUser := false
 	userName := userInfo.GetName()
+
+	// Treat user responsible for kube garbage collection as admin, i.e. let
+	// it see all, no restrictions
+	if userName == "system:kube-controller-manager" {
+		isAdmin = true
+	}
+
 	if !strings.Contains(userName, ":") { // E.g. system:admin
 		// potentially a rancher user
 		logrus.Debugf("ext.cattle.io/token username: %s, check in rancher", userName)
