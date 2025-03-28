@@ -36,7 +36,7 @@ func CheckETCDVersion(client *rancher.Client, nodes []*nodes.Node, clusterID str
 					}
 
 					etcdResult = append(etcdResult, output)
-					logrus.Infof(output)
+					logrus.Info(output)
 				}
 			}
 		}

@@ -352,7 +352,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		if secret != nil {
 			err = r.secretMigrator.UpdateSecretOwnerReference(secret, owner)
 			if err != nil {
-				logrus.Errorf(errMsg)
+				logrus.Error(errMsg)
 			}
 		}
 	}
@@ -914,7 +914,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		if secret != nil {
 			err = r.secretMigrator.UpdateSecretOwnerReference(secret, owner)
 			if err != nil {
-				logrus.Errorf(errMsg)
+				logrus.Error(errMsg)
 			}
 		}
 	}

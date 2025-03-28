@@ -4,7 +4,7 @@ set -e
 MAX_RETRIES=3
 BUILD_TIMEOUT=300  # 5 minutes timeout
 CACHE_DIR="/var/cache/vai-query"
-GO_VERSION="1.23.7"
+GO_VERSION="1.24.1"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $1"

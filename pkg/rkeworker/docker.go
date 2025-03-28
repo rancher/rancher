@@ -2,6 +2,7 @@ package rkeworker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -413,7 +414,7 @@ func waitContainerExit(rootCtx context.Context, dockerCli *client.Client, contai
 			if result.Error != nil {
 				statusC <- containerWaitingStatus{
 					code:  125,
-					cause: fmt.Errorf(result.Error.Message),
+					cause: errors.New(result.Error.Message),
 				}
 			} else {
 				statusC <- containerWaitingStatus{
