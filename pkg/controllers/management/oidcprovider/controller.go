@@ -131,21 +131,11 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		if err != nil {
 			return nil, err
 		}
-		maxSecretKeyCounter := 1
-		for key, _ := range k8sSecret.Data {
-			split := strings.Split(key, "-")
-			if len(split) != 3 {
-				return nil, fmt.Errorf("invalid key found in secret")
-			}
-			num, err := strconv.Atoi(split[2])
-			if err != nil {
-				return nil, err
-			}
-			if num > maxSecretKeyCounter {
-				maxSecretKeyCounter = num
-			}
+		secretKey, err := findNextSecretKey(k8sSecret.Data)
+		if err != nil {
+			return nil, err
 		}
-		k8sSecret.Data[secretKeyPrefix+strconv.Itoa(maxSecretKeyCounter+1)] = []byte(clientSecret)
+		k8sSecret.Data[secretKey] = []byte(clientSecret)
 		_, err = c.secretClient.Update(k8sSecret)
 		if err != nil {
 			return nil, err
@@ -202,4 +192,22 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	}
 
 	return oidcClient, nil
+}
+
+func findNextSecretKey(secretData map[string][]byte) (string, error) {
+	maxSecretKeyCounter := 0
+	for key, _ := range secretData {
+		split := strings.Split(key, "-")
+		if len(split) != 3 {
+			return "", fmt.Errorf("invalid key found in secret")
+		}
+		num, err := strconv.Atoi(split[2])
+		if err != nil {
+			return "", fmt.Errorf("invalid key found in secret: %w", err)
+		}
+		if num > maxSecretKeyCounter {
+			maxSecretKeyCounter = num
+		}
+	}
+	return secretKeyPrefix + strconv.Itoa(maxSecretKeyCounter+1), nil
 }
