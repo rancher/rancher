@@ -99,7 +99,25 @@ func newJWKSHandler(secretCache corecontrollers.SecretCache, secretClient coreco
 	}, nil
 }
 
-// jwksEndpoint writes the content of the jwks endpoint
+// jwksEndpoint writes the content of the jwks endpoint.
+// A default key pair for signing the jwt tokens will be created by Rancher. Additionally, administrators should have the ability to change keys. Keys are stored in a k8s secret called oidc-signing-key in the cattle-system namespace. Only one key will be used for signing,
+// but multiple keys can be returned in the jwks endpoint in order to avoid disruption when doing a key rotation. Example:
+//
+// apiVersion: v1
+// kind: Secret
+// metadata:
+//
+//	name: oidc-signing-key
+//
+// type: Opaque
+// data:
+//
+//	key2.pem: <base64-encoded-private-key>
+//	key1.pub: <base64-encoded-public-key>
+//	key2.pub: <base64-encoded-public-key>
+//
+// It will sign jwt tokens with key2.pem, but jwks will return key1.pub and key2.pub in order to avoid disruptions when doing a key rotation from key1 to key2.
+// Only one private key (.pem) can be in this secret. Note that the private and public keys must have the same name (kid) with different suffix (.pem and .pub).
 func (h *jwksHandler) jwksEndpoint(w http.ResponseWriter, r *http.Request) {
 	s, err := h.secretCache.Get(keySecretNamespace, keySecretName)
 	if err != nil {
@@ -135,7 +153,7 @@ func (h *jwksHandler) jwksEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetSigningKey returns the key used for signing jwt tokens
+// GetSigningKey returns the key used for signing jwt tokens, and it's key id (kid)
 func (h *jwksHandler) GetSigningKey() (*rsa.PrivateKey, string, error) {
 	s, err := h.secretCache.Get(keySecretNamespace, keySecretName)
 	if err != nil {
