@@ -61,6 +61,7 @@ var (
 	NodeDriverResourceName                                = "nodedrivers"
 	NodePoolResourceName                                  = "nodepools"
 	NodeTemplateResourceName                              = "nodetemplates"
+	OIDCClientResourceName                                = "oidcclients"
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
 	PodSecurityAdmissionConfigurationTemplateResourceName = "podsecurityadmissionconfigurationtemplates"
@@ -169,6 +170,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodePoolList{},
 		&NodeTemplate{},
 		&NodeTemplateList{},
+		&OIDCClient{},
+		&OIDCClientList{},
 		&OIDCProvider{},
 		&OIDCProviderList{},
 		&OpenLdapProvider{},

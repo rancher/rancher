@@ -64,6 +64,7 @@ type Interface interface {
 	NodeDriver() NodeDriverController
 	NodePool() NodePoolController
 	NodeTemplate() NodeTemplateController
+	OIDCClient() OIDCClientController
 	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
 	PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController
@@ -225,6 +226,10 @@ func (v *version) NodePool() NodePoolController {
 
 func (v *version) NodeTemplate() NodeTemplateController {
 	return generic.NewController[*v3.NodeTemplate, *v3.NodeTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeTemplate"}, "nodetemplates", true, v.controllerFactory)
+}
+
+func (v *version) OIDCClient() OIDCClientController {
+	return generic.NewNonNamespacedController[*v3.OIDCClient, *v3.OIDCClientList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCClient"}, "oidcclients", v.controllerFactory)
 }
 
 func (v *version) OIDCProvider() OIDCProviderController {

@@ -49,6 +49,7 @@ type Interface interface {
 	RkeAddonsGetter
 	FleetWorkspacesGetter
 	RancherUserNotificationsGetter
+	OIDCClientsGetter
 }
 
 type Client struct {
@@ -611,6 +612,20 @@ func (c *Client) RancherUserNotifications(namespace string) RancherUserNotificat
 	sharedClient := c.clientFactory.ForResourceKind(RancherUserNotificationGroupVersionResource, RancherUserNotificationGroupVersionKind.Kind, false)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RancherUserNotificationResource, RancherUserNotificationGroupVersionKind, rancherUserNotificationFactory{})
 	return &rancherUserNotificationClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type OIDCClientsGetter interface {
+	OIDCClients(namespace string) OIDCClientInterface
+}
+
+func (c *Client) OIDCClients(namespace string) OIDCClientInterface {
+	sharedClient := c.clientFactory.ForResourceKind(OIDCClientGroupVersionResource, OIDCClientGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &OIDCClientResource, OIDCClientGroupVersionKind, oidcClientFactory{})
+	return &oidcClientClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

@@ -42,5 +42,8 @@ jobs:
         name: Install controller-gen
         run: go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.1
       -
+        name: Install mockgen
+        run:  go install go.uber.org/mock/mockgen@v0.5.0
+      -
         name: Verify auto-generated changes
         run: ./.github/scripts/check-for-auto-generated-changes.sh

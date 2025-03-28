@@ -2,7 +2,6 @@ package management
 
 import (
 	"context"
-
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/aks"
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
@@ -11,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/feature"
 	"github.com/rancher/rancher/pkg/controllers/management/gke"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/rancher/rancher/pkg/controllers/management/oidcprovider"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -29,6 +29,10 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 		if err := authprovisioningv2.Register(ctx, wranglerContext, management); err != nil {
 			return err
 		}
+	}
+
+	if features.OIDCProvider.Enabled() {
+		oidcprovider.Register(ctx, wranglerContext)
 	}
 
 	return nil

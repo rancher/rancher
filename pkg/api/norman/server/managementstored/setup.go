@@ -98,6 +98,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.UserType,
 		client.ClusterTemplateType,
 		client.ClusterTemplateRevisionType,
+		client.OIDCClientType,
 	)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &managementschema.Version,

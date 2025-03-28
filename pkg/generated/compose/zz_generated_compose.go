@@ -45,6 +45,7 @@ type Config struct {
 	RkeAddons                                  map[string]managementClient.RkeAddon                                  `json:"rkeAddons,omitempty" yaml:"rkeAddons,omitempty"`
 	FleetWorkspaces                            map[string]managementClient.FleetWorkspace                            `json:"fleetWorkspaces,omitempty" yaml:"fleetWorkspaces,omitempty"`
 	RancherUserNotifications                   map[string]managementClient.RancherUserNotification                   `json:"rancherUserNotifications,omitempty" yaml:"rancherUserNotifications,omitempty"`
+	OIDCClients                                map[string]managementClient.OIDCClient                                `json:"oidcClients,omitempty" yaml:"oidcClients,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
