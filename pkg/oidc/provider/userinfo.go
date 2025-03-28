@@ -116,10 +116,10 @@ func getTokenFromHeader(r *http.Request) (string, error) {
 	}
 
 	// Expected format: "Bearer <token>"
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
+	_, token, found := strings.Cut(authHeader, "Bearer ")
+	if !found {
 		return "", fmt.Errorf("invalid authorization header format")
 	}
 
-	return parts[1], nil
+	return token, nil
 }
