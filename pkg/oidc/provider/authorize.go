@@ -23,6 +23,8 @@ const (
 	supportedCodeChallengeMethod = "S256"
 )
 
+var supportedScopes = []string{"openid", "profile", "offline_access"}
+
 type authParams struct {
 	clientID            string
 	responseType        string
@@ -87,6 +89,12 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	if !slices.Contains(params.scopes, "openid") {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, "missing openid scope", params.state, w, r)
 		return
+	}
+	for _, scope := range params.scopes {
+		if !slices.Contains(supportedScopes, scope) {
+			oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, fmt.Sprintf("invalid scope: %s", scope), params.state, w, r)
+			return
+		}
 	}
 	if params.codeChallenge == "" {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "missing code_challenge", params.state, w, r)

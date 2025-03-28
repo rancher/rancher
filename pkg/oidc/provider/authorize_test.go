@@ -189,6 +189,25 @@ func TestAuthEndpoint(t *testing.T) {
 			wantHttpCode: http.StatusFound,
 			wantRedirect: fakeRedirectUri + "?error=invalid_scope&error_description=missing+openid+scope",
 		},
+		"invalid scope": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid+invalidscope&redirect_uri=" + fakeRedirectUri,
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeRedirectUri + "?error=invalid_scope&error_description=invalid+scope%3A+invalidscope",
+		},
 		"missing code challenge": {
 			req: func() *http.Request {
 				req := &http.Request{
