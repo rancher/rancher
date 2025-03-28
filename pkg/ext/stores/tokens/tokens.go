@@ -21,6 +21,7 @@ import (
 	extcore "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -225,6 +226,8 @@ func (t *Store) Create(
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions) (runtime.Object, error) {
+	logrus.Debug("ext.cattle.io/token create")
+
 	if createValidation != nil {
 		err := createValidation(ctx, obj)
 		if err != nil {
@@ -250,6 +253,8 @@ func (t *Store) Delete(
 	name string,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	logrus.Debugf("ext.cattle.io/token delete [%s]", name)
+
 	// locate resource first
 	obj, err := t.get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
@@ -279,6 +284,8 @@ func (t *Store) Get(
 	ctx context.Context,
 	name string,
 	options *metav1.GetOptions) (runtime.Object, error) {
+	logrus.Debugf("ext.cattle.io/token get [%s]", name)
+
 	return t.get(ctx, name, options)
 }
 
@@ -294,6 +301,8 @@ func (t *Store) NewList() runtime.Object {
 func (t *Store) List(
 	ctx context.Context,
 	internaloptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	logrus.Debug("ext.cattle.io/token list")
+
 	options, err := extcore.ConvertListOptions(internaloptions)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
@@ -320,6 +329,8 @@ func (t *Store) Update(
 	updateValidation rest.ValidateObjectUpdateFunc,
 	forceAllowCreate bool,
 	options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	logrus.Debugf("ext.cattle.io/token update [%s]", name)
+
 	return extcore.CreateOrUpdate(ctx, name, objInfo, createValidation,
 		updateValidation, forceAllowCreate, options,
 		t.get, t.create, t.update)
@@ -329,6 +340,8 @@ func (t *Store) Update(
 func (t *Store) Watch(
 	ctx context.Context,
 	internaloptions *metainternalversion.ListOptions) (watch.Interface, error) {
+	logrus.Debug("ext.cattle.io/token watch")
+
 	options, err := extcore.ConvertListOptions(internaloptions)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
@@ -338,6 +351,8 @@ func (t *Store) Watch(
 
 // create implements the core resource creation for tokens
 func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
+	logrus.Debugf("ext.cattle.io/token /create [%s]", token.Name)
+
 	userName, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, err
@@ -353,6 +368,8 @@ func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.Cr
 }
 
 func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
+	logrus.Debugf("ext.cattle.io/token sys.create [%s]", token.Name)
+
 	// check if the user does not wish to actually change anything
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
@@ -474,6 +491,8 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 // delete implements the core resource destruction for tokens
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
+	logrus.Debugf("ext.cattle.io/token /delete [%s]", token.Name)
+
 	user, isAdmin, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return err
@@ -486,6 +505,8 @@ func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.De
 }
 
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
+	logrus.Debugf("ext.cattle.io/token sys.delete [%s]", name)
+
 	err := t.secretClient.Delete(TokenNamespace, name, options)
 	if err == nil {
 		return nil
@@ -498,6 +519,8 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 
 // get implements the core resource retrieval for tokens
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
+	logrus.Debugf("ext.cattle.io/token /get [%s]", name)
+
 	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, err
@@ -520,6 +543,8 @@ func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions
 }
 
 func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*ext.Token, error) {
+	logrus.Debugf("ext.cattle.io/token sys.get [%s] (%s)", name, sessionID)
+
 	// Core token retrieval from backing secrets
 	// We try to go through the fast cache as much as we can.
 	var err error
@@ -548,6 +573,8 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 
 // list implements the core resource listing of tokens
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
+	logrus.Debug("ext.cattle.io/token /list")
+
 	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, err
@@ -559,6 +586,8 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 // ListForUser returns the set of token owned by the named user. It is an
 // internal call invoked by other parts of Rancher
 func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
+	logrus.Debugf("ext.cattle.io/token sys.list-for-user [%s]", userName)
+
 	// As internal call this method can use the cache of secrets.
 	// Query the cache using a proper label selector
 	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
@@ -585,22 +614,27 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 }
 
 func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
+	logrus.Debugf("ext.cattle.io/token sys.list admin=%v [%s]", isAdmin, sessionID)
+
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
 	localOptions, err := ListOptionMerge(isAdmin, userName, options)
 	if err != nil {
+		logrus.Errorf("ext.cattle.io/token sys.list admin=%v [%s] merge error: %v", isAdmin, sessionID, err)
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
 	}
 	empty := metav1.ListOptions{}
 	if localOptions == empty {
 		// The setup indicated that we can bail out. I.e the
 		// options ask for something which cannot match.
+		logrus.Debugf("ext.cattle.io/token sys.list admin=%v [%s] quick empty", isAdmin, sessionID)
 		return &ext.TokenList{}, nil
 	}
 
 	// Core token listing from backing secrets
 	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
 	if err != nil {
+		logrus.Errorf("ext.cattle.io/token sys.list admin=%v [%s] list error: %v", isAdmin, sessionID, err)
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
 	}
 
@@ -616,6 +650,8 @@ func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *me
 		token.Status.Current = token.Name == sessionID
 		tokens = append(tokens, *token)
 	}
+
+	logrus.Debugf("ext.cattle.io/token sys.list admin=%v [%s] reporting %d", isAdmin, sessionID, len(tokens))
 	return &ext.TokenList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: secrets.ResourceVersion,
@@ -626,6 +662,8 @@ func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *me
 
 // update implements the core resource updating/modification of tokens
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
+	logrus.Debugf("ext.cattle.io/token /update [%s]", token.Name)
+
 	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, err
@@ -645,6 +683,8 @@ func (t *SystemStore) Update(token *ext.Token, options *metav1.UpdateOptions) (*
 
 func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.Token,
 	options *metav1.UpdateOptions) (*ext.Token, error) {
+	logrus.Debugf("ext.cattle.io/token sys.update [%s] full=%v", sessionID, fullPermission)
+
 	// check if the user does not wish to actually change anything
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
@@ -725,6 +765,8 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 // UpdateLastUsedAt patches the last-used-at information of the token.
 // Called during authentication.
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
+	logrus.Debugf("ext.cattle.io/token sys.update-last-used-at [%s]", name)
+
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
 	patch, err := json.Marshal([]struct {
@@ -747,6 +789,8 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 // UpdateLastActivitySeen patches the last-activity-seen information of the token.
 // Called from the ext user activity store.
 func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) error {
+	logrus.Debugf("ext.cattle.io/token sys.update-last-activity-seen [%s]", name)
+
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
 	patch, err := json.Marshal([]struct {
@@ -769,6 +813,8 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) error {
 // Disable patches the enabled flag of the token.
 // Called by refreshAttributes.
 func (t *SystemStore) Disable(name string) error {
+	logrus.Debugf("ext.cattle.io/token sys.disable [%s]", name)
+
 	// Operate directly on the backend secret holding the token
 	patch, err := json.Marshal([]struct {
 		Op    string `json:"op"`
@@ -789,6 +835,8 @@ func (t *SystemStore) Disable(name string) error {
 
 // watch implements the core resource watcher for tokens
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
+	logrus.Debug("ext.cattle.io/token /watch")
+
 	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
 	if err != nil {
 		return nil, err
@@ -1025,6 +1073,7 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, bool, bool, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
+		logrus.Errorf("ext.cattle.io/token username: context has no user info")
 		return "", false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
 	}
 
@@ -1035,6 +1084,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, 
 		ResourceRequest: true,
 	})
 	if err != nil {
+		logrus.Errorf("ext.cattle.io/token username: authorization error: %v", err)
 		return "", false, false, err
 	}
 	isAdmin := decision == authorizer.DecisionAllow
@@ -1043,17 +1093,20 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, 
 	userName := userInfo.GetName()
 	if !strings.Contains(userName, ":") { // E.g. system:admin
 		// potentially a rancher user
+		logrus.Debugf("ext.cattle.io/token username: %s, check in rancher", userName)
 		_, err := store.userClient.Get(userName)
 		if err == nil {
 			// definitely a rancher user
 			isRancherUser = true
 		} else if !apierrors.IsNotFound(err) {
+			logrus.Errorf("ext.cattle.io/token username: user retrieval error: %v", err)
 			// some general error
 			return "", false, false,
 				apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
 		} // else: not a rancher user, may still be an admin
 	} // else: some system user, not a rancher user, may still be an admin
 
+	logrus.Debugf("ext.cattle.io/token username: %s admin=%v rancher=%v", userName, isAdmin, isRancherUser)
 	return userName, isAdmin, isRancherUser, nil
 }
 
