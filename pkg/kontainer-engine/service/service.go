@@ -469,16 +469,16 @@ func portOnly(address string) (string, error) {
 
 	_, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return "", fmt.Errorf("error parsing host address: %w", portParseErr)
+		return "", fmt.Errorf("%s %w", portParseErr, err)
 	}
 
 	portNum, err := strconv.Atoi(port)
 	if err != nil {
-		return "", fmt.Errorf("invalid port: %w", portParseErr)
+		return "", fmt.Errorf("%s %w", portParseErr, err)
 	}
 
 	if portNum < 1 || portNum > 65535 {
-		return "", fmt.Errorf("invalid port [%s], port range is between 1 and 65535", port)
+		return "", fmt.Errorf("%s invalid port [%s], port range is between 1 and 65535", portParseErr, port)
 	}
 
 	return port, nil
