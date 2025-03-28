@@ -206,34 +206,28 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 
 // getAuthParamsFromRequest returns the params for the request. OIDC spec says that params can be either in a GET or POST request, so we should check both.
 func getAuthParamsFromRequest(r *http.Request) (*authParams, error) {
-	if r.Method == "POST" {
-		err := r.ParseForm()
-		if err != nil {
+	var values url.Values
+
+	switch r.Method {
+	case http.MethodGet:
+		values = r.URL.Query()
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
 			return nil, err
 		}
-		return &authParams{
-			clientID:            r.Form.Get("client_id"),
-			scopes:              strings.Split(r.Form.Get("scope"), " "),
-			codeChallenge:       r.Form.Get("code_challenge"),
-			codeChallengeMethod: r.Form.Get("code_challenge_method"),
-			nonce:               r.Form.Get("nonce"),
-			state:               r.Form.Get("state"),
-			redirectURI:         r.Form.Get("redirect_uri"),
-			responseType:        r.Form.Get("response_type"),
-		}, nil
-	}
-	if r.Method == "GET" {
-		return &authParams{
-			clientID:            r.URL.Query().Get("client_id"),
-			scopes:              strings.Split(r.URL.Query().Get("scope"), " "),
-			codeChallenge:       r.URL.Query().Get("code_challenge"),
-			codeChallengeMethod: r.URL.Query().Get("code_challenge_method"),
-			nonce:               r.URL.Query().Get("nonce"),
-			state:               r.URL.Query().Get("state"),
-			redirectURI:         r.URL.Query().Get("redirect_uri"),
-			responseType:        r.URL.Query().Get("response_type"),
-		}, nil
+		values = r.Form
+	default:
+		return nil, fmt.Errorf("unsupported method")
 	}
 
-	return nil, fmt.Errorf("unsupported method")
+	return &authParams{
+		clientID:            values.Get("client_id"),
+		scopes:              strings.Split(values.Get("scope"), " "),
+		codeChallenge:       values.Get("code_challenge"),
+		codeChallengeMethod: values.Get("code_challenge_method"),
+		nonce:               values.Get("nonce"),
+		state:               values.Get("state"),
+		redirectURI:         values.Get("redirect_uri"),
+		responseType:        values.Get("response_type"),
+	}, nil
 }
