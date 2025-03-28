@@ -157,7 +157,18 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// redirect to the redirect_uri with a valid code
-	http.Redirect(w, r, params.redirectURI+"?code="+code+"&state="+params.state, http.StatusFound)
+	u, err := url.Parse(params.redirectURI)
+	if err != nil {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "failed to parse redirect_uri", http.StatusBadRequest, w)
+	}
+	q := url.Values{}
+	q.Set("code", code)
+	if params.state != "" {
+		q.Set("state", params.state)
+	}
+	u.RawQuery = q.Encode()
+
+	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
 func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) (*v3.Token, error) {

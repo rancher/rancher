@@ -101,7 +101,7 @@ func TestAuthEndpoint(t *testing.T) {
 				return req
 			},
 			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?code=fake-code&state=",
+			wantRedirect: fakeRedirectUri + "?code=fake-code",
 		},
 		"redirect to login page if Rancher token is not present": {
 			req: func() *http.Request {
