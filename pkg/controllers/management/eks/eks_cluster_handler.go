@@ -3,6 +3,7 @@ package eks
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	stderrors "errors"
 	"fmt"
 	"net"
@@ -32,7 +33,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -113,7 +114,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	// get EKS Cluster Config, if it does not exist, create it
 	eksClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return cluster, err
 		}
 
@@ -189,7 +190,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		}
 
 		if apimgmtv3.ClusterConditionUpdated.IsFalse(cluster) && strings.HasPrefix(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
-			return cluster, fmt.Errorf(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster))
+			return cluster, errors.New(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster))
 		}
 
 		if cluster.Status.EKSStatus.UpstreamSpec == nil {

@@ -189,7 +189,7 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 			if capr.Reconciled.GetMessage(machine) == msg {
 				continue
 			}
-			conditions.MarkUnknown(machine, capi.ConditionType(capr.Reconciled), "Waiting", msg)
+			conditions.MarkUnknown(machine, capi.ConditionType(capr.Reconciled), "Waiting", "%s", msg)
 		} else if !capr.Reconciled.IsTrue(machine) {
 			// Since there is no status message, then the condition should be set to true.
 			conditions.MarkTrue(machine, capi.ConditionType(capr.Reconciled))

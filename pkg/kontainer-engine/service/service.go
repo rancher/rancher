@@ -12,11 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/jailer"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/aks"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/eks"
@@ -443,7 +440,7 @@ func (r *RunningDriver) Start() (string, error) {
 		cmd.Env = []string{"PATH=/usr/bin"}
 		cmd, err = jailer.JailCommand(cmd, "/opt/jail/driver-jail")
 		if err != nil {
-			return "", errors.WithMessage(err, "failed to setup jail command")
+			return "", fmt.Errorf("failed to setup jail command: %w", err)
 		}
 
 		// redirect output to console
@@ -472,16 +469,16 @@ func portOnly(address string) (string, error) {
 
 	_, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return "", errors.Wrap(err, portParseErr.Error())
+		return "", fmt.Errorf("error parsing host address: %w", portParseErr)
 	}
 
 	portNum, err := strconv.Atoi(port)
 	if err != nil {
-		return "", portParseErr
+		return "", fmt.Errorf("invalid port: %w", portParseErr)
 	}
 
 	if portNum < 1 || portNum > 65535 {
-		return "", errors.Wrap(fmt.Errorf(fmt.Sprintf("invalid port [%s], port range is between 1 and 65535", port)), portParseErr.Error())
+		return "", fmt.Errorf("invalid port [%s], port range is between 1 and 65535", port)
 	}
 
 	return port, nil

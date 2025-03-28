@@ -319,7 +319,7 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 			if err != nil {
 				return nil, err
 			}
-			logrus.Infof(output)
+			logrus.Info(output)
 		}
 		totalNodesObserved += int(quantityPerPool[poolIndex])
 	}
@@ -347,7 +347,7 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 				if err != nil {
 					return nil, err
 				}
-				logrus.Infof(output)
+				logrus.Info(output)
 			}
 		}
 		totalNodesObserved += int(quantityPerPool[poolIndex])
@@ -532,7 +532,7 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 			if err != nil {
 				return nil, nil, err
 			}
-			logrus.Infof(output)
+			logrus.Info(output)
 		}
 		totalNodesObserved += int(quantityPerPool[poolIndex])
 	}
@@ -901,7 +901,7 @@ func AddRKE2K3SCustomClusterNodes(client *rancher.Client, cluster *v1.SteveAPIOb
 			return err
 		}
 
-		logrus.Infof(output)
+		logrus.Info(output)
 	}
 
 	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
@@ -986,7 +986,7 @@ func AddRKE1CustomClusterNodes(client *rancher.Client, cluster *management.Clust
 			return err
 		}
 
-		logrus.Infof(output)
+		logrus.Info(output)
 	}
 
 	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, defaults.ThirtyMinuteTimeout, true, func(ctx context.Context) (done bool, err error) {
