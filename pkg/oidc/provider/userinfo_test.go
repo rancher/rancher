@@ -126,7 +126,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 			mockSetup: func(mockParams mockParams) {
 				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
 			},
-			wantError: `{"error":"invalid_request","error_description":"invalid access_token: crypto/rsa: verification error"}`,
+			wantError: `{"error":"invalid_request","error_description":"invalid access_token: token signature is invalid: crypto/rsa: verification error"}`,
 		},
 		"invalid access token": {
 			req: func() *http.Request {
@@ -154,7 +154,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 				req, _ := http.NewRequest("GET", "https://rancher.com", nil)
 				return req
 			},
-			wantError: `{"error":"invalid_request","error_description":"invalid access_token: token contains an invalid number of segments"}`,
+			wantError: `{"error":"invalid_request","error_description":"invalid access_token: token is malformed: token contains an invalid number of segments"}`,
 		},
 	}
 

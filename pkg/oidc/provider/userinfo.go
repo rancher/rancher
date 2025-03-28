@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
