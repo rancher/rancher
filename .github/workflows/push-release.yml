@@ -642,7 +642,7 @@ jobs:
           done
 
   notify-release:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
+    if: github.event_name == 'push' && contains(github.ref, 'tags/') && !contains(github.ref, '-hotfix-') # Only run on tags
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:latest
     needs: [merge-server-manifest, merge-agent-manifest,  merge-installer-manifest]
