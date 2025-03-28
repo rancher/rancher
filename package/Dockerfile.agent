@@ -9,7 +9,7 @@ FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS build
 ARG VERSION=${VERSION}
 ARG CGO_ENABLED=0
 ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static"
+ARG LINKFLAGS="-extldflags -static -s"
 ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
 ARG TARGETOS
 ARG TARGETARCH
