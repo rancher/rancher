@@ -273,6 +273,11 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return err
 	}
 
+	rancherChartRepo, err := m.clusterRepos.Cache().Get("rancher-charts")
+	if err != nil {
+		return fmt.Errorf("get rancher-charts ClusterRepo: %w", err)
+	}
+
 	const latestVersionMatcher = ">=0-a" // latest - special syntax to match everything including pre-release builds
 
 	v := latestVersionMatcher
@@ -296,7 +301,9 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	}
 	// Because of the behavior of `index.Get`, we need this check.
 	if v != latestVersionMatcher && chart.Version != v {
-		return fmt.Errorf("specified version %s doesn't exist in the index", v)
+		branch := rancherChartRepo.Status.Branch
+		commit := rancherChartRepo.Status.Commit
+		return fmt.Errorf("version %s in the index (branch=%s, commit=%s) doesn't not match requested version %s", chart.Version, branch, commit, v)
 	}
 
 	// If the chart version is already installed, we do nothing
