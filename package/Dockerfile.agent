@@ -16,16 +16,19 @@ ARG TARGETARCH
 
 WORKDIR /app
 
+ENV GOMODCACHE=/root/.cache/go/modcache
+ENV GOCACHE=/root/.cache/go/cache
+
 # Only invalidate cache if mod files changes.
 COPY go.mod go.sum .
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
-RUN go mod download
+RUN --mount=type=cache,target=/root/.cache go mod download
 
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+RUN --mount=type=cache,target=/root/.cache GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
 
 FROM ${RANCHER_IMAGE} AS rancher
 
@@ -74,9 +77,9 @@ ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
 ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
-COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
-COPY --from=rancher /usr/bin/tini /usr/bin/
-COPY --from=build /app/agent /usr/bin/
+COPY --link --from=rancher /var/lib/rancher-data /var/lib/rancher-data
+COPY --link --from=rancher /usr/bin/tini /usr/bin/
+COPY --link --from=build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
