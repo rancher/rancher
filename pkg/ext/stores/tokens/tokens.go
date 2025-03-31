@@ -46,12 +46,14 @@ const (
 	FieldAnnotations      = "annotations"
 	FieldDescription      = "description"
 	FieldEnabled          = "enabled"
+	FieldFinalizers       = "finalizers"
 	FieldHash             = "hash"
 	FieldKind             = "kind"
 	FieldLabels           = "labels"
 	FieldLastActivitySeen = "last-activity-seen"
 	FieldLastUpdateTime   = "last-update-time"
 	FieldLastUsedAt       = "last-used-at"
+	FieldOwnerReferences  = "owners"
 	FieldPrincipal        = "principal"
 	FieldTTL              = "ttl"
 	FieldUID              = "kube-uid"
@@ -1157,6 +1159,22 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 		return nil, err
 	}
 
+	// finalizers -- encode and store into a data field. on reading decode
+	// that field.  this fully separates the finalizers on the tokens from
+	// finalizers on the backing secrets.
+	finalizerBytes, err := json.Marshal(token.Finalizers)
+	if err != nil {
+		return nil, err
+	}
+
+	// ownerReferences -- encode and store into a data field. on reading
+	// decode that field.  this fully separates the ownerReferences on the
+	// tokens from ownerReferences on the backing secrets.
+	ownerBytes, err := json.Marshal(token.OwnerReferences)
+	if err != nil {
+		return nil, err
+	}
+
 	// annotations -- encode and store into a data field. on reading decode
 	// that field.  this fully separates the annotations on the tokens from
 	// the annotations on the backing secrets.
@@ -1209,6 +1227,8 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldUID] = string(token.ObjectMeta.UID)
 	secret.StringData[FieldLabels] = string(labelBytes)
 	secret.StringData[FieldAnnotations] = string(annotationBytes)
+	secret.StringData[FieldFinalizers] = string(finalizerBytes)
+	secret.StringData[FieldOwnerReferences] = string(ownerBytes)
 
 	// spec values
 	// inject default on creation
@@ -1261,12 +1281,22 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 		return token, fmt.Errorf("kube uid missing")
 	}
 
-	// system - annotations - decode the field and place into the token
+	// system - finalizers - decode the field and place into the token
+	if err := json.Unmarshal(secret.Data[FieldFinalizers], &token.Finalizers); err != nil {
+		return token, err
+	}
+
+	// system - owner references - decode the field and place into the token
+	if err := json.Unmarshal(secret.Data[FieldOwnerReferences], &token.OwnerReferences); err != nil {
+		return token, err
+	}
+
+	// system - labels - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldLabels], &token.Labels); err != nil {
 		return token, err
 	}
 
-	// system - labels - decode the fields and place into the token
+	// system - annotations - decode the fields and place into the token
 	if err := json.Unmarshal(secret.Data[FieldAnnotations], &token.Annotations); err != nil {
 		return token, err
 	}
