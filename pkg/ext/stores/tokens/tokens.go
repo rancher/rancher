@@ -682,9 +682,9 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 			token.Name))
 	}
 
-	// It is not allowed to extend the TTL.
+	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		if token.Spec.TTL > currentToken.Spec.TTL {
+		if ttlGreater(token.Spec.TTL, currentToken.Spec.TTL) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to extend time-to-live",
 				token.Name))
 		}
@@ -1368,6 +1368,41 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 
 	return token, nil
+}
+
+// ttlGreater compares the two TTL as and b. It returns true if a is greater than b.
+// Important special cases for TTL:
+// Any value < 0 represents +infinity.
+// A value of 0 represents 30 days.
+// A value > 0 is that many milliseconds
+func ttlGreater(a, b int64) bool {
+	// Decision table
+	//
+	// a   b   | note                           | result
+	// --------+--------------------------------+-------
+	// <0  <0  | both infinite, same            | false
+	// <0  >=0 | a infinite, b not, greater     | true
+	// >=0 <0  | b infinite, a not, less        | false
+	// >=0 >=0 | map 0 to 30d, rhegular compare | t/f
+
+	if a < 0 && b < 0 {
+		return false
+	}
+	if a < 0 && b >= 0 {
+		return true
+	}
+	if a >= 0 && b < 0 {
+		return false
+	}
+
+	if a == 0 {
+		a = ThirtyDays
+	}
+	if b == 0 {
+		b = ThirtyDays
+	}
+
+	return a > b
 }
 
 // decodeTime parses the byte-slice of the secret into a proper k8s timestamp.
