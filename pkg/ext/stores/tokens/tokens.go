@@ -2,6 +2,8 @@
 // known as ext tokens.
 package tokens
 
+//go::generate mockgen -source tokens.go -destination=zz_token_fakes.go -package=tokens
+
 import (
 	"context"
 	"encoding/base64"
