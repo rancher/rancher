@@ -14,7 +14,17 @@ spec:
     singular: oidcclient
   scope: Cluster
   versions:
-  - name: v3
+  - additionalPrinterColumns:
+    - jsonPath: .status.clientID
+      name: Client ID
+      type: string
+    - jsonPath: .spec.tokenExpirationSeconds
+      name: Token Expiration
+      type: integer
+    - jsonPath: .spec.refreshTokenExpirationSeconds
+      name: RefreshToken Expiration
+      type: integer
+    name: v3
     schema:
       openAPIV3Schema:
         properties:
@@ -40,25 +50,32 @@ spec:
               the oidc client.
             properties:
               description:
+                description: |-
+                  Description provides additional context about the OIDC client.
+                  This field is optional.
                 type: string
               redirectURIs:
+                description: |-
+                  RedirectURIs defines the allowed redirect URIs for the OIDC client.
+                  These URIs must be registered and used during the authentication flow.
                 items:
                   type: string
                 type: array
               refreshTokenExpirationSeconds:
                 description: |-
-                  A Duration represents the elapsed time between two instants
-                  as an int64 nanosecond count. The representation limits the
-                  largest representable duration to approximately 290 years.
+                  RefreshTokenExpirationSeconds defines how long (in seconds)
+                  a refresh token remains valid before expiration.
                 format: int64
                 type: integer
               tokenExpirationSeconds:
                 description: |-
-                  A Duration represents the elapsed time between two instants
-                  as an int64 nanosecond count. The representation limits the
-                  largest representable duration to approximately 290 years.
+                  TokenExpirationSeconds specifies the duration (in seconds) before
+                  an access token and ID token expire.
                 format: int64
                 type: integer
+            required:
+            - refreshTokenExpirationSeconds
+            - tokenExpirationSeconds
             type: object
           status:
             description: Status is the most recently observed status of the oidc client.
