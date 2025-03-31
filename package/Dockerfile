@@ -14,6 +14,72 @@ RUN zypper refresh && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
+FROM final AS builder
+COPY --from=chroot-builder /chroot/ /
+
+FROM builder as tini
+ARG ARCH=amd64
+ENV TINI_VERSION=v0.18.0
+ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
+    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
+    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
+    TINI_URL=TINI_URL_${ARCH}
+RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
+    chmod +x /usr/bin/tini
+
+
+FROM builder as rancher-charts
+ARG CHART_DEFAULT_BRANCH=dev-v2.11
+ENV CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
+    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
+    git clone --no-checkout -b $CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721/
+
+
+FROM builder as rancher-partner-charts
+ARG PARTNER_CHART_DEFAULT_BRANCH=main
+ENV PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
+    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
+    git clone --no-checkout -b $PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
+
+
+FROM builder as rancher-rke2-charts
+ARG RKE2_CHART_DEFAULT_BRANCH=main
+ENV RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
+    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
+    git clone --no-checkout -b $RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
+
+FROM builder as driver-metadata
+ARG CATTLE_KDM_BRANCH=dev-v2.11
+ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
+RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
+    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
+
+# Easier sharing of /var/lib/rancher-data for rancher and agent
+FROM scratch as rancher-data
+COPY --link --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts
+COPY --link --from=rancher-partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts
+COPY --link --from=rancher-rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts
+COPY --link --from=driver-metadata /var/lib/rancher-data/driver-metadata /var/lib/rancher-data/driver-metadata
+
+
+# Helper to build Go programs (rancher, agent, others)
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS go-builder
+ARG CGO_ENABLED=0
+ENV CGO_ENABLED=$CGO_ENABLED
+ENV GOMODCACHE=/root/.cache/go/modcache
+ENV GOCACHE=/root/.cache/go/cache
+WORKDIR /app
+
+
 # Main stage using bci-micro as the base image
 FROM final AS base
 
@@ -59,7 +125,6 @@ ENV CATTLE_MACHINE_VERSION v0.15.0-rancher125
 ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.16
-ENV TINI_VERSION v0.18.0
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.12
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
@@ -102,17 +167,6 @@ ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_V
 ARG CATTLE_CSP_ADAPTER_MIN_VERSION
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load
-    # in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone --no-checkout -b $CATTLE_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721/ && \
-    git clone --no-checkout -b $CATTLE_PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 && \
-    git clone --no-checkout -b $CATTLE_RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 && \
-    # Revert the previous change in git.rancher.io from .gitconfig
-    rm "${HOME}/.gitconfig"
-
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
     chown root:root /usr/bin/rancher-machine && \
     curl -LO https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-${ARCH}.zip && \
@@ -125,11 +179,6 @@ RUN curl -LO https://github.com/harvester/docker-machine-driver-harvester/releas
     tar -xf docker-machine-driver-harvester-${ARCH}.tar.gz -C /opt/drivers/management-state/bin && \
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-harvester-${ARCH}.tar.gz
-
-ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
-    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
-    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
-    TINI_URL=TINI_URL_${ARCH}
 
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
@@ -174,11 +223,8 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
     ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
 
-RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
-    mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
-    chmod +x /usr/bin/tini && \
-    mkdir -p /var/lib/rancher-data/driver-metadata
+RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
+    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl
 
 ENV CATTLE_UI_VERSION 2.11.0-alpha13
 ENV CATTLE_DASHBOARD_UI_VERSION v2.11.0-alpha13
@@ -226,7 +272,7 @@ ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
-RUN curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
+COPY --from=rancher-data /var/lib/rancher-data /var/lib/rancher-data
 
 ENV ETCDCTL_API=3
 
@@ -235,11 +281,9 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 
 # Enable exporting of the k3s images as part of the build process.
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS images
-
-ENV GOMODCACHE=/root/.cache/go/modcache
-ENV GOCACHE=/root/.cache/go/cache
-
+FROM --platform=$BUILDPLATFORM go-builder AS images
+# Enable CGO for this one
+ENV CGO_ENABLED=1
 ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 
 RUN zypper -n install libbtrfs-devel libgpgme-devel
@@ -253,11 +297,10 @@ RUN --mount=type=cache,target=/root/.cache go build -tags k3s_export -o export-i
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS build
+FROM --platform=$BUILDPLATFORM go-builder AS build
 ARG VERSION
 ARG COMMIT
 ARG RKE_VERSION
-ARG CGO_ENABLED=0
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
 ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
@@ -265,29 +308,27 @@ ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X git
 ARG TARGETOS
 ARG TARGETARCH
 
-WORKDIR /app
-
-ENV GOMODCACHE=/root/.cache/go/modcache
-ENV GOCACHE=/root/.cache/go/cache
-
 # Only invalidate cache if go.mod/go.sum changes.
 COPY go.mod go.sum .
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
 RUN --mount=type=cache,target=/root/.cache go mod download
+RUN --mount=type=cache,target=/root/.cache cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache cd pkg/client && go mod download
 
 COPY pkg/ pkg/
 COPY main.go .
 
 RUN --mount=type=cache,target=/root/.cache GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
-FROM base
+FROM base as rancher-server
 
 ARG VERSION=${VERSION}
 ENV CATTLE_SERVER_VERSION ${VERSION}
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 
+COPY --link --from=tini /usr/bin/tini /usr/bin/tini
 COPY --link --chown=root:root --chmod=0755 \
     --from=build /app/rancher /usr/bin/
 COPY --link --chown=root:root --chmod=0755 \
@@ -312,3 +353,90 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opensuse.reference"=rancher/rancher:${VERSION}
 
 ENTRYPOINT ["entrypoint.sh"]
+
+
+
+
+
+
+
+FROM --platform=$BUILDPLATFORM go-builder AS rancher-agent-build
+ARG VERSION=${VERSION}
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
+
+
+# Only invalidate cache if mod files changes.
+COPY go.mod go.sum .
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+RUN --mount=type=cache,target=/root/.cache go mod download
+RUN --mount=type=cache,target=/root/.cache cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache cd pkg/client && go mod download
+
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+
+RUN --mount=type=cache,target=/root/.cache GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+
+FROM registry.suse.com/bci/bci-base:15.6 AS zypper
+
+# Install system packages using builder image that has zypper
+COPY --from=final / /chroot/
+
+# Install some packages with zypper in the chroot of the final micro image
+RUN zypper refresh && \
+    zypper --installroot /chroot -n in --no-recommends \
+    curl util-linux ca-certificates ca-certificates-mozilla jq git-core hostname iproute2 vim-small less \
+	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat openssl patterns-base-fips && \
+    zypper --installroot /chroot clean -a && \
+    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+
+# Main stage using bci-micro as the base image.
+FROM final as rancher-agent
+
+# Copy binaries and configuration files from zypper to micro.
+COPY --from=zypper /chroot/ /
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
+
+ARG ARCH=amd64
+ENV KUBECTL_VERSION v1.27.10
+
+RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
+    chmod +x /usr/bin/kubectl
+
+LABEL io.cattle.agent=true
+
+ARG RANCHER_REPO=rancher
+ARG VERSION=${VERSION}
+ENV AGENT_IMAGE ${RANCHER_REPO}/rancher-agent:${VERSION}
+# For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
+ARG CATTLE_RANCHER_WEBHOOK_VERSION
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+COPY --link --from=rancher-data /var/lib/rancher-data /var/lib/rancher-data
+COPY --link --from=tini /usr/bin/tini /usr/bin/
+COPY --link --from=rancher-agent-build /app/agent /usr/bin/
+COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
+WORKDIR /var/lib/rancher
+
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
+      "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
+      "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
+      "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
+      "org.opencontainers.image.version"=${VERSION} \
+      "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
+
+ENTRYPOINT ["run.sh"]
