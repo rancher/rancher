@@ -118,11 +118,11 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
 		linodeBuiltin = isCommandAvailable("docker-machine-driver-linode")
 	}
-	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.12/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
-	linodeDriverChecksum := "5fab97320e3965607340567b11857e76a2d9d87fe6dbb3571cc3df04db432c14"
+	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.15/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
+	linodeDriverChecksum := "26a71dbbc2f5249a66716cad586c3b4048d3cd9e67c0527442c374dd5dcf1c41"
 	if runtime.GOARCH == "arm64" {
 		//overwrite arm driver version here
-		linodeDriverChecksum = "1d4cc22b5ffc9cb47446905e8e9303ad2043dea471f07f1ef16f255e4b738044"
+		linodeDriverChecksum = "3b1ed74291cbf581c0f8a63d878d79e1fe3b443387c1c0bb8b1d078a78db8bc4"
 	}
 	if err := addMachineDriver(Linodedriver, linodeDriverURL, "/assets/rancher-ui-driver-linode/component.js", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, management); err != nil {
 		return err
