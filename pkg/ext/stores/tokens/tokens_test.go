@@ -184,7 +184,7 @@ func Test_Store_Delete(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("laber", false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
@@ -208,7 +208,7 @@ func Test_Store_Delete(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("laber", false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
@@ -230,7 +230,7 @@ func Test_Store_Delete(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		users.EXPECT().Cache().Return(nil)
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("", false, false, apierrors.NewInternalError(invalidContext))
 		secrets.EXPECT().Cache().Return(nil)
 
@@ -249,7 +249,7 @@ func Test_Store_Delete(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdl/ksjlkds", false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
@@ -272,7 +272,7 @@ func Test_Store_Delete(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil).Times(2)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
@@ -303,7 +303,7 @@ func Test_Store_Get(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdl/ksjlkds", false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
@@ -326,7 +326,7 @@ func Test_Store_Get(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
@@ -349,7 +349,7 @@ func Test_Store_Get(t *testing.T) {
 		auth := NewMockauthHandler(ctrl)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
@@ -377,7 +377,7 @@ func Test_Store_Update(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdl/ksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -401,7 +401,7 @@ func Test_Store_Update(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
@@ -453,7 +453,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(nil, someerror)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -476,7 +476,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(NewWatcher(), nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
 		todo, cancel := context.WithCancel(context.TODO())
@@ -511,7 +511,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -544,7 +544,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -577,7 +577,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -612,7 +612,7 @@ func Test_Store_Watch(t *testing.T) {
 		}).Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdl/ksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -645,7 +645,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -683,7 +683,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
@@ -740,7 +740,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("lkajdlksjlkds", false, true, nil)
 			},
 		},
@@ -759,7 +759,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
@@ -785,7 +785,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
@@ -818,7 +818,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
@@ -853,7 +853,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
@@ -890,7 +890,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				// fail fetch of session token, v3 and ext
@@ -933,7 +933,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				// session token fetch for user principal
@@ -980,7 +980,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				// session token fetch for user principal
@@ -1037,7 +1037,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				// session token fetch for user principal
@@ -1094,7 +1094,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				// session token fetch for user principal
@@ -1159,7 +1159,7 @@ func Test_Store_Create(t *testing.T) {
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any()).
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("world", false, true, nil)
 
 				// session token fetch for user principal

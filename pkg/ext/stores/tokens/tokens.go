@@ -353,7 +353,7 @@ func (t *Store) Watch(
 func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
 	logrus.Debugf("ext.cattle.io/token /create [%s]", token.Name)
 
-	userName, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
+	userName, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "create")
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +493,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
 	logrus.Debugf("ext.cattle.io/token /delete [%s]", token.Name)
 
-	user, isAdmin, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
+	user, isAdmin, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
 	if err != nil {
 		return err
 	}
@@ -521,7 +521,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
 	logrus.Debugf("ext.cattle.io/token /get [%s]", name)
 
-	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
+	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +575,7 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
 	logrus.Debug("ext.cattle.io/token /list")
 
-	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
+	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore, "list")
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +664,7 @@ func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *me
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
 	logrus.Debugf("ext.cattle.io/token /update [%s]", token.Name)
 
-	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore)
+	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
 	if err != nil {
 		return nil, err
 	}
@@ -837,7 +837,7 @@ func (t *SystemStore) Disable(name string) error {
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	logrus.Debug("ext.cattle.io/token /watch")
 
-	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore)
+	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore, "watch")
 	if err != nil {
 		return nil, err
 	}
@@ -1023,7 +1023,7 @@ type hashHandler interface {
 // makes these operations mockable for store testing.
 type authHandler interface {
 	SessionID(ctx context.Context) string
-	UserName(ctx context.Context, store *SystemStore) (string, bool, bool, error)
+	UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error)
 }
 
 // Standard implementations for the above interfaces.
@@ -1070,10 +1070,10 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 
 // UserName hides the details of extracting a user name and its permission
 // status from the request context
-func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, bool, bool, error) {
+func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
-		logrus.Errorf("ext.cattle.io/token username: context has no user info")
+		logrus.Error("ext.cattle.io/token username: context has no user info")
 		return "", false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
 	}
 
@@ -1087,15 +1087,29 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore) (string, 
 		logrus.Errorf("ext.cattle.io/token username: authorization error: %v", err)
 		return "", false, false, err
 	}
+
 	isAdmin := decision == authorizer.DecisionAllow
+
+	// recheck for limited admin on the specific verb
+	// example: kube GC user `system:kube-controller-manager`
+	if !isAdmin {
+		logrus.Debugf("ext.cattle.io/token username: not general admin, recheck for verb %s alone", verb)
+
+		decision, _, err := store.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
+			User:            userInfo,
+			Verb:            verb,
+			Resource:        "*",
+			ResourceRequest: true,
+		})
+		if err != nil {
+			logrus.Errorf("ext.cattle.io/token username: authorization error: %v", err)
+			return "", false, false, err
+		}
+		isAdmin = decision == authorizer.DecisionAllow
+	}
+
 	isRancherUser := false
 	userName := userInfo.GetName()
-
-	// Treat user responsible for kube garbage collection as admin, i.e. let
-	// it see all, no restrictions
-	if userName == "system:kube-controller-manager" {
-		isAdmin = true
-	}
 
 	if !strings.Contains(userName, ":") { // E.g. system:admin
 		// potentially a rancher user
