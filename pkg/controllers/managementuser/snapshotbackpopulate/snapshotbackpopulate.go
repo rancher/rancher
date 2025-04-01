@@ -159,14 +159,17 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 					continue
 				}
 			}
-			// indicate that it should be OK to delete the etcd snapshot object
-			// don't delete the snapshots here because our configmap can be outdated. we will reconcile based on the system-agent output via the periodic output
-			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating status missing=true on etcd snapshot %s/%s as it was not found in the actual snapshot config map", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name)
-			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: etcd snapshot was %s/%s: %v", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, existingSnapshotCR)
-			existingSnapshotCR = existingSnapshotCR.DeepCopy()
-			existingSnapshotCR.Status.Missing = true // a missing snapshot indicates that it was not found in the (rke2|k3s)-etcd-snapshots configmap. This could potentially be a transient situation after an etcd snapshot restore to an older/newer datastore, when new snapshots have not been taken.
-			if existingSnapshotCR, err = h.etcdSnapshots.UpdateStatus(existingSnapshotCR); err != nil && !apierrors.IsNotFound(err) {
-				return configMap, fmt.Errorf("rkecluster %s/%s: error while setting status missing=true on etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, err)
+
+			if !existingSnapshotCR.Status.Missing {
+				// indicate that it should be OK to delete the etcd snapshot object
+				// don't delete the snapshots here because our configmap can be outdated. we will reconcile based on the system-agent output via the periodic output
+				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating status missing=true on etcd snapshot %s/%s as it was not found in the actual snapshot config map", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name)
+				logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: etcd snapshot was %s/%s: %v", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, existingSnapshotCR)
+				existingSnapshotCR = existingSnapshotCR.DeepCopy()
+				existingSnapshotCR.Status.Missing = true // a missing snapshot indicates that it was not found in the (rke2|k3s)-etcd-snapshots configmap. This could potentially be a transient situation after an etcd snapshot restore to an older/newer datastore, when new snapshots have not been taken.
+				if existingSnapshotCR, err = h.etcdSnapshots.UpdateStatus(existingSnapshotCR); err != nil && !apierrors.IsNotFound(err) {
+					return configMap, fmt.Errorf("rkecluster %s/%s: error while setting status missing=true on etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, err)
+				}
 			}
 			continue
 		}
