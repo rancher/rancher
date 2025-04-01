@@ -215,6 +215,8 @@ webhook: ""
 fleet: ""
 
 # Create a dynamic manifests via values:
+# Beware: There will be no validation on these resource manifests in `extraObjects` - they must be valid k8s resources.
+# If you encounter issues installing/upgrading rancher while using these, please investigate these first.
 extraObjects: []
 # - apiVersion: "networking.k8s.io/v1"
 #   kind: NetworkPolicy
