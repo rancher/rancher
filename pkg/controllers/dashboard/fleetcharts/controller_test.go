@@ -71,9 +71,6 @@ func Test_ChartInstallation(t *testing.T) {
 					"gitops": map[string]interface{}{
 						"enabled": features.Gitops.Enabled(),
 					},
-					"gitjob": map[string]interface{}{
-						"priorityClassName": priorityClassName,
-					},
 					"priorityClassName": priorityClassName,
 				}
 
@@ -124,9 +121,6 @@ func Test_ChartInstallation(t *testing.T) {
 					},
 					"gitops": map[string]interface{}{
 						"enabled": features.Gitops.Enabled(),
-					},
-					"gitjob": map[string]interface{}{
-						"priorityClassName": priorityClassName,
 					},
 					"priorityClassName": priorityClassName,
 				}
@@ -216,8 +210,6 @@ leaderElection:
   leaseDuration: 2s
 bootstrap:
   enabled: true
-gitjob:
-  debug: true
 `},
 			newManager: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("pass")
@@ -239,10 +231,6 @@ gitjob:
 					},
 					"gitops": map[string]interface{}{
 						"enabled": features.Gitops.Enabled(),
-					},
-					"gitjob": map[string]interface{}{
-						"priorityClassName": priorityClassName,
-						"debug":             true,
 					},
 					"priorityClassName": priorityClassName,
 					"leaderElection": map[string]interface{}{
