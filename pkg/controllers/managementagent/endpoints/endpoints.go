@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -31,6 +32,10 @@ const (
 )
 
 func Register(ctx context.Context, workload *config.UserOnlyContext) {
+	if os.Getenv("DISABLE_ENDPOINTS") != "" {
+		return
+	}
+
 	s := &ServicesController{
 		services:           workload.Core.Services(""),
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload, nil),
