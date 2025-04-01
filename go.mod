@@ -440,6 +440,3 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-// Backport: https://github.com/rancher/steve/pull/576, pushed to aggregation-server-conn-leak-2.10.2 branch, based on previous steve version (commit)
-replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20250328123547-428c4d180fa4
