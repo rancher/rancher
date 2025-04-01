@@ -493,11 +493,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
 	logrus.Debugf("ext.cattle.io/token /delete [%s]", token.Name)
 
-	user, isAdmin, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
+	user, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
 	if err != nil {
 		return err
 	}
-	if !isAdmin && (!isRancherUser || !userMatch(user, token)) {
+	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
 		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
@@ -521,7 +521,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
 	logrus.Debugf("ext.cattle.io/token /get [%s]", name)
 
-	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
+	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
 	if err != nil {
 		return nil, err
 	}
@@ -532,7 +532,7 @@ func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions
 		return nil, err
 	}
 
-	if isAdmin {
+	if fullAccess {
 		return token, nil
 	}
 	if !userMatch(userName, token) {
@@ -575,12 +575,12 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
 	logrus.Debug("ext.cattle.io/token /list")
 
-	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore, "list")
+	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "list")
 	if err != nil {
 		return nil, err
 	}
 
-	return t.SystemStore.list(isAdmin, userName, t.auth.SessionID(ctx), options)
+	return t.SystemStore.list(fullAccess, userName, t.auth.SessionID(ctx), options)
 }
 
 // ListForUser returns the set of token owned by the named user. It is an
@@ -613,28 +613,28 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
-func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
-	logrus.Debugf("ext.cattle.io/token sys.list admin=%v [%s]", isAdmin, sessionID)
+func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
+	logrus.Debugf("ext.cattle.io/token sys.list full=%v [%s]", fullAccess, sessionID)
 
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
-	localOptions, err := ListOptionMerge(isAdmin, userName, options)
+	localOptions, err := ListOptionMerge(fullAccess, userName, options)
 	if err != nil {
-		logrus.Errorf("ext.cattle.io/token sys.list admin=%v [%s] merge error: %v", isAdmin, sessionID, err)
+		logrus.Errorf("ext.cattle.io/token sys.list full=%v [%s] merge error: %v", fullAccess, sessionID, err)
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
 	}
 	empty := metav1.ListOptions{}
 	if localOptions == empty {
 		// The setup indicated that we can bail out. I.e the
 		// options ask for something which cannot match.
-		logrus.Debugf("ext.cattle.io/token sys.list admin=%v [%s] quick empty", isAdmin, sessionID)
+		logrus.Debugf("ext.cattle.io/token sys.list full=%v [%s] quick empty", fullAccess, sessionID)
 		return &ext.TokenList{}, nil
 	}
 
 	// Core token listing from backing secrets
 	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
 	if err != nil {
-		logrus.Errorf("ext.cattle.io/token sys.list admin=%v [%s] list error: %v", isAdmin, sessionID, err)
+		logrus.Errorf("ext.cattle.io/token sys.list full=%v [%s] list error: %v", fullAccess, sessionID, err)
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
 	}
 
@@ -651,7 +651,7 @@ func (t *SystemStore) list(isAdmin bool, userName, sessionID string, options *me
 		tokens = append(tokens, *token)
 	}
 
-	logrus.Debugf("ext.cattle.io/token sys.list admin=%v [%s] reporting %d", isAdmin, sessionID, len(tokens))
+	logrus.Debugf("ext.cattle.io/token sys.list full=%v [%s] reporting %d", fullAccess, sessionID, len(tokens))
 	return &ext.TokenList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: secrets.ResourceVersion,
@@ -837,7 +837,7 @@ func (t *SystemStore) Disable(name string) error {
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	logrus.Debug("ext.cattle.io/token /watch")
 
-	userName, isAdmin, _, err := t.auth.UserName(ctx, &t.SystemStore, "watch")
+	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "watch")
 	if err != nil {
 		return nil, err
 	}
@@ -849,7 +849,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		ch: make(chan watch.Event, 100),
 	}
 
-	localOptions, err := ListOptionMerge(isAdmin, userName, options)
+	localOptions, err := ListOptionMerge(fullAccess, userName, options)
 	if err != nil {
 		return nil,
 			apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w",
@@ -1079,7 +1079,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 
 	decision, _, err := store.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 		User:            userInfo,
-		Verb:            "*",
+		Verb:            verb,
 		Resource:        "*",
 		ResourceRequest: true,
 	})
@@ -1088,25 +1088,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 		return "", false, false, err
 	}
 
-	isAdmin := decision == authorizer.DecisionAllow
-
-	// recheck for limited admin on the specific verb
-	// example: kube GC user `system:kube-controller-manager`
-	if !isAdmin {
-		logrus.Debugf("ext.cattle.io/token username: not general admin, recheck for verb %s alone", verb)
-
-		decision, _, err := store.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
-			User:            userInfo,
-			Verb:            verb,
-			Resource:        "*",
-			ResourceRequest: true,
-		})
-		if err != nil {
-			logrus.Errorf("ext.cattle.io/token username: authorization error: %v", err)
-			return "", false, false, err
-		}
-		isAdmin = decision == authorizer.DecisionAllow
-	}
+	fullAccess := decision == authorizer.DecisionAllow
 
 	isRancherUser := false
 	userName := userInfo.GetName()
@@ -1126,8 +1108,8 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 		} // else: not a rancher user, may still be an admin
 	} // else: some system user, not a rancher user, may still be an admin
 
-	logrus.Debugf("ext.cattle.io/token username: %s admin=%v rancher=%v", userName, isAdmin, isRancherUser)
-	return userName, isAdmin, isRancherUser, nil
+	logrus.Debugf("ext.cattle.io/token username: %s full=%v rancher=%v", userName, fullAccess, isRancherUser)
+	return userName, fullAccess, isRancherUser, nil
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
@@ -1176,11 +1158,11 @@ func SessionID(ctx context.Context) (string, error) {
 // (for the current user).  A non-error empty result indicates that the options
 // specified a filter which cannot match anything.  I.e. the calling user
 // requests a filter for a different user than itself.
-func ListOptionMerge(isAdmin bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
+func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
 
 	// for admins we do not impose any additional restrictions over the requested
-	if isAdmin {
+	if fullAccess {
 		return *options, nil
 	}
 
