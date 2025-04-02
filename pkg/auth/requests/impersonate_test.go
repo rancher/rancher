@@ -228,15 +228,17 @@ func TestAuthenticateImpersonation(t *testing.T) {
 						Data: map[string][]byte{
 							exttokenstore.FieldUserID: []byte("impUser"),
 							// everything else to satisfy the ext token read checks
-							exttokenstore.FieldAnnotations:    []byte("null"),
-							exttokenstore.FieldEnabled:        []byte("true"),
-							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
-							exttokenstore.FieldLabels:         []byte("null"),
-							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-							exttokenstore.FieldPrincipal:      principalBytes,
-							exttokenstore.FieldTTL:            []byte("57600000"),
-							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+							exttokenstore.FieldAnnotations:     []byte("null"),
+							exttokenstore.FieldEnabled:         []byte("true"),
+							exttokenstore.FieldFinalizers:      []byte("null"),
+							exttokenstore.FieldHash:            []byte("kadjsf;alkd"),
+							exttokenstore.FieldKind:            []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldLabels:          []byte("null"),
+							exttokenstore.FieldLastUpdateTime:  []byte("13:00"),
+							exttokenstore.FieldOwnerReferences: []byte("null"),
+							exttokenstore.FieldPrincipal:       principalBytes,
+							exttokenstore.FieldTTL:             []byte("57600000"),
+							exttokenstore.FieldUID:             []byte("2905498-kafld-lkad"),
 						},
 					}, nil)
 				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
@@ -432,15 +434,17 @@ func TestAuthenticateImpersonation(t *testing.T) {
 						Data: map[string][]byte{
 							exttokenstore.FieldUserID: []byte("someoneelse"),
 							// everything else to satisfy the ext token read checks
-							exttokenstore.FieldAnnotations:    []byte("null"),
-							exttokenstore.FieldEnabled:        []byte("true"),
-							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
-							exttokenstore.FieldLabels:         []byte("null"),
-							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
-							exttokenstore.FieldPrincipal:      principalBytes,
-							exttokenstore.FieldTTL:            []byte("57600000"),
-							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+							exttokenstore.FieldAnnotations:     []byte("null"),
+							exttokenstore.FieldEnabled:         []byte("true"),
+							exttokenstore.FieldFinalizers:      []byte("null"),
+							exttokenstore.FieldHash:            []byte("kadjsf;alkd"),
+							exttokenstore.FieldKind:            []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldLabels:          []byte("null"),
+							exttokenstore.FieldLastUpdateTime:  []byte("13:00"),
+							exttokenstore.FieldOwnerReferences: []byte("null"),
+							exttokenstore.FieldPrincipal:       principalBytes,
+							exttokenstore.FieldTTL:             []byte("57600000"),
+							exttokenstore.FieldUID:             []byte("2905498-kafld-lkad"),
 						},
 					}, nil)
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
