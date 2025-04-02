@@ -213,6 +213,48 @@ func TestApply(t *testing.T) {
 			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
 		}
 	})
+
+	t.Run("apply changesets - applies all changesets if change fails", func(t *testing.T) {
+		Register(testChangeSetDeletionMigration{t})
+		t.Cleanup(func() {
+			knownMigrations = nil
+		})
+		clientset := fake.NewClientset()
+		// The migration deletes secret1 and secret2 in two changesets, the
+		// first changeset also modifies a resource that doesn't exist in this
+		// test.
+		dynamicset := newFakeDynamicClient(t,
+			newSecret(types.NamespacedName{Name: "test-secret-1", Namespace: "cattle-secrets"}, testSecretData),
+			newSecret(types.NamespacedName{Name: "test-secret-2", Namespace: "cattle-secrets"}, testSecretData))
+		statusClient := NewStatusClient(clientset.CoreV1())
+
+		metrics, err := Apply(context.TODO(), "changeset-deletion-migration", statusClient, dynamicset, changes.ApplyOptions{}, test.NewFakeMapper())
+		want := "failed to get resource for patching: authconfigs.management.cattle.io \"shibboleth\" not found"
+		assert.Equal(t, want, err.Error())
+
+		wantMetrics := &changes.ApplyMetrics{Delete: 1, Patch: 1, Errors: 1}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
+
+		remaining := func() []string {
+			raw, err := dynamicset.Resource(schema.GroupVersionResource{
+				Version:  "v1",
+				Resource: "secrets",
+			}).Namespace("cattle-secrets").List(context.TODO(), metav1.ListOptions{})
+			require.NoError(t, err)
+
+			var remainingNames []string
+			for _, secret := range raw.Items {
+				remainingNames = append(remainingNames, fmt.Sprintf("%s/%s", secret.GetNamespace(), secret.GetName()))
+			}
+
+			return remainingNames
+		}()
+		// We should successfully delete test-secret-2 but leave test-secret-1
+		// because the first element in the changeset fails.
+		assert.Equal(t, []string{"cattle-secrets/test-secret-1"}, remaining)
+	})
 }
 
 func TestApplyUnappliedMigrations(t *testing.T) {
@@ -535,6 +577,74 @@ func (m testChangeSetMigration) Changes(ctx context.Context, _ changes.Interface
 					Create: &changes.CreateChange{
 						Resource: test.ToUnstructured(m.t,
 							newSecret(types.NamespacedName{Name: "test-secret2", Namespace: "cattle-secrets"}, testSecretData)),
+					},
+				},
+			},
+		},
+	}, nil
+}
+
+type testChangeSetDeletionMigration struct {
+	t *testing.T
+}
+
+func (m testChangeSetDeletionMigration) Name() string {
+	return "changeset-deletion-migration"
+}
+
+func (m testChangeSetDeletionMigration) Changes(ctx context.Context, _ changes.Interface, _ MigrationOptions) (*MigrationChanges, error) {
+	return &MigrationChanges{
+		Changes: []ChangeSet{
+			{
+				{
+					Operation: changes.OperationPatch,
+					Patch: &changes.PatchChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name: "shibboleth",
+							},
+							Group:    "management.cattle.io",
+							Resource: "authconfigs",
+							Version:  "v3",
+						},
+						Operations: []changes.PatchOperation{
+							{
+								Operation: "replace",
+								Path:      "/openLdapConfig/serviceAccountPassword",
+								Value:     "cattle-secrets:test-secret",
+							},
+						},
+						Type: changes.PatchApplicationJSON,
+					},
+				},
+				{
+					Operation: changes.OperationDelete,
+					Delete: &changes.DeleteChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name:      "test-secret-1",
+								Namespace: "cattle-secrets",
+							},
+							Group:    "",
+							Resource: "secrets",
+							Version:  "v1",
+						},
+					},
+				},
+			},
+			{
+				{
+					Operation: changes.OperationDelete,
+					Delete: &changes.DeleteChange{
+						ResourceRef: changes.ResourceReference{
+							ObjectRef: types.NamespacedName{
+								Name:      "test-secret-2",
+								Namespace: "cattle-secrets",
+							},
+							Group:    "",
+							Resource: "secrets",
+							Version:  "v1",
+						},
 					},
 				},
 			},
