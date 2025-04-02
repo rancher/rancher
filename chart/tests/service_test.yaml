@@ -44,3 +44,19 @@ tests:
   asserts:
   - isNull:
       path: metadata.annotations
+- it: should define both http and https-internal ports
+  asserts:
+    - equal:
+        path: spec.ports[0].name
+        value: http
+    - equal:
+        path: spec.ports[1].name
+        value: https-internal
+- it: should define disable HTTP port when disableHTTP is true
+  set:
+    service.disableHTTP: true
+    ingress.servicePort: 443
+  asserts:
+    - equal:
+        path: spec.ports[0].name
+        value: https-internal

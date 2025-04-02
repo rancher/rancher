@@ -257,3 +257,58 @@ tests:
                     number: 80
               pathType: Prefix
               path: "/*"
+- it: should work with service.disableHTTP
+  set:
+    hostname: host.example.com
+    service.disableHTTP: true
+    ingress.servicePort: 443
+  asserts:
+    - equal:
+        path: spec.rules
+        value:
+          - host: host.example.com
+            http:
+              paths:
+                - backend:
+                    service:
+                      name: RELEASE-NAME-rancher
+                      port:
+                        number: 443
+                  pathType: ImplementationSpecific
+                  path: /
+    - equal:
+        path: metadata.annotations
+        value:
+          cert-manager.io/issuer: RELEASE-NAME-rancher
+          cert-manager.io/issuer-kind: Issuer
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+          nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+          nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+- it: can target servicePort 443 without disabling port 80
+  set:
+    hostname: host.example.com
+    ingress.servicePort: 443
+  asserts:
+    - equal:
+        path: spec.rules
+        value:
+          - host: host.example.com
+            http:
+              paths:
+                - backend:
+                    service:
+                      name: RELEASE-NAME-rancher
+                      port:
+                        number: 443
+                  pathType: ImplementationSpecific
+                  path: /
+    - equal:
+        path: metadata.annotations
+        value:
+          cert-manager.io/issuer: RELEASE-NAME-rancher
+          cert-manager.io/issuer-kind: Issuer
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+          nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+          nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"

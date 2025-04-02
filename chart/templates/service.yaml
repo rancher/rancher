@@ -16,10 +16,12 @@ spec:
   type: {{ .Values.service.type }}
   {{- end }}
   ports:
+  {{- if not (default .Values.service.disableHTTP false) }}
   - port: 80
     targetPort: 80
     protocol: TCP
     name: http
+  {{- end }}
   - port: 443
     targetPort: 444
     protocol: TCP
