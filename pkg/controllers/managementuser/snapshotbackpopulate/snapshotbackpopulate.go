@@ -159,6 +159,12 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 					continue
 				}
 			}
+
+			if existingSnapshotCR.Status.Missing {
+				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: skipping updating status missing=true on etcd snapshot %s/%s as it was already marked missing", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name)
+				continue
+			}
+
 			// indicate that it should be OK to delete the etcd snapshot object
 			// don't delete the snapshots here because our configmap can be outdated. we will reconcile based on the system-agent output via the periodic output
 			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating status missing=true on etcd snapshot %s/%s as it was not found in the actual snapshot config map", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name)
