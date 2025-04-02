@@ -103,7 +103,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	if errors.IsNotFound(err) {
 		clientSecret, err := c.generator.GenerateClientSecret()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to generate client secret: %w", err)
 		}
 
 		k8sSecret, err = c.secretClient.Create(&v1.Secret{
@@ -124,7 +124,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 			},
 		})
 		if err != nil && !errors.IsAlreadyExists(err) {
-			return nil, err
+			return nil, fmt.Errorf("failed to create secret: %w", err)
 		}
 	}
 
@@ -133,21 +133,21 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	if _, ok := oidcClient.Annotations[createClientSecretAnn]; ok {
 		clientSecret, err := c.generator.GenerateClientSecret()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("falied to generate client secret: %w", err)
 		}
 		secretKey, err := findNextSecretKey(k8sSecret.Data)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("falied to find next secret key: %w", err)
 		}
 		k8sSecret.Data[secretKey] = []byte(clientSecret)
 		_, err = c.secretClient.Update(k8sSecret)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to update secret: %w", err)
 		}
 		delete(oidcClient.Annotations, createClientSecretAnn)
 		_, err = c.oidcClient.Update(oidcClient)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
 	}
 
@@ -159,20 +159,20 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 			if _, ok := k8sSecret.Data[csid]; ok {
 				clientSecret, err := c.generator.GenerateClientSecret()
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to generate client secret: %w", err)
 				}
 				k8sSecret.Data[csid] = []byte(clientSecret)
 			}
 		}
 		_, err = c.secretClient.Update(k8sSecret)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to update secret: %w", err)
 		}
 
 		delete(oidcClient.Annotations, regenerateClientSecretAnn)
 		_, err = c.oidcClient.Update(oidcClient)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
 	}
 
@@ -185,13 +185,13 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 		_, err = c.secretClient.Update(k8sSecret)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to update secret: %w", err)
 		}
 
 		delete(oidcClient.Annotations, removeClientSecretAnn)
 		_, err = c.oidcClient.Update(oidcClient)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
 	}
 
