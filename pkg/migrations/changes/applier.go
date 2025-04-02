@@ -106,35 +106,34 @@ type restMapper interface {
 
 // ApplyChanges applies a set of ResourceChanges to the cluster.
 func ApplyChanges(ctx context.Context, client dynamic.Interface, changes []ResourceChange, options ApplyOptions, mapper restMapper) (*ApplyMetrics, error) {
-	var err error
 	var metrics ApplyMetrics
 	for _, change := range changes {
 		switch change.Operation {
 		case OperationPatch:
 			metrics.Patch += 1
-			if patchErr := applyPatchChangesToResource(ctx, client, *change.Patch, options); patchErr != nil {
-				err = errors.Join(err, patchErr)
+			if err := applyPatchChangesToResource(ctx, client, *change.Patch, options); err != nil {
 				metrics.Errors += 1
+				return &metrics, err
 			}
 		case OperationCreate:
 			metrics.Create += 1
-			if createErr := applyCreateChange(ctx, client, *change.Create, mapper, options); createErr != nil {
-				err = errors.Join(err, createErr)
+			if err := applyCreateChange(ctx, client, *change.Create, mapper, options); err != nil {
 				metrics.Errors += 1
+				return &metrics, err
 			}
 		case OperationDelete:
 			metrics.Delete += 1
-			if deleteErr := applyDeleteChange(ctx, client, *change.Delete, options); err != nil {
-				err = errors.Join(err, deleteErr)
+			if err := applyDeleteChange(ctx, client, *change.Delete, options); err != nil {
 				metrics.Errors += 1
+				return &metrics, err
 			}
 		default:
-			err = errors.Join(err, fmt.Errorf("unknown operation: %q", change.Operation))
 			metrics.Errors += 1
+			return &metrics, fmt.Errorf("unknown operation: %q", change.Operation)
 		}
 	}
 
-	return &metrics, err
+	return &metrics, nil
 }
 
 func resourceName(u *unstructured.Unstructured) string {

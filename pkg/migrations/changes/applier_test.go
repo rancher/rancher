@@ -95,6 +95,100 @@ func TestApplyChanges(t *testing.T) {
 		}
 	})
 
+	t.Run("ApplyChanges failing an operation doesn't complete all operations", func(t *testing.T) {
+		svc := test.NewService()
+		change := ResourceChange{
+			Operation: OperationPatch,
+			Patch: &PatchChange{
+				ResourceRef: ResourceReference{
+					ObjectRef: types.NamespacedName{
+						Name:      "unknown-name",
+						Namespace: "unknown-ns",
+					},
+					Resource: "services",
+					Version:  "v1",
+				},
+				Operations: []PatchOperation{
+					{
+						Operation: "replace",
+						Path:      "/spec/ports/0/targetPort",
+						Value:     9371,
+					},
+				},
+				Type: PatchApplicationJSON,
+			},
+		}
+
+		changes := []ResourceChange{
+			change,
+			// This change is not applied because the first one references an
+			// unknown svc.
+			ResourceChange{
+				Operation: OperationPatch,
+				Patch: &PatchChange{
+					ResourceRef: ResourceReference{
+						ObjectRef: types.NamespacedName{
+							Name:      svc.Name,
+							Namespace: svc.Namespace,
+						},
+						Resource: "services",
+						Version:  "v1",
+					},
+					Operations: []PatchOperation{
+						{
+							Operation: "replace",
+							Path:      "/spec/ports/0/targetPort",
+							Value:     9371,
+						},
+					},
+					Type: PatchApplicationJSON,
+				},
+			},
+		}
+
+		k8sClient := newFakeClient(testScheme, svc)
+
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
+		require.ErrorContains(t, err, `failed to get resource for patching: services "unknown-name" not found`)
+
+		updated, err := k8sClient.Resource(change.Patch.ResourceRef.GVR()).
+			Namespace(svc.Namespace).
+			Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		assert.NoError(t, err)
+
+		want := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "v1",
+				"kind":       "Service",
+				"metadata": map[string]any{
+					"name":              "test-svc",
+					"namespace":         "default",
+					"creationTimestamp": nil,
+				},
+				"spec": map[string]any{
+					"ports": []any{
+						map[string]any{
+							"name":       "http-80",
+							"port":       int64(80),
+							"protocol":   "TCP",
+							"targetPort": int64(9376),
+						},
+					},
+				},
+				"status": map[string]any{
+					"loadBalancer": map[string]any{},
+				},
+			},
+		}
+		if diff := cmp.Diff(want, updated); diff != "" {
+			t.Errorf("failed to apply migrations: diff -want +got\n%s", diff)
+		}
+		wantMetrics := &ApplyMetrics{Patch: 1, Errors: 1}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
+	})
+
 	t.Run("ApplyChanges patching an existing resource with dry-run", func(t *testing.T) {
 		t.Skip("See https://github.com/kubernetes/kubernetes/issues/129737")
 		svc := test.NewService()
