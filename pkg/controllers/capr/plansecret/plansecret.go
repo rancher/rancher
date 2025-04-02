@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"

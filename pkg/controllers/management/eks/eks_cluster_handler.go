@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	stderrors "errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -148,7 +147,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 	// get EKS Cluster Config's phase
 	status, _ := eksClusterConfigDynamic.Object["status"].(map[string]interface{})
-	phase, _ := status["phase"]
+	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
 	if strings.Contains(failureMessage, "403") {
 		failureMessage = fmt.Sprintf("cannot access EKS, check cloud credential: %s", failureMessage)
@@ -548,14 +547,14 @@ func (e *eksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 	if err != nil {
 		*requiresTunnel = true
 		var dnsError *net.DNSError
-		if stderrors.As(err, &dnsError) && !dnsError.IsTemporary {
+		if errors.As(err, &dnsError) && !dnsError.IsTemporary {
 			return "", requiresTunnel, nil
 		}
 
 		// In the existence of a proxy, it may be the case that the following error occurs,
 		// in which case rancher should use the tunnel connection to communicate with the cluster.
 		var urlError *url.Error
-		if stderrors.As(err, &urlError) && urlError.Timeout() {
+		if errors.As(err, &urlError) && urlError.Timeout() {
 			return "", requiresTunnel, nil
 		}
 
