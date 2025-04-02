@@ -324,9 +324,9 @@ ENV CATTLE_SERVER_VERSION ${VERSION}
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 
-COPY --link --chown=root:root --chmod=0755 \
+COPY --chown=root:root --chmod=0755 \
      --from=build /app/rancher /usr/bin/
-COPY --link --chown=root:root --chmod=0755 \
+COPY --chown=root:root --chmod=0755 \
      --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 
 COPY --chown=root:root --chmod=0755 \
@@ -334,7 +334,6 @@ COPY --chown=root:root --chmod=0755 \
         package/entrypoint.sh \
         package/kustomize.sh \
         package/jailer.sh /usr/bin/
-
 
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
