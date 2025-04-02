@@ -33,8 +33,7 @@ func (t preferencesMigration) Name() string {
 // This combines multiple `v3.Preference` resources into a single ConfigMap for
 // each user.
 //
-// This would be a good example to use the MigrationOption.Continue and
-// per-user ChangeSets.
+// TODO: This would be a good example to use the MigrationOption.Continue
 func (t preferencesMigration) Changes(ctx context.Context, client changes.Interface, opts migrations.MigrationOptions) (*migrations.MigrationChanges, error) {
 	userPreferences, err := client.Resource(schema.GroupVersionResource{
 		Resource: "preferences",
@@ -42,17 +41,19 @@ func (t preferencesMigration) Changes(ctx context.Context, client changes.Interf
 		Version:  "v3",
 	}).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("listing preferences to calculate migration: %s", err)
+		return nil, fmt.Errorf("listing preferences to calculate migration: %w", err)
 	}
 
 	combined, err := combinePreferences(userPreferences.Items)
 	if err != nil {
-		return nil, fmt.Errorf("combining preferences to calculate migration: %s", err)
+		return nil, fmt.Errorf("combining preferences to calculate migration: %w", err)
 	}
 
-	var resourceChanges []changes.ResourceChange
+	var changeSets []migrations.ChangeSet
 	var migrationErr error
+
 	for k, v := range combined {
+		var changeSet migrations.ChangeSet
 		configMap := newConfigMap(k+"-preferences", k, v.data)
 		raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(configMap)
 		if err != nil {
@@ -61,7 +62,7 @@ func (t preferencesMigration) Changes(ctx context.Context, client changes.Interf
 			continue
 		}
 
-		resourceChanges = append(resourceChanges,
+		changeSet = append(changeSet,
 			changes.ResourceChange{
 				Operation: changes.OperationCreate,
 				Create: &changes.CreateChange{
@@ -70,7 +71,7 @@ func (t preferencesMigration) Changes(ctx context.Context, client changes.Interf
 		)
 
 		for _, preferenceName := range v.resources {
-			resourceChanges = append(resourceChanges,
+			changeSet = append(changeSet,
 				changes.ResourceChange{
 					Operation: changes.OperationDelete,
 					Delete: &changes.DeleteChange{
@@ -86,13 +87,15 @@ func (t preferencesMigration) Changes(ctx context.Context, client changes.Interf
 					},
 				})
 		}
+
+		changeSets = append(changeSets, changeSet)
 	}
 
 	if migrationErr != nil {
 		return nil, migrationErr
 	}
 
-	return &migrations.MigrationChanges{Changes: []migrations.ChangeSet{resourceChanges}}, nil
+	return &migrations.MigrationChanges{Changes: changeSets}, nil
 }
 
 // Combine a set of preferences by user returning a map with the combined

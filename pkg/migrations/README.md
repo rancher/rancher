@@ -19,7 +19,12 @@ limiting of requests.
 applied to a cluster (which is what a `Migration` is), and applying changes to
 resources.
 
-`./preferences` is an example migration that can combine multiple `v3.Preference` resources into a single `ConfigMap` and removes the original `v3.Preference` resources.
+`./preferences` is an example migration that can combine multiple
+`v3.Preference` resources into a single `ConfigMap` and removes the original
+`v3.Preference` resources.
+
+Each user is modified as part of a ChangeSet which means that failures to modify
+one user's preferences doesn't impact on another user's changes.
 
 `./restrictedadmin` is an example migration that replaces GlobalRoleBindings
 that reference `restricted-admin` with `restricted-admin-replacement`.

@@ -33,6 +33,8 @@ func TestMigrationChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &migrations.MigrationChanges{
+		// Two ChangeSets one for user-dt7v1 and the other for user-xn8mf
+		// Each one creats a ConfigMap and cleans up the Preference resources.
 		Changes: []migrations.ChangeSet{
 			{
 				{
@@ -68,6 +70,8 @@ func TestMigrationChanges(t *testing.T) {
 						},
 					},
 				},
+			},
+			{
 				{
 					Operation: changes.OperationCreate,
 					Create: &changes.CreateChange{
