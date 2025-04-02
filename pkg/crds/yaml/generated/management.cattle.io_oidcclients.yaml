@@ -50,9 +50,8 @@ spec:
               the oidc client.
             properties:
               description:
-                description: |-
-                  Description provides additional context about the OIDC client.
-                  This field is optional.
+                description: Description provides additional context about the OIDC
+                  client.
                 type: string
               redirectURIs:
                 description: |-
