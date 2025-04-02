@@ -282,10 +282,10 @@ RUN zypper -n install libbtrfs-devel libgpgme-devel
 
 WORKDIR /src
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
-RUN --mount=type=cache,target=/root/.cache go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 COPY hack/airgap/ /src/
 
-RUN --mount=type=cache,target=/root/.cache go build -tags k3s_export -o export-images ./...
+RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
 
@@ -310,12 +310,12 @@ ENV GOCACHE=/root/.cache/go/cache
 COPY go.mod go.sum .
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
-RUN --mount=type=cache,target=/root/.cache go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 
 COPY pkg/ pkg/
 COPY main.go .
 
-RUN --mount=type=cache,target=/root/.cache GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
 FROM base
 
