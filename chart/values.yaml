@@ -68,7 +68,8 @@ ingress:
   # Certain ingress controllers will require the pathType or path to be set to a different value.
   pathType: ImplementationSpecific
   path: "/"
-  # backend port number
+  # Backend port number; should use either: 80, or 443.
+  # Must use 443 when `service.disableHTTP` is set to true.
   servicePort: 80
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
@@ -85,6 +86,9 @@ ingress:
 service:
   type: ""
   annotations: {}
+  # An optional security setting to disables the HTTP port of the rancher service
+  # When set true, you must also set `ingress.servicePort` to 443 and the appropriate ingress annotation to use HTTPS
+  disableHTTP: false
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
@@ -209,3 +213,35 @@ webhook: ""
 # helm values to use when installing the fleet chart.
 # helm values set here will override all other global values used when installing the fleet chart.
 fleet: ""
+
+# Create a dynamic manifests via values:
+# Beware: There will be no validation on these resource manifests in `extraObjects` - they must be valid k8s resources.
+# If you encounter issues installing/upgrading rancher while using these, please investigate these first.
+extraObjects: []
+# - apiVersion: "networking.k8s.io/v1"
+#   kind: NetworkPolicy
+#   metadata:
+#     name: allow-https-444-to-rancher
+#     namespace: your-namespace  # Change to the appropriate namespace
+#   spec:
+#     podSelector:
+#       matchLabels:
+#         app: rancher  # Selects pods labeled with "app: rancher"
+#     policyTypes:
+#       - Ingress  # Controls inbound traffic to the selected pods
+#     ingress:
+#       - ports:
+#           - protocol: TCP
+#             port: 444  # Allows only TCP traffic on port 444 (custom HTTPS port)
+#     # Since no other ingress rules are defined, all other traffic is denied by default.
+# - apiVersion: "networking.k8s.io/v1"
+#   kind: NetworkPolicy
+#   metadata:
+#     name: rancher-deny-ingress
+#     namespace: cattle-system
+#   spec:
+#     podSelector:
+#       matchLabels:
+#         app: rancher
+#     policyTypes:
+#       - Ingress
