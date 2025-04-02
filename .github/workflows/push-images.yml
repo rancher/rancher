@@ -1,0 +1,63 @@
+name: Push Server and agent images
+on:
+  workflow_call:
+jobs:
+  push-images:
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=2cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      REGISTRY: "stgregistry.suse.com"
+    steps:
+      - name: Environment variables
+        shell: bash
+        run: |
+          if [[ "$ARCH" == "x64" ]]; then
+            echo "ARCH=amd64" >> $GITHUB_ENV
+          fi
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download rancher image
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-${{ matrix.os }}-${{ env.ARCH }}"
+          path: /tmp
+          merge-multiple: true
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | STAGE_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | STAGE_REGISTRY_PASSWORD ;
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.STAGE_REGISTRY_USERNAME }}
+          password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: Push server image
+        run: |
+          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+          docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
+          docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
+      - name: Push agent image
+        run: |
+          image_agent_id=$(docker load --input /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_agent_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
+          docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}

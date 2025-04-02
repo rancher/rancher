@@ -1,0 +1,45 @@
+name: Hotfix Release
+on:
+  push:
+    tags:
+      - "v*-hotfix*"
+env:
+  COMMIT: ${{ github.sha }}
+  REGISTRY: "stgregistry.suse.com"
+  DOCKERIO_REGISTRY: "docker.io"
+  AWS_DEFAULT_REGION: "us-east-1"
+jobs:
+  unit-tests:
+    uses: ./.github/workflows/unit-test.yml
+  build-publish-chart:
+    needs: [push-images]
+    uses: ./.github/workflows/build-publish-chart.yml
+  build-server:
+    uses: ./.github/workflows/build-server.yml
+  build-agent:
+    needs: [build-server]
+    uses: ./.github/workflows/build-agent.yml
+  integration-tests:
+    needs: [build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
+  build-agent-windows:
+    uses: ./.github/workflows/build-agent-windows.yml
+  push-images:
+    needs: [unit-tests, integration-tests]
+    uses: ./.github/workflows/push-images.yml
+  merge-server-manifest:
+    needs: [push-images]
+    uses: ./.github/workflows/merge-server-manifest.yml
+  merge-agent-manifest:
+    needs: [push-images, build-agent-windows]
+    uses: ./.github/workflows/merge-agent-manifest.yml
+  build-installer:
+    needs: [build-publish-chart, merge-server-manifest]
+    uses: ./.github/workflows/build-installer.yml
+  merge-installer-manifest:
+    needs: [build-installer]
+    uses: ./.github/workflows/merge-installer-manifest.yml
+  create-images-files:
+    uses: ./.github/workflows/create-images-files.yml
