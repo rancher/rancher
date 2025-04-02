@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -61,7 +62,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	clientID := oidcClient.Status.ClientID
 
 	// generate client id
-	if oidcClient.Status.ClientID == "" {
+	if clientID == "" {
 		var err error
 		clientID, err = c.generator.GenerateClientID()
 		if err != nil {
@@ -69,10 +70,13 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 
 		clients, err := c.oidcClientCache.List(labels.Everything())
-		for _, client := range clients {
+		if slices.ContainsFunc(clients, func(client *v3.OIDCClient) bool {
 			if client.Status.ClientID == clientID {
-				return nil, fmt.Errorf("client id already exists")
+				return true
 			}
+			return false
+		}) {
+			return nil, fmt.Errorf("client id already exists")
 		}
 		patchData := map[string]interface{}{
 			"status": map[string]string{
