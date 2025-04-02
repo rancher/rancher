@@ -62,8 +62,10 @@ type TokenSpec struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 	// TTL is the time-to-live of the token, in milliseconds.
-	// The default, 30 days, is indicated by the value `0`.
-	// Setting a value < 0 indicates that the token should not expire.
+	// Setting a value < 0 represents +infinity, i.e. a token which does not expire.
+	// The default is indicated by the value `0`.
+	// This default is provided by the `auth-token-max-ttl-minutes` setting.
+	// Note that this default is also the maximum specifiable TTL.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an

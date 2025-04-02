@@ -17,8 +17,10 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	extcore "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -39,7 +41,6 @@ import (
 
 const (
 	TokenNamespace = "cattle-tokens"
-	ThirtyDays     = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds.
 	UserIDLabel    = "authn.management.cattle.io/token-userId"
 	KindLabel      = "authn.management.cattle.io/kind"
 	IsLogin        = "session"
@@ -684,7 +685,17 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		if ttlGreater(token.Spec.TTL, currentToken.Spec.TTL) {
+		ttl, err := clampMaxTTL(token.Spec.TTL)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token %s ttl: %w",
+				token.Name, err))
+		}
+		token.Spec.TTL = ttl
+
+		// Because of the clamping applied to new and current token we
+		// cannot have values < 0 (+infinity). A direct comparison of
+		// the values is ok.
+		if token.Spec.TTL > currentToken.Spec.TTL {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to extend time-to-live",
 				token.Name))
 		}
@@ -1236,13 +1247,14 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldOwnerReferences] = string(ownerBytes)
 
 	// spec values
-	// inject default on creation
-	ttl := token.Spec.TTL
-	if ttl == 0 {
-		ttl = ThirtyDays
-		// pass back to caller (Create)
-		token.Spec.TTL = ttl
+
+	// injects default on creation
+	ttl, err := clampMaxTTL(token.Spec.TTL)
+	if err != nil {
+		return nil, err
 	}
+	// pass back to caller (Create)
+	token.Spec.TTL = ttl
 
 	secret.StringData[FieldDescription] = token.Spec.Description
 	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", token.Spec.Enabled == nil || *token.Spec.Enabled)
@@ -1336,10 +1348,13 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	if err != nil {
 		return token, err
 	}
-	// inject default on retrieval
-	if ttl == 0 {
-		ttl = ThirtyDays
+
+	// clamp and inject default on retrieval
+	ttl, err = clampMaxTTL(ttl)
+	if err != nil {
+		return token, err
 	}
+
 	token.Spec.TTL = ttl
 
 	// status information
@@ -1368,41 +1383,6 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 
 	return token, nil
-}
-
-// ttlGreater compares the two TTL as and b. It returns true if a is greater than b.
-// Important special cases for TTL:
-// Any value < 0 represents +infinity.
-// A value of 0 represents 30 days.
-// A value > 0 is that many milliseconds
-func ttlGreater(a, b int64) bool {
-	// Decision table
-	//
-	// a   b   | note                           | result
-	// --------+--------------------------------+-------
-	// <0  <0  | both infinite, same            | false
-	// <0  >=0 | a infinite, b not, greater     | true
-	// >=0 <0  | b infinite, a not, less        | false
-	// >=0 >=0 | map 0 to 30d, rhegular compare | t/f
-
-	if a < 0 && b < 0 {
-		return false
-	}
-	if a < 0 && b >= 0 {
-		return true
-	}
-	if a >= 0 && b < 0 {
-		return false
-	}
-
-	if a == 0 {
-		a = ThirtyDays
-	}
-	if b == 0 {
-		b = ThirtyDays
-	}
-
-	return a > b
 }
 
 // decodeTime parses the byte-slice of the secret into a proper k8s timestamp.
@@ -1453,4 +1433,26 @@ func ensureNameOrGenerateName(token *ext.Token) error {
 	return apierrors.NewBadRequest(fmt.Sprintf(
 		"Token \"%s\" is invalid: metadata.name: Required value: name or generateName is required",
 		token.ObjectMeta.Name))
+}
+
+func clampMaxTTL(millis int64) (int64, error) {
+	max, err := maxTTL()
+	if err != nil {
+		return 0, err
+	}
+	// clamp. note that `millis < 0` represents +infinity, and `millis == 0` the default (max)
+	if millis > max || millis <= 0 {
+		return max, nil
+	}
+	return millis, nil
+}
+
+func maxTTL() (int64, error) {
+	maxTTL, err := tokens.ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
+	}
+
+	return maxTTL.Milliseconds(), nil
 }
