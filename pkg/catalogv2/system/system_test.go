@@ -12,7 +12,9 @@ import (
 	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/system/mocks"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/mock/gomock"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	v1 "k8s.io/api/core/v1"
@@ -655,6 +657,17 @@ func TestInstall(t *testing.T) {
 		})
 		contentMock, opsMock, podsMock, settingsMock, helmMock, clusterRepoMock :=
 			&mocks.ContentClient{}, &mocks.OperationClient{}, &mocks.PodClient{}, &mocks.SettingController{}, &mocks.HelmClient{}, &mocks.ClusterRepoController{}
+
+		ctrl := gomock.NewController(t)
+		mockClusterCache := fake.NewMockNonNamespacedCacheInterface[*catalog.ClusterRepo](ctrl)
+		mockClusterCache.EXPECT().Get("rancher-charts").Return(&catalog.ClusterRepo{
+			Status: catalog.RepoStatus{
+				Branch: "my-branch",
+				Commit: "my-commit",
+			},
+		}, nil).AnyTimes()
+
+		clusterRepoMock.On("Cache").Return(mockClusterCache)
 
 		contentMock.On("Index", "", "rancher-charts", "", true).Return(test.mocks.indexOutput, test.mocks.indexError)
 		helmMock.On("ListReleases", test.input.namespace, test.input.name, action.ListDeployed).Return(test.mocks.isInstalledReleasesOutput, test.mocks.isInstalledReleasesError)
