@@ -77,9 +77,9 @@ ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
 ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
-COPY --link --from=rancher /var/lib/rancher-data /var/lib/rancher-data
-COPY --link --from=rancher /usr/bin/tini /usr/bin/
-COPY --link --from=build /app/agent /usr/bin/
+COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
+COPY --from=rancher /usr/bin/tini /usr/bin/
+COPY --from=build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
