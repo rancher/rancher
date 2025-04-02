@@ -175,7 +175,7 @@ var (
 		true)
 	OIDCProvider = newFeature(
 		"oidc-provider",
-		"Provide an OIDC provider embedded in Rancher. Required to enable SSO in Rancher prime components.",
+		"Provide an OIDC provider embedded in Rancher. Required to enable SSO in Rancher Prime components.",
 		false,
 		false,
 		true)
