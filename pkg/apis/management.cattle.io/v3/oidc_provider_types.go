@@ -40,9 +40,8 @@ type OIDCClientStatus struct {
 
 // OIDCClient is a description of the oidc client.
 type OIDCClientSpec struct {
-	// +optional
 	// Description provides additional context about the OIDC client.
-	// This field is optional.
+	// +optional
 	Description string `json:"description,omitempty"`
 	// RedirectURIs defines the allowed redirect URIs for the OIDC client.
 	// These URIs must be registered and used during the authentication flow.
