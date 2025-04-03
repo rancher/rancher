@@ -5,6 +5,8 @@ go 1.23.0
 toolchain go1.23.4
 
 replace (
+	golang.org/x/net => golang.org/x/net v0.36.0 // CVE-2025-22870
+
 	k8s.io/api => k8s.io/api v0.30.10
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.30.10
 	k8s.io/apimachinery => k8s.io/apimachinery v0.30.10
@@ -28,7 +30,6 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.30.10
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.30.10
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.4.1
-
 )
 
 require (
