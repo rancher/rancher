@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
@@ -165,8 +166,15 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
 
 		go func() {
-			if err := sniProvider.Run(ctx.Done()); err != nil {
-				logrus.Errorf("sni provider failed: %s", err)
+			// sniProvider.Run uses a Watch that could be aborted due to external reasons, make sure we retry unless the context was already canceled
+			for {
+				if err := sniProvider.Run(ctx.Done()); err != nil {
+					logrus.Errorf("sni provider failed: %s", err)
+					if ctx.Err() != nil {
+						return
+					}
+				}
+				time.Sleep(10 * time.Second)
 			}
 		}()
 

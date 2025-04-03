@@ -212,28 +212,33 @@ func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create secret watcher: %w", err)
 	}
+	defer watcher.Stop()
 
 	if err := p.handleCert(); err != nil {
 		logrus.Error(err)
 	}
 
+	ticker := time.NewTicker(certCheckInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-stopChan:
 			logrus.Info("stopping imperative api cert rotator")
-
-			watcher.Stop()
 
 			if err := p.secrets.Delete(Namespace, p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
 				logrus.Error(err)
 			}
 
 			return nil
-		case <-time.After(certCheckInterval):
+		case <-ticker.C:
 			if err := p.handleCert(); err != nil {
 				logrus.Error(err)
 			}
-		case event := <-watcher.ResultChan():
+		case event, ok := <-watcher.ResultChan():
+			if !ok || event.Type == watch.Error {
+				logrus.Error("watcher channel closed: %v", err)
+				return nil
+			}
 			if err := p.handleCertEvent(event); err != nil {
 				logrus.Error(err)
 			}
