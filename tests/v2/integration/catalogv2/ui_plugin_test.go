@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
@@ -254,8 +253,52 @@ func (w *UIPluginTest) TestGetSingleUnauthorizedExtension() {
 	w.Require().Equal(res.StatusCode, http.StatusNotFound)
 }
 
+func (w *UIPluginTest) TestCompressedEndpoint() {
+	ts, err := StartUIPluginTgzServer()
+	if err != nil {
+		w.T().Fatal(err)
+	}
+	url := ts.URL
+
+	uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(context.TODO(), "homepage", metav1.GetOptions{})
+	w.Require().NoError(err)
+	uiplugin.Spec.Plugin.Endpoint = ""
+	uiplugin.Spec.Plugin.CompressedEndpoint = url
+	_, err = w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Update(context.TODO(), uiplugin, metav1.UpdateOptions{})
+	w.Require().NoError(err)
+
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}}
+	host := fmt.Sprintf("https://%s", w.client.RancherConfig.Host)
+	req, _ := http.NewRequest(http.MethodGet, host+"/v1/uiplugins/homepage/0.4.1/plugin/main.js", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "R_SESS",
+		Value: w.client.RancherConfig.AdminToken,
+	})
+
+	res, _ := client.Do(req)
+	w.Require().True(res.StatusCode == http.StatusOK || res.StatusCode == http.StatusTooEarly)
+
+	t := 360
+	err = kwait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, time.Duration(t)*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(ctx, "homepage", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if uiplugin.Spec.Plugin.CompressedEndpoint != url {
+			return false, nil
+		}
+		if uiplugin.Status.Ready {
+			return true, nil
+		}
+		return false, nil
+	})
+	w.Require().NoError(err)
+}
+
 func (w *UIPluginTest) TestExponentialBackoff() {
-	ts, err := StartUIPluginServer(w.T())
+	ts, err := StartUIPluginServer()
 	if err != nil {
 		w.T().Fatal(err)
 	}
@@ -266,6 +309,7 @@ func (w *UIPluginTest) TestExponentialBackoff() {
 		return
 	}
 	uiplugin.Spec.Plugin.Endpoint = url
+	uiplugin.Spec.Plugin.CompressedEndpoint = ""
 	_, err = w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Update(context.TODO(), uiplugin, metav1.UpdateOptions{})
 	if err != nil {
 		return
@@ -301,7 +345,26 @@ func (w *UIPluginTest) TestExponentialBackoff() {
 	w.Require().NoError(err)
 }
 
-func StartUIPluginServer(t assert.TestingT) (*httptest.Server, error) {
+func StartUIPluginTgzServer() (*httptest.Server, error) {
+
+	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "../../../testdata/uiext/0.4.1.tgz")
+	})
+
+	ts := httptest.NewUnstartedServer(customHandler)
+
+	ip := getOutboundIP()
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
+	if err != nil {
+		return nil, err
+	}
+	ts.Listener = listener
+	ts.Start()
+
+	return ts, nil
+}
+
+func StartUIPluginServer() (*httptest.Server, error) {
 	reqCount := 1
 
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
