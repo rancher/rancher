@@ -64,6 +64,8 @@ func main() {
 
 		initFeatures()
 
+		go clean.UnusedCattleCredentials()
+
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
