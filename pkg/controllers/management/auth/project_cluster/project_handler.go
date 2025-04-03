@@ -38,7 +38,7 @@ type projectLifecycle struct {
 	prtbClient           v3.ProjectRoleTemplateBindingController
 	rbLister             rbacv1.RoleBindingCache
 	roleBindings         rbacv1.RoleBindingController
-	systemAccountManager *systemaccount.Manager
+	systemAccountManager systemaccount.SystemAccountManager
 	crClient             rbacv1.ClusterRoleController
 }
 

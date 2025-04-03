@@ -49,6 +49,10 @@ func NewManagerFromScale(management *config.ScaledContext) *Manager {
 	}
 }
 
+type SystemAccountManager interface {
+	RemoveSystemAccount(userID string) error
+}
+
 type Manager struct {
 	userManager  user.Manager
 	systemTokens systemtokens.Interface
