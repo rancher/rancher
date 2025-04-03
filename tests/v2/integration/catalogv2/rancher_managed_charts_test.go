@@ -150,6 +150,7 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
+	w.Assert().Equal(app.Spec.Chart.Metadata.Version, "104.0.2+up1.9.0")
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 }
@@ -173,6 +174,7 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	// GETTING INDEX FROM CONFIGMAP AND MODIFYING IT
 	originalLatestVersion := w.updateConfigMap(cfgMap)
+	w.Require().Equal(originalLatestVersion, "104.0.2+up1.9.0")
 
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
@@ -180,6 +182,10 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	//KWait for config map to be updated
 	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, originalLatestVersion))
+
+	// Make sure that aks-operator is not installed.
+	_, err = w.catalogClient.Apps("cattle-system").Get(ctx, "rancher-aks-operator", metav1.GetOptions{})
+	w.Require().Error(err)
 
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
@@ -364,7 +370,9 @@ func (w *RancherManagedChartsTest) updateConfigMap(cfgMap *v1.ConfigMap) string 
 	w.Require().NoError(json.Unmarshal(data, index))
 	index.SortEntries()
 	latestVersion := index.Entries["rancher-aks-operator"][0].Version
+	w.Require().Equal(latestVersion, "104.0.2+up1.9.0")
 	index.Entries["rancher-aks-operator"] = index.Entries["rancher-aks-operator"][1:]
+	w.Require().Equal(index.Entries["rancher-aks-operator"][0].Version, "104.0.1+up1.9.0")
 	marshal, err := json.Marshal(index)
 	w.Require().NoError(err)
 	var compressedData bytes.Buffer
