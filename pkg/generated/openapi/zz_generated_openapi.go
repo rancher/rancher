@@ -324,7 +324,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 					},
 					"ttl": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TTL is the time-to-live of the token, in milliseconds. Setting a value < 0 represents +infinity, i.e. a token which does not expire. The default is indicated by the value `0`. This default is provided by the `auth-token-max-ttl-minutes` setting. Note that this default is also the maximum specifiable TTL.",
+							Description: "TTL is the time-to-live of the token, in milliseconds. Setting a value < 0 represents +infinity, i.e. a token which does not expire. The default is indicated by the value `0`. This default is provided by the `auth-token-max-ttl-minutes` setting. Note that this default is also the maximum specifiable TTL. A value <= 0 there enables non-expiring tokens.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",

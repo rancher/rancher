@@ -691,11 +691,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 				token.Name, err))
 		}
 		token.Spec.TTL = ttl
-
-		// Because of the clamping applied to new and current token we
-		// cannot have values < 0 (+infinity). A direct comparison of
-		// the values is ok.
-		if token.Spec.TTL > currentToken.Spec.TTL {
+		if ttlGreater(ttl, currentToken.Spec.TTL) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to extend time-to-live",
 				token.Name))
 		}
@@ -1435,16 +1431,34 @@ func ensureNameOrGenerateName(token *ext.Token) error {
 		token.ObjectMeta.Name))
 }
 
-func clampMaxTTL(millis int64) (int64, error) {
+func clampMaxTTL(ttl int64) (int64, error) {
 	max, err := maxTTL()
 	if err != nil {
 		return 0, err
 	}
-	// clamp. note that `millis < 0` represents +infinity, and `millis == 0` the default (max)
-	if millis > max || millis <= 0 {
+
+	// decision table
+	// max | ttl         | note                                        | result
+	// --- + ----------- + ------------------------------------------- + ----------------
+	// < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
+	// < 1 | = 0         | max = +inf = default, ttl default requested | -1 = +inf
+	// < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
+	// --- + ----------- + ------------------------------------------- + ----------------
+	// > 0 | < 0         | ttl = +inf, clamp to max                    | max
+	// > 0 | = 0         | ttl default requested, this is max          | max
+	// > 0 | > 0, <= max | less than max                               | ttl
+	// > 0 | > max       | clamp to max                                | max
+
+	if max < 1 {
+		if ttl == 0 {
+			return -1, nil
+		}
+		return ttl, nil
+	}
+	if ttl > max || ttl <= 0 {
 		return max, nil
 	}
-	return millis, nil
+	return ttl, nil
 }
 
 func maxTTL() (int64, error) {
@@ -1455,4 +1469,32 @@ func maxTTL() (int64, error) {
 	}
 
 	return maxTTL.Milliseconds(), nil
+}
+
+// ttlGreater compares the two TTL as and b. It returns true if a is greater than b.
+// Important special cases for TTL:
+// Any value < 0 represents +infinity.
+// A value > 0 is that many milliseconds.
+// The default of `0` cannot arrive here. `clampMaxTTL` resolved that already.
+func ttlGreater(a, b int64) bool {
+	// Decision table
+	//
+	// a   b   | note                           | result
+	// --------+--------------------------------+-------
+	// <0  <0  | both infinite, same            | false
+	// <0  >=0 | a infinite, b not, greater     | true
+	// >=0 <0  | b infinite, a not, less        | false
+	// >=0 >=0 | regular compare                | t/f
+
+	if a < 0 && b < 0 {
+		return false
+	}
+	if a < 0 && b >= 0 {
+		return true
+	}
+	if a >= 0 && b < 0 {
+		return false
+	}
+
+	return a > b
 }

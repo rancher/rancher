@@ -66,6 +66,7 @@ type TokenSpec struct {
 	// The default is indicated by the value `0`.
 	// This default is provided by the `auth-token-max-ttl-minutes` setting.
 	// Note that this default is also the maximum specifiable TTL.
+	// A value <= 0 there enables non-expiring tokens.
 	// +optional
 	TTL int64 `json:"ttl"`
 	// Enabled indicates an active token. The default (`null`) indicates an
