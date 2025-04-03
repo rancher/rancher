@@ -236,7 +236,7 @@ func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 			}
 		case event, ok := <-watcher.ResultChan():
 			if !ok || event.Type == watch.Error {
-				logrus.Error("watcher channel closed: %v", err)
+				logrus.Errorf("watcher channel closed: %v", err)
 				return nil
 			}
 			if err := p.handleCertEvent(event); err != nil {
