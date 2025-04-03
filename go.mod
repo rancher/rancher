@@ -1,8 +1,8 @@
 module github.com/rancher/rancher
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.22.5
+toolchain go1.24.0
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
@@ -78,7 +78,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0
-	github.com/coreos/go-oidc/v3 v3.5.0
+	github.com/coreos/go-oidc/v3 v3.13.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.4.14
@@ -137,12 +137,12 @@ require (
 	github.com/urfave/cli v1.22.15
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vmware/govmomi v0.42.0
-	golang.org/x/crypto v0.32.0
+	golang.org/x/crypto v0.36.0
 	golang.org/x/mod v0.22.0
-	golang.org/x/net v0.34.0
-	golang.org/x/oauth2 v0.25.0
-	golang.org/x/sync v0.10.0
-	golang.org/x/text v0.21.0
+	golang.org/x/net v0.37.0
+	golang.org/x/oauth2 v0.28.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/text v0.23.0
 	golang.org/x/tools v0.28.0 // indirect
 	google.golang.org/api v0.196.0
 	google.golang.org/grpc v1.66.0
@@ -193,7 +193,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/google/cel-go v0.16.1 // indirect
@@ -378,8 +378,8 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/term v0.28.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1 // indirect
