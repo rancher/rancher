@@ -8,6 +8,7 @@ replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.25+incompatible // rancher-machine requires a repalce is set
+	github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2 // CVE-2025-30204
 
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/manicminer/hamilton v0.46.0 => github.com/rancher/hamilton v0.0.0-20240507075902-326692ab84f7
