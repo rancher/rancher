@@ -2,6 +2,7 @@ package project_cluster
 
 import (
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -112,4 +113,43 @@ func TestReconcileProjectCreatorRTBNoCreatorRBAC(t *testing.T) {
 	obj, err := lifecycle.reconcileProjectCreatorRTB(project)
 	assert.NoError(t, err)
 	assert.NotNil(t, obj)
+}
+
+// fakeSystemAccountManager is a fake implementation of systemaccount.SystemAccountManager.
+type fakeSystemAccountManager struct {
+	removedIDs []string
+	removeErr  error
+}
+
+// RemoveSystemAccount records the removal and returns a simulated error if set.
+func (f *fakeSystemAccountManager) RemoveSystemAccount(projectID string) error {
+	f.removedIDs = append(f.removedIDs, projectID)
+	return f.removeErr
+}
+
+// Test deletion of system account created for this project when Sync is called
+func TestSyncDeleteSystemUser(t *testing.T) {
+	sysMgr := &fakeSystemAccountManager{}
+	// Create a project with a deletion timestamp.
+	now := v1.NewTime(time.Now())
+	proj := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:              "p-deleted",
+			Namespace:         clusterID,
+			DeletionTimestamp: &now,
+		},
+	}
+
+	// Instantiate lifecycle with the fake system account manager.
+	lifecycle := &projectLifecycle{
+		systemAccountManager: sysMgr,
+	}
+
+	// Use a key of format "clusterID/projectID".
+	key := clusterID + "/p-deleted"
+	obj, err := lifecycle.Sync(key, proj)
+	require.NoError(t, err)
+	require.Nil(t, obj)
+	// Check that RemoveSystemAccount was called with the correct projectID.
+	assert.Contains(t, sysMgr.removedIDs, "p-deleted")
 }
