@@ -372,7 +372,7 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 	// 1. If the server version does not contain the "head" substring. If "head" is present, it means the server is not a released version.
 	// 2. If the server version matches the releasePattern. A valid release version should start with "v" followed by a single digit, such as v1, v2, v3, etc.
 	// If the server is not a released version (settings.IsRelease() returns false) or if skipFilter is true, it returns the current index.
-	if !settings.IsRelease() || skipFilter {
+	if settings.ServerVersion.Get() == "dev" || skipFilter {
 		return index
 	}
 
