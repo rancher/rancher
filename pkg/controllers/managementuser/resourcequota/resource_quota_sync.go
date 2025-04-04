@@ -456,31 +456,35 @@ func completeQuota(requestedQuota *v32.ResourceQuotaLimit, defaultQuota *v32.Res
 	return toReturn, err
 }
 
-func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.ContainerResourceLimit) (*v32.ContainerResourceLimit, error) {
-	if defaultLimit == nil {
+func completeLimit(nsLimit *v32.ContainerResourceLimit, projectLimit *v32.ContainerResourceLimit) (*v32.ContainerResourceLimit, error) {
+	if projectLimit == nil {
 		return nil, nil
 	}
-	existingLimitMap, err := convert.EncodeToMap(existingLimit)
+
+	nsLimitMap, err := convert.EncodeToMap(nsLimit)
 	if err != nil {
 		return nil, err
 	}
-	newLimitMap, err := convert.EncodeToMap(defaultLimit)
+
+	projectLimitMap, err := convert.EncodeToMap(projectLimit)
 	if err != nil {
 		return nil, err
 	}
-	for key, value := range existingLimitMap {
-		if _, ok := newLimitMap[key]; ok {
-			newLimitMap[key] = value
+
+	if reflect.DeepEqual(nsLimitMap, projectLimitMap) {
+		return nil, nil
+	}
+
+	// project values are mostly default values
+	for key, value := range projectLimitMap {
+		if _, ok := nsLimitMap[key]; !ok {
+			nsLimitMap[key] = value
 		}
 	}
 
-	if reflect.DeepEqual(existingLimitMap, newLimitMap) {
-		return nil, nil
-	}
-
-	newLimit := &v32.ContainerResourceLimit{}
-	err = convert.ToObj(newLimitMap, newLimit)
-	return newLimit, err
+	resultingLimit := &v32.ContainerResourceLimit{}
+	err = convert.ToObj(nsLimitMap, resultingLimit)
+	return resultingLimit, err
 }
 
 // zeroOutResourceQuotaLimit takes a resource quota limit and a list of resources exceeding the quota,
