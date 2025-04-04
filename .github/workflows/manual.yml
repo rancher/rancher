@@ -11,7 +11,7 @@ on:
 jobs:
   port-issue:
     runs-on: ubuntu-latest
-    if: contains(github.event.comment.body, '/backport') || contains(github.event.comment.body, '/forwardport')
+    if: startsWith(github.event.comment.body, '/backport') || startsWith(github.event.comment.body, '/forwardport')
     steps:
       - name: Check org membership
         env:
