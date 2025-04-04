@@ -1291,43 +1291,43 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 
 	// system - kubernetes uid
 	if token.ObjectMeta.UID = types.UID(string(secret.Data[FieldUID])); token.ObjectMeta.UID == "" {
-		return token, fmt.Errorf("kube uid missing")
+		return nil, fmt.Errorf("kube uid missing")
 	}
 
 	// system - finalizers - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldFinalizers], &token.Finalizers); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// system - owner references - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldOwnerReferences], &token.OwnerReferences); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// system - labels - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldLabels], &token.Labels); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// system - annotations - decode the fields and place into the token
 	if err := json.Unmarshal(secret.Data[FieldAnnotations], &token.Annotations); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// spec - user id, required
 	if token.Spec.UserID = string(secret.Data[FieldUserID]); token.Spec.UserID == "" {
-		return token, fmt.Errorf("user id missing")
+		return nil, fmt.Errorf("user id missing")
 	}
 
 	// spec - user principal, required
 	if err := json.Unmarshal(secret.Data[FieldPrincipal], &token.Spec.UserPrincipal); err != nil {
-		return token, err
+		return nil, err
 	}
 	if token.Spec.UserPrincipal.Name == "" {
-		return token, fmt.Errorf("principal id missing")
+		return nil, fmt.Errorf("principal id missing")
 	}
 	if token.Spec.UserPrincipal.Provider == "" {
-		return token, fmt.Errorf("auth provider missing")
+		return nil, fmt.Errorf("auth provider missing")
 	}
 
 	// spec - optional elements
@@ -1336,46 +1336,46 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 
 	enabled, err := strconv.ParseBool(string(secret.Data[FieldEnabled]))
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 	token.Spec.Enabled = &enabled
 
 	ttl, err := strconv.ParseInt(string(secret.Data[FieldTTL]), 10, 64)
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// clamp and inject default on retrieval
 	ttl, err = clampMaxTTL(ttl)
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 
 	token.Spec.TTL = ttl
 
 	// status information
 	if token.Status.Hash = string(secret.Data[FieldHash]); token.Status.Hash == "" {
-		return token, fmt.Errorf("token hash missing")
+		return nil, fmt.Errorf("token hash missing")
 	}
 
 	if token.Status.LastUpdateTime = string(secret.Data[FieldLastUpdateTime]); token.Status.LastUpdateTime == "" {
-		return token, fmt.Errorf("last update time missing")
+		return nil, fmt.Errorf("last update time missing")
 	}
 
 	lastUsedAt, err := decodeTime("lastUsedAt", secret.Data[FieldLastUsedAt])
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 	token.Status.LastUsedAt = lastUsedAt
 
 	lastActivitySeen, err := decodeTime("lastActivitySeen", secret.Data[FieldLastActivitySeen])
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 	token.Status.LastActivitySeen = lastActivitySeen
 
 	if err := setExpired(token); err != nil {
-		return token, fmt.Errorf("failed to set expiration information: %w", err)
+		return nil, fmt.Errorf("failed to set expiration information: %w", err)
 	}
 
 	return token, nil
