@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -141,6 +142,13 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 
 	w.Require().NoError(w.updateManagementCluster())
+
+	pods, err := w.corev1.Pods("cattle-system").List(ctx, metav1.ListOptions{})
+	w.Require().NoError(err)
+	for _, pod := range pods.Items {
+		fmt.Printf("Pod Name: %s, Status: %s\n", pod.Name, pod.Status.Phase)
+	}
+
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
 
@@ -387,6 +395,7 @@ func (w *RancherManagedChartsTest) waitForAksChart(status rv1.Status, name strin
 	var at time.Time
 	err := kwait.Poll(PollInterval, time.Duration(t)*time.Second, func() (done bool, err error) {
 		app, err = w.catalogClient.Apps("cattle-system").Get(context.TODO(), name, metav1.GetOptions{})
+		fmt.Println("App: ", app)
 		e, ok := err.(*errors.StatusError)
 		if ok && errors.IsNotFound(e) {
 			return false, nil
