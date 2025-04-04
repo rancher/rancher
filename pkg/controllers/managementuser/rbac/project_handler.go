@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -26,23 +27,79 @@ type pLifecycle struct {
 	m *manager
 }
 
+const updatePSAVerb = "updatepsa"
+
 func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 	for verb, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 		_, err := p.m.crLister.Get("", roleName)
+		// skip if clusterroles for project have already been created.
 		if err == nil || !apierrors.IsNotFound(err) {
 			continue
 		}
 
-		err = p.m.createProjectNSRole(roleName, verb, "", project.Name)
+		var psa bool
+		// here we ensure that the requisites to add updatepsa rule are met.
+		if suffix == projectNSVerbToSuffix[projectNSEditVerb] {
+			rt, err := p.rtLookup(project.Name)
+			if err != nil {
+				return project, err
+			}
+			psa = isUpdatepsaAllowed(rt, project.Name)
+		}
+
+		err = p.m.createProjectNSRole(roleName, verb, "", project.Name, psa)
 		if err != nil {
 			return project, err
 		}
-
 	}
 
 	err := p.ensureNamespacesAssigned(project)
 	return project, err
+}
+
+// rtLookup retrieves the roletemplate associated with the given project.
+func (p *pLifecycle) rtLookup(projectName string) (*v32.RoleTemplate, error) {
+	prtbs, err := p.m.prtbLister.List(projectName, labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	if len(prtbs) == 0 {
+		return nil, fmt.Errorf("unable to list projectroletemplatebindings")
+	}
+	var rt string
+	for _, prtb := range prtbs {
+		// since prtbs are usually 2 (creator-project-owner and prtb-xxxxx),
+		// we just want the one that starts with "prtb-"
+		if prtb.Namespace == projectName && strings.HasPrefix(prtb.Name, "prtb-") {
+			rt = prtb.RoleTemplateName
+		}
+	}
+	if rt == "" {
+		return nil, fmt.Errorf("unable to find roletemplate")
+	}
+	roleTemplate, err := p.m.rtLister.Get("", rt)
+	if err != nil {
+		return nil, err
+	}
+	if roleTemplate.Context != "project" {
+		return nil, fmt.Errorf("roletemplate must have context of type 'project'")
+	}
+	return roleTemplate, nil
+}
+
+// isUpdatepsaAllowed verify that updatepsa verb is allowed in the projectroletemplate.
+func isUpdatepsaAllowed(prt *v32.RoleTemplate, projectName string) bool {
+	return rbac.RulesAllow(
+		&authorizer.AttributesRecord{
+			Verb:            updatePSAVerb,
+			APIGroup:        management.GroupName,
+			Resource:        v32.ProjectResourceName,
+			Name:            projectName,
+			ResourceRequest: true,
+		},
+		prt.Rules...,
+	)
 }
 
 func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
@@ -142,7 +199,7 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 	cr, err := p.m.crLister.Get("", roleName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return p.m.createProjectNSRole(roleName, projectNSEditVerb, "", project.Name)
+			return p.m.createProjectNSRole(roleName, projectNSEditVerb, "", project.Name, false)
 		}
 		return fmt.Errorf("unable to get backing cluster role for project %s: %w", project.Name, err)
 	}
@@ -159,10 +216,10 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 		// only add the manageNS permission so that we don't overwrite the other permissions dynamically given by the
 		// namespace_handler
 		cr = addManageNSPermission(cr, project.Name)
-		_, err = p.m.clusterRoles.Update(cr)
-		if err != nil {
-			return fmt.Errorf("unable to update backing cluster role for project %s: %w", project.Name, err)
-		}
+	}
+	_, err = p.m.clusterRoles.Update(cr)
+	if err != nil {
+		return fmt.Errorf("unable to update backing cluster role for project %s: %w", project.Name, err)
 	}
 	return nil
 }
