@@ -1471,7 +1471,7 @@ func maxTTL() (int64, error) {
 	return maxTTL.Milliseconds(), nil
 }
 
-// ttlGreater compares the two TTL as and b. It returns true if a is greater than b.
+// ttlGreater compares the two TTL a and b. It returns true if a is greater than b.
 // Important special cases for TTL:
 // Any value < 0 represents +infinity.
 // A value > 0 is that many milliseconds.
