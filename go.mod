@@ -2,7 +2,7 @@ module github.com/rancher/rancher
 
 go 1.23.0
 
-toolchain go1.24.0
+toolchain go1.23.7
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
