@@ -339,7 +339,7 @@ func TestIsInstalledExactVersion(t *testing.T) {
 		},
 		{
 			name:           "exact matches current",
-			desiredVersion: "1.0.0",
+			desiredVersion: "1.0.0+up4.5.6-rc.9",
 			desiredValues:  nil,
 			isExact:        true,
 
@@ -350,19 +350,30 @@ func TestIsInstalledExactVersion(t *testing.T) {
 		},
 		{
 			name:           "exact matches current but values changed and got merged",
-			desiredVersion: "1.0.0",
+			desiredVersion: "1.0.0+up4.5.6-rc.9",
 			desiredValues: map[string]any{
 				"foo": "bar",
 			},
 			isExact: true,
 
 			expectedInstalled: false,
-			expectedVersion:   "1.0.0",
+			expectedVersion:   "1.0.0+up4.5.6-rc.9",
 			expectedValues: map[string]any{
 				"name": "Pablo",
 				"foo":  "bar",
 			},
 			expectedErr: false,
+		},
+		{
+			name:           "exact has different metadata than current",
+			desiredVersion: "1.0.0+up4.5.6-rc.10",
+			desiredValues:  standardValues,
+			isExact:        true,
+
+			expectedInstalled: false,
+			expectedVersion:   "1.0.0+up4.5.6-rc.10",
+			expectedValues:    standardValues,
+			expectedErr:       false,
 		},
 	}
 
@@ -372,7 +383,7 @@ func TestIsInstalledExactVersion(t *testing.T) {
 			Info: &release.Info{Status: release.StatusDeployed},
 			Chart: &chart.Chart{
 				Metadata: &chart.Metadata{
-					Version: "1.0.0",
+					Version: "1.0.0+up4.5.6-rc.9",
 				},
 			},
 			Config: standardValues,
