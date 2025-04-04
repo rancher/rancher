@@ -1244,12 +1244,12 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 
 	// spec values
 
-	// injects default on creation
+	// injects default on creation and update
 	ttl, err := clampMaxTTL(token.Spec.TTL)
 	if err != nil {
 		return nil, err
 	}
-	// pass back to caller (Create)
+	// pass back to caller (Create, Update)
 	token.Spec.TTL = ttl
 
 	secret.StringData[FieldDescription] = token.Spec.Description
@@ -1344,13 +1344,6 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// clamp and inject default on retrieval
-	ttl, err = clampMaxTTL(ttl)
-	if err != nil {
-		return nil, err
-	}
-
 	token.Spec.TTL = ttl
 
 	// status information
