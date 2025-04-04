@@ -20,10 +20,8 @@ import (
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/session"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -112,8 +110,8 @@ func (w *RancherManagedChartsTest) resetSettings() {
 		return true, nil
 	})
 	w.Require().NoError(err)
-	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-aks-operator"))
-	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-aks-operator-crd"))
+	w.uninstallApp("cattle-system", "rancher-aks-operator")
+	w.uninstallApp("cattle-system", "rancher-aks-operator-crd")
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
 	if clusterRepo.Spec.GitRepo != w.originalGitRepo {
@@ -144,12 +142,20 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 
 	w.Require().NoError(w.updateManagementCluster())
+
+	pods, err := w.corev1.Pods("cattle-system").List(ctx, metav1.ListOptions{})
+	w.Require().NoError(err)
+	for _, pod := range pods.Items {
+		fmt.Printf("Pod Name: %s, Status: %s\n", pod.Name, pod.Status.Phase)
+	}
+
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
 
 	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
+	w.Assert().Equal(app.Spec.Chart.Metadata.Version, "104.0.2+up1.9.0")
 	w.Require().Nil(app.Spec.Values)
 	w.Require().Nil(app.Spec.Chart.Values)
 }
@@ -173,6 +179,7 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	// GETTING INDEX FROM CONFIGMAP AND MODIFYING IT
 	originalLatestVersion := w.updateConfigMap(cfgMap)
+	w.Require().Equal(originalLatestVersion, "104.0.2+up1.9.0")
 
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
@@ -180,6 +187,10 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	//KWait for config map to be updated
 	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, originalLatestVersion))
+
+	// Make sure that aks-operator is not installed.
+	_, err = w.catalogClient.Apps("cattle-system").Get(ctx, "rancher-aks-operator", metav1.GetOptions{})
+	w.Require().Error(err)
 
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
@@ -364,7 +375,9 @@ func (w *RancherManagedChartsTest) updateConfigMap(cfgMap *v1.ConfigMap) string 
 	w.Require().NoError(json.Unmarshal(data, index))
 	index.SortEntries()
 	latestVersion := index.Entries["rancher-aks-operator"][0].Version
+	w.Require().Equal(latestVersion, "104.0.2+up1.9.0")
 	index.Entries["rancher-aks-operator"] = index.Entries["rancher-aks-operator"][1:]
+	w.Require().Equal(index.Entries["rancher-aks-operator"][0].Version, "104.0.1+up1.9.0")
 	marshal, err := json.Marshal(index)
 	w.Require().NoError(err)
 	var compressedData bytes.Buffer
@@ -382,6 +395,7 @@ func (w *RancherManagedChartsTest) waitForAksChart(status rv1.Status, name strin
 	var at time.Time
 	err := kwait.Poll(PollInterval, time.Duration(t)*time.Second, func() (done bool, err error) {
 		app, err = w.catalogClient.Apps("cattle-system").Get(context.TODO(), name, metav1.GetOptions{})
+		fmt.Println("App: ", app)
 		e, ok := err.(*errors.StatusError)
 		if ok && errors.IsNotFound(e) {
 			return false, nil
@@ -442,33 +456,9 @@ func (w *RancherManagedChartsTest) updateSetting(name, value string) error {
 	return err
 }
 
-func (w *RancherManagedChartsTest) uninstallApp(namespace, chartName string) error {
-	var cfg action.Configuration
-	if err := cfg.Init(w.restClientGetter, namespace, "", logrus.Infof); err != nil {
-		return err
-	}
-	l := action.NewList(&cfg)
-	l.All = true
-	l.SetStateMask()
-	releases, err := l.Run()
-	if err != nil {
-		return fmt.Errorf("failed to fetch all releases in the %s namespace: %w", namespace, err)
-	}
-	for _, r := range releases {
-		if r.Chart.Name() == chartName {
-			err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
-				act := action.NewUninstall(&cfg)
-				act.Wait = true
-				act.Timeout = time.Minute
-				if _, err = act.Run(r.Name); err != nil {
-					return false, nil
-				}
-				return true, nil
-			})
-			w.Require().NoError(err)
-		}
-	}
-	return nil
+func (w *RancherManagedChartsTest) uninstallApp(namespace, appName string) {
+	err := w.catalogClient.Apps(namespace).Delete(context.Background(), appName, metav1.DeleteOptions{})
+	w.Require().Error(err)
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
