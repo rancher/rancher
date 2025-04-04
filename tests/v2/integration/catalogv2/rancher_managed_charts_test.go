@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -20,10 +19,8 @@ import (
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/session"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -112,8 +109,8 @@ func (w *RancherManagedChartsTest) resetSettings() {
 		return true, nil
 	})
 	w.Require().NoError(err)
-	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-aks-operator"))
-	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-aks-operator-crd"))
+	w.uninstallApp("cattle-system", "rancher-aks-operator")
+	w.uninstallApp("cattle-system", "rancher-aks-operator-crd")
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
 	if clusterRepo.Spec.GitRepo != w.originalGitRepo {
@@ -450,33 +447,9 @@ func (w *RancherManagedChartsTest) updateSetting(name, value string) error {
 	return err
 }
 
-func (w *RancherManagedChartsTest) uninstallApp(namespace, chartName string) error {
-	var cfg action.Configuration
-	if err := cfg.Init(w.restClientGetter, namespace, "", logrus.Infof); err != nil {
-		return err
-	}
-	l := action.NewList(&cfg)
-	l.All = true
-	l.SetStateMask()
-	releases, err := l.Run()
-	if err != nil {
-		return fmt.Errorf("failed to fetch all releases in the %s namespace: %w", namespace, err)
-	}
-	for _, r := range releases {
-		if r.Chart.Name() == chartName {
-			err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
-				act := action.NewUninstall(&cfg)
-				act.Wait = true
-				act.Timeout = time.Minute
-				if _, err = act.Run(r.Name); err != nil {
-					return false, nil
-				}
-				return true, nil
-			})
-			w.Require().NoError(err)
-		}
-	}
-	return nil
+func (w *RancherManagedChartsTest) uninstallApp(namespace, appName string) {
+	err := w.catalogClient.Apps(namespace).Delete(context.Background(), appName, metav1.DeleteOptions{})
+	w.Require().Error(err)
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
