@@ -12,6 +12,177 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+func TestCompleteLimit(t *testing.T) {
+	type input struct {
+		nsValues      *v32.ContainerResourceLimit
+		projectValues *v32.ContainerResourceLimit
+	}
+
+	type expected struct {
+		expected *v32.ContainerResourceLimit
+		err      error
+	}
+
+	testCases := []struct {
+		name     string
+		input    input
+		expected expected
+	}{
+		{
+			name: "limits not set in project",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				projectValues: &v32.ContainerResourceLimit{},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "limits set in project - namespace setting equal values",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				projectValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+			},
+			expected: expected{
+				expected: nil,
+				err:      nil,
+			},
+		},
+		{
+			name: "limits set in namespace and in project",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				projectValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1200m",
+					LimitsMemory: "512Mi",
+				},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "limits set in namespace and requests set in project",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+				projectValues: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+				},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+					LimitsCPU:      "1000m",
+					LimitsMemory:   "256Mi",
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "requests set in namespace and limits in project",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+				},
+				projectValues: &v32.ContainerResourceLimit{
+					LimitsCPU:    "1000m",
+					LimitsMemory: "256Mi",
+				},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+					LimitsCPU:      "1000m",
+					LimitsMemory:   "256Mi",
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "requests and limits set in both",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+					LimitsCPU:      "2000m",
+					LimitsMemory:   "1Gi",
+				},
+				projectValues: &v32.ContainerResourceLimit{
+					RequestsCPU:    "200m",
+					RequestsMemory: "256Mi",
+					LimitsCPU:      "1000m",
+					LimitsMemory:   "512Mi",
+				},
+			},
+			expected: expected{
+				expected: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+					LimitsCPU:      "2000m",
+					LimitsMemory:   "1Gi",
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "project values are null",
+			input: input{
+				nsValues: &v32.ContainerResourceLimit{
+					RequestsCPU:    "100m",
+					RequestsMemory: "128Mi",
+					LimitsCPU:      "2000m",
+					LimitsMemory:   "1Gi",
+				},
+				projectValues: nil,
+			},
+			expected: expected{
+				expected: nil,
+				err:      nil,
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := completeLimit(tt.input.nsValues, tt.input.projectValues)
+			if tt.expected.err != nil {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.Equal(t, tt.expected.expected, res)
+		})
+	}
+}
+
 func TestLimitsChanged(t *testing.T) {
 
 	tests := []struct {
