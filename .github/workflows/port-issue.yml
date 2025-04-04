@@ -1,5 +1,3 @@
-# This is a basic workflow that is manually triggered
-
 name: Port issue
 run-name: "Port issue ${{ github.event.issue.number }}: ${{ github.event.issue.title }}"
 
@@ -11,11 +9,11 @@ on:
 jobs:
   port-issue:
     runs-on: ubuntu-latest
-    if: contains(github.event.comment.body, '/backport') || contains(github.event.comment.body, '/forwardport')
+    if: startsWith(github.event.comment.body, '/backport') || startsWith(github.event.comment.body, '/forwardport')
     steps:
       - name: Check org membership
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
         run: |
           if gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -e --arg GITHUB_ACTOR "$GITHUB_ACTOR" '.[] | select(.login == $GITHUB_ACTOR)' > /dev/null; then
               echo "${GITHUB_ACTOR} is a member"
@@ -27,7 +25,7 @@ jobs:
       - name: Check milestone
         if: env.is_member == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
           ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
@@ -47,7 +45,7 @@ jobs:
           env.is_member == 'true' &&
           env.milestone_exists == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
           ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
