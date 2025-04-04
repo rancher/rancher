@@ -666,6 +666,11 @@ func TestInstall(t *testing.T) {
 		}
 		manager, _ := NewManager(context.TODO(), contentMock, opsMock, podsMock, settingsMock, clusterRepoMock, helmMock)
 		err := manager.install(test.input.namespace, test.input.name, test.input.minVersion, test.input.exactVersion, test.input.values, test.input.takeOwnership, test.input.installImageOverride)
-		asserts.Equal(test.expected, err, test.name)
+		if test.expected == nil {
+			asserts.Nil(err, test.name)
+		} else {
+			assert.NotNil(t, err, test.name)
+			asserts.Equal(test.expected.Error(), err.Error(), test.name)
+		}
 	}
 }

@@ -291,8 +291,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	// It instead returns the latest version in the index.
 	chart, err := index.Get(name, v)
 	if err != nil {
-		// The helm library is using github.com/pkg/errors which is deprecated
-		return fmt.Errorf(err.Error())
+		return err
 	}
 	// Because of the behavior of `index.Get`, we need this check.
 	if v != latestVersionMatcher && chart.Version != v {

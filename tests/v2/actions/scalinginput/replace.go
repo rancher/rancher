@@ -80,7 +80,7 @@ func ReplaceNodes(client *rancher.Client, clusterName string, isEtcd bool, isCon
 			return err
 		}
 
-		logrus.Infof("Deleting node: " + nodesToDelete[i].NodeName)
+		logrus.Info("Deleting node: " + nodesToDelete[i].NodeName)
 		err = client.Steve.SteveType(machineSteveResourceType).Delete(machineToDelete)
 		if err != nil {
 			return err

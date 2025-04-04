@@ -191,14 +191,14 @@ func (handler *handler) extractCreds(req *http.Request, creds *Credentials) (int
 		// Get credentials from body
 		raw, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			logrus.Debugf("[oci-handler] cannot read request body: " + err.Error())
-			return httperror.InvalidBodyContent.Status, fmt.Errorf("cannot read request body: " + err.Error())
+			logrus.Debugf("[oci-handler] cannot read request body: %s", err)
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cannot read request body: %w", err)
 		}
 
 		err = json.Unmarshal(raw, &creds)
 		if err != nil {
-			logrus.Debugf("[oci-handler] cannot parse request body: " + err.Error())
-			return httperror.InvalidBodyContent.Status, fmt.Errorf("cannot parse request body: " + err.Error())
+			logrus.Debugf("[oci-handler] cannot parse request body: %s", err)
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cannot parse request body: %w", err)
 		}
 	} else {
 		return httperror.Unauthorized.Status, fmt.Errorf("cannot access OCI API without credentials to authenticate")

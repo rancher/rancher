@@ -6,9 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"time"
 
+	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -201,7 +201,7 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 			!conditions.IsFalse(machine, condition) ||
 			conditions.GetReason(machine, condition) != "Error") {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as false", machine.Namespace, machine.Name)
-		conditions.MarkFalse(machine, condition, "Error", capi.ConditionSeverityError, planAppliedErr.Error())
+		conditions.MarkFalse(machine, condition, "Error", capi.ConditionSeverityError, "%s", planAppliedErr.Error())
 		needsUpdate = true
 	} else if planAppliedErr == nil && !conditions.IsTrue(machine, condition) {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as true", machine.Namespace, machine.Name)
