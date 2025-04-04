@@ -45,13 +45,13 @@ check_go() {
 # Install Go with retries
 install_go() {
     mkdir -p $CACHE_DIR
-    GO_ARCHIVE="$CACHE_DIR/go1.23.5.linux-amd64.tar.gz"
+    GO_ARCHIVE="$CACHE_DIR/go1.23.7.linux-amd64.tar.gz"
 
     for i in $(seq 1 $MAX_RETRIES); do
         log "Attempting to install Go (attempt $i of $MAX_RETRIES)..."
 
         if [ ! -f "$GO_ARCHIVE" ]; then
-            if ! curl -L -o "$GO_ARCHIVE" https://go.dev/dl/go1.23.5.linux-amd64.tar.gz --insecure; then
+            if ! curl -L -o "$GO_ARCHIVE" https://go.dev/dl/go1.23.7.linux-amd64.tar.gz --insecure; then
                 error "Failed to download Go (attempt $i)"
                 continue
             fi
