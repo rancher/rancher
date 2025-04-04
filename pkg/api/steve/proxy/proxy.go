@@ -213,14 +213,15 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 }
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {
+	ht := http.DefaultTransport.(*http.Transport).Clone()
+	ht.Proxy = nil
+	ht.DialContext = h.dialer
 	cfg := &rest.Config{
 		// this is bogus, the dialer will change it to 127.0.0.1:6080, but the clusterID is used to lookup the tunnel
 		// connect
 		Host:      "http://" + clusterID,
 		UserAgent: rest.DefaultKubernetesUserAgent() + " cluster " + clusterID,
-		Transport: &http.Transport{
-			DialContext: h.dialer,
-		},
+		Transport: ht,
 	}
 
 	next := proxy.ImpersonatingHandler(prefix, cfg)
