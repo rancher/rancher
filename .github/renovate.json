@@ -1,11 +1,29 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "github>rancher/renovate-config#release"
+    "github>rancher/renovate-config//rancher-main#release"
   ],
   "baseBranches": [
+    "main",
+    "release/v2.11",
+    "release/v2.10",
     "release/v2.9"
   ],
   "prHourlyLimit": 2,
   "prConcurrentLimit": 4,
-  "prCreation": "status-success"
+  "prCreation": "status-success",
+  "packageRules": [
+    {
+      "matchBaseBranches": ["release/v2.11"],
+      "extends": ["github>rancher/renovate-config//rancher-2.11#release"]
+    },
+    {
+      "matchBaseBranches": ["release/v2.10"],
+      "extends": ["github>rancher/renovate-config//rancher-2.10#release"]
+    },
+    {
+      "matchBaseBranches": ["release/v2.9"],
+      "extends": ["github>rancher/renovate-config//rancher-2.9#release"]
+    }
+  ]
 }
