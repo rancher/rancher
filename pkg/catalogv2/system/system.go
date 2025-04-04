@@ -488,7 +488,7 @@ func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVer
 		}
 
 		if isExact {
-			if !current.Equal(desired) {
+			if !isVersionAndMetadataEqual(current, desired) {
 				return false, desired.String(), desiredValues, nil
 			}
 		}
@@ -517,6 +517,17 @@ func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVer
 		}
 	}
 	return false, desiredVersion, desiredValues, nil
+}
+
+// isVersionAndMetadataEqual is like [semver.Version.Equal] but it also checks whether
+// the metadata is the same.
+//
+// This makes it so that 1.2.3+up4.5.6-rc.1 is not the same as 1.2.3+up4.5.6-rc.2
+// because semver ignores anything after the + sign.
+//
+// Some background on why [semver.Version.Equal] behaves this way: https://github.com/semver/semver/issues/136
+func isVersionAndMetadataEqual(v1, v2 *semver.Version) bool {
+	return v1.Equal(v2) && v1.Metadata() == v2.Metadata()
 }
 
 // hasStatus gets all releases in the given namespace that matches the given name and stateMask and
