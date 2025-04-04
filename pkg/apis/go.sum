@@ -93,8 +93,8 @@ github.com/rancher/gke-operator v1.10.4-rc.1 h1:sk0wuZOd6vZi8VRRoSXlbNKl2yxI079J
 github.com/rancher/gke-operator v1.10.4-rc.1/go.mod h1:gursXBgWJ5z0gd907ZtUnJbIY4MUQ9bsovKFJjurJqA=
 github.com/rancher/lasso v0.2.0 h1:0YaprDYRZNMQoG9/308ZI+oxvof2JUjo9rYT2It38L8=
 github.com/rancher/lasso v0.2.0/go.mod h1:stR7zYyew1IOnKYV5vFx1kXX5/pUoKeo5K5c78qAdV8=
-github.com/rancher/norman v0.4.1 h1:RGHaPiSFZZmvBIK9SKZAeTeyXHcVG8fQ/W0UID7WhAE=
-github.com/rancher/norman v0.4.1/go.mod h1:qX/OG/4wY27xSAcSdRilUBxBumV6Ey2CWpAeaKnBQDs=
+github.com/rancher/norman v0.4.2 h1:WtNMHGF0pu2G8xKlQhLpkZ/JV4NWv5AjpKV8fE4pnrg=
+github.com/rancher/norman v0.4.2/go.mod h1:zT0lJQCQQgECZx0ZhR/zzn7QoRpBbVV2UzRkwpx2Oyg=
 github.com/rancher/rke v1.7.5 h1:oA3GlGksu3MVT4bGuCIYac5Bcx7GmjM4mueKr/iOm/A=
 github.com/rancher/rke v1.7.5/go.mod h1:+x++Mvl0A3jIzNLiu8nkraqZXiHg6VPWv0Xl4iQCg+A=
 github.com/rancher/wrangler/v3 v3.1.0 h1:8ETBnQOEcZaR6WBmUSysWW7WnERBOiNTMJr4Dj3UG/s=
