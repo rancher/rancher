@@ -11,7 +11,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v4
+      - uses: actions/stale@a20b814fb01b71def3bd6f56e7494d667ddf28da # v4
         with:
           stale-issue-message: 'This repository uses an automated workflow to automatically label issues which have not had any activity (commit/comment/label) for 60 days. This helps us manage the community issues better. If the issue is still relevant, please add a comment to the issue so the workflow can remove the label and we know it is still valid. If it is no longer relevant (or possibly fixed in the latest release), the workflow will automatically close the issue in 14 days. Thank you for your contributions.'
           stale-pr-message: 'This repository uses an automated workflow to automatically label pull requests which have not had any activity (commit/comment/label) for 60 days. This helps us manage the community pull requests better. If the pull request is still relevant, please add a comment to the pull request so the workflow can remove the label and we know it is still valid. If it is no longer relevant (or possibly fixed in the latest release), the workflow will automatically close the pull request in 14 days. Thank you for your contributions.'
