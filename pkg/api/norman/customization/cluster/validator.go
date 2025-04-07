@@ -517,9 +517,6 @@ func validateEKSNodegroups(spec *v32.ClusterSpec) error {
 	if nodegroups == nil {
 		return nil
 	}
-	if len(nodegroups) == 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one nodegroup"))
-	}
 
 	var errors []string
 
