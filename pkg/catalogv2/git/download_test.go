@@ -177,7 +177,7 @@ func Test_Update(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.test, func(t *testing.T) {
 			if tc.dir != "" {
 				err := os.MkdirAll(tc.dir, 0755)
 				assert.NoError(t, err)
@@ -185,7 +185,7 @@ func Test_Update(t *testing.T) {
 
 			commit, err := Update(tc.secret, tc.namespace, tc.name, tc.gitURL, tc.branch, tc.insecureSkipTLS, tc.caBundle)
 			if tc.expectedError != "" {
-				assert.Contains(t, err.Error(), tc.expectedError)
+				assert.ErrorContains(t, err, tc.expectedError)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, len(commit), len(tc.expectedCommit))
