@@ -9,6 +9,7 @@ RUN zypper in -y wget git
 # All downloaded binaries are used at the build layer only,
 # therefore they can be based off the BUILD PLATFORM architecture.
 ARG BUILDARCH
+ARG VERSION=${RANCHER_TAG}
 
 
 # set up helm 3
@@ -24,10 +25,11 @@ RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_l
         tar xz && mv yq_linux_${BUILDARCH} /usr/bin/yq
 
 WORKDIR /src
-COPY .git/ /src/.git/
-COPY chart/ /src/chart/
-COPY scripts/ /src/scripts/
-COPY build.yaml .
+
+ENV VERSION=${VERSION}
+ENV GIT_TAG=${VERSION}
+
+COPY . /src
 
 RUN /src/scripts/export-config
 RUN /src/scripts/chart/ci
