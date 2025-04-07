@@ -35,7 +35,7 @@ replace (
 require (
 	github.com/rancher/aks-operator v1.10.3
 	github.com/rancher/eks-operator v1.10.3
-	github.com/rancher/fleet/pkg/apis v0.11.3
+	github.com/rancher/fleet/pkg/apis v0.11.6-beta.1
 	github.com/rancher/gke-operator v1.10.3
 	github.com/rancher/norman v0.4.1
 	github.com/rancher/rke v1.7.5
@@ -78,7 +78,7 @@ require (
 	github.com/rancher/lasso v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
