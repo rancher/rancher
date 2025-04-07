@@ -2442,8 +2442,8 @@ github.com/rancher/dynamiclistener v0.6.2 h1:F0SEJhvO2aFe0eTvKGlQoy5x7HtwK8oJbyI
 github.com/rancher/dynamiclistener v0.6.2/go.mod h1:ncmVR7qR8kR1o6xNkTcVS2mZ9WtlljimBilIlNjdyzc=
 github.com/rancher/eks-operator v1.11.0 h1:o7HgTKGPr/UNskkAmUik5pDyIATeDbOo+3k2yGqejN8=
 github.com/rancher/eks-operator v1.11.0/go.mod h1:7G0kfoUs7qKMVgBdmeL/Mci7moV7OnyPkeX2MIvEBV8=
-github.com/rancher/fleet/pkg/apis v0.12.0 h1:ZzDB63LFLrtwu0wOMDSrmtboixEnwPnNS4sY0KfCr9M=
-github.com/rancher/fleet/pkg/apis v0.12.0/go.mod h1:aPeCke/1zE63hh4rojpm12hc0tZfwuEn0WXrhM4/PXM=
+github.com/rancher/fleet/pkg/apis v0.12.1-beta.1 h1:MWrpR6rR1VWGkeTb7OJY4WkSzAiPDu/feo9Q6dnPoWE=
+github.com/rancher/fleet/pkg/apis v0.12.1-beta.1/go.mod h1:aPeCke/1zE63hh4rojpm12hc0tZfwuEn0WXrhM4/PXM=
 github.com/rancher/gke-operator v1.11.0 h1:p/7q46jr3D2eiX1ydJNf8gZbzBYn1xa4ONjyfTEPg7Q=
 github.com/rancher/gke-operator v1.11.0/go.mod h1:a6OTHbCb+J3TNqqOnXwQ7Ld3pYZ8MU9I5KQMotEjuvs=
 github.com/rancher/helm/v3 v3.17.0-rancher1 h1:CAitia3a0jagclTn+QACzpoV8s5fU52xNmfDP77FMUA=
