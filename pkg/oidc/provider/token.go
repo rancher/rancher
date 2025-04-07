@@ -202,7 +202,7 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 	if oidcErr == nil {
 		err := h.sessionClient.Remove(code)
 		if err != nil && !errors.IsNotFound(err) {
-			logrus.Warnf("[OIDC provider] error removing session: " + err.Error())
+			logrus.Warnf("[OIDC provider] error removing session: %v", err)
 		}
 	}
 
