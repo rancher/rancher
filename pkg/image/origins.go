@@ -261,6 +261,15 @@ var OriginMap = map[string]string{
 	"windows_exporter-package":                                "https://github.com/rancher/windows_exporter-package",
 	"wins":                                                    "https://github.com/rancher/wins",
 	"wmi_exporter-package":                                    "https://github.com/rancher/wmi_exporter-package",
+	"kuberlr-kubectl":                                         "https://github.com/rancher/kuberlr-kubectl",
+	"neuvector-compliance-config":                             "https://github.com/neuvector/compliance-config",
+	"neuvector-controller":                                    "https://github.com/neuvector/neuvector",
+	"neuvector-enforcer":                                      "https://github.com/neuvector/neuvector",
+	"neuvector-manager":                                       "https://github.com/neuvector/manager",
+	"neuvector-scanner":                                       "https://github.com/neuvector/scanner",
+	"neuvector-updater":                                       "https://github.com/neuvector/neuvector",
+	"neuvector-prometheus-exporter":                           "https://github.com/neuvector/prometheus-exporter",
+	"neuvector-registry-adapter":                              "https://github.com/neuvector/registry-adapter",
 }
 
 const (
