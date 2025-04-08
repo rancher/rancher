@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -98,6 +99,13 @@ func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.Clust
 
 func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
 	if repo == nil {
+		// deleting the folder that contains the cluster repo files locally
+		path := git.ParentRepoDir("", key)
+		err := os.RemoveAll(path)
+		if err != nil {
+			logrus.Errorf("error while removing git repo %s: %v", path, err)
+			return nil, err
+		}
 		return nil, nil
 	}
 	// Ignore OCI Based Helm Repositories
