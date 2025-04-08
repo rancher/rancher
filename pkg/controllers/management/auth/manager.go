@@ -541,6 +541,8 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 			}
 		}
 		if len(resourceToVerbs) > 0 {
+			// Roles:
+			// read-only
 			if err := m.reconcileManagementPlaneRole(namespace, resourceToVerbs, role); err != nil {
 				return err
 			}
@@ -557,6 +559,8 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 		currentRBs[rb.Name] = rb
 	}
 
+	// RoleBindings:
+	// prtb-<rand_string>-read-only
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, namespace)
 }
 
@@ -663,6 +667,9 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 			}
 		}
 		if len(resourceToVerbs) > 0 {
+			// Roles:
+			// <project_name>-admin
+			// <project_name>-project-owner
 			if err := m.reconcileManagementPlaneRole(clusterNamespace, resourceToVerbs, role); err != nil {
 				return err
 			}
@@ -679,6 +686,9 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 		currentRBs[rb.Name] = rb
 	}
 
+	// RoleBindings:
+	// <project_name>-creator-project-owner-admin
+	// <project_name>-creator-project-owner-project-owner
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, clusterNamespace)
 }
 
