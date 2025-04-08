@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
@@ -36,6 +37,7 @@ const (
 	rolesCircularSoftLimit = 100
 	rolesCircularHardLimit = 500
 	clusterNameLabel       = "cluster.cattle.io/name"
+	managementAPIGroup     = "management.cattle.io"
 )
 
 func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *crtbLifecycle) {
@@ -101,10 +103,11 @@ type managerInterface interface {
 	removeAuthV2Permissions(string, runtime.Object) error
 	checkReferencedRoles(string, string, int) (bool, error)
 	ensureClusterMembershipBinding(string, string, *v3.Cluster, bool, v1.Subject) error
-	ensureProjectMembershipBinding(string, string, string, *v3.Project, bool, v1.Subject) error
+	ensureProjectMembershipBinding(string, string, string, string, *v3.Project, bool, v1.Subject) error
 	grantManagementPlanePrivileges(string, map[string]string, v1.Subject, interface{}) error
 	grantManagementClusterScopedPrivilegesInProjectNamespace(string, string, map[string]string, v1.Subject, *v3.ClusterRoleTemplateBinding) error
 	grantManagementProjectScopedPrivilegesInClusterNamespace(string, string, map[string]string, v1.Subject, *v3.ProjectRoleTemplateBinding) error
+	canUpdatePSA(string) (bool, error)
 }
 
 type manager struct {
@@ -209,8 +212,8 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 
 // When a PRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
 // that gives the subject access to the the project/cluster custom resource itself
-func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespace string, project *v3.Project, makeOwner bool, subject v1.Subject) error {
-	if err := m.createProjectMembershipRole(roleName, namespace, project, makeOwner); err != nil {
+func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespace, roleTemplate string, project *v3.Project, makeOwner bool, subject v1.Subject) error {
+	if err := m.createProjectMembershipRole(roleName, namespace, roleTemplate, project, makeOwner); err != nil {
 		return err
 	}
 
@@ -296,21 +299,32 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 // (or CRUD the project/cluster if they are an owner)
 func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Cluster, makeOwner bool) error {
 	if cr, _ := m.crLister.Get("", roleName); cr == nil {
-		return m.createMembershipRole(clusterResource, roleName, makeOwner, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
+		return m.createMembershipRole(clusterResource, roleName, makeOwner, false, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
 	}
 	return nil
 }
 
 // Creates a role that lets the bound subject see (if they are an ordinary member) the project in the mgmt api
 // (or CRUD the project if they are an owner)
-func (m *manager) createProjectMembershipRole(roleName, namespace string, project *v3.Project, makeOwner bool) error {
+func (m *manager) createProjectMembershipRole(roleName, namespace, roleTemplate string, project *v3.Project, makeOwner bool) error {
+	// when the role is not <project_name>-projectowner
+	// we should carefully select the verbs we want to allow
+	var canUpdatePSA bool
+	var err error
+	if !makeOwner {
+		canUpdatePSA, err = m.canUpdatePSA(roleTemplate)
+		if err != nil {
+			return err
+		}
+	}
 	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
-		return m.createMembershipRole(projectResource, roleName, makeOwner, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
+		return m.createMembershipRole(projectResource, roleName, makeOwner, canUpdatePSA, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
 	}
 	return nil
 }
 
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
+// createMembershipRole creates Role or ClusterRole for Project resources.
+func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, canUpdatePSA bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
 		return err
@@ -329,8 +343,13 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 	}
 
 	if makeOwner {
+		// verbs for <project_name>-projectowner
 		rules[0].Verbs = []string{"*"}
+	} else if strings.HasSuffix(roleName, "-projectpsa") {
+		// verbs for <project_name>-projectpsa
+		rules[0].Verbs = []string{updatePSAVerb}
 	} else {
+		// verbs for <project_name>-projectmember
 		rules[0].Verbs = []string{"get"}
 	}
 	logrus.Infof("[%v] Creating role/clusterRole %v", m.controller, roleName)
@@ -519,6 +538,8 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 			}
 		}
 		if len(resourceToVerbs) > 0 {
+			// Roles:
+			// read-only
 			if err := m.reconcileManagementPlaneRole(namespace, resourceToVerbs, role); err != nil {
 				return err
 			}
@@ -535,6 +556,8 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 		currentRBs[rb.Name] = rb
 	}
 
+	// RoleBindings:
+	// prtb-<rand_string>-read-only
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, namespace)
 }
 
@@ -641,6 +664,9 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 			}
 		}
 		if len(resourceToVerbs) > 0 {
+			// Roles:
+			// <project_name>-admin
+			// <project_name>-project-owner
 			if err := m.reconcileManagementPlaneRole(clusterNamespace, resourceToVerbs, role); err != nil {
 				return err
 			}
@@ -657,6 +683,9 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 		currentRBs[rb.Name] = rb
 	}
 
+	// RoleBindings:
+	// <project_name>-creator-project-owner-admin
+	// <project_name>-creator-project-owner-project-owner
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, clusterNamespace)
 }
 
@@ -984,4 +1013,33 @@ func getLabelRequirements(objMeta metav1.ObjectMeta) ([]labels.Requirement, erro
 		return []labels.Requirement{}, err
 	}
 	return []labels.Requirement{*reqUpdatedLabel, *reqNsAndNameLabel}, nil
+}
+
+// canUpdatePSA returns true if the roletemplate has the updatepsa verb enabled
+func (m *manager) canUpdatePSA(roleTemplate string) (bool, error) {
+	var additionalVerbs bool
+	// retrieve involved role templates
+	roleTemplates, err := m.gatherAndDedupeRoles(roleTemplate)
+	if err != nil {
+		return false, err
+	}
+	verbList := make(map[string]string, 0)
+	for _, rt := range roleTemplates {
+		// retrieve verbs listed in role template rule for management.cattle.io/projects resource
+		verbs, err := m.checkForManagementPlaneRules(rt, projectResource, managementAPIGroup)
+		if err != nil {
+			return false, err
+		}
+		// merging current verbs with the ones previously found
+		for verb, apiGroup := range verbs {
+			verbList[verb] = apiGroup
+		}
+	}
+	// making the list of verb unique after collecting them from role templates
+	for verb := range verbList {
+		if verb == updatePSAVerb {
+			additionalVerbs = true
+		}
+	}
+	return additionalVerbs, nil
 }
