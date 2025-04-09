@@ -1,12 +1,12 @@
 module github.com/rancher/rancher/airgap
 
-go 1.23.0
+go 1.24
 
-toolchain go1.23.7
+toolchain go1.24.2
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.27 // CVE-2024-40635
-	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5 // CVE-2025-27144
+	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.0 // CVE-2025-27144
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.14 // CVE-2024-45310
 	golang.org/x/net => golang.org/x/net v0.36.0 // CVE-2025-22870
 )
