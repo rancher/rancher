@@ -7,7 +7,7 @@ toolchain go1.23.7
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.27 // CVE-2024-40635
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5 // CVE-2025-27144
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.14 // CVE-2024-45310
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.2.6 // CVE-2024-45310
 	golang.org/x/net => golang.org/x/net v0.36.0 // CVE-2025-22870
 )
 
@@ -35,7 +35,7 @@ require (
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.2.0 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20231217050601-ba74d44ecf5f // indirect
-	github.com/cyphar/filepath-securejoin v0.3.1 // indirect
+	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/disiqueira/gotree/v3 v3.0.2 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
