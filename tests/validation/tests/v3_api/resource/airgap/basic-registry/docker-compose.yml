@@ -10,7 +10,7 @@ web:
 
 registry:
   # v2.6 is needed to support Windoes images in the registry, otherwise will get 500 Internal Server Error
-  image: registry:2.6
+  image: registry:3.0
   ports:
    - 127.0.0.1:5000:5000
 
