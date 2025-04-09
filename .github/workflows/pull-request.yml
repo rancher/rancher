@@ -127,19 +127,12 @@ jobs:
           retention-days: 4
           overwrite: false
   build-agent:
-    needs: [build-server]
     strategy:
       matrix:
         os: [linux]
         arch: [x64, arm64]
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     env:
-      REGISTRY: "localhost:5000"
       ARCH: ${{ matrix.arch }}
     steps:
       - name: Environment variables
@@ -171,20 +164,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
-      - name: Download rancher image
-        uses: actions/download-artifact@v4
-        with:
-          name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
-          path: /tmp
-      - name: Load image
-        run: |
-          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
-          if [ -z "$image_id" ]; then
-            echo "Error: Failed to load image from tarball!"
-            exit 1
-          fi
-          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Build agent
         id: build
         uses: docker/build-push-action@v5
@@ -195,7 +174,6 @@ jobs:
             "ARCH=${{ env.ARCH }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-            "REGISTRY=${{ env.REGISTRY }}"
             "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
             "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_PROVISIONING_CAPI_VERSION }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ env.ARCH }}
@@ -214,12 +192,12 @@ jobs:
           retention-days: 4
           overwrite: false
   integration-tests:
-    needs: [build-agent]
+    needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
     with:
       parent_run_id: ${{ github.run_id }}
   provisioning-tests:
-    needs: [build-agent]
+    needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
     with:
       parent_run_id: ${{ github.run_id }}
