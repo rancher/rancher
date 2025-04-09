@@ -65,7 +65,7 @@ export CATTLE_FEATURES=${CATTLE_FEATURES}
 source ./scripts/version
 
 # defaulting to :head (matching the hardcoded value within rancher) if CATTLE_AGENT_IMAGE or TAG is not specified
-if [ $TAG = "dev" ]; then 
+if [ $TAG = "dev" ]; then
     TAG="head"
 fi
 
@@ -219,8 +219,18 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
-  --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
+  --exit-command "dump_rancher_logs" `# Dump logs to find out why capi-controller-manager did not start` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
+
+# The remotedialer-proxy is pulled in by the api-extension deployment
+echo "Waiting up to 5 minutes for the api-extension deployment"
+./scripts/retry \
+  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --sleep 2 `# Sleep for 2 seconds in between attempts` \
+  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
+  --message "api-extension was not available after {{elapsed}} seconds" `# Print this progress message` \
+  --exit-command "dump_rancher_logs" `# Dump logs to find out why api-extension did not start` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/api-extension &>/dev/null"
 
 # only push the image if we're not using the default image:tag
 if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then
