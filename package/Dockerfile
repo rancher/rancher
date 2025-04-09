@@ -1,3 +1,7 @@
+ARG CHART_DEFAULT_BRANCH=dev-v2.11
+ARG PARTNER_CHART_DEFAULT_BRANCH=main
+ARG RKE2_CHART_DEFAULT_BRANCH=main
+
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
 # Temporary build stage image
@@ -16,6 +20,34 @@ RUN zypper refresh && \
 
 FROM final AS builder
 COPY --from=chroot-builder /chroot/ /
+
+
+FROM builder AS rancher-charts
+ARG CHART_DEFAULT_BRANCH
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
+    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
+    git clone --no-checkout -b $CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
+
+
+FROM builder AS partner-charts
+ARG PARTNER_CHART_DEFAULT_BRANCH
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
+    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
+    git clone --no-checkout -b $PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
+
+
+FROM builder AS rke2-charts
+ARG RKE2_CHART_DEFAULT_BRANCH
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
+    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
+    git clone --no-checkout -b $RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
+
 
 # Main stage using bci-micro as the base image
 FROM final AS base
@@ -47,9 +79,9 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG CHART_DEFAULT_BRANCH=dev-v2.11
-ARG PARTNER_CHART_DEFAULT_BRANCH=main
-ARG RKE2_CHART_DEFAULT_BRANCH=main
+ARG CHART_DEFAULT_BRANCH
+ARG PARTNER_CHART_DEFAULT_BRANCH
+ARG RKE2_CHART_DEFAULT_BRANCH
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ARG CATTLE_KDM_BRANCH=release-v2.11
 ARG VERSION=${VERSION}
@@ -104,16 +136,9 @@ ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_V
 ARG CATTLE_CSP_ADAPTER_MIN_VERSION
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load
-    # in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone -b $CATTLE_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721/ && \
-    git clone -b $CATTLE_PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 && \
-    git clone -b $CATTLE_RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 && \
-    # Revert the previous change in git.rancher.io from .gitconfig
-    rm "${HOME}/.gitconfig"
+COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
+COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
+COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
     chown root:root /usr/bin/rancher-machine && \
