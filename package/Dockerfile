@@ -28,6 +28,11 @@ RUN zypper refresh && \
 FROM final AS builder
 COPY --from=chroot-builder /chroot/ /
 
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS go-builder
+ARG CGO_ENABLED=0
+ENV CGO_ENABLED=$CGO_ENABLED
+ENV GOMODCACHE=/root/.cache/go/modcache
+ENV GOCACHE=/root/.cache/go/cache
 
 FROM builder AS rancher-charts
 ARG CHART_DEFAULT_BRANCH
@@ -278,41 +283,23 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 
 # Enable exporting of the k3s images as part of the build process.
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS images
-
-ENV GOMODCACHE=/root/.cache/go/modcache
-ENV GOCACHE=/root/.cache/go/cache
-
-ENV CATTLE_K3S_VERSION v1.32.1+k3s1
-
-RUN zypper -n install libbtrfs-devel libgpgme-devel
-
+FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
+ENV CGO_ENABLED=1
+ENV CATTLE_K3S_VERSION v1.32.1+k3s1
+RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 COPY hack/airgap/ /src/
-
 RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS build
-ARG VERSION
-ARG COMMIT
-ARG RKE_VERSION
-ARG CGO_ENABLED=0
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
-ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
-ARG TARGETOS
-ARG TARGETARCH
-
+# rancher-go-builder is an intermediate stage with go mod ready and Rancher
+# dependencies downloaded. Can be used to build both the Rancher server and agent
+# binaries.
+FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder
 WORKDIR /app
-
-ENV GOMODCACHE=/root/.cache/go/modcache
-ENV GOCACHE=/root/.cache/go/cache
-
 # Only invalidate cache if go.mod/go.sum changes.
 COPY go.mod go.sum .
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
@@ -321,10 +308,33 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
 
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
+ARG VERSION
+ARG COMMIT
+ARG RKE_VERSION
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
+ARG TARGETOS
+ARG TARGETARCH
 COPY pkg/ pkg/
 COPY main.go .
-
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
+ARG VERSION
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+
 
 FROM base AS server
 
@@ -334,7 +344,7 @@ ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 
 COPY --chown=root:root --chmod=0755 \
-    --from=build /app/rancher /usr/bin/
+    --from=server-build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
     --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 COPY --chown=root:root --chmod=0755 \
@@ -356,34 +366,6 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opensuse.reference"=rancher/rancher:${VERSION}
 
 ENTRYPOINT ["entrypoint.sh"]
-
-
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS agent-build
-ARG VERSION
-ARG CGO_ENABLED=0
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
-ARG TARGETOS
-ARG TARGETARCH
-
-WORKDIR /app
-
-ENV GOMODCACHE=/root/.cache/go/modcache
-ENV GOCACHE=/root/.cache/go/cache
-
-# Only invalidate cache if mod files changes.
-COPY go.mod go.sum .
-COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
-COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
-
-COPY cmd/ cmd/
-COPY pkg/ pkg/
-
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
 
 
 # Main stage using bci-micro as the base image.
