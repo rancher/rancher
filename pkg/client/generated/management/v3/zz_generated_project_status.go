@@ -1,10 +1,12 @@
 package client
 
 const (
-	ProjectStatusType            = "projectStatus"
-	ProjectStatusFieldConditions = "conditions"
+	ProjectStatusType                  = "projectStatus"
+	ProjectStatusFieldBackingNamespace = "backingNamespace"
+	ProjectStatusFieldConditions       = "conditions"
 )
 
 type ProjectStatus struct {
-	Conditions []ProjectCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	BackingNamespace string             `json:"backingNamespace,omitempty" yaml:"backingNamespace,omitempty"`
+	Conditions       []ProjectCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }
