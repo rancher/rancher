@@ -1,8 +1,11 @@
+ARG ARCH=amd64
 ARG CHART_DEFAULT_BRANCH=dev-v2.10
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ARG CATTLE_KDM_BRANCH=release-v2.10
+
+ARG VERSION=${VERSION}
 
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
@@ -85,7 +88,7 @@ RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
-ARG ARCH=amd64
+ARG ARCH
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.10
@@ -93,7 +96,7 @@ ARG CHART_DEFAULT_BRANCH
 ARG PARTNER_CHART_DEFAULT_BRANCH
 ARG RKE2_CHART_DEFAULT_BRANCH
 ARG CATTLE_KDM_BRANCH
-ARG VERSION=${VERSION}
+ARG VERSION
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
