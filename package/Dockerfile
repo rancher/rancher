@@ -20,7 +20,8 @@ COPY --from=final / /chroot/
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
     git-core curl util-linux ca-certificates ca-certificates-mozilla unzip xz gzip sed tar shadow gawk vim-small \
-    netcat-openbsd mkisofs openssh-clients openssl patterns-base-fips && \
+    netcat-openbsd mkisofs openssh-clients openssl patterns-base-fips jq sysstat acl less iproute2 hostname git-core \
+    bind-utils bash-completion && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
@@ -106,7 +107,6 @@ ARG CHART_DEFAULT_BRANCH
 ARG PARTNER_CHART_DEFAULT_BRANCH
 ARG RKE2_CHART_DEFAULT_BRANCH
 ARG CATTLE_KDM_BRANCH
-ARG VERSION
 
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
@@ -326,7 +326,7 @@ COPY main.go .
 
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
-FROM base
+FROM base AS server
 
 ARG VERSION=${VERSION}
 ENV CATTLE_SERVER_VERSION ${VERSION}
@@ -356,3 +356,81 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opensuse.reference"=rancher/rancher:${VERSION}
 
 ENTRYPOINT ["entrypoint.sh"]
+
+
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS agent-build
+ARG VERSION
+ARG CGO_ENABLED=0
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /app
+
+ENV GOMODCACHE=/root/.cache/go/modcache
+ENV GOCACHE=/root/.cache/go/cache
+
+# Only invalidate cache if mod files changes.
+COPY go.mod go.sum .
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
+
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+
+
+# Main stage using bci-micro as the base image.
+FROM final AS agent
+
+# Copy binaries and configuration files from zypper to micro.
+COPY --from=chroot-builder /chroot/ /
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
+
+ARG ARCH
+ENV KUBECTL_VERSION v1.27.10
+
+RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
+    chmod +x /usr/bin/kubectl
+
+LABEL io.cattle.agent=true
+
+ARG RANCHER_REPO=rancher
+ARG VERSION
+ENV AGENT_IMAGE ${RANCHER_REPO}/rancher-agent:${VERSION}
+# For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
+ARG CATTLE_RANCHER_WEBHOOK_VERSION
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
+COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
+COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
+COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
+COPY --from=tini /usr/bin/tini /usr/bin/
+COPY --from=agent-build /app/agent /usr/bin/
+COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
+WORKDIR /var/lib/rancher
+
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
+      "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
+      "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
+      "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
+      "org.opencontainers.image.version"=${VERSION} \
+      "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
+
+ENTRYPOINT ["run.sh"]
