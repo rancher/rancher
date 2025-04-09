@@ -32,6 +32,19 @@ func RepoDir(namespace, name, gitURL string) string {
 	return filepath.Join(stateDir, namespace, name, Hash(gitURL))
 }
 
+// ParentRepoDir returns the parent directory where the git repo is cloned.
+func ParentRepoDir(namespace, name string) string {
+	staticDir := filepath.Join(staticDir, namespace, name)
+	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
+		return staticDir
+	}
+	localDir := filepath.Join(localDir, namespace, name)
+	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
+		return localDir
+	}
+	return filepath.Join(stateDir, namespace, name)
+}
+
 // IsBundled checks the directory to see if it is a bundled catalog repository.
 func IsBundled(dir string) bool {
 	return strings.HasPrefix(dir, staticDir) || strings.HasPrefix(dir, localDir)
