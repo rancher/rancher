@@ -17,8 +17,10 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	extcore "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -39,7 +41,6 @@ import (
 
 const (
 	TokenNamespace = "cattle-tokens"
-	ThirtyDays     = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds.
 	UserIDLabel    = "authn.management.cattle.io/token-userId"
 	KindLabel      = "authn.management.cattle.io/kind"
 	IsLogin        = "session"
@@ -682,9 +683,15 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 			token.Name))
 	}
 
-	// It is not allowed to extend the TTL.
+	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		if token.Spec.TTL > currentToken.Spec.TTL {
+		ttl, err := clampMaxTTL(token.Spec.TTL)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token %s ttl: %w",
+				token.Name, err))
+		}
+		token.Spec.TTL = ttl
+		if ttlGreater(ttl, currentToken.Spec.TTL) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to extend time-to-live",
 				token.Name))
 		}
@@ -1236,13 +1243,14 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldOwnerReferences] = string(ownerBytes)
 
 	// spec values
-	// inject default on creation
-	ttl := token.Spec.TTL
-	if ttl == 0 {
-		ttl = ThirtyDays
-		// pass back to caller (Create)
-		token.Spec.TTL = ttl
+
+	// injects default on creation and update
+	ttl, err := clampMaxTTL(token.Spec.TTL)
+	if err != nil {
+		return nil, err
 	}
+	// pass back to caller (Create, Update)
+	token.Spec.TTL = ttl
 
 	secret.StringData[FieldDescription] = token.Spec.Description
 	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", token.Spec.Enabled == nil || *token.Spec.Enabled)
@@ -1283,43 +1291,43 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 
 	// system - kubernetes uid
 	if token.ObjectMeta.UID = types.UID(string(secret.Data[FieldUID])); token.ObjectMeta.UID == "" {
-		return token, fmt.Errorf("kube uid missing")
+		return nil, fmt.Errorf("kube uid missing")
 	}
 
 	// system - finalizers - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldFinalizers], &token.Finalizers); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// system - owner references - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldOwnerReferences], &token.OwnerReferences); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// system - labels - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldLabels], &token.Labels); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// system - annotations - decode the fields and place into the token
 	if err := json.Unmarshal(secret.Data[FieldAnnotations], &token.Annotations); err != nil {
-		return token, err
+		return nil, err
 	}
 
 	// spec - user id, required
 	if token.Spec.UserID = string(secret.Data[FieldUserID]); token.Spec.UserID == "" {
-		return token, fmt.Errorf("user id missing")
+		return nil, fmt.Errorf("user id missing")
 	}
 
 	// spec - user principal, required
 	if err := json.Unmarshal(secret.Data[FieldPrincipal], &token.Spec.UserPrincipal); err != nil {
-		return token, err
+		return nil, err
 	}
 	if token.Spec.UserPrincipal.Name == "" {
-		return token, fmt.Errorf("principal id missing")
+		return nil, fmt.Errorf("principal id missing")
 	}
 	if token.Spec.UserPrincipal.Provider == "" {
-		return token, fmt.Errorf("auth provider missing")
+		return nil, fmt.Errorf("auth provider missing")
 	}
 
 	// spec - optional elements
@@ -1328,43 +1336,39 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 
 	enabled, err := strconv.ParseBool(string(secret.Data[FieldEnabled]))
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 	token.Spec.Enabled = &enabled
 
 	ttl, err := strconv.ParseInt(string(secret.Data[FieldTTL]), 10, 64)
 	if err != nil {
-		return token, err
-	}
-	// inject default on retrieval
-	if ttl == 0 {
-		ttl = ThirtyDays
+		return nil, err
 	}
 	token.Spec.TTL = ttl
 
 	// status information
 	if token.Status.Hash = string(secret.Data[FieldHash]); token.Status.Hash == "" {
-		return token, fmt.Errorf("token hash missing")
+		return nil, fmt.Errorf("token hash missing")
 	}
 
 	if token.Status.LastUpdateTime = string(secret.Data[FieldLastUpdateTime]); token.Status.LastUpdateTime == "" {
-		return token, fmt.Errorf("last update time missing")
+		return nil, fmt.Errorf("last update time missing")
 	}
 
 	lastUsedAt, err := decodeTime("lastUsedAt", secret.Data[FieldLastUsedAt])
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 	token.Status.LastUsedAt = lastUsedAt
 
 	lastActivitySeen, err := decodeTime("lastActivitySeen", secret.Data[FieldLastActivitySeen])
 	if err != nil {
-		return token, err
+		return nil, err
 	}
 	token.Status.LastActivitySeen = lastActivitySeen
 
 	if err := setExpired(token); err != nil {
-		return token, fmt.Errorf("failed to set expiration information: %w", err)
+		return nil, fmt.Errorf("failed to set expiration information: %w", err)
 	}
 
 	return token, nil
@@ -1418,4 +1422,72 @@ func ensureNameOrGenerateName(token *ext.Token) error {
 	return apierrors.NewBadRequest(fmt.Sprintf(
 		"Token \"%s\" is invalid: metadata.name: Required value: name or generateName is required",
 		token.ObjectMeta.Name))
+}
+
+func clampMaxTTL(ttl int64) (int64, error) {
+	max, err := maxTTL()
+	if err != nil {
+		return 0, err
+	}
+
+	// decision table
+	// max | ttl         | note                                        | result
+	// --- + ----------- + ------------------------------------------- + ----------------
+	// < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
+	// < 1 | = 0         | max = +inf = default, ttl default requested | -1 = +inf
+	// < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
+	// --- + ----------- + ------------------------------------------- + ----------------
+	// > 0 | < 0         | ttl = +inf, clamp to max                    | max
+	// > 0 | = 0         | ttl default requested, this is max          | max
+	// > 0 | > 0, <= max | less than max                               | ttl
+	// > 0 | > max       | clamp to max                                | max
+
+	if max < 1 {
+		if ttl == 0 {
+			return -1, nil
+		}
+		return ttl, nil
+	}
+	if ttl > max || ttl <= 0 {
+		return max, nil
+	}
+	return ttl, nil
+}
+
+func maxTTL() (int64, error) {
+	maxTTL, err := tokens.ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
+	}
+
+	return maxTTL.Milliseconds(), nil
+}
+
+// ttlGreater compares the two TTL a and b. It returns true if a is greater than b.
+// Important special cases for TTL:
+// Any value < 0 represents +infinity.
+// A value > 0 is that many milliseconds.
+// The default of `0` cannot arrive here. `clampMaxTTL` resolved that already.
+func ttlGreater(a, b int64) bool {
+	// Decision table
+	//
+	// a   b   | note                           | result
+	// --------+--------------------------------+-------
+	// <0  <0  | both infinite, same            | false
+	// <0  >=0 | a infinite, b not, greater     | true
+	// >=0 <0  | b infinite, a not, less        | false
+	// >=0 >=0 | regular compare                | t/f
+
+	if a < 0 && b < 0 {
+		return false
+	}
+	if a < 0 && b >= 0 {
+		return true
+	}
+	if a >= 0 && b < 0 {
+		return false
+	}
+
+	return a > b
 }

@@ -180,6 +180,54 @@ func init() {
 	properTokenCurrent.Status.Current = true
 }
 
+func Test_ttlGreater(t *testing.T) {
+
+	tests := []struct {
+		name string
+		a    int64
+		b    int64
+		want bool
+	}{
+		{
+			name: "infinities",
+			a:    -1,
+			b:    -2,
+			want: false,
+		},
+		{
+			name: "left infinite",
+			a:    -3,
+			b:    40,
+			want: true,
+		},
+		{
+			name: "right infinite",
+			a:    40,
+			b:    -2,
+			want: false,
+		},
+		{
+			name: "plain left > right",
+			a:    10,
+			b:    1,
+			want: true,
+		},
+		{
+			name: "plain left <= right",
+			a:    10,
+			b:    11,
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			have := ttlGreater(test.a, test.b)
+			assert.Equal(t, have, test.want)
+		})
+	}
+}
+
 func Test_Store_Delete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
