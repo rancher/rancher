@@ -60,6 +60,16 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
 
+FROM builder AS tini
+ARG ARCH
+ENV TINI_VERSION v0.18.0
+ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
+    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
+    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
+    TINI_URL=TINI_URL_${ARCH}
+RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
+    chmod +x /usr/bin/tini
+
 
 # Main stage using bci-micro as the base image
 FROM final AS base
@@ -107,7 +117,6 @@ ENV CATTLE_MACHINE_VERSION v0.15.0-rancher125
 ENV CATTLE_K3S_VERSION v1.31.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.14
-ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.6.2
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.15
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
@@ -167,11 +176,6 @@ RUN curl -LO https://github.com/harvester/docker-machine-driver-harvester/releas
     tar -xf docker-machine-driver-harvester-${ARCH}.tar.gz -C /opt/drivers/management-state/bin && \
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-harvester-${ARCH}.tar.gz
-
-ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
-    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
-    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
-    TINI_URL=TINI_URL_${ARCH}
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
     HELM_URL_V2_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-arm64 \
@@ -243,11 +247,12 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
     ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
 
-RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
-    mkdir -p /var/lib/rancher/k3s/agent/images/ && \
+COPY --from=tini /usr/bin/tini /usr/bin/tini
+
+RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
-    chmod +x /usr/bin/tini /usr/bin/telemetry && \
+    chmod +x /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 ENV CATTLE_UI_VERSION 2.10.5
