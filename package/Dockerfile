@@ -1,6 +1,8 @@
 ARG CHART_DEFAULT_BRANCH=dev-v2.10
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
+# kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
+ARG CATTLE_KDM_BRANCH=release-v2.10
 
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
@@ -49,6 +51,13 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
     git clone --no-checkout -b $RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 
 
+FROM builder AS kdm
+ARG CATTLE_KDM_BRANCH
+RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
+    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
+
+
+
 # Main stage using bci-micro as the base image
 FROM final AS base
 # Copy binaries and configuration files from builder to micro
@@ -83,8 +92,7 @@ ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.10
 ARG CHART_DEFAULT_BRANCH
 ARG PARTNER_CHART_DEFAULT_BRANCH
 ARG RKE2_CHART_DEFAULT_BRANCH
-# kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=release-v2.10
+ARG CATTLE_KDM_BRANCH
 ARG VERSION=${VERSION}
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
@@ -285,7 +293,7 @@ ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
-RUN curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
+COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
 
 ENV ETCDCTL_API=3
 
