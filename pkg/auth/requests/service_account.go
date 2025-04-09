@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	jwtv4 "github.com/golang-jwt/jwt/v4"
+	jwtv4 "github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/tokens"
