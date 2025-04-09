@@ -359,7 +359,7 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TAR
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
 ARG VERSION
 ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
+ARG LINKFLAGS="-extldflags -static"
 ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
 ARG TARGETOS
 ARG TARGETARCH

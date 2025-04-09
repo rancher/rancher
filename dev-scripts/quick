@@ -44,6 +44,7 @@ docker buildx build \
   --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
   --tag "${REPO}"/rancher:"${TAG}" \
   --platform="${OS}/${ARCH}" \
+  --target server \
   --file ./package/Dockerfile .
 
 docker buildx build \
@@ -57,4 +58,5 @@ docker buildx build \
   --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
   --tag "${REPO}"/rancher-agent:"${TAG}" \
   --platform="${OS}/${ARCH}" \
-  --file ./package/Dockerfile.agent .
+  --target agent \
+  --file ./package/Dockerfile .
