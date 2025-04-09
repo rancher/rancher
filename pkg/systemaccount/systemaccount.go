@@ -6,7 +6,6 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
@@ -28,7 +27,6 @@ func NewManager(management *config.ManagementContext) *Manager {
 		systemTokens: management.SystemTokens,
 		crtbs:        management.Management.ClusterRoleTemplateBindings(""),
 		crts:         management.Management.ClusterRegistrationTokens(""),
-		prtbs:        management.Management.ProjectRoleTemplateBindings(""),
 		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		tokens:       management.Management.Tokens(""),
 		users:        management.Management.Users(""),
@@ -41,7 +39,6 @@ func NewManagerFromScale(management *config.ScaledContext) *Manager {
 		systemTokens: management.SystemTokens,
 		crtbs:        management.Management.ClusterRoleTemplateBindings(""),
 		crts:         management.Management.ClusterRegistrationTokens(""),
-		prtbs:        management.Management.ProjectRoleTemplateBindings(""),
 		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		tokens:       management.Management.Tokens(""),
 		tokenLister:  management.Management.Tokens("").Controller().Lister(),
@@ -54,7 +51,6 @@ type Manager struct {
 	systemTokens systemtokens.Interface
 	crtbs        v3.ClusterRoleTemplateBindingInterface
 	crts         v3.ClusterRegistrationTokenInterface
-	prtbs        v3.ProjectRoleTemplateBindingInterface
 	prtbLister   v3.ProjectRoleTemplateBindingLister
 	tokens       v3.TokenInterface
 	tokenLister  v3.TokenLister
@@ -122,37 +118,6 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 	}
 
 	return token, nil
-}
-
-func (s *Manager) GetOrCreateProjectSystemAccount(projectID string) error {
-	_, projectName := ref.Parse(projectID)
-
-	u, err := s.GetProjectSystemUser(projectName)
-	if err != nil {
-		return err
-	}
-
-	bindingName := u.Name + "-member"
-	_, err = s.prtbLister.Get(projectName, bindingName)
-	if err != nil {
-		if !errors2.IsNotFound(err) {
-			return err
-		}
-		// prtb does not exist in cache, attempt to create it
-		prtb := &v3.ProjectRoleTemplateBinding{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      bindingName,
-				Namespace: projectName,
-			},
-			ProjectName:      projectID,
-			UserName:         u.Name,
-			RoleTemplateName: projectMemberRole,
-		}
-		if _, err := s.prtbs.Create(prtb); err != nil && !errors2.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {

@@ -267,6 +267,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	n := &NamespaceController{
 		clusterSecretsClient: clusterSecretsClient,
 		managementSecrets:    cluster.Management.Core.Secrets("").Controller().Lister(),
+		projectCache:         cluster.Management.Management.Projects("").Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler(ctx, "secretsController", n.sync)
 
@@ -302,6 +303,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 type NamespaceController struct {
 	clusterSecretsClient v1.SecretInterface
 	managementSecrets    v1.SecretLister
+	projectCache         v3.ProjectLister
 }
 
 func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.Object, error) {
@@ -312,33 +314,38 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 	// field.cattle.io/projectId value is <cluster name>:<project name>
 	logrus.Tracef("secretsController: sync: key [%s], obj.Annotations[projectIDLabel]: [%s]", key, obj.Annotations[projectIDLabel])
 	if obj.Annotations[projectIDLabel] != "" {
-		parts := strings.Split(obj.Annotations[projectIDLabel], ":")
-		if len(parts) == 2 {
-			if parts[1] == "" {
-				logrus.Debugf("[NamspaceController|sync] empty project name found in obj.Annotations[projectIDLabel] for cluster: %s", parts[0])
-				return nil, nil
+		clusterName, projectName, found := strings.Cut(obj.Annotations[projectIDLabel], ":")
+		if !found {
+			logrus.Debugf("secretsController: sync: namespace %s projectId annotation %s is malformed, should be <cluster name>:<project name>", obj.Name, obj.Annotations[projectIDLabel])
+			return nil, nil
+		}
+
+		p, err := n.projectCache.Get(clusterName, projectName)
+		if err != nil {
+			return nil, fmt.Errorf("secretsController: sync: error getting project %s for namespace %s: %w", projectName, obj.Name, err)
+		}
+
+		projectNamespace := p.GetProjectNamespace()
+		secrets, err := n.managementSecrets.List(projectNamespace, labels.NewSelector())
+		if err != nil {
+			return nil, err
+		}
+
+		logrus.Tracef("secretsController: sync: length of secrets for project [%s] in namespace [%s] is %d", projectName, obj.Name, len(secrets))
+		for _, secret := range secrets {
+			// skip service account token secrets
+			if secret.Type == corev1.SecretTypeServiceAccountToken {
+				logrus.Tracef("secretsController: AddHandler: secret [%s] is Service Account token, skipping", secret.Name)
+				continue
 			}
-			// on the management side, secret's namespace name equals to project name
-			secrets, err := n.managementSecrets.List(parts[1], labels.NewSelector())
-			if err != nil {
+			namespacedSecret := getNamespacedSecret(secret, obj.Name)
+			if _, err := n.clusterSecretsClient.GetNamespaced(namespacedSecret.Namespace, namespacedSecret.Name, metav1.GetOptions{}); err == nil {
+				continue
+			}
+			logrus.Infof("Creating secret [%s] into namespace [%s]", namespacedSecret.Name, obj.Name)
+			_, err := n.clusterSecretsClient.Create(namespacedSecret)
+			if err != nil && !errors.IsAlreadyExists(err) {
 				return nil, err
-			}
-			logrus.Tracef("secretsController: sync: length of secrets for [%s] in namespace [%s] is %d", parts[1], obj.Name, len(secrets))
-			for _, secret := range secrets {
-				// skip service account token secrets
-				if secret.Type == corev1.SecretTypeServiceAccountToken {
-					logrus.Tracef("secretsController: AddHandler: secret [%s] is Service Account token, skipping", secret.Name)
-					continue
-				}
-				namespacedSecret := getNamespacedSecret(secret, obj.Name)
-				if _, err := n.clusterSecretsClient.GetNamespaced(namespacedSecret.Namespace, namespacedSecret.Name, metav1.GetOptions{}); err == nil {
-					continue
-				}
-				logrus.Infof("Creating secret [%s] into namespace [%s]", namespacedSecret.Name, obj.Name)
-				_, err := n.clusterSecretsClient.Create(namespacedSecret)
-				if err != nil && !errors.IsAlreadyExists(err) {
-					return nil, err
-				}
 			}
 		}
 	}
