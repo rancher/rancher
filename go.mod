@@ -133,7 +133,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.11.6-beta.1
 	github.com/rancher/gke-operator v1.10.4-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.2.0
+	github.com/rancher/lasso v0.2.1
 	github.com/rancher/machine v0.15.0-rancher125
 	github.com/rancher/norman v0.4.1
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -165,18 +165,18 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.16.2
-	k8s.io/api v0.31.6
+	k8s.io/api v0.32.1
 	k8s.io/apiextensions-apiserver v0.31.6
-	k8s.io/apimachinery v0.31.6
+	k8s.io/apimachinery v0.32.1
 	k8s.io/apiserver v0.31.6
 	k8s.io/cli-runtime v0.31.6
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/helm v2.17.0+incompatible
 	k8s.io/kube-aggregator v0.31.6
-	k8s.io/kube-openapi v0.0.0-20240411171206-dc4e619f62f3
+	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kubectl v0.31.6
 	k8s.io/kubernetes v1.31.6
-	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
+	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.8.3
@@ -427,13 +427,12 @@ require (
 	k8s.io/code-generator v0.31.6 // indirect
 	k8s.io/component-base v0.31.6 // indirect
 	k8s.io/component-helpers v0.31.6 // indirect
-	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
-	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
 )
