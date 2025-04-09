@@ -138,7 +138,7 @@ func main() {
 			Name:        "audit-level",
 			Value:       0,
 			EnvVar:      "AUDIT_LEVEL",
-			Usage:       "Audit log level: 0 - disable audit log, 1 - log event metadata, 2 - log event metadata and request body, 3 - log event metadata, request body and response body",
+			Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body",
 			Destination: &config.AuditLogLevel,
 		},
 		cli.BoolFlag{
