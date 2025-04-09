@@ -61,6 +61,16 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
 
+FROM builder AS tini
+ARG ARCH
+ENV TINI_VERSION v0.18.0
+ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
+    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
+    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
+    TINI_URL=TINI_URL_${ARCH}
+RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
+    chmod +x /usr/bin/tini
+
 
 # Main stage using bci-micro as the base image
 FROM final AS base
@@ -105,7 +115,6 @@ ENV CATTLE_MACHINE_VERSION v0.15.0-rancher127
 ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.16
-ENV TINI_VERSION v0.18.0
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.15
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
@@ -165,11 +174,6 @@ RUN curl -LO https://github.com/harvester/docker-machine-driver-harvester/releas
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-harvester-${ARCH}.tar.gz
 
-ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
-    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
-    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
-    TINI_URL=TINI_URL_${ARCH}
-
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
 # Set up K3s: copy the necessary binaries from the K3s image.
@@ -213,10 +217,10 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
     ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
 
-RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
-    mkdir -p /var/lib/rancher/k3s/agent/images/ && \
+COPY --from=tini /usr/bin/tini /usr/bin/tini
+
+RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
-    chmod +x /usr/bin/tini && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 ENV CATTLE_UI_VERSION 2.11.1
