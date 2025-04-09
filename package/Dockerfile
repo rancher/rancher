@@ -1,7 +1,7 @@
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS builder
+FROM registry.suse.com/bci/bci-base:15.6 AS chroot-builder
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -14,11 +14,13 @@ RUN zypper refresh && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
+FROM final AS builder
+COPY --from=chroot-builder /chroot/ /
+
 # Main stage using bci-micro as the base image
 FROM final AS base
-
 # Copy binaries and configuration files from builder to micro
-COPY --from=builder /chroot/ /
+COPY --from=chroot-builder /chroot/ /
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
