@@ -436,3 +436,5 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+replace github.com/rancher/steve => github.com/rancher/steve v0.4.3-0.20250409082843-148a22d3eb7b
