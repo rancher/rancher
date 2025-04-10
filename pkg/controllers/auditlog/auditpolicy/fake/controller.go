@@ -35,8 +35,15 @@ func (m *MockController) Cache() generic.CacheInterface[*auditlogv1.AuditPolicy]
 	panic("unimplemented")
 }
 
-func (m *MockController) Create(*auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
-	panic("unimplemented")
+func (m *MockController) Create(obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
+	ns, ok := m.Objs[obj.Namespace]
+	if !ok {
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
+	}
+
+	ns[obj.Name] = *obj
+
+	return obj, nil
 }
 
 func (m *MockController) Delete(string, string, *metav1.DeleteOptions) error {
@@ -56,12 +63,12 @@ func (m *MockController) EnqueueAfter(namespace string, name string, duration ti
 func (m *MockController) Get(namespace string, name string, options metav1.GetOptions) (*auditlogv1.AuditPolicy, error) {
 	ns, ok := m.Objs[namespace]
 	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource("auditpolicy"), fmt.Sprintf("%s/%s", namespace, name))
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", namespace, name))
 	}
 
 	obj, ok := ns[name]
 	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource("auditpolicy"), fmt.Sprintf("%s/%s", namespace, name))
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", namespace, name))
 	}
 
 	return &obj, nil
@@ -98,18 +105,32 @@ func (m *MockController) Patch(namespace string, name string, pt types.PatchType
 }
 
 // Update implements v1.AuditPolicyController.
-func (m *MockController) Update(*auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
-	panic("unimplemented")
+func (m *MockController) Update(obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
+	ns, ok := m.Objs[obj.Namespace]
+	if !ok {
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
+	}
+
+	ns[obj.Name] = *obj
+
+	return obj, nil
 }
 
 // UpdateStatus implements v1.AuditPolicyController.
 func (m *MockController) UpdateStatus(obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
 	ns, ok := m.Objs[obj.Namespace]
 	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource("auditpolicy"), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
 	}
 
-	ns[obj.Name] = *obj
+	existing, ok := ns[obj.Name]
+	if !ok {
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
+	}
+
+	existing.Status = obj.Status
+
+	ns[obj.Name] = existing
 
 	return obj, nil
 }
