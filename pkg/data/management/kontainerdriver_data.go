@@ -110,6 +110,17 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	); err != nil {
 		return err
 	}
+	if err := creator.addCustomDriver(
+		"exoscalekubernetesengine",
+		"https://github.com/exoscale/kontainer-engine-driver-sks/releases/download/v0.0.1/kontainer-engine-driver-sks_0.0.1_linux_amd64",
+		"2f1dea48f07baad1634101cf6311a6342bbb444f1039a4fbe2f1d9f02f31d4cc",
+		"https://exoscale.github.io/kontainer-engine-driver-sks/component.js",
+		false,
+		"*.exoscale.com",
+		"exoscale.github.io",
+	); err != nil {
+		return err
+	}
 
 	return creator.addCustomDriver(
 		"opentelekomcloudcontainerengine",
