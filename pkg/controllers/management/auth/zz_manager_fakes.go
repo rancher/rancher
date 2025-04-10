@@ -36,6 +36,21 @@ func (m *MockmanagerInterface) EXPECT() *MockmanagerInterfaceMockRecorder {
 	return m.recorder
 }
 
+// canUpdatePSA mocks base method.
+func (m *MockmanagerInterface) canUpdatePSA(arg0 string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "canUpdatePSA", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// canUpdatePSA indicates an expected call of canUpdatePSA.
+func (mr *MockmanagerInterfaceMockRecorder) canUpdatePSA(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "canUpdatePSA", reflect.TypeOf((*MockmanagerInterface)(nil).canUpdatePSA), arg0)
+}
+
 // checkReferencedRoles mocks base method.
 func (m *MockmanagerInterface) checkReferencedRoles(arg0, arg1 string, arg2 int) (bool, error) {
 	m.ctrl.T.Helper()
@@ -77,21 +92,6 @@ func (m *MockmanagerInterface) ensureProjectMembershipBinding(arg0, arg1, arg2, 
 func (mr *MockmanagerInterfaceMockRecorder) ensureProjectMembershipBinding(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ensureProjectMembershipBinding", reflect.TypeOf((*MockmanagerInterface)(nil).ensureProjectMembershipBinding), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-}
-
-// getAllowedProjectVerbs mocks base method.
-func (m *MockmanagerInterface) getAllowedProjectVerbs(arg0 string) ([]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getAllowedProjectVerbs", arg0)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// getAllowedProjectVerbs indicates an expected call of getAllowedProjectVerbs.
-func (mr *MockmanagerInterfaceMockRecorder) getAllowedProjectVerbs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getAllowedProjectVerbs", reflect.TypeOf((*MockmanagerInterface)(nil).getAllowedProjectVerbs), arg0)
 }
 
 // grantManagementClusterScopedPrivilegesInProjectNamespace mocks base method.

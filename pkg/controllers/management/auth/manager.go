@@ -39,10 +39,6 @@ const (
 	managementAPIGroup     = "management.cattle.io"
 )
 
-// allowed verbs for project resource on <project_name>-projectmember role
-// this help us to ensure that only verbs listed here will be added to the role
-var allowedProjectVerbs = []string{"updatepsa"}
-
 func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *crtbLifecycle) {
 	crbInformer := management.RBAC.ClusterRoleBindings("").Controller().Informer()
 	rbInformer := management.RBAC.RoleBindings("").Controller().Informer()
@@ -110,7 +106,7 @@ type managerInterface interface {
 	grantManagementPlanePrivileges(string, map[string]string, v1.Subject, interface{}) error
 	grantManagementClusterScopedPrivilegesInProjectNamespace(string, string, map[string]string, v1.Subject, *v3.ClusterRoleTemplateBinding) error
 	grantManagementProjectScopedPrivilegesInClusterNamespace(string, string, map[string]string, v1.Subject, *v3.ProjectRoleTemplateBinding) error
-	getAllowedProjectVerbs(string) ([]string, error)
+	canUpdatePSA(string) (bool, error)
 }
 
 type manager struct {
@@ -302,7 +298,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 // (or CRUD the project/cluster if they are an owner)
 func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Cluster, makeOwner bool) error {
 	if cr, _ := m.crLister.Get("", roleName); cr == nil {
-		return m.createMembershipRole(clusterResource, roleName, makeOwner, nil, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
+		return m.createMembershipRole(clusterResource, roleName, makeOwner, false, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
 	}
 	return nil
 }
@@ -310,24 +306,24 @@ func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Clust
 // Creates a role that lets the bound subject see (if they are an ordinary member) the project in the mgmt api
 // (or CRUD the project if they are an owner)
 func (m *manager) createProjectMembershipRole(roleName, namespace, roleTemplate string, project *v3.Project, makeOwner bool) error {
-	var additionalVerbs []string
-	var err error
 	// when the role is not <project_name>-projectowner
 	// we should carefully select the verbs we want to allow
+	var canUpdatePSA bool
+	var err error
 	if !makeOwner {
-		additionalVerbs, err = m.getAllowedProjectVerbs(roleTemplate)
+		canUpdatePSA, err = m.canUpdatePSA(roleTemplate)
 		if err != nil {
 			return err
 		}
 	}
 	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
-		return m.createMembershipRole(projectResource, roleName, makeOwner, additionalVerbs, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
+		return m.createMembershipRole(projectResource, roleName, makeOwner, canUpdatePSA, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
 	}
 	return nil
 }
 
 // createMembershipRole creates Role or ClusterRole for Project resources.
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, additionalVerbs []string, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
+func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, canUpdatePSA bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
 		return err
@@ -348,7 +344,7 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 	if makeOwner {
 		// verbs for <project_name>-projectowner
 		rules[0].Verbs = []string{"*"}
-	} else if slices.Contains(additionalVerbs, updatePSAVerb) {
+	} else if canUpdatePSA {
 		// verbs for <project_name>-projectpsa
 		rules[0].Verbs = []string{updatePSAVerb}
 	} else {
@@ -1018,20 +1014,20 @@ func getLabelRequirements(objMeta metav1.ObjectMeta) ([]labels.Requirement, erro
 	return []labels.Requirement{*reqUpdatedLabel, *reqNsAndNameLabel}, nil
 }
 
-// getAllowedProjectVerbs returns the list of verbs set for project rules in the role template
-func (m *manager) getAllowedProjectVerbs(roleTemplate string) ([]string, error) {
-	var additionalVerbs []string
+// canUpdatePSA returns true if the roletemplate has the updatepsa verb enabled
+func (m *manager) canUpdatePSA(roleTemplate string) (bool, error) {
+	var additionalVerbs bool
 	// retrieve involved role templates
 	roleTemplates, err := m.gatherAndDedupeRoles(roleTemplate)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	verbList := make(map[string]string, 0)
 	for _, rt := range roleTemplates {
 		// retrieve verbs listed in role template rule for management.cattle.io/projects resource
 		verbs, err := m.checkForManagementPlaneRules(rt, projectResource, managementAPIGroup)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 		// merging current verbs with the ones previously found
 		for verb, apiGroup := range verbs {
@@ -1040,8 +1036,8 @@ func (m *manager) getAllowedProjectVerbs(roleTemplate string) ([]string, error) 
 	}
 	// making the list of verb unique after collecting them from role templates
 	for verb := range verbList {
-		if slices.Contains(allowedProjectVerbs, verb) {
-			additionalVerbs = append(additionalVerbs, verb)
+		if verb == updatePSAVerb {
+			additionalVerbs = true
 		}
 	}
 	return additionalVerbs, nil

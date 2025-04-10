@@ -3,7 +3,6 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
@@ -173,18 +172,15 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		}
 		return err
 	}
-	verbs, err := p.mgr.getAllowedProjectVerbs(binding.RoleTemplateName)
+	canUpdatePSA, err := p.mgr.canUpdatePSA(binding.RoleTemplateName)
 	if err != nil {
 		return err
 	}
 
-	logrus.Info("================= roleTemplate:", binding.RoleTemplateName)
-	logrus.Info("================= isOwner:", isOwnerRole)
-	logrus.Info("================= verbs:", verbs)
 	var projectRoleNames []string
 	if isOwnerRole {
 		projectRoleNames = append(projectRoleNames, strings.ToLower(fmt.Sprintf("%s-projectowner", projectName)))
-	} else if slices.Contains(verbs, updatePSAVerb) {
+	} else if canUpdatePSA {
 		// in this specific case we are going to create multiple roles
 		// in particular, we are going to add a special role who can perform controlled actions on the namespaces PSA labels.
 		projectRoleNames = append(projectRoleNames, strings.ToLower(fmt.Sprintf("%s-projectpsa", projectName)))
@@ -193,7 +189,6 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		// if no special verbs are found, we create only the <project_name>-projectmember role
 		projectRoleNames = append(projectRoleNames, strings.ToLower(fmt.Sprintf("%s-projectmember", projectName)))
 	}
-	logrus.Info("================= projectRoleNames:", projectRoleNames)
 
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
@@ -202,9 +197,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, projectRoleName := range projectRoleNames {
 		// depending on the number of roles collected above, we create them accordingly.
-		logrus.Info("================= projectRoleName:", projectRoleName)
 		if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, rtbNsAndName, clusterName, binding.RoleTemplateName, proj, isOwnerRole, subject); err != nil {
-			logrus.Info("================= projectRoleName / err:", err)
 			return err
 		}
 	}
