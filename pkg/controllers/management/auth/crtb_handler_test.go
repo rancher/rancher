@@ -401,6 +401,16 @@ func TestReconcileBindings(t *testing.T) {
 				}
 			},
 			crtb: defaultCRTB.DeepCopy(),
+			wantConditions: []v1.Condition{
+				{
+					Type:   bindingExists,
+					Status: v1.ConditionTrue,
+					Reason: bindingExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+			},
 		},
 		{
 			name: "skip projects that are deleting",
