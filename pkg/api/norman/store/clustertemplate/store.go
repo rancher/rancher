@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
@@ -20,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -520,6 +522,8 @@ func setLabelsAndOwnerRef(apiContext *types.APIContext, data map[string]interfac
 }
 
 func (p *Store) isTemplateInUse(apiContext *types.APIContext, id string) (bool, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "Store.isTemplateInUse()")
 
 	/*check if there are any clusters referencing this template or templateRevision */
 	var clusters []*v3.Cluster

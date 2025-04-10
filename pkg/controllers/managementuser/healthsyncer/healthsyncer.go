@@ -17,6 +17,7 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -47,6 +48,7 @@ type ClusterControllerLifecycle interface {
 	Stop(cluster *v3.Cluster)
 }
 
+// vf each cluster gets its own health syncer which is going to periodically check up on it.
 type HealthSyncer struct {
 	ctx               context.Context
 	clusterName       string
@@ -57,6 +59,7 @@ type HealthSyncer struct {
 	k8s               kubernetes.Interface
 }
 
+// vf each cluster gets its own context
 func Register(ctx context.Context, workload *config.UserContext) {
 	h := &HealthSyncer{
 		ctx:               ctx,
@@ -71,12 +74,21 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	go h.syncHealth(ctx, syncInterval)
 }
 
-func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration) {
-	for range ticker.Context(ctx, syncHealth) {
+// vf loops through all the contexts and update the cluster's health
+func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealthInterval time.Duration) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "HealthSyncer.syncHealth()")
+
+	//vf ticker.Context() returns a channel on which we receive ticks.
+	//every time we receive a tick, we will do cluster health check. this goes on until the ctx is done (receives signal on its Done channel)
+	//this loop might need some additional logic so that we don't keep pinging unreachable clusters all the time. might have to
+	//move them to a different queue and check up on them less frequently.
+	for range ticker.Context(ctx, syncHealthInterval) {
 		err := h.updateClusterHealth()
 		if err != nil && !apierrors.IsConflict(err) {
 			logrus.Error(err)
 		}
+
 	}
 }
 
@@ -142,6 +154,9 @@ func IsAPIUp(ctx context.Context, ns typedv1.NamespaceInterface) error {
 }
 
 func (h *HealthSyncer) updateClusterHealth() error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "HealthSyncer.updateClusterHealth()")
+
 	oldCluster, err := h.getCluster()
 	if err != nil {
 		return err
@@ -158,25 +173,38 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 
+	//vf the receiver is somewhat dummy string receiver, the function is actually performed on object passed in.
+	//but receiver 'ClusterConditionReady' is being checked
+	//will check twice if cluster is healthy
 	newObj, err := v32.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
+		//vf so here we are getting cluster status twice.
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
+			//vf the code below uses the fact that Wrap on nil error produces a nil.
+			//so it is basically
+			// if err == nil
+			//      return cluster, nil
+			// if i > 1
+			//      return cluster, errors.Wrap(err, "cluster health check failed")
 			if err == nil || i > 1 {
 				return cluster, errors.Wrap(err, "cluster health check failed")
 			}
 			select {
 			case <-h.ctx.Done():
 				return cluster, err
+			//vf block here for 5 seconds, then try again. but why do we need to do this if caller will call us again in 15 seconds?
 			case <-time.After(5 * time.Second):
 			}
 		}
 	})
 
+	//vf if no error, then  cluster.ConditionWaiting=True cluster.ConditionWaiting.Message = ""
 	if err == nil {
 		v32.ClusterConditionWaiting.True(newObj)
 		v32.ClusterConditionWaiting.Message(newObj, "")
 	}
 
+	//vf check if cached cluster struct is not same as what we got, update the cached one.
 	if !reflect.DeepEqual(oldCluster, newObj) {
 		logrus.Tracef("[healthSyncer] update cluster %s", cluster.Name)
 		if _, err := h.clusters.Update(newObj.(*v3.Cluster)); err != nil {

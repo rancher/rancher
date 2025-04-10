@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	rkecluster "github.com/rancher/rke/cluster"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
@@ -61,7 +62,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		clusterLister:         management.Management.Clusters("").Controller().Lister(),
 		backupClient:          management.Management.EtcdBackups(""),
 		backupLister:          management.Management.EtcdBackups("").Controller().Lister(),
-		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core, management.Management.Clusters(""))),
+		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		secretLister:          management.Core.Secrets("").Controller().Lister(),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
@@ -141,7 +142,11 @@ func (c *Controller) Updated(b *v3.EtcdBackup) (runtime.Object, error) {
 	return b, nil
 }
 
+// vf todo: revisit this. runs in parallel via go routine
 func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Duration) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "clusterBackupSync()")
+
 	for range ticker.Context(ctx, interval) {
 		clusters, err := c.clusterLister.List("", labels.NewSelector())
 		if err != nil {

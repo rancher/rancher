@@ -3,12 +3,14 @@ package metrics
 import (
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	rm "github.com/rancher/remotedialer/metrics"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,6 +34,9 @@ type metricGarbageCollector struct {
 }
 
 func (gc *metricGarbageCollector) metricGarbageCollection() {
+	startTime := time.Now()
+	defer zed.Log(startTime, "metricGarbageCollector.metricGarbageCollection()")
+
 	logrus.Debugf("[metrics-garbage-collector] Start")
 
 	isClusterMode := settings.Namespace.Get() != "" && settings.PeerServices.Get() != ""

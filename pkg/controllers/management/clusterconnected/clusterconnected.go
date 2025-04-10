@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
@@ -47,7 +48,11 @@ type checker struct {
 	tunnelServer *remotedialer.Server
 }
 
+// vf todo: revisit
 func (c *checker) check() error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "checker.check()")
+
 	clusters, err := c.clusterCache.List(labels.Everything())
 	if err != nil {
 		return err
@@ -55,9 +60,11 @@ func (c *checker) check() error {
 
 	for _, cluster := range clusters {
 		if err := c.checkCluster(cluster); err != nil {
+			logrus.Printf("XXXX check() failed to check cluster connectivity. stopping on cluster %s\n", cluster.Name)
 			logrus.Errorf("failed to check connectivity of cluster [%s]: %v", cluster.Name, err)
 		}
 	}
+
 	return nil
 }
 

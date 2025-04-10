@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zks-config
+  namespace: cattle-system
+data:
+  LoggingTriggerInterval: "15000" #specified in milliseconds. string.
+

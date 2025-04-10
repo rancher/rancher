@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"helm.sh/helm/v3/pkg/repo"
 )
@@ -28,6 +30,9 @@ type contentDownload struct {
 // link field of the API context. It then calls the appropriate function of
 // contentManager to serve the information.
 func (i *contentDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "contentDownload.ServeHTTP()")
+
 	// Get the APIContext from the current request's context. This APIContext
 	// encapsulates the details of the API request, which will be used to
 	// determine the necessary operation and respond accordingly.

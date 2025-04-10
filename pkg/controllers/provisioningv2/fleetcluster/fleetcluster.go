@@ -3,8 +3,9 @@ package fleetcluster
 import (
 	"context"
 	"os"
-	"strings"
 	"time"
+
+	zed "github.com/rancher/rancher/pkg/zdbg"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -27,10 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/clientcmd"
-)
-
-const (
-	externallyManagedAnn = "provisioning.cattle.io/externally-managed"
 )
 
 // ClusterHostGetter provides cluster API server URL retrieval.
@@ -111,14 +108,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 		return cluster, nil
 	}
 
-	// Clusters annotated with "provisioning.cattle.io/externally-managed": "true" to manage fleet deployment externally
-	var clusterExternallyManaged bool
-	// For legacy purposes of the way our API generally works, make sure the value is not set to "false"
-	if ann := cluster.Annotations[externallyManagedAnn]; ann != "" && (strings.ToLower(ann) != "false") {
-		clusterExternallyManaged = true
-	}
-
-	if cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged {
+	if cluster.Spec.FleetWorkspaceName == "" {
 		def := settings.FleetDefaultWorkspaceName.Get()
 		if def == "" {
 			return cluster, nil
@@ -143,6 +133,9 @@ func (h *handler) ensureAgentMigrated(key string, cluster *fleet.Cluster) (*flee
 }
 
 func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterStatus) ([]runtime.Object, provv1.ClusterStatus, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "createCluster()")
+
 	if status.ClusterName == "" || status.ClientSecretName == "" {
 		return nil, status, nil
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
@@ -131,6 +133,9 @@ func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtim
 }
 
 func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBinding) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "deleteAdminBinding()")
+
 	// Explicit API call to ensure we have the most recent cluster info when deleting admin bindings
 	clusters, err := grb.clusters.List(metav1.ListOptions{})
 	if err != nil {
@@ -180,6 +185,9 @@ func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBind
 // reconcileClusterPermissions grants permissions for the binding in all downstream (non-local) clusters. Will also
 // remove invalid bindings (bindings not for active RoleTemplates or for invalid subjects).
 func (grb *globalRoleBindingLifecycle) reconcileClusterPermissions(globalRoleBinding *v3.GlobalRoleBinding) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "reconcileClusterPermissions()")
+
 	globalRole, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
 	if err != nil {
 		return fmt.Errorf("unable to get globalRole %s: %w", globalRoleBinding.Name, err)
@@ -507,6 +515,9 @@ func (grb *globalRoleBindingLifecycle) createRestrictedAdminCRBsForUserClusters(
 }
 
 func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermissions(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "grantRestrictedAdminUserClusterPermissions()")
+
 	var returnErr error
 	clusters, err := grb.clusterLister.List("", labels.NewSelector())
 	if err != nil {

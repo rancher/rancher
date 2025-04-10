@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -93,6 +94,9 @@ func (u *userCleanup) cleanup() error {
 }
 
 func (u *userCleanup) checkClusterOrProjectExistsForSystemUser(user *v3.User, clusters []*v3.Cluster) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "userCleanup.checkClusterOrProjectExistsForSystemUser()")
+
 	displayName := user.DisplayName
 	if strings.HasPrefix(user.DisplayName, systemaccount.ClusterSystemAccountPrefix) {
 		clusterID := strings.TrimPrefix(displayName, systemaccount.ClusterSystemAccountPrefix)

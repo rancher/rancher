@@ -2,6 +2,7 @@ package networkpolicy
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -10,6 +11,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	zed "github.com/rancher/rancher/pkg/zdbg"
 )
 
 type nsSyncer struct {
@@ -24,6 +27,9 @@ type nsSyncer struct {
 
 // Sync invokes Policy Handler to program the native network policies
 func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) (runtime.Object, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "nsSyncer.Sync()")
+
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -69,6 +75,7 @@ func (nss *nsSyncer) syncOnMove(nsName string, projectID string, movedToNone boo
 		nss.npmgr.delete(nsName, hostNetworkPolicyName)
 		nss.npmgr.delete(nsName, defaultSystemProjectNamespacePolicyName)
 	}
+
 	if err = nss.syncNodePortServices(systemNamespaces, nsName, movedToNone); err != nil {
 		return fmt.Errorf("nsSyncer: error syncing services %v", err)
 	}

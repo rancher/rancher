@@ -2,9 +2,11 @@ package clusterindex
 
 import (
 	"context"
+	"time"
 
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -14,6 +16,9 @@ const (
 )
 
 func Register(ctx context.Context, clients *wrangler.Context) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "clusterindex::Register()")
+
 	clusterCache := clients.Provisioning.Cluster().Cache()
 
 	clusterCache.AddIndexer(ClusterV1ByClusterV3Reference, func(obj *rancherv1.Cluster) ([]string, error) {

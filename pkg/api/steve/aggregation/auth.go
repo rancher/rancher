@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"net/http"
 	"strings"
+	"time"
 
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/remotedialer"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,6 +50,9 @@ func hashSecret(sa *corev1.Secret) string {
 }
 
 func (a *APIServiceAuthorizer) Authorize(req *http.Request) (clientKey string, authed bool, err error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve APIServiceAuthorizer.Authorize()")
+
 	token := strings.TrimSpace(strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer "))
 	if token == "" {
 		return "", false, nil

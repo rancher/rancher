@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -17,6 +18,7 @@ import (
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -135,6 +137,10 @@ func matchRKENodeGroup(gvk schema.GroupVersionKind) bool {
 }
 
 func (h *handler) infraWatch(obj runtime.Object) (runtime.Object, error) {
+	//vf this function should not be a problem, but lets time it anyways
+	startTime := time.Now()
+	defer zed.Log(startTime, "infraWatch()")
+
 	if obj == nil {
 		return nil, nil
 	}

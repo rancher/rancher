@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/oracle/oci-go-sdk/common"
@@ -21,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/sirupsen/logrus"
 )
 
@@ -138,6 +140,9 @@ func (handler *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 
 // extractCreds attempts to extract the credentials from a given request either from the body or cloud credentials.
 func (handler *handler) extractCreds(req *http.Request, creds *Credentials) (int, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "handler.extractCreds()")
+
 	if credID := req.URL.Query().Get("cloudCredentialId"); credID != "" {
 		ns, name := ref.Parse(credID)
 		if ns == "" || name == "" {

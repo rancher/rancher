@@ -12,6 +12,7 @@ package catalog
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/rancher/apiserver/pkg/handlers"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -20,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/catalog.cattle.io"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
 	schemas3 "github.com/rancher/wrangler/v3/pkg/schemas"
@@ -56,6 +58,9 @@ func Register(ctx context.Context, server *steve.Server,
 //
 // The handlers for retrieving resources by their IDs are also customized.
 func addSchemas(server *steve.Server, ops *operation, index http.Handler) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve::catalog::addSchemas()")
+
 	// Imports and generates API schemas to be handled by as requests by the Rancher API server.
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUninstallAction{}, nil)
 	server.BaseSchemas.MustImportAndCustomize(types2.ChartUpgradeAction{}, nil)

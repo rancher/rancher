@@ -10,9 +10,11 @@ import (
 	"net/http/httputil"
 	neturl "net/url"
 	"path/filepath"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -62,6 +64,9 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request, denyListFunc denyFunc) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve:catlog::proxyRequest()")
+
 	url, err := neturl.Parse(target)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse url [%s]", target), http.StatusInternalServerError)

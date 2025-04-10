@@ -2,6 +2,7 @@ package clusterregistrationtokens
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
@@ -12,6 +13,7 @@ import (
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -20,6 +22,9 @@ type ClusterImport struct {
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "ClusterImport.ClusterImportHandler()")
+
 	resp.Header().Set("Content-Type", "text/plain")
 	token := mux.Vars(req)["token"]
 	clusterID := mux.Vars(req)["clusterId"]

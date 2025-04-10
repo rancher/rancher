@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -22,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -361,6 +363,9 @@ func validateAKSNodePools(spec *v32.ClusterSpec) error {
 }
 
 func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "validateAKSClusterName()")
+
 	// validate cluster does not reference an AKS cluster that is already backed by a Rancher cluster
 	name := spec.AKSConfig.ClusterName
 	region := spec.AKSConfig.ResourceLocation
@@ -412,6 +417,9 @@ func (v *Validator) validateAKSNetworkPolicy(clusterSpec *v32.ClusterSpec, prevC
 }
 
 func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "Validator.validateEKSConfig()")
+
 	eksConfig, ok := cluster["eksConfig"].(map[string]interface{})
 	if !ok {
 		return nil
@@ -730,6 +738,9 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 }
 
 func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "validateGKEClusterName()")
+
 	// validate cluster does not reference an GKE cluster that is already backed by a Rancher cluster
 	name := spec.GKEConfig.ClusterName
 	region := spec.GKEConfig.Region

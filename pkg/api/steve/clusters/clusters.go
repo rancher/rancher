@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
@@ -25,6 +26,9 @@ import (
 )
 
 func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve::clusters::Register()")
+
 	log := &log{
 		cg: server.ClientFactory,
 	}
@@ -49,6 +53,8 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 		userMgr: userManager,
 		auth:    requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc),
 	}
+
+	//vf are we spending more time adding templates or doing OnAdd/OnChange?
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
 	server.ClusterCache.OnChange(ctx, func(gvk schema.GroupVersionKind, key string, obj, oldObj runtime.Object) error {

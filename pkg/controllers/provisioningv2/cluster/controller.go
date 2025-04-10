@@ -4,7 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -192,15 +193,7 @@ func (h *handler) isLegacyCluster(cluster interface{}) bool {
 // cluster FleetWorkspaceName is empty or if the cluster name does not match (c-XXXXX|local) where XXXXX is a random
 // string of characters.
 func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
-	// Clusters annotated with "provisioning.cattle.io/externally-managed": "true" should get cluster created
-	// when the fleet workspace defaulting is disabled
-	var clusterExternallyManaged bool
-	// For legacy purposes of the way our API generally works, make sure the value is not set to "false"
-	if ann := cluster.Annotations[externallyManagedAnn]; ann != "" && (strings.ToLower(ann) != "false") {
-		clusterExternallyManaged = true
-	}
-
-	if !h.isLegacyCluster(cluster) || (cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged) {
+	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
 		return nil, status, nil
 	}
 	provCluster := &v1.Cluster{
@@ -290,6 +283,9 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 }
 
 func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "createCluster()")
+
 	if h.isLegacyCluster(cluster) {
 		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Name)
 		if err != nil {
@@ -531,6 +527,9 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 }
 
 func (h *handler) updateFeatureLockedValue(lockValueToTrue bool) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "updateFeatureLockedValue()")
+
 	feature, err := h.featureCache.Get(features.RKE2.Name())
 	if err != nil {
 		return err

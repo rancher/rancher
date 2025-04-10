@@ -26,6 +26,7 @@ import (
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/sirupsen/logrus"
 )
 
@@ -280,6 +281,9 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 }
 
 func (h *handler) clusterCheck(apiContext *types.APIContext, clusterID, cloudCredentialID string) (int, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "handler.clusterCheck()")
+
 	var (
 		clusters []*v3.Cluster
 		err      error

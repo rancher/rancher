@@ -13,6 +13,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/proxy"
@@ -84,6 +85,9 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 
 func routeToShellProxy(key, value string, localSupport bool, localCluster http.Handler, mux *gmux.Router, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		startTime := time.Now()
+		defer zed.Log(startTime, "handler returned by routeToShellProxy()")
+
 		vars := gmux.Vars(r)
 		cluster := vars["clusterID"]
 		if cluster == "local" {
@@ -160,7 +164,11 @@ func (h *Handler) matchManagementCRDs() gmux.MatcherFunc {
 	}
 }
 
+// vf - look up correct handler function for the cluster, and call it to serve http response.
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve Handler.ServeHTTP()")
+
 	clusterID := gmux.Vars(req)["clusterID"]
 	authed := h.userCanAccessCluster(req, clusterID)
 	if !authed {
@@ -168,6 +176,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	prefix := "/" + gmux.Vars(req)["prefix"]
+	//vf this fishes out the correct handler
 	handler, err := h.next(clusterID, prefix)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -187,6 +196,9 @@ func (h *Handler) userCanAccessCluster(req *http.Request, clusterID string) bool
 }
 
 func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve Handler.dialer()")
+
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -212,6 +224,7 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 	return conn, nil
 }
 
+// vf looks up the http handler based on cluster id and prefix.
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {
 	cfg := &rest.Config{
 		// this is bogus, the dialer will change it to 127.0.0.1:6080, but the clusterID is used to lookup the tunnel
