@@ -50,12 +50,14 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 		}
 	}
 
+	var err error
+
 	if !obj.Spec.Enabled {
 		h.writer.RemovePolicy(obj)
 
 		updateStatus(obj, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "policy was disabled")
 
-		if _, err := h.auditpolicy.UpdateStatus(obj); err != nil {
+		if obj, err = h.auditpolicy.UpdateStatus(obj); err != nil {
 			return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as disabled: %s", obj.Namespace, obj.Name, err)
 		}
 
@@ -65,7 +67,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 	if err := h.writer.UpdatePolicy(obj); err != nil {
 		updateStatus(obj, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, err.Error())
 
-		if _, err := h.auditpolicy.UpdateStatus(obj); err != nil {
+		if obj, err = h.auditpolicy.UpdateStatus(obj); err != nil {
 			return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as invalid: %s", obj.Namespace, obj.Name, err)
 		}
 
@@ -75,7 +77,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 	updateStatus(obj, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
 	updateStatus(obj, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionTrue, "")
 
-	if _, err := h.auditpolicy.UpdateStatus(obj); err != nil {
+	if obj, err := h.auditpolicy.UpdateStatus(obj); err != nil {
 		return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as active: %s", obj.Namespace, obj.Name, err)
 	}
 
