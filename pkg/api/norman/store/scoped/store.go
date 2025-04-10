@@ -49,7 +49,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		if err != nil {
 			return nil, err
 		}
-		data[client.ProjectFieldNamespaceId] = p.GetProjectNamespace()
+		data[client.ProjectFieldNamespaceId] = p.GetProjectBackingNamespace()
 	} else {
 		data[client.ProjectFieldNamespaceId] = data[s.key]
 	}

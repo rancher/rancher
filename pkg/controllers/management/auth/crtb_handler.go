@@ -233,12 +233,12 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 	for _, p := range projects {
-		projectNamespace := p.GetProjectNamespace()
+		backingNamespace := p.GetProjectBackingNamespace()
 		if p.DeletionTimestamp != nil {
-			logrus.Warnf("Project %v is being deleted, not creating membership bindings", projectNamespace)
+			logrus.Warnf("Project %v is being deleted, not creating membership bindings", backingNamespace)
 			continue
 		}
-		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, projectNamespace, projectManagementPlaneResources, subject, binding); err != nil {
+		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, backingNamespace, projectManagementPlaneResources, subject, binding); err != nil {
 			c.s.AddCondition(localConditions, condition, failedToGrantManagementClusterScopedPrivilegesInProjectNamespace, err)
 			return err
 		}
@@ -255,15 +255,15 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	}
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, p := range projects {
-		projectNamespace := p.GetProjectNamespace()
+		backingNamespace := p.GetProjectBackingNamespace()
 		set := labels.Set(map[string]string{bindingKey: CrtbInProjectBindingOwner})
-		rbs, err := c.rbLister.List(projectNamespace, set.AsSelector())
+		rbs, err := c.rbLister.List(backingNamespace, set.AsSelector())
 		if err != nil {
 			return err
 		}
 		for _, rb := range rbs {
-			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, projectNamespace, binding.Name)
-			if err := c.rbClient.DeleteNamespaced(projectNamespace, rb.Name, &metav1.DeleteOptions{}); err != nil {
+			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, backingNamespace, binding.Name)
+			if err := c.rbClient.DeleteNamespaced(backingNamespace, rb.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 		}
