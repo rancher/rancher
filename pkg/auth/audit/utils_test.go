@@ -21,8 +21,8 @@ func TestMergePolicyVerbosities(t *testing.T) {
 		},
 		{
 			Name:     "Single Policy Returns Policy Verbosity",
-			Rhs:      verbosityForLevel(auditlogv1.LevelMetadata),
-			Expected: verbosityForLevel(auditlogv1.LevelMetadata),
+			Rhs:      verbosityForLevel(auditlogv1.LevelHeaders),
+			Expected: verbosityForLevel(auditlogv1.LevelHeaders),
 		},
 		{
 			Name: "Multiple Policies Merge Verbosities",
