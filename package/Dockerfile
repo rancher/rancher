@@ -12,21 +12,37 @@ FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
 # Temporary build stage image
 FROM registry.suse.com/bci/bci-base:15.6 AS chroot-builder
-
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
-
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-    git-core curl util-linux ca-certificates ca-certificates-mozilla unzip xz gzip sed tar shadow gawk vim-small \
-    netcat-openbsd mkisofs openssh-clients openssl patterns-base-fips jq sysstat acl less iproute2 hostname git-core \
-    bind-utils bash-completion && \
+    curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small \
+    openssh-clients openssl patterns-base-fips && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
+
+FROM chroot-builder AS chroot-builder-server
+COPY --from=final / /chroot/
+RUN zypper refresh && \
+    zypper --installroot /chroot -n in --no-recommends \
+    git-core unzip sed shadow netcat-openbsd mkisofs && \
+    zypper --installroot /chroot clean -a && \
+    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+
+
+FROM chroot-builder AS chroot-builder-agent
+COPY --from=final / /chroot/
+RUN zypper refresh && \
+    zypper --installroot /chroot -n in --no-recommends \
+    jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+    zypper --installroot /chroot clean -a && \
+    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+
+
 FROM final AS builder
-COPY --from=chroot-builder /chroot/ /
+COPY --from=chroot-builder-server /chroot/ /
 
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS go-builder
 ARG CGO_ENABLED=0
@@ -81,7 +97,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 # Main stage using bci-micro as the base image
 FROM final AS base
 # Copy binaries and configuration files from builder to micro
-COPY --from=chroot-builder /chroot/ /
+COPY --from=chroot-builder-server /chroot/ /
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
@@ -372,7 +388,7 @@ ENTRYPOINT ["entrypoint.sh"]
 FROM final AS agent
 
 # Copy binaries and configuration files from zypper to micro.
-COPY --from=chroot-builder /chroot/ /
+COPY --from=chroot-builder-agent /chroot/ /
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
