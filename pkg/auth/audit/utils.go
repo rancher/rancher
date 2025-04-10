@@ -22,7 +22,7 @@ func mergeLogVerbosities(lhs auditlogv1.LogVerbosity, rhs auditlogv1.LogVerbosit
 
 func verbosityForLevel(level auditlogv1.Level) auditlogv1.LogVerbosity {
 	switch level {
-	case auditlogv1.LevelMetadata:
+	case auditlogv1.LevelHeaders:
 		return auditlogv1.LogVerbosity{
 			Request: auditlogv1.Verbosity{
 				Headers: true,
