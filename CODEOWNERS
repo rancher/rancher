@@ -1,7 +1,0 @@
-# Code owners of this repo. Goes from more general to more specific.
-# Each line is a file pattern followed by one or more owners.
-# For more info, see https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-* vadim@zededa.com manjunath@zededa.com ppallapothu@zededa.com vignesh@zededa.com
-
-pkg/zdbg/zdbg.go vadim@zededa.com
-chart/templates/zksConfigMap.yaml vadim@zededa.com
