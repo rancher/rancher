@@ -78,7 +78,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	backingNamespace := orig.GetProjectNamespace()
+	backingNamespace := orig.GetProjectBackingNamespace()
 	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, backingNamespace, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
@@ -141,8 +141,8 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 
 // Remove deletes all backing resources created by the project
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
-	projectNamespace := obj.GetProjectNamespace()
-	return obj, deleteNamespace(ProjectRemoveController, projectNamespace, l.nsClient)
+	backingNamespace := obj.GetProjectBackingNamespace()
+	return obj, deleteNamespace(ProjectRemoveController, backingNamespace, l.nsClient)
 }
 
 func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object, nsName string) (runtime.Object, error) {

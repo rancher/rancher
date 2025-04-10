@@ -325,8 +325,8 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 			return nil, fmt.Errorf("secretsController: sync: error getting project %s for namespace %s: %w", projectName, obj.Name, err)
 		}
 
-		projectNamespace := p.GetProjectNamespace()
-		secrets, err := n.managementSecrets.List(projectNamespace, labels.NewSelector())
+		backingNamespace := p.GetProjectBackingNamespace()
+		secrets, err := n.managementSecrets.List(backingNamespace, labels.NewSelector())
 		if err != nil {
 			return nil, err
 		}

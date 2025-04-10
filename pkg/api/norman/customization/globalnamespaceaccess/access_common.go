@@ -35,7 +35,6 @@ type MemberAccess struct {
 	Prtbs              v3.ProjectRoleTemplateBindingInterface
 	Crtbs              v3.ClusterRoleTemplateBindingInterface
 	ProjectLister      v3.ProjectLister
-	ProjectClient      v3.ProjectInterface
 	ClusterLister      v3.ClusterLister
 }
 
@@ -143,12 +142,12 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		callerIsProjectMember := false
 		callerIsClusterOwner := false
 
-		p, err := ma.ProjectClient.GetNamespaced(cname, pname, v1.GetOptions{})
+		p, err := ma.ProjectLister.Get(cname, pname)
 		if err != nil {
 			return fmt.Errorf("unable to get project %s in namespace %s: %w", pname, cname, err)
 		}
 
-		backingNamespace := p.GetProjectNamespace()
+		backingNamespace := p.GetProjectBackingNamespace()
 
 		prtbs, err := ma.PrtbLister.List(backingNamespace, labels.NewSelector())
 		if err != nil {
@@ -494,11 +493,11 @@ func (ma *MemberAccess) RemoveRolesFromTargets(targetProjects, rolesToRemove []s
 			return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
 		}
 		clusterName, projectName := split[0], split[1]
-		p, err := ma.ProjectClient.GetNamespaced(clusterName, projectName, v1.GetOptions{})
+		p, err := ma.ProjectLister.Get(clusterName, projectName)
 		if err != nil {
 			return fmt.Errorf("unable to get project %s in namespace %s: %w", projectName, clusterName, err)
 		}
-		backingNamespace := p.GetProjectNamespace()
+		backingNamespace := p.GetProjectBackingNamespace()
 		prtbs, err := ma.PrtbLister.List(backingNamespace, labels.NewSelector())
 		if err != nil {
 			return err

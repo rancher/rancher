@@ -48,8 +48,8 @@ func (p *Project) ObjClusterName() string {
 	return p.Spec.ObjClusterName()
 }
 
-// GetProjectNamespace returns the namespace a project uses in the local cluster to store PRTBs and Project Scoped Secrets.
-func (p *Project) GetProjectNamespace() string {
+// GetProjectBackingNamespace returns the namespace a project uses in the local cluster to store PRTBs and Project Scoped Secrets.
+func (p *Project) GetProjectBackingNamespace() string {
 	if p.Status.BackingNamespace != "" {
 		return p.Status.BackingNamespace
 	}
