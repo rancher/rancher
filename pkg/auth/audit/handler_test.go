@@ -57,7 +57,7 @@ func getRequest() *http.Request {
 	return r
 }
 
-func TestMisddleware(t *testing.T) {
+func TestMiddleware(t *testing.T) {
 	requests := []http.Request{}
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		r := *req
