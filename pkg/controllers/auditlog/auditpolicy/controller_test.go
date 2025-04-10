@@ -13,7 +13,7 @@ import (
 
 const (
 	defaultNamespace   = "default"
-	testHandlerFuncKey = "test"
+	testHandlerFuncKey = "cattle-system/auditpolicy"
 )
 
 var (
@@ -57,7 +57,7 @@ func setup(t *testing.T, level auditlogv1.Level) handler {
 	h := handler{
 		auditpolicy: &fake.MockController{
 			Objs: map[string]map[string]auditlogv1.AuditPolicy{
-				defaultNamespace: {},
+				defaultNamespace: map[string]auditlogv1.AuditPolicy{},
 			},
 		},
 		writer: writer,
@@ -67,11 +67,14 @@ func setup(t *testing.T, level auditlogv1.Level) handler {
 }
 
 func TestOnChangeAddSimplePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -92,8 +95,6 @@ func TestOnChangeAddSimplePolicy(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyFilterRequestURIRegex(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 	policy.Spec.Filters = []auditlogv1.Filter{
 		{
@@ -102,7 +103,12 @@ func TestOnChangeAddInvalidPolicyFilterRequestURIRegex(t *testing.T) {
 		},
 	}
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -120,8 +126,6 @@ func TestOnChangeAddInvalidPolicyFilterRequestURIRegex(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyFilterAction(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 	policy.Spec.Filters = []auditlogv1.Filter{
 		{
@@ -129,7 +133,12 @@ func TestOnChangeAddInvalidPolicyFilterAction(t *testing.T) {
 		},
 	}
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -147,8 +156,6 @@ func TestOnChangeAddInvalidPolicyFilterAction(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyRedactorHeaderRegex(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 	policy.Spec.AdditionalRedactions = []auditlogv1.Redaction{
 		{
@@ -158,7 +165,12 @@ func TestOnChangeAddInvalidPolicyRedactorHeaderRegex(t *testing.T) {
 		},
 	}
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -176,8 +188,6 @@ func TestOnChangeAddInvalidPolicyRedactorHeaderRegex(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyRedactorJSONPath(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 	policy.Spec.AdditionalRedactions = []auditlogv1.Redaction{
 		{
@@ -187,7 +197,12 @@ func TestOnChangeAddInvalidPolicyRedactorJSONPath(t *testing.T) {
 		},
 	}
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -205,12 +220,15 @@ func TestOnChangeAddInvalidPolicyRedactorJSONPath(t *testing.T) {
 }
 
 func TestOnChangeAddDisablePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 	policy.Spec.Enabled = false
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -227,11 +245,14 @@ func TestOnChangeAddDisablePolicy(t *testing.T) {
 }
 
 func TestOnChangeDisableActivePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -244,6 +265,9 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 	assert.Equal(t, &expected, actual)
 
 	policy.Spec.Enabled = false
+
+	_, err = h.auditpolicy.Update(&policy)
+	assert.NoError(t, err)
 
 	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
@@ -262,11 +286,14 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 }
 
 func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -293,6 +320,9 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 		},
 	}
 
+	_, err = h.auditpolicy.Update(&invalidPolicy)
+	assert.NoError(t, err)
+
 	_, err = h.OnChange(testHandlerFuncKey, &invalidPolicy)
 	assert.NoError(t, err)
 
@@ -315,8 +345,6 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 }
 
 func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	invalidPolicy := samplePolicy
 	invalidPolicy.Spec.Filters = []auditlogv1.Filter{
 		{
@@ -325,7 +353,12 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 		},
 	}
 
-	_, err := h.OnChange(testHandlerFuncKey, &invalidPolicy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&invalidPolicy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &invalidPolicy)
 	assert.NoError(t, err)
 
 	expected := invalidPolicy
@@ -342,6 +375,9 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 	assert.False(t, ok)
 
 	policy := samplePolicy
+
+	_, err = h.auditpolicy.Update(&policy)
+	assert.NoError(t, err)
 
 	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
@@ -364,11 +400,14 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 }
 
 func TestOnRemoveActivePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -385,12 +424,15 @@ func TestOnRemoveActivePolicy(t *testing.T) {
 }
 
 func TestOnRemoveDisabledPolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 	policy.Spec.Enabled = false
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -413,8 +455,6 @@ func TestOnRemoveDisabledPolicy(t *testing.T) {
 }
 
 func TestOnRemoveInvalidPolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
 	policy.Spec.Filters = []auditlogv1.Filter{
 		{
@@ -423,7 +463,12 @@ func TestOnRemoveInvalidPolicy(t *testing.T) {
 		},
 	}
 
-	_, err := h.OnChange(testHandlerFuncKey, &policy)
+	h := setup(t, auditlogv1.LevelHeaders)
+
+	_, err := h.auditpolicy.Create(&policy)
+	assert.NoError(t, err)
+
+	_, err = h.OnChange(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
 	expected := policy
@@ -447,9 +492,9 @@ func TestOnRemoveInvalidPolicy(t *testing.T) {
 }
 
 func TestOnRemoveNonexistantPolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelHeaders)
-
 	policy := samplePolicy
+
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	_, err := h.OnRemove(testHandlerFuncKey, &policy)
 	assert.Error(t, err)
