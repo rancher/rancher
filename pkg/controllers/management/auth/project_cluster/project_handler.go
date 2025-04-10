@@ -2,6 +2,7 @@ package project_cluster
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -78,7 +79,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 	obj := orig.DeepCopyObject()
 
 	backingNamespace := orig.GetProjectNamespace()
-	_, err := reconcileResourceToNamespace(obj, ProjectCreateController, backingNamespace, l.nsLister, l.nsClient)
+	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, backingNamespace, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 		}
 	}
 
-	obj, err = l.reconcileProjectCreatorRTB(orig, backingNamespace)
+	obj, err = l.reconcileProjectCreatorRTB(obj, backingNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +145,12 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	return obj, deleteNamespace(ProjectRemoveController, projectNamespace, l.nsClient)
 }
 
-func (l *projectLifecycle) reconcileProjectCreatorRTB(project *apisv3.Project, nsName string) (runtime.Object, error) {
+func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object, nsName string) (runtime.Object, error) {
+	project, ok := obj.(*apisv3.Project)
+	if !ok {
+		return obj, fmt.Errorf("expected project, got %T", obj)
+	}
+
 	// If we specify no creator owner RBAC, exit
 	if _, ok := project.Annotations[NoCreatorRBACAnnotation]; ok {
 		logrus.Infof("[%s] annotation %s found. Skipping adding creator as owner", ProjectCreateController, NoCreatorRBACAnnotation)
