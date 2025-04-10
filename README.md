@@ -54,6 +54,7 @@ Please submit any Rancher bugs, issues, and feature requests to [rancher/rancher
 
 For security issues, please first check our [security policy](https://github.com/rancher/rancher/security) and email security-rancher@suse.com instead of posting a public issue in GitHub.  You may (but are not required to) use the GPG key located on [Keybase](https://keybase.io/rancher).
 
+
 # License
 
 Copyright (c) 2014-2025 [SUSE](http://rancher.com)
