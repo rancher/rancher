@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultNamespace   = "default"
+	defaultNamespace   = "cattle-system"
 	testHandlerFuncKey = "cattle-system/auditpolicy"
 )
 

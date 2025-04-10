@@ -11,6 +11,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	TargetNamespace = "cattle-system"
+)
+
 func updateStatus(obj *auditlogv1.AuditPolicy, condition auditlogv1.AuditPolicyConditionType, status metav1.ConditionStatus, message string) {
 	for i, cond := range obj.Status.Conditions {
 		if cond.Type == string(condition) {
@@ -33,6 +37,10 @@ type handler struct {
 }
 
 func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
+	if obj.Namespace != TargetNamespace {
+		return obj, nil
+	}
+
 	if len(obj.Status.Conditions) == 0 {
 		obj.Status.Conditions = []metav1.Condition{
 			{
