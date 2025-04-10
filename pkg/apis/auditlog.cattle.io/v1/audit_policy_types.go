@@ -4,14 +4,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type AuditPolicyStatusCondition string
+type AuditPolicyConditionType string
 type FilterAction string
 
 const (
-	AuditPolicyStatusConditionUnknown  AuditPolicyStatusCondition = "Unknown"
-	AuditPolicyStatusConditionActive   AuditPolicyStatusCondition = "Active"
-	AuditPolicyStatusConditionInactive AuditPolicyStatusCondition = "Inactive"
-	AuditPolicyStatusConditionInvalid  AuditPolicyStatusCondition = "Invalid"
+	AuditPolicyConditionTypeUnknown AuditPolicyConditionType = "Unknown"
+	AuditPolicyConditionTypeActive  AuditPolicyConditionType = "Active"
+	AuditPolicyConditionTypeValid   AuditPolicyConditionType = "Valid"
 
 	FilterActionUnknown FilterAction = ""
 	FilterActionAllow   FilterAction = "allow"
@@ -100,7 +99,8 @@ type LogVerbosity struct {
 
 // +genclient
 // +kubebuilder:printcolumn:name="Enabled",type=string,JSONPath=`.spec.enabled`
-// +kubebuilder:printcolumn:name="Condition",type=string,JSONPath=`.status.condition`
+// +kubebuilder:printcolumn:name="Active",type=string,JSONPath=`.status.conditions[?(@.type == "Active")].status`
+// +kubebuilder:printcolumn:name="Valid",type=string,JSONPath=`.status.conditions[?(@.type == "Valid")].status`
 // +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -127,6 +127,5 @@ type AuditPolicySpec struct {
 }
 
 type AuditPolicyStatus struct {
-	Condition AuditPolicyStatusCondition `json:"condition,omitempty"`
-	Message   string                     `json:"message,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

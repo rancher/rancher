@@ -8,7 +8,24 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/generated/controllers/auditlog.cattle.io"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/auditlog.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func updateStatus(obj *auditlogv1.AuditPolicy, condition auditlogv1.AuditPolicyConditionType, status metav1.ConditionStatus, message string) {
+	for i, cond := range obj.Status.Conditions {
+		if cond.Type == string(condition) {
+			obj.Status.Conditions[i] = metav1.Condition{
+				Type:               string(condition),
+				Status:             status,
+				ObservedGeneration: obj.GetGeneration(),
+				LastTransitionTime: metav1.Now(),
+				Message:            message,
+			}
+
+			break
+		}
+	}
+}
 
 type handler struct {
 	auditpolicy v1.AuditPolicyController
@@ -16,12 +33,27 @@ type handler struct {
 }
 
 func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
+	if len(obj.Status.Conditions) == 0 {
+		obj.Status.Conditions = []metav1.Condition{
+			{
+				Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
+				Status:             metav1.ConditionUnknown,
+				LastTransitionTime: metav1.Now(),
+				ObservedGeneration: obj.GetGeneration(),
+			},
+			{
+				Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
+				Status:             metav1.ConditionUnknown,
+				LastTransitionTime: metav1.Now(),
+				ObservedGeneration: obj.GetGeneration(),
+			},
+		}
+	}
+
 	if !obj.Spec.Enabled {
 		h.writer.RemovePolicy(obj)
 
-		obj.Status = auditlogv1.AuditPolicyStatus{
-			Condition: auditlogv1.AuditPolicyStatusConditionInactive,
-		}
+		updateStatus(obj, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "policy was disabled")
 
 		if _, err := h.auditpolicy.UpdateStatus(obj); err != nil {
 			return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as disabled: %s", obj.Namespace, obj.Name, err)
@@ -31,10 +63,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 	}
 
 	if err := h.writer.UpdatePolicy(obj); err != nil {
-		obj.Status = auditlogv1.AuditPolicyStatus{
-			Condition: auditlogv1.AuditPolicyStatusConditionInvalid,
-			Message:   err.Error(),
-		}
+		updateStatus(obj, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, err.Error())
 
 		if _, err := h.auditpolicy.UpdateStatus(obj); err != nil {
 			return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as invalid: %s", obj.Namespace, obj.Name, err)
@@ -43,8 +72,9 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 		return obj, nil
 	}
 
-	obj.Status.Condition = auditlogv1.AuditPolicyStatusConditionActive
-	obj.Status.Message = ""
+	updateStatus(obj, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
+	updateStatus(obj, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionTrue, "")
+
 	if _, err := h.auditpolicy.UpdateStatus(obj); err != nil {
 		return obj, fmt.Errorf("could not mark audit log policy '%s/%s' as active: %s", obj.Namespace, obj.Name, err)
 	}
