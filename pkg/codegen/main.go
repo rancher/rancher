@@ -1,3 +1,8 @@
+// Turn off creation of Alias types, which break code generation.
+// For more details see https://github.com/rancher/rancher/issues/47207
+//go:debug gotypesalias=0
+
+// This program generates the code for the Rancher types and clients.
 package main
 
 import (
