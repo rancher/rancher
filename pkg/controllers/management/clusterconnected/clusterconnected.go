@@ -60,7 +60,7 @@ func (c *checker) check() error {
 
 	for _, cluster := range clusters {
 		if err := c.checkCluster(cluster); err != nil {
-			logrus.Printf("XXXX check() failed to check cluster connectivity. stopping on cluster %s\n", cluster.Name)
+			//vf logrus.Printf("XXXX check() failed to check cluster connectivity. stopping on cluster %s\n", cluster.Name)
 			logrus.Errorf("failed to check connectivity of cluster [%s]: %v", cluster.Name, err)
 		}
 	}

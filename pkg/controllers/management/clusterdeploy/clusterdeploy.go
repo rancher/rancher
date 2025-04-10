@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/image"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -138,7 +139,7 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 
 	// Skip further work if the cluster's API is not reachable according to HealthSyncer criteria
 	// Note that we don't check the cluster's ClusterConditionReady status here, as HealthSyncer is not running
-	// prior to deployment of the cluster dagent
+	// prior to deployment of the cluster agent
 	uc, err := cd.clusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
 	if err != nil {
 		return err
@@ -190,19 +191,14 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 // when we set a feature to true so we can't reliably set a feature to false that is enabled by default.
 // This behavior makes adding new def false features not cause the agent to redeploy.
 func agentFeaturesChanged(desired, actual map[string]bool) bool {
-	//logrus.Println("YYYY agentFeaturesChanged: desired", desired)
-	//logrus.Println("YYYY agentFeaturesChanged: actual", actual)
-
 	for k, v := range desired {
 		if actual[k] != v {
-			//logrus.Printf("YYYY 1 agentFeaturesChanged: mismatch on k:%v, v:%v", k, v)
 			return true
 		}
 	}
 
 	for k, v := range actual {
 		if desired[k] != v {
-			//logrus.Printf("YYYY 2 agentFeaturesChanged: mismatch on k:%v, v:%v", k, v)
 			return true
 		}
 	}
@@ -211,12 +207,8 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 }
 
 func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
-	//vf - dont redeploy for now - just keep the agent running.
-	//return false
-
-	//logrus.Printf("YYYY clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
+	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
 	if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
-		//	logrus.Printf("YYYY redeployAgent() cp1 \n")
 		return true
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
@@ -232,59 +224,31 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 				appliedRepo := &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
 
 				if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
-					//logrus.Printf("YYY cp1.01 \n")
 					repoChange = true
 				}
 				if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
-					//logrus.Printf("YYY cp1.02 \n")
 					repoChange = true
 				}
 			}
 		}
 	}
 
-	if forceDeploy {
-		//logrus.Printf("YYY cp1.03 \n")
-	}
-
-	if imageChange {
-		//logrus.Printf("YYY cp1.04 \n")
-	}
-
-	if repoChange {
-		//logrus.Printf("YYY cp1.05 \n")
-	}
-
-	if agentFeaturesChanged {
-		//logrus.Printf("YYY cp1.06 \n") //vf come here
-	}
-
 	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
-		//	logrus.Printf("YYY cp2 Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
-		// 	" private repo changed=%v, agent features changed=%v \n", cluster.Name, forceDeploy, imageChange, repoChange,
-		// 	agentFeaturesChanged)
-		// logrus.Printf("YYYY clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s] \n", cluster.Status.AgentImage, desiredAgent)
-		// logrus.Printf("YYYY clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s] \n", cluster.Status.AuthImage, desiredAuth)
-		// logrus.Printf("YYYYYY clusterDeploy: redeployAgent: cluster.Status.AgentFeatures [%v], desiredFeatures: [%v]\n", cluster.Status.AgentFeatures, desiredFeatures)
+		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
+			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
+			agentFeaturesChanged)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s]", cluster.Status.AgentImage, desiredAgent)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s]", cluster.Status.AuthImage, desiredAuth)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentFeatures [%v], desiredFeatures: [%v]", cluster.Status.AgentFeatures, desiredFeatures)
 		return true
 	}
 
 	na, ca := getAgentImages(cluster.Name)
-	if cluster.Status.AgentImage != na {
-		//logrus.Printf("YYY cp3.1 \n")
-	}
-	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
-		//logrus.Printf("YYY cp3.2 \n")
-	}
-
-	if cluster.Status.AgentImage != ca {
-		//logrus.Printf("YYY cp3.3 \n")
-	}
 
 	if (cluster.Status.AgentImage != na && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
-		//logrus.Printf("YYYYY clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s] \n",
-		//	cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
+			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
 		clearAgentImages(cluster.Name)
 		return true
 	}
@@ -292,37 +256,27 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	// Taints/tolerations
 	// Current control plane taints are cached for comparison
 	currentTaints := getCachedControlPlaneTaints(cluster.Name)
-	//logrus.Printf("YYYYY clusterDeploy: redeployAgent: cluster [%s] currentTaints: [%v] \n", cluster.Name, currentTaints)
-	//logrus.Printf("YYYYYY clusterDeploy: redeployAgent: cluster [%s] desiredTaints: [%v] \n", cluster.Name, desiredTaints)
+	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] currentTaints: [%v]", cluster.Name, currentTaints)
+	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] desiredTaints: [%v]", cluster.Name, desiredTaints)
 	toAdd, toDelete := taints.GetToDiffTaints(currentTaints, desiredTaints)
-
-	if len(toAdd) > 0 {
-		//logrus.Printf("YYY cp3.4 \n")
-	}
-
-	if len(toDelete) > 0 {
-		//logrus.Printf("YYY cp3.5 \n")
-	}
 
 	// Any change to current triggers redeploy
 	if len(toAdd) > 0 || len(toDelete) > 0 {
-		//logrus.Printf("YYYYY clusterDeploy: redeployAgent: redeploy Rancher agents due to toleration mismatch for [%s], was [%v] and will be [%v] \n", cluster.Name, currentTaints, desiredTaints)
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to toleration mismatch for [%s], was [%v] and will be [%v]", cluster.Name, currentTaints, desiredTaints)
 		// Clear cache to refresh
 		clearControlPlaneTaints(cluster.Name)
 		return true
 	}
 
 	if !reflect.DeepEqual(append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...), cluster.Status.AppliedAgentEnvVars) {
-		//logrus.Printf("YYYYY clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v] \n", cluster.Name, cluster.Status.AppliedAgentEnvVars, cluster.Spec.AgentEnvVars)
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedAgentEnvVars, cluster.Spec.AgentEnvVars)
 		return true
 	}
 
 	if !reflect.DeepEqual(cluster.Spec.ClusterAgentDeploymentCustomization, cluster.Status.AppliedClusterAgentDeploymentCustomization) {
-		//logrus.Printf("YYYYYY clusterDeploy: redeployAgent: redeploy Rancher agents due to agent customization mismatch for [%s], was [%v] and will be [%v] \n", cluster.Name, cluster.Status.AppliedClusterAgentDeploymentCustomization, cluster.Spec.ClusterAgentDeploymentCustomization)
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent customization mismatch for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedClusterAgentDeploymentCustomization, cluster.Spec.ClusterAgentDeploymentCustomization)
 		return true
 	}
-
-	//logrus.Printf("YYYYY clusterDeploy: redeployAgent: returning false for redeployAgent \n")
 
 	return false
 }
@@ -345,18 +299,15 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
 
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
-		logrus.Printf("YYYYY deployAgent cp1 \n")
 		return nil
 	}
 
 	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
 	if err != nil {
-		logrus.Printf("YYYYY deployAgent cp2 \n")
 		return err
 	}
 	defer func() {
 		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
-			logrus.Printf("YYYYY deployAgent cp -end \n")
 			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
 		}
 	}()
@@ -364,7 +315,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
 		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
 		if err != nil {
-			logrus.Printf("YYYYY deployAgent cp3 \n")
 			return cluster, err
 		}
 		logrus.Tracef("clusterDeploy: deployAgent: agent YAML: %v", string(yaml))
@@ -382,7 +332,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			time.Sleep(5 * time.Second)
 		}
 		if err != nil {
-			logrus.Printf("YYYYY deployAgent cp4 \n")
 			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Error while applying agent YAML, it will be retried automatically")
 		}
 		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
@@ -390,22 +339,20 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
 		if err != nil {
-			logrus.Printf(" YYYY deployAgent cp5 Output from kubectl delete kube-api-auth DaemonSet, output: %s, err: %v \n", string(output), err)
+			logrus.Tracef("Output from kubectl delete kube-api-auth DaemonSet, output: %s, err: %v", string(output), err)
 			// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
 			dsNotFoundError := "daemonsets.apps \"kube-api-auth\" not found"
 			if !strings.Contains(string(output), dsNotFoundError) {
-				logrus.Printf("YYYYY deployAgent cp5 \n")
 				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
 			}
-			logrus.Printf(" YYYY Ignored '%s' error during delete kube-api-auth DaemonSet \n", dsNotFoundError)
+			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
 		if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE {
 			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
-				logrus.Printf("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v \n", string(output), err)
+				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
 				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
 				dsNotFoundError := "daemonsets.apps \"cattle-node-agent\" not found"
 				if !strings.Contains(string(output), dsNotFoundError) {
-					logrus.Printf("YYYYY deployAgent cp6 \n")
 					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
 				}
 				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
@@ -415,7 +362,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			timeout := settings.AgentRolloutTimeout.Get()
 			_, err = time.ParseDuration(timeout)
 			if err != nil {
-				logrus.Printf("YYYYY deployAgent cp7 \n")
 				logrus.Warnf("[deployAgent] agent-rollout-timeout setting must be in Duration format. Using default: 300s")
 				timeout = "300s"
 			}
@@ -423,7 +369,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			output, err := kubectl.RolloutStatusWithNamespace("cattle-system", "ds/cattle-node-agent", timeout, kubeConfig)
 			if err != nil {
 				logrus.Debugf("clusterDeploy: deployAgent: timeout waiting rollout agent daemonset for cluster [%s]: %v", cluster.Name, err)
-				logrus.Printf("YYYYY deployAgent cp8 \n")
 				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Timeout waiting rollout agent daemonset")
 			}
 			logrus.Debugf("clusterDeploy: deployAgent: successfully rollout agent daemonset for cluster [%s]", cluster.Name)
@@ -432,12 +377,10 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
-		logrus.Printf("YYYYY deployAgent cp9 deployAgent got error: %w \n", err)
 		return err
 	}
 
 	if err = cd.cacheAgentImages(cluster.Name); err != nil {
-		logrus.Printf("YYYYY deployAgent cp10 deployAgent got error: %w \n", err)
 		return err
 	}
 
@@ -458,7 +401,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	cluster.Status.AppliedClusterAgentDeploymentCustomization = cluster.Spec.ClusterAgentDeploymentCustomization
 
-	logrus.Printf("YYYYY deployAgent cp11 Success!!!! \n")
 	return nil
 }
 

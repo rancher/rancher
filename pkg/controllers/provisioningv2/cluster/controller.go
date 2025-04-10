@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rancher/norman/types/convert"
@@ -193,9 +194,18 @@ func (h *handler) isLegacyCluster(cluster interface{}) bool {
 // cluster FleetWorkspaceName is empty or if the cluster name does not match (c-XXXXX|local) where XXXXX is a random
 // string of characters.
 func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
-	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
+	// Clusters annotated with "provisioning.cattle.io/externally-managed": "true" should get cluster created
+	// when the fleet workspace defaulting is disabled
+	var clusterExternallyManaged bool
+	// For legacy purposes of the way our API generally works, make sure the value is not set to "false"
+	if ann := cluster.Annotations[externallyManagedAnn]; ann != "" && (strings.ToLower(ann) != "false") {
+		clusterExternallyManaged = true
+	}
+
+	if !h.isLegacyCluster(cluster) || (cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged) {
 		return nil, status, nil
 	}
+
 	provCluster := &v1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,

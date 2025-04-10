@@ -3,6 +3,7 @@ package fleetcluster
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	zed "github.com/rancher/rancher/pkg/zdbg"
@@ -28,6 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/clientcmd"
+)
+
+const (
+	externallyManagedAnn = "provisioning.cattle.io/externally-managed"
 )
 
 // ClusterHostGetter provides cluster API server URL retrieval.
@@ -108,7 +113,13 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 		return cluster, nil
 	}
 
-	if cluster.Spec.FleetWorkspaceName == "" {
+	var clusterExternallyManaged bool
+	// For legacy purposes of the way our API generally works, make sure the value is not set to "false"
+	if ann := cluster.Annotations[externallyManagedAnn]; ann != "" && (strings.ToLower(ann) != "false") {
+		clusterExternallyManaged = true
+	}
+
+	if cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged {
 		def := settings.FleetDefaultWorkspaceName.Get()
 		if def == "" {
 			return cluster, nil
