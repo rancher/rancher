@@ -2,7 +2,7 @@ package git
 
 import (
 	"fmt"
-	"strings"
+	"regexp"
 
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
@@ -75,7 +75,7 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 		// We don't report an error unless the branch is invalid
 		// The reason being it would break airgap environments in downstream
 		// cluster. A new issue is created to tackle this in the forthcoming.
-		if strings.Contains(err.Error(), "couldn't find remote ref") || strings.Contains(err.Error(), "Could not find remote branch") {
+		if checkInvalidBranch(err) {
 			return "", err
 		}
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
@@ -105,4 +105,23 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 		InsecureTLSVerify: insecureSkipTLS,
 		CABundle:          caBundle,
 	})
+}
+
+// checkInvalidBranch checks if the error indicates that the branch does not exist.
+// There is no errorCode that we could use here and so falling back to regex checking.
+func checkInvalidBranch(err error) bool {
+	regexPatterns := []string{
+		".*couldn't find remote ref.*",
+		".*Could not find remote branch.*",
+		".*Remote branch .* not found in upstream origin.*",
+	}
+
+	for _, pattern := range regexPatterns {
+		matched, _ := regexp.MatchString(pattern, err.Error())
+		if matched {
+			return true
+		}
+	}
+
+	return false
 }
