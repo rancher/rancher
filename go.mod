@@ -4,6 +4,9 @@ go 1.22.0
 
 toolchain go1.22.7
 
+// Backport https://github.com/rancher/lasso/pull/156
+replace github.com/rancher/lasso => github.com/aruiz14/lasso v0.0.0-20250410113738-43b8fddc5755
+
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
