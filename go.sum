@@ -1404,6 +1404,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7OputlJIzU=
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
 github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c/go.mod h1:X0CRv0ky0k6m906ixxpzmDRLvX58TFUKS2eePweuyxk=
+github.com/JonCrowther/shepherd v0.0.0-20250410195813-0c1797172859 h1:gwU9AA2qiI+kBHm4EWEuv96K0jd7rnNNg95zOGF4rQU=
+github.com/JonCrowther/shepherd v0.0.0-20250410195813-0c1797172859/go.mod h1:IVVaLrIQ1/1Fk7KTrkhpKFlgaqhh3uv27CokmEhXHJc=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/Masterminds/goutils v1.1.1 h1:5nUrii3FMTL5diU80unEVvNevw1nH4+ZV4DSLVJLSYI=
@@ -2469,8 +2471,6 @@ github.com/rancher/rke v1.8.0-rc.4 h1:jowVyaF3LsJonC7vNsAwWf3MONHAtEFUD/j3UzNSE5
 github.com/rancher/rke v1.8.0-rc.4/go.mod h1:x9N1abruzDFMwTpqq2cnaDYpKCptlNoW8VraNWB6Pc4=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20250410162748-9d50a3d8c82c h1:ptoiRUYiYRW3yJyoqFfFWYkCdRbOMKSHEcERvZtFaJs=
-github.com/rancher/shepherd v0.0.0-20250410162748-9d50a3d8c82c/go.mod h1:IVVaLrIQ1/1Fk7KTrkhpKFlgaqhh3uv27CokmEhXHJc=
 github.com/rancher/steve v0.6.2 h1:vQEvAWfklKWh8LjvHhgrh9kWu0xNg/m+nIbjxAU7Te4=
 github.com/rancher/steve v0.6.2/go.mod h1:+tzNay6IxktR3wMBfGD6CVdxxEc0kUkMP5yCpj7ib4I=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab h1:Ttxt14bAImsWyFrtQZ314GW2DeExrYRNoAb+u9V3RiA=
