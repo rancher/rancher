@@ -67,7 +67,7 @@ func setup(t *testing.T, level auditlogv1.Level) handler {
 }
 
 func TestOnChangeAddSimplePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 
@@ -92,7 +92,7 @@ func TestOnChangeAddSimplePolicy(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyFilterRequestURIRegex(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 	policy.Spec.Filters = []auditlogv1.Filter{
@@ -120,7 +120,7 @@ func TestOnChangeAddInvalidPolicyFilterRequestURIRegex(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyFilterAction(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 	policy.Spec.Filters = []auditlogv1.Filter{
@@ -147,7 +147,7 @@ func TestOnChangeAddInvalidPolicyFilterAction(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyRedactorHeaderRegex(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 	policy.Spec.AdditionalRedactions = []auditlogv1.Redaction{
@@ -176,7 +176,7 @@ func TestOnChangeAddInvalidPolicyRedactorHeaderRegex(t *testing.T) {
 }
 
 func TestOnChangeAddInvalidPolicyRedactorJSONPath(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 	policy.Spec.AdditionalRedactions = []auditlogv1.Redaction{
@@ -205,7 +205,7 @@ func TestOnChangeAddInvalidPolicyRedactorJSONPath(t *testing.T) {
 }
 
 func TestOnChangeAddDisablePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 	policy.Spec.Enabled = false
@@ -227,7 +227,7 @@ func TestOnChangeAddDisablePolicy(t *testing.T) {
 }
 
 func TestOnChangeDisableActivePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 
@@ -262,7 +262,7 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 }
 
 func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 
@@ -315,7 +315,7 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 }
 
 func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	invalidPolicy := samplePolicy
 	invalidPolicy.Spec.Filters = []auditlogv1.Filter{
@@ -364,7 +364,7 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 }
 
 func TestOnRemoveActivePolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 
@@ -385,7 +385,7 @@ func TestOnRemoveActivePolicy(t *testing.T) {
 }
 
 func TestOnRemoveDisabledPolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 	policy.Spec.Enabled = false
@@ -413,7 +413,7 @@ func TestOnRemoveDisabledPolicy(t *testing.T) {
 }
 
 func TestOnRemoveInvalidPolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 	policy.Spec.Filters = []auditlogv1.Filter{
@@ -447,7 +447,7 @@ func TestOnRemoveInvalidPolicy(t *testing.T) {
 }
 
 func TestOnRemoveNonexistantPolicy(t *testing.T) {
-	h := setup(t, auditlogv1.LevelMetadata)
+	h := setup(t, auditlogv1.LevelHeaders)
 
 	policy := samplePolicy
 
