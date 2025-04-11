@@ -165,7 +165,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				secrets.EXPECT().Cache().Return(nil)
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil, nil)
 				return store
 			},
 			wantUserInfo: &user.DefaultInfo{
@@ -237,7 +237,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
 						},
 					}, nil)
-				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil, nil)
 				return store
 			},
 			wantUserInfo: &user.DefaultInfo{
@@ -380,7 +380,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				secrets.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil, nil)
 				return store
 			},
 			wantErr: "request token user does not match impersonation user",
@@ -441,7 +441,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 					}, nil)
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil, nil)
 				return store
 			},
 			wantErr: "request token user does not match impersonation user",
@@ -477,7 +477,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				secrets.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil, nil)
 				return store
 			},
 			wantErr: "multiple requesttokenid values",
@@ -610,7 +610,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				scache.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww").
 					Return(nil, errors.New("unexpected error"))
-				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil, nil)
 				return store
 			},
 			wantErr: "error getting request token",
