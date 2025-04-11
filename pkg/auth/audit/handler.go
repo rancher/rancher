@@ -19,7 +19,9 @@ const (
 	errorDebounceTime = time.Second * 30
 )
 
-var userKey struct{}
+type userKey string
+
+var userKeyValue userKey = "user"
 
 func NewAuditLogMiddleware(writer *Writer) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -50,7 +52,7 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	user := getUserInfo(req)
 
-	context := context.WithValue(req.Context(), userKey, user)
+	context := context.WithValue(req.Context(), userKeyValue, user)
 	req = req.WithContext(context)
 
 	wr := &wrapWriter{ResponseWriter: rw, statusCode: http.StatusOK}
