@@ -166,7 +166,7 @@ func (w *Writer) Write(log *log) error {
 func (w *Writer) UpdatePolicy(policy *auditlogv1.AuditPolicy) error {
 	newPolicy, err := PolicyFromAuditPolicy(policy)
 	if err != nil {
-		return fmt.Errorf("failed to create policy: %w", err)
+		return err
 	}
 
 	name := types.NamespacedName{
