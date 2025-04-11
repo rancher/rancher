@@ -1995,7 +1995,7 @@ func Test_SystemStore_Update(t *testing.T) {
 			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit user id"),
 		},
 		{
-			name:     "reject login flag change",
+			name:     "reject login flag (kind) change",
 			fullPerm: true,
 			opts:     &metav1.UpdateOptions{},
 			token: func() *ext.Token {
