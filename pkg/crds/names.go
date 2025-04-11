@@ -41,18 +41,18 @@ func RequiredCRDs() []string {
 // BasicCRDs returns a list of CRD names needed to run rancher.
 func BasicCRDs() []string {
 	return []string{
-		"apps.catalog.cattle.io",
-		"clusterrepos.catalog.cattle.io",
-		"operations.catalog.cattle.io",
 		"apiservices.management.cattle.io",
-		"clusters.management.cattle.io",
+		"apps.catalog.cattle.io",
+		"auditpolicies.auditlog.cattle.io",
 		"clusterregistrationtokens.management.cattle.io",
+		"clusterrepos.catalog.cattle.io",
+		"clusters.management.cattle.io",
 		"features.management.cattle.io",
+		"navlinks.ui.cattle.io",
+		"operations.catalog.cattle.io",
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
 		"preferences.management.cattle.io",
 		"settings.management.cattle.io",
-		"navlinks.ui.cattle.io",
-		"auditpolicies.auditlog.cattle.io",
 	}
 }
 
@@ -196,6 +196,7 @@ var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
 	"apiservices.management.cattle.io":                                false,
 	"apps.catalog.cattle.io":                                          false,
+	"auditpolicies.auditlog.cattle.io":                                true,
 	"authconfigs.management.cattle.io":                                false,
 	"authproviders.management.cattle.io":                              false,
 	"authtokens.management.cattle.io":                                 false,
@@ -279,5 +280,4 @@ var MigratedResources = map[string]bool{
 	"users.management.cattle.io":                                      false,
 	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
-	"auditpolicies.auditlog.cattle.io":                                true,
 }
