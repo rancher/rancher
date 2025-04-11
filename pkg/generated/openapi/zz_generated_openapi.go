@@ -569,6 +569,13 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
+					"clusterName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ClusterName holds the name of the cluster the token is scoped to, if any. An empty string indicates that the token is not scoped to a specific cluster.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"userPrincipal"},
 			},
