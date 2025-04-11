@@ -10,6 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
@@ -20,6 +21,9 @@ import (
 )
 
 func (h *handler) createClusterAndDeployAgent(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "createClusterAndDeployAgent()")
+
 	objs, status, err := h.createCluster(cluster, status, v3.ClusterSpec{
 		ImportedConfig: &v3.ImportedConfig{},
 	})

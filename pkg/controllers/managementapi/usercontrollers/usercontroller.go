@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/metrics"
 	tpeermanager "github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -185,6 +186,9 @@ func (u *userControllersController) setPeers(peers *tpeermanager.Peers) error {
 }
 
 func (u *userControllersController) peersSync() error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "userControllersController.peersSync()")
+
 	clusters, err := u.clusterLister.List("", labels.Everything())
 	if err != nil {
 		return err

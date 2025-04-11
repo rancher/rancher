@@ -4,6 +4,7 @@ import (
 	"encoding/base32"
 	"fmt"
 	"strings"
+	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -115,6 +117,9 @@ func (ma *MemberAccess) IsRestrictedAdmin(callerID string) (bool, error) {
 }
 
 func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []string, callerID string) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "MemberAccess.EnsureRoleInTargets()")
+
 	isAdmin, err := ma.IsAdmin(callerID)
 	if err != nil {
 		return err
