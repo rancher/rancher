@@ -80,6 +80,10 @@ type TokenSpec struct {
 	// enabled token.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
+	// ClusterName holds the name of the cluster the token is scoped to, if any.
+	// An empty string indicates that the token is not scoped to a specific cluster.
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
 }
 
 // TokenPrincipal contains the data about the user principal owning the token.
