@@ -570,7 +570,7 @@ func Test_refreshAttributes(t *testing.T) {
 						return nil, nil
 					},
 				}),
-				extTokenStore: exttokens.NewSystem(nil, secrets, users, nil,
+				extTokenStore: exttokens.NewSystem(nil, secrets, users, nil, nil,
 					exttokens.NewTimeHandler(),
 					exttokens.NewHashHandler(),
 					exttokens.NewAuthHandler()),
