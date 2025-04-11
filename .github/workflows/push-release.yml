@@ -161,6 +161,7 @@ jobs:
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
           outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
+          no-cache: true
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
@@ -249,6 +250,7 @@ jobs:
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
           outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
+          no-cache: true
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
