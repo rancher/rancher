@@ -46,6 +46,6 @@ func getUserInfo(req *http.Request) *User {
 
 // FromContext gets the user information from the given context.
 func FromContext(ctx context.Context) (*User, bool) {
-	u, ok := ctx.Value(userKey).(*User)
+	u, ok := ctx.Value(userKeyValue).(*User)
 	return u, ok
 }
