@@ -9,11 +9,15 @@ import (
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
+	rbackv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,6 +40,7 @@ type projectLifecycle struct {
 	projects             v3.ProjectController
 	prtbLister           v3.ProjectRoleTemplateBindingCache
 	prtbClient           v3.ProjectRoleTemplateBindingController
+	rtLister             v3.RoleTemplateCache
 	rbLister             rbacv1.RoleBindingCache
 	roleBindings         rbacv1.RoleBindingController
 	systemAccountManager *systemaccount.Manager
@@ -52,6 +57,7 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		projects:             management.Wrangler.Mgmt.Project(),
 		prtbLister:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		prtbClient:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
+		rtLister:             management.Wrangler.Mgmt.RoleTemplate().Cache(),
 		rbLister:             management.Wrangler.RBAC.RoleBinding().Cache(),
 		roleBindings:         management.Wrangler.RBAC.RoleBinding(),
 		systemAccountManager: systemaccount.NewManager(management),
@@ -85,6 +91,9 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	if features.AggregatedRoleTemplates.Enabled() {
 		if err := createMembershipRoles(obj, l.crClient); err != nil {
+			return nil, err
+		}
+		if err := checkPSAMembershipRole(obj, l.crClient, l.prtbLister, l.rtLister); err != nil {
 			return nil, err
 		}
 	}
@@ -235,4 +244,65 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 		return obj, err
 	})
+}
+
+// checkPSAMembershipRole creates (if needed) an additional cluster role to grant updatepsa permissions, if needed.
+func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleController, prtbLister v3.ProjectRoleTemplateBindingCache, rtLister v3.RoleTemplateCache) error {
+	var resourceName, resourceType, context string
+	var annotations map[string]string
+
+	switch v := obj.(type) {
+	case *apisv3.Project:
+		context = projectContext
+		resourceType = apisv3.ProjectResourceName
+		resourceName = v.GetName()
+	default:
+		return fmt.Errorf("cannot create membership roles for unsupported type %T", v)
+	}
+
+	ownerRef, err := newOwnerReference(obj)
+	if err != nil {
+		return err
+	}
+
+	psaNeeded, err := needsPSARole(resourceName, prtbLister, rtLister)
+	if err != nil {
+		return err
+	}
+
+	var psaRole *rbackv1.ClusterRole
+	if psaNeeded {
+		psaRole = &rbackv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name.SafeConcatName(resourceName, context, "psa"),
+				OwnerReferences: []metav1.OwnerReference{ownerRef},
+				Annotations:     annotations,
+			},
+			Rules: []rbackv1.PolicyRule{
+				{
+					APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
+					Resources:     []string{resourceType},
+					ResourceNames: []string{resourceName},
+					Verbs:         []string{updatepsaVerb},
+				},
+			},
+		}
+		if err := rbac.CreateOrUpdateResource(psaRole, crClient, rbac.AreClusterRolesSame); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// needsPSARole ensure that given the project name, it needs a psa role to work properly.
+func needsPSARole(projectName string, prtbLister v3.ProjectRoleTemplateBindingCache, rtLister v3.RoleTemplateCache) (bool, error) {
+	// lookup the roletemplate(s) associated with the project name
+	// to check if those contain updatepsa verb
+	roleTemplates, err := roleTemplatesLookup(projectName, prtbLister, rtLister)
+	if err != nil {
+		return false, err
+	}
+
+	return isPSAAllowed(roleTemplates), nil
 }
