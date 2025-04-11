@@ -684,6 +684,11 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 			token.Name))
 	}
 
+	if token.Spec.ClusterName != currentToken.Spec.ClusterName {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit cluster name",
+			token.Name))
+	}
+
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
 		ttl, err := clampMaxTTL(token.Spec.TTL)

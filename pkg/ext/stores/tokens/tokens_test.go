@@ -1877,6 +1877,27 @@ func Test_SystemStore_Update(t *testing.T) {
 			},
 			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit kind"),
 		},
+		{
+			name:     "reject cluster name change",
+			fullPerm: true,
+			opts:     &metav1.UpdateOptions{},
+			token: func() *ext.Token {
+				changed := properToken.DeepCopy()
+				changed.Spec.ClusterName = "foo"
+				return changed
+			}(),
+			storeSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+				scache.EXPECT().
+					Get("cattle-tokens", "bogus").
+					Return(&properSecret, nil)
+			},
+			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit cluster name"),
+		},
 		// Third set, accepted changes and other errors
 		{
 			name:     "accept ttl extension (full permission)",
