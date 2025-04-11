@@ -1,23 +1,11 @@
 package ui
 
 import (
-	"crypto/tls"
-	"net/http"
-
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/ui"
 )
 
 var (
-	insecureClient = &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-
 	ember = newHandler(settings.UIIndex.Get,
 		settings.UIPath.Get,
 		settings.UIOfflinePreferred.Get)
