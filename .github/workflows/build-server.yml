@@ -67,6 +67,7 @@ jobs:
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
           outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
+          target: "server"
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
