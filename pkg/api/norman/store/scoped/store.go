@@ -25,7 +25,7 @@ func NewScopedStore(key string, store types.Store, pLister v3.ProjectLister) *St
 					return data, nil
 				}
 				v := convert.ToString(data[key])
-				if !strings.HasSuffix(v, ":"+convert.ToString(data[client.ProjectFieldNamespaceId])) && !strings.HasSuffix(v, "-"+convert.ToString(data[client.ProjectFieldNamespaceId])) {
+				if !strings.HasSuffix(v, ":"+convert.ToString(data[client.ProjectFieldNamespaceId])) && v != strings.Replace(convert.ToString(data[client.ProjectFieldNamespaceId]), "-", ":", 1) {
 					data[key] = data[client.ProjectFieldNamespaceId]
 				}
 
