@@ -47,6 +47,7 @@ const (
 
 	// names of the data fields used by the backing secrets to store token information
 	FieldAnnotations      = "annotations"
+	FieldClusterName      = "cluster"
 	FieldDescription      = "description"
 	FieldEnabled          = "enabled"
 	FieldFinalizers       = "finalizers"
@@ -1252,6 +1253,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	// pass back to caller (Create, Update)
 	token.Spec.TTL = ttl
 
+	secret.StringData[FieldClusterName] = token.Spec.ClusterName
 	secret.StringData[FieldDescription] = token.Spec.Description
 	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", token.Spec.Enabled == nil || *token.Spec.Enabled)
 	secret.StringData[FieldKind] = token.Spec.Kind
@@ -1331,6 +1333,7 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 
 	// spec - optional elements
+	token.Spec.ClusterName = string(secret.Data[FieldClusterName])
 	token.Spec.Description = string(secret.Data[FieldDescription])
 	token.Spec.Kind = string(secret.Data[FieldKind])
 
