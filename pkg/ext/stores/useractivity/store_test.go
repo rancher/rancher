@@ -330,7 +330,7 @@ func TestStoreCreate(t *testing.T) {
 			users = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(scache)
-			store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+			store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil, nil)
 
 			uas := &Store{
 				tokens:        mockTokenControllerFake,
@@ -534,7 +534,7 @@ func TestStoreGet(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
-		store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+		store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil, nil)
 
 		uas := &Store{
 			tokens:        mockTokenControllerFake,
