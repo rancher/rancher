@@ -27,7 +27,7 @@ jobs:
       K3D_VERSION: v5.7.1
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - name: Clean up Docker
@@ -47,7 +47,7 @@ jobs:
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
       - name: Download Docker images artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
         with:
           run-id: ${{ inputs.parent_run_id }}
           github-token: ${{ github.token }}
@@ -143,7 +143,7 @@ jobs:
           curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
       ## Helm Setup end
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
       - name: Build Integration Setup

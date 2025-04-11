@@ -30,7 +30,7 @@ jobs:
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: install yq
         uses: ./.github/actions/install-yq
         with:
@@ -70,7 +70,7 @@ jobs:
             echo "ARCH=amd64" >> $GITHUB_ENV
           fi
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: install yq
         uses: ./.github/actions/install-yq
         with:
@@ -81,15 +81,15 @@ jobs:
         uses: ./.github/actions/setup-build-env
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
       - name: Create k3s images file
         uses: ./.github/actions/k3s-images
         with:
@@ -98,7 +98,7 @@ jobs:
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build and export server
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           push: false
           build-args: |
@@ -117,7 +117,7 @@ jobs:
           labels: "${{ steps.meta.outputs.labels }}"
           outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
       - name: Upload image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar
@@ -147,7 +147,7 @@ jobs:
             echo "ARCH=amd64" >> $GITHUB_ENV
           fi
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: install yq
         uses: ./.github/actions/install-yq
         with:
@@ -158,19 +158,19 @@ jobs:
         uses: ./.github/actions/setup-build-env
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
         with:
           driver-opts: network=host
       - name: Download rancher image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
         with:
           name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp
@@ -185,7 +185,7 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Build agent
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           push:  ${{ github.event_name != 'pull_request' }}
           build-args: |
@@ -203,7 +203,7 @@ jobs:
           labels: "${{ steps.meta.outputs.labels }}"
           outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
       - name: Upload image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: "rancher-agent-${{ matrix.os }}-${{ env.ARCH }}"
           path: /tmp/rancher-agent-${{ matrix.os }}-${{ env.ARCH }}.tar
@@ -223,6 +223,6 @@ jobs:
     runs-on: ${{ matrix.os }}-${{ matrix.version }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
     - name: Build Windows Agent Image
       run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
