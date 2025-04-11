@@ -15,6 +15,8 @@ import (
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -35,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -48,6 +51,7 @@ const (
 
 	// names of the data fields used by the backing secrets to store token information
 	FieldAnnotations      = "annotations"
+	FieldClusterName      = "cluster"
 	FieldDescription      = "description"
 	FieldEnabled          = "enabled"
 	FieldFinalizers       = "finalizers"
@@ -108,6 +112,7 @@ type SystemStore struct {
 	secretCache     v1.SecretCache     // cached access to the backing secrets
 	userClient      v3.UserCache       // cached access to the v3.Users
 	v3TokenClient   v3.TokenCache      // cached access to v3.Tokens. See Fetch.
+	clusterCache    v3.ClusterCache    // cached access to cluster for presence checks
 	timer           timeHandler        // access to timestamp generation
 	hasher          hashHandler        // access to generation and hashing of secret values
 	auth            authHandler        // access to user retrieval from context
@@ -122,6 +127,7 @@ func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Au
 		wranglerContext.Core.Secret(),
 		wranglerContext.Mgmt.User(),
 		wranglerContext.Mgmt.Token().Cache(),
+		wranglerContext.Mgmt.Cluster().Cache(),
 		NewTimeHandler(),
 		NewHashHandler(),
 		NewAuthHandler(),
@@ -138,6 +144,7 @@ func New(
 	secretClient v1.SecretController,
 	userClient v3.UserController,
 	tokenClient v3.TokenCache,
+	clusterClient v3.ClusterCache,
 	timer timeHandler,
 	hasher hashHandler,
 	auth authHandler,
@@ -150,6 +157,7 @@ func New(
 			secretCache:     secretClient.Cache(),
 			userClient:      userClient.Cache(),
 			v3TokenClient:   tokenClient,
+			clusterCache:    clusterClient,
 			timer:           timer,
 			hasher:          hasher,
 			auth:            auth,
@@ -166,6 +174,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 		wranglerContext.Core.Secret(),
 		wranglerContext.Mgmt.User(),
 		wranglerContext.Mgmt.Token().Cache(),
+		wranglerContext.Mgmt.Cluster().Cache(),
 		NewTimeHandler(),
 		NewHashHandler(),
 		NewAuthHandler(),
@@ -181,6 +190,7 @@ func NewSystem(
 	secretClient v1.SecretController,
 	userClient v3.UserController,
 	tokenClient v3.TokenCache,
+	clusterClient v3.ClusterCache,
 	timer timeHandler,
 	hasher hashHandler,
 	auth authHandler,
@@ -191,6 +201,7 @@ func NewSystem(
 		secretCache:     secretClient.Cache(),
 		userClient:      userClient.Cache(),
 		v3TokenClient:   tokenClient,
+		clusterCache:    clusterClient,
 		timer:           timer,
 		hasher:          hasher,
 		auth:            auth,
@@ -344,21 +355,21 @@ func (t *Store) Watch(
 
 // create implements the core resource creation for tokens
 func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
-	userName, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "create")
+	userInfo, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "create")
 	if err != nil {
 		return nil, err
 	}
 	if !isRancherUser {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "",
-			fmt.Errorf("user %s is not a Rancher user", userName))
+			fmt.Errorf("user %s is not a Rancher user", userInfo.GetName()))
 	}
-	if !userMatchOrDefault(userName, token) {
+	if !userMatchOrDefault(userInfo.GetName(), token) {
 		return nil, apierrors.NewBadRequest("unable to create token for other user")
 	}
-	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options)
+	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options, userInfo)
 }
 
-func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
+func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, token *ext.Token, options *metav1.CreateOptions, userInfo user.Info) (*ext.Token, error) {
 	// check if the user does not wish to actually change anything
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
@@ -417,6 +428,39 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		MemberOf:       rtPrincipal.MemberOf,
 		Provider:       rtPrincipal.Provider,
 		ExtraInfo:      rtPrincipal.ExtraInfo,
+	}
+
+	if token.Spec.ClusterName != "" {
+		// Verify existence of cluster
+		cluster, err := t.clusterCache.Get(token.Spec.ClusterName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, apierrors.NewBadRequest(fmt.Sprintf("cluster %s not found",
+					token.Spec.ClusterName))
+			}
+			return nil, apierrors.NewInternalError(fmt.Errorf("error getting cluster %s: %w",
+				token.Spec.ClusterName, err))
+		}
+
+		// Verify that user is authorized to access cluster
+		decision, _, err := t.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
+			User:            userInfo,
+			Verb:            "get",
+			APIGroup:        mgmt.GroupName,
+			Resource:        apiv3.ClusterResourceName,
+			ResourceRequest: true,
+			Name:            cluster.Name,
+		})
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error authorizing user %s to access cluster %s: %w",
+				userInfo.GetName(), cluster.Name, err))
+		}
+
+		if decision != authorizer.DecisionAllow {
+			return nil, apierrors.NewForbidden(GVR.GroupResource(), "",
+				fmt.Errorf("user %s is not allowed to access cluster %s",
+					userInfo.GetName(), cluster.Name))
+		}
 	}
 
 	// Generate a secret and its hash
@@ -484,7 +528,7 @@ func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.De
 	if err != nil {
 		return err
 	}
-	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
+	if !fullAccess && (!isRancherUser || !userMatch(user.GetName(), token)) {
 		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
@@ -504,7 +548,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 
 // get implements the core resource retrieval for tokens
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
-	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +562,7 @@ func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions
 	if fullAccess {
 		return token, nil
 	}
-	if !userMatch(userName, token) {
+	if !userMatch(userInfo.GetName(), token) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
@@ -554,12 +598,12 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 
 // list implements the core resource listing of tokens
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
-	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "list")
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "list")
 	if err != nil {
 		return nil, err
 	}
 
-	return t.SystemStore.list(fullAccess, userName, t.auth.SessionID(ctx), options)
+	return t.SystemStore.list(fullAccess, userInfo.GetName(), t.auth.SessionID(ctx), options)
 }
 
 // ListForUser returns the set of token owned by the named user. It is an
@@ -635,11 +679,11 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 
 // update implements the core resource updating/modification of tokens
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
-	user, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
+	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
 	if err != nil {
 		return nil, err
 	}
-	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
+	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), token)) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
@@ -683,6 +727,11 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 
 	if token.Spec.Kind != currentToken.Spec.Kind {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kind",
+			token.Name))
+	}
+
+	if token.Spec.ClusterName != currentToken.Spec.ClusterName {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit cluster name",
 			token.Name))
 	}
 
@@ -804,7 +853,7 @@ func (t *SystemStore) Disable(name string) error {
 
 // watch implements the core resource watcher for tokens
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
-	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "watch")
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "watch")
 	if err != nil {
 		return nil, err
 	}
@@ -816,7 +865,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		ch: make(chan watch.Event, 100),
 	}
 
-	localOptions, err := ListOptionMerge(fullAccess, userName, options)
+	localOptions, err := ListOptionMerge(fullAccess, userInfo.GetName(), options)
 	if err != nil {
 		return nil,
 			apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w",
@@ -1016,7 +1065,7 @@ type hashHandler interface {
 // makes these operations mockable for store testing.
 type authHandler interface {
 	SessionID(ctx context.Context) string
-	UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error)
+	UserName(ctx context.Context, store *SystemStore, verb string) (user.Info, bool, bool, error)
 }
 
 // Standard implementations for the above interfaces.
@@ -1063,10 +1112,10 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 
 // UserName hides the details of extracting a user name and its permission
 // status from the request context
-func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error) {
+func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb string) (user.Info, bool, bool, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
-		return "", false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
+		return nil, false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
 	}
 
 	decision, _, err := store.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
@@ -1076,7 +1125,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 		ResourceRequest: true,
 	})
 	if err != nil {
-		return "", false, false, err
+		return nil, false, false, err
 	}
 
 	fullAccess := decision == authorizer.DecisionAllow
@@ -1092,12 +1141,12 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 			isRancherUser = true
 		} else if !apierrors.IsNotFound(err) {
 			// some general error
-			return "", false, false,
+			return nil, false, false,
 				apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
 		} // else: not a rancher user, may still be an admin
 	} // else: some system user, not a rancher user, may still be an admin
 
-	return userName, fullAccess, isRancherUser, nil
+	return userInfo, fullAccess, isRancherUser, nil
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
@@ -1281,6 +1330,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	// pass back to caller (Create, Update)
 	token.Spec.TTL = ttl
 
+	secret.StringData[FieldClusterName] = token.Spec.ClusterName
 	secret.StringData[FieldDescription] = token.Spec.Description
 	secret.StringData[FieldEnabled] = fmt.Sprintf("%t", token.Spec.Enabled == nil || *token.Spec.Enabled)
 	secret.StringData[FieldKind] = token.Spec.Kind
@@ -1360,6 +1410,7 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	}
 
 	// spec - optional elements
+	token.Spec.ClusterName = string(secret.Data[FieldClusterName])
 	token.Spec.Description = string(secret.Data[FieldDescription])
 	token.Spec.Kind = string(secret.Data[FieldKind])
 
