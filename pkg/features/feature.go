@@ -71,12 +71,6 @@ var (
 		true,
 		false,
 		false)
-	RKE2 = newFeature(
-		"rke2",
-		"Enable provisioning of RKE2",
-		true,
-		false,
-		true)
 	Legacy = newFeature(
 		"legacy",
 		"Enable legacy features",
@@ -88,7 +82,7 @@ var (
 		"Enable cluster-api based provisioning framework",
 		true,
 		false,
-		false)
+		true)
 	TokenHashing = newFeature(
 		"token-hashing",
 		"Enable one way hashing of tokens. Once enabled token hashing can not be disabled",
@@ -209,9 +203,13 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 	}
 
 	// external-rules feature flag was removed in 2.9. We need to delete it for users upgrading from 2.8.
-	err := featuresClient.Delete("external-rules", &metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		logrus.Errorf("unable to delete external-rules feature: %v", err)
+	// rke2 feature flag is removed with 2.12. We need to delete it for users upgrading from 2.11.
+	deprecatedFlags := []string{"external-rules", "rke2"}
+	for _, flag := range deprecatedFlags {
+		err := featuresClient.Delete(flag, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			logrus.Errorf("unable to delete %s feature: %v", flag, err)
+		}
 	}
 
 	// creates any features in map that do not exist, updates features with new default value

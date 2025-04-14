@@ -21,7 +21,7 @@ import (
 )
 
 func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Handler {
-	if features.RKE2.Enabled() {
+	if features.ProvisioningV2.Enabled() {
 		connectHandler := configserver.New(config)
 		mux := gmux.NewRouter()
 		mux.UseEncodedPath()

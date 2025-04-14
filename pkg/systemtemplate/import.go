@@ -252,7 +252,6 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.MCM.Name():                            false,
 		features.MCMAgent.Name():                       true,
 		features.Fleet.Name():                          false,
-		features.RKE2.Name():                           false,
 		features.ProvisioningV2.Name():                 false,
 		features.EmbeddedClusterAPI.Name():             false,
 		features.UISQLCache.Name():                     features.UISQLCache.Enabled(),

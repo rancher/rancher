@@ -106,7 +106,7 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 	scopedOnRemove(ctx, "auth-prov-v2-crb", clients.RBAC.ClusterRoleBinding(), h.OnRemoveClusterRoleBinding)
 	clients.Provisioning.Cluster().OnChange(ctx, "auth-prov-v2-cluster", h.OnCluster)
 	clients.CRD.CustomResourceDefinition().OnChange(ctx, "auth-prov-v2-crd", h.OnCRD)
-	if features.RKE2.Enabled() {
+	if features.ProvisioningV2.Enabled() {
 		clients.Dynamic.OnChange(ctx, "auth-prov-v2-rke-machine-config", validMachineConfigGVK, h.OnMachineConfigChange)
 	}
 	clients.Provisioning.Cluster().Cache().AddIndexer(byClusterName, func(obj *v1.Cluster) ([]string, error) {

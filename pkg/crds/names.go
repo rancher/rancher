@@ -7,9 +7,7 @@ func RequiredCRDs() []string {
 	requiredCRDS := BasicCRDs()
 	if features.ProvisioningV2.Enabled() {
 		requiredCRDS = append(requiredCRDS, ProvisioningV2CRDs()...)
-		if features.RKE2.Enabled() {
-			requiredCRDS = append(requiredCRDS, RKE2CRDs()...)
-		}
+		requiredCRDS = append(requiredCRDS, RKE2CRDs()...)
 		if features.EmbeddedClusterAPI.Enabled() {
 			requiredCRDS = append(requiredCRDS, CAPICRDs()...)
 		}
@@ -71,7 +69,6 @@ func CAPICRDs() []string {
 // RKE2CRDs returns a list of CRD names needed for RKE2.
 func RKE2CRDs() []string {
 	return []string{
-		"clusters.provisioning.cattle.io",
 		"custommachines.rke.cattle.io",
 		"etcdsnapshots.rke.cattle.io",
 		"rkebootstraps.rke.cattle.io",

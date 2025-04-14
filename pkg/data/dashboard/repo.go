@@ -73,7 +73,7 @@ func addRepos(wrangler *wrangler.Context) error {
 		return err
 	}
 
-	if features.RKE2.Enabled() {
+	if features.ProvisioningV2.Enabled() {
 		if err := addRepo(
 			wrangler,
 			"rancher-rke2-charts",

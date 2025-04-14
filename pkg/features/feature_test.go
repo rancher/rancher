@@ -46,15 +46,17 @@ func TestInitializeNil(t *testing.T) {
 }
 
 func TestInitializeFeatures(t *testing.T) {
+	deprecatedFlags := []string{"external-rules", "rke2"}
 	tests := map[string]struct {
 		featureMock func() managementv3.FeatureClient
 		features    map[string]*Feature
 	}{
-		"delete external-rules feature is called": {
+		"delete all deprecated features is called": {
 			featureMock: func() managementv3.FeatureClient {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
-				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
-
+				for _, flag := range deprecatedFlags {
+					mock.EXPECT().Delete(flag, &metav1.DeleteOptions{})
+				}
 				return mock
 			},
 			features: nil,

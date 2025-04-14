@@ -80,7 +80,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	if features.RKE2.Enabled() {
+	if features.ProvisioningV2.Enabled() {
 		// must migrate system agent data directory first, since update requests will be rejected by webhook if
 		// "CATTLE_AGENT_VAR_DIR" is set within AgentEnvVars.
 		if err := migrateSystemAgentDataDirectory(wranglerContext); err != nil {

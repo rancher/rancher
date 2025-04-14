@@ -659,7 +659,7 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 }
 
 func (h *handler) updateFeatureLockedValue(lockValueToTrue bool) error {
-	feature, err := h.featureCache.Get(features.RKE2.Name())
+	feature, err := h.featureCache.Get(features.ProvisioningV2.Name())
 	if err != nil {
 		return err
 	}
