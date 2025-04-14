@@ -12,6 +12,8 @@ replace (
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.32.2
 	k8s.io/client-go => k8s.io/client-go v0.32.2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.32.2
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.32.2
+	k8s.io/code-generator => k8s.io/code-generator v0.32.2
 	k8s.io/component-base => k8s.io/component-base v0.32.2
 	k8s.io/component-helpers => k8s.io/component-helpers v0.32.2
 	k8s.io/controller-manager => k8s.io/controller-manager v0.32.2
@@ -21,6 +23,8 @@ replace (
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.32.2
 	k8s.io/endpointslice => k8s.io/endpointslice v0.32.2
 	k8s.io/externaljwt => k8s.io/externaljwt v0.32.2
+	k8s.io/kms => k8s.io/kms v0.32.2
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.32.2
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.32.2
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.32.2
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.32.2
@@ -40,7 +44,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.12.1-rc.1
 	github.com/rancher/gke-operator v1.11.1-rc.1
 	github.com/rancher/norman v0.5.2
-	github.com/rancher/rke v1.8.1
+	github.com/rancher/rke v1.8.2-rc.2
 	github.com/rancher/wrangler/v3 v3.2.0
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.32.2
