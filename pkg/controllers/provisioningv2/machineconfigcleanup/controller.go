@@ -179,6 +179,10 @@ func cleanupObjects(token string) []runtime.Object {
 								{
 									Name:  fmt.Sprintf("%s-pod", prefix),
 									Image: image,
+									SecurityContext: &corev1.SecurityContext{
+										RunAsUser:  &[]int64{65534}[0],
+										RunAsGroup: &[]int64{65534}[0],
+									},
 									Env: []corev1.EnvVar{
 										{
 											Name:  "CATTLE_SERVER",
