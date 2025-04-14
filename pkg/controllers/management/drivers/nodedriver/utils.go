@@ -74,19 +74,6 @@ func ToLowerCamelCase(nodeFlagName string) (string, error) {
 
 func getCreateFlagsForDriver(driver string) ([]cli.Flag, error) {
 	var flags []cli.Flag
-	// NOTE(cmurphy): There is not currently a real google machine driver, but
-	// we still want to be able to create a Google cloud credential to use with
-	// GKE. This fake driver flag allows us to go through the motions of
-	// handling the credential fields without actually needing to run the
-	// machine driver binary.
-	if driver == "google" {
-		flags = []cli.Flag{
-			&cli.StringFlag{
-				Name: "google-auth-encoded-json",
-			},
-		}
-		return flags, nil
-	}
 
 	logrus.Debugf("Starting binary %s", driver)
 	finalDriverName := driver
