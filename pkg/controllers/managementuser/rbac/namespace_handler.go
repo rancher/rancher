@@ -15,7 +15,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
-	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -165,7 +164,7 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 }
 
 func (n *nsLifecycle) GetSystemProjectName() (string, error) {
-	projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[projectpkg.System].AsSelector())
+	projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[project.System].AsSelector())
 	if err != nil {
 		return "", err
 	}
@@ -173,7 +172,7 @@ func (n *nsLifecycle) GetSystemProjectName() (string, error) {
 		return "", nil
 	}
 	if len(projects) > 1 {
-		return "", fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.m.clusterName, projectpkg.System)
+		return "", fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.m.clusterName, project.System)
 	}
 	if projects[0] == nil {
 		return "", nil
@@ -261,7 +260,11 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 	var namespace string
 	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		namespace = parts[1]
+		project, err := n.rq.ProjectLister.Get(parts[0], parts[1])
+		if err != nil {
+			return hasPRTBs, err
+		}
+		namespace = project.GetProjectBackingNamespace()
 	} else {
 		return hasPRTBs, nil
 	}
