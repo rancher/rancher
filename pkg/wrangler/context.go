@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
+	extv1api "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	projectv3api "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -30,6 +31,8 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
+	extv1 "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -98,6 +101,7 @@ var (
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		catalogv1.AddToScheme,
+		extv1api.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
@@ -117,6 +121,7 @@ type Context struct {
 	CAPI                capicontrollers.Interface
 	RKE                 rkecontrollers.Interface
 	Mgmt                managementv3.Interface
+	Ext                 extv1.Interface
 	Apps                appsv1.Interface
 	Admission           admissionregcontrollers.Interface
 	Batch               batchv1.Interface
@@ -150,6 +155,7 @@ type Context struct {
 	SystemChartsManager   *system.Manager
 
 	mgmt         *management.Factory
+	ext          *ext.Factory
 	rbac         *rbac.Factory
 	project      *project.Factory
 	ctlg         *catalog.Factory
@@ -246,6 +252,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
 	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
+	wContextCopy.Ext = wContextCopy.ext.WithAgent(userAgent).V1()
 	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
 	wContextCopy.Admission = wContextCopy.adminReg.WithAgent(userAgent).V1()
 	wContextCopy.Batch = wContextCopy.batch.WithAgent(userAgent).V1()
@@ -286,6 +293,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	mgmt, err := management.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	ext, err := ext.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -428,6 +440,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
+		Ext:                     ext.Ext().V1(),
 		Apps:                    apps.Apps().V1(),
 		Admission:               adminReg.Admissionregistration().V1(),
 		Project:                 project.Project().V3(),
@@ -458,6 +471,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Plan:                    plan.Upgrade().V1(),
 
 		mgmt:         mgmt,
+		ext:          ext,
 		apps:         apps,
 		adminReg:     adminReg,
 		project:      project,
