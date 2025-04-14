@@ -48,6 +48,14 @@ func (p *Project) ObjClusterName() string {
 	return p.Spec.ObjClusterName()
 }
 
+// GetProjectBackingNamespace returns the namespace a project uses in the local cluster to store PRTBs and Project Scoped Secrets.
+func (p *Project) GetProjectBackingNamespace() string {
+	if p.Status.BackingNamespace != "" {
+		return p.Status.BackingNamespace
+	}
+	return p.Name
+}
+
 // ProjectStatus represents the most recently observed status of the project.
 type ProjectStatus struct {
 	// Conditions are a set of indicators about aspects of the project.
