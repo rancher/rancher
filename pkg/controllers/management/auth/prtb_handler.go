@@ -139,7 +139,7 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 		return binding, nil
 	}
 
-	return nil, fmt.Errorf("Binding %v has no subject", binding.Name)
+	return nil, fmt.Errorf("binding %s has no subject", binding.Name)
 }
 
 // When a PRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC.

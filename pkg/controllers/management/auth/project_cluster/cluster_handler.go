@@ -13,13 +13,13 @@ import (
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -51,7 +51,7 @@ type clusterLifecycle struct {
 	clusterClient      v3.ClusterInterface
 	crtbLister         v3.ClusterRoleTemplateBindingLister
 	crtbClient         v3.ClusterRoleTemplateBindingInterface
-	nsLister           corev1.NamespaceLister
+	nsLister           corev1.NamespaceCache
 	nsClient           k8scorev1.NamespaceInterface
 	projects           wranglerv3.ProjectClient
 	projectLister      v3.ProjectLister
@@ -66,7 +66,7 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 		clusterClient:      management.Management.Clusters(""),
 		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		crtbClient:         management.Management.ClusterRoleTemplateBindings(""),
-		nsLister:           management.Core.Namespaces("").Controller().Lister(),
+		nsLister:           management.Wrangler.Core.Namespace().Cache(),
 		nsClient:           management.K8sClient.CoreV1().Namespaces(),
 		projects:           management.Wrangler.Mgmt.Project(),
 		projectLister:      management.Management.Projects("").Controller().Lister(),
@@ -84,7 +84,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, l.nsLister, l.nsClient)
+	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, orig.Name, l.nsLister, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	}
 	returnErr = errors.Join(
 		l.deleteSystemProject(obj, ClusterRemoveController),
-		deleteNamespace(obj, ClusterRemoveController, l.nsClient),
+		deleteNamespace(ClusterRemoveController, obj.Name, l.nsClient),
 	)
 	return obj, returnErr
 }
