@@ -132,7 +132,7 @@ require (
 	github.com/rancher/aks-operator v1.9.8-rc.1
 	github.com/rancher/apiserver v0.3.0
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.6.0
+	github.com/rancher/dynamiclistener v0.6.1
 	github.com/rancher/eks-operator v1.9.8-rc.1
 	github.com/rancher/fleet/pkg/apis v0.10.11-rc.1
 	github.com/rancher/gke-operator v1.9.8-rc.1
@@ -143,7 +143,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.6.9
-	github.com/rancher/steve v0.3.1
+	github.com/rancher/steve v0.3.3
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.1.0
@@ -178,7 +178,7 @@ require (
 	k8s.io/kube-aggregator v0.31.1
 	k8s.io/kubectl v0.30.10
 	k8s.io/kubernetes v1.30.10
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.7.3
@@ -233,7 +233,6 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
@@ -264,13 +263,10 @@ require (
 	k8s.io/gengo v0.0.0-20240826214909-a7b603a56eb7 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
 	k8s.io/pod-security-admission v0.30.1 // indirect
-	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
-	modernc.org/libc v1.49.3 // indirect
-	modernc.org/mathutil v1.6.0 // indirect
-	modernc.org/memory v1.8.0 // indirect
-	modernc.org/sqlite v1.29.10 // indirect
-	modernc.org/strutil v1.2.0 // indirect
-	modernc.org/token v1.1.0 // indirect
+	modernc.org/libc v1.61.13 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.8.2 // indirect
+	modernc.org/sqlite v1.36.0 // indirect
 )
 
 require (
@@ -299,7 +295,7 @@ require (
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/containerd/containerd v1.7.12 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/cyphar/filepath-securejoin v0.3.6
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
