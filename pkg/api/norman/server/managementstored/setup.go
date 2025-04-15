@@ -140,12 +140,14 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext)
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 	projectaction.SetProjectStore(schemas.Schema(&managementschema.Version, client.ProjectType), apiContext)
-	setupScopedTypes(schemas)
+	setupScopedTypes(schemas, apiContext)
 
 	return nil
 }
 
-func setupScopedTypes(schemas *types.Schemas) {
+func setupScopedTypes(schemas *types.Schemas, management *config.ScaledContext) {
+	projectLister := management.Management.Projects("").Controller().Lister()
+
 	for _, schema := range schemas.Schemas() {
 		if schema.Scope != types.NamespaceScope || schema.Store == nil || schema.Store.Context() != config.ManagementStorageContext {
 			continue
@@ -161,7 +163,7 @@ func setupScopedTypes(schemas *types.Schemas) {
 				continue
 			}
 
-			schema.Store = scoped.NewScopedStore(key, schema.Store)
+			schema.Store = scoped.NewScopedStore(key, schema.Store, projectLister)
 			ns.Required = false
 			schema.ResourceFields["namespaceId"] = ns
 			break

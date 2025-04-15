@@ -65,7 +65,7 @@ replace (
 
 require (
 	github.com/antihax/optional v1.0.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20241127174121-c051d99dcded
+	github.com/rancher/rancher/pkg/apis v0.0.0-20250410003522-2a1bf3d05723
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -367,7 +367,7 @@ require (
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/matryer/moq v0.3.4 // indirect
+	github.com/matryer/moq v0.5.2 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
