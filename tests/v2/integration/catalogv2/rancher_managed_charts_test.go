@@ -155,7 +155,6 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
-	w.T().Skip()
 	defer w.resetSettings()
 	ctx := context.Background()
 
