@@ -101,7 +101,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
-
 	// TODO user should be dynamically authorized to only see herself
 	// TODO enable when groups are "in". they need to be self-service
 
@@ -419,7 +418,8 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch").
+		addRule().apiGroups("ext.cattle.io").resources("kubeconfigs").verbs("get", "list", "create", "delete")
 	return role
 }
 
