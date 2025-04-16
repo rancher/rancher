@@ -75,8 +75,26 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.WriteError(oidcerror.InvalidRequest, "missing redirect_uri", http.StatusBadRequest, w)
 		return
 	}
-	if _, err := url.Parse(params.redirectURI); err != nil {
+	redirectURL, err := url.Parse(params.redirectURI)
+	if err != nil {
 		oidcerror.WriteError(oidcerror.InvalidRequest, "invalid redirect_uri", http.StatusBadRequest, w)
+	}
+	if redirectURL.Host == r.URL.Host && redirectURL.Path == r.URL.Path {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri can't be the same as the host uri", http.StatusBadRequest, w)
+	}
+	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
+	if err != nil {
+		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("error retrieving OIDC client: %v", err), http.StatusBadRequest, w)
+		return
+	}
+	if len(oidcClients) == 0 {
+		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("OIDC client not found: %v", err), http.StatusBadRequest, w)
+		return
+	}
+	oidcClient := oidcClients[0]
+	if !slices.Contains(oidcClient.Spec.RedirectURIs, params.redirectURI) {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri is not registered", http.StatusBadRequest, w)
+		return
 	}
 	if params.responseType != supportedResponseType {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.UnsupportedResponseType, "response type not supported", params.state, w, r)
@@ -98,21 +116,6 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 	if params.codeChallenge == "" {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "missing code_challenge", params.state, w, r)
-		return
-	}
-	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
-	if err != nil {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.ServerError, fmt.Sprintf("error retrieving OIDC client: %v", err), params.state, w, r)
-		return
-	}
-	if len(oidcClients) == 0 {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.ServerError, fmt.Sprintf("OIDC client not found: %v", err), params.state, w, r)
-		return
-	}
-	oidcClient := oidcClients[0]
-
-	if !slices.Contains(oidcClient.Spec.RedirectURIs, params.redirectURI) {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, fmt.Sprintf("redirect_uri %s is not registered", params.redirectURI), params.state, w, r)
 		return
 	}
 
@@ -138,6 +141,8 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		}
 		u.RawQuery = q.Encode()
 
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return
 	}
@@ -176,6 +181,8 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 	u.RawQuery = q.Encode()
 
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
