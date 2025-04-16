@@ -30,7 +30,21 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 		tokenByUserAndClusterIndex: tokenByUserAndCluster,
 	}
 
-	return tokenInformer.AddIndexers(tokenIndexers)
+	err := tokenInformer.AddIndexers(tokenIndexers)
+	if err != nil {
+		return err
+	}
+
+	extTokenInformer := scaledContext.Wrangler.Ext.Token().Informer()
+	extTokenIndexers := map[string]cache.IndexFunc{
+		tokenByUserAndClusterIndex: extTokenByUserAndCluster,
+	}
+
+	err = extTokenInformer.AddIndexers(extTokenIndexers)
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
@@ -124,4 +138,16 @@ func tokenByUserAndCluster(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{tokenUserClusterKey(t)}, nil
+}
+
+func extTokenUserClusterKey(token *extv1.Token) string {
+	return fmt.Sprintf("%s/%s", token.Spec.UserID, token.Spec.ClusterName)
+}
+
+func extTokenByUserAndCluster(obj interface{}) ([]string, error) {
+	t, ok := obj.(*extv1.Token)
+	if !ok {
+		return []string{}, nil
+	}
+	return []string{extTokenUserClusterKey(t)}, nil
 }
