@@ -36,6 +36,7 @@ type projectLifecycle struct {
 	projects             v3.ProjectController
 	prtbLister           v3.ProjectRoleTemplateBindingCache
 	prtbClient           v3.ProjectRoleTemplateBindingController
+	rtLister             v3.RoleTemplateCache
 	rbLister             rbacv1.RoleBindingCache
 	roleBindings         rbacv1.RoleBindingController
 	systemAccountManager *systemaccount.Manager
@@ -52,6 +53,7 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		projects:             management.Wrangler.Mgmt.Project(),
 		prtbLister:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		prtbClient:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
+		rtLister:             management.Wrangler.Mgmt.RoleTemplate().Cache(),
 		rbLister:             management.Wrangler.RBAC.RoleBinding().Cache(),
 		roleBindings:         management.Wrangler.RBAC.RoleBinding(),
 		systemAccountManager: systemaccount.NewManager(management),
@@ -86,6 +88,11 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	if features.AggregatedRoleTemplates.Enabled() {
 		if err := createMembershipRoles(obj, l.crClient); err != nil {
+			return nil, err
+		}
+		// if the associated project roletemplate explicitly set updatepsa verb,
+		// projects need an additional role to manage psa labels to work properly.
+		if err := checkPSAMembershipRole(obj, l.crClient, l.prtbLister, l.rtLister); err != nil {
 			return nil, err
 		}
 	}

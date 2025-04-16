@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
@@ -169,6 +171,168 @@ func TestCreateMembershipRoles(t *testing.T) {
 			}
 
 			if err := createMembershipRoles(tt.obj, crClient); (err != nil) != tt.wantErr {
+				t.Errorf("createMembershipRoles() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCheckPSAMembershipRole(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	crClient := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+	prtbLister := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+	rtLister := fake.NewMockNonNamespacedCacheInterface[*v3.RoleTemplate](ctrl)
+	tests := []struct {
+		name      string
+		obj       runtime.Object
+		mockSetup func()
+		wantedCRs []*rbacv1.ClusterRole
+		wantErr   bool
+	}{
+		{
+			name: "psa role created",
+			obj: &apisv3.Project{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v3",
+					Kind:       "Project",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-project",
+					UID:  "1234abcd",
+				},
+			},
+			mockSetup: func() {
+				prtbLister.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*v3.ProjectRoleTemplateBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: projectName,
+							Name:      "my-prtb",
+						},
+						RoleTemplateName: "my-roletemplate",
+					},
+				}, nil)
+				rtLister.EXPECT().Get(gomock.Any()).Return(&v3.RoleTemplate{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:     []string{"updatepsa"},
+							APIGroups: []string{management.GroupName},
+							Resources: []string{v3.ProjectResourceName},
+						},
+					},
+				}, nil)
+				crClient.EXPECT().Get(gomock.Any(), metav1.GetOptions{}).Return(nil, errNotFound)
+				crClient.EXPECT().Create(gomock.Any()).Return(nil, nil)
+			},
+			wantedCRs: []*rbacv1.ClusterRole{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-project-project-psa",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "v3",
+								Kind:       "Project",
+								Name:       "test-project",
+								UID:        "1234abcd",
+							},
+						},
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups:     []string{"management.cattle.io"},
+							Resources:     []string{"projects"},
+							ResourceNames: []string{"test-project"},
+							Verbs:         []string{"updatepsa"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "no prtbs available",
+			obj: &apisv3.Project{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v3",
+					Kind:       "Project",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-project",
+					UID:  "1234abcd",
+				},
+			},
+			mockSetup: func() {
+				prtbLister.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, errNotFound)
+			},
+			wantedCRs: nil,
+			wantErr:   true,
+		},
+		{
+			name: "no roletemplates available",
+			obj: &apisv3.Project{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v3",
+					Kind:       "Project",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-project",
+					UID:  "1234abcd",
+				},
+			},
+			mockSetup: func() {
+				prtbLister.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*v3.ProjectRoleTemplateBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: projectName,
+							Name:      "my-prtb",
+						},
+						RoleTemplateName: "my-roletemplate",
+					},
+				}, nil)
+				rtLister.EXPECT().Get(gomock.Any()).Return(nil, errNotFound)
+			},
+			wantedCRs: nil,
+			wantErr:   true,
+		},
+		{
+			name: "no updatepsa verb in roletemplate",
+			obj: &apisv3.Project{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v3",
+					Kind:       "Project",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-project",
+					UID:  "1234abcd",
+				},
+			},
+			mockSetup: func() {
+				prtbLister.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*v3.ProjectRoleTemplateBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: projectName,
+							Name:      "my-prtb",
+						},
+						RoleTemplateName: "my-roletemplate",
+					},
+				}, nil)
+				rtLister.EXPECT().Get(gomock.Any()).Return(&v3.RoleTemplate{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Verbs:     []string{"list"},
+							APIGroups: []string{management.GroupName},
+							Resources: []string{v3.ProjectResourceName},
+						},
+					},
+				}, nil)
+			},
+			wantedCRs: nil,
+			wantErr:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			if err := checkPSAMembershipRole(tt.obj, crClient, prtbLister, rtLister); (err != nil) != tt.wantErr {
 				t.Errorf("createMembershipRoles() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
