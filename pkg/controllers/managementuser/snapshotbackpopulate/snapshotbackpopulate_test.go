@@ -546,6 +546,16 @@ func TestOnDownstreamChange(t *testing.T) {
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should not return an error when creating the machine")
 
+	// No matching snapshots but exists upstream
+
+	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return([]*rkev1.ETCDSnapshot{}, nil).Times(1)
+
+	etcdSnapshotController.EXPECT().Create(gomock.Any()).Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "error")).Times(1)
+	etcdSnapshotController.EXPECT().Update(gomock.Any()).Return(nil, nil).Times(1)
+
+	_, err = h.OnDownstreamChange("", snapshot)
+	assert.NoError(t, err, "It should update the snapshot if one exists but could not be found by the indexer")
+
 	// delete multiple snapshots
 
 	toDelete := []*rkev1.ETCDSnapshot{
