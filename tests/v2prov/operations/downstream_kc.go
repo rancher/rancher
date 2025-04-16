@@ -17,7 +17,7 @@ import (
 )
 
 func getDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*kubernetes.Clientset, error) {
-	wContext, err := wrangler.NewContext(context.TODO(), clients.ClientConfig, clients.RESTConfig)
+	wContext, err := wrangler.NewContext(context.TODO(), clients.ClientConfig, clients.RESTConfig, 0)
 	if err != nil {
 		return nil, err
 	}

@@ -276,7 +276,7 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 	return cpy
 }
 
-func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config, port int) (*Context, error) {
 	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(restConfig), Scheme, sharedOpts)
 	if err != nil {
@@ -297,7 +297,23 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	ext, err := ext.NewFactoryFromConfigWithOptions(restConfig, opts)
+
+	var extFactory *ext.Factory
+	if port > 0 {
+		extRestConfig := *restConfig
+		extRestConfig.Host = fmt.Sprintf("localhost:%d", port)
+		extRestConfig.APIPath = "/ext"
+		extControllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&extRestConfig),
+			Scheme, sharedOpts)
+		if err != nil {
+			return nil, err
+		}
+		extFactory, err = ext.NewFactoryFromConfigWithOptions(&extRestConfig, &generic.FactoryOptions{
+			SharedControllerFactory: extControllerFactory,
+		})
+	} else {
+		extFactory, err = ext.NewFactoryFromConfigWithOptions(restConfig, opts)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +456,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
-		Ext:                     ext.Ext().V1(),
+		Ext:                     extFactory.Ext().V1(),
 		Apps:                    apps.Apps().V1(),
 		Admission:               adminReg.Admissionregistration().V1(),
 		Project:                 project.Project().V3(),
@@ -471,7 +487,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Plan:                    plan.Upgrade().V1(),
 
 		mgmt:         mgmt,
-		ext:          ext,
+		ext:          extFactory,
 		apps:         apps,
 		adminReg:     adminReg,
 		project:      project,
