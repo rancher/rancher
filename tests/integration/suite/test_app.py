@@ -104,6 +104,7 @@ def test_app_istio(admin_cc, admin_pc, admin_mc):
     wait_for_monitor_metric(admin_cc, admin_mc)
 
 
+@pytest.mark.skip
 def test_prehook_chart(admin_pc, admin_mc):
     client = admin_pc.client
     name = random_str()

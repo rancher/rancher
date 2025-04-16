@@ -11,7 +11,6 @@ import (
 
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -27,7 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -91,13 +89,14 @@ func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
+	backingNamespace := orig.GetProjectBackingNamespace()
 
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController, backingNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	obj, err = l.mgr.reconcileCreatorRTB(obj)
+	obj, err = l.mgr.reconcileCreatorRTB(obj, backingNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +109,7 @@ func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Objec
 			return nil, err
 		}
 	}
-	if err != nil && !kerrors.IsAlreadyExists(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return nil, err
 	}
 
@@ -155,7 +154,8 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
-	err = l.mgr.deleteNamespace(obj, projectRemoveController)
+	backingNamespace := obj.GetProjectBackingNamespace()
+	err = l.mgr.deleteNamespace(projectRemoveController, backingNamespace)
 	returnErr = errors.Join(returnErr, err)
 	return obj, returnErr
 }
@@ -170,7 +170,7 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController, orig.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		}
 	}
 
-	obj, err = l.mgr.reconcileCreatorRTB(obj)
+	obj, err = l.mgr.reconcileCreatorRTB(obj, orig.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	}
 	returnErr = errors.Join(
 		l.mgr.deleteSystemProject(obj, clusterRemoveController),
-		l.mgr.deleteNamespace(obj, clusterRemoveController),
+		l.mgr.deleteNamespace(clusterRemoveController, obj.Name),
 	)
 	return obj, returnErr
 }
@@ -264,11 +264,11 @@ type mgr struct {
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.Default, v32.ClusterConditionDefaultProjectCreated, obj, defaultProjectLabels)
+	return m.createProject(project.Default, apisv3.ClusterConditionDefaultProjectCreated, obj, defaultProjectLabels)
 }
 
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.System, v32.ClusterConditionSystemProjectCreated, obj, systemProjectLabels)
+	return m.createProject(project.System, apisv3.ClusterConditionSystemProjectCreated, obj, systemProjectLabels)
 }
 
 func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set) (runtime.Object, error) {
@@ -310,7 +310,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 				Annotations:  annotation,
 				Labels:       labels,
 			},
-			Spec: v32.ProjectSpec{
+			Spec: apisv3.ProjectSpec{
 				DisplayName: name,
 				Description: fmt.Sprintf("%s project created for the cluster", name),
 				ClusterName: metaAccessor.GetName(),
@@ -352,8 +352,8 @@ func (m *mgr) deleteSystemProject(cluster *apisv3.Cluster, controller string) er
 	return deleteError
 }
 
-func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
-	return v32.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
+func (m *mgr) reconcileCreatorRTB(obj runtime.Object, nsName string) (runtime.Object, error) {
+	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, err
@@ -374,7 +374,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 		case v3.ProjectGroupVersionKind.Kind:
 			project := obj.(*apisv3.Project)
 
-			if v32.ProjectConditionInitialRolesPopulated.IsTrue(project) {
+			if apisv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 				// The projectRoleBindings are already completed, no need to check
 				break
 			}
@@ -407,7 +407,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				// The projectRoleBinding doesn't exist yet so create it
 				om := v1.ObjectMeta{
 					Name:      rtbName,
-					Namespace: metaAccessor.GetName(),
+					Namespace: nsName,
 				}
 
 				logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
@@ -433,7 +433,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			project.Annotations[roleTemplatesRequired] = string(d)
 
 			if reflect.DeepEqual(roleMap["required"], createdRoles) {
-				v32.ProjectConditionInitialRolesPopulated.True(project)
+				apisv3.ProjectConditionInitialRolesPopulated.True(project)
 				logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ctrbMGMTController, project.Name)
 			}
 			if _, err := m.mgmt.Management.Projects("").Update(project); err != nil {
@@ -443,7 +443,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 		case v3.ClusterGroupVersionKind.Kind:
 			cluster := obj.(*apisv3.Cluster)
 
-			if v32.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+			if apisv3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 				// The clusterRoleBindings are already completed, no need to check
 				break
 			}
@@ -507,20 +507,15 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	})
 }
 
-func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
-	o, err := meta.Accessor(obj)
-	if err != nil {
-		return condition.Error("MissingMetadata", err)
-	}
-
+func (m *mgr) deleteNamespace(controller string, nsName string) error {
 	nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
-	ns, err := nsClient.Get(context.TODO(), o.GetName(), v1.GetOptions{})
+	ns, err := nsClient.Get(context.TODO(), nsName, v1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if ns.Status.Phase != v12.NamespaceTerminating {
-		logrus.Infof("[%s] Deleting namespace %s", controller, o.GetName())
-		err = nsClient.Delete(context.TODO(), o.GetName(), v1.DeleteOptions{})
+		logrus.Infof("[%s] Deleting namespace %s", controller, nsName)
+		err = nsClient.Delete(context.TODO(), nsName, v1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -528,31 +523,27 @@ func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 	return err
 }
 
-func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string) (runtime.Object, error) {
-	return v32.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
-		o, err := meta.Accessor(obj)
-		if err != nil {
-			return obj, condition.Error("MissingMetadata", err)
-		}
+func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string, nsName string) (runtime.Object, error) {
+	return apisv3.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		t, err := meta.TypeAccessor(obj)
 		if err != nil {
 			return obj, condition.Error("MissingTypeMetadata", err)
 		}
 
-		ns, _ := m.nsLister.Get("", o.GetName())
+		ns, _ := m.nsLister.Get("", nsName)
 		if ns == nil {
 			nsClient := m.mgmt.K8sClient.CoreV1().Namespaces()
-			logrus.Infof("[%v] Creating namespace %v", controller, o.GetName())
+			logrus.Infof("[%v] Creating namespace %v", controller, nsName)
 			_, err := nsClient.Create(context.TODO(), &v12.Namespace{
 				ObjectMeta: v1.ObjectMeta{
-					Name: o.GetName(),
+					Name: nsName,
 					Annotations: map[string]string{
 						"management.cattle.io/system-namespace": "true",
 					},
 				},
 			}, v1.CreateOptions{})
 			if err != nil {
-				return obj, condition.Error("NamespaceCreationFailure", fmt.Errorf("failed to create namespace for %v %v: %w", t.GetKind(), o.GetName(), err))
+				return obj, condition.Error("NamespaceCreationFailure", fmt.Errorf("failed to create namespace for %s %s: %w", t.GetKind(), nsName, err))
 			}
 		}
 
@@ -640,7 +631,7 @@ func (m *mgr) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, anno 
 		c.Annotations[roleTemplatesRequired] = anno
 
 		if updateCondition {
-			v32.ClusterConditionInitialRolesPopulated.True(c)
+			apisv3.ClusterConditionInitialRolesPopulated.True(c)
 		}
 		_, err = m.mgmt.Management.Clusters("").Update(c)
 		if err != nil {

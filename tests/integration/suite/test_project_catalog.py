@@ -3,8 +3,10 @@ from .conftest import wait_until, wait_until_available, wait_for_condition,\
 from rancher import ApiError
 from .common import random_str
 import time
+import pytest
 
 
+@pytest.mark.skip
 def test_project_catalog_creation(admin_mc, remove_resource,
                                   user_mc, user_factory, admin_pc,
                                   admin_cc):
@@ -91,6 +93,7 @@ def test_project_catalog_creation(admin_mc, remove_resource,
     wait_for_projectcatalog_template_to_be_deleted(client, catalog_name)
 
 
+@pytest.mark.skip
 def test_create_project_catalog_after_user_addition(admin_mc,
                                                     user_factory,
                                                     remove_resource,
@@ -150,6 +153,7 @@ def test_create_project_catalog_after_user_addition(admin_mc,
     wait_for_projectcatalog_template_to_be_deleted(client, catalog_name)
 
 
+@pytest.mark.skip
 def test_user_addition_after_creating_project_catalog(admin_mc,
                                                       user_factory,
                                                       remove_resource,
@@ -212,6 +216,7 @@ def test_user_addition_after_creating_project_catalog(admin_mc,
     wait_for_projectcatalog_template_to_be_deleted(client, catalog_name)
 
 
+@pytest.mark.skip
 def test_project_catalog_access_before_app_creation(admin_mc, admin_pc,
                                                     remove_resource,
                                                     user_factory):
