@@ -396,10 +396,15 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, apierrors.NewBadRequest("operation references a disabled user")
 	}
 
+	session, err := t.auth.SessionID(ctx)
+	if err != nil {
+		return nil, apierrors.NewInternalError(err)
+	}
+
 	// Get token of the request and use its principal as ours. Any attempt
 	// by the user to set their own information for the principal is
 	// discarded and written over. No checks are made, no errors are thrown.
-	requestToken, err := t.Fetch(t.auth.SessionID(ctx))
+	requestToken, err := t.Fetch(session)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
@@ -508,8 +513,13 @@ func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions
 		return nil, err
 	}
 
+	session, err := t.auth.SessionID(ctx)
+	if err != nil {
+		return nil, apierrors.NewInternalError(err)
+	}
+
 	// note: have to get token first before we can check for a user mismatch
-	token, err := t.SystemStore.Get(name, t.auth.SessionID(ctx), options)
+	token, err := t.SystemStore.Get(name, session, options)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +568,12 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 		return nil, err
 	}
 
-	return t.SystemStore.list(fullAccess, userName, t.auth.SessionID(ctx), options)
+	session, err := t.auth.SessionID(ctx)
+	if err != nil {
+		return nil, apierrors.NewInternalError(err)
+	}
+
+	return t.SystemStore.list(fullAccess, userName, session, options)
 }
 
 // ListForUser returns the set of token owned by the named user. It is an
@@ -640,7 +655,10 @@ func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.Up
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
-	sessionID := t.auth.SessionID(ctx)
+	sessionID, err := t.auth.SessionID(ctx)
+	if err != nil {
+		return nil, apierrors.NewInternalError(err)
+	}
 
 	return t.SystemStore.update(sessionID, false, token, options)
 }
@@ -828,7 +846,10 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		return consumer, nil
 	}
 
-	sessionID := t.auth.SessionID(ctx)
+	sessionID, err := t.auth.SessionID(ctx)
+	if err != nil {
+		return nil, apierrors.NewInternalError(err)
+	}
 
 	// watch the backend secrets for changes and transform their events into
 	// the appropriate token events.
@@ -966,7 +987,7 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		return ext, nil
 	}
 
-	return nil, fmt.Errorf("unable to fetch unknown token %s", tokenID)
+	return nil, fmt.Errorf("unable to fetch unknown token '%s'", tokenID)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from
@@ -986,7 +1007,7 @@ type hashHandler interface {
 // information (user name, principal id, auth provider) from the store. This
 // makes these operations mockable for store testing.
 type authHandler interface {
-	SessionID(ctx context.Context) string
+	SessionID(ctx context.Context) (string, error)
 	UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error)
 }
 
@@ -1078,9 +1099,8 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 // I.e. in case of error the result is simply the empty string. Which means that
 // for requests with broken token information no returned token will be marked
 // as current, as a kube resource cannot have the empty string as its name.
-func (tp *tokenAuth) SessionID(ctx context.Context) string {
-	tokenID, _ := SessionID(ctx)
-	return tokenID
+func (tp *tokenAuth) SessionID(ctx context.Context) (string, error) {
+	return SessionID(ctx)
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
