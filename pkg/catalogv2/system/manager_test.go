@@ -429,7 +429,7 @@ func TestInstallCharts(t *testing.T) {
 				"rancher-webhook": true,
 				"aks-operator":    false,
 			},
-			expectedErr: errors.New("specified version 3.0.0+up1.2.3 doesn't exist in the index"),
+			expectedErr: errors.New("version 3.0.0 in the index (branch=my-branch, commit=my-commit) doesn't not match requested version 3.0.0+up1.2.3"),
 		},
 	}
 
@@ -442,6 +442,9 @@ func TestInstallCharts(t *testing.T) {
 			mockOperationClient := NewMockOperationClient(ctrl)
 			mockPodClient := fake.NewMockClientInterface[*v1.Pod, *v1.PodList](ctrl)
 			mockHelmClient := NewMockHelmClient(ctrl)
+
+			mockClusterCache := fake.NewMockNonNamespacedCacheInterface[*catalog.ClusterRepo](ctrl)
+			mockClusterRepos := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
 
 			for dc := range test.desiredCharts {
 				var foundRelease *release.Release
@@ -503,6 +506,13 @@ func TestInstallCharts(t *testing.T) {
 
 				mockContentClient.EXPECT().Index("", "rancher-charts", "", true).
 					Return(&repo.IndexFile{Entries: test.indexedReleases}, nil)
+				mockClusterRepos.EXPECT().Cache().Return(mockClusterCache)
+				mockClusterCache.EXPECT().Get("rancher-charts").Return(&catalog.ClusterRepo{
+					Status: catalog.RepoStatus{
+						Branch: "my-branch",
+						Commit: "my-commit",
+					},
+				}, nil)
 			}
 
 			manager := Manager{
@@ -512,6 +522,7 @@ func TestInstallCharts(t *testing.T) {
 				desiredCharts: test.desiredCharts,
 				helmClient:    mockHelmClient,
 				operation:     mockOperationClient,
+				clusterRepos:  mockClusterRepos,
 			}
 
 			err := manager.installCharts(test.desiredCharts, test.takeOwnership)
