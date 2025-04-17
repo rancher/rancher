@@ -121,7 +121,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
+	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig,
+		opts.HTTPSListenPort)
 	if err != nil {
 		return nil, err
 	}

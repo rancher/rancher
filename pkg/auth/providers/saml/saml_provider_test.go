@@ -27,7 +27,7 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	require.NoError(t, err, "Failed to create NewScaledContext")
 
 	// Create the dummy wrangler context
-	wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{})
+	wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{}, 0)
 	require.NoError(t, err, "Failed to create wranglerContext")
 	mgmtCtx.Wrangler = wranglerContext
 

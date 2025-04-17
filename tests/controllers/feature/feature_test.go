@@ -59,7 +59,7 @@ func (s *FeatureTestSuite) SetupSuite() {
 	assert.NoError(s.T(), err)
 
 	// Create the wrangler context
-	s.wranglerContext, err = wrangler.NewContext(s.ctx, nil, restCfg)
+	s.wranglerContext, err = wrangler.NewContext(s.ctx, nil, restCfg, 0)
 	assert.NoError(s.T(), err)
 
 	scaledContext, _, _, err := mcm.BuildScaledContext(s.ctx, s.wranglerContext, &mcm.Options{})

@@ -73,7 +73,7 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 		})
 
 	// Create wrangler context
-	wranglerContext, err := wrangler.NewContext(s.ctx, nil, restCfg)
+	wranglerContext, err := wrangler.NewContext(s.ctx, nil, restCfg, 0)
 	assert.NoError(s.T(), err)
 
 	// Create management context

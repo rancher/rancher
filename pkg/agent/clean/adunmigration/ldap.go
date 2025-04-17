@@ -261,7 +261,7 @@ func prepareClientContexts(clientConfig *restclient.Config) (*config.ScaledConte
 		logrus.Errorf("[%v] failed to create scaled context: %v", migrateAdUserOperation, err)
 		return nil, nil, err
 	}
-	wc, err := wrangler.NewContext(context.Background(), nil, clientConfig)
+	wc, err := wrangler.NewContext(context.Background(), nil, clientConfig, 0)
 	if err != nil {
 		logrus.Errorf("[%v] failed to create wrangler context: %v", migrateAdUserOperation, err)
 	}

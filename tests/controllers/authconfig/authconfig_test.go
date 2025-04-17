@@ -63,7 +63,7 @@ func (s *AuthConfigSuite) SetupSuite() {
 	assert.NoError(t, err)
 
 	// Create the wrangler and management contexts
-	wranglerContext, err := wrangler.NewContext(s.ctx, nil, restCfg)
+	wranglerContext, err := wrangler.NewContext(s.ctx, nil, restCfg, 0)
 	assert.NoError(t, err)
 
 	scaledContext, clusterManager, _, err := multiclustermanager.BuildScaledContext(s.ctx, wranglerContext, &multiclustermanager.Options{})

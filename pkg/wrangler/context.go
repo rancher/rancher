@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
+	extv1api "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	projectv3api "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -30,6 +31,8 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
+	extv1 "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -98,6 +101,7 @@ var (
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		catalogv1.AddToScheme,
+		extv1api.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
@@ -112,29 +116,31 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
-	Apply               apply.Apply
-	Dynamic             *dynamic.Controller
-	CAPI                capicontrollers.Interface
-	RKE                 rkecontrollers.Interface
-	Mgmt                managementv3.Interface
-	Apps                appsv1.Interface
-	Admission           admissionregcontrollers.Interface
-	Batch               batchv1.Interface
-	Fleet               fleetv1alpha1.Interface
-	Project             projectv3.Interface
-	Catalog             catalogcontrollers.Interface
-	ControllerFactory   controller.SharedControllerFactory
-	MultiClusterManager MultiClusterManager
-	TunnelServer        *remotedialer.Server
-	TunnelAuthorizer    *tunnelserver.Authorizers
-	PeerManager         peermanager.PeerManager
-	Provisioning        provisioningv1.Interface
-	RBAC                rbacv1.Interface
-	Core                corev1.Interface
-	API                 apiregv1.Interface
-	CRD                 crdv1.Interface
-	K8s                 *kubernetes.Clientset
-	Plan                plancontrolers.Interface
+	Apply                apply.Apply
+	Dynamic              *dynamic.Controller
+	CAPI                 capicontrollers.Interface
+	RKE                  rkecontrollers.Interface
+	Mgmt                 managementv3.Interface
+	Ext                  extv1.Interface
+	Apps                 appsv1.Interface
+	Admission            admissionregcontrollers.Interface
+	Batch                batchv1.Interface
+	Fleet                fleetv1alpha1.Interface
+	Project              projectv3.Interface
+	Catalog              catalogcontrollers.Interface
+	ControllerFactory    controller.SharedControllerFactory
+	extControllerFactory controller.SharedControllerFactory // conditional, see (a)
+	MultiClusterManager  MultiClusterManager
+	TunnelServer         *remotedialer.Server
+	TunnelAuthorizer     *tunnelserver.Authorizers
+	PeerManager          peermanager.PeerManager
+	Provisioning         provisioningv1.Interface
+	RBAC                 rbacv1.Interface
+	Core                 corev1.Interface
+	API                  apiregv1.Interface
+	CRD                  crdv1.Interface
+	K8s                  *kubernetes.Clientset
+	Plan                 plancontrolers.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -150,6 +156,7 @@ type Context struct {
 	SystemChartsManager   *system.Manager
 
 	mgmt         *management.Factory
+	ext          *ext.Factory
 	rbac         *rbac.Factory
 	project      *project.Factory
 	ctlg         *catalog.Factory
@@ -195,6 +202,16 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 	}
 
 	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+
+	if w.extControllerFactory != nil {
+		if err := w.extControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
+			transaction.Rollback()
+			return err
+		}
+
+		w.extControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	}
+
 	transaction.Commit()
 	return w.Start(ctx)
 }
@@ -213,6 +230,11 @@ func (w *Context) Start(ctx context.Context) error {
 
 	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
 		return err
+	}
+	if w.extControllerFactory != nil {
+		if err := w.extControllerFactory.Start(ctx, 50); err != nil {
+			return err
+		}
 	}
 	w.leadership.Start(ctx)
 	return nil
@@ -246,6 +268,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
 	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
+	wContextCopy.Ext = wContextCopy.ext.WithAgent(userAgent).V1()
 	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
 	wContextCopy.Admission = wContextCopy.adminReg.WithAgent(userAgent).V1()
 	wContextCopy.Batch = wContextCopy.batch.WithAgent(userAgent).V1()
@@ -269,7 +292,7 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 	return cpy
 }
 
-func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config, port int) (*Context, error) {
 	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(restConfig), Scheme, sharedOpts)
 	if err != nil {
@@ -286,6 +309,29 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	mgmt, err := management.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+
+	var extFactory *ext.Factory
+	var extControllerFactory controller.SharedControllerFactory
+	// (a) conditional setup
+	if port > 0 {
+		extRestConfig := *restConfig
+		extRestConfig.Host = fmt.Sprintf("localhost:%d", port)
+		extRestConfig.APIPath = "/ext"
+		extControllerFactory, err = controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&extRestConfig),
+			Scheme, sharedOpts)
+		if err != nil {
+			return nil, err
+		}
+		extFactory, err = ext.NewFactoryFromConfigWithOptions(&extRestConfig, &generic.FactoryOptions{
+			SharedControllerFactory: extControllerFactory,
+		})
+	} else {
+		extFactory, err = ext.NewFactoryFromConfigWithOptions(restConfig, opts)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -428,6 +474,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
+		Ext:                     extFactory.Ext().V1(),
 		Apps:                    apps.Apps().V1(),
 		Admission:               adminReg.Admissionregistration().V1(),
 		Project:                 project.Project().V3(),
@@ -441,6 +488,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CRD:                     crd.Apiextensions().V1(),
 		K8s:                     k8s,
 		ControllerFactory:       controllerFactory,
+		extControllerFactory:    extControllerFactory,
 		ASL:                     asl,
 		ClientConfig:            clientConfig,
 		MultiClusterManager:     noopMCM{},
@@ -458,6 +506,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Plan:                    plan.Upgrade().V1(),
 
 		mgmt:         mgmt,
+		ext:          extFactory,
 		apps:         apps,
 		adminReg:     adminReg,
 		project:      project,

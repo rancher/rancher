@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -17,6 +18,7 @@ const (
 
 	clusterController              = "cat-cluster-controller-deferred"
 	tokenController                = "cat-token-controller"
+	extTokenController             = "cat-ext-token-controller"
 	settingController              = "cat-setting-controller"
 	userController                 = "cat-user-controller"
 	userAttributeController        = "cat-user-attribute-controller"
@@ -30,7 +32,21 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 		tokenByUserAndClusterIndex: tokenByUserAndCluster,
 	}
 
-	return tokenInformer.AddIndexers(tokenIndexers)
+	err := tokenInformer.AddIndexers(tokenIndexers)
+	if err != nil {
+		return err
+	}
+
+	extTokenInformer := scaledContext.Wrangler.Ext.Token().Informer()
+	extTokenIndexers := map[string]cache.IndexFunc{
+		tokenByUserAndClusterIndex: extTokenByUserAndCluster,
+	}
+
+	err = extTokenInformer.AddIndexers(extTokenIndexers)
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
@@ -90,6 +106,15 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 			userAttributeLister,
 		})
 
+	cluster.Management.Wrangler.Ext.Token().OnChange(ctx, extTokenController+"-change-"+clusterName,
+		func(key string, obj *extv1.Token) (*extv1.Token, error) {
+			return obj, nil
+		})
+	cluster.Management.Wrangler.Ext.Token().OnRemove(ctx, extTokenController+"-remove-"+clusterName,
+		func(key string, obj *extv1.Token) (*extv1.Token, error) {
+			return obj, nil
+		})
+
 	cluster.Management.Management.Users("").AddHandler(ctx, userController, (&userHandler{
 		namespace,
 		clusterUserAttribute,
@@ -124,4 +149,16 @@ func tokenByUserAndCluster(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{tokenUserClusterKey(t)}, nil
+}
+
+func extTokenUserClusterKey(token *extv1.Token) string {
+	return fmt.Sprintf("%s/%s", token.Spec.UserID, token.Spec.ClusterName)
+}
+
+func extTokenByUserAndCluster(obj interface{}) ([]string, error) {
+	t, ok := obj.(*extv1.Token)
+	if !ok {
+		return []string{}, nil
+	}
+	return []string{extTokenUserClusterKey(t)}, nil
 }

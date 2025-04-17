@@ -21,7 +21,6 @@ import (
 type MocksessionGetterRemover struct {
 	ctrl     *gomock.Controller
 	recorder *MocksessionGetterRemoverMockRecorder
-	isgomock struct{}
 }
 
 // MocksessionGetterRemoverMockRecorder is the mock recorder for MocksessionGetterRemover.
@@ -74,7 +73,6 @@ func (mr *MocksessionGetterRemoverMockRecorder) Remove(code any) *gomock.Call {
 type MocksigningKeyGetter struct {
 	ctrl     *gomock.Controller
 	recorder *MocksigningKeyGetterMockRecorder
-	isgomock struct{}
 }
 
 // MocksigningKeyGetterMockRecorder is the mock recorder for MocksigningKeyGetter.
