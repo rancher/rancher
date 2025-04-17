@@ -116,30 +116,31 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
-	Apply               apply.Apply
-	Dynamic             *dynamic.Controller
-	CAPI                capicontrollers.Interface
-	RKE                 rkecontrollers.Interface
-	Mgmt                managementv3.Interface
-	Ext                 extv1.Interface
-	Apps                appsv1.Interface
-	Admission           admissionregcontrollers.Interface
-	Batch               batchv1.Interface
-	Fleet               fleetv1alpha1.Interface
-	Project             projectv3.Interface
-	Catalog             catalogcontrollers.Interface
-	ControllerFactory   controller.SharedControllerFactory
-	MultiClusterManager MultiClusterManager
-	TunnelServer        *remotedialer.Server
-	TunnelAuthorizer    *tunnelserver.Authorizers
-	PeerManager         peermanager.PeerManager
-	Provisioning        provisioningv1.Interface
-	RBAC                rbacv1.Interface
-	Core                corev1.Interface
-	API                 apiregv1.Interface
-	CRD                 crdv1.Interface
-	K8s                 *kubernetes.Clientset
-	Plan                plancontrolers.Interface
+	Apply                apply.Apply
+	Dynamic              *dynamic.Controller
+	CAPI                 capicontrollers.Interface
+	RKE                  rkecontrollers.Interface
+	Mgmt                 managementv3.Interface
+	Ext                  extv1.Interface
+	Apps                 appsv1.Interface
+	Admission            admissionregcontrollers.Interface
+	Batch                batchv1.Interface
+	Fleet                fleetv1alpha1.Interface
+	Project              projectv3.Interface
+	Catalog              catalogcontrollers.Interface
+	ControllerFactory    controller.SharedControllerFactory
+	extControllerFactory controller.SharedControllerFactory // conditional, see (a)
+	MultiClusterManager  MultiClusterManager
+	TunnelServer         *remotedialer.Server
+	TunnelAuthorizer     *tunnelserver.Authorizers
+	PeerManager          peermanager.PeerManager
+	Provisioning         provisioningv1.Interface
+	RBAC                 rbacv1.Interface
+	Core                 corev1.Interface
+	API                  apiregv1.Interface
+	CRD                  crdv1.Interface
+	K8s                  *kubernetes.Clientset
+	Plan                 plancontrolers.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -201,6 +202,16 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 	}
 
 	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+
+	if w.extControllerFactory != nil {
+		if err := w.extControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
+			transaction.Rollback()
+			return err
+		}
+
+		w.extControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	}
+
 	transaction.Commit()
 	return w.Start(ctx)
 }
@@ -219,6 +230,11 @@ func (w *Context) Start(ctx context.Context) error {
 
 	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
 		return err
+	}
+	if w.extControllerFactory != nil {
+		if err := w.extControllerFactory.Start(ctx, 50); err != nil {
+			return err
+		}
 	}
 	w.leadership.Start(ctx)
 	return nil
@@ -299,11 +315,13 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 
 
 	var extFactory *ext.Factory
+	var extControllerFactory controller.SharedControllerFactory
+	// (a) conditional setup
 	if port > 0 {
 		extRestConfig := *restConfig
 		extRestConfig.Host = fmt.Sprintf("localhost:%d", port)
 		extRestConfig.APIPath = "/ext"
-		extControllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&extRestConfig),
+		extControllerFactory, err = controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&extRestConfig),
 			Scheme, sharedOpts)
 		if err != nil {
 			return nil, err
@@ -470,6 +488,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CRD:                     crd.Apiextensions().V1(),
 		K8s:                     k8s,
 		ControllerFactory:       controllerFactory,
+		extControllerFactory:    extControllerFactory,
 		ASL:                     asl,
 		ClientConfig:            clientConfig,
 		MultiClusterManager:     noopMCM{},
