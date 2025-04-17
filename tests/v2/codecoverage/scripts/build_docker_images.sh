@@ -31,7 +31,6 @@ docker build \
   --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
   --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
   --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
-  --target server \
   -t ${IMAGE} -f Dockerfile . --no-cache
 
 echo "building agent test docker image"
@@ -42,8 +41,7 @@ docker build \
   --build-arg RANCHER_REPO=${REPO} \
   --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
   --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
-  --target agent \
-  -t ${AGENT_IMAGE} -f Dockerfile . --no-cache
+  -t ${AGENT_IMAGE} -f Dockerfile.agent . --no-cache
 
 echo ${DOCKERHUB_PASSWORD} | docker login --username ${DOCKERHUB_USERNAME} --password-stdin
 
