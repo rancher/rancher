@@ -19,6 +19,8 @@ func TestWriteError(t *testing.T) {
 
 	WriteError(errorMessage, errorDescription, errorCode, rec)
 
+	assert.Equal(t, rec.Header().Get("X-Content-Type-Options"), "nosniff")
+	assert.Equal(t, rec.Header().Get("X-Frame-Options"), "SAMEORIGIN")
 	assert.Equal(t, errorCode, rec.Code)
 	assert.JSONEq(t, `{"error":"`+errorMessage+`","error_description":"`+errorDescription+`"}`, strings.TrimSpace(rec.Body.String()))
 }
@@ -34,6 +36,8 @@ func TestRedirectWithError(t *testing.T) {
 
 	RedirectWithError(redirectURI, errorMessage, errorDescription, state, rec, &http.Request{})
 
+	assert.Equal(t, rec.Header().Get("X-Content-Type-Options"), "nosniff")
+	assert.Equal(t, rec.Header().Get("X-Frame-Options"), "SAMEORIGIN")
 	assert.Equal(t, 302, rec.Code)
 	assert.Equal(t, redirectURI+"?error="+errorMessage+"&error_description="+errorDescription+"&state="+state, rec.Header().Get("Location"))
 }

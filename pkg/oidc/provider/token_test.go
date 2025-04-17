@@ -552,6 +552,8 @@ func TestTokenEndpoint(t *testing.T) {
 
 			h.tokenEndpoint(rec, test.req())
 
+			assert.Equal(t, rec.Header().Get("X-Content-Type-Options"), "nosniff")
+			assert.Equal(t, rec.Header().Get("X-Frame-Options"), "SAMEORIGIN")
 			if test.wantError != "" {
 				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			} else {

@@ -46,6 +46,8 @@ func WriteError(errStr string, errDescription string, code int, w http.ResponseW
 		Error:            errStr,
 		ErrorDescription: errDescription,
 	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	err := json.NewEncoder(w).Encode(oidcErr)
@@ -67,6 +69,7 @@ func RedirectWithError(redirectURI string, errString string, description string,
 		q.Set("state", state)
 	}
 	u.RawQuery = q.Encode()
-
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
