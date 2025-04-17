@@ -10,12 +10,16 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/user"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
@@ -143,6 +147,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				EmailVerified:     true,
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
+				Roles:             []string{"adminrole"},
 			},
 		},
 		"error - invalid certificate": {
@@ -280,6 +285,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				EmailVerified:     true,
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
+				Roles:             []string{"adminrole"},
 			},
 		},
 		"token is refreshed and updated when expired": {
@@ -319,6 +325,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				EmailVerified:     true,
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
+				Roles:             []string{"adminrole"},
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
@@ -427,6 +434,100 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 	}
 }
 
+func TestGetGroupsFromClaimInfo(t *testing.T) {
+	type fields struct {
+		Name        string
+		Type        string
+		CTX         context.Context
+		AuthConfigs v3.AuthConfigInterface
+		Secrets     wcorev1.SecretController
+		UserMGR     user.Manager
+		TokenMGR    tokenManager
+	}
+	type args struct {
+		claimInfo ClaimInfo
+	}
+	type want struct {
+		groupNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   want
+	}{
+		{
+			name: "get groups from claim info",
+			args: args{
+				claimInfo: ClaimInfo{
+					Groups: []string{"group1", "group2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"group1", "group2"},
+			},
+		},
+		{
+			name: "roles and groups are combined",
+			args: args{
+				claimInfo: ClaimInfo{
+					Groups: []string{"group1", "group2"},
+					Roles:  []string{"role1", "role2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"group1", "group2", "role1", "role2"},
+			},
+		},
+		{
+			name: "just roles",
+			args: args{
+				claimInfo: ClaimInfo{
+					Roles: []string{"role1", "role2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"role1", "role2"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &OpenIDCProvider{
+				Name:        tt.fields.Name,
+				Type:        tt.fields.Type,
+				CTX:         tt.fields.CTX,
+				AuthConfigs: tt.fields.AuthConfigs,
+				Secrets:     tt.fields.Secrets,
+				UserMGR:     tt.fields.UserMGR,
+				TokenMGR:    tt.fields.TokenMGR,
+			}
+			got := o.getGroupsFromClaimInfo(tt.args.claimInfo)
+			// Assert the length of returned groups is as expected
+			if len(got) != len(tt.want.groupNames) {
+				t.Errorf("getGroupsFromClaimInfo() returned %d groups, want %d", len(got), len(tt.want.groupNames))
+			}
+
+			// Create a map for easier comparison
+			gotGroupNames := make(map[string]bool)
+			for _, principal := range got {
+				parts := strings.Split(principal.Name, "://")
+				if len(parts) == 2 {
+					gotGroupNames[parts[1]] = true
+				}
+			}
+
+			// Check that each expected group name is present
+			for _, wantGroupName := range tt.want.groupNames {
+				if !gotGroupNames[wantGroupName] {
+					t.Errorf("Expected group name %s not found in returned groups", wantGroupName)
+				}
+			}
+
+		})
+	}
+}
+
 // mockOIDCServer creates an http server that mocks an OIDC provider. Responses are passed as a parameter.
 func mockOIDCServer(listener net.Listener, resp oidcResponses) *http.Server {
 	mux := http.NewServeMux()
@@ -498,8 +599,11 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 				"full_group_path": [
 					"/admingroup"
 				],
+				"roles": [
+					"adminrole"
+				],
 				"preferred_username": "admin"
-              }`,
+      }`,
 		config: providerJSON{
 			Issuer:      "http://localhost:" + port,
 			UserInfoURL: "http://localhost:" + port + "/user",
