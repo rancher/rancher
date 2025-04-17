@@ -15,9 +15,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/aks"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/eks"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	kubeimport "github.com/rancher/rancher/pkg/kontainer-engine/drivers/import"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
@@ -27,8 +24,6 @@ import (
 
 const (
 	ListenAddress                           = "127.0.0.1:"
-	GoogleKubernetesEngineDriverName        = "googlekubernetesengine"
-	AzureKubernetesServiceDriverName        = "azurekubernetesservice"
 	AmazonElasticContainerServiceDriverName = "amazonelasticcontainerservice"
 	ImportDriverName                        = "import"
 	RancherKubernetesEngineDriverName       = "rancherkubernetesengine"
@@ -36,11 +31,8 @@ const (
 
 var (
 	Drivers = map[string]types.Driver{
-		GoogleKubernetesEngineDriverName:        gke.NewDriver(),
-		AzureKubernetesServiceDriverName:        aks.NewDriver(),
-		AmazonElasticContainerServiceDriverName: eks.NewDriver(),
-		ImportDriverName:                        kubeimport.NewDriver(),
-		RancherKubernetesEngineDriverName:       rke.NewDriver(),
+		ImportDriverName:                  kubeimport.NewDriver(),
+		RancherKubernetesEngineDriverName: rke.NewDriver(),
 	}
 )
 
