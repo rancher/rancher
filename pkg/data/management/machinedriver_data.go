@@ -10,6 +10,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
+	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -62,12 +63,6 @@ var driverDefaults = map[string]map[string]string{
 }
 
 func addMachineDrivers(management *config.ManagementContext) error {
-	if err := addMachineDriver("pinganyunecs", "https://drivers.rancher.cn/node-driver-pinganyun/0.3.0/docker-machine-driver-pinganyunecs-linux.tgz", "https://drivers.rancher.cn/node-driver-pinganyun/0.3.0/component.js", "f84ccec11c2c1970d76d30150916933efe8ca49fe4c422c8954fc37f71273bb5", []string{"drivers.rancher.cn"}, false, false, false, nil, management); err != nil {
-		return err
-	}
-	if err := addMachineDriver("aliyunecs", "https://drivers.rancher.cn/node-driver-aliyun/1.0.4/docker-machine-driver-aliyunecs.tgz", "", "5990d40d71c421a85563df9caf069466f300cd75723effe4581751b0de9a6a0e", []string{"ecs.aliyuncs.com"}, false, false, false, nil, management); err != nil {
-		return err
-	}
 	if err := addMachineDriver(Amazonec2driver, "local://", "", "",
 		[]string{"iam.amazonaws.com", "iam.us-gov.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn", "eks.%.amazonaws.com", "eks.%.amazonaws.com.cn", "kms.%.amazonaws.com", "kms.%.amazonaws.com.cn"},
 		true, true, true, nil, management); err != nil {
@@ -134,7 +129,14 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale/docker-machine-driver-outscale/releases/download/v0.2.0/docker-machine-driver-outscale_0.2.0_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.2.0/component.js", "bb539ed4e2b0f1a1083b29cbdbab59bde3efed0a3145fefc0b2f47026c48bfe0", []string{"oos.eu-west-2.outscale.com"}, false, false, false, nil, management); err != nil {
 		return err
 	}
-	return addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, nil, management)
+	if err := addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, nil, management); err != nil {
+		return err
+	}
+
+	deleteMachineDriver("pinganyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
+	deleteMachineDriver("aliyunecs", "https://drivers.rancher.cn", management.Management.NodeDrivers(""))
+
+	return nil
 }
 
 func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
@@ -238,6 +240,30 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, cre
 	})
 
 	return err
+}
+
+// Delete a deprecated or invalid node driver. Don't return errors to avoid affecting
+// Rancher's startup, as the driver will be removed on the next restart.
+func deleteMachineDriver(name, urlPrefix string, ndClient normanv3.NodeDriverInterface) {
+	driver, err := ndClient.Get(name, v1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			logrus.Warnf("Error getting node driver %s for deletion: %v", name, err)
+		}
+		return
+	}
+
+	// Don't delete if the driver is active or if the url is not the expected invalid one,
+	// as it was likely modified.
+	if driver.Spec.Active || !strings.HasPrefix(driver.Spec.URL, urlPrefix) {
+		logrus.Infof("Not deleting active or modified node driver %s", name)
+		return
+	}
+
+	logrus.Infof("Deleting node driver %s", name)
+	if err := ndClient.Delete(name, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		logrus.Warnf("Error deleting node driver %s: %v", name, err)
+	}
 }
 
 func isCommandAvailable(name string) bool {
