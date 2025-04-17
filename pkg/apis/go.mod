@@ -34,7 +34,7 @@ replace (
 
 require (
 	github.com/rancher/aks-operator v1.9.8-rc.1
-	github.com/rancher/eks-operator v1.9.8-rc.1
+	github.com/rancher/eks-operator v1.9.8
 	github.com/rancher/fleet/pkg/apis v0.10.11
 	github.com/rancher/gke-operator v1.9.8-rc.1
 	github.com/rancher/norman v0.3.1
