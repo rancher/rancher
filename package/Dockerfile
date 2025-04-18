@@ -5,6 +5,8 @@ ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ARG CATTLE_KDM_BRANCH=dev-v2.11
+ARG CONTROLLER_GEN_VERSION=v0.17.1
+ARG MOCKGEN_VERSION=v0.5.0
 
 ARG VERSION=${VERSION}
 
@@ -324,6 +326,17 @@ COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
+
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder AS generate-build
+ARG CONTROLLER_GEN_VERSION
+RUN --mount=type=cache,target=/root/.cache,id=rancher go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
+ARG MOCKGEN_VERSION
+RUN --mount=type=cache,target=/root/.cache,id=rancher go install go.uber.org/mock/mockgen@${MOCKGEN_VERSION}
+COPY . .
+RUN --mount=type=cache,target=/root/.cache,id=rancher go generate ./...
+FROM scratch as generate
+COPY --from=generate-build /app/pkg /pkg
 
 
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build

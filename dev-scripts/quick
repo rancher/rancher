@@ -64,3 +64,13 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
     --target agent \
     --file ./package/Dockerfile .
 fi
+
+if [ "$TARGET" = "generate" ]; then
+  # start the builds
+  docker buildx build \
+    $BUILD_ARGS \
+    --platform="${OS}/${ARCH}" \
+    --target generate \
+    --output=type=local,dest="." \
+    --file ./package/Dockerfile .
+fi
