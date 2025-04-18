@@ -299,7 +299,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 // (or CRUD the project/cluster if they are an owner)
 func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Cluster, makeOwner bool) error {
 	if cr, _ := m.crLister.Get("", roleName); cr == nil {
-		return m.createMembershipRole(clusterResource, roleName, makeOwner, false, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
+		return m.createMembershipRole(clusterResource, roleName, makeOwner, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
 	}
 	return nil
 }
@@ -309,22 +309,14 @@ func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Clust
 func (m *manager) createProjectMembershipRole(roleName, namespace, roleTemplate string, project *v3.Project, makeOwner bool) error {
 	// when the role is not <project_name>-projectowner
 	// we should carefully select the verbs we want to allow
-	var canUpdatePSA bool
-	var err error
-	if !makeOwner {
-		canUpdatePSA, err = m.canUpdatePSA(roleTemplate)
-		if err != nil {
-			return err
-		}
-	}
 	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
-		return m.createMembershipRole(projectResource, roleName, makeOwner, canUpdatePSA, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
+		return m.createMembershipRole(projectResource, roleName, makeOwner, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
 	}
 	return nil
 }
 
 // createMembershipRole creates Role or ClusterRole for Project resources.
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, canUpdatePSA bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
+func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
 		return err
