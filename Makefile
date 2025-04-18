@@ -17,6 +17,9 @@ $(TARGETS): .dapper
 
 .DEFAULT_GOAL := ci
 
+generate:
+	@$(MAKE) quick TARGET="generate"
+
 quick-agent:
 	@$(MAKE) quick TARGET="agent"
 
@@ -26,4 +29,4 @@ quick-server:
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
-.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server
+.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server generate
