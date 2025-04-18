@@ -662,6 +662,9 @@ func Test_ChartInstallation(t *testing.T) {
 				// system-upgrade-controller
 				// nothing to do in this case
 
+				// remotedialer-proxy (it will call uninstall if imperative api is disabled)
+				mocks.manager.EXPECT().Remove(namespace.System, "remotedialer-proxy").Return(nil)
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
@@ -724,6 +727,9 @@ func Test_ChartInstallation(t *testing.T) {
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
+
+				// remotedialer-proxy (it will call uninstall if imperative api is disabled)
+				mocks.manager.EXPECT().Remove(namespace.System, "remotedialer-proxy").Return(nil)
 
 				// system-upgrade-controller
 				// nothing to do in this case
