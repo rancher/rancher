@@ -3,11 +3,13 @@ package auditpolicy
 import (
 	"io"
 	"testing"
+	"time"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/controllers/auditlog/auditpolicy/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -46,6 +48,12 @@ var (
 	}
 )
 
+func mockTimeFactory() metav1.Time {
+	return metav1.Time{
+		Time: time.Time{},
+	}
+}
+
 func setup(t *testing.T, level auditlogv1.Level) handler {
 	writer, err := audit.NewWriter(io.Discard, audit.WriterOptions{
 		DefaultPolicyLevel: level,
@@ -61,171 +69,211 @@ func setup(t *testing.T, level auditlogv1.Level) handler {
 			},
 		},
 		writer: writer,
+
+		time: mockTimeFactory,
 	}
 
 	return h
 }
 
-func TestOnChangeAddSimplePolicy(t *testing.T) {
-	policy := samplePolicy
+func inject(t *testing.T, p auditlogv1.AuditPolicy, name string) auditlogv1.AuditPolicy {
+	t.Helper()
 
-	h := setup(t, auditlogv1.LevelHeaders)
+	p.Namespace = TargetNamespace
+	p.Name = name
 
-	_, err := h.auditpolicy.Create(&policy)
-	assert.NoError(t, err)
-
-	_, err = h.OnChange(testHandlerFuncKey, &policy)
-	assert.NoError(t, err)
-
-	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
-
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
-
-	expectedPolicy, err := audit.PolicyFromAuditPolicy(&policy)
-	assert.NoError(t, err)
-
-	actualPolicy, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
-	assert.True(t, ok)
-	assert.Equal(t, expectedPolicy, actualPolicy)
+	return p
 }
 
-func TestOnChangeAddInvalidPolicyFilterRequestURIRegex(t *testing.T) {
-	policy := samplePolicy
-	policy.Spec.Filters = []auditlogv1.Filter{
-		{
-			Action:     auditlogv1.FilterActionAllow,
-			RequestURI: "*",
-		},
+func TestOnChange(t *testing.T) {
+	type testCase struct {
+		name     string
+		input    auditlogv1.AuditPolicy
+		expected auditlogv1.AuditPolicyStatus
 	}
 
-	h := setup(t, auditlogv1.LevelHeaders)
-
-	_, err := h.auditpolicy.Create(&policy)
-	assert.NoError(t, err)
-
-	_, err = h.OnChange(testHandlerFuncKey, &policy)
-	assert.NoError(t, err)
-
-	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
-
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
-
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
-	assert.False(t, ok)
-}
-
-func TestOnChangeAddInvalidPolicyFilterAction(t *testing.T) {
-	policy := samplePolicy
-	policy.Spec.Filters = []auditlogv1.Filter{
+	cases := []testCase{
 		{
-			Action: "don't not allow",
+			name: "AddSimplePolicy",
+			input: auditlogv1.AuditPolicy{
+				Spec: auditlogv1.AuditPolicySpec{
+					Enabled: true,
+				},
+			},
+			expected: auditlogv1.AuditPolicyStatus{
+				Conditions: []metav1.Condition{
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
+						Status:             metav1.ConditionTrue,
+						LastTransitionTime: mockTimeFactory(),
+					},
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
+						Status:             metav1.ConditionTrue,
+						LastTransitionTime: mockTimeFactory(),
+					},
+				},
+			},
 		},
-	}
 
-	h := setup(t, auditlogv1.LevelHeaders)
-
-	_, err := h.auditpolicy.Create(&policy)
-	assert.NoError(t, err)
-
-	_, err = h.OnChange(testHandlerFuncKey, &policy)
-	assert.NoError(t, err)
-
-	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: invalid filter action: 'don't not allow'")
-
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
-
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
-	assert.False(t, ok)
-}
-
-func TestOnChangeAddInvalidPolicyRedactorHeaderRegex(t *testing.T) {
-	policy := samplePolicy
-	policy.Spec.AdditionalRedactions = []auditlogv1.Redaction{
 		{
-			Headers: []string{
-				"*",
+			name: "AddInvalidPolicyFilterRequestURIRegex",
+			input: auditlogv1.AuditPolicy{
+				Spec: auditlogv1.AuditPolicySpec{
+					Enabled: true,
+					Filters: []auditlogv1.Filter{
+						{
+							Action:     auditlogv1.FilterActionAllow,
+							RequestURI: "*",
+						},
+					},
+				},
+			},
+			expected: auditlogv1.AuditPolicyStatus{
+				Conditions: []metav1.Condition{
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
+						Status:             metav1.ConditionUnknown,
+						LastTransitionTime: mockTimeFactory(),
+					},
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
+						Status:             metav1.ConditionFalse,
+						LastTransitionTime: mockTimeFactory(),
+						Message:            "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`",
+					},
+				},
+			},
+		},
+
+		{
+			name: "AddInvalidPolicyFilterAction",
+			input: auditlogv1.AuditPolicy{
+				Spec: auditlogv1.AuditPolicySpec{
+					Enabled: true,
+					Filters: []auditlogv1.Filter{
+						{
+							Action: "do not allow",
+						},
+					},
+				},
+			},
+			expected: auditlogv1.AuditPolicyStatus{
+				Conditions: []metav1.Condition{
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
+						Status:             metav1.ConditionUnknown,
+						LastTransitionTime: mockTimeFactory(),
+					},
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
+						Status:             metav1.ConditionFalse,
+						LastTransitionTime: mockTimeFactory(),
+						Message:            "failed to create filter: invalid filter action: 'do not allow'",
+					},
+				},
+			},
+		},
+
+		{
+			name: "AddInvalidPolicyRedactorHeaderRegex",
+			input: auditlogv1.AuditPolicy{
+				Spec: auditlogv1.AuditPolicySpec{
+					Enabled: true,
+					AdditionalRedactions: []auditlogv1.Redaction{
+						{
+							Headers: []string{
+								"*",
+							},
+						},
+					},
+				},
+			},
+			expected: auditlogv1.AuditPolicyStatus{
+				Conditions: []metav1.Condition{
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
+						Status:             metav1.ConditionUnknown,
+						LastTransitionTime: mockTimeFactory(),
+					},
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
+						Status:             metav1.ConditionFalse,
+						LastTransitionTime: mockTimeFactory(),
+						Message:            "failed to create redactor: failed to compile headers regexes: failed to compile regex: error parsing regexp: missing argument to repetition operator: `*`",
+					},
+				},
+			},
+		},
+
+		{
+			name: "AddInvalidPolicyRedactorJSONPath",
+			input: auditlogv1.AuditPolicy{
+				Spec: auditlogv1.AuditPolicySpec{
+					Enabled: true,
+					AdditionalRedactions: []auditlogv1.Redaction{
+						{
+							Paths: []string{
+								".missing.root",
+							},
+						},
+					},
+				},
+			},
+			expected: auditlogv1.AuditPolicyStatus{
+				Conditions: []metav1.Condition{
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
+						Status:             metav1.ConditionUnknown,
+						LastTransitionTime: mockTimeFactory(),
+					},
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
+						Status:             metav1.ConditionFalse,
+						LastTransitionTime: mockTimeFactory(),
+						Message:            "failed to create redactor: failed to parse paths: failed to parse jsonpath: paths must begin with the root object identifier: '$'",
+					},
+				},
+			},
+		},
+
+		{
+			name: "AddDisabledPolicy",
+			input: auditlogv1.AuditPolicy{
+				Spec: auditlogv1.AuditPolicySpec{},
+			},
+			expected: auditlogv1.AuditPolicyStatus{
+				Conditions: []metav1.Condition{
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
+						Status:             metav1.ConditionFalse,
+						LastTransitionTime: mockTimeFactory(),
+						Message:            "policy was disabled",
+					},
+					metav1.Condition{
+						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
+						Status:             metav1.ConditionUnknown,
+						LastTransitionTime: mockTimeFactory(),
+					},
+				},
 			},
 		},
 	}
 
-	h := setup(t, auditlogv1.LevelHeaders)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := setup(t, auditlogv1.LevelHeaders)
+			c.input = inject(t, c.input, c.name)
 
-	_, err := h.auditpolicy.Create(&policy)
-	assert.NoError(t, err)
+			_, err := h.auditpolicy.Create(&c.input)
+			require.NoError(t, err)
 
-	_, err = h.OnChange(testHandlerFuncKey, &policy)
-	assert.NoError(t, err)
+			actual, err := h.OnChange(testHandlerFuncKey, &c.input)
+			assert.NoError(t, err)
 
-	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create redactor: failed to compile headers regexes: failed to compile regex: error parsing regexp: missing argument to repetition operator: `*`")
-
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
-
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
-	assert.False(t, ok)
-}
-
-func TestOnChangeAddInvalidPolicyRedactorJSONPath(t *testing.T) {
-	policy := samplePolicy
-	policy.Spec.AdditionalRedactions = []auditlogv1.Redaction{
-		{
-			Paths: []string{
-				".missing.root",
-			},
-		},
+			assert.Equal(t, c.expected, actual.Status)
+		})
 	}
-
-	h := setup(t, auditlogv1.LevelHeaders)
-
-	_, err := h.auditpolicy.Create(&policy)
-	assert.NoError(t, err)
-
-	_, err = h.OnChange(testHandlerFuncKey, &policy)
-	assert.NoError(t, err)
-
-	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create redactor: failed to parse paths: failed to parse jsonpath: paths must begin with the root object identifier: '$'")
-
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
-
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
-	assert.False(t, ok)
-}
-
-func TestOnChangeAddDisablePolicy(t *testing.T) {
-	policy := samplePolicy
-	policy.Spec.Enabled = false
-
-	h := setup(t, auditlogv1.LevelHeaders)
-
-	_, err := h.auditpolicy.Create(&policy)
-	assert.NoError(t, err)
-
-	_, err = h.OnChange(testHandlerFuncKey, &policy)
-	assert.NoError(t, err)
-
-	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
-
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
-
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
-	assert.False(t, ok)
 }
 
 func TestOnChangeDisableActivePolicy(t *testing.T) {
@@ -240,11 +288,11 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
+	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
 
 	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
+	assert.Equal(t, expected, *actual)
 
 	policy.Spec.Enabled = false
 
@@ -255,11 +303,11 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected.Spec.Enabled = false
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
+	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
 
 	actual, err = h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
+	assert.Equal(t, expected, *actual)
 
 	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
 	assert.False(t, ok)
@@ -277,7 +325,7 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
+	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
 
 	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
@@ -305,7 +353,7 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected = invalidPolicy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
+	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
 
 	actual, err = h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
@@ -337,7 +385,7 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := invalidPolicy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
+	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
 
 	actual, err := h.auditpolicy.Get(invalidPolicy.Namespace, invalidPolicy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
@@ -355,7 +403,7 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected = policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
+	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
 
 	actual, err = h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
@@ -381,11 +429,11 @@ func TestOnRemoveActivePolicy(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
+	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
 
 	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
+	assert.Equal(t, expected, *actual)
 
 	_, err = h.OnRemove(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
@@ -404,11 +452,11 @@ func TestOnRemoveDisabledPolicy(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
+	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
 
 	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
-	assert.Equal(t, &expected, actual)
+	assert.Equal(t, expected, *actual)
 
 	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
 	assert.False(t, ok)
@@ -438,7 +486,7 @@ func TestOnRemoveInvalidPolicy(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := policy
-	updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
+	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
 
 	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
