@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -324,7 +323,12 @@ func toArgs(driverName string, args map[string]any, cluster *rancherv1.Cluster) 
 		cmd = append(cmd, fmt.Sprintf("--harvester-cluster-name=%s", cluster.Name))
 	}
 
-	sort.Strings(cmd)
+	// Intentionally leave the slice unsorted.
+	// Re‑ordering values that map to the same CLI flag
+	// (e.g. multiple --vmwarevsphere-network entries) would change their
+	// positional semantics and can alter how the driver wires the node.
+	// Preserve the exact order the user provided.
+	// sort.Strings(cmd)
 	return
 }
 
