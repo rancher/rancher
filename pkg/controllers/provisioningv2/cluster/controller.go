@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -20,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -203,6 +205,7 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 	if !h.isLegacyCluster(cluster) || (cluster.Spec.FleetWorkspaceName == "" && !clusterExternallyManaged) {
 		return nil, status, nil
 	}
+
 	provCluster := &v1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,
@@ -290,6 +293,9 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 }
 
 func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "createCluster()")
+
 	if h.isLegacyCluster(cluster) {
 		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Name)
 		if err != nil {
@@ -531,6 +537,9 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 }
 
 func (h *handler) updateFeatureLockedValue(lockValueToTrue bool) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "updateFeatureLockedValue()")
+
 	feature, err := h.featureCache.Get(features.RKE2.Name())
 	if err != nil {
 		return err

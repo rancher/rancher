@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/image"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -21,7 +22,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -29,6 +29,7 @@ import (
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -88,6 +89,9 @@ type clusterDeploy struct {
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "clusterDeploy.sync()")
+
 	logrus.Tracef("clusterDeploy: sync called for key [%s]", key)
 	var (
 		err, updateErr error
@@ -135,7 +139,7 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 
 	// Skip further work if the cluster's API is not reachable according to HealthSyncer criteria
 	// Note that we don't check the cluster's ClusterConditionReady status here, as HealthSyncer is not running
-	// prior deployment of the cluster agent
+	// prior to deployment of the cluster agent
 	uc, err := cd.clusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
 	if err != nil {
 		return err
@@ -209,6 +213,8 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
+
+	//vf so here the desired features has ManagedSystemUpgradeController and that's what causing the agent upgrade.
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
 	repoChange := false
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
@@ -238,6 +244,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	}
 
 	na, ca := getAgentImages(cluster.Name)
+
 	if (cluster.Status.AgentImage != na && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
@@ -252,6 +259,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] currentTaints: [%v]", cluster.Name, currentTaints)
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] desiredTaints: [%v]", cluster.Name, desiredTaints)
 	toAdd, toDelete := taints.GetToDiffTaints(currentTaints, desiredTaints)
+
 	// Any change to current triggers redeploy
 	if len(toAdd) > 0 || len(toDelete) > 0 {
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to toleration mismatch for [%s], was [%v] and will be [%v]", cluster.Name, currentTaints, desiredTaints)
@@ -269,8 +277,6 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent customization mismatch for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedClusterAgentDeploymentCustomization, cluster.Spec.ClusterAgentDeploymentCustomization)
 		return true
 	}
-
-	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
 }

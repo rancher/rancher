@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -27,6 +28,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func runRefreshCatalog(ctx context.Context, interval int, controller v3.CatalogController, m *manager.Manager) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "unRefreshCatalog()")
+
 	for range ticker.Context(ctx, time.Duration(interval)*time.Second) {
 		catalogs, err := m.CatalogLister.List("", labels.NewSelector())
 		if err != nil {
@@ -40,6 +44,9 @@ func runRefreshCatalog(ctx context.Context, interval int, controller v3.CatalogC
 }
 
 func runRefreshProjectCatalog(ctx context.Context, interval int, controller v3.ProjectCatalogController, m *manager.Manager) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "runRefreshProjectCatalog()")
+
 	for range ticker.Context(ctx, time.Duration(interval)*time.Second) {
 		projectCatalogs, err := m.ProjectCatalogLister.List("", labels.NewSelector())
 		if err != nil {
@@ -53,6 +60,9 @@ func runRefreshProjectCatalog(ctx context.Context, interval int, controller v3.P
 }
 
 func runRefreshClusterCatalog(ctx context.Context, interval int, controller v3.ClusterCatalogController, m *manager.Manager) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "runRefreshClusterCatalog()")
+
 	for range ticker.Context(ctx, time.Duration(interval)*time.Second) {
 		clusterCatalogs, err := m.ClusterCatalogLister.List("", labels.NewSelector())
 		if err != nil {

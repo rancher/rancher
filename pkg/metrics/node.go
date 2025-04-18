@@ -10,6 +10,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,6 +51,9 @@ type nodeMetrics struct {
 }
 
 func (m *nodeMetrics) collect(ctx context.Context) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "nodeMetrics.collect()")
+
 	for range ticker.Context(ctx, reportInterval) {
 		logrus.Debugf("%s collecting nodes to report metrics", logPrefix)
 
