@@ -10,8 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/blang/semver"
-	mVersion "github.com/mcuadros/go-version"
+	msemver "github.com/Masterminds/semver/v3"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/norman/store/setting"
 	"github.com/rancher/rancher/pkg/channelserver"
@@ -151,7 +150,15 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 			maxIgnore = append(maxIgnore, k8sVersion)
 			continue
 		}
-		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || mVersion.Compare(k8sVersion, curr, ">") {
+		curr, ok := maxVersionForMajorK8sVersion[majorVersion]
+		if !ok {
+			maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
+			continue
+		}
+
+		currVer, err1 := msemver.NewVersion(curr)
+		newVer, err2 := msemver.NewVersion(k8sVersion)
+		if err1 == nil && err2 == nil && newVer.GreaterThan(currVer) {
 			maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
 		}
 	}
@@ -160,22 +167,40 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 	return md.updateSettings(maxVersionForMajorK8sVersion, rancherVersion, ServiceOptions, DefaultK8sVersions, deprecatedMap)
 }
 
-func toIgnoreForAllK8s(rancherVersionInfo rketypes.K8sVersionInfo, rancherVersion string) bool {
-	if rancherVersionInfo.DeprecateRancherVersion != "" && mVersion.Compare(rancherVersion, rancherVersionInfo.DeprecateRancherVersion, ">=") {
-		return true
+func toIgnoreForAllK8s(info rketypes.K8sVersionInfo, rancherVersion string) bool {
+	rVersion, err := msemver.NewVersion(rancherVersion)
+	if err != nil {
+		return false
 	}
-	if rancherVersionInfo.MinRancherVersion != "" && mVersion.Compare(rancherVersion, rancherVersionInfo.MinRancherVersion, "<") {
-		// only respect min versions, even if max is present - we need to support upgraded clusters
-		return true
+
+	if info.DeprecateRancherVersion != "" {
+		deprecateVer, err := msemver.NewVersion(info.DeprecateRancherVersion)
+		if err == nil && rVersion.Compare(deprecateVer) >= 0 {
+			return true
+		}
 	}
+
+	if info.MinRancherVersion != "" {
+		minVer, err := msemver.NewVersion(info.MinRancherVersion)
+		if err == nil && rVersion.LessThan(minVer) {
+			return true
+		}
+	}
+
 	return false
 }
 
-func toIgnoreForK8sCurrent(majorVersionInfo rketypes.K8sVersionInfo, rancherVersion string) bool {
-	if majorVersionInfo.MaxRancherVersion != "" && mVersion.Compare(rancherVersion, majorVersionInfo.MaxRancherVersion, ">") {
-		// include in K8sVersionCurrent only if less then max version
+func toIgnoreForK8sCurrent(info rketypes.K8sVersionInfo, rancherVersion string) bool {
+	if info.MaxRancherVersion == "" {
+		return false
+	}
+
+	rVersion, err := msemver.NewVersion(rancherVersion)
+	maxVer, err2 := msemver.NewVersion(info.MaxRancherVersion)
+	if err == nil && err2 == nil && rVersion.GreaterThan(maxVer) {
 		return true
 	}
+
 	return false
 }
 
@@ -358,7 +383,7 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 
 func getLabelMap(k8sVersion string, data map[string]map[string]string,
 	svcOption map[string]rketypes.KubernetesServicesOptions, svcOptionWindows map[string]rketypes.KubernetesServicesOptions) (map[string]string, error) {
-	toMatch, err := semver.Make(k8sVersion[1:])
+	toMatch, err := msemver.NewVersion(k8sVersion[1:])
 	if err != nil {
 		return nil, fmt.Errorf("k8sVersion not sem-ver %s %v", k8sVersion, err)
 	}
@@ -369,12 +394,12 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 		}
 		found := false
 		for k8sRange, key := range addonData {
-			testRange, err := semver.ParseRange(k8sRange)
+			testRange, err := msemver.NewConstraint(k8sRange)
 			if err != nil {
 				logrus.Errorf("getPluginData: range for %s not sem-ver %v %v", addon, testRange, err)
 				continue
 			}
-			if testRange(toMatch) {
+			if testRange.Check(toMatch) {
 				labelMap[addon] = key
 				found = true
 				break
