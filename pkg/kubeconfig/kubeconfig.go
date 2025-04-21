@@ -170,7 +170,7 @@ func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clu
 	return buf.String(), err
 }
 
-type Input struct {
+type GenerateInput struct {
 	ClusterID        string
 	Cluster          *apiv3.Cluster
 	Nodes            []*apiv3.Node
@@ -178,19 +178,24 @@ type Input struct {
 	IsCurrentContext bool
 }
 
-func Generate(host string, input []Input) (string, error) {
+func Generate(host string, input []GenerateInput) (string, error) {
 	k := KubeConfig{}
 	caCert := caCertString()
 
 	for _, entry := range input {
 		clusterName := entry.Cluster.Spec.DisplayName
-		if clusterName == "" {
+		if clusterName == "" || entry.ClusterID == "rancher" {
 			clusterName = entry.ClusterID
+		}
+
+		server := "https://" + host
+		if clusterName != "rancher" {
+			server += "/k8s/clusters/" + entry.ClusterID
 		}
 
 		k.Clusters = append(k.Clusters, Cluster{
 			Name:   clusterName,
-			Server: fmt.Sprintf("https://%s/k8s/clusters/%s", host, entry.ClusterID),
+			Server: server,
 			Cert:   caCert,
 		})
 		k.Users = append(k.Users, User{

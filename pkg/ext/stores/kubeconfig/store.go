@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	Kind                     = "Kubeconfig"
-	Singular                 = "kubeconfig"
-	GroupCattleAuthenticated = "system:cattle:authenticated"
+	Kind     = "Kubeconfig"
+	Singular = "kubeconfig"
 )
 
 var gvr = ext.SchemeGroupVersion.WithResource(ext.KubeconfigResourceName)
@@ -213,6 +212,11 @@ func (s *Store) Create(
 		return nil, apierrors.NewInternalError(fmt.Errorf("error checking if kubeconfig %s exists: %w", kubeConfigID, err))
 	}
 
+	localCluster, err := s.clusterCache.Get("local")
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting local cluster: %w", err))
+	}
+
 	var clusters []*apiv3.Cluster
 	if kubeconfig.Spec.Clusters[0] == "*" {
 		// The first id in the spec.clusters "*" means all clusters.
@@ -223,6 +227,11 @@ func (s *Store) Create(
 	} else {
 		// Individualy listed clusters.
 		for _, clusterID := range kubeconfig.Spec.Clusters {
+			if clusterID == "local" { // Shortcut for the local cluster.
+				clusters = append(clusters, localCluster)
+				continue
+			}
+
 			cluster, err := s.clusterCache.Get(clusterID)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -240,10 +249,7 @@ func (s *Store) Create(
 		return nil, fmt.Errorf("failed to get default token TTL: %w", err)
 	}
 
-	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
-
-	generateToken := s.shouldGenerateToken()
-	input := make([]kconfig.Input, 0, len(kubeconfig.Spec.Clusters))
+	// Check if the user has access to requested clusters before generating tokens.
 	for _, cluster := range clusters {
 		decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 			User:            userInfo,
@@ -260,7 +266,31 @@ func (s *Store) Create(
 		if decision != authorizer.DecisionAllow {
 			return nil, apierrors.NewForbidden(gvr.GroupResource(), kubeConfigID, fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), cluster.Name))
 		}
+	}
 
+	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
+
+	generateToken := s.shouldGenerateToken()
+	input := make([]kconfig.GenerateInput, 0, len(kubeconfig.Spec.Clusters)+1)
+	var sharedTokenKey string
+
+	// Generate a shared token for the default and non-ACE clusters.
+	if !dryRun && generateToken {
+		input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, defaultTokenTTL)
+		sharedTokenKey, err = s.userMgr.EnsureToken(input)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
+		}
+	}
+
+	// The default cluster entry.
+	input = append(input, kconfig.GenerateInput{
+		ClusterID: "rancher",
+		Cluster:   localCluster,
+		TokenKey:  sharedTokenKey,
+	})
+
+	for _, cluster := range clusters {
 		var nodes []*apiv3.Node
 		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 			nodes, err = s.nodeCache.List(cluster.Name, labels.Everything())
@@ -269,26 +299,20 @@ func (s *Store) Create(
 			}
 		}
 
-		var tokenKey, sharedTokenKey string
-
+		var tokenKey string
 		if !dryRun && generateToken {
-			input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, defaultTokenTTL)
 			if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
+				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, defaultTokenTTL)
 				tokenKey, err = s.userMgr.EnsureClusterToken(cluster.Name, input)
-			} else {
-				if sharedTokenKey != "" { // Reuse the same token for clusters without ACE.
-					tokenKey = sharedTokenKey
-				} else {
-					tokenKey, err = s.userMgr.EnsureToken(input)
-					sharedTokenKey = tokenKey
+				if err != nil {
+					return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
 				}
-			}
-			if err != nil {
-				return nil, apierrors.NewInternalError(fmt.Errorf("error creating a kubeconfig token for cluster %s: %w", cluster.Name, err))
+			} else {
+				tokenKey = sharedTokenKey // Resuse the shared token.
 			}
 		}
 
-		input = append(input, kconfig.Input{
+		input = append(input, kconfig.GenerateInput{
 			ClusterID: cluster.Name,
 			Cluster:   cluster,
 			Nodes:     nodes,
