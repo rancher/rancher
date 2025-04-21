@@ -5,10 +5,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -137,6 +139,48 @@ func TestStoreCreate(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Store.Create() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestStoreTransform(t *testing.T) {
+	tests := map[string]struct {
+		key      string
+		data     map[string]interface{}
+		wantData map[string]interface{}
+	}{
+		"projectId for the local cluster": {
+			key: "projectId",
+			data: map[string]interface{}{
+				"projectId":   "local:project-XYZ",
+				"namespaceId": "local-project-XYZ",
+			},
+			wantData: map[string]interface{}{
+				"projectId":   "local:project-XYZ",
+				"namespaceId": nil,
+			},
+		},
+		"projectId for a downstream cluster": {
+			key: "projectId",
+			data: map[string]interface{}{
+				"projectId":   "cluster-ABC:project-XYZ",
+				"namespaceId": "cluster-ABC-project-XYZ",
+			},
+			wantData: map[string]interface{}{
+				"projectId":   "cluster-ABC:project-XYZ",
+				"namespaceId": nil,
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			s := NewScopedStore(test.key, nil, nil)
+			transformStore := s.Store.(*transform.Store)
+			data, err := transformStore.Transformer(nil, nil, test.data, nil)
+			assert.NoError(t, err)
+			assert.Equal(t, test.wantData, data)
 		})
 	}
 }
