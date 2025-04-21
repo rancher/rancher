@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -167,7 +168,11 @@ func (p *peerManager) addRemovePeers(endpoints *v1.Endpoints) {
 
 	toCreate, toDelete, _ := set.Diff(newSet, p.peers)
 	for _, ip := range toCreate {
-		p.server.AddPeer(fmt.Sprintf(p.urlFormat, ip), ip, p.token)
+		urlSafeIP := ip
+		if utils.IsPlainIPV6(ip) {
+			urlSafeIP = fmt.Sprintf("[%s]", ip)
+		}
+		p.server.AddPeer(fmt.Sprintf(p.urlFormat, urlSafeIP), ip, p.token)
 	}
 	for _, ip := range toDelete {
 		p.server.RemovePeer(ip)

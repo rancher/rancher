@@ -2,7 +2,7 @@ package utils
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"sort"
 	"strings"
 
@@ -21,8 +21,9 @@ func FormatResourceList(resources v1.ResourceList) string {
 
 // IsPlainIPV6 will return true if the given address is a plain IPV6 address and not encapsulated or similar.
 func IsPlainIPV6(address string) bool {
-	if net.ParseIP(address) != nil && strings.Count(address, ":") >= 2 {
-		return true
+	ipAddr, err := netip.ParseAddr(address)
+	if err != nil {
+		return false
 	}
-	return false
+	return ipAddr.Is6()
 }
