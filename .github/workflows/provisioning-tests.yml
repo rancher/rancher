@@ -68,6 +68,8 @@ jobs:
           AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
           docker tag "$image_id" ${{ env.IMAGE }}:${{ env.TAG }}
           echo "the image created is ${{ env.IMAGE }}:${{ env.TAG }}"
+      - name: Install go-junit-report
+        run: go install github.com/jstemmer/go-junit-report/v2@latest
       - name: Load rancher/rancher-agent image
         run: |
           image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -87,3 +89,9 @@ jobs:
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
           CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
+      - name: Publish Test Results
+        uses: rancher/publish-unit-test-result-action@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6
+        if: always()
+        with:
+          files: |
+            report.xml
