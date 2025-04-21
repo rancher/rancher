@@ -558,6 +558,7 @@ func TestTokenEndpoint(t *testing.T) {
 				var tokenResponse TokenResponse
 				err := json.Unmarshal(rec.Body.Bytes(), &tokenResponse)
 				assert.NoError(t, err)
+				assert.Equal(t, tokenResponse.TokenType, bearerTokenType)
 				if test.wantIdTokenClaims != nil {
 					claims := jwt.MapClaims{}
 					_, err := jwt.ParseWithClaims(tokenResponse.IDToken, &claims, func(token *jwt.Token) (interface{}, error) {
