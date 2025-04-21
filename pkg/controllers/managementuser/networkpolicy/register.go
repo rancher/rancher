@@ -73,4 +73,5 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	mgmtClusters.AddHandler(ctx, "clusterHandler", clusterHandler.Sync)
 
 	mgmtClusters.AddHandler(ctx, "clusterNetAnnHandler", clusterNetAnnHandler.Sync)
+	npClient.NetworkPolicies("").AddHandler(ctx, "netpol-handler", npmgr.SyncDefaultNetworkPolicies)
 }
