@@ -141,8 +141,6 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		}
 		u.RawQuery = q.Encode()
 
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return
 	}
