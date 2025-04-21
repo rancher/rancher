@@ -227,12 +227,18 @@ if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then
   ( push_cattle_agent_image & )
 fi
 
+REPORTING_ARGS=""
+if [ -n $(which go-junit-report) ]; then
+  echo "Using go-junit-report for test reporting"
+  REPORTING_ARGS="-json 2>&1 | go-junit-report -parser gojson -set-exit-code -iocopy -out report.xml"
+fi
+
 #kill $TPID
 
 echo Running provisioning-tests $RUNARG
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
+go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... $REPORTING_ARGS || {
      dump_rancher_logs
      exit 1
 }
