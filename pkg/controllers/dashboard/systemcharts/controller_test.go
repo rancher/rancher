@@ -662,6 +662,10 @@ func Test_ChartInstallation(t *testing.T) {
 				// system-upgrade-controller
 				// nothing to do in this case
 
+				// remotedialer-proxy
+				mocks.manager.EXPECT().Uninstall(namespace.System, "remotedialer-proxy").Return(nil)
+				mocks.manager.EXPECT().Remove(namespace.System, "remotedialer-proxy")
+
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
