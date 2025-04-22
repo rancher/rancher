@@ -556,13 +556,14 @@ func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermission
 
 		for _, project := range projects {
 			rbName := fmt.Sprintf("%s-%s", globalRoleBinding.Name, rbac.RestrictedAdminProjectRoleBinding)
-			_, err := grb.roleBindingLister.Get(project.Name, rbName)
+			projectBackingNamespace := project.GetProjectBackingNamespace()
+			_, err := grb.roleBindingLister.Get(projectBackingNamespace, rbName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					_, err := grb.roleBindings.Create(&v1.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      rbName,
-							Namespace: project.Name,
+							Namespace: projectBackingNamespace,
 							OwnerReferences: []metav1.OwnerReference{
 								{
 									APIVersion: globalRoleBinding.APIVersion,
