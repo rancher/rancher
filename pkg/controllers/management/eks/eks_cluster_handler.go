@@ -172,28 +172,28 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		logrus.Infof("waiting for cluster EKS [%s] create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
 	case "active":
-		if cluster.Spec.EKSConfig.Imported {
-			if cluster.Status.EKSStatus.UpstreamSpec == nil {
-				// non imported clusters will have already had upstream spec set
-				return e.setInitialUpstreamSpec(cluster)
-			}
 
-			if apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
-				cluster = cluster.DeepCopy()
-				apimgmtv3.ClusterConditionPending.True(cluster)
-				cluster, err = e.ClusterClient.Update(cluster)
-				if err != nil {
-					return cluster, err
-				}
+		if cluster.Status.EKSStatus.UpstreamSpec == nil {
+			// for imported clusters cluster.Status.EKSStatus.UpstreamSpec will be nil initially so has to be set
+
+			// for non imported clusters if eksClusterConfig is in active phase but still the UpstreamSpec is not set
+			// this means there were some failures while initialising UpstreamSpec when the eksClusterConfig was in creating phase
+			// and those failures were resolved so the config status became active so UpstreamSpec can be set now
+			return e.setInitialUpstreamSpec(cluster)
+		}
+
+		if cluster.Spec.EKSConfig.Imported && apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
+			cluster = cluster.DeepCopy()
+			apimgmtv3.ClusterConditionPending.True(cluster)
+			cluster, err = e.ClusterClient.Update(cluster)
+			if err != nil {
+				return cluster, err
+
 			}
 		}
 
 		if apimgmtv3.ClusterConditionUpdated.IsFalse(cluster) && strings.HasPrefix(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
 			return cluster, errors.New(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster))
-		}
-
-		if cluster.Status.EKSStatus.UpstreamSpec == nil {
-			return cluster, fmt.Errorf("initial upstreamSpec on cluster [%s] has not been set, unable to continue", cluster.Name)
 		}
 
 		// EKS cluster must have at least one node to run cluster agent. The best way to verify
