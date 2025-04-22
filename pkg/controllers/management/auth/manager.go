@@ -1009,7 +1009,7 @@ func getLabelRequirements(objMeta metav1.ObjectMeta) ([]labels.Requirement, erro
 
 // canUpdatePSA returns true if the roletemplate has the updatepsa verb enabled
 func (m *manager) canUpdatePSA(roleTemplate string) (bool, error) {
-	var additionalVerbs bool
+	var canUpdatePSA bool
 	// retrieve involved role templates
 	roleTemplates, err := m.gatherAndDedupeRoles(roleTemplate)
 	if err != nil {
@@ -1030,8 +1030,8 @@ func (m *manager) canUpdatePSA(roleTemplate string) (bool, error) {
 	// making the list of verb unique after collecting them from role templates
 	for verb := range verbList {
 		if verb == updatePSAVerb {
-			additionalVerbs = true
+			canUpdatePSA = true
 		}
 	}
-	return additionalVerbs, nil
+	return canUpdatePSA, nil
 }
