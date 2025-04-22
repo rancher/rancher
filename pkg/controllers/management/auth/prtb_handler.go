@@ -196,7 +196,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, projectRoleName := range projectRoleNames {
 		// depending on the number of roles collected above, we create them accordingly.
-		if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, rtbNsAndName, clusterName, binding.RoleTemplateName, proj, isOwnerRole, subject); err != nil {
+		if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, rtbNsAndName, clusterName, proj, isOwnerRole, subject); err != nil {
 			return err
 		}
 	}
