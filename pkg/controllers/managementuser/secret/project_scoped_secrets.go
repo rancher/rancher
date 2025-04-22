@@ -1,0 +1,199 @@
+package secret
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"maps"
+	"reflect"
+	"strings"
+
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/types/config"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
+)
+
+const (
+	namespaceChangeHandler   = "project-scoped-secret-namespace-handler"
+	namespaceEnqueuerName    = "project-scoped-secret-namespace-enqueuer"
+	projectIDLabel           = "field.cattle.io/projectId"
+	projectScopedSecretLabel = "management.cattle.io/project-scoped-secret"
+)
+
+type namespaceHandler struct {
+	managementSecretCache wcorev1.SecretCache
+	clusterNamespaceCache wcorev1.NamespaceCache
+	projectCache          mgmtv3.ProjectCache
+	secretController      wcorev1.SecretController
+	clusterName           string
+}
+
+func register(ctx context.Context, cluster *config.UserContext) {
+	n := &namespaceHandler{
+		secretController:      cluster.Corew.Secret(),
+		managementSecretCache: cluster.Management.Wrangler.Core.Secret().Cache(),
+		projectCache:          cluster.Management.Wrangler.Mgmt.Project().Cache(),
+		clusterNamespaceCache: cluster.Corew.Namespace().Cache(),
+		clusterName:           cluster.ClusterName,
+	}
+	cluster.Corew.Namespace().OnChange(ctx, namespaceChangeHandler, n.OnChange)
+	relatedresource.WatchClusterScoped(ctx, namespaceEnqueuerName, n.secretEnqueueNamespace, cluster.Corew.Namespace(), cluster.Management.Wrangler.Core.Secret())
+}
+
+func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*corev1.Namespace, error) {
+	if namespace == nil {
+		return nil, nil
+	}
+
+	if namespace.DeletionTimestamp != nil {
+		return nil, nil
+	}
+
+	secrets, err := n.getProjectScopedSecretsFromNamespace(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var errs error
+	desiredSecrets := make(map[string]bool, len(secrets))
+
+	// create/update project scoped secrets
+	for _, secret := range secrets {
+		desiredSecrets[secret.Name] = true
+		secretCopy := getNamespacedSecret(secret, namespace.Name)
+
+		err = rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretController, func(s1, s2 *corev1.Secret) (bool, *corev1.Secret) {
+			return reflect.DeepEqual(s1.Data, s2.Data), s2
+		})
+		errs = errors.Join(errs, err)
+	}
+	if errs != nil {
+		return nil, errs
+	}
+
+	// remove any project scoped secrets that don't belong in the project
+	downstreamProjectScopedSecrets, err := n.secretController.List(namespace.Name, metav1.ListOptions{
+		LabelSelector: projectScopedSecretLabel,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, secret := range downstreamProjectScopedSecrets.Items {
+		if desiredSecrets[secret.Name] {
+			continue
+		}
+		// secret in namespace does not belong here
+		if err := n.secretController.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}); err != nil {
+			return nil, err
+		}
+	}
+
+	return namespace, nil
+}
+
+// getProjectScopedSecretsFromNamespace gets all project scoped secret from a project namespace.
+func (n *namespaceHandler) getProjectScopedSecretsFromNamespace(namespace *corev1.Namespace) ([]*corev1.Secret, error) {
+	// check if namespace is part of a project
+	projectID, ok := namespace.Annotations[projectIDLabel]
+	if !ok {
+		return nil, nil
+	}
+
+	clusterName, projectName, found := strings.Cut(projectID, ":")
+	if !found {
+		logrus.Debugf("Namespace %s projectId annotation %s is malformed, should be <cluster name>:<project name>", namespace.Name, namespace.Annotations[projectIDLabel])
+		return nil, nil
+	}
+
+	p, err := n.projectCache.Get(clusterName, projectName)
+	if err != nil {
+		return nil, fmt.Errorf("error getting project %s for namespace %s: %w", projectName, namespace.Name, err)
+	}
+
+	backingNamespace := p.GetProjectBackingNamespace()
+
+	r, err := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{projectName})
+	if err != nil {
+		return nil, err
+	}
+	return n.managementSecretCache.List(backingNamespace, labels.NewSelector().Add(*r))
+}
+
+// secretEnqueueNamespace enqueues all the project namespaces of a project scoped secret.
+func (n *namespaceHandler) secretEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a secret", obj)
+		return nil, nil
+	}
+
+	if secret.Labels == nil {
+		return nil, nil
+	}
+
+	namespaces, err := n.getNamespacesFromSecret(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	namespaceKeys := make([]relatedresource.Key, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		namespaceKeys = append(namespaceKeys, relatedresource.Key{Name: namespace.Name})
+	}
+	return namespaceKeys, nil
+}
+
+// getNamespacesFromSecret returns a slice of project namespaces from a project scoped secret.
+func (n *namespaceHandler) getNamespacesFromSecret(secret *corev1.Secret) ([]*corev1.Namespace, error) {
+	// we only care about project scoped secrets
+	projectName, ok := secret.Labels[projectScopedSecretLabel]
+	if !ok {
+		return nil, nil
+	}
+	project, err := n.projectCache.Get(n.clusterName, projectName)
+	if apierrors.IsNotFound(err) {
+		// this controller is called for every cluster, so if the project isn't found, it's likely a project in a different cluster
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	if project.GetProjectBackingNamespace() != secret.Namespace {
+		logrus.Tracef("secret [%s] not in the project namespace, not copying", secret.Name)
+		return nil, nil
+	}
+
+	r, err := labels.NewRequirement(projectIDLabel, selection.Equals, []string{project.Name})
+	if err != nil {
+		return nil, err
+	}
+	return n.clusterNamespaceCache.List(labels.NewSelector().Add(*r))
+}
+
+// getNamespacedSecret copies a project scoped secret with a project namespace
+func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
+	namespacedSecret := &corev1.Secret{}
+	namespacedSecret.Name = obj.Name
+	namespacedSecret.Kind = obj.Kind
+	namespacedSecret.Data = obj.Data
+	namespacedSecret.StringData = obj.StringData
+	namespacedSecret.Namespace = namespace
+	namespacedSecret.Type = obj.Type
+	namespacedSecret.Annotations = make(map[string]string)
+	namespacedSecret.Labels = make(map[string]string)
+	maps.Copy(namespacedSecret.Annotations, obj.Annotations)
+	maps.Copy(namespacedSecret.Labels, obj.Labels)
+	namespacedSecret.Annotations[userSecretAnnotation] = "true"
+	return namespacedSecret
+}

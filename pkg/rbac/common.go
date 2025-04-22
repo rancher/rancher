@@ -336,11 +336,11 @@ func IsAdminGlobalRole(rtName string, grLister normanv3.GlobalRoleLister) (bool,
 	return false, nil
 }
 
-// CreateOrUpdateResource creates or updates the given resource
-//   - getResource is a func that returns a single object and an error
-//   - obj is the resource to create or update
-//   - client is the Wrangler client to use to get/create/update resource
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same where T is an updated resource
+// CreateOrUpdateResource creates or updates the given non-namespaced resource
+//   - obj is the resource to create or update.
+//   - client is the Wrangler client to use to get/create/update resource.
+//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
+//     T is an updated version of the resource.
 func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
 	// attempt to get the resource
 	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
@@ -356,6 +356,33 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 	// check that the existing resource is the same as the one we want
 	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
 		// if it has changed, update it to the correct version
+		_, err := client.Update(updatedResource)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateOrUpdateNamespacedResource creates or updates the given namespaced resource.
+//   - obj is the resource to create or update.
+//   - client is the Wrangler client to use to get/create/update resource.
+//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
+//     T is an updated version of the resource.
+func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
+	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		// resource doesn't exist, create it
+		logrus.Infof("%T %s being created in namespace %s", obj, obj.GetName(), obj.GetNamespace())
+		_, err = client.Create(obj)
+		return err
+	}
+
+	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
+		logrus.Infof("%T %s in namespace %s needs to be updated", obj, obj.GetName(), obj.GetNamespace())
 		_, err := client.Update(updatedResource)
 		if err != nil {
 			return err
