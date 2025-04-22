@@ -31,6 +31,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const bearerTokenType = "Bearer"
+
 type sessionGetterRemover interface {
 	Get(code string) (*session.Session, error)
 	Remove(code string) error
@@ -65,6 +67,8 @@ type TokenResponse struct {
 	RefreshToken string `json:"refresh_token,omitempty"`
 	// ExpiresIn indicates when id_token and access_token expire.
 	ExpiresIn int `json:"expires_in"`
+	// TokenType is the OAuth 2.0 Token Type value. The value must be Bearer.
+	TokenType string `json:"token_type"`
 }
 
 // RefreshTokenClaims represent claims in the refresh_token
@@ -363,6 +367,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	resp := TokenResponse{
 		IDToken:     idTokenString,
 		AccessToken: accessTokenString,
+		TokenType:   bearerTokenType,
 	}
 
 	// create refresh_token
