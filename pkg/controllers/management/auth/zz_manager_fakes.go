@@ -81,17 +81,17 @@ func (mr *MockmanagerInterfaceMockRecorder) ensureClusterMembershipBinding(arg0,
 }
 
 // ensureProjectMembershipBinding mocks base method.
-func (m *MockmanagerInterface) ensureProjectMembershipBinding(arg0, arg1, arg2, arg3 string, arg4 *v3.Project, arg5 bool, arg6 v1.Subject) error {
+func (m *MockmanagerInterface) ensureProjectMembershipBinding(arg0, arg1, arg2 string, arg3 *v3.Project, arg4 bool, arg5 v1.Subject) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ensureProjectMembershipBinding", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	ret := m.ctrl.Call(m, "ensureProjectMembershipBinding", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ensureProjectMembershipBinding indicates an expected call of ensureProjectMembershipBinding.
-func (mr *MockmanagerInterfaceMockRecorder) ensureProjectMembershipBinding(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
+func (mr *MockmanagerInterfaceMockRecorder) ensureProjectMembershipBinding(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ensureProjectMembershipBinding", reflect.TypeOf((*MockmanagerInterface)(nil).ensureProjectMembershipBinding), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ensureProjectMembershipBinding", reflect.TypeOf((*MockmanagerInterface)(nil).ensureProjectMembershipBinding), arg0, arg1, arg2, arg3, arg4, arg5)
 }
 
 // grantManagementClusterScopedPrivilegesInProjectNamespace mocks base method.

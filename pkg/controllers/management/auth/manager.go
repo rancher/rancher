@@ -103,7 +103,7 @@ type managerInterface interface {
 	removeAuthV2Permissions(string, runtime.Object) error
 	checkReferencedRoles(string, string, int) (bool, error)
 	ensureClusterMembershipBinding(string, string, *v3.Cluster, bool, v1.Subject) error
-	ensureProjectMembershipBinding(string, string, string, string, *v3.Project, bool, v1.Subject) error
+	ensureProjectMembershipBinding(string, string, string, *v3.Project, bool, v1.Subject) error
 	grantManagementPlanePrivileges(string, map[string]string, v1.Subject, interface{}) error
 	grantManagementClusterScopedPrivilegesInProjectNamespace(string, string, map[string]string, v1.Subject, *v3.ClusterRoleTemplateBinding) error
 	grantManagementProjectScopedPrivilegesInClusterNamespace(string, string, map[string]string, v1.Subject, *v3.ProjectRoleTemplateBinding) error
@@ -212,8 +212,8 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 
 // When a PRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
 // that gives the subject access to the the project/cluster custom resource itself
-func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespace, roleTemplate string, project *v3.Project, makeOwner bool, subject v1.Subject) error {
-	if err := m.createProjectMembershipRole(roleName, namespace, roleTemplate, project, makeOwner); err != nil {
+func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespace string, project *v3.Project, makeOwner bool, subject v1.Subject) error {
+	if err := m.createProjectMembershipRole(roleName, namespace, project, makeOwner); err != nil {
 		return err
 	}
 
@@ -306,7 +306,7 @@ func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Clust
 
 // Creates a role that lets the bound subject see (if they are an ordinary member) the project in the mgmt api
 // (or CRUD the project if they are an owner)
-func (m *manager) createProjectMembershipRole(roleName, namespace, roleTemplate string, project *v3.Project, makeOwner bool) error {
+func (m *manager) createProjectMembershipRole(roleName, namespace string, project *v3.Project, makeOwner bool) error {
 	// when the role is not <project_name>-projectowner
 	// we should carefully select the verbs we want to allow
 	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
