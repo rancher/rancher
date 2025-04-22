@@ -9,6 +9,7 @@ ARG CATTLE_KDM_BRANCH=release-v2.11
 ARG VERSION=${VERSION}
 
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
+RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
 
 # Temporary build stage image
 FROM registry.suse.com/bci/bci-base:15.6 AS chroot-builder
