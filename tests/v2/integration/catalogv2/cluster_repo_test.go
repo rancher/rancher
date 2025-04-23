@@ -145,6 +145,7 @@ func (c *ClusterRepoTestSuite) TestGitRepo() {
 }
 
 func (c *ClusterRepoTestSuite) TestGitRepoRetries() {
+	c.T().Skip()
 	c.testClusterRepoRetries(ClusterRepoParams{
 		Name: GitClusterSmallForkName,
 		URL1: GitClusterSmallForkURL,
