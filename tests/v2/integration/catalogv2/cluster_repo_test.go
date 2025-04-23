@@ -952,6 +952,7 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 
 		for _, condition := range cr.Status.Conditions {
 			if v1.RepoCondition(condition.Type) == v1.RepoDownloaded {
+				logrus.Infof("Condition Status (Actual/Wanted): %s/%s, Number of Retries (Actual/Wanted): %d/%d", condition.Status, corev1.ConditionFalse, cr.Status.NumberOfRetries, retryNumber)
 				if condition.Status == corev1.ConditionFalse && cr.Status.NumberOfRetries == retryNumber {
 					retryNumber++
 					return false, nil
