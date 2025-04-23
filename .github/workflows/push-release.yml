@@ -585,9 +585,9 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY
       - name: Create App Token
         uses: actions/create-github-app-token@v1
         id: app-token
