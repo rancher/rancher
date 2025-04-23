@@ -228,8 +228,6 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 			RefreshTokenExpirationSeconds: 36000,
 		},
 	}
-	err = s.wranglerContext.Mgmt.OIDCClient().Informer().GetIndexer().Add(oidcClient)
-	assert.NoError(s.T(), err)
 	_, err = s.wranglerContext.Mgmt.OIDCClient().Create(oidcClient)
 	assert.NoError(s.T(), err)
 
