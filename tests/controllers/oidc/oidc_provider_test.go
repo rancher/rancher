@@ -243,7 +243,7 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 		assert.NotEmpty(c, clientSecret)
 	}, duration, tick)
 
-	// set sever URL
+	// set server URL
 	err = settings.ServerURL.Set(s.server.URL)
 	assert.NoError(s.T(), err)
 
