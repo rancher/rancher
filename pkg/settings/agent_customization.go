@@ -10,7 +10,7 @@ const (
         {
           "matchExpressions": [
             {
-              "key": "beta.kubernetes.io/os",
+              "key": "kubernetes.io/os",
               "operator": "NotIn",
               "values": [
                 "windows"
@@ -54,7 +54,7 @@ const (
         "preference": {
           "matchExpressions": [
             {
-              "key": "node-role.kubernetes.io/master",
+              "key": "node-role.kubernetes.io/control-plane",
               "operator": "In",
               "values": [
                 "true"
