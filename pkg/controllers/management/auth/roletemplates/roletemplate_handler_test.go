@@ -732,11 +732,6 @@ func Test_getManagementPlaneRules(t *testing.T) {
 					Verbs:     []string{"*"},
 				},
 				{
-					Resources: []string{"sourcecodeproviderconfigs"},
-					APIGroups: []string{"project.cattle.io"},
-					Verbs:     []string{"*"},
-				},
-				{
 					Resources: []string{"projectroletemplatebindings"},
 					APIGroups: []string{"management.cattle.io"},
 					Verbs:     []string{"*"},
