@@ -1,4 +1,5 @@
 ARG ARCH=amd64
+ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.10
 ARG CHART_DEFAULT_BRANCH=dev-v2.10
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
@@ -48,6 +49,21 @@ ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
 ENV GOCACHE=/root/.cache/go/cache
+
+
+FROM builder AS master-charts
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/library && \
+    git clone -b master --depth 1 https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/library
+
+
+FROM builder AS system-charts
+ARG SYSTEM_CHART_DEFAULT_BRANCH
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
+    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
+    git clone -b $SYSTEM_CHART_DEFAULT_BRANCH --depth 1 https://github.com/rancher/system-charts /var/lib/rancher-data/local-catalogs/system-library
+
 
 FROM builder AS rancher-charts
 ARG CHART_DEFAULT_BRANCH
@@ -123,7 +139,7 @@ WORKDIR /var/lib/rancher
 ARG ARCH
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.10
+ARG SYSTEM_CHART_DEFAULT_BRANCH
 ARG CHART_DEFAULT_BRANCH
 ARG PARTNER_CHART_DEFAULT_BRANCH
 ARG RKE2_CHART_DEFAULT_BRANCH
@@ -181,6 +197,8 @@ ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_V
 ARG CATTLE_CSP_ADAPTER_MIN_VERSION
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 
+COPY --from=master-charts /var/lib/rancher-data/local-catalogs/library /var/lib/rancher-data/local-catalogs/library
+COPY --from=system-charts /var/lib/rancher-data/local-catalogs/system-library /var/lib/rancher-data/local-catalogs/system-library
 COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
 COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
 COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
@@ -448,6 +466,8 @@ ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
 ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+COPY --from=master-charts /var/lib/rancher-data/local-catalogs/library /var/lib/rancher-data/local-catalogs/library
+COPY --from=system-charts /var/lib/rancher-data/local-catalogs/system-library /var/lib/rancher-data/local-catalogs/system-library
 COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
 COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
 COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
