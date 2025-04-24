@@ -101,8 +101,8 @@ func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccCon
 	logrus.Debugf("[scc.registration-controller]: system announced, check %s", sccSystemUrl)
 
 	newRegObj := registrationObj.DeepCopy()
-	v1.RegistrationConditionSystemUrlReady.SetStatusBool(newRegObj, false) // This must be false until successful activation too.
-	v1.RegistrationConditionSystemUrlReady.SetMessageIfBlank(newRegObj, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+	v1.RegistrationConditionSccUrlReady.SetStatusBool(newRegObj, false) // This must be false until successful activation too.
+	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(newRegObj, fmt.Sprintf("system announced, check %s", sccSystemUrl))
 
 	newRegObj.Status.RegistrationStatus.SCCSystemId = int(id)
 	newRegObj.Status.SystemCredentialsSecretRef = &corev1.SecretReference{

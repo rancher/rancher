@@ -20,7 +20,7 @@ func (oh *offlineHandler) Run(registrationObj *v1.Registration) (*v1.Registratio
 		if err != nil {
 			return registrationObj, err
 		}
-	} else if registrationObj.Spec.RegistrationCertificateSecretRef != nil {
+	} else if registrationObj.Spec.OfflineRegistrationCertificateSecretRef != nil {
 		updatedObj, err = oh.processOfflineRegistration(registrationObj)
 		if err != nil {
 			return registrationObj, err

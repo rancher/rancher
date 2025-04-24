@@ -106,15 +106,15 @@ spec:
                   certificate:
                     type: string
                   lastValidatedTS:
+                    format: date-time
                     type: string
                   valid:
                     type: boolean
                   validUntilTS:
+                    format: date-time
                     type: string
                 required:
-                - lastValidatedTS
                 - valid
-                - validUntilTS
                 type: object
               conditions:
                 items:
@@ -162,6 +162,7 @@ spec:
               registrationStatus:
                 properties:
                   requestProcessedTS:
+                    format: date-time
                     type: string
                   sccSystemId:
                     type: integer
