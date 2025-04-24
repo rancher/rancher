@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc"
 	"net/http"
 	"os"
 	"strings"
@@ -356,6 +357,15 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {
 			return err
+		}
+
+		if features.RancherSCCRegistrationExtension.Enabled() {
+			logrus.Info("[rancher::Start] starting RancherSCCRegistrationExtension")
+			// TODO: Also trigger install of the UI extension somewhere near here
+			err := scc.Setup(ctx, r.Wrangler)
+			if err != nil {
+				return err
+			}
 		}
 
 		return runMigrations(r.Wrangler)

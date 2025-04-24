@@ -252,3 +252,21 @@ extraObjects: []
 #         app: rancher
 #     policyTypes:
 #       - Ingress
+
+# SCC Registration for Rancher Prime
+# For more information see: TODO link to a docs page
+registration:
+  enabled: false
+  regCode: ""
+  # Optionally, specify the name of a secret that contains the registration code.
+  # regCodeRef:
+  #   secretName: ""
+  #   secretNamespace: ""
+  # The default mode is online and this is preferred for most users.
+  # If your cluster is in an air-gap, or otherwise cannot reach the SUSE SCC
+  # mode: offline
+  # certificate: {}
+  # Optionally, specify the name of a secret that contains the certificate.
+  # certificateRef:
+  #   secretName: ""
+  #   secretNamespace: ""
