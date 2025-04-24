@@ -17,13 +17,39 @@ function sed_i_wrapper(){
   fi
 }
 
-
 DEV_SCRIPT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 SCRIPT_DIR=$(realpath "$DEV_SCRIPT_DIR/../scripts")
 
 echo "Dev-Script: Prepare Rancher Chart"
 
+CHARTS_DIRTY=$(git status --porcelain chart/)
+# Check if CLEAN_DIRTY is set to true
+if [[ "$CLEAN_DIRTY" == "true" ]]; then
+  # Check if the 'chart' directory is dirty
+  if [[ -n "$CHARTS_DIRTY" ]]; then
+    # Prompt the user for confirmation
+    read -p "The 'chart' directory is dirty. Do you want to reset it? (yes/no): " confirm
+
+    # Check the user's response
+    if [[ "$confirm" == "yes" ]]; then
+      # Reset the dirty files in the 'chart' directory
+      git checkout -- chart/
+      echo "Charts directory reset to clean state."
+    else
+      echo "Charts directory not reset. Continuing with potentially dirty state."
+    fi
+  fi
+  CHARTS_DIRTY=$(git status --porcelain chart/)
+fi
+
 source "$SCRIPT_DIR/version"
+
+if [[ "$DIRTY" ]]; then
+  echo "Dev-Script: Dirty files detected, skipping chart preparation"
+  echo "If you ran with CLEAN_DIRTY and reset the charts, this may mean you have other uncommitted code changes."
+  exit 0
+fi
+
 
 test_image="$REPO/rancher"
 
@@ -35,3 +61,7 @@ sed_i_wrapper -i -e "s@%POST_DELETE_IMAGE_NAME%@${test_image}@g" ./chart/values.
 sed_i_wrapper -i -e "s/%POST_DELETE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
 sed_i_wrapper -i -e "s@%PRE_UPGRADE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
 sed_i_wrapper -i -e "s/%PRE_UPGRADE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
+
+if [[ $REPO != "rancher" ]]; then
+  sed_i_wrapper -i -e "s#rancherImage: rancher/rancher#rancherImage: ${test_image}#g" ./chart/values.yaml
+fi
