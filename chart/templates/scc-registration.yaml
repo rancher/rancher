@@ -1,0 +1,83 @@
+{{- /*
+These Secrets and the ConfigMap are only intended to be used the first time Rancher is installed.
+This is a workaround for when the scc.cattle.io CRDs may not (almost always won't) be installed
+when the helm chart is installed. After that time, users should use the CRDs - potentially this chart should if they are there?
+*/}}
+{{- if .Values.registration.enabled }}
+{{- if .Values.registration.regCode }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "rancher-scc-registration-code"
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": keep
+type: Opaque
+data:
+  regCode: {{ .Values.registration.regCode | b64enc }}
+{{- end -}}
+{{- if .Values.registration.certificate }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "rancher-scc-registration-certificate"
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": keep
+type: Opaque
+data:
+  certificate: {{ .Values.registration.certificate | b64enc }}
+{{- end -}}
+{{- if (lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "registrations.scc.cattle.io") }}
+---
+apiVersion: scc.cattle.io/v1
+kind: Registration
+metadata:
+  name: rancher-chart-{{ .Release.Name }}-{{ .Release.Revision }}
+spec:
+  mode: {{ include "registration.mode" . | quote }}
+  registrationRequest:
+    {{- if .Values.registration.regCode }}
+    registrationCodeSecretRef:
+      name: "rancher-scc-registration-code"
+      namespace: "cattle-system"
+    {{- end }}
+    {{- if .Values.registration.regCodeRef }}
+    registrationCodeSecretRef:
+      name: "{{ .Values.registration.regCodeRef.secretName | default "rancher-scc-registration-code" }}"
+      namespace: {{ .Values.registration.regCodeRef.secretNamespace | default .Release.Namespace }}
+    {{- end }}
+  {{- if or .Values.registration.certificate .Values.registration.certificateRef }}
+  registrationCertificateSecretRef:
+    name: "{{ .Values.registration.certificateRef.secretName | default "rancher-scc-registration-certificate" }}"
+    namespace: {{ .Values.registration.regCodeRef.secretNamespace | default .Release.Namespace }}
+  {{- end }}
+{{- else }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: initial-scc-registration
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "rancher.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: "rancher"
+data:
+  mode: {{ include "registration.mode" . | quote }}
+  {{- if .Values.registration.regCode }}
+  regCodeSecretNamespace: {{ .Release.Namespace }}
+  regCodeSecretName: "rancher-scc-registration-code"
+  {{- else if .Values.registration.regCodeRef }}
+  regCodeSecretNamespace: {{ .Values.registration.regCodeRef.secretNamespace | default .Release.Namespace }}
+  regCodeSecretName: "{{ .Values.registration.regCodeRef.secretName | default "rancher-scc-registration-code" }}"
+  {{- end }}
+  {{- if .Values.registration.certificate }}
+  certificateSecretNamespace: {{ .Release.Namespace }}
+  certificateSecretName: "rancher-scc-registration-certificate"
+  {{- else if .Values.registration.certificateRef }}
+  certificateSecretNamespace: {{ .Values.registration.certificateRef.secretNamespace | default .Release.Namespace }}
+  certificateSecretName: "{{ .Values.registration.certificateRef.secretName | default "rancher-scc-registration-certificate" }}"
+  {{- end }}
+{{- end -}}
+{{ end -}}

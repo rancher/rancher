@@ -29,6 +29,11 @@ func RequiredCRDs() []string {
 	if features.UIExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
+
+	if features.RancherSCCRegistrationExtension.Enabled() {
+		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
+	}
+
 	return requiredCRDS
 }
 
@@ -170,6 +175,13 @@ func UIPluginsCRD() []string {
 	}
 }
 
+// SCCRegistrationCRDs returns a list of required CRD names needed for SCC Registration features
+func SCCRegistrationCRDs() []string {
+	return []string{
+		"registrations.scc.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
@@ -235,6 +247,7 @@ var MigratedResources = map[string]bool{
 	"projectroletemplatebindings.management.cattle.io":                true,
 	"projects.management.cattle.io":                                   true,
 	"rancherusernotifications.management.cattle.io":                   false,
+	"registrations.scc.cattle.io":                                     true,
 	"rkeaddons.management.cattle.io":                                  false,
 	"rkebootstraps.rke.cattle.io":                                     false,
 	"rkebootstraptemplates.rke.cattle.io":                             false,
