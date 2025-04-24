@@ -48,10 +48,10 @@ func (h *handler) OnActivationChange(key string, registrationObj *v1.Registratio
 	}
 
 	// Ignore the registration until both of these are true
-	if v1.ResourceConditionFailure.ToK8sCondition().IsTrue(registrationObj) ||
-		!v1.ResourceConditionProgressing.ToK8sCondition().IsTrue(registrationObj) ||
-		!v1.RegistrationConditionAnnounced.ToK8sCondition().IsTrue(registrationObj) ||
-		!v1.RegistrationConditionSccUrlReady.ToK8sCondition().IsFalse(registrationObj) {
+	if v1.ResourceConditionFailure.IsTrue(registrationObj) ||
+		!v1.ResourceConditionProgressing.IsTrue(registrationObj) ||
+		!v1.RegistrationConditionAnnounced.IsTrue(registrationObj) ||
+		!v1.RegistrationConditionSccUrlReady.IsFalse(registrationObj) {
 		return registrationObj, generic.ErrSkip
 	}
 
@@ -107,8 +107,8 @@ func (h *handler) setReconcilingCondition(registrationObj *v1.Registration, orig
 	logrus.Error(originalErr)
 
 	// TODO: actually set the message to something that makes sense based on the error
-	v1.ResourceConditionFailure.ToK8sCondition().SetStatusBool(registrationObj, true)
-	v1.ResourceConditionFailure.ToK8sCondition().SetError(registrationObj, "", originalErr)
+	v1.ResourceConditionFailure.SetStatusBool(registrationObj, true)
+	v1.ResourceConditionFailure.SetError(registrationObj, "", originalErr)
 
 	registrationObj, err := h.registrations.UpdateStatus(registrationObj)
 	if err != nil {
