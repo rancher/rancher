@@ -208,7 +208,7 @@ func getHarvesterCredentialTokenNameFromKubeconfig(kubeconfigYaml string) (strin
 			if entry, ok := u.(map[string]any); ok && entry != nil {
 				if user, ok := entry["user"].(map[string]any); ok && user != nil {
 					if token, ok := user["token"].(string); ok && token != "" {
-						if strings.HasPrefix(token, "kubeconfig-user-") {
+						if strings.HasPrefix(token, "kubeconfig-user-") || strings.HasPrefix(token, "kubeconfig-u-") {
 							token, _, _ = strings.Cut(token, ":")
 							return token, nil
 						}
