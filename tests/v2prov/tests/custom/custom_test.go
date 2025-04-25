@@ -92,6 +92,538 @@ func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func Test_Provisioning_Custom_OneNodeWithDelete_2(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node-2",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
+
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_Custom_OneNodeWithDelete_3(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node-3",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
+
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_Custom_OneNodeWithDelete_4(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node-4",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
+
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_Custom_OneNodeWithDelete_5(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node-5",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
+
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_Custom_OneNodeWithDelete_6(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node-6",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
+
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_Custom_OneNodeWithDelete_7(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node-7",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
+
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_Custom_OneNodeWithDelete_8(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node-8",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			RKEConfig: &provisioningv1.RKEConfig{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command, err := cluster.CustomCommand(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, command)
+
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Len(t, machines.Items, 1)
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
+	assert.Len(t, machines.Items[0].Status.Addresses, 2)
+	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
+
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
+	var labels map[string]string
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
 func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
