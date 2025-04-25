@@ -25,7 +25,6 @@ const (
 	nodeRoleControlPlane       = "node-role.kubernetes.io/controlplane"
 	nodeRoleControlPlaneHyphen = "node-role.kubernetes.io/control-plane"
 	nodeRoleETCD               = "node-role.kubernetes.io/etcd"
-	nodeRoleMaster             = "node-role.kubernetes.io/master"
 	agentVersionUpgraded       = "agent.cluster.cattle.io/upgraded-v1.22"
 )
 
@@ -326,7 +325,7 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 func isTaintedNoExecuteNoSchedule(m *v3.Node) bool {
 	for _, taint := range m.Spec.InternalNodeSpec.Taints {
 		isETCDOrControlPlane := taint.Key == nodeRoleControlPlane || taint.Key == nodeRoleETCD ||
-			taint.Key == nodeRoleControlPlaneHyphen || taint.Key == nodeRoleMaster
+			taint.Key == nodeRoleControlPlaneHyphen
 		if isETCDOrControlPlane && (taint.Effect == "NoSchedule" || taint.Effect == "NoExecute") {
 			return true
 		}
