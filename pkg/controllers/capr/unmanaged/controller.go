@@ -246,6 +246,14 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 		annotations[capr.TaintsAnnotation] = string(data)
 	}
 
+	annotationWithTaints := func() map[string]string {
+		m := map[string]string{}
+		if annotations[capr.TaintsAnnotation] != "" {
+			m[capr.TaintsAnnotation] = annotations[capr.TaintsAnnotation]
+		}
+		return m
+	}
+
 	return []runtime.Object{
 		&rkev1.RKEBootstrap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -260,17 +268,19 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 		},
 		&rkev1.CustomMachine{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      machineName,
-				Namespace: capiCluster.Namespace,
-				Labels:    labels,
+				Name:        machineName,
+				Namespace:   capiCluster.Namespace,
+				Labels:      labels,
+				Annotations: annotationWithTaints(),
 			},
 		},
 		&capi.Machine{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      machineName,
-				Namespace: capiCluster.Namespace,
-				Labels:    labels,
+				Name:        machineName,
+				Namespace:   capiCluster.Namespace,
+				Labels:      labels,
+				Annotations: annotationWithTaints(),
 			},
 			Spec: capi.MachineSpec{
 				ClusterName: capiCluster.Name,
