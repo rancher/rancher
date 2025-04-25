@@ -732,7 +732,7 @@ func determineNodeRoles(machine *apimgmtv3.Node) {
 	if machine.Status.NodeLabels != nil {
 		_, etcd := machine.Status.NodeLabels["node-role.kubernetes.io/etcd"]
 		_, control := machine.Status.NodeLabels["node-role.kubernetes.io/controlplane"]
-		_, master := machine.Status.NodeLabels["node-role.kubernetes.io/master"]
+		_, master := machine.Status.NodeLabels["node-role.kubernetes.io/control-plane"]
 		_, worker := machine.Status.NodeLabels["node-role.kubernetes.io/worker"]
 		machine.Spec.Etcd = etcd
 		machine.Spec.Worker = worker

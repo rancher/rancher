@@ -50,20 +50,6 @@ const (
         }
       },
       {
-        "weight": 100,
-        "preference": {
-          "matchExpressions": [
-            {
-              "key": "node-role.kubernetes.io/control-plane",
-              "operator": "In",
-              "values": [
-                "true"
-              ]
-            }
-          ]
-        }
-      },
-      {
         "weight": 1,
         "preference": {
           "matchExpressions": [
