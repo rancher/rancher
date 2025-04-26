@@ -37,7 +37,7 @@ func TestGetHarvesterCloudCredentialExpirationFromKubeconfig(t *testing.T) {
 `,
 		},
 		{
-			name: "valid kubeconfig but no token",
+			name: "valid kubeconfig but no token (default admin user)",
 			kubeconfig: `users:
 - user:
     token: kubeconfig-user-test
@@ -51,7 +51,21 @@ func TestGetHarvesterCloudCredentialExpirationFromKubeconfig(t *testing.T) {
 			},
 		},
 		{
-			name: "bad timestamp on token",
+			name: "valid kubeconfig but no token (non-default user)",
+			kubeconfig: `users:
+- user:
+    token: kubeconfig-u-foobar
+`,
+			tokenFunc: func(token string) (*apimgmtv3.Token, error) {
+				return nil, apierrors.NewNotFound(apimgmtv3.Resource("token"), "kubeconfig-u-foobar")
+			},
+			expectErr: true,
+			validateErr: func(err error) bool {
+				return apierrors.IsNotFound(err)
+			},
+		},
+		{
+			name: "bad timestamp on token (default admin user)",
 			kubeconfig: `users:
 - user:
     token: kubeconfig-user-test
@@ -64,7 +78,20 @@ func TestGetHarvesterCloudCredentialExpirationFromKubeconfig(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "no timestamp on token",
+			name: "bad timestamp on token (non-default user)",
+			kubeconfig: `users:
+- user:
+    token: kubeconfig-u-foobar
+`,
+			tokenFunc: func(token string) (*apimgmtv3.Token, error) {
+				return &apimgmtv3.Token{
+					ExpiresAt: "notatimestamp",
+				}, nil
+			},
+			expectErr: true,
+		},
+		{
+			name: "no timestamp on token (default admin user)",
 			kubeconfig: `users:
 - user:
     token: kubeconfig-user-test
@@ -74,10 +101,33 @@ func TestGetHarvesterCloudCredentialExpirationFromKubeconfig(t *testing.T) {
 			},
 		},
 		{
-			name: "valid timestamp on token",
+			name: "no timestamp on token (non-default user)",
+			kubeconfig: `users:
+- user:
+    token: kubeconfig-u-foobar
+`,
+			tokenFunc: func(token string) (*apimgmtv3.Token, error) {
+				return &apimgmtv3.Token{}, nil
+			},
+		},
+		{
+			name: "valid timestamp on token (default admin user)",
 			kubeconfig: `users:
 - user:
     token: kubeconfig-user-test
+`,
+			tokenFunc: func(token string) (*apimgmtv3.Token, error) {
+				return &apimgmtv3.Token{
+					ExpiresAt: "2006-01-02T15:04:05Z",
+				}, nil
+			},
+			expected: "1136214245000",
+		},
+		{
+			name: "valid timestamp on token (non-default user)",
+			kubeconfig: `users:
+- user:
+    token: kubeconfig-u-foobar
 `,
 			tokenFunc: func(token string) (*apimgmtv3.Token, error) {
 				return &apimgmtv3.Token{
