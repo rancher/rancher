@@ -9,13 +9,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -230,7 +234,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			// we just want to expose these. Note /api is needed for client-go's
 			// discovery even though not strictly necessary
 			maybeAllowed := false
-			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3"}
+			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3", "/version"}
 			for _, path := range allowedPathsPrefix {
 				if strings.HasPrefix(a.GetPath(), path) {
 					maybeAllowed = true
@@ -239,7 +243,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			}
 
 			if !maybeAllowed {
-				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2 and /openapi/v3 supported", nil
+				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2, /openapi/v3, and /version supported", nil
 			}
 
 			return aslAuthorizer.Authorize(ctx, a)
@@ -255,6 +259,56 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	if err = extstores.InstallStores(extensionAPIServer, wranglerContext, scheme); err != nil {
 		return nil, fmt.Errorf("failed to install stores: %w", err)
 	}
+
+	// Note to self: the extension api server is handed to the caller to be
+	// run, which is done by handing it to a steveserver constructor. Not
+	// having direct access to the `Run` a goro with a delay is used to wait
+	// for the start and then perform the necessary factory action for
+	// ext'ension controllers.
+
+	go func() {
+		time.Sleep(3 * time.Second)
+
+		// Get the rest.Config from loopback client which has the following attributes:
+		// - username: system:apiserver
+		// - groups:   [system:authenticated system:masters]
+		// - extras:   []
+		restConfig := extensionAPIServer.LoopbackClientConfig()
+
+		// set up factory and controllers for ext api
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(restConfig, scheme, nil)
+		if err != nil {
+			panic(err)
+		}
+
+		core, err := ext.NewFactoryFromConfigWithOptions(restConfig, &generic.FactoryOptions{
+			SharedControllerFactory: controllerFactory,
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		// ext controller setup ...
+		err = clusterauthtoken.RegisterExtIndexers(core.Ext().V1())
+		if err != nil {
+			panic(err)
+		}
+
+		err = controllerFactory.SharedCacheFactory().Start(ctx)
+		if err != nil {
+			panic(err)
+		}
+
+		controllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+
+		err = controllerFactory.Start(ctx, 10)
+		if err != nil {
+			panic(err)
+		}
+
+		// See clusterauthtoken's `registerDeferred` for user
+		wrangler.InitExtAPI(wranglerContext, core.Ext().V1())
+	}()
 
 	return extensionAPIServer, nil
 }
