@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sort"
 
+	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
@@ -33,8 +34,20 @@ type tokenHandler struct {
 	clusterUserAttribute       clusterv3.ClusterUserAttributeInterface
 	clusterUserAttributeLister clusterv3.ClusterUserAttributeLister
 	tokenIndexer               cache.Indexer
+	extTokenIndexer            cache.Indexer
 	userLister                 managementv3.UserLister
 	userAttributeLister        managementv3.UserAttributeLister
+}
+
+
+// ExtUpdated is called when a given ext token is modified, and is responsible
+// for updating/creating the ClusterAuthToken in a downstream cluster.
+func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
+}
+
+// ExtRemove is called when a given ext token is delete, and is responsible for
+// removing the ClusterAuthToken in a downstream cluster.
+func (h *tokenHandler) ExtRemove(token *extv1.Token) (*extv1.Token, error) {
 }
 
 // Create is called when a given token is created, and is responsible for creating a ClusterAuthToken in a downstream cluster.
