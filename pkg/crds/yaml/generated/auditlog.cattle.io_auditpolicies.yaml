@@ -49,9 +49,9 @@ spec:
             properties:
               additionalRedactions:
                 description: |-
-                  AdditionalRedactions details additional informatino to be redacted. These redactions are only applied to logs
-                  that are allowed by the defiend Filters. Note that if no filters are defined, these redactions will apply to all
-                  logs.
+                  AdditionalRedactions details additional informatino to be redacted. If there are any Filers defined in the same
+                  policy, these Redactions will only be applied to logs that are Allowed by those filters. If there are no
+                  Filters, the redactions will be applied to all logs.
                 items:
                   properties:
                     headers:
@@ -67,8 +67,10 @@ spec:
               enabled:
                 type: boolean
               filters:
-                description: Filters described what are explicitly allowed and denied.
-                  Leave empty if all logs should be allowed.
+                description: |-
+                  Filters described what logs are explicitly allowed and denied. Leave empty if all logs should be allowed. The
+                  Allow action has higher precedence than Deny. So if there are multiple filters that match a log and at least one
+                  Allow, the log will be allowed.
                 items:
                   description: Filter provides values used to filter out audit logs.
                   properties:
@@ -76,14 +78,50 @@ spec:
                       description: Action defines what happens
                       type: string
                     requestURI:
-                      description: RequestURI is a regular expression used to match
-                        against the url of the log request.
+                      description: |-
+                        RequestURI is a regular expression used to match against the url of the log request. For exapmle, the Filter:
+
+                        Filter {
+                            Action: Allow.
+                            REquestURI: "/foo/.*"
+                        }
+
+                        would allow logs sent to "/foo/some/endpoint" but not "/foo" or "/foobar".
                       type: string
                   type: object
                 type: array
               verbosity:
-                description: LogVerbosity defines what is included in an audit log.
-                  Log metadata (includeing RequestURI, user info, etc) is always present.
+                description: |-
+                  Verbosity defines how much data to collect from each log. The end verbosity for a log is calculated as a merge
+                  of each policy that Allows a log (including plicies with no Filters). For example, take the two policie specs
+                  below:
+
+                  AuditPolicySpec {
+                      Enabled: True,
+                      Verbosity: LogVerbosity {
+                          Request: Verbosity {
+                              Body: True,
+                          },
+                      },
+                  }
+
+                  AuditPolicySpec {
+                      Enabled: True,
+                      Filters: []Filters{
+                          {
+                              Action: "allow",
+                              RequestURI: "/foo"
+                          },
+                      },
+                      Verbosity: LogVerbosity {
+                          Response: Verbosity {
+                              Body: True,
+                          },
+                      },
+                  }
+
+                  A request to the "/foo" endpoint will log both the request and response bodies, but a request to "/bar" will
+                  only log the request body.
                 properties:
                   level:
                     description: |-
