@@ -24,7 +24,6 @@ var (
 	}
 	projectManagementPlaneResources = map[string]string{
 		"apps":                        "project.cattle.io",
-		"sourcecodeproviderconfigs":   "project.cattle.io",
 		"projectroletemplatebindings": "management.cattle.io",
 		"secrets":                     "",
 	}

@@ -367,16 +367,6 @@ func (m *Migrator) CreateOrUpdateAADCertSecret(secretName string, rkeConfig *rke
 	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword, nil, owner, "cluster", "aadcert")
 }
 
-// CreateOrUpdateSourceCodeProviderConfigSecret accepts an optional secret name and a client secret or
-// private key for a SourceCodeProviderConfig and creates a Secret for the credential if there is one.
-// If an owner is passed, the owner is set as an owner reference on the Secret.
-// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
-// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
-// updating the Cluster object, if applicable.
-func (m *Migrator) CreateOrUpdateSourceCodeProviderConfigSecret(secretName string, credential string, owner runtime.Object, provider string) (*corev1.Secret, error) {
-	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, credential, nil, owner, "sourcecodeproviderconfig", provider)
-}
-
 // CreateOrUpdateHarvesterCloudConfigSecret accepts an optional secret name and a client secret or
 // harvester cloud-provider-config and creates a Secret for the credential if there is one.
 // If an owner is passed, the owner is set as an owner reference on the Secret.

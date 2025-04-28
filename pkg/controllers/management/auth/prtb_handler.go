@@ -25,7 +25,6 @@ const (
 )
 
 var projectManagementPlaneResources = map[string]string{
-	"sourcecodeproviderconfigs":   "project.cattle.io",
 	"projectroletemplatebindings": "management.cattle.io",
 	"secrets":                     "",
 }
