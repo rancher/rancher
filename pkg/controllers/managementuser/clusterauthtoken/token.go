@@ -43,8 +43,11 @@ type tokenHandler struct {
 // ExtCreate is called when a given ext token is created, and is responsible for
 // updating/creating the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) ExtCreate(token *extv1.Token) (*extv1.Token, error) {
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle CREATE /%s/\n", token.Name)
+
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle --> update /%s/\n", token.Name)
 		return h.ExtUpdated(token)
 	}
 
@@ -58,6 +61,7 @@ func (h *tokenHandler) ExtCreate(token *extv1.Token) (*extv1.Token, error) {
 	}
 	// we only sync tokens downstream that were created with SHA3
 	if hashVersion == hashers.SHA3Version {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle --> create /%s/ (%s)\n", token.Name, token.Status.Hash)
 		return nil, h.createClusterAuthToken(token, token.Status.Hash)
 	}
 
@@ -70,16 +74,21 @@ func (h *tokenHandler) ExtCreate(token *extv1.Token) (*extv1.Token, error) {
 // ExtUpdated is called when a given ext token is modified, and is responsible
 // for updating/creating the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle UPDATED n(%s) /%s/\n", h.namespace, token.Name)
+
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle --> create /%s/\n", token.Name)
 		return h.ExtCreate(token)
 	}
 	if err != nil {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle error /%s/ (%v)\n", token.Name, err)
 		return nil, err
 	}
 
 	err = h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle update error /%s/ (%v)\n", token.Name, err)
 		return nil, err
 	}
 
@@ -109,6 +118,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	}
 
 	if reflect.DeepEqual(current, old) {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle /%s/ unchanged, SKIPPED\n", token.Name)
 		return nil, nil
 	}
 	clusterAuthToken.UserName = token.Spec.UserID
@@ -120,21 +130,29 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 		clusterAuthToken.SecretKeyHash = current.value
 	}
 
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle /%s/ updating\n", token.Name)
 	_, err = h.clusterAuthToken.Update(clusterAuthToken)
 	if errors.IsNotFound(err) {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle /%s/ creating\n", token.Name)
 		_, err = h.clusterAuthToken.Create(clusterAuthToken)
 	}
+
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle /%s/ result: %v\n", token.Name, err)
 	return nil, err
 }
 
 // ExtRemove is called when a given ext token is delete, and is responsible for
 // removing the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) ExtRemove(token *extv1.Token) (*extv1.Token, error) {
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle REMOVE /%s/\n", token.Name)
 	return nil, h.remove(token.GetName(), token.GetUserID(), extTokenUserClusterKey(token))
 }
 
 // Create is called when a given token is created, and is responsible for creating a ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
+
+	fmt.Printf("ZZZZZ TOKEN CREATE (%s|%s)\n", token.Name, token.ClusterName)
+
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.Updated(token)
@@ -174,14 +192,17 @@ func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error)
 func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hashedValue string) error {
 	err := h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle cat user update error /%s/ (%v)\n", token.GetName(), err)
 		return err
 	}
 
 	clusterAuthToken, err := common.NewClusterAuthToken(token, hashedValue)
 	if err != nil {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle cat error /%s/ (%v)\n", token.GetName(), err)
 		return err
 	}
 
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle /%s/ CAT create\n", token.GetName())
 	_, err = h.clusterAuthToken.Create(clusterAuthToken)
 	return err
 }
@@ -189,6 +210,9 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 // Updated is called when a token is updated, and is responsible for creating/updating the corresponding
 // ClusterAuthTokens in the downstream cluster.
 func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
+
+	fmt.Printf("ZZZZZ TOKEN UPDATE (%s|%s)\n", token.Name, token.ClusterName)
+
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
 		return h.Create(token)
@@ -249,27 +273,33 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 }
 
 func (h *tokenHandler) Remove(token *managementv3.Token) (runtime.Object, error) {
+	fmt.Printf("ZZZZZ TOKEN REMOVE (%s|%s)\n", token.Name, token.ClusterName)
 	return nil, h.remove(token.GetName(), token.GetUserID(), tokenUserClusterKey(token))
 }
 
 func (h *tokenHandler) remove(name, userID, key string) error {
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove: '%s' / '%s' / '%s'\n", name, userID, key)
 
 	tokens, err := h.tokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
 	if err != nil && !errors.IsNotFound(err) {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove index access: '%s' error: %v\n", name, err)
 		return err
 	}
 
 	eTokens, err := h.extTokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
 	if err != nil && !errors.IsNotFound(err) {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove ext index access: '%s' error: %v\n", name, err)
 		return err
 	}
 
 	err = h.clusterAuthToken.Delete(name, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove delete: '%s' error: %v\n", name, err)
 		return err
 	}
 
 	if len(tokens)+len(eTokens) > 1 {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove '%s' done, skip UA\n", name)
 		return nil
 	}
 
@@ -280,15 +310,21 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 		lastName = eTokens[0].(*extv1.Token).Name
 	}
 
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove '%s' last '%s'\n", name, lastName)
+
 	if name == lastName {
+		fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove '%s' delete user attr\n", name)
+
 		// we are about to remove the last token for this user & cluster,
 		// also remove user data from cluster
 		err = h.clusterUserAttribute.Delete(userID, &metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
+			fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove '%s' delete user attr err: %v\n", name, err)
 			return err
 		}
 	}
 
+	fmt.Printf("ZZZZZ A ETOKEN lifecycle CAT remove '%s' ua done\n", name)
 	return nil
 }
 

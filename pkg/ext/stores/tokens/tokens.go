@@ -524,15 +524,24 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 // delete implements the core resource destruction for tokens
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
+
+	fmt.Printf("ZZZZZ ESTORE delete (%s)\n", token.Name)
+
 	user, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
 	if err != nil {
+		fmt.Printf("ZZZZZ ESTORE delete (%s) user error %v\n", token.Name, err)
 		return err
 	}
 	if !fullAccess && (!isRancherUser || !userMatch(user.GetName(), token)) {
+		fmt.Printf("ZZZZZ ESTORE delete (%s) rejected\n", token.Name)
 		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
-	return t.SystemStore.Delete(token.Name, options)
+	err = t.SystemStore.Delete(token.Name, options)
+
+	fmt.Printf("ZZZZZ ESTORE delete (%s) system %v\n", token.Name, err)
+
+	return err
 }
 
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
@@ -548,24 +557,32 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 
 // get implements the core resource retrieval for tokens
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
+
+	fmt.Printf("ZZZZZ ESTORE get (%s)\n", name)
+
 	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
 	if err != nil {
+		fmt.Printf("ZZZZZ ESTORE get (%s) user error %v\n", name, err)
 		return nil, err
 	}
 
 	// note: have to get token first before we can check for a user mismatch
 	token, err := t.SystemStore.Get(name, t.auth.SessionID(ctx), options)
 	if err != nil {
+		fmt.Printf("ZZZZZ ESTORE get (%s) system error %v\n", name, err)
 		return nil, err
 	}
 
 	if fullAccess {
+		fmt.Printf("ZZZZZ ESTORE get (%s) OK FULL\n", name)
 		return token, nil
 	}
 	if !userMatch(userInfo.GetName(), token) {
+		fmt.Printf("ZZZZZ ESTORE get (%s) MISMATCH\n", name)
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
+	fmt.Printf("ZZZZZ ESTORE get (%s) OK\n", name)
 	return token, nil
 }
 
@@ -679,17 +696,27 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 
 // update implements the core resource updating/modification of tokens
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
+
+	fmt.Printf("ZZZZZ ESTORE update (%s)\n", token.Name)
+
 	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
 	if err != nil {
+		fmt.Printf("ZZZZZ ESTORE update (%s) user error %v\n", token.Name, err)
 		return nil, err
 	}
 	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), token)) {
+		fmt.Printf("ZZZZZ ESTORE update (%s) rejected\n", token.Name)
+
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
 	sessionID := t.auth.SessionID(ctx)
 
-	return t.SystemStore.update(sessionID, false, token, options)
+	tok, err := t.SystemStore.update(sessionID, false, token, options)
+
+	fmt.Printf("ZZZZZ ESTORE update (%s) system %v\n", token.Name, err)
+
+	return tok, err
 }
 
 func (t *SystemStore) Update(token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
@@ -1113,6 +1140,8 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 // UserName hides the details of extracting a user name and its permission
 // status from the request context
 func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb string) (user.Info, bool, bool, error) {
+	fmt.Printf("ZZZZZ ESTORE UserNameFor(%s)\n", verb)
+
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
 		return nil, false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
@@ -1125,6 +1154,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 		ResourceRequest: true,
 	})
 	if err != nil {
+		fmt.Printf("ZZZZZ ESTORE UserNameFor(%s) auth error: %v\n", verb, err)
 		return nil, false, false, err
 	}
 
@@ -1133,18 +1163,24 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 	isRancherUser := false
 	userName := userInfo.GetName()
 
+	fmt.Printf("ZZZZZ ESTORE UserNameFor(%s) first full=%v rancher=%v, name %q\n", verb, fullAccess, isRancherUser, userName)
+
 	if !strings.Contains(userName, ":") { // E.g. system:admin
 		// potentially a rancher user
 		_, err := store.userClient.Get(userName)
 		if err == nil {
+			fmt.Printf("ZZZZZ ESTORE UserNameFor(%s) rancher!\n", verb)
 			// definitely a rancher user
 			isRancherUser = true
 		} else if !apierrors.IsNotFound(err) {
 			// some general error
+			fmt.Printf("ZZZZZ ESTORE UserNameFor(%s) user error: %v\n", verb, err)
 			return nil, false, false,
 				apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
 		} // else: not a rancher user, may still be an admin
 	} // else: some system user, not a rancher user, may still be an admin
+
+	fmt.Printf("ZZZZZ ESTORE UserNameFor(%s) final full=%v rancher=%v, name %q\n", verb, fullAccess, isRancherUser, userName)
 
 	return userInfo, fullAccess, isRancherUser, nil
 }

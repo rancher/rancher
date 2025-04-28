@@ -29,6 +29,8 @@ const (
 )
 
 func RegisterExtIndexers(extAPI ext.Interface) error {
+	fmt.Printf("ZZZZZ ext token indexers\n")
+
 	return extAPI.Token().Informer().
 		AddIndexers(map[string]cache.IndexFunc{
 			tokenByUserAndClusterIndex: extTokenByUserAndCluster,
@@ -60,7 +62,16 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 }
 
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {
+	fmt.Printf("ZZZZZ c(%p) register deferred ....\n", ctx)
+
 	ext := wrangler.GetExtAPI(cluster.Management.Wrangler)
+
+	fmt.Printf("ZZZZZ c(%p) usrC ((%T))\n", cluster, cluster)
+	fmt.Printf("ZZZZZ c(%p) Mgm1 ((%T))\n", cluster, cluster.Management)
+	fmt.Printf("ZZZZZ c(%p) Mgm2 ((%T))\n", cluster, cluster.Management.Management)
+	fmt.Printf("ZZZZZ c(%p) nTok ((%T))\n", cluster, cluster.Management.Management.Tokens(""))
+	fmt.Printf("ZZZZZ c(%p) TokC ((%T))\n", cluster, cluster.Management.Management.Tokens("").Controller())
+	fmt.Printf("ZZZZZ c(%p) TokI ((%T))\n", cluster, cluster.Management.Management.Tokens("").Controller().Informer())
 
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 	tokenCache := cluster.Management.Wrangler.Mgmt.Token().Cache()
@@ -108,6 +119,9 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 
 	eTokenLifecycle(ctx, ext.Token(), extTokenController, clusterName, handler)
 
+	fmt.Printf("ZZZZZ w(%p) wran ((%T))\n", cluster.Management.Wrangler, cluster.Management.Wrangler)
+	fmt.Printf("ZZZZZ w(%p) wExt ((%T) %p)\n", cluster.Management.Wrangler, cluster.Management.Wrangler.Ext, cluster.Management.Wrangler.Ext)
+
 	cluster.Management.Management.Users("").AddHandler(ctx, userController, (&userHandler{
 		namespace,
 		clusterUserAttribute,
@@ -145,6 +159,8 @@ func tokenByUserAndCluster(obj interface{}) ([]string, error) {
 }
 
 func extTokenByUserAndCluster(obj interface{}) ([]string, error) {
+	fmt.Printf("ZZZZZ XX eTBUAC (%v)\n", obj)
+
 	t, ok := obj.(*extv1.Token)
 	if !ok {
 		return []string{}, nil
@@ -153,19 +169,32 @@ func extTokenByUserAndCluster(obj interface{}) ([]string, error) {
 }
 
 func extTokenUserClusterKey(token *extv1.Token) string {
+	fmt.Printf("ZZZZZ XX eTUCK u(%s) // c(%s)\n",
+		token.Spec.UserID, token.Spec.ClusterName)
+
 	return fmt.Sprintf("%s/%s", token.Spec.UserID, token.Spec.ClusterName)
 }
 
 func eTokenLifecycle(ctx context.Context, tok ext.TokenController, controller, clusterName string, h *tokenHandler) {
+
+	fmt.Printf("ZZZZZ eTokLC (%T -- (%v))\n", tok, tok)
+	fmt.Printf("ZZZZZ CLUSTER ((%s))\n", clusterName)
+	fmt.Printf("ZZZZZ CONTROL ((%s))\n", controller)
+
 	tok.OnChange(ctx,
 		controller+"-change-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
 			// ignore removals
 			if obj == nil {
+				fmt.Printf("ZZZZZ A ETOKEN CHANGE /%s/ (--|--) @(%s)\n", key, clusterName)
 				return obj, nil
 			}
+			fmt.Printf("ZZZZZ A ETOKEN CHANGE /%s/ (%s|%s) @(%s)\n",
+				key, obj.Name, obj.Spec.ClusterName, clusterName)
 			// ignore tokens of no or other clusters
 			if clusterName != obj.Spec.ClusterName {
+				fmt.Printf("ZZZZZ A ETOKEN CHANGE /%s/ (%s|%s) @(%s) IGNORED, MISMATCH\n",
+					key, obj.Name, obj.Spec.ClusterName, clusterName)
 				return obj, nil
 			}
 			return h.ExtUpdated(obj)
@@ -174,8 +203,11 @@ func eTokenLifecycle(ctx context.Context, tok ext.TokenController, controller, c
 	tok.OnRemove(ctx,
 		controller+"-remove-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
+			fmt.Printf("ZZZZZ A ETOKEN REMOVE /%s/ (%s|%s) @(%s)\n", key, obj.Name, obj.Spec.ClusterName, clusterName)
 			// ignore tokens of no or other clusters
 			if clusterName != obj.Spec.ClusterName {
+				fmt.Printf("ZZZZZ A ETOKEN REMOVE /%s/ (%s|%s) @(%s) IGNORED, MISMATCH\n",
+					key, obj.Name, obj.Spec.ClusterName, clusterName)
 				return obj, nil
 			}
 			return h.ExtRemove(obj)

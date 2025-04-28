@@ -275,6 +275,8 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	go func() {
 		time.Sleep(3 * time.Second)
 
+		fmt.Printf("ZZZZZ XX ext API controller setup\n")
+
 		// Get the rest.Config from loopback client which has the following attributes:
 		// - username: system:apiserver
 		// - groups:   [system:authenticated system:masters]

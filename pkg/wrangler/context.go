@@ -191,6 +191,7 @@ func (w *Context) OnLeader(f func(ctx context.Context) error) {
 
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
 	transaction := controller.NewHandlerTransaction(ctx)
+
 	if err := f(transaction); err != nil {
 		transaction.Rollback()
 		return err
@@ -203,6 +204,7 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 	}
 
 	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+
 	transaction.Commit()
 	return w.Start(ctx)
 }
@@ -266,6 +268,8 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
+
+	fmt.Printf("ZZZZZ XX w(%p) with-agent from w(%p)\n", &wContextCopy, w)
 
 	return &wContextCopy
 }
@@ -484,6 +488,8 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		extLock: &sync.Mutex{},
 	}
 
+	fmt.Printf("ZZZZZ XX w(%p) newly made\n", wContext)
+
 	return wContext, nil
 }
 
@@ -492,7 +498,12 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 func InitExtAPI(context *Context, ext extv1.Interface) {
 	context.extLock.Lock()
 	defer context.extLock.Unlock()
+
+	fmt.Printf("ZZZZZ XX w(%p) inject / late init -- ext %T (%p)\n", context, ext, ext)
+
 	context.Ext = ext
+
+	fmt.Printf("ZZZZZ XX w(%p) injected\n", context)
 }
 
 // GetExtAPI safely retrieves the Ext API component of the context. Access to
@@ -505,9 +516,12 @@ func GetExtAPI(context *Context) extv1.Interface {
 	// wait for initialization, if not yet done
 	for context.Ext == nil {
 		context.extLock.Unlock()
+		fmt.Printf("ZZZZZ XX w(%p) waiting\n", context)
 		time.Sleep(time.Second)
 		context.extLock.Lock()
 	}
+
+	fmt.Printf("ZZZZZ XX w(%p) retrieved EXT %p\n", context, context.Ext)
 
 	return context.Ext
 }
