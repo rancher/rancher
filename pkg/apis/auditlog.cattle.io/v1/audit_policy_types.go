@@ -22,7 +22,14 @@ type Filter struct {
 	// Action defines what happens
 	Action FilterAction `json:"action,omitempty"`
 
-	// RequestURI is a regular expression used to match against the url of the log request.
+	// RequestURI is a regular expression used to match against the url of the log request. For exapmle, the Filter:
+	//
+	// Filter {
+	//     Action: Allow.
+	//     REquestURI: "/foo/.*"
+	// }
+	//
+	// would allow logs sent to "/foo/some/endpoint" but not "/foo" or "/foobar".
 	RequestURI string `json:"requestURI,omitempty"`
 }
 
@@ -115,14 +122,46 @@ type AuditPolicy struct {
 type AuditPolicySpec struct {
 	Enabled bool `json:"enabled"`
 
-	// Filters described what are explicitly allowed and denied. Leave empty if all logs should be allowed.
+	// Filters described what logs are explicitly allowed and denied. Leave empty if all logs should be allowed. The
+	// Allow action has higher precedence than Deny. So if there are multiple filters that match a log and at least one
+	// Allow, the log will be allowed.
 	Filters []Filter `json:"filters,omitempty"`
 
-	// AdditionalRedactions details additional informatino to be redacted. These redactions are only applied to logs
-	// that are allowed by the defiend Filters. Note that if no filters are defined, these redactions will apply to all
-	// logs.
+	// AdditionalRedactions details additional informatino to be redacted. If there are any Filers defined in the same
+	// policy, these Redactions will only be applied to logs that are Allowed by those filters. If there are no
+	// Filters, the redactions will be applied to all logs.
 	AdditionalRedactions []Redaction `json:"additionalRedactions,omitempty"`
 
+	// Verbosity defines how much data to collect from each log. The end verbosity for a log is calculated as a merge
+	// of each policy that Allows a log (including plicies with no Filters). For example, take the two policie specs
+	// below:
+	//
+	// AuditPolicySpec {
+	//     Enabled: True,
+	//     Verbosity: LogVerbosity {
+	//         Request: Verbosity {
+	//             Body: True,
+	//         },
+	//     },
+	// }
+	//
+	// AuditPolicySpec {
+	//     Enabled: True,
+	//     Filters: []Filters{
+	//         {
+	//             Action: "allow",
+	//             RequestURI: "/foo"
+	//         },
+	//     },
+	//     Verbosity: LogVerbosity {
+	//         Response: Verbosity {
+	//             Body: True,
+	//         },
+	//     },
+	// }
+	//
+	// A request to the "/foo" endpoint will log both the request and response bodies, but a request to "/bar" will
+	// only log the request body.
 	Verbosity LogVerbosity `json:"verbosity,omitempty"`
 }
 
