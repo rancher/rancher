@@ -497,7 +497,7 @@ func Test_Store_Watch(t *testing.T) {
 	// various store calls are in, i.e. the channels involved, the context, and the goroutine
 	// internal to `Watch`.
 
-	t.Run("backend watch creation error closes watch channel", func(t *testing.T) {
+	t.Run("backend watch creation error does not close watch channel", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
@@ -512,12 +512,22 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return("lkajdlksjlkds", false, true, nil)
 
+		todo, cancel := context.WithCancel(context.TODO())
+
 		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
-		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
+		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		_, more := (<-consumer.ResultChan())
-		assert.False(t, more)
+		cancel()
+
+		select {
+		case _, more := (<-consumer.ResultChan()):
+			// no events received, and none pending - should not trigger
+			assert.False(t, more)
+		case <-time.After(5 * time.Second):
+			// trigger and end - we close the consumer
+			consumer.Stop()
+		}
 	})
 
 	t.Run("context cancellation does not close watch channel", func(t *testing.T) {
