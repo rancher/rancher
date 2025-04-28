@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -60,6 +61,14 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 }
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
+	//management.Wrangler.Mgmt.Project().Cache().AddIndexer(project_cluster.RTPrtbIndex, project_cluster.PRIndexer)
+	//enqueuer := project_cluster.ProjectClusterenqueuer{
+	//	RTCache: management.Wrangler.Mgmt.Project().Cache(),
+	//}
+	//// this will enqueue Projects when a ProjectRoleTemplateBinding changes.
+	//// this is needed by checkPSAMembershipRole in order to list all the roletemplates when projects are created.
+	//relatedresource.Watch(ctx, "prtb-watcher", enqueuer.EnqueueRoleTemplates, management.Wrangler.Mgmt.Project(), management.Wrangler.Mgmt.ProjectRoleTemplateBinding())
+
 	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
 	p := project_cluster.NewProjectLifecycle(management)
 	c := project_cluster.NewClusterLifecycle(management)
@@ -96,6 +105,14 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
+	management.Wrangler.Mgmt.Project().Cache().AddIndexer(project_cluster.RTPrtbIndex, project_cluster.PRIndexer)
+	enqueuer := project_cluster.ProjectClusterenqueuer{
+		RTCache: management.Wrangler.Mgmt.Project().Cache(),
+	}
+	// this will enqueue Projects when a ProjectRoleTemplateBinding changes.
+	// this is needed by checkPSAMembershipRole in order to list all the roletemplates when projects are created.
+	relatedresource.Watch(ctx, "prtb-watcher", enqueuer.EnqueueRoleTemplates, management.Wrangler.Mgmt.Project(), management.Wrangler.Mgmt.ProjectRoleTemplateBinding())
+
 	p := project_cluster.NewProjectLifecycle(management)
 	c := project_cluster.NewClusterLifecycle(management)
 	management.Management.Projects("").AddLifecycle(ctx, project_cluster.ProjectRemoveController, p)

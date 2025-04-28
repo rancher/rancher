@@ -3,6 +3,7 @@ package project_cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -151,7 +152,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 
 // checkPSAMembershipRole creates (if needed) an additional cluster role to grant updatepsa permissions, if needed.
 func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleController, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) error {
-	var resourceName, resourceType, context string
+	var resourceName, resourceNamespace, resourceType, context string
 	var annotations map[string]string
 
 	switch v := obj.(type) {
@@ -159,6 +160,7 @@ func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleCont
 		context = projectContext
 		resourceType = apisv3.ProjectResourceName
 		resourceName = v.GetName()
+		resourceNamespace = v.Status.BackingNamespace
 	default:
 		return fmt.Errorf("cannot create membership roles for unsupported type %T", v)
 	}
@@ -168,7 +170,7 @@ func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleCont
 		return err
 	}
 
-	psaNeeded, err := needsPSARole(resourceName, prtbLister, rtLister)
+	psaNeeded, err := needsPSARole(resourceName, resourceNamespace, prtbLister, rtLister)
 	if err != nil {
 		return err
 	}
@@ -217,10 +219,10 @@ func newOwnerReference(obj runtime.Object) (metav1.OwnerReference, error) {
 }
 
 // needsPSARole ensure that given the project name, it needs a psa role to work properly.
-func needsPSARole(projectName string, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) (bool, error) {
+func needsPSARole(projectName, projectNamespace string, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) (bool, error) {
 	// lookup the roletemplate(s) associated with the project name
 	// to check if those contain updatepsa verb
-	roleTemplates, err := roleTemplatesLookup(projectName, prtbLister, rtLister)
+	roleTemplates, err := roleTemplatesLookup(projectName, projectNamespace, prtbLister, rtLister)
 	if err != nil {
 		return false, err
 	}
@@ -229,25 +231,33 @@ func needsPSARole(projectName string, prtbLister v32.ProjectRoleTemplateBindingC
 }
 
 // roleTemplatesLookup returns the list of roletemplates associated to the project.
-func roleTemplatesLookup(projectName string, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) ([]*v3.RoleTemplate, error) {
+func roleTemplatesLookup(projectName, projectNamespace string, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) ([]*v3.RoleTemplate, error) {
 	// list all the prtbs in the project namespace
-	prtbs, err := prtbLister.List(projectName, labels.Everything())
+	prtbs, err := prtbLister.List(projectNamespace, labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	if len(prtbs) == 0 {
-		return nil, fmt.Errorf("no PRTBs found")
+		return nil, fmt.Errorf("PRTBs not found")
 	}
 
 	// find all the roletemplate names associated to the prtbs
 	var rtNames []string
 	for _, prtb := range prtbs {
-		if prtb.Namespace == projectName {
+		var pName string
+		// the ProjectName is expressed with the following format:
+		// namespace:name, so we only need its name for comparison.
+		projectInfo := strings.Split(prtb.ProjectName, ":")
+		if len(projectInfo) != 2 {
+			continue
+		}
+		pName = projectInfo[1]
+		if pName == projectName {
 			rtNames = append(rtNames, prtb.RoleTemplateName)
 		}
 	}
 	if len(rtNames) == 0 {
-		return nil, fmt.Errorf("no RoleTemplates found")
+		return nil, fmt.Errorf("RoleTemplates not found")
 	}
 
 	var roleTemplates []*v3.RoleTemplate
