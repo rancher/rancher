@@ -36,17 +36,17 @@ import (
 
 // TokenController interface for managing Token resources.
 type TokenController interface {
-	generic.ControllerInterface[*v1.Token, *v1.TokenList]
+	generic.NonNamespacedControllerInterface[*v1.Token, *v1.TokenList]
 }
 
 // TokenClient interface for managing Token resources in Kubernetes.
 type TokenClient interface {
-	generic.ClientInterface[*v1.Token, *v1.TokenList]
+	generic.NonNamespacedClientInterface[*v1.Token, *v1.TokenList]
 }
 
 // TokenCache interface for retrieving Token resources in memory.
 type TokenCache interface {
-	generic.CacheInterface[*v1.Token]
+	generic.NonNamespacedCacheInterface[*v1.Token]
 }
 
 // TokenStatusHandler is executed for every added or modified Token. Should return the new status to be updated
