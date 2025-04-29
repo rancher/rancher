@@ -237,15 +237,19 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 # Enable exporting of the k3s images as part of the build process.
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS images
 
+ENV GOMODCACHE=/root/.cache/go/modcache
+ENV GOCACHE=/root/.cache/go/cache
+
 ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 
 WORKDIR /src
+COPY hack/airgap/go.mod hack/airgap/go.sum /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 COPY hack/airgap/ /src/
-RUN go mod download
 
-RUN go build -tags k3s_export -o export-images ./...
+RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
 
@@ -263,16 +267,19 @@ ARG TARGETARCH
 
 WORKDIR /app
 
+ENV GOMODCACHE=/root/.cache/go/modcache
+ENV GOCACHE=/root/.cache/go/cache
+
 # Only invalidate cache if go.mod/go.sum changes.
 COPY go.mod go.sum .
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
-RUN go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 
 COPY pkg/ pkg/
 COPY main.go .
 
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
 FROM base
 
@@ -285,7 +292,6 @@ COPY --chown=root:root --chmod=0755 \
     --from=build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
     --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
-
 COPY --chown=root:root --chmod=0755 \
     package/loglevel \
     package/entrypoint.sh \
