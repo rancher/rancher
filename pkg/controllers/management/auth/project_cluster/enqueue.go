@@ -1,10 +1,12 @@
 package project_cluster
 
 import (
+	"context"
 	"fmt"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
@@ -43,4 +45,15 @@ func (p *ProjectClusterenqueuer) EnqueueRoleTemplates(_, _ string, obj runtime.O
 		roleTemplateNames = append(roleTemplateNames, relatedresource.Key{Name: binding.Name})
 	}
 	return roleTemplateNames, nil
+}
+
+func Enqueue(ctx context.Context, management *config.ManagementContext) {
+	// add indexer to project resources.
+	management.Wrangler.Mgmt.Project().Cache().AddIndexer(RTPrtbIndex, PRIndexer)
+	enqueuer := ProjectClusterenqueuer{
+		RTCache: management.Wrangler.Mgmt.Project().Cache(),
+	}
+	// this will enqueue Projects when a ProjectRoleTemplateBinding changes.
+	// this is needed by checkPSAMembershipRole in order to list all the roletemplates when projects are created.
+	relatedresource.Watch(ctx, "prtb-watcher", enqueuer.EnqueueRoleTemplates, management.Wrangler.Mgmt.Project(), management.Wrangler.Mgmt.ProjectRoleTemplateBinding())
 }
