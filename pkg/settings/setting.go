@@ -120,7 +120,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "release-v2.8")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.8")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
