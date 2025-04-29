@@ -625,7 +625,9 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 
 	return &ext.TokenList{
 		ListMeta: metav1.ListMeta{
-			ResourceVersion: secrets.ResourceVersion,
+			ResourceVersion:    secrets.ResourceVersion,
+			Continue:           secrets.Continue,
+			RemainingItemCount: secrets.RemainingItemCount,
 		},
 		Items: tokens,
 	}, nil
