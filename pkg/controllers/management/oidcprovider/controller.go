@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -21,11 +23,13 @@ import (
 )
 
 const (
-	createClientSecretAnn     = "cattle.io/oidc-client-secret-create"
-	removeClientSecretAnn     = "cattle.io/oidc-client-secret-remove"
-	regenerateClientSecretAnn = "cattle.io/oidc-client-secret-regenerate"
-	secretKeyPrefix           = "client-secret-"
-	secretNamespace           = "cattle-oidc-client-secrets"
+	createClientSecretAnn          = "cattle.io/oidc-client-secret-create"
+	removeClientSecretAnn          = "cattle.io/oidc-client-secret-remove"
+	regenerateClientSecretAnn      = "cattle.io/oidc-client-secret-regenerate"
+	clientSecretCreatedAtPrefixAnn = "cattle.io/oidc-client-secret-created-at_"
+	clientSecretUsedAtPrefixAnn    = "cattle.io.oidc-client-secret-used-"
+	secretKeyPrefix                = "client-secret-"
+	secretNamespace                = "cattle-oidc-client-secrets"
 )
 
 type ClientIDAndSecretGenerator interface {
@@ -39,6 +43,7 @@ type oidcClientController struct {
 	oidcClient      wrangmgmtv3.OIDCClientClient
 	oidcClientCache wrangmgmtv3.OIDCClientCache
 	generator       ClientIDAndSecretGenerator
+	now             func() time.Time
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
@@ -49,6 +54,7 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 		oidcClient:      wContext.Mgmt.OIDCClient(),
 		oidcClientCache: wContext.Mgmt.OIDCClient().Cache(),
 		generator:       &randomstring.Generator{},
+		now:             time.Now,
 	}
 	oidcClient.OnChange(ctx, "oidcclient-change", controller.onChange)
 }
@@ -58,7 +64,6 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	if oidcClient == nil {
 		return nil, nil
 	}
-
 	clientID := oidcClient.Status.ClientID
 
 	// generate client id
@@ -75,21 +80,6 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}) {
 			return nil, fmt.Errorf("client id already exists")
 		}
-		patchData := map[string]interface{}{
-			"status": map[string]string{
-				"clientID": clientID,
-			},
-		}
-
-		patchBytes, err := json.Marshal(patchData)
-		if err != nil {
-			return nil, err
-		}
-		// add client id to status
-		_, err = c.oidcClient.Patch(oidcClient.Name, types.MergePatchType, patchBytes)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	k8sSecret, err := c.secretCache.Get(secretNamespace, clientID)
@@ -102,10 +92,13 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate client secret: %w", err)
 		}
-
+		clientSecretName := secretKeyPrefix + "1"
 		k8sSecret, err = c.secretClient.Create(&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      clientID,
+				Name: clientID,
+				Annotations: map[string]string{
+					clientSecretCreatedAtPrefixAnn + clientSecretName: fmt.Sprintf("%d", c.now().Unix()),
+				},
 				Namespace: secretNamespace,
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -117,11 +110,26 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 				},
 			},
 			StringData: map[string]string{
-				secretKeyPrefix + "1": clientSecret,
+				clientSecretName: clientSecret,
 			},
 		})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return nil, fmt.Errorf("failed to create client secret: %w", err)
+		}
+
+		// add client id to status
+		patchData := map[string]interface{}{
+			"status": map[string]interface{}{
+				"clientID": clientID,
+			},
+		}
+		patchBytes, err := json.Marshal(patchData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create clientID status patch: %w", err)
+		}
+		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.MergePatchType, patchBytes, "status")
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply clientID status patch: %w", err)
 		}
 	}
 
@@ -132,17 +140,22 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate client secret: %w", err)
 		}
-		secretKey, err := findNextSecretKey(k8sSecret.Data)
+		clientSecretName, err := findNextSecretKey(k8sSecret.Data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find next secret key: %w", err)
 		}
-		k8sSecret.Data[secretKey] = []byte(clientSecret)
-		_, err = c.secretClient.Update(k8sSecret)
+		k8sSecret.Data[clientSecretName] = []byte(clientSecret)
+		if k8sSecret.Annotations == nil {
+			k8sSecret.Annotations = map[string]string{}
+		}
+		k8sSecret.Annotations[clientSecretCreatedAtPrefixAnn+clientSecretName] = fmt.Sprintf("%d", c.now().Unix())
+		k8sSecret, err = c.secretClient.Update(k8sSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update secret: %w", err)
 		}
+		//delete annotation
 		delete(oidcClient.Annotations, createClientSecretAnn)
-		_, err = c.oidcClient.Update(oidcClient)
+		oidcClient, err = c.oidcClient.Update(oidcClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
@@ -161,13 +174,14 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 				k8sSecret.Data[csid] = []byte(clientSecret)
 			}
 		}
-		_, err = c.secretClient.Update(k8sSecret)
+		k8sSecret, err = c.secretClient.Update(k8sSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update secret: %w", err)
 		}
 
+		// delete annotation
 		delete(oidcClient.Annotations, regenerateClientSecretAnn)
-		_, err = c.oidcClient.Update(oidcClient)
+		oidcClient, err = c.oidcClient.Update(oidcClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
@@ -179,20 +193,61 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		csids := strings.Split(clientSecretIDs, ",")
 		for _, csid := range csids {
 			delete(k8sSecret.Data, csid)
+			delete(k8sSecret.Annotations, clientSecretCreatedAtPrefixAnn+csid)
 		}
-		_, err = c.secretClient.Update(k8sSecret)
+		k8sSecret, err = c.secretClient.Update(k8sSecret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update secret: %w", err)
 		}
 
+		// delete annotation
 		delete(oidcClient.Annotations, removeClientSecretAnn)
-		_, err = c.oidcClient.Update(oidcClient)
+		oidcClient, err = c.oidcClient.Update(oidcClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
 	}
 
-	return oidcClient, nil
+	return oidcClient, c.updateStatusIfNeeded(oidcClient, k8sSecret)
+}
+
+func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, secret *v1.Secret) error {
+	// calculate status
+	observedClientSecrets := map[string]v3.OIDCClientSecretStatus{}
+	for clientSecretName, clientSecretBytes := range secret.Data {
+		clientSecretValue := string(clientSecretBytes)
+		lastFiveCharacters := clientSecretValue
+		if len(clientSecretValue) > 5 {
+			lastFiveCharacters = clientSecretValue[len(clientSecretValue)-5:]
+		}
+		observedClientSecrets[clientSecretName] = v3.OIDCClientSecretStatus{
+			LastFiveCharacters: lastFiveCharacters,
+			CreatedAt:          secret.Annotations[clientSecretCreatedAtPrefixAnn+clientSecretName],
+			LastUsedAt:         oidcClient.Annotations[clientSecretUsedAtPrefixAnn+clientSecretName],
+		}
+	}
+	observedStatus := v3.OIDCClientStatus{
+		ClientID: secret.Name,
+	}
+	if len(observedClientSecrets) > 0 {
+		observedStatus.ClientSecrets = observedClientSecrets
+	}
+
+	if !reflect.DeepEqual(oidcClient.Status, observedStatus) {
+		patchData := map[string]interface{}{
+			"status": observedStatus,
+		}
+		patchBytes, err := json.Marshal(patchData)
+		if err != nil {
+			return fmt.Errorf("failed to create status patch: %w", err)
+		}
+		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.MergePatchType, patchBytes, "status")
+		if err != nil {
+			return fmt.Errorf("failed to apply status patch: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func findNextSecretKey(secretData map[string][]byte) (string, error) {

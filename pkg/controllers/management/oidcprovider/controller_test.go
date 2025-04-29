@@ -2,7 +2,9 @@ package oidcprovider
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/oidc/mocks"
@@ -23,8 +25,10 @@ func TestOnChange(t *testing.T) {
 		fakeOIDCClientName = "client-name"
 		fakeClientId       = "client-id"
 		fakeClientSecret   = "client-secret"
+		fakeClientSecret2  = "client-secret2"
 		fakeOIDCClientUID  = "uid"
 	)
+	fakeNow := time.Unix(10, 0)
 	type mockParams struct {
 		secretCache     *fake.MockCacheInterface[*v1.Secret]
 		secretClient    *fake.MockClientInterface[*v1.Secret, *v1.SecretList]
@@ -35,7 +39,7 @@ func TestOnChange(t *testing.T) {
 
 	tests := map[string]struct {
 		oidcClient  *v3.OIDCClient
-		setupMock   func(*mockParams)
+		setupMock   func(*mockParams, *v3.OIDCClient)
 		expectedErr string
 	}{
 		"clientID and clientSecret are created for a new OIDCClient": {
@@ -45,21 +49,18 @@ func TestOnChange(t *testing.T) {
 					UID:  fakeOIDCClientUID,
 				},
 			},
-			setupMock: func(p *mockParams) {
+
+			setupMock: func(p *mockParams, oidcClient *v3.OIDCClient) {
 				p.generator.EXPECT().GenerateClientID().Return(fakeClientId, nil)
-				patchData := map[string]interface{}{
-					"status": map[string]string{
-						"clientID": fakeClientId,
-					},
-				}
-				patchBytes, _ := json.Marshal(patchData)
 				p.oidcClientCache.EXPECT().List(labels.Everything()).Return(nil, nil)
-				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes).Return(nil, nil)
 				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
 				p.secretClient.EXPECT().Create(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeClientId,
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "1": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
 						Namespace: secretNamespace,
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -73,10 +74,52 @@ func TestOnChange(t *testing.T) {
 					StringData: map[string]string{
 						secretKeyPrefix + "1": fakeClientSecret,
 					},
-				}).Return(nil, nil)
+				}).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "1": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
+						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
+					},
+					Data: map[string][]byte{
+						secretKeyPrefix + "1": []byte(fakeClientSecret),
+					},
+				}, nil)
+
+				// update status with client id
+				patchData := map[string]interface{}{
+					"status": map[string]interface{}{
+						"clientID": fakeClientId,
+					},
+				}
+				patchBytes, _ := json.Marshal(patchData)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
+
+				// update status with client secret
+				patchData = map[string]interface{}{
+					"status": v3.OIDCClientStatus{
+						ClientID: fakeClientId,
+						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+							secretKeyPrefix + "1": {
+								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+							},
+						},
+					},
+				}
+				patchBytes, _ = json.Marshal(patchData)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
 		},
-
 		"clientID and clientSecret are not created for an existing OIDCClient": {
 			oidcClient: &v3.OIDCClient{
 				ObjectMeta: metav1.ObjectMeta{
@@ -87,8 +130,12 @@ func TestOnChange(t *testing.T) {
 					ClientID: fakeClientId,
 				},
 			},
-			setupMock: func(p *mockParams) {
-				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{}, nil)
+			setupMock: func(p *mockParams, _ *v3.OIDCClient) {
+				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeClientId,
+					},
+				}, nil)
 			},
 		},
 		"new client secret is created with annotation": {
@@ -105,8 +152,8 @@ func TestOnChange(t *testing.T) {
 				},
 			},
 
-			setupMock: func(p *mockParams) {
-				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
+			setupMock: func(p *mockParams, oidcClient *v3.OIDCClient) {
+				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret2, nil)
 				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeClientId,
@@ -124,9 +171,13 @@ func TestOnChange(t *testing.T) {
 						secretKeyPrefix + "1": []byte(fakeClientSecret),
 					},
 				}, nil)
-				p.secretClient.EXPECT().Update(&v1.Secret{
+
+				secret := &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeClientId,
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "2": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
 						Namespace: secretNamespace,
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -139,10 +190,11 @@ func TestOnChange(t *testing.T) {
 					},
 					Data: map[string][]byte{
 						secretKeyPrefix + "1": []byte(fakeClientSecret),
-						secretKeyPrefix + "2": []byte(fakeClientSecret),
+						secretKeyPrefix + "2": []byte(fakeClientSecret2),
 					},
-				}).Return(nil, nil)
-				p.oidcClient.EXPECT().Update(&v3.OIDCClient{
+				}
+				p.secretClient.EXPECT().Update(secret).Return(secret, nil)
+				client := &v3.OIDCClient{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        fakeOIDCClientName,
 						UID:         fakeOIDCClientUID,
@@ -151,7 +203,27 @@ func TestOnChange(t *testing.T) {
 					Status: v3.OIDCClientStatus{
 						ClientID: fakeClientId,
 					},
-				}).Return(nil, nil)
+				}
+				p.oidcClient.EXPECT().Update(client).Return(client, nil)
+
+				// update status with client secret
+				patchData := map[string]interface{}{
+					"status": v3.OIDCClientStatus{
+						ClientID: fakeClientId,
+						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+							secretKeyPrefix + "1": {
+								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+							},
+							secretKeyPrefix + "2": {
+								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+								LastFiveCharacters: fakeClientSecret2[len(fakeClientSecret2)-5:],
+							},
+						},
+					},
+				}
+
+				patchBytes, _ := json.Marshal(patchData)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
 		},
 		"client secret is regenerated with annotation": {
@@ -167,11 +239,14 @@ func TestOnChange(t *testing.T) {
 					ClientID: fakeClientId,
 				},
 			},
-			setupMock: func(p *mockParams) {
+			setupMock: func(p *mockParams, oidcClient *v3.OIDCClient) {
 				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
 				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeClientId,
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "1": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
 						Namespace: secretNamespace,
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -186,9 +261,12 @@ func TestOnChange(t *testing.T) {
 						secretKeyPrefix + "1": []byte("oldSecret"),
 					},
 				}, nil)
-				p.secretClient.EXPECT().Update(&v1.Secret{
+				secret := &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeClientId,
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "1": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
 						Namespace: secretNamespace,
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -202,8 +280,9 @@ func TestOnChange(t *testing.T) {
 					Data: map[string][]byte{
 						secretKeyPrefix + "1": []byte(fakeClientSecret),
 					},
-				}).Return(nil, nil)
-				p.oidcClient.EXPECT().Update(&v3.OIDCClient{
+				}
+				p.secretClient.EXPECT().Update(secret).Return(secret, nil)
+				client := &v3.OIDCClient{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        fakeOIDCClientName,
 						UID:         fakeOIDCClientUID,
@@ -212,7 +291,23 @@ func TestOnChange(t *testing.T) {
 					Status: v3.OIDCClientStatus{
 						ClientID: fakeClientId,
 					},
-				}).Return(nil, nil)
+				}
+				p.oidcClient.EXPECT().Update(client).Return(client, nil)
+
+				// update status with client secret
+				patchData := map[string]interface{}{
+					"status": v3.OIDCClientStatus{
+						ClientID: fakeClientId,
+						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+							secretKeyPrefix + "1": {
+								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+							},
+						},
+					},
+				}
+				patchBytes, _ := json.Marshal(patchData)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
 		},
 		"client secret is removed with annotation": {
@@ -228,10 +323,14 @@ func TestOnChange(t *testing.T) {
 					ClientID: fakeClientId,
 				},
 			},
-			setupMock: func(p *mockParams) {
+			setupMock: func(p *mockParams, oidcClient *v3.OIDCClient) {
 				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeClientId,
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "1": fmt.Sprintf("%d", fakeNow.Unix()),
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "2": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
 						Namespace: secretNamespace,
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -247,9 +346,13 @@ func TestOnChange(t *testing.T) {
 						secretKeyPrefix + "2": []byte(fakeClientSecret),
 					},
 				}, nil)
-				p.secretClient.EXPECT().Update(&v1.Secret{
+				secret := &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fakeClientId,
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "2": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
+
 						Namespace: secretNamespace,
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -263,8 +366,9 @@ func TestOnChange(t *testing.T) {
 					Data: map[string][]byte{
 						secretKeyPrefix + "2": []byte(fakeClientSecret),
 					},
-				}).Return(nil, nil)
-				p.oidcClient.EXPECT().Update(&v3.OIDCClient{
+				}
+				p.secretClient.EXPECT().Update(secret).Return(secret, nil)
+				client := &v3.OIDCClient{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        fakeOIDCClientName,
 						UID:         fakeOIDCClientUID,
@@ -273,7 +377,24 @@ func TestOnChange(t *testing.T) {
 					Status: v3.OIDCClientStatus{
 						ClientID: fakeClientId,
 					},
-				}).Return(nil, nil)
+				}
+				p.oidcClient.EXPECT().Update(client).Return(client, nil)
+
+				// update status with client secret
+				patchData := map[string]interface{}{
+					"status": v3.OIDCClientStatus{
+						ClientID: fakeClientId,
+						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+							secretKeyPrefix + "2": {
+								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+							},
+						},
+					},
+				}
+
+				patchBytes, _ := json.Marshal(patchData)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
 		},
 	}
@@ -289,7 +410,7 @@ func TestOnChange(t *testing.T) {
 				generator:       mocks.NewMockClientIDAndSecretGenerator(ctlr),
 			}
 			if test.setupMock != nil {
-				test.setupMock(mocks)
+				test.setupMock(mocks, test.oidcClient)
 			}
 
 			c := oidcClientController{
@@ -298,6 +419,9 @@ func TestOnChange(t *testing.T) {
 				oidcClient:      mocks.oidcClient,
 				oidcClientCache: mocks.oidcClientCache,
 				generator:       mocks.generator,
+				now: func() time.Time {
+					return fakeNow
+				},
 			}
 
 			_, err := c.onChange("", test.oidcClient)

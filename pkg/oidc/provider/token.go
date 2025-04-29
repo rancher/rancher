@@ -11,18 +11,16 @@ import (
 	"strings"
 	"time"
 
-	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
-	"github.com/rancher/rancher/pkg/oidc/provider/session"
-	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/golang-jwt/jwt/v5"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
+	"github.com/rancher/rancher/pkg/oidc/provider/session"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -412,7 +410,7 @@ func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient
 	}{{
 		Op:    "add",
 		Path:  "/metadata/annotations/cattle.io.oidc-client-secret-used-" + clientSecretID,
-		Value: metav1.NewTime(h.now()),
+		Value: fmt.Sprintf("%d", h.now().Unix()),
 	}})
 	if err != nil {
 		return err

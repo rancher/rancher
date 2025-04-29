@@ -33,9 +33,22 @@ type OIDCClient struct {
 	Status OIDCClientStatus `json:"status,omitempty"`
 }
 
+// OIDCClientSecretStatus represent the observed status of a client secret.
+type OIDCClientSecretStatus struct {
+	// LastUsedAt represent when this client secret was used.
+	LastUsedAt string `json:"lastUsedAt,omitempty"`
+	// CreatedAt represent when this client secret was created.
+	CreatedAt string `json:"createdAt,omitempty"`
+	// LastFiveCharacters are the 5 last characters of the client secret
+	LastFiveCharacters string `json:"lastFiveCharacters,omitempty"`
+}
+
 // OIDCClientStatus represents the most recently observed status of the oidc client.
 type OIDCClientStatus struct {
+	// ClientID represents the ID of the client
 	ClientID string `json:"clientID,omitempty"`
+	// ClientSecrets represents the observed status of the client secrets
+	ClientSecrets map[string]OIDCClientSecretStatus `json:"clientSecrets,omitempty"`
 }
 
 // OIDCClient is a description of the oidc client.

@@ -29,6 +29,9 @@ func RequiredCRDs() []string {
 	if features.UIExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
+	if features.OIDCProvider.Enabled() {
+		requiredCRDS = append(requiredCRDS, OIDCClientCRD()...)
+	}
 	return requiredCRDS
 }
 
@@ -170,6 +173,13 @@ func UIPluginsCRD() []string {
 	}
 }
 
+// OIDCClientCRD returns a list of CRD names needed to enable the OIDC provider
+func OIDCClientCRD() []string {
+	return []string{
+		"oidcclients.management.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
@@ -256,4 +266,5 @@ var MigratedResources = map[string]bool{
 	"users.management.cattle.io":                                      false,
 	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
+	"oidcclients.management.cattle.io":                                true,
 }
