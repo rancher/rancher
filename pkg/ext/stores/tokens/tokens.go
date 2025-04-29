@@ -25,6 +25,7 @@ import (
 	extcore "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -835,7 +836,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 	go func() {
 		producer, err := t.secretClient.Watch(TokenNamespace, localOptions)
 		if err != nil {
-			close(consumer.ch)
+			logrus.Errorf("error starting a watch for token secrets: %s", err)
 			return
 		}
 
