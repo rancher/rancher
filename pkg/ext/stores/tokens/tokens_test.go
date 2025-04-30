@@ -1347,6 +1347,11 @@ func Test_SystemStore_List(t *testing.T) {
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "1",
+					Continue:           "true",
+					RemainingItemCount: pointer.Int64(2),
+				},
 				Items: []ext.Token{
 					properToken,
 				},
@@ -1355,6 +1360,11 @@ func Test_SystemStore_List(t *testing.T) {
 				secrets.EXPECT().
 					List("cattle-tokens", gomock.Any()).
 					Return(&corev1.SecretList{
+						ListMeta: metav1.ListMeta{
+							ResourceVersion:    "1",
+							Continue:           "true",
+							RemainingItemCount: pointer.Int64(2),
+						},
 						Items: []corev1.Secret{
 							properSecret,
 						},
@@ -1368,6 +1378,11 @@ func Test_SystemStore_List(t *testing.T) {
 			opts:    &metav1.ListOptions{},
 			err:     nil,
 			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "",
+					Continue:           "",
+					RemainingItemCount: nil,
+				},
 				Items: []ext.Token{
 					properTokenCurrent,
 				},
@@ -1388,6 +1403,11 @@ func Test_SystemStore_List(t *testing.T) {
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "",
+					Continue:           "",
+					RemainingItemCount: nil,
+				},
 				Items: []ext.Token{
 					properToken,
 				},
