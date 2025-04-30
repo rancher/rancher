@@ -81,13 +81,15 @@ type RegistrationStatus struct {
 }
 
 type SystemRegistrationState struct {
-	SCCSystemId        int    `json:"sccSystemId,omitempty"`
-	RequestProcessedTS string `json:"requestProcessedTS,omitempty"`
+	SCCSystemId        int          `json:"sccSystemId,omitempty"`
+	RequestProcessedTS *metav1.Time `json:"requestProcessedTS,omitempty"`
 }
 
 type SystemActivationState struct {
-	Valid           bool   `json:"valid"`
-	LastValidatedTS string `json:"lastValidatedTS"`
-	ValidUntilTS    string `json:"validUntilTS"`
-	Certificate     string `json:"certificate,omitempty"`
+	Valid bool `json:"valid"`
+	// +optional
+	LastValidatedTS *metav1.Time `json:"lastValidatedTS"`
+	// +optional
+	ValidUntilTS *metav1.Time `json:"validUntilTS"`
+	Certificate  string       `json:"certificate,omitempty"`
 }
