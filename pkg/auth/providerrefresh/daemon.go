@@ -85,7 +85,7 @@ func RefreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 	logrus.Debugf("Starting refresh process for %v", attribs.Name)
 	modified, err := ref.refreshAttributes(attribs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error refreshing userattribute %s: %w", attribs.Name, err)
 	}
 	logrus.Debugf("Finished refresh process for %v", attribs.Name)
 	modified.LastRefresh = time.Now().UTC().Format(time.RFC3339)
