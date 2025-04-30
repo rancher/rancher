@@ -208,10 +208,14 @@ func TestCheckPSAMembershipRole(t *testing.T) {
 							Namespace: projectName,
 							Name:      "my-prtb",
 						},
+						ProjectName:      "local:test-project",
 						RoleTemplateName: "my-roletemplate",
 					},
 				}, nil)
 				rtLister.EXPECT().Get(gomock.Any()).Return(&v3.RoleTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-roletemplate",
+					},
 					Rules: []rbacv1.PolicyRule{
 						{
 							Verbs:     []string{"updatepsa"},
@@ -287,7 +291,7 @@ func TestCheckPSAMembershipRole(t *testing.T) {
 						RoleTemplateName: "my-roletemplate",
 					},
 				}, nil)
-				rtLister.EXPECT().Get(gomock.Any()).Return(nil, errNotFound)
+				rtLister.EXPECT().Get(gomock.Any()).Return(nil, errNotFound).Times(1)
 			},
 			wantedCRs: nil,
 			wantErr:   true,
@@ -312,9 +316,13 @@ func TestCheckPSAMembershipRole(t *testing.T) {
 							Name:      "my-prtb",
 						},
 						RoleTemplateName: "my-roletemplate",
+						ProjectName:      "local:test-project",
 					},
 				}, nil)
 				rtLister.EXPECT().Get(gomock.Any()).Return(&v3.RoleTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-roletemplate",
+					},
 					Rules: []rbacv1.PolicyRule{
 						{
 							Verbs:     []string{"list"},
@@ -322,10 +330,10 @@ func TestCheckPSAMembershipRole(t *testing.T) {
 							Resources: []string{v3.ProjectResourceName},
 						},
 					},
-				}, nil)
+				}, nil).AnyTimes()
 			},
 			wantedCRs: nil,
-			wantErr:   false,
+			wantErr:   true,
 		},
 	}
 	for _, tt := range tests {
