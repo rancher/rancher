@@ -89,7 +89,7 @@ func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error)
 
 // createClusterAuthToken handles actions commonly taken to create a clusterAuthToken from a token.
 func (h *tokenHandler) createClusterAuthToken(token *managementv3.Token, hashedValue string) error {
-	err := h.updateClusterUserAttribute(token)
+	err := h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 		return nil, err
 	}
 
-	err = h.updateClusterUserAttribute(token)
+	err = h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
 		return nil, err
 	}
@@ -190,8 +190,7 @@ func (h *tokenHandler) Remove(token *managementv3.Token) (runtime.Object, error)
 	return nil, nil
 }
 
-func (h *tokenHandler) updateClusterUserAttribute(token *managementv3.Token) error {
-	userID := token.UserID
+func (h *tokenHandler) updateClusterUserAttribute(userID string) error {
 	user, err := h.userLister.Get("", userID)
 	if err != nil {
 		return err
