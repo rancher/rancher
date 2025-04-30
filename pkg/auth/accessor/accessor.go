@@ -43,4 +43,6 @@ type TokenAccessor interface {
 	GetLastActivitySeen() *metav1.Time
 	// GetCreationTime returns the creation time of the token
 	GetCreationTime() metav1.Time
+	// GetExpiresAt returns the Expiration time of the token, as string
+	GetExpiresAt() string
 }
