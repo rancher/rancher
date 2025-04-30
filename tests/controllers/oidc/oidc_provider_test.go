@@ -71,7 +71,7 @@ var (
 )
 
 func (s *OIDCProviderSuite) SetupSuite() {
-	s.ctx, s.cancel = context.WithCancel(context.TODO())
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.done = make(chan struct{})
 
 	// Start envtest
@@ -260,12 +260,11 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 	}
 
 	authURL := oauth2Config.AuthCodeURL(state, oauth2.S256ChallengeOption(fakeCodeVerifier))
-	req, err := http.NewRequest("GET", authURL, nil)
+	req, err := http.NewRequest(http.MethodGet, authURL, nil)
 	assert.NoError(s.T(), err)
 	req.Header.Set("Authorization", "Bearer "+fakeToken+":"+fakeTokenValue)
-	client := &http.Client{}
 	s.wg.Add(1)
-	res, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 	assert.NoError(s.T(), err)
 	defer res.Body.Close()
 
@@ -304,7 +303,7 @@ func (s *OIDCProviderSuite) redirect(rw http.ResponseWriter, r *http.Request) {
 	data.Set("client_id", clientID)
 	data.Set("client_secret", clientSecret)
 
-	req, err := http.NewRequest("POST", provider.Endpoint().TokenURL, bytes.NewBufferString(data.Encode()))
+req, err := http.NewRequest(http.MethodPost, provider.Endpoint().TokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		fmt.Printf("Failed to create HTTP request: %v\n", err)
 		return
