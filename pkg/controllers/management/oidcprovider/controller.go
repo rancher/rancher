@@ -78,7 +78,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		if slices.ContainsFunc(clients, func(client *v3.OIDCClient) bool {
 			return client.Status.ClientID == clientID
 		}) {
-			return nil, fmt.Errorf("client id already exists")
+			return nil, fmt.Errorf("client id '%s' already exists", clientID)
 		}
 	}
 
