@@ -76,7 +76,13 @@ func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Regist
 			v1.ResourceConditionProgressing.True(updated)
 			v1.ResourceConditionReady.False(updated)
 			v1.ResourceConditionDone.False(updated)
-			return h.registrations.Update(updated)
+
+			var err error
+			updated, err = h.registrations.UpdateStatus(updated)
+
+			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
+			updated, err = h.registrations.Update(updated)
+			return updated, err
 		}
 	}
 
