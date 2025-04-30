@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	psautils "github.com/rancher/rancher/pkg/controllers/management/auth/psautils"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -22,9 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	rbacmgmt "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 const (
@@ -36,7 +34,6 @@ const (
 	clusterNameLabel                = "cluster.cattle.io/name"
 	projectContext                  = "project"
 	clusterContext                  = "cluster"
-	updatepsaVerb                   = "updatepsa"
 )
 
 var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
@@ -188,7 +185,7 @@ func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleCont
 					APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
 					Resources:     []string{resourceType},
 					ResourceNames: []string{resourceName},
-					Verbs:         []string{updatepsaVerb},
+					Verbs:         []string{psautils.UpdatepsaVerb},
 				},
 			},
 		}
@@ -227,7 +224,7 @@ func needsPSARole(projectName, projectNamespace string, prtbLister v32.ProjectRo
 		return false, err
 	}
 
-	return isPSAAllowed(roleTemplates), nil
+	return psautils.IsPSAAllowed(roleTemplates), nil
 }
 
 // roleTemplatesLookup returns the list of roletemplates associated to the project.
@@ -269,21 +266,4 @@ func roleTemplatesLookup(projectName, projectNamespace string, prtbLister v32.Pr
 		roleTemplates = append(roleTemplates, roleTemplate)
 	}
 	return roleTemplates, nil
-}
-
-// isPSAAllowed get a list of roletemplates to verify if updatepsa verb is enabled on their rules
-func isPSAAllowed(roleTemplates []*v3.RoleTemplate) bool {
-	isUpdatepsaAllowed := false
-	auth := authorizer.AttributesRecord{
-		Verb:            updatepsaVerb,
-		APIGroup:        management.GroupName,
-		Resource:        v3.ProjectResourceName,
-		ResourceRequest: true,
-	}
-	for _, rt := range roleTemplates {
-		if rbacmgmt.RulesAllow(auth, rt.Rules...) {
-			isUpdatepsaAllowed = true
-		}
-	}
-	return isUpdatepsaAllowed
 }

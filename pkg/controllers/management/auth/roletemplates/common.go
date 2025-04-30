@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	psautils "github.com/rancher/rancher/pkg/controllers/management/auth/psautils"
 	"github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/rbac"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -252,6 +253,8 @@ func getProjectMembershipRoleName(rt *v3.RoleTemplate, prtb *v3.ProjectRoleTempl
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	if isProjectOwnerRole(rt) {
 		return name.SafeConcatName(projectName, projectContext, "owner")
+	} else if psautils.IsPSAAllowed([]*v3.RoleTemplate{rt}) {
+		return name.SafeConcatName(projectName, projectContext, "psa")
 	} else {
 		return name.SafeConcatName(projectName, projectContext, "member")
 	}
