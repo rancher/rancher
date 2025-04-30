@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/version"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -65,12 +64,4 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 	secretReference.Namespace = secretNamespace
 
 	return secretReference, &mode, nil
-}
-
-func GetProductIdentifier(override string) (string, string, string) {
-	if override != "" {
-		return "rancher", override, "unknown"
-	}
-
-	return "rancher", version.Version, "unknown"
 }

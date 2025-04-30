@@ -34,6 +34,10 @@ func NewRancherSystemInfo(rancherUuid uuid.UUID, clusterUuid uuid.UUID, wcontext
 	}
 }
 
+func (rsi *RancherSystemInfo) GetProductIdentifier() (string, string, string) {
+	return "rancher", rsi.Version, "unknown"
+}
+
 func (rsi *RancherSystemInfo) ServerUrl() string {
 	serverUrl := settings.ServerURL.Get()
 	if serverUrl == "" {
