@@ -88,7 +88,7 @@ spec:
                     of a client secret.
                   properties:
                     createdAt:
-                      description: CreatedAt represent when this client secret was
+                      description: CreatedAt represents when this client secret was
                         created.
                       type: string
                     lastFiveCharacters:
