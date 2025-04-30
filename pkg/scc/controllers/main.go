@@ -56,7 +56,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	// That is why these conditions may look a bit odd, as it helps ensure registration logic is used as needed.
-	if registrationObj.Status.RegistrationStatus.RequestProcessedTS == nil || registrationObj.Status.RegistrationStatus.RequestProcessedTS.IsZero() ||
+	if registrationObj.Status.RegistrationProcessedTS == nil || registrationObj.Status.RegistrationProcessedTS.IsZero() ||
 		!registrationObj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
 		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced) {
 		registrationHandler := registration.New(

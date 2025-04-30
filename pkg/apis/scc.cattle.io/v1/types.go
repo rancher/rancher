@@ -37,8 +37,11 @@ const (
 
 // +genclient
 // +genclient:nonNamespaced
+// +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Registered",type=boolean,JSONPath=`.status.activationStatus.valid`
+// +kubebuilder:printcolumn:name="Last SCC Sync",type="date",JSONPath=".status.activationStatus.lastValidatedTS"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Registration struct {
@@ -50,18 +53,21 @@ type Registration struct {
 }
 
 type RegistrationRequest struct {
-	RegistrationCodeSecretRef *corev1.SecretReference `yaml:"registrationCodeSecretRef,omitempty" json:"registrationCodeSecretRef,omitempty"`
-	SeverUrl                  string                  `yaml:"severUrl,omitempty" json:"sever_url,omitempty"`
-	ServerCertificate         *corev1.SecretReference `yaml:"serverCertficate,omitempty" json:"server_certficate,omitempty"`
+	RegistrationCodeSecretRef *corev1.SecretReference `json:"registrationCodeSecretRef,omitempty"`
+	// +optional
+	SeverUrl string `json:"severUrl,omitempty"`
+	// +optional
+	ServerCertificateSecretRef *corev1.SecretReference `json:"serverCertficateSecretRef,omitempty"`
 }
 
+// RegistrationSpec is a description of a registration config
 type RegistrationSpec struct {
 	// +default:value="online"
-	Mode RegistrationMode `yaml:"mode" json:"mode"`
+	Mode RegistrationMode `json:"mode"`
 	// +optional
-	RegistrationRequest                     *RegistrationRequest    `yaml:"registrationRequest,omitempty" json:"registrationRequest,omitempty"`
-	OfflineRegistrationCertificateSecretRef *corev1.SecretReference `yaml:"offlineRegistrationCertificateSecretRef,omitempty" json:"offlineRegistrationCertificateSecretRef,omitempty"`
-	CheckNow                                bool                    `yaml:"checkNow,omitempty" json:"checkNow,omitempty"`
+	RegistrationRequest                     *RegistrationRequest    `json:"registrationRequest,omitempty"`
+	OfflineRegistrationCertificateSecretRef *corev1.SecretReference `json:"offlineRegistrationCertificateSecretRef,omitempty"`
+	CheckNow                                bool                    `json:"checkNow,omitempty"`
 }
 
 func (rs *RegistrationSpec) WithoutCheckNow() *RegistrationSpec {
@@ -73,16 +79,24 @@ func (rs *RegistrationSpec) WithoutCheckNow() *RegistrationSpec {
 }
 
 type RegistrationStatus struct {
-	Conditions                 []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	RegistrationStatus         SystemRegistrationState             `json:"registrationStatus,omitempty"`
-	ActivationStatus           SystemActivationState               `json:"activationStatus,omitempty"`
-	SystemCredentialsSecretRef *corev1.SecretReference             `json:"systemCredentialsSecretRef,omitempty"`
-	OfflineRegistrationRequest *corev1.SecretReference             `json:"offlineRegistrationRequest,omitempty"`
-}
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
-type SystemRegistrationState struct {
-	SCCSystemId        int          `json:"sccSystemId,omitempty"`
-	RequestProcessedTS *metav1.Time `json:"requestProcessedTS,omitempty"`
+	// +optional
+	RegistrationProcessedTS *metav1.Time `json:"registrationProcessedTS,omitempty"`
+	// +optional
+	SCCSystemId int `json:"sccSystemId,omitempty"`
+
+	// +optional
+	ActivationStatus SystemActivationState `json:"activationStatus,omitempty"`
+	// +optional
+	SystemCredentialsSecretRef *corev1.SecretReference `json:"systemCredentialsSecretRef,omitempty"`
+	// +optional
+	OfflineRegistrationRequest *corev1.SecretReference `json:"offlineRegistrationRequest,omitempty"`
 }
 
 type SystemActivationState struct {

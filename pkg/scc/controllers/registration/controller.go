@@ -46,12 +46,11 @@ func (h *Handler) Call(name string, registrationObj *v1.Registration) (*v1.Regis
 
 	// TODO: implement expiration - gist: Registration shouldn't repeat to infinity when issues.
 	// Ideally we would eventually timeout a Registration after it fails X times or for X minutes
-	if registrationObj.Status.RegistrationStatus.RequestProcessedTS != nil {
+	if registrationObj.Status.RegistrationProcessedTS != nil {
 		logrus.Info("[scc.registration-controller]: Registration already processed")
 		return registrationObj, nil
 	}
 
-	// TODO: set a status so we know this is currently processing
 	var err error
 	if registrationObj.Spec.Mode == v1.Online {
 		onlineHandlerObj := &onlineHandler{
@@ -71,7 +70,7 @@ func (h *Handler) Call(name string, registrationObj *v1.Registration) (*v1.Regis
 		}
 	}
 
-	if registrationObj.Status.RegistrationStatus.RequestProcessedTS != nil {
+	if registrationObj.Status.RegistrationProcessedTS != nil {
 		h.registrations.Enqueue(registrationObj.Name)
 	}
 
@@ -82,7 +81,6 @@ func (h *Handler) setReconcilingCondition(request *v1.Registration, originalErr 
 	logrus.Info("[scc.registration-controller]: set reconciling condition")
 	logrus.Error(originalErr)
 
-	// TODO Update status
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
 		updBackup, err := h.registrations.Get(request.Name, metav1.GetOptions{})

@@ -14,7 +14,14 @@ spec:
     singular: registration
   scope: Cluster
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.activationStatus.valid
+      name: Registered
+      type: boolean
+    - jsonPath: .status.activationStatus.lastValidatedTS
+      name: Last SCC Sync
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         properties:
@@ -36,6 +43,7 @@ spec:
           metadata:
             type: object
           spec:
+            description: RegistrationSpec is a description of a registration config
             properties:
               checkNow:
                 type: boolean
@@ -78,7 +86,7 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
-                  server_certficate:
+                  serverCertficateSecretRef:
                     description: |-
                       SecretReference represents a Secret Reference. It has enough information to retrieve secret
                       in any namespace
@@ -93,7 +101,7 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
-                  sever_url:
+                  severUrl:
                     type: string
                 type: object
             required:
@@ -144,6 +152,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               offlineRegistrationRequest:
                 description: |-
                   SecretReference represents a Secret Reference. It has enough information to retrieve secret
@@ -159,14 +170,11 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              registrationStatus:
-                properties:
-                  requestProcessedTS:
-                    format: date-time
-                    type: string
-                  sccSystemId:
-                    type: integer
-                type: object
+              registrationProcessedTS:
+                format: date-time
+                type: string
+              sccSystemId:
+                type: integer
               systemCredentialsSecretRef:
                 description: |-
                   SecretReference represents a Secret Reference. It has enough information to retrieve secret

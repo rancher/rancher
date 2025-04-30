@@ -23,11 +23,11 @@ import (
 )
 
 type sccOperator struct {
-	registrations     sccv1.RegistrationController
-	configMaps        v1core.ConfigMapController
-	secrets           v1core.SecretController
-	systemInformation *util.RancherSystemInfo
-	serverUrlReady    chan struct{}
+	registrations           sccv1.RegistrationController
+	configMaps              v1core.ConfigMapController
+	secrets                 v1core.SecretController
+	systemInformation       *util.RancherSystemInfo
+	systemRegistrationReady chan struct{}
 }
 
 func setup(wContext *wrangler.Context) (*sccOperator, error) {
@@ -45,7 +45,7 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 		return nil, err
 	}
 
-	// TODO: also get Node, Sockets, v-cpus, Clusters and watch those
+	// TODO(o&b): also get Node, Sockets, v-cpus, Clusters and watch those
 	return &sccOperator{
 		registrations: wContext.SCC.Registration(),
 		configMaps:    wContext.Core.ConfigMap(),
@@ -55,24 +55,26 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 			uuid.MustParse(string(kubeSystemNS.UID)),
 			wContext,
 		),
-		serverUrlReady: make(chan struct{}),
+		systemRegistrationReady: make(chan struct{}),
 	}, nil
 }
 
-func (so *sccOperator) waitForServerURL(ctx context.Context) {
+func (so *sccOperator) waitForSystemReady() {
+	// Currently we only wait for ServerUrl not being empty, this is a good start as with out the URL we cannot start.
+	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
 	if so.systemInformation.ServerUrl() != "" {
-		close(so.serverUrlReady)
+		close(so.systemRegistrationReady)
 		return
 	}
 	logrus.Info("[scc-operator] Waiting for server-url to be ready")
 	wait.Until(func() {
 		if so.systemInformation.ServerUrl() != "" {
 			logrus.Info("[scc-operator] can now start controllers; server URL is now ready.")
-			close(so.serverUrlReady)
+			close(so.systemRegistrationReady)
 		} else {
 			logrus.Info("[scc-operator] cannot start controllers yet; server URL is not ready.")
 		}
-	}, 15*time.Second, so.serverUrlReady)
+	}, 15*time.Second, so.systemRegistrationReady)
 }
 
 // maybeFirstInit will check if the initial `Registration` seeding values exist
@@ -137,12 +139,12 @@ func Setup(
 		return fmt.Errorf("error setting up scc operator: %s", err.Error())
 	}
 
-	// Start goroutine to wait for Server URL to be configured
+	// Start goroutine to wait for systemRegistrationReady to complete; currently based on server-url only
 	go func() {
-		if initOperator.serverUrlReady != nil {
-			logrus.Info("[scc-operator] Waiting to run first init after server-url is ready")
+		if initOperator.systemRegistrationReady != nil {
+			logrus.Info("[scc-operator] Waiting to run first init until system is ready for registration")
 		}
-		<-initOperator.serverUrlReady
+		<-initOperator.systemRegistrationReady
 
 		_, err = initOperator.maybeFirstInit()
 		if err != nil {
@@ -152,7 +154,7 @@ func Setup(
 		return
 	}()
 
-	go initOperator.waitForServerURL(ctx)
+	go initOperator.waitForSystemReady()
 
 	controllers.Register(
 		ctx,
@@ -161,9 +163,9 @@ func Setup(
 		initOperator.systemInformation,
 	)
 
-	// TODO: Somewhere in operator, or in registration controller, the current Activation needs to be revalidated every 24 hours
+	// TODO(o&b): Somewhere in operator, or in registration controller, the current Activation needs to be revalidated every 24 hours
 
-	if initOperator.serverUrlReady != nil {
+	if initOperator.systemRegistrationReady != nil {
 		logrus.Info("[scc-operator] Initial setup initiated. When Server URL is configured full setup will complete.")
 	}
 

@@ -61,7 +61,7 @@ func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration
 
 	// Prepare the Registration for Activation phase next
 	updatingObj := announcedReg.DeepCopy()
-	updatingObj.Status.RegistrationStatus.RequestProcessedTS = &metav1.Time{
+	updatingObj.Status.RegistrationProcessedTS = &metav1.Time{
 		Time: time.Now(),
 	}
 	v1.ResourceConditionFailure.SetStatusBool(updatingObj, false)
@@ -83,12 +83,12 @@ func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccCon
 
 	id, regErr := sccConnection.RegisterOrKeepAlive(registrationCode)
 	if regErr != nil {
-		// TODO, do we error different based on ID type?
+		// TODO(scc) do we error different based on ID type?
 		return registrationObj, regErr
 	}
 
 	if id == suseconnect.KeepAliveRegistrationSystemId {
-		// TODO something to update status from keepalive
+		// TODO(scc) something to update status from keepalive
 		return registrationObj, nil
 	}
 
@@ -100,7 +100,7 @@ func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccCon
 	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(newRegObj, fmt.Sprintf("system announced, check %s", sccSystemUrl))
 	v1.RegistrationConditionAnnounced.SetStatusBool(newRegObj, true)
 
-	newRegObj.Status.RegistrationStatus.SCCSystemId = int(id)
+	newRegObj.Status.SCCSystemId = int(id)
 	newRegObj.Status.SystemCredentialsSecretRef = &corev1.SecretReference{
 		Namespace: credentials.Namespace,
 		Name:      credentials.SecretName,

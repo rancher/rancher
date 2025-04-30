@@ -63,7 +63,7 @@ func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Regist
 	if registrationObj.Spec.CheckNow && !lastValidatedTS.IsZero() {
 		if registrationObj.Spec.Mode == v1.Offline {
 			updated := registrationObj.DeepCopy()
-			// TODO: Also update the status to warn Offline users that `CheckNow` does nothing
+			// TODO(o&b): Also update the status to warn Offline users that `CheckNow` does nothing
 			// Better alternative, webhook prevent updates if mode=offline
 			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
 			return h.registrations.Update(updated)
@@ -109,7 +109,6 @@ func (h *Handler) setReconcilingCondition(registrationObj *v1.Registration, orig
 	logrus.Info("[scc.registration-controller]: set reconciling condition")
 	logrus.Error(originalErr)
 
-	// TODO: actually set the message to something that makes sense based on the error
 	v1.ResourceConditionFailure.SetStatusBool(registrationObj, true)
 	v1.ResourceConditionFailure.SetError(registrationObj, "", originalErr)
 
@@ -153,7 +152,6 @@ func (h *Handler) processOnlineActivation(registrationObj *v1.Registration) (*v1
 		Time: time.Now().Add(24 * time.Hour),
 	}
 	updated.Status.ActivationStatus.Valid = true
-	// TODO: may need to unset the CheckNow on spec?
 	return h.registrations.UpdateStatus(updated)
 }
 
