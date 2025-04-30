@@ -863,7 +863,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 				case watch.Bookmark:
 					secret, ok := event.Object.(*corev1.Secret)
 					if !ok {
-						logrus.Warnf("tokens: watch: expected secret got %T", secret)
+						logrus.Warnf("tokens: watch: expected secret got %T", event.Object)
 						continue
 					}
 
@@ -883,22 +883,22 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 				default: // watch.Added, watch.Modified, watch.Deleted
 					secret, ok := event.Object.(*corev1.Secret)
 					if !ok {
-						logrus.Warnf("tokens: watch: expected secret got %T", secret)
+						logrus.Warnf("tokens: watch: expected secret got %T", event.Object)
 						continue
 					}
 
 					token, err = tokenFromSecret(secret)
 					if err != nil {
-						logrus.Errorf("tokens: watch: error converting secret %s to token: %s", secret.Name, err)
+						logrus.Errorf("tokens: watch: error converting secret '%s' to token: %s", secret.Name, err)
 						continue
 					}
-				}
 
-				// skipping tokens not owned by the watching
-				// user is not required. The watch filter (see
-				// ListOptionMerge above) takes care of only
-				// asking for owned tokens
-				token.Status.Current = token.Name == sessionID
+					// skipping tokens not owned by the watching
+					// user is not required. The watch filter (see
+					// ListOptionMerge above) takes care of only
+					// asking for owned tokens
+					token.Status.Current = token.Name == sessionID
+				}
 
 				// push to consumer, and terminate ourselves if
 				// the consumer terminated on us
