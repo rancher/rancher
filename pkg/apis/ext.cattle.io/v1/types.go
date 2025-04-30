@@ -194,6 +194,10 @@ func (t *Token) GetCreationTime() metav1.Time {
 	return t.CreationTimestamp
 }
 
+func (t *Token) GetExpiresAt() string {
+	return t.Status.ExpiresAt
+}
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
