@@ -36,17 +36,17 @@ import (
 
 // UserActivityController interface for managing UserActivity resources.
 type UserActivityController interface {
-	generic.ControllerInterface[*v1.UserActivity, *v1.UserActivityList]
+	generic.NonNamespacedControllerInterface[*v1.UserActivity, *v1.UserActivityList]
 }
 
 // UserActivityClient interface for managing UserActivity resources in Kubernetes.
 type UserActivityClient interface {
-	generic.ClientInterface[*v1.UserActivity, *v1.UserActivityList]
+	generic.NonNamespacedClientInterface[*v1.UserActivity, *v1.UserActivityList]
 }
 
 // UserActivityCache interface for retrieving UserActivity resources in memory.
 type UserActivityCache interface {
-	generic.CacheInterface[*v1.UserActivity]
+	generic.NonNamespacedCacheInterface[*v1.UserActivity]
 }
 
 // UserActivityStatusHandler is executed for every added or modified UserActivity. Should return the new status to be updated
