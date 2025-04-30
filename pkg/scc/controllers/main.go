@@ -37,8 +37,8 @@ func Register(
 		systemInfo:     systemInfo,
 	}
 
-	registrations.OnChange(ctx, "registrations", controller.OnRegistrationChange)
-	registrations.OnRemove(ctx, "registrations", controller.OnRegistrationRemove)
+	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
+	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
 	// TODO: EnqueueAfter - revalidate every 24 hours
 	// Ex: https://github.com/rancher/rancher/blob/d6b40c3acd945f0c8fe463ff96d144561c9640c3/pkg/controllers/dashboard/helm/repo.go#L95
 }
