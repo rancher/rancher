@@ -1,7 +1,7 @@
 package credentials
 
 import (
-	"fmt"
+	"github.com/sirupsen/logrus"
 
 	"github.com/SUSE/connect-ng/pkg/connection"
 
@@ -93,7 +93,7 @@ func (c *SccCredentials) SetLogin(newLogin string, newPassword string) error {
 			}
 			errorMessage += "newPassword is empty"
 		}
-		return errors.New(fmt.Sprintf("cannot update systemLogin; %v", errorMessage))
+		logrus.Warnf("updating systemLogin to empty value(s); %v", errorMessage)
 	}
 
 	c.systemLogin = newLogin
