@@ -48,9 +48,10 @@ type tokenHandler struct {
 func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 }
 
-// ExtRemove is called when a given ext token is delete, and is responsible for
-// removing the ClusterAuthToken in a downstream cluster.
+// ExtRemove is called when a given ext token is deleted,
+// and removes the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) ExtRemove(token *extv1.Token) (*extv1.Token, error) {
+	return nil, h.remove(token.GetName(), token.GetUserID(), extTokenUserClusterKey(token))
 }
 
 // Create is called when a given token is created, and is responsible for creating a ClusterAuthToken in a downstream cluster.
@@ -99,7 +100,7 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 		return err
 	}
 
-	clusterAuthToken := common.NewClusterAuthToken(token)
+	clusterAuthToken := common.NewClusterAuthToken(token, hashedValue)
 	clusterAuthTokenSecret := common.NewClusterAuthTokenSecret(token, hashedValue)
 
 	// Creating the secret first, then the token for it. This ensures that
@@ -234,32 +235,51 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 }
 
 func (h *tokenHandler) Remove(token *managementv3.Token) (runtime.Object, error) {
-	tokens, err := h.tokenIndexer.ByIndex(tokenByUserAndClusterIndex, tokenUserClusterKey(token))
+	return nil, h.remove(token.GetName(), token.GetUserID(), tokenUserClusterKey(token))
+}
+
+func (h *tokenHandler) remove(name, userID, key string) error {
+	tokens, err := h.tokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
 	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
+		return err
 	}
 
-	err = h.clusterAuthToken.Delete(token.Name, &metav1.DeleteOptions{})
+	eTokens, err := h.extTokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
 	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
-	}
-	err = h.clusterSecret.Delete(common.ClusterAuthTokenSecretName(token.Name), &metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
+		return err
 	}
 
+	err = h.clusterSecret.Delete(common.ClusterAuthTokenSecretName(name), &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	err = h.clusterAuthToken.Delete(name, &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	if len(tokens)+len(eTokens) > 1 {
+		return nil
+	}
+
+	var lastName string
 	if len(tokens) == 1 {
-		lastToken := tokens[0].(*managementv3.Token)
-		if token.Name == lastToken.Name {
-			// we are about to remove the last token for this user & cluster,
-			// also remove user data from cluster
-			err = h.clusterUserAttribute.Delete(token.UserID, &metav1.DeleteOptions{})
-			if err != nil && !errors.IsNotFound(err) {
-				return nil, err
-			}
+		lastName = tokens[0].(*managementv3.Token).Name
+	} else if len(eTokens) == 1 {
+		lastName = eTokens[0].(*extv1.Token).Name
+	}
+
+	if name == lastName {
+		// we are about to remove the last token for this user & cluster,
+		// also remove user data from cluster
+		err = h.clusterUserAttribute.Delete(userID, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
 		}
 	}
-	return nil, nil
+
+	return nil
 }
 
 func (h *tokenHandler) updateClusterUserAttribute(userID string) error {
