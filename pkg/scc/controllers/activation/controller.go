@@ -126,8 +126,7 @@ func (h *Handler) processOnlineActivation(registrationObj *v1.Registration) (*v1
 	regCode := suseconnect.FetchSccRegistrationCodeFrom(h.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
 	sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfo)
 
-	// TODO: remove override value - it's really just for testing
-	identifier, version, arch := util.GetProductIdentifier("2.10.3")
+	identifier, version, arch := h.systemInfo.GetProductIdentifier()
 	metaData, product, err := sccConnection.Activate(identifier, version, arch, regCode)
 	if err != nil {
 		return registrationObj, err
