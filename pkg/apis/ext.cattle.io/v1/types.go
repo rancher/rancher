@@ -193,3 +193,7 @@ func (t *Token) GetLastActivitySeen() *metav1.Time {
 func (t *Token) GetCreationTime() metav1.Time {
 	return t.CreationTimestamp
 }
+
+func (t *Token) GetExpiresAt() string {
+	return t.Status.ExpiresAt
+}
