@@ -12,10 +12,11 @@ import (
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 )
 
-type handler struct {
+type Handler struct {
 	ctx            context.Context
 	registrations  registrationControllers.RegistrationController
 	secrets        v1core.SecretController
@@ -23,35 +24,31 @@ type handler struct {
 	systemInfo     *util.RancherSystemInfo
 }
 
-func Register(
+func New(
 	ctx context.Context,
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
+	sccCredentials *credentials.CredentialSecretsAdapter,
 	systemInfo *util.RancherSystemInfo,
-) {
-	controller := &handler{
+) *Handler {
+	controller := &Handler{
 		ctx:            ctx,
 		registrations:  registrations,
 		secrets:        secrets,
-		sccCredentials: credentials.New(secrets),
+		sccCredentials: sccCredentials,
 		systemInfo:     systemInfo,
 	}
 
-	registrations.OnChange(ctx, "registrationActivations", controller.OnActivationChange)
-	// TODO: EnqueueAfter - revalidate every 24 hours
-	// Ex: https://github.com/rancher/rancher/blob/d6b40c3acd945f0c8fe463ff96d144561c9640c3/pkg/controllers/dashboard/helm/repo.go#L95
+	return controller
 }
 
-func (h *handler) OnActivationChange(key string, registrationObj *v1.Registration) (*v1.Registration, error) {
+func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	if registrationObj == nil {
 		return nil, fmt.Errorf("received nil registration")
 	}
 
-	// Ignore the registration until both of these are true
 	if v1.ResourceConditionFailure.IsTrue(registrationObj) ||
-		!v1.ResourceConditionProgressing.IsTrue(registrationObj) ||
-		!v1.RegistrationConditionAnnounced.IsTrue(registrationObj) ||
-		!v1.RegistrationConditionSccUrlReady.IsFalse(registrationObj) {
+		v1.RegistrationConditionAnnounced.IsFalse(registrationObj) {
 		return registrationObj, generic.ErrSkip
 	}
 
@@ -59,8 +56,8 @@ func (h *handler) OnActivationChange(key string, registrationObj *v1.Registratio
 	logrus.Info("[scc.activations-controller]: registration ", registrationObj)
 
 	var lastValidatedTS time.Time
-	if registrationObj.Status.ActivationStatus.LastValidatedTS != "" {
-		lastValidatedTS, _ = time.Parse(time.RFC3339, registrationObj.Status.ActivationStatus.LastValidatedTS)
+	if registrationObj.Status.ActivationStatus.LastValidatedTS != nil {
+		lastValidatedTS = registrationObj.Status.ActivationStatus.LastValidatedTS.Time
 	}
 
 	if registrationObj.Spec.CheckNow && !lastValidatedTS.IsZero() {
@@ -74,12 +71,12 @@ func (h *handler) OnActivationChange(key string, registrationObj *v1.Registratio
 			updated := registrationObj.DeepCopy()
 			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
 			updated.Status.ActivationStatus.Valid = false
-			updated, err := h.processOnlineActivation(updated)
-			if err != nil {
-				return h.setReconcilingCondition(registrationObj, err)
-			}
-
-			return updated, nil
+			updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{}
+			updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{}
+			v1.ResourceConditionProgressing.True(updated)
+			v1.ResourceConditionReady.False(updated)
+			v1.ResourceConditionDone.False(updated)
+			return h.registrations.Update(updated)
 		}
 	}
 
@@ -102,7 +99,7 @@ func (h *handler) OnActivationChange(key string, registrationObj *v1.Registratio
 	return registrationObj, nil
 }
 
-func (h *handler) setReconcilingCondition(registrationObj *v1.Registration, originalErr error) (*v1.Registration, error) {
+func (h *Handler) setReconcilingCondition(registrationObj *v1.Registration, originalErr error) (*v1.Registration, error) {
 	logrus.Info("[scc.registration-controller]: set reconciling condition")
 	logrus.Error(originalErr)
 
@@ -118,7 +115,7 @@ func (h *handler) setReconcilingCondition(registrationObj *v1.Registration, orig
 	return registrationObj, originalErr
 }
 
-func (h *handler) processOnlineActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
+func (h *Handler) processOnlineActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
 	_ = h.sccCredentials.Refresh()
 	regCode := suseconnect.FetchSccRegistrationCodeFrom(h.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
 	sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfo)
@@ -138,16 +135,23 @@ func (h *handler) processOnlineActivation(registrationObj *v1.Registration) (*v1
 		return registrationObj, keepAliveErr
 	}
 
-	now := time.Now()
 	logrus.Info("[scc.activation-controller]: Successfully registered activation")
 	updated := registrationObj.DeepCopy()
-	updated.Status.ActivationStatus.LastValidatedTS = now.UTC().Format(time.RFC3339)
-	updated.Status.ActivationStatus.ValidUntilTS = now.Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	v1.RegistrationConditionSccUrlReady.True(updated)
+	v1.ResourceConditionProgressing.False(updated)
+	v1.ResourceConditionReady.True(updated)
+	v1.ResourceConditionDone.True(updated)
+	updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
+		Time: time.Now(),
+	}
+	updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{
+		Time: time.Now().Add(24 * time.Hour),
+	}
 	updated.Status.ActivationStatus.Valid = true
 	// TODO: may need to unset the CheckNow on spec?
 	return h.registrations.UpdateStatus(updated)
 }
 
-func (h *handler) processOfflineActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
+func (h *Handler) processOfflineActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
 	return registrationObj, nil
 }

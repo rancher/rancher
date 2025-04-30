@@ -2,30 +2,23 @@ package registration
 
 import (
 	"fmt"
-	"time"
-
-	"github.com/pkg/errors"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/util"
-	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 type onlineHandler struct {
-	rootHandler *handler
+	rootHandler *Handler
 }
 
 func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration, error) {
-	// This is an extra verification borne of paranoia - technically the controller won't start till this is ready.
-	// However, people can do silly things so if someone unsets the server URL this will block that.
-	if !oh.rootHandler.isServerUrlReady() {
-		return registrationObj, errors.New("cannot process registration if `server-url` is not configured")
-	}
-
-	if v1.ResourceConditionDone.IsTrue(registrationObj) && v1.RegistrationConditionAnnounced.IsTrue(registrationObj) {
+	if v1.ResourceConditionDone.IsTrue(registrationObj) ||
+		v1.RegistrationConditionAnnounced.IsTrue(registrationObj) {
 		logrus.Debugf("[scc.registration-controller]: registration already complete, nothing to process for %s", registrationObj.Name)
 		return registrationObj, nil
 	}
@@ -36,8 +29,9 @@ func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration
 		return registrationObj, fmt.Errorf("cannot refresh credentials: %w", credErr)
 	}
 
-	v1.ResourceConditionProgressing.SetStatusBool(registrationObj, true)
-	registrationObj, err := oh.rootHandler.registrations.UpdateStatus(registrationObj)
+	progressingObj := registrationObj.DeepCopy()
+	v1.ResourceConditionProgressing.True(progressingObj)
+	progressingObj, err := oh.rootHandler.registrations.UpdateStatus(progressingObj)
 	if err != nil {
 		return registrationObj, err
 	}
@@ -47,10 +41,10 @@ func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration
 		Namespace: "cattle-system",
 		Name:      util.RegCodeSecretName,
 	}
-	if registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef != nil {
-		regObjRegCodeSecretRef := registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef
+	if progressingObj.Spec.RegistrationRequest.RegistrationCodeSecretRef != nil {
+		regObjRegCodeSecretRef := progressingObj.Spec.RegistrationRequest.RegistrationCodeSecretRef
 		if regObjRegCodeSecretRef.Name != "" && regObjRegCodeSecretRef.Namespace != "" {
-			regCodeSecretRef = registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef
+			regCodeSecretRef = regObjRegCodeSecretRef
 		} else {
 			logrus.Warn("[scc.registration-controller]: registration code secret reference was set but cannot be used")
 		}
@@ -60,23 +54,24 @@ func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration
 	sccConnection := suseconnect.DefaultRancherConnection(oh.rootHandler.sccCredentials.SccCredentials(), oh.rootHandler.systemInfo)
 
 	// Announce this Rancher cluster to SCC
-	registrationObj, err = oh.announceSystem(registrationObj, &sccConnection, regCodeSecretRef)
-	if err != nil {
-		return registrationObj, err
+	announcedReg, announceErr := oh.announceSystem(progressingObj, &sccConnection, regCodeSecretRef)
+	if announceErr != nil {
+		return progressingObj, announceErr
 	}
 
 	// Prepare the Registration for Activation phase next
-	completeObj := registrationObj.DeepCopy()
-	completeObj.Status.RegistrationStatus.RequestProcessedTS = time.Now().UTC().Format(time.RFC3339)
-	completeObj.Status.Conditions = make([]genericcondition.GenericCondition, 0)
-	v1.ResourceConditionFailure.SetStatusBool(completeObj, false)
-	v1.ResourceConditionReady.SetStatusBool(completeObj, true)
-	completeObj, finalUpdateErr := oh.rootHandler.registrations.UpdateStatus(completeObj)
+	updatingObj := announcedReg.DeepCopy()
+	updatingObj.Status.RegistrationStatus.RequestProcessedTS = &metav1.Time{
+		Time: time.Now(),
+	}
+	v1.ResourceConditionFailure.SetStatusBool(updatingObj, false)
+	v1.ResourceConditionReady.SetStatusBool(updatingObj, true)
+	updatingObj, finalUpdateErr := oh.rootHandler.registrations.UpdateStatus(updatingObj)
 	if finalUpdateErr != nil {
-		return registrationObj, finalUpdateErr
+		return announcedReg, finalUpdateErr
 	}
 
-	return completeObj, nil
+	return updatingObj, nil
 }
 
 func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccConnection *suseconnect.SccWrapper, regCodeSecretRef *corev1.SecretReference) (*v1.Registration, error) {
@@ -97,12 +92,13 @@ func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccCon
 		return registrationObj, nil
 	}
 
-	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/system/%d", id)
+	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", id)
 	logrus.Debugf("[scc.registration-controller]: system announced, check %s", sccSystemUrl)
 
 	newRegObj := registrationObj.DeepCopy()
 	v1.RegistrationConditionSccUrlReady.SetStatusBool(newRegObj, false) // This must be false until successful activation too.
 	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(newRegObj, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+	v1.RegistrationConditionAnnounced.SetStatusBool(newRegObj, true)
 
 	newRegObj.Status.RegistrationStatus.SCCSystemId = int(id)
 	newRegObj.Status.SystemCredentialsSecretRef = &corev1.SecretReference{

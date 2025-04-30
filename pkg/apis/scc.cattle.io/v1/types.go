@@ -93,3 +93,14 @@ type SystemActivationState struct {
 	ValidUntilTS *metav1.Time `json:"validUntilTS"`
 	Certificate  string       `json:"certificate,omitempty"`
 }
+
+func (r *Registration) HasCondition(matchCond condition.Cond) bool {
+	conditions := r.Status.Conditions
+	for _, cond := range conditions {
+		if cond.Type == string(matchCond) {
+			return true
+		}
+	}
+
+	return false
+}

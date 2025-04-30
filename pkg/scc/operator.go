@@ -18,8 +18,7 @@ import (
 	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 
-	"github.com/rancher/rancher/pkg/scc/controllers/activation"
-	"github.com/rancher/rancher/pkg/scc/controllers/registration"
+	"github.com/rancher/rancher/pkg/scc/controllers"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
@@ -155,13 +154,7 @@ func Setup(
 
 	go initOperator.waitForServerURL(ctx)
 
-	registration.Register(
-		ctx,
-		initOperator.registrations,
-		initOperator.secrets,
-		initOperator.systemInformation,
-	)
-	activation.Register(
+	controllers.Register(
 		ctx,
 		initOperator.registrations,
 		initOperator.secrets,

@@ -9,7 +9,7 @@ import (
 )
 
 type offlineHandler struct {
-	rootHandler *handler
+	rootHandler *Handler
 }
 
 func (oh *offlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration, error) {
