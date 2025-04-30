@@ -37,7 +37,7 @@ type OIDCClient struct {
 type OIDCClientSecretStatus struct {
 	// LastUsedAt represent when this client secret was used.
 	LastUsedAt string `json:"lastUsedAt,omitempty"`
-	// CreatedAt represent when this client secret was created.
+	// CreatedAt represents when this client secret was created.
 	CreatedAt string `json:"createdAt,omitempty"`
 	// LastFiveCharacters are the 5 last characters of the client secret
 	LastFiveCharacters string `json:"lastFiveCharacters,omitempty"`
