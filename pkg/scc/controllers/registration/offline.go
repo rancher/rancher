@@ -47,7 +47,7 @@ func (oh *offlineHandler) prepareOfflineRegistrationRequest(registrationObj *v1.
 		Namespace: offlineRegistrationSecret.Namespace,
 	}
 
-	// TODO: also set a status/condition to indicate Offline is ready for user
+	// TODO(o&b): also set a status/condition to indicate Offline is ready for user
 	// The message could potentially even give command to fetch secret?
 
 	updatedRequest, err = oh.rootHandler.registrations.UpdateStatus(updatedRequest)
@@ -59,7 +59,7 @@ func (oh *offlineHandler) prepareOfflineRegistrationRequest(registrationObj *v1.
 }
 
 func (oh *offlineHandler) processOfflineRegistration(registrationObj *v1.Registration) (*v1.Registration, error) {
-	// TODO implement offline mechanism
+	// TODO(o&b) implement offline mechanism
 	logrus.Info("[scc.registration-controller]: offline mode processing")
 	return registrationObj, nil
 }

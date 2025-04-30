@@ -83,12 +83,12 @@ func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccCon
 
 	id, regErr := sccConnection.RegisterOrKeepAlive(registrationCode)
 	if regErr != nil {
-		// TODO, do we error different based on ID type?
+		// TODO(scc) do we error different based on ID type?
 		return registrationObj, regErr
 	}
 
 	if id == suseconnect.KeepAliveRegistrationSystemId {
-		// TODO something to update status from keepalive
+		// TODO(scc) something to update status from keepalive
 		return registrationObj, nil
 	}
 
