@@ -7,10 +7,12 @@ import (
 	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/controllers/activation"
 	"github.com/rancher/rancher/pkg/scc/controllers/registration"
+	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/util"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type handler struct {
@@ -36,6 +38,7 @@ func Register(
 	}
 
 	registrations.OnChange(ctx, "registrations", controller.OnRegistrationChange)
+	registrations.OnRemove(ctx, "registrations", controller.OnRegistrationRemove)
 	// TODO: EnqueueAfter - revalidate every 24 hours
 	// Ex: https://github.com/rancher/rancher/blob/d6b40c3acd945f0c8fe463ff96d144561c9640c3/pkg/controllers/dashboard/helm/repo.go#L95
 }
@@ -80,4 +83,33 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 func (h *handler) isServerUrlReady() bool {
 	return h.systemInfo.ServerUrl() != ""
+}
+
+func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
+	if registrationObj == nil {
+		return nil, nil
+	}
+
+	// For online mode, call deregister
+	if registrationObj.Spec.Mode == v1.Online {
+		_ = h.sccCredentials.Refresh()
+		sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfo)
+		err := sccConnection.Deregister()
+		if err != nil {
+			return nil, err
+		}
+
+		// Delete SCC credentials after successful Deregister
+		credErr := h.sccCredentials.Remove()
+		if credErr != nil {
+			return nil, credErr
+		}
+	}
+
+	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
+	if err != nil {
+		return registrationObj, err
+	}
+
+	return nil, nil
 }
