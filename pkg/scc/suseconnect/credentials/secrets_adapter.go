@@ -102,6 +102,10 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 	return createOrUpdateErr
 }
 
+func (c *CredentialSecretsAdapter) Remove() error {
+	return c.secrets.Delete(Namespace, SecretName, &metav1.DeleteOptions{})
+}
+
 func (c *CredentialSecretsAdapter) HasAuthentication() bool {
 	if err := c.loadCredentials(); err != nil {
 		return false
