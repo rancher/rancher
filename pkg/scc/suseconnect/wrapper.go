@@ -100,3 +100,7 @@ func (sw *SccWrapper) Activate(identifier string, version string, arch string, r
 
 	return metaData, product, err
 }
+
+func (sw *SccWrapper) Deregister() error {
+	return registration.Deregister(sw.conn)
+}
