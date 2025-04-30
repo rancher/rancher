@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
@@ -88,7 +89,7 @@ func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error)
 }
 
 // createClusterAuthToken handles actions commonly taken to create a clusterAuthToken from a token.
-func (h *tokenHandler) createClusterAuthToken(token *managementv3.Token, hashedValue string) error {
+func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hashedValue string) error {
 	err := h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
 		return err
