@@ -1,7 +1,6 @@
 package oidc_integration_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -303,7 +303,7 @@ func (s *OIDCProviderSuite) redirect(rw http.ResponseWriter, r *http.Request) {
 	data.Set("client_id", clientID)
 	data.Set("client_secret", clientSecret)
 
-req, err := http.NewRequest(http.MethodPost, provider.Endpoint().TokenURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequest(http.MethodPost, provider.Endpoint().TokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		fmt.Printf("Failed to create HTTP request: %v\n", err)
 		return
