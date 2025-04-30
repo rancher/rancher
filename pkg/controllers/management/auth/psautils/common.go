@@ -1,4 +1,4 @@
-package auth
+package psautils
 
 import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
