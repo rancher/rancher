@@ -40,9 +40,91 @@ type tokenHandler struct {
 	userAttributeLister        managementv3.UserAttributeLister
 }
 
+// ExtCreate is called when a given ext token is created, and is responsible for
+// updating/creating the ClusterAuthToken in a downstream cluster.
+func (h *tokenHandler) ExtCreate(token *extv1.Token) (*extv1.Token, error) {
+	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
+	if !errors.IsNotFound(err) {
+		return h.ExtUpdated(token)
+	}
+
+	// we can sync tokens which are hashed by copying the hash downstream
+	// token is hashed, we can safely attempt to sync downstream
+	hashVersion, err := hashers.GetHashVersion(token.Status.Hash)
+	if err != nil {
+		// the token hash is unlikely to change, re-enqueing would just produce a flood of errors
+		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err.Error())
+		return token, generic.ErrSkip
+	}
+	// we only sync tokens downstream that were created with SHA3
+	if hashVersion == hashers.SHA3Version {
+		return nil, h.createClusterAuthToken(token, token.Status.Hash)
+	}
+
+	// token is hashed, but we can't sync it since we don't have the raw value
+	logrus.Warnf("token [%s] will not be synced or useable for ACE because it uses an older hash version, generate a new token to use ACE", token.Name)
+	// don't re-enqueue, we can't sync this token
+	return nil, generic.ErrSkip
+}
+
 // ExtUpdated is called when a given ext token is modified, and is responsible
 // for updating/creating the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
+	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
+	if errors.IsNotFound(err) {
+		return h.ExtCreate(token)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	err = h.updateClusterUserAttribute(token.GetUserID())
+	if err != nil {
+		return nil, err
+	}
+
+	tokenEnabled := token.GetIsEnabled()
+	current := tokenAttributeCompare{
+		enabled:   tokenEnabled,
+		expiresAt: token.Status.ExpiresAt,
+		username:  token.Spec.UserID,
+	}
+	old := tokenAttributeCompare{
+		enabled:   clusterAuthToken.Enabled,
+		expiresAt: clusterAuthToken.ExpiresAt,
+		username:  clusterAuthToken.UserName,
+	}
+
+	// note: ext tokens are always hashed (contrary to v3 Tokens)
+	hashVersion, err := hashers.GetHashVersion(token.Status.Hash)
+	if err != nil {
+		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err.Error())
+		return token, generic.ErrSkip
+	}
+	// we only sync tokens downstream that were created with SHA3
+	if hashVersion == hashers.SHA3Version {
+		// trigger the compare to compare the values of the tokens
+		current.value = token.Status.Hash
+		old.value = clusterAuthToken.SecretKeyHash
+	}
+
+	if reflect.DeepEqual(current, old) {
+		return nil, nil
+	}
+	clusterAuthToken.UserName = token.Spec.UserID
+	clusterAuthToken.Enabled = tokenEnabled
+	clusterAuthToken.ExpiresAt = token.Status.ExpiresAt
+
+	// if we were comparing token values, then the token was hashed, so we can update the value downstream
+	if current.value != "" {
+		clusterAuthToken.SecretKeyHash = current.value
+	}
+
+	_, err = h.clusterAuthToken.Update(clusterAuthToken)
+	if errors.IsNotFound(err) {
+		_, err = h.clusterAuthToken.Create(clusterAuthToken)
+	}
+	return nil, err
 }
 
 // ExtRemove is called when a given ext token is delete, and is responsible for
