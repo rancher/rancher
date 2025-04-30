@@ -45,7 +45,7 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 		return nil, err
 	}
 
-	// TODO: also get Node, Sockets, v-cpus, Clusters and watch those
+	// TODO(o&b): also get Node, Sockets, v-cpus, Clusters and watch those
 	return &sccOperator{
 		registrations: wContext.SCC.Registration(),
 		configMaps:    wContext.Core.ConfigMap(),
@@ -161,7 +161,7 @@ func Setup(
 		initOperator.systemInformation,
 	)
 
-	// TODO: Somewhere in operator, or in registration controller, the current Activation needs to be revalidated every 24 hours
+	// TODO(o&b): Somewhere in operator, or in registration controller, the current Activation needs to be revalidated every 24 hours
 
 	if initOperator.serverUrlReady != nil {
 		logrus.Info("[scc-operator] Initial setup initiated. When Server URL is configured full setup will complete.")
