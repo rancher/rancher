@@ -963,6 +963,21 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 
 		return false, nil
 	})
+
+	if err != nil {
+		logrus.Infof("ClusterRepo Status Details:")
+		logrus.Infof("Conditions: %+v", cr.Status.Conditions)
+		logrus.Infof("NumberOfRetries: %d", cr.Status.NumberOfRetries)
+		logrus.Infof("DownloadTime: %s", cr.Status.DownloadTime)
+		logrus.Infof("ObservedGeneration: %d", cr.Status.ObservedGeneration)
+		logrus.Infof("Meta Generation: %d", cr.Generation)
+		logrus.Infof("Branch: %s", cr.Status.Branch)
+		logrus.Infof("Commit: %s", cr.Status.Commit)
+		logrus.Infof("NumberOfRetries: %d", cr.Status.NumberOfRetries)
+		logrus.Infof("NextRetryAt: %s", cr.Status.NextRetryAt)
+		logrus.Infof("ShouldNotSkip: %t", cr.Status.ShouldNotSkip)
+		logrus.Infof("ExponentialBackOffValues: %+v", cr.Spec.ExponentialBackOffValues)
+	}
 	require.NoError(c.T(), err)
 
 	downloadTime := cr.Status.DownloadTime
