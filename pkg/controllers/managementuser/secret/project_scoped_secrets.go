@@ -37,7 +37,7 @@ type namespaceHandler struct {
 	clusterName           string
 }
 
-func register(ctx context.Context, cluster *config.UserContext) {
+func RegisterProjectScopedSecretHandler(ctx context.Context, cluster *config.UserContext) {
 	n := &namespaceHandler{
 		secretController:      cluster.Corew.Secret(),
 		managementSecretCache: cluster.Management.Wrangler.Core.Secret().Cache(),
@@ -50,11 +50,7 @@ func register(ctx context.Context, cluster *config.UserContext) {
 }
 
 func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*corev1.Namespace, error) {
-	if namespace == nil {
-		return nil, nil
-	}
-
-	if namespace.DeletionTimestamp != nil {
+	if namespace == nil || namespace.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
@@ -80,24 +76,7 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 		return nil, errs
 	}
 
-	// remove any project scoped secrets that don't belong in the project
-	downstreamProjectScopedSecrets, err := n.secretController.List(namespace.Name, metav1.ListOptions{
-		LabelSelector: projectScopedSecretLabel,
-	})
-	if err != nil {
-		return nil, err
-	}
-	for _, secret := range downstreamProjectScopedSecrets.Items {
-		if desiredSecrets[secret.Name] {
-			continue
-		}
-		// secret in namespace does not belong here
-		if err := n.secretController.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}); err != nil {
-			return nil, err
-		}
-	}
-
-	return namespace, nil
+	return namespace, n.removeUndesiredProjectScopedSecrets(namespace, desiredSecrets)
 }
 
 // getProjectScopedSecretsFromNamespace gets all project scoped secret from a project namespace.
@@ -128,6 +107,27 @@ func (n *namespaceHandler) getProjectScopedSecretsFromNamespace(namespace *corev
 	return n.managementSecretCache.List(backingNamespace, labels.NewSelector().Add(*r))
 }
 
+// removeUndesiredProjectScopedSecrets removes project scoped secrets from the namespace that are not in the desiredSecrets map.
+func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1.Namespace, desiredSecrets map[string]bool) error {
+	// remove any project scoped secrets that don't belong in the project
+	downstreamProjectScopedSecrets, err := n.secretController.List(namespace.Name, metav1.ListOptions{
+		LabelSelector: projectScopedSecretLabel,
+	})
+	if err != nil {
+		return err
+	}
+	var errs error
+	for _, secret := range downstreamProjectScopedSecrets.Items {
+		if desiredSecrets[secret.Name] {
+			continue
+		}
+		// secret in namespace does not belong here
+		logrus.Infof("deleting secret %s from namespace %s", secret.Name, secret.Namespace)
+		errs = errors.Join(errs, n.secretController.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}))
+	}
+	return errs
+}
+
 // secretEnqueueNamespace enqueues all the project namespaces of a project scoped secret.
 func (n *namespaceHandler) secretEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
 	if obj == nil {
@@ -136,10 +136,6 @@ func (n *namespaceHandler) secretEnqueueNamespace(_, _ string, obj runtime.Objec
 	secret, ok := obj.(*corev1.Secret)
 	if !ok {
 		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a secret", obj)
-		return nil, nil
-	}
-
-	if secret.Labels == nil {
 		return nil, nil
 	}
 
@@ -157,6 +153,10 @@ func (n *namespaceHandler) secretEnqueueNamespace(_, _ string, obj runtime.Objec
 
 // getNamespacesFromSecret returns a slice of project namespaces from a project scoped secret.
 func (n *namespaceHandler) getNamespacesFromSecret(secret *corev1.Secret) ([]*corev1.Namespace, error) {
+	if secret.Labels == nil {
+		return nil, nil
+	}
+
 	// we only care about project scoped secrets
 	projectName, ok := secret.Labels[projectScopedSecretLabel]
 	if !ok {
@@ -181,7 +181,7 @@ func (n *namespaceHandler) getNamespacesFromSecret(secret *corev1.Secret) ([]*co
 	return n.clusterNamespaceCache.List(labels.NewSelector().Add(*r))
 }
 
-// getNamespacedSecret copies a project scoped secret with a project namespace
+// getNamespacedSecret copies a project scoped secret and replaces the namespace with the passed in namespace.
 func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 	namespacedSecret := &corev1.Secret{}
 	namespacedSecret.Name = obj.Name

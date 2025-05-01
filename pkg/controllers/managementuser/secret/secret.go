@@ -67,7 +67,7 @@ func Bootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.
 }
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) {
-	register(ctx, cluster)
+	RegisterProjectScopedSecretHandler(ctx, cluster)
 
 	resourceSyncController := &ResourceSyncController{
 		upstreamSecrets:   mgmt.Core.Secrets(clusterRec.Spec.FleetWorkspaceName),
