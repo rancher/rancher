@@ -42,6 +42,35 @@ BUILD_ARGS="$BUILD_ARGS --build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}
 BUILD_ARGS="$BUILD_ARGS --build-arg=RANCHER_TAG=${TAG}"
 BUILD_ARGS="$BUILD_ARGS --build-arg=RANCHER_REPO=${REPO}"
 
+# because macos doesn't have realpath apparently
+abs_path() {
+  echo "$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
+}
+
+# add_context adds _some_ support for local replace directives of dependency.
+add_context() {
+  if ! replace=$(grep "$1 =>" go.mod); then
+    return 0
+  fi
+
+  if [ -z "$(echo "$replace" | cut -d' ' -f4)" ]; then
+    godep=$(echo "$replace" | cut -d' ' -f3)
+    path=$(abs_path "$godep")
+    BUILD_ARGS="$BUILD_ARGS --build-context=$2=$path"
+    BUILD_ARGS="$BUILD_ARGS --build-arg=$3=$2"
+    BUILD_ARGS="$BUILD_ARGS --build-arg=$3_PATH=$path"
+
+    if [ -z "$workdir_set" ]; then
+      BUILD_ARGS="$BUILD_ARGS --build-arg=BUILD_WORKDIR=$PWD"
+      workdir_set="true"
+    fi
+  fi
+}
+
+add_context "github.com/rancher/remotedialer" "remotedialer-context" "GODEP_REMOTEDIALER"
+add_context "github.com/rancher/steve" "steve-context" "GODEP_STEVE"
+add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
+
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
   docker buildx build \
