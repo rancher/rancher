@@ -1,5 +1,7 @@
 ARG ARCH=amd64
 
+ARG BUILD_WORKDIR=/app
+
 ARG CHART_DEFAULT_BRANCH=dev-v2.12
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
@@ -312,12 +314,12 @@ COPY hack/airgap/ /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
-
 # rancher-go-builder is an intermediate stage with go mod ready and Rancher
 # dependencies downloaded. Can be used to build both the Rancher server and agent
 # binaries.
 FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder
-WORKDIR /app
+ARG BUILD_WORKDIR
+WORKDIR ${BUILD_WORKDIR}
 # Only invalidate cache if go.mod/go.sum changes.
 COPY go.mod go.sum .
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
@@ -337,7 +339,7 @@ ARG TARGETOS
 ARG TARGETARCH
 COPY pkg/ pkg/
 COPY main.go .
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/rancher
 
 
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
@@ -349,7 +351,7 @@ ARG TARGETOS
 ARG TARGETARCH
 COPY cmd/ cmd/
 COPY pkg/ pkg/
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/agent ./cmd/agent
 
 
 FROM base AS server
