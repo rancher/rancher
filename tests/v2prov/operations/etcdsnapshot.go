@@ -15,6 +15,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/sirupsen/logrus"
@@ -182,7 +183,9 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 			var snapshots []*rkev1.ETCDSnapshot
 			// Parse the snapshot time from the snapshot file name
 			for _, s := range snapshotsList.Items {
-				if s.SnapshotFile.NodeName == targetNode && s.SnapshotFile.Size > 0 {
+				// 1.32.4, 1.31.8, and 1.30.12 onwards set the nodename correctly, so use the annotation to determine the target node.
+				// todo: refactor this function to pass both nodename and storage once 1.33.0 is the lowest supported version
+				if (s.SnapshotFile.NodeName == targetNode || (targetNode == "s3" && s.Annotations[snapshotbackpopulate.StorageAnnotationKey] == string(snapshotbackpopulate.S3))) && s.SnapshotFile.Size > 0 {
 					// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
 					// Ensure that there are at least 2 snapshots for the given target node, as the first snapshot is not usable.
 					spec, err := capr.ParseSnapshotClusterSpecOrError(&s)
