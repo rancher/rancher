@@ -94,7 +94,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.13.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/creasty/defaults v1.5.2
-	github.com/crewjam/saml v0.0.0-00010101000000-000000000000
+	github.com/crewjam/saml v0.5.1
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/docker/go-connections v0.5.0
