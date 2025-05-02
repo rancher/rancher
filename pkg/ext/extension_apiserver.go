@@ -217,6 +217,8 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			// This is user facing and we want the names in the OpenAPI documents to be of the form "io.cattle.ext.v1.<Type>"
 			// and that's what this replacement map is doing.
 			"com.github.rancher.rancher.pkg.apis.ext.cattle.io.v1": "io.cattle.ext.v1",
+			// TODO(frameworks): verify this needs to be added for openAPI stuff
+			"com.github.rancher.rancher.pkg.apis.scc.cattle.io.v1": "io.cattle.scc.v1", // assume this is needed for my new CRDs too?
 		},
 		Authenticator: authenticator,
 		Authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
