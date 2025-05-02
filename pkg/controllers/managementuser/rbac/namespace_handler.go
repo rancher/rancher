@@ -189,6 +189,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
 	if len(projectID) == 0 {
+		logrus.Infof("namespace %s does not belong to a project - deleting rolebindings", ns.Name)
 		// if namespace does not belong to a project, delete all rolebindings from that namespace that were created for a PRTB
 		// such rolebindings will have the label "authz.cluster.cattle.io/rtb-owner" prior to 2.5 and
 		// "authz.cluster.cattle.io/rtb-owner-updated" 2.5 onwards
