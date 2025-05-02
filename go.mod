@@ -6,7 +6,7 @@ toolchain go1.23.7
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
-	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
+	github.com/crewjam/saml => github.com/rancher/saml v0.4.14
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.27+incompatible // rancher-machine requires a replace is set
 
