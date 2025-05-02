@@ -170,14 +170,11 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              registrationStatus:
-                properties:
-                  requestProcessedTS:
-                    format: date-time
-                    type: string
-                  sccSystemId:
-                    type: integer
-                type: object
+              registrationProcessedTS:
+                format: date-time
+                type: string
+              sccSystemId:
+                type: integer
               systemCredentialsSecretRef:
                 description: |-
                   SecretReference represents a Secret Reference. It has enough information to retrieve secret
