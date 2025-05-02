@@ -68,6 +68,7 @@ add_context() {
 }
 
 add_context "github.com/rancher/remotedialer" "remotedialer-context" "GODEP_REMOTEDIALER"
+add_context "github.com/rancher/shepherd" "shepherd-context" "GODEP_SHEPHERD"
 add_context "github.com/rancher/steve" "steve-context" "GODEP_STEVE"
 add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
 
