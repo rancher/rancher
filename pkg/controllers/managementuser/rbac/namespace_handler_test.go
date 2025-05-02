@@ -485,6 +485,7 @@ func (d *FakeResourceIndexer[T]) ByIndex(indexName, indexKey string) ([]interfac
 	if d.err != nil {
 		return nil, d.err
 	}
+
 	resources := d.resources[indexKey]
 	var interfaces []interface{}
 	for _, resource := range resources {
@@ -609,6 +610,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 		name                string
 		indexedRoles        []*rbacv1.ClusterRole
 		currentRoles        []*rbacv1.ClusterRole
+		indexedPRTBs        []*v3.ProjectRoleTemplateBinding
 		projectNSAnnotation string
 		indexerError        error
 		updateError         error
@@ -626,7 +628,18 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
 				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
 			},
-			wantError: `projects.management.cattle.io "p-123xyz" not found`,
+			indexedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespaceName,
+						Name:      "test-prtb",
+					},
+					UserName:         "test-user",
+					ProjectName:      "test-cluster:test-project",
+					RoleTemplateName: "test-rt",
+				},
+			},
+			wantHasPRTBs: true,
 		},
 	}
 	for _, test := range tests {
@@ -640,15 +653,25 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 				err:   test.indexerError,
 			}
 			prtbIndexer := &FakeResourceIndexer[*v3.ProjectRoleTemplateBinding]{
-				resources: map[string][]*v3.ProjectRoleTemplateBinding{},
-				err:       test.indexerError,
-				index:     prtbByProjectIndex,
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{
+					"c-123xyz:p-123xyz": test.indexedPRTBs,
+				},
+				err:   test.indexerError,
+				index: prtbByProjectIndex,
 			}
 
 			lifecycle := nsLifecycle{
 				m: &manager{
 					crIndexer:   crIndexer,
 					prtbIndexer: prtbIndexer,
+					rtLister: &v3fakes.RoleTemplateListerMock{
+						GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
+							return nil, apierrors.NewNotFound(schema.GroupResource{
+								Group:    "management.cattle.io",
+								Resource: "roletemplates",
+							}, name)
+						},
+					},
 				},
 				rq: &resourcequota.SyncController{
 					ProjectLister: &v3fakes.ProjectListerMock{
