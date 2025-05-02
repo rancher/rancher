@@ -167,16 +167,17 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 		return nil
 	}
 
+	existingCharts := make(map[string]bool)
 	// Loop over all the repositories and fetch the tags
 	repositoriesFunc := func(repositories []string) error {
-		existingCharts := make(map[string]bool)
 		for _, repository := range repositories {
 			logrus.Debugf("found repository %s for OCI clusterrepo URL %s", repository, URL)
 			// Storing the user provided repository that can be an oras repository or a sub repository.
 			userProvidedRepository := ociClient.repository
 
-			// Work on the oci repositories that match with the userProvidedRepository
-			if _, found := strings.CutPrefix(repository, ociClient.repository); found {
+			// Work on all repositories if the user has not provided any repository or
+			// work on the oci repositories that match with the userProvidedRepository
+			if after, found := strings.CutPrefix(repository, ociClient.repository); found && (ociClient.repository == "" || after[0] == '/') {
 				ociClient.repository = repository
 				orasRepository, err := ociClient.GetOrasRepository()
 				if err != nil {
