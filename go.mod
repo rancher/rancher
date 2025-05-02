@@ -156,7 +156,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.16
-	github.com/vishvananda/netlink v1.3.1-0.20240905180732-b1ce50cfa9be
+	github.com/vishvananda/netlink v1.3.1-0.20250425193846-9d88d8385bf9
 	github.com/vmware/govmomi v0.42.0
 	go.uber.org/mock v0.5.0
 	golang.org/x/crypto v0.36.0
@@ -405,7 +405,7 @@ require (
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/vishvananda/netns v0.0.4 // indirect
+	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
