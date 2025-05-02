@@ -158,7 +158,7 @@ require (
 	github.com/urfave/cli v1.22.16
 	github.com/vishvananda/netlink v1.3.1-0.20240905180732-b1ce50cfa9be
 	github.com/vmware/govmomi v0.42.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.36.0
 	golang.org/x/mod v0.23.0
 	golang.org/x/net v0.37.0
