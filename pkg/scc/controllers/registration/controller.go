@@ -46,7 +46,7 @@ func (h *Handler) Call(name string, registrationObj *v1.Registration) (*v1.Regis
 
 	// TODO: implement expiration - gist: Registration shouldn't repeat to infinity when issues.
 	// Ideally we would eventually timeout a Registration after it fails X times or for X minutes
-	if registrationObj.Status.RegistrationStatus.RequestProcessedTS != nil {
+	if registrationObj.Status.RegistrationProcessedTS != nil {
 		logrus.Info("[scc.registration-controller]: Registration already processed")
 		return registrationObj, nil
 	}
@@ -70,7 +70,7 @@ func (h *Handler) Call(name string, registrationObj *v1.Registration) (*v1.Regis
 		}
 	}
 
-	if registrationObj.Status.RegistrationStatus.RequestProcessedTS != nil {
+	if registrationObj.Status.RegistrationProcessedTS != nil {
 		h.registrations.Enqueue(registrationObj.Name)
 	}
 
