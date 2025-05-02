@@ -87,18 +87,16 @@ type RegistrationStatus struct {
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// +optional
-	RegistrationStatus SystemRegistrationState `json:"registrationStatus,omitempty"`
+	RegistrationProcessedTS *metav1.Time `json:"registrationProcessedTS,omitempty"`
+	// +optional
+	SCCSystemId int `json:"sccSystemId,omitempty"`
+
 	// +optional
 	ActivationStatus SystemActivationState `json:"activationStatus,omitempty"`
 	// +optional
 	SystemCredentialsSecretRef *corev1.SecretReference `json:"systemCredentialsSecretRef,omitempty"`
 	// +optional
 	OfflineRegistrationRequest *corev1.SecretReference `json:"offlineRegistrationRequest,omitempty"`
-}
-
-type SystemRegistrationState struct {
-	SCCSystemId        int          `json:"sccSystemId,omitempty"`
-	RequestProcessedTS *metav1.Time `json:"requestProcessedTS,omitempty"`
 }
 
 type SystemActivationState struct {
