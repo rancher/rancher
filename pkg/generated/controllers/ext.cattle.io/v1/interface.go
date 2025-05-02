@@ -50,5 +50,5 @@ func (v *version) Token() TokenController {
 }
 
 func (v *version) UserActivity() UserActivityController {
-	return generic.NewController[*v1.UserActivity, *v1.UserActivityList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "UserActivity"}, "useractivities", true, v.controllerFactory)
+	return generic.NewNonNamespacedController[*v1.UserActivity, *v1.UserActivityList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "UserActivity"}, "useractivities", v.controllerFactory)
 }
