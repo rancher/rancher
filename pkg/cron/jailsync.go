@@ -5,11 +5,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/robfig/cron"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -44,6 +46,9 @@ func StartJailSyncCron(scaledContext *config.ScaledContext) error {
 
 // syncJails removes any unneeded jails from old clusters.
 func (j *jailSync) syncJails() {
+	startTime := time.Now()
+	defer zed.Log(startTime, "jailSync.syncJails()")
+
 	// Get the clusters from the api to ensure we are up to date
 	clusters, err := j.clusters.List(metav1.ListOptions{})
 	if err != nil {

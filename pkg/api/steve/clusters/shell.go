@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/settings"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
@@ -57,6 +58,9 @@ func (s *shell) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (s *shell) proxyRequest(rw http.ResponseWriter, req *http.Request, pod *v1.Pod, client kubernetes.Interface) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve clusters shell.proxyRequest()")
+
 	attachURL := client.CoreV1().RESTClient().
 		Get().
 		Namespace(pod.Namespace).
@@ -110,6 +114,9 @@ func (s *shell) contextAndClient(req *http.Request) (context.Context, user.Info,
 }
 
 func (s *shell) createPod(imageOverride string) *v1.Pod {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve clusters shell.createPod()")
+
 	imageName := imageOverride
 	if imageName == "" {
 		imageName = settings.FullShellImage()

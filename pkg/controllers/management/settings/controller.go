@@ -2,11 +2,13 @@ package settings
 
 import (
 	"context"
+	"time"
 
 	apis "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -34,6 +36,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func (h *handler) onChange(key string, obj *apis.Setting) (runtime.Object, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "handler.onChange()")
+
 	if obj == nil || !toCopy[obj.Name] {
 		return nil, nil
 	}
