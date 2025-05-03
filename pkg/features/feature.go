@@ -179,6 +179,12 @@ var (
 		false,
 		false,
 		true)
+	RancherSCCRegistrationExtension = newFeature(
+		"rancher-scc-registration-extension",
+		"Enable Rancher's SCC registration extension to register the system(s) for customer support",
+		true,
+		false,
+		true)
 )
 
 type Feature struct {
