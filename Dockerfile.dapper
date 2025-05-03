@@ -37,7 +37,7 @@ ENV YQ_VERSION v4.44.2
 RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH}.tar.gz -O - | tar xz && mv yq_linux_${ARCH} /usr/bin/yq
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.32.0-k3s1 \
+COPY --from=rancher/k3s:v1.32.4-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
