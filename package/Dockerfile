@@ -9,6 +9,9 @@ ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
 ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
 ARG TARGETOS
 ARG TARGETARCH
+ARG BASE_UI_BRAND
+ARG RANCHER_PRIME="false"
+ARG BASE_REGISTRY="docker.io"
 
 WORKDIR /app
 COPY . .
@@ -294,6 +297,9 @@ COPY --from=build /app/data.json /var/lib/rancher-data/driver-metadata/
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 ENV ETCDCTL_API=3
+ENV CATTLE_BASE_REGISTRY=$BASE_REGISTRY
+ENV RANCHER_PRIME=$RANCHER_PRIME
+ENV CATTLE_BASE_UI_BRAND=$BASE_UI_BRAND
 
 ENV SSL_CERT_DIR /etc/rancher/ssl
 VOLUME /var/lib/rancher
