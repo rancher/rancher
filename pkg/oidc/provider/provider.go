@@ -2,17 +2,21 @@ package provider
 
 import (
 	"context"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
 	"github.com/rancher/rancher/pkg/oidc/randomstring"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -76,11 +80,41 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 	}, nil
 }
 
+func (p *Provider) addHeadersMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		oidcClients, err := p.authHandler.oidcClientCache.List(labels.Everything())
+		if err != nil {
+			oidcerror.WriteError(oidcerror.ServerError, "failed to list OIDCCLients", http.StatusInternalServerError, w)
+			return
+		}
+
+		for _, oidcClient := range oidcClients {
+			for _, redirectURI := range oidcClient.Spec.RedirectURIs {
+				url, err := url.Parse(redirectURI)
+				if err != nil {
+					continue
+				}
+				if r.URL.Host == url.Host {
+					w.Header().Set("Access-Control-Allow-Origin", redirectURI)
+					break
+				}
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
 // RegisterOIDCProviderHandles register all Handlers for the OIDC provider.
 func (p *Provider) RegisterOIDCProviderHandles(mux *mux.Router) {
-	mux.HandleFunc("/oidc/.well-known/openid-configuration", openIDConfigurationEndpoint)
-	mux.HandleFunc("/oidc/.well-known/jwks.json", p.jwksHandler.jwksEndpoint)
-	mux.HandleFunc("/oidc/authorize", p.authHandler.authEndpoint)
-	mux.HandleFunc("/oidc/token", p.tokenHandler.tokenEndpoint)
-	mux.HandleFunc("/oidc/userinfo", p.userInfoHandler.userInfoEndpoint)
+	mux.HandleFunc("/oidc/.well-known/openid-configuration", p.addHeadersMiddleware(openIDConfigurationEndpoint))
+	mux.HandleFunc("/oidc/.well-known/jwks.json", p.addHeadersMiddleware(p.jwksHandler.jwksEndpoint))
+	mux.HandleFunc("/oidc/authorize", p.addHeadersMiddleware(p.authHandler.authEndpoint))
+	mux.HandleFunc("/oidc/token", p.addHeadersMiddleware(p.tokenHandler.tokenEndpoint))
+	mux.HandleFunc("/oidc/userinfo", p.addHeadersMiddleware(p.userInfoHandler.userInfoEndpoint))
 }

@@ -114,19 +114,32 @@ func TestAuthEndpoint(t *testing.T) {
 					Method: http.MethodGet,
 				}
 			},
-			mockSetup: func(m mockParams) {
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: fakeClientName,
-						},
-						Spec: v3.OIDCClientSpec{
-							RedirectURIs: []string{fakeRedirectUri},
-						},
-						Status: v3.OIDCClientStatus{
-							ClientID: fakeClientID,
-						},
+			wantHttpCode: http.StatusFound,
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+		},
+		"redirect to login page if Rancher token does not match": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&code_challenge=code-challenge&response_type=code&redirect_uri=https://www.rancher.com&scope=openid&client_id=client-id",
 					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  "invalid",
+					UserID: fakeUserID,
 				}, nil)
 			},
 			wantHttpCode: http.StatusFound,
@@ -148,6 +161,33 @@ func TestAuthEndpoint(t *testing.T) {
 
 				return req
 			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
+			},
 			wantHttpCode: http.StatusFound,
 			wantRedirect: fakeRedirectUri + "?error=unsupported_response_type&error_description=response+type+not+supported",
 		},
@@ -166,6 +206,33 @@ func TestAuthEndpoint(t *testing.T) {
 				}
 
 				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
 			},
 			wantHttpCode: http.StatusFound,
 			wantRedirect: fakeRedirectUri + "?error=invalid_request&error_description=challenge_method+not+supported%2C+only+S256+is+supported",
@@ -186,6 +253,33 @@ func TestAuthEndpoint(t *testing.T) {
 
 				return req
 			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
+			},
 			wantHttpCode: http.StatusFound,
 			wantRedirect: fakeRedirectUri + "?error=invalid_scope&error_description=missing+openid+scope",
 		},
@@ -204,6 +298,33 @@ func TestAuthEndpoint(t *testing.T) {
 				}
 
 				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
 			},
 			wantHttpCode: http.StatusFound,
 			wantRedirect: fakeRedirectUri + "?error=invalid_scope&error_description=invalid+scope%3A+invalidscope",
@@ -224,6 +345,33 @@ func TestAuthEndpoint(t *testing.T) {
 
 				return req
 			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
+			},
 			wantHttpCode: http.StatusFound,
 			wantRedirect: fakeRedirectUri + "?error=invalid_request&error_description=missing+code_challenge",
 		},
@@ -243,11 +391,37 @@ func TestAuthEndpoint(t *testing.T) {
 
 				return req
 			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+			},
 			wantHttpCode: http.StatusBadRequest,
 			wantError:    `{"error":"invalid_request","error_description":"missing redirect_uri"}`,
 		},
 		"oidc client not registered": {
 			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
 				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return(nil, errors.NewNotFound(schema.GroupResource{}, fakeClientID))
 			},
 			req: func() *http.Request {
@@ -265,11 +439,23 @@ func TestAuthEndpoint(t *testing.T) {
 
 				return req
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=server_error&error_description=error+retrieving+OIDC+client%3A++%22client-id%22+not+found",
+			wantHttpCode: http.StatusBadRequest,
+			wantError:    `{"error":"invalid_request","error_description":"error retrieving OIDC client:  \"client-id\" not found"}`,
 		},
-		"redirect uri not registed": {
+		"redirect uri not registered": {
 			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
 				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -299,8 +485,8 @@ func TestAuthEndpoint(t *testing.T) {
 
 				return req
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=invalid_request&error_description=redirect_uri+https%3A%2F%2Fwww.rancher.com+is+not+registered",
+			wantHttpCode: http.StatusBadRequest,
+			wantError:    `{"error":"invalid_request","error_description":"redirect_uri is not registered"}`,
 		},
 	}
 

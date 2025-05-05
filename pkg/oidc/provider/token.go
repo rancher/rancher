@@ -274,8 +274,8 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 // createTokenResponse creates an id_token, access_token and refresh_token for a valid Rancher token
 func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v3.OIDCClient, nonce string, scopes []string) (TokenResponse, *oidcerror.Error) {
 	// verify Rancher token and user are valid
-	if rancherToken.Expired {
-		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token is expired")
+	if tokens.IsExpired(*rancherToken) {
+		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token has expired")
 	}
 	if rancherToken.Enabled != nil && !*rancherToken.Enabled {
 		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token is disabled")
