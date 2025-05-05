@@ -1,7 +1,0 @@
-# dot env
-.env
-# json
-*.json
-#yaml
-*.yaml
-!manifest.yaml
