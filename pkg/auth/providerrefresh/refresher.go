@@ -7,9 +7,8 @@ import (
 	"sync"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/settings"
@@ -21,7 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type UserAuthRefresher interface {
@@ -51,7 +50,6 @@ type refresher struct {
 	userLister          v3.UserLister
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
-	intervalInSeconds   int64
 	unparsedMaxAge      string
 	maxAge              time.Duration
 	extTokenStore       *exttokenstore.SystemStore
@@ -150,12 +148,9 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	}
 }
 
-func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
+func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAttribute, error) {
 	var (
 		derivedTokenList      []accessor.TokenAccessor
-		derivedTokens         map[string][]accessor.TokenAccessor
-		loginTokenList        []accessor.TokenAccessor
-		loginTokens           map[string][]accessor.TokenAccessor
 		canLogInAtAll         bool
 		errorConfirmingLogins bool
 	)
@@ -164,71 +159,56 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 	user, err := r.userLister.Get("", attribs.Name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting user %s: %w", attribs.Name, err)
 	}
 
-	loginTokens = make(map[string][]accessor.TokenAccessor)
-	derivedTokens = make(map[string][]accessor.TokenAccessor)
+	loginTokens := make(map[string][]accessor.TokenAccessor)
+	derivedTokens := make(map[string][]accessor.TokenAccessor)
 
-	// List all tokens, v3 and ext.
-	// For ext tokens we actually filter for the user here.
-
-	allV3Tokens, err := r.tokenLister.List("", labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-
-	allExtTokens, err := r.extTokenStore.ListForUser(user.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	// Merge the separate lists into a unified set
-	allTokens := make([]accessor.TokenAccessor, 0, len(allV3Tokens)+len(allExtTokens.Items))
-	for _, token := range allV3Tokens {
-		allTokens = append(allTokens, token)
-	}
-	for _, eToken := range allExtTokens.Items {
-		allTokens = append(allTokens, &eToken)
-	}
-
-	// split into derived versus login tokens, filter for the user
-	for providerName := range providers.ProviderNames {
-		loginTokens[providerName] = []accessor.TokenAccessor{}
-		derivedTokens[providerName] = []accessor.TokenAccessor{}
-	}
-
-	for _, token := range allTokens {
-		// Needed for the v3 tokens. Ext has already filtered for this.
-		if token.GetUserID() != user.Name {
-			continue
-		}
-
-		ap := token.GetAuthProvider()
+	assign := func(token accessor.TokenAccessor) {
+		provider := token.GetAuthProvider()
 		if token.GetIsDerived() {
-			derivedTokens[ap] = append(derivedTokens[ap], token)
+			derivedTokens[provider] = append(derivedTokens[provider], token)
 			derivedTokenList = append(derivedTokenList, token)
 		} else {
-			loginTokens[ap] = append(loginTokens[ap], token)
-			loginTokenList = append(loginTokenList, token)
+			loginTokens[provider] = append(loginTokens[provider], token)
 		}
 	}
 
-	// per provider ...
+	// List v3.Tokens.
+	tokenUserIDLabelSet := labels.Set(map[string]string{tokens.UserIDLabel: user.Name})
+	v3Tokens, err := r.tokenLister.List("", tokenUserIDLabelSet.AsSelector())
+	if err != nil {
+		return nil, fmt.Errorf("error listing tokens for user %s: %w", user.Name, err)
+	}
+
+	for _, token := range v3Tokens {
+		assign(token)
+	}
+
+	// List ext.Tokens.
+	extTokens, err := r.extTokenStore.ListForUser(user.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error listing ext tokens for user %s: %w", user.Name, err)
+	}
+
+	for _, token := range extTokens.Items {
+		assign(&token)
+	}
 
 	for providerName := range providers.ProviderNames {
-		// We have to find out if the user has a userprincipal for the provider.
+		// We have to find out if the user has a principal for the provider.
 		principalID := GetPrincipalIDForProvider(providerName, user)
-		var newGroupPrincipals []v3.Principal
+		var newGroupPrincipals []apiv3.Principal
 
 		providerDisabled, err := providers.IsDisabledProvider(providerName)
 		if err != nil {
 			logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
-			// this is set as false by the return, but it's re-set here to be explicit/safe about the behavior
+			// This is set as false by the return, but it's re-set here to be explicit/safe about the behavior.
 			providerDisabled = false
 		}
 		if providerDisabled {
-			// if this auth provider has been disabled, act as though the user lost access to this provider
+			// If this auth provider has been disabled, act as though the user lost access to this provider.
 			principalID = ""
 		}
 
@@ -242,7 +222,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			if hasPerUserSecrets {
 				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
 				if apierrors.IsNotFound(err) {
-					// There is no secret so we can't refresh, just continue to the next attribute
+					// There is no secret so we can't refresh, just continue to the next attribute.
 					return attribs, nil
 				}
 				if err != nil {
@@ -260,10 +240,16 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 				newGroupPrincipals, err = providers.RefetchGroupPrincipals(principalID, providerName, secret)
 				if err != nil {
 					// In the case that we cant access a server, we still want to continue refreshing, but
-					// we no longer want to disable derived tokens, or remove their login tokens for this provider
+					// we no longer want to disable derived tokens, or remove their login tokens for this provider.
 					if err.Error() != "no access" {
 						errorConfirmingLogins = true
-						logrus.Warnf("Error refreshing token principals, skipping: %v", err)
+						logrus.Warnf(
+							"Error refreshing token principals for auth provider %s, userattribute %s, principal %s, skipping: %v",
+							providerName,
+							attribs.Name,
+							principalID,
+							err,
+						)
 						existingPrincipals := attribs.GroupPrincipals[providerName].Items
 						if existingPrincipals != nil {
 							newGroupPrincipals = existingPrincipals
@@ -282,12 +268,12 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			newGroupPrincipals = nil
 		}
 
-		attribs.GroupPrincipals[providerName] = v32.Principals{Items: newGroupPrincipals}
+		attribs.GroupPrincipals[providerName] = apiv3.Principals{Items: newGroupPrincipals}
 
 		canAccessProvider := false
 
 		if principalID != "" && !errorConfirmingLogins {
-			// We want to verify that the user still has rancher access
+			// We want to verify that the user still has rancher access.
 			canStillAccess, err := providers.CanAccessWithGroupProviders(providerName, principalID, newGroupPrincipals)
 			if err != nil {
 				return nil, err
@@ -326,10 +312,9 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		// login tokens for this provider
 		if !canAccessProvider && !errorConfirmingLogins {
 			for _, token := range loginTokens[providerName] {
-				// Deletion is type-dependent
 				var err error
 				switch token.(type) {
-				case *v3.Token:
+				case *apiv3.Token:
 					err = r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
 				case *ext.Token:
 					err = r.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
@@ -346,19 +331,18 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		}
 	}
 
-	// if they can still log in, or we failed to validate one of their logins, don't disable derived tokens
+	// If they can still log in, or we failed to validate one of their logins, don't disable derived tokens
 	if canLogInAtAll || errorConfirmingLogins {
 		return attribs, nil
 	}
 
-	// user has been deactivated, disable their tokens
+	// User has been deactivated, disable their tokens.
 	for _, token := range derivedTokenList {
-		// Update is type-dependent
 		var err error
 		switch t := token.(type) {
-		case *v3.Token:
+		case *apiv3.Token:
 			v3Token := t.DeepCopy()
-			v3Token.Enabled = pointer.Bool(false)
+			v3Token.Enabled = ptr.To(false)
 			_, err = r.tokenMGR.UpdateToken(v3Token)
 		case *ext.Token:
 			err = r.extTokenStore.Disable(t.GetName())
@@ -366,7 +350,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			err = fmt.Errorf("unable to update token of unknown type %T", token)
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error disabling token %s: %w", token.GetName(), err)
 		}
 	}
 	return attribs, err
