@@ -706,7 +706,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: "update"})
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Modified})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -720,7 +720,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		event, more := (<-consumer.ResultChan()) // receive update event
 		assert.True(t, more)
-		assert.Equal(t, watch.EventType("update"), event.Type)
+		assert.Equal(t, watch.Modified, event.Type)
 		assert.Equal(t, &properToken, event.Object)
 
 		watcher.Done() // close backend channel
@@ -744,7 +744,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: "update"})
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Modified})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -758,7 +758,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		event, more := (<-consumer.ResultChan()) // receive update event
 		assert.True(t, more)
-		assert.Equal(t, watch.EventType("update"), event.Type)
+		assert.Equal(t, watch.Modified, event.Type)
 		assert.Equal(t, &properTokenCurrent, event.Object)
 
 		watcher.Done() // close backend channel
@@ -782,7 +782,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: "ERROR"})
+		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Error})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -815,7 +815,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: "BOOKMARK"})
+		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Bookmark})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -848,7 +848,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: "BOOKMARK"})
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -862,7 +862,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		event, more := (<-consumer.ResultChan()) // receive update event
 		assert.True(t, more)
-		assert.Equal(t, watch.EventType("BOOKMARK"), event.Type)
+		assert.Equal(t, watch.Bookmark, event.Type)
 		assert.Equal(t, &ext.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "",

@@ -880,7 +880,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 						logrus.Warnf("tokens: watch: received error event: %s", event.Object.GetObjectKind().GroupVersionKind().String())
 					}
 					continue
-				default: // watch.Added, watch.Modified, watch.Deleted
+				case watch.Added, watch.Modified, watch.Deleted:
 					secret, ok := event.Object.(*corev1.Secret)
 					if !ok {
 						logrus.Warnf("tokens: watch: expected secret got %T", event.Object)
@@ -898,6 +898,9 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					// ListOptionMerge above) takes care of only
 					// asking for owned tokens
 					token.Status.Current = token.Name == sessionID
+				default:
+					logrus.Warnf("tokens: watch: received and ignored unknown event: '%s'", event.Type)
+					continue
 				}
 
 				// push to consumer, and terminate ourselves if
