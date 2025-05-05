@@ -133,7 +133,7 @@ node {
           dir ("./") {
             stage('Configure and Build') {
               if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-                dir("./rancher/tests/v2/validation/.ssh") {
+                dir("./rancher/tests/v2/codecoverage/.ssh") {
                   def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
                   writeFile file: AWS_SSH_KEY_NAME, text: decoded
                 }
@@ -145,7 +145,7 @@ node {
                 writeFile file: filename, text: configContents
                 env.CATTLE_TEST_CONFIG = workPath+filename
               }
-              sh "rancher/tests/v2/validation/configure.sh"
+              sh "rancher/tests/v2/codecoverage/configure.sh"
               sh "docker build . -f rancher/tests/v2/codecoverage/Dockerfile.codecoverage -t ${goImageName}"
               sh "docker volume create --name ${code_cover_volume}"
             }
@@ -208,7 +208,7 @@ node {
               }
               
               sh "rm ${envFile}"
-              sh "rancher/tests/v2/validation/configure.sh"
+              sh "rancher/tests/v2/codecoverage/configure.sh"
             }
 
             stage ('Run Go Integration Tests') {

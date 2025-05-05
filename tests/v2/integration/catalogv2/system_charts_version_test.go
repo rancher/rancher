@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/v2/actions/kubeapi/workloads/deployments"
+	"github.com/rancher/tests/actions/kubeapi/workloads/deployments"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
