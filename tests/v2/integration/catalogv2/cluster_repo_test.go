@@ -530,6 +530,32 @@ func (c *ClusterRepoTestSuite) TestOCIRepo5() {
 	})
 }
 
+// TestOCIRepoMultipleChartRepos tests CREATE, UPDATE, and DELETE operations of OCI ClusterRepo with many chart repos
+func (c *ClusterRepoTestSuite) TestOCIRepoMultipleChartRepos() {
+	//start registry
+	ts, err := StartRegistry(c)
+	assert.NoError(c.T(), err)
+
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	require.NoError(c.T(), err)
+
+	//push testingchart helm chart
+	for i := 0; i < 300; i++ {
+		err = AddHelmChart(u, fmt.Sprintf("testingchart-%d", i), "../../../testdata/testingchart-0.1.0.tgz", "0.1.0")
+		require.NoError(c.T(), err)
+	}
+
+	c.testClusterRepo(ClusterRepoParams{
+		Name:              OCIClusterRepoName,
+		URL1:              fmt.Sprintf("oci://%s/rancher/testingchart-0", u.Host),
+		URL2:              fmt.Sprintf("oci://%s/rancher/testingchart-0:0.1.0", u.Host),
+		Type:              OCI,
+		InsecurePlainHTTP: true,
+	})
+}
+
 func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	var err error
 
