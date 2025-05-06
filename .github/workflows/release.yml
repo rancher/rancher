@@ -16,36 +16,6 @@ env:
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
-  build-publish-chart:
-    needs: [push-images]
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
-    permissions:
-      contents: read
-      id-token: write
-    concurrency:
-      group: 'build-chart-tag'
-      # instead of cancelling other runs, wait until they are finished
-      cancel-in-progress: false
-    env:
-      ARCH: amd64
-    steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: setup and build
-        uses: ./.github/actions/rancher-chart/build.yml
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
-      - name: publish
-        uses: ./.github/actions/rancher-chart/publish-gcp.yml
   build-server:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -134,6 +104,36 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: push
         uses: ./.github/actions/push-images
+  build-publish-chart:
+    needs: [push-images]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: 'build-chart-tag'
+      # instead of cancelling other runs, wait until they are finished
+      cancel-in-progress: false
+    env:
+      ARCH: amd64
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/rancher-chart/build.yml
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
+      - name: publish
+        uses: ./.github/actions/rancher-chart/publish-gcp.yml
   merge-server-manifest:
     needs: [push-images]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
