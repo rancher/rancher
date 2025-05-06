@@ -25,15 +25,15 @@ import (
 
 // KubeconfigController interface for managing Kubeconfig resources.
 type KubeconfigController interface {
-	generic.ControllerInterface[*v1.Kubeconfig, *v1.KubeconfigList]
+	generic.NonNamespacedControllerInterface[*v1.Kubeconfig, *v1.KubeconfigList]
 }
 
 // KubeconfigClient interface for managing Kubeconfig resources in Kubernetes.
 type KubeconfigClient interface {
-	generic.ClientInterface[*v1.Kubeconfig, *v1.KubeconfigList]
+	generic.NonNamespacedClientInterface[*v1.Kubeconfig, *v1.KubeconfigList]
 }
 
 // KubeconfigCache interface for retrieving Kubeconfig resources in memory.
 type KubeconfigCache interface {
-	generic.CacheInterface[*v1.Kubeconfig]
+	generic.NonNamespacedCacheInterface[*v1.Kubeconfig]
 }
