@@ -21,11 +21,13 @@ runs:
         password: ${{ env.DOCKER_PASSWORD }}
         registry: ${{ env.REGISTRY }}
     - name: Create manifest list and push
+      shell: bash
       run: |
         docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-arm64
         if [[ "${{ github.ref_name }}" == release/v* ]]; then
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.HEAD_TAG }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-arm64
         fi
     - name: Inspect image
+      shell: bash
       run: |
         docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}

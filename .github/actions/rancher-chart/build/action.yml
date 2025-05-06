@@ -20,18 +20,23 @@ runs:
       env:
         HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
         HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
+      shell: bash
       run: |
         curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
         mv /tmp/helm /usr/bin/helm_v3 && \
         chmod +x /usr/bin/helm_v3
         helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
     - name: Build
+      shell: bash
       run: ./scripts/chart/build chart
     - name: Validate
+      shell: bash
       run: ./scripts/chart/validate
     - name: Test
+      shell: bash
       run: ./scripts/chart/test
     - name: Package
+      shell: bash
       run: ./scripts/chart/package
     - name: Upload chart
       uses: actions/upload-artifact@v4

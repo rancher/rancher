@@ -24,6 +24,7 @@ runs:
         password: ${{ env.DOCKER_PASSWORD }}
         registry: ${{ env.REGISTRY }}
     - name: Push server image
+      shell: bash
       run: |
         image_id=$(docker load --input /tmp/rancher-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
         if [ -z "$image_id" ]; then
@@ -33,6 +34,7 @@ runs:
         docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
         docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
     - name: Push agent image
+      shell: bash
       run: |
         image_agent_id=$(docker load --input /tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
         if [ -z "$image_agent_id" ]; then

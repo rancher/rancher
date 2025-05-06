@@ -14,13 +14,16 @@ runs:
         password: ${{ env.DOCKER_PASSWORD }}
         registry: ${{ env.REGISTRY }}
     - name: Create manifest list and push
+      shell: bash
       run: |
         docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-arm64
     - name: Create head manifest list and push
+      shell: bash
       run: |
         if [[ "${{ github.ref_name }}" == release/v* ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.HEAD_TAG }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-amd64 ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-arm64
         fi
     - name: Inspect image
+      shell: bash
       run: |
         docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}

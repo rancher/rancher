@@ -14,6 +14,7 @@ runs:
         password: ${{ env.DOCKER_PASSWORD }}
         registry: ${{ env.REGISTRY }}
     - name: Create manifest list and push
+      shell: bash
       run: |
         # docker manifest is used with windows images to maintain os.version in the manifest
         docker manifest create ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }} \

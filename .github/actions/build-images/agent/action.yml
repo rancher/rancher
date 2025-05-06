@@ -38,6 +38,7 @@ runs:
         name: "rancher-${{ env.OS }}-${{ env.ARCH }}"
         path: /tmp
     - name: Load image
+      shell: bash
       run: |
         image_id=$(docker load --input /tmp/rancher-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
         if [ -z "$image_id" ]; then
