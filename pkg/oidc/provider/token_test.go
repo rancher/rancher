@@ -151,7 +151,7 @@ func TestTokenEndpoint(t *testing.T) {
 	}{{
 		Op:    "add",
 		Path:  "/metadata/annotations/cattle.io.oidc-client-secret-used-" + fakeClientSecretID,
-		Value: metav1.NewTime(fakeTime()),
+		Value: fmt.Sprintf("%d", fakeTime().Unix()),
 	}})
 	tokenPatch, _ := json.Marshal([]struct {
 		Op    string `json:"op"`
