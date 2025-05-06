@@ -5,41 +5,231 @@ on:
       - "v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
-  REGISTRY: "stgregistry.suse.com"
   DOCKERIO_REGISTRY: "docker.io"
   AWS_DEFAULT_REGION: "us-east-1"
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+  REGISTRY: "stgregistry.suse.com"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
   build-publish-chart:
     needs: [push-images]
-    uses: ./.github/workflows/build-publish-chart.yml
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: 'build-chart-tag'
+      # instead of cancelling other runs, wait until they are finished
+      cancel-in-progress: false
+    env:
+      ARCH: amd64
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/rancher-chart/build.yml
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | AWS_ACCESS_KEY_ID_CHARTS ;
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | AWS_SECRET_ACCESS_KEY_CHARTS ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
+      - name: publish
+        uses: ./.github/actions/rancher-chart/publish-aws.yml
   build-server:
-    uses: ./.github/workflows/build-server.yml
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/build-images/server.yml
   build-agent:
     needs: [build-server]
-    uses: ./.github/workflows/build-agent.yml
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/build-images/agent.yml
   integration-tests:
     needs: [build-agent]
-    uses: ./.github/workflows/integration-tests.yml
     with:
       parent_run_id: ${{ github.run_id }}
+    uses: ./.github/workflows/integration-tests.yml
   build-agent-windows:
-    uses: ./.github/workflows/build-agent-windows.yml
+    strategy:
+      matrix:
+        os: [windows]
+        version: [2019, 2022]
+    runs-on: ${{ matrix.os }}-${{ matrix.version }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+      - name: build
+        uses: ./.github/actions/build-images/agent-windows.yml
   push-images:
     needs: [unit-tests, integration-tests]
-    uses: ./.github/workflows/push-images.yml
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=2cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+      - name: push
+        uses: ./.github/actions/push-images
   merge-server-manifest:
     needs: [push-images]
-    uses: ./.github/workflows/merge-server-manifest.yml
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+      - name: merge
+        uses: ./.github/actions/merge-manifests/server.yml
   merge-agent-manifest:
     needs: [push-images, build-agent-windows]
-    uses: ./.github/workflows/merge-agent-manifest.yml
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+      - name: merge
+        uses: ./.github/actions/merge-manifests/agent.yml
   build-installer:
-    needs: [build-publish-chart, merge-server-manifest]
-    uses: ./.github/workflows/build-installer.yml
+    needs: [merge-server-manifest]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+      - name: build
+        uses: ./.github/actions/build-images/installer.yml
   merge-installer-manifest:
     needs: [build-installer]
-    uses: ./.github/workflows/merge-installer-manifest.yml
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+      - name: merge
+        uses: ./.github/actions/merge-manifests/installer.yml
   create-images-files:
-    uses: ./.github/workflows/create-images-files.yml
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      REGISTRY: ""
+      CHECKSUM_FILE: "sha256sum.txt"
+      ARTIFACTS_BASE_DIR: "bin"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: generate
+        uses: ./.github/actions/images-files/generate.yml
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | AWS_ACCESS_KEY_ID ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | AWS_SECRET_ACCESS_KEY ;
+      - name: publish to aws
+        uses: ./.github/actions/images-files/publish-aws.yml

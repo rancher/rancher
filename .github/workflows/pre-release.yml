@@ -11,6 +11,7 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+  REGISTRY: "docker.io"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -43,7 +44,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: publish
-        uses: ./.github/actions/build-publish-chart/publish-gcp.yml
+        uses: ./.github/actions/rancher-chart/publish-gcp.yml
   build-server:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -70,13 +71,7 @@ jobs:
         os: [linux]
         arch: [x64, arm64]
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     env:
-      REGISTRY: "127.0.0.1:5000"
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.os }}
     steps:
@@ -95,7 +90,6 @@ jobs:
       parent_run_id: ${{ github.run_id }}
     uses: ./.github/workflows/integration-tests.yml
   build-agent-windows:
-    needs: [integration-tests]
     strategy:
       matrix:
         os: [windows]
@@ -111,9 +105,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
         uses: ./.github/actions/build-images/agent-windows.yml
   push-images:
@@ -136,9 +129,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: push
         uses: ./.github/actions/push-images
   merge-server-manifest:
@@ -154,9 +146,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
         uses: ./.github/actions/merge-manifests/server.yml
   merge-agent-manifest:
@@ -172,9 +163,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
         uses: ./.github/actions/merge-manifests/agent.yml
   build-installer:
@@ -197,9 +187,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
         uses: ./.github/actions/build-images/installer.yml
   merge-installer-manifest:
@@ -215,9 +204,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
         uses: ./.github/actions/merge-manifests/installer.yml
   create-images-files:
