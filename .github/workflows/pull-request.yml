@@ -32,7 +32,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: setup and build
-        uses: ./.github/actions/rancher-chart/build.yml
+        uses: ./.github/actions/rancher-chart/build
   build-server:
     strategy:
       matrix:
@@ -42,15 +42,10 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: setup and build
-        uses: ./.github/actions/build-images/server.yml
+        uses: ./.github/actions/build-images/server
   build-agent:
     strategy:
       matrix:
@@ -68,7 +63,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: setup and build
-        uses: ./.github/actions/build-images/agent.yml
+        uses: ./.github/actions/build-images/agent
   integration-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml

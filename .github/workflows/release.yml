@@ -26,15 +26,10 @@ jobs:
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.os }}
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: setup and build
-        uses: ./.github/actions/build-images/server.yml
+        uses: ./.github/actions/build-images/server
   build-agent:
     needs: [build-server]
     strategy:
@@ -46,15 +41,10 @@ jobs:
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.os }}
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: setup and build
-        uses: ./.github/actions/build-images/agent.yml
+        uses: ./.github/actions/build-images/agent
   integration-tests:
     needs: [build-agent]
     with:
@@ -79,7 +69,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
-        uses: ./.github/actions/build-images/agent-windows.yml
+        uses: ./.github/actions/build-images/agent-windows
   push-images:
     needs: [unit-tests, integration-tests]
     strategy:
@@ -126,14 +116,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: setup and build
-        uses: ./.github/actions/rancher-chart/build.yml
+        uses: ./.github/actions/rancher-chart/build
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: publish
-        uses: ./.github/actions/rancher-chart/publish-gcp.yml
+        uses: ./.github/actions/rancher-chart/publish-gcp
   merge-server-manifest:
     needs: [push-images]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -150,7 +140,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
-        uses: ./.github/actions/merge-manifests/server.yml
+        uses: ./.github/actions/merge-manifests/server
   merge-agent-manifest:
     needs: [push-images, build-agent-windows]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -167,7 +157,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
-        uses: ./.github/actions/merge-manifests/agent.yml
+        uses: ./.github/actions/merge-manifests/agent
   build-installer:
     needs: [merge-server-manifest]
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
@@ -191,7 +181,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
-        uses: ./.github/actions/build-images/installer.yml
+        uses: ./.github/actions/build-images/installer
   merge-installer-manifest:
     needs: [build-installer]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -208,7 +198,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
-        uses: ./.github/actions/merge-manifests/installer.yml
+        uses: ./.github/actions/merge-manifests/installer
   create-images-files:
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
@@ -222,7 +212,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: generate
-        uses: ./.github/actions/images-files/generate.yml
+        uses: ./.github/actions/images-files/generate
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -231,4 +221,4 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY;
             secret/data/github/repo/${{ github.repository }}/aws/credentials artifactBucketName | ARTIFACT_BUCKET_NAME;
       - name: publish to aws
-        uses: ./.github/actions/images-files/publish-gh.yml
+        uses: ./.github/actions/images-files/publish-gh
