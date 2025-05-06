@@ -32,21 +32,6 @@ runs:
       uses: docker/setup-buildx-action@v3
       with:
         driver-opts: network=host
-    - name: Download rancher image
-      uses: actions/download-artifact@v4
-      with:
-        name: "rancher-${{ env.OS }}-${{ env.ARCH }}"
-        path: /tmp
-    - name: Load image
-      shell: bash
-      run: |
-        image_id=$(docker load --input /tmp/rancher-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
-        if [ -z "$image_id" ]; then
-          echo "Error: Failed to load image from tarball!"
-          exit 1
-        fi
-        docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
-        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
     - name: Build agent
       id: build
       uses: docker/build-push-action@v5
