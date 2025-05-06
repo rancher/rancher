@@ -6,12 +6,12 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	authfakes "github.com/rancher/rancher/pkg/controllers/management/auth/fakes"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	apisv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	normanv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -99,7 +99,7 @@ type grbTestState struct {
 	grbListerMock     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
 	grbClientMock     *fake.MockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
 	fwhMock           *fleetPermissionsHandlerMock
-	userManagerMock   *authfakes.MockManager
+	userManagerMock   *userMocks.MockManager
 	userListerMock    *fakes.UserListerMock
 	stateChanges      *grbTestStateChanges
 }
@@ -1318,7 +1318,7 @@ func TestCreateUpdate(t *testing.T) {
 					fwhMock:           &fphMock,
 					grbListerMock:     grbListerMock,
 					grbClientMock:     grbClientMock,
-					userManagerMock:   authfakes.NewMockManager(ctrl),
+					userManagerMock:   userMocks.NewMockManager(ctrl),
 					userListerMock:    &fakes.UserListerMock{},
 					stateChanges:      &stateChanges,
 				}

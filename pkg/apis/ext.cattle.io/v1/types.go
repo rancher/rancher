@@ -195,6 +195,7 @@ func (t *Token) GetCreationTime() metav1.Time {
 }
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Kubeconfig contains information about clusters, users, namespaces, and authentication mechanisms.
@@ -221,6 +222,12 @@ type KubeconfigSpec struct {
 	// If omitted, the first cluster in the list is considered for setting the current context.
 	// +optional
 	CurrentContext string `json:"currentContext,omitempty"`
+	// Description is a human readable description of the kubeconfig.
+	// +optional
+	Description string `json:"description,omitempty"`
+	// TTL is the time-to-live of the kubeconfig tokens, in milliseconds.
+	// +optional
+	TTL int64 `json:"ttl,omitempty"`
 }
 
 // KubeconfigStatus defines the most recently observed status of the kubeconfig.
