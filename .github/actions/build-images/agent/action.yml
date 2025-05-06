@@ -48,7 +48,7 @@ runs:
         tags: ${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
         context: .
         platforms: "${{ env.OS }}/${{ env.ARCH }}"
-        file: ./package/Dockerfile.agent
+        file: ./package/Dockerfile
         labels: "${{ steps.meta.outputs.labels }}"
         outputs: type=docker,dest=/tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar
         no-cache: true
