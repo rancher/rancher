@@ -2,7 +2,8 @@ name: Alpha Release
 on:
   push:
     tags:
-      - "v*-alpha*"
+      - "v*"
+      - "!v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
   DOCKERIO_REGISTRY: "docker.io"
