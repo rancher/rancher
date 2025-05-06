@@ -8,16 +8,18 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/pborman/uuid"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	authTokens "github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
@@ -30,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -40,46 +44,53 @@ import (
 type fakeUserManager struct {
 	clusterTokens          []string
 	tokens                 []string
-	ensureClusterTokenFunc func(clusterID string, input user.TokenInput) (string, error)
-	ensureTokenFunc        func(input user.TokenInput) (string, error)
+	ensureClusterTokenFunc func(clusterID string, input user.TokenInput) (string, runtime.Object, error)
+	ensureTokenFunc        func(input user.TokenInput) (string, runtime.Object, error)
 }
 
-func (f *fakeUserManager) EnsureClusterToken(clusterID string, input user.TokenInput) (string, error) {
+func (f *fakeUserManager) EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error) {
 	if f.ensureClusterTokenFunc != nil {
 		return f.ensureClusterTokenFunc(clusterID, input)
 	}
-	token, err := f.Generate()
+	tokenKey, token, err := f.Generate()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	f.clusterTokens = append(f.clusterTokens, token)
-	return token, nil
+	f.clusterTokens = append(f.clusterTokens, tokenKey)
+	return tokenKey, token, nil
 }
 
-func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, error) {
+func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
 	if f.ensureTokenFunc != nil {
 		return f.ensureTokenFunc(input)
 	}
-	token, err := f.Generate()
+	tokenKey, token, err := f.Generate()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	f.tokens = append(f.tokens, token)
-	return token, nil
+
+	f.tokens = append(f.tokens, tokenKey)
+	return tokenKey, token, nil
 }
 
-func (f *fakeUserManager) Generate() (string, error) {
+func (f *fakeUserManager) Generate() (string, runtime.Object, error) {
 	key, err := randomtoken.Generate()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	name := names.SimpleNameGenerator.GenerateName("token-")
-	return name + ":" + key, nil
+
+	token := &v3.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			UID:  types.UID(uuid.NewUUID().String()),
+		},
+	}
+
+	return name + ":" + key, token, nil
 }
 
 func TestIsUnique(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name   string
 		ids    []string
@@ -113,8 +124,6 @@ func TestIsUnique(t *testing.T) {
 	}
 }
 func TestStoreNew(t *testing.T) {
-	t.Parallel()
-
 	store := &Store{}
 	obj := store.New()
 	require.NotNil(t, obj)
@@ -124,18 +133,13 @@ func TestStoreNew(t *testing.T) {
 func TestStoreUserFrom(t *testing.T) {
 	t.Parallel()
 
-	systemAdmin := "system:admin"
-	rancherAdmin := "user-2p7w6"
-	rancherUser := "u-s857n"
-
 	ctrl := gomock.NewController(t)
+	existingUserID := "user-2p7w6"
 	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
 		switch name {
-		case rancherAdmin, rancherUser:
-			return &v3.User{
-				ObjectMeta: metav1.ObjectMeta{Name: name},
-			}, nil
+		case existingUserID:
+			return &v3.User{}, nil
 		case "error":
 			return nil, fmt.Errorf("some error")
 		default:
@@ -143,81 +147,72 @@ func TestStoreUserFrom(t *testing.T) {
 		}
 	}).AnyTimes()
 
+	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+		switch a.GetUser().GetName() {
+		case "system:admin":
+			return authorizer.DecisionAllow, "", nil
+		default:
+			return authorizer.DecisionDeny, "", nil
+		}
+	})
+
 	store := &Store{
-		userCache: userCache,
-		authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			switch a.GetUser().GetName() {
-			case systemAdmin, rancherAdmin:
-				return authorizer.DecisionAllow, "", nil
-			default:
-				return authorizer.DecisionDeny, "", nil
-			}
-		}),
+		authorizer: authorizer,
+		userCache:  userCache,
 	}
 
-	t.Run("global admin", func(t *testing.T) {
-		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "system:admin",
-		}))
-		require.NoError(t, err)
-		assert.NotNil(t, userInfo)
-		assert.Equal(t, systemAdmin, userInfo.GetName())
-		assert.True(t, isAdmin)
-		assert.False(t, isRancherUser)
-	})
+	t.Run("valid authenticated user", func(t *testing.T) {
+		t.Parallel()
 
-	t.Run("rancher admin", func(t *testing.T) {
-		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: rancherAdmin,
-		}))
+		userInfo, _, _, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: existingUserID,
+		}), "get")
 		require.NoError(t, err)
 		assert.NotNil(t, userInfo)
-		assert.Equal(t, rancherAdmin, userInfo.GetName())
-		assert.True(t, isAdmin)
-		assert.True(t, isRancherUser)
-	})
-
-	t.Run("rancher user", func(t *testing.T) {
-		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: rancherUser,
-		}))
-		require.NoError(t, err)
-		assert.NotNil(t, userInfo)
-		assert.Equal(t, rancherUser, userInfo.GetName())
-		assert.False(t, isAdmin)
-		assert.True(t, isRancherUser)
-	})
-
-	t.Run("user not found", func(t *testing.T) {
-		userInfo, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "not-found",
-		}))
-		require.NoError(t, err)
-		assert.NotNil(t, userInfo)
-		assert.False(t, isAdmin)
-		assert.False(t, isRancherUser)
+		assert.Equal(t, existingUserID, userInfo.GetName())
 	})
 
 	t.Run("no user info", func(t *testing.T) {
-		_, _, _, err := store.userFrom(context.Background())
+		t.Parallel()
+
+		userInfo, _, _, err := store.userFrom(context.Background(), "get")
 		require.Error(t, err)
+		assert.Nil(t, userInfo)
+	})
+
+	t.Run("admin service account", func(t *testing.T) {
+		t.Parallel()
+
+		_, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "system:admin",
+		}), "get")
+		require.NoError(t, err)
+		assert.True(t, isAdmin)
+		assert.False(t, isRancherUser)
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		t.Parallel()
+
+		_, isAdmin, isRancherUser, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "non-existent",
+		}), "get")
+		require.NoError(t, err)
+		assert.False(t, isAdmin)
+		assert.False(t, isRancherUser)
 	})
 
 	t.Run("error retrieving user", func(t *testing.T) {
+		t.Parallel()
+
 		_, _, _, err := store.userFrom(request.WithUser(context.Background(), &k8suser.DefaultInfo{
 			Name: "error",
-		}))
+		}), "get")
 		require.Error(t, err)
 	})
 }
 
-var allowAll = authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return authorizer.DecisionAllow, "", nil
-})
-
 func TestStoreCreate(t *testing.T) {
-	t.Parallel()
-
 	userID := "user-2p7w6"
 	authTokenID := "token-nh98r"
 	serverURL := "https://rancher.example.com"
@@ -326,22 +321,39 @@ func TestStoreCreate(t *testing.T) {
 			return nil, nil
 		}
 	}).AnyTimes()
+	configMapCache := fake.NewMockCacheInterface[*k8scorev1.ConfigMap](ctrl)
+	configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*k8scorev1.ConfigMap, error) {
+		return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+	})
+
+	var configMap *k8scorev1.ConfigMap
+	configMapClient := fake.NewMockClientInterface[*k8scorev1.ConfigMap, *k8scorev1.ConfigMapList](ctrl)
+	configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *k8scorev1.ConfigMap) (*k8scorev1.ConfigMap, error) {
+		configMap = obj.DeepCopy()
+		return configMap, nil
+	}).Times(1)
+
+	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+		return authorizer.DecisionAllow, "", nil
+	})
 
 	userManager := &fakeUserManager{}
+	defaultTTL := int64(43200)
 
 	store := &Store{
-		authorizer:   allowAll,
-		userCache:    userCache,
-		tokenCache:   tokenCache,
-		clusterCache: clusterCache,
-		nodeCache:    nodeCache,
-		userMgr:      userManager,
+		authorizer:      authorizer,
+		configMapCache:  configMapCache,
+		configMapClient: configMapClient,
+		userCache:       userCache,
+		tokenCache:      tokenCache,
+		clusterCache:    clusterCache,
+		nodeCache:       nodeCache,
+		userMgr:         userManager,
 		getServerURL: func() string {
 			return serverURL
 		},
 		getDefaultTTL: func() (*int64, error) {
-			ttl := int64(43200)
-			return &ttl, nil
+			return &defaultTTL, nil
 		},
 		shouldGenerateToken: func() bool {
 			return true
@@ -374,22 +386,42 @@ func TestStoreCreate(t *testing.T) {
 
 	assert.True(t, createValidationCalled)
 
-	generated := obj.(*ext.Kubeconfig)
-	assert.NotEmpty(t, generated.Status)
-	assert.NotEmpty(t, generated.Status.Value)
+	created := obj.(*ext.Kubeconfig)
+	assert.NotEmpty(t, created.Status)
+	assert.NotEmpty(t, created.Status.Value)
+	assert.NotEmpty(t, created.Name)
+	assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
+	assert.Equal(t, defaultTTL, created.Spec.TTL)
+	assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
+	assert.NotEmpty(t, kubeconfig.Spec.CurrentContext)
+	assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
+
+	require.NotNil(t, configMap)
+	assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
+	assert.Equal(t, Namespace, configMap.Namespace)
+	require.NotNil(t, configMap.Labels)
+	assert.Equal(t, userID, configMap.Labels[UserIDLabel])
+	assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
+	require.NotNil(t, configMap.Annotations)
+	assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
+	require.NotNil(t, configMap.Data)
+	assert.Equal(t, strconv.FormatInt(defaultTTL, 10), configMap.Data[TTLField])
+	assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
+	assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
+	clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
+	require.NoError(t, err)
+	assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
 
 	require.Len(t, userManager.tokens, 1)
 
-	config, err := clientcmd.Load([]byte(generated.Status.Value))
+	config, err := clientcmd.Load([]byte(created.Status.Value))
 	require.NoError(t, err)
 	require.Len(t, config.Clusters, 4)
-	assert.Equal(t, serverURL, config.Clusters["rancher"].Server)
 	assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream1), config.Clusters["downstream1"].Server)
 	assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream2), config.Clusters["downstream2"].Server)
 	assert.Equal(t, "https://172.20.0.3:6443", config.Clusters["downstream2-cp"].Server)
 
 	require.Len(t, config.Contexts, 4)
-	assert.Equal(t, "rancher", config.Contexts["rancher"].Cluster)
 	assert.Equal(t, "downstream1", config.Contexts["downstream1"].Cluster)
 	assert.Equal(t, "downstream1", config.Contexts["downstream1"].AuthInfo)
 	assert.Equal(t, "downstream2", config.Contexts["downstream2"].Cluster)
@@ -401,168 +433,8 @@ func TestStoreCreate(t *testing.T) {
 	require.Len(t, userManager.clusterTokens, 1)
 
 	require.Len(t, config.AuthInfos, 3)
-	assert.Equal(t, userManager.tokens[0], config.AuthInfos["rancher"].Token)
 	assert.Equal(t, userManager.tokens[0], config.AuthInfos["downstream1"].Token)
 	assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
-}
-
-func TestStoreList(t *testing.T) {
-	t.Parallel()
-
-	adminID := "user-2p7w6"
-	userID := "u-s857n"
-	authTokenID := "token-nh98r"
-	kubeconfigID1 := "kubeconfig-4bgj2"
-	kubeconfigID2 := "kubeconfig-c3km5"
-	kubeconfigID3 := "kubeconfig-fk1mn"
-
-	now := time.Now()
-
-	tokens := []*v3.Token{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "kubeconfig-user-2p7w6abcde",
-				CreationTimestamp: metav1.NewTime(now.Add(-time.Hour)),
-				Labels: map[string]string{
-					authTokens.TokenKindLabel:         "kubeconfig",
-					authTokens.TokenKubeconfigIDLabel: kubeconfigID1,
-					authTokens.UserIDLabel:            adminID,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "kubeconfig-user-2p7w6fghij",
-				CreationTimestamp: metav1.NewTime(now.Add(-time.Hour)),
-				Labels: map[string]string{
-					authTokens.TokenKindLabel:         "kubeconfig",
-					authTokens.TokenKubeconfigIDLabel: kubeconfigID2,
-					authTokens.UserIDLabel:            adminID,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "kubeconfig-user-2p7w6klmno",
-				CreationTimestamp: metav1.NewTime(now.Add(-time.Hour)),
-				Labels: map[string]string{
-					authTokens.TokenKindLabel:         "kubeconfig",
-					authTokens.TokenKubeconfigIDLabel: kubeconfigID2,
-					authTokens.UserIDLabel:            adminID,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "kubeconfig-u-s857nklmno",
-				CreationTimestamp: metav1.NewTime(now.Add(-time.Hour)),
-				Labels: map[string]string{
-					authTokens.TokenKindLabel:         "kubeconfig",
-					authTokens.TokenKubeconfigIDLabel: kubeconfigID3,
-					authTokens.UserIDLabel:            userID,
-				},
-			},
-		},
-	}
-
-	ctrl := gomock.NewController(t)
-	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
-		switch name {
-		case adminID, userID:
-			return &v3.User{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
-		case "error":
-			return nil, fmt.Errorf("some error")
-		default:
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
-		}
-	}).AnyTimes()
-
-	userManager := &fakeUserManager{}
-
-	t.Run("admin", func(t *testing.T) {
-		tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
-		tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
-			requirements, selectable := selector.Requirements()
-			assert.True(t, selectable)
-			require.Len(t, requirements, 1)
-			value, ok := selector.RequiresExactMatch(authTokens.TokenKindLabel)
-			assert.True(t, ok)
-			assert.Equal(t, "kubeconfig", value)
-
-			return tokens, nil
-		}).AnyTimes()
-
-		store := &Store{
-			authorizer: allowAll,
-			userCache:  userCache,
-			tokenCache: tokenCache,
-			userMgr:    userManager,
-		}
-
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
-
-		obj, err := store.List(ctx, nil)
-		require.NoError(t, err)
-		require.NotNil(t, obj)
-		assert.IsType(t, &ext.KubeconfigList{}, obj)
-
-		list := obj.(*ext.KubeconfigList)
-		require.Len(t, list.Items, 3)
-		assert.Equal(t, kubeconfigID1, list.Items[0].Name)
-		assert.Equal(t, kubeconfigID2, list.Items[1].Name)
-		assert.Equal(t, kubeconfigID3, list.Items[2].Name)
-	})
-
-	t.Run("user", func(t *testing.T) {
-		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionDeny, "", nil
-		})
-
-		tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
-		tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
-			requirements, selectable := selector.Requirements()
-			assert.True(t, selectable)
-			require.Len(t, requirements, 2)
-			value, ok := selector.RequiresExactMatch(authTokens.TokenKindLabel)
-			assert.True(t, ok)
-			assert.Equal(t, "kubeconfig", value)
-			value, ok = selector.RequiresExactMatch(authTokens.UserIDLabel)
-			assert.True(t, ok)
-			assert.Equal(t, userID, value)
-
-			return tokens[0:3], nil
-		}).AnyTimes()
-
-		store := &Store{
-			authorizer: authorizer,
-			userCache:  userCache,
-			tokenCache: tokenCache,
-			userMgr:    userManager,
-		}
-
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
-
-		obj, err := store.List(ctx, nil)
-		require.NoError(t, err)
-		require.NotNil(t, obj)
-		assert.IsType(t, &ext.KubeconfigList{}, obj)
-
-		list := obj.(*ext.KubeconfigList)
-		require.Len(t, list.Items, 2)
-		assert.Equal(t, kubeconfigID1, list.Items[0].Name)
-		assert.Equal(t, kubeconfigID2, list.Items[1].Name)
-	})
 }
 
 func generateCAKeyAndCert() (*ecdsa.PrivateKey, string, error) {
@@ -590,4 +462,19 @@ func generateCAKeyAndCert() (*ecdsa.PrivateKey, string, error) {
 
 	pem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 	return key, base64.StdEncoding.EncodeToString(pem), nil
+}
+
+func TestWatcher(t *testing.T) {
+	t.Run("safe to call Stop more than once", func(t *testing.T) {
+		w := &watcher{
+			ch: make(chan watch.Event, 1),
+		}
+
+		go func() {
+			w.Stop()
+		}()
+
+		w.Stop()
+
+	})
 }

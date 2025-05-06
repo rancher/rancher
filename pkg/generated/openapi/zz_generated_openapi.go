@@ -229,6 +229,20 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human readable description of the kubeconfig.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"ttl": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TTL is the time-to-live of the kubeconfig tokens, in milliseconds.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 			},
 		},

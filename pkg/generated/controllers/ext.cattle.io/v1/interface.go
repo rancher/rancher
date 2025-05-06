@@ -47,7 +47,7 @@ type version struct {
 }
 
 func (v *version) Kubeconfig() KubeconfigController {
-	return generic.NewController[*v1.Kubeconfig, *v1.KubeconfigList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Kubeconfig"}, "kubeconfigs", true, v.controllerFactory)
+	return generic.NewNonNamespacedController[*v1.Kubeconfig, *v1.KubeconfigList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Kubeconfig"}, "kubeconfigs", v.controllerFactory)
 }
 
 func (v *version) Token() TokenController {

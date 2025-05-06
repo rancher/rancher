@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -236,13 +237,13 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 }
 
 // creates tokens with 0 ttl and returns token in 'token.Name:token.Token' format
-func (m *userManager) EnsureToken(input user.TokenInput) (string, error) {
+func (m *userManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
 	return m.EnsureClusterToken("", input)
 }
 
-func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, error) {
+func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
 	if strings.HasPrefix(input.TokenName, "token-") {
-		return "", errors.New("token names can't start with token-")
+		return "", nil, errors.New("token names can't start with token-")
 	}
 
 	var err error
@@ -250,18 +251,18 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 	if !input.Randomize {
 		token, err = m.tokenLister.Get(input.TokenName)
 		if err != nil && !apierrors.IsNotFound(err) {
-			return "", err
+			return "", nil, err
 		}
 		if err == nil {
 			if err := m.tokens.Delete(token.Name, &v1.DeleteOptions{}); err != nil {
-				return "", err
+				return "", nil, err
 			}
 		}
 	}
 
 	key, err := randomtoken.Generate()
 	if err != nil {
-		return "", errors.New("failed to generate token key")
+		return "", nil, errors.New("failed to generate token key")
 	}
 
 	labels := map[string]string{
@@ -301,10 +302,10 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 	}
 	err = tokens.ConvertTokenKeyToHash(token)
 	if err != nil {
-		return "", err
+		return "", nil, fmt.Errorf("failed to convert token key to hash: %w", err)
 	}
 
-	logrus.Infof("Creating token for user %v", input.UserName)
+	logrus.Infof("Creating token for user %s", input.UserName)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		// Backoff was added here because it is possible the token is in the process of deleting.
 		// This should cause the create to retry until the delete is finished.
@@ -319,10 +320,10 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		return true, nil
 	})
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	return token.Name + ":" + key, nil
+	return token.Name + ":" + key, token, nil
 }
 
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
@@ -343,7 +344,12 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 		UserPrincipal: userPrincipal,
 	}
 
-	return m.EnsureClusterToken(clusterName, input)
+	tokenKey, _, err := m.EnsureClusterToken(clusterName, input)
+	if err != nil {
+		return "", fmt.Errorf("failed to create token: %w", err)
+	}
+
+	return tokenKey, nil
 }
 
 // GetKubeconfigToken creates a new token for use in a kubeconfig generated through the CLI.
