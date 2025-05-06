@@ -55,11 +55,6 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: setup and build
