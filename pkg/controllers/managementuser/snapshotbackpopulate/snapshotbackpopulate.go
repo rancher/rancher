@@ -193,6 +193,11 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 		logrus.Debugf("%s creating snapshot %s", logPrefix, upstream.Name)
 
 		_, err = h.etcdSnapshotController.Create(upstream)
+		// snapshot may exist on a previous version of Rancher but fail to indexer criteria, update in this case
+		if apierrors.IsAlreadyExists(err) {
+			logrus.Debugf("%s snapshot %s already exists but does not match indexer criteria, updating", logPrefix, upstream.Name)
+			_, err = h.etcdSnapshotController.Update(upstream)
+		}
 		return downstream, err
 	} else if len(upstreamSnapshots) > 1 {
 		logrus.Warnf("%s multiple snapshots objects found for snapshot %s", logPrefix, downstream.Name)
