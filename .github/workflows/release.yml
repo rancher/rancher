@@ -45,7 +45,7 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/build-images/agent
   integration-tests:
-    needs: [build-agent]
+    needs: [build-server, build-agent]
     with:
       parent_run_id: ${{ github.run_id }}
     uses: ./.github/workflows/integration-tests.yml
@@ -219,5 +219,5 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID;
             secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY;
             secret/data/github/repo/${{ github.repository }}/aws/credentials artifactBucketName | ARTIFACT_BUCKET_NAME;
-      - name: publish to aws
+      - name: publish to gh
         uses: ./.github/actions/images-files/publish-gh
