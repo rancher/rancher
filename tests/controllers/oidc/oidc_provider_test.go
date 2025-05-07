@@ -93,6 +93,7 @@ func (s *OIDCProviderSuite) SetupSuite() {
 		crd.CRD{
 			SchemaObject: apimgmtv3.OIDCClient{},
 			NonNamespace: true,
+			Status:       true,
 		},
 	)
 
