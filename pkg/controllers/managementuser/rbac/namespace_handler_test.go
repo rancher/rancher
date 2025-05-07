@@ -6,14 +6,16 @@ import (
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	v1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
@@ -172,8 +174,9 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var newRoles []*rbacv1.ClusterRole
 			var deletedRoleNames []string
-			indexer := DummyIndexer{
-				clusterRoles: map[string][]*rbacv1.ClusterRole{
+			indexer := FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index: crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{
 					namespaceName: test.indexedRoles,
 				},
 				err: test.indexerError,
@@ -188,7 +191,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 							return role, nil
 						}
 					}
-					return nil, apierror.NewNotFound(schema.GroupResource{
+					return nil, apierrors.NewNotFound(schema.GroupResource{
 						Group:    "rbac.authorization.k8s.io",
 						Resource: "ClusterRoles",
 					}, name)
@@ -258,8 +261,8 @@ func TestCreateProjectNSRole(t *testing.T) {
 		verb        string
 		namespace   string
 		projectName string
-		startingCR  *v1.ClusterRole
-		expectedCR  *v1.ClusterRole
+		startingCR  *rbacv1.ClusterRole
+		expectedCR  *rbacv1.ClusterRole
 		createError error
 		expectedErr string
 	}
@@ -268,7 +271,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "create get role",
 			verb:        "get",
 			projectName: "p-123xyz",
-			expectedCR: &v1.ClusterRole{
+			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-readonly",
 					Annotations: map[string]string{
@@ -281,14 +284,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "create edit role",
 			verb:        "*",
 			projectName: "p-123xyz",
-			expectedCR: &v1.ClusterRole{
+			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []v1.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -302,14 +305,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "do not change role if already exists and return AlreadyExists error",
 			verb:        "*",
 			projectName: "p-123xyz",
-			expectedCR: &v1.ClusterRole{
+			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []v1.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -318,14 +321,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 					},
 				},
 			},
-			startingCR: &v1.ClusterRole{
+			startingCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []v1.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -340,14 +343,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "test should return non-AlreadyExists error",
 			verb:        "*",
 			projectName: "p-123xyz",
-			createError: errors.NewInternalError(fmt.Errorf("some error")),
+			createError: apierrors.NewInternalError(fmt.Errorf("some error")),
 			expectedErr: "Internal error occurred: some error",
 		},
 	}
 	for _, test := range testCases {
-		clusterRoles := map[string]*v1.ClusterRole{}
+		clusterRoles := map[string]*rbacv1.ClusterRole{}
 		if test.startingCR != nil {
-			clusterRoles = map[string]*v1.ClusterRole{
+			clusterRoles = map[string]*rbacv1.ClusterRole{
 				test.startingCR.Name: test.startingCR,
 			}
 		}
@@ -450,43 +453,144 @@ func createRoleName(projectName string, verb string) string {
 	return fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix[verb])
 }
 
-type DummyIndexer struct {
+type FakeResourceIndexer[T runtime.Object] struct {
 	cache.Store
-	clusterRoles map[string][]*rbacv1.ClusterRole
-	err          error
+	resources map[string][]T
+	err       error
+	index     string
 }
 
-func (d *DummyIndexer) Index(indexName string, obj interface{}) ([]interface{}, error) {
+func (d *FakeResourceIndexer[T]) Index(indexName string, obj interface{}) ([]interface{}, error) {
 	return nil, nil
 }
 
-func (d *DummyIndexer) IndexKeys(indexName, indexKey string) ([]string, error) {
+func (d *FakeResourceIndexer[T]) IndexKeys(indexName, indexKey string) ([]string, error) {
 	return []string{}, nil
 }
 
-func (d *DummyIndexer) ListIndexFuncValues(indexName string) []string {
+func (d *FakeResourceIndexer[T]) ListIndexFuncValues(indexName string) []string {
 	return []string{}
 }
 
-func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
-	if indexName != crByNSIndex {
-		return nil, fmt.Errorf("dummy indexer only supports %s for index name, %s given", crByNSIndex, indexName)
+func (d *FakeResourceIndexer[T]) ByIndex(indexName, indexKey string) ([]interface{}, error) {
+	if indexName != d.index {
+		return nil, fmt.Errorf("dummy indexer only supports %s for index name, %s given", d.index, indexName)
 	}
 	if d.err != nil {
 		return nil, d.err
 	}
-	crs := d.clusterRoles[indexKey]
+
+	resources := d.resources[indexKey]
 	var interfaces []interface{}
-	for _, cr := range crs {
-		interfaces = append(interfaces, cr)
+	for _, resource := range resources {
+		interfaces = append(interfaces, resource)
 	}
+
 	return interfaces, nil
 }
 
-func (d *DummyIndexer) GetIndexers() cache.Indexers {
+func (d *FakeResourceIndexer[T]) GetIndexers() cache.Indexers {
 	return nil
 }
 
-func (d *DummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
+func (d *FakeResourceIndexer[T]) AddIndexers(newIndexers cache.Indexers) error {
 	return nil
+}
+
+func TestEnsurePRTBAddToNamespace(t *testing.T) {
+	const namespaceName = "test-ns"
+	tests := []struct {
+		name                string
+		indexedRoles        []*rbacv1.ClusterRole
+		currentRoles        []*rbacv1.ClusterRole
+		indexedPRTBs        []*v3.ProjectRoleTemplateBinding
+		projectNSAnnotation string
+		indexerError        error
+		updateError         error
+		createError         error
+		deleteError         error
+		getError            error
+
+		wantError    string
+		wantHasPRTBs bool
+	}{
+		{
+			name:                "update namespace with missing namespace",
+			projectNSAnnotation: "c-123xyz:p-123xyz",
+			indexedRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
+			},
+			indexedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespaceName,
+						Name:      "test-prtb",
+					},
+					UserName:         "test-user",
+					ProjectName:      "test-cluster:test-project",
+					RoleTemplateName: "test-rt",
+				},
+			},
+			wantHasPRTBs: true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			crIndexer := &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				resources: map[string][]*rbacv1.ClusterRole{
+					namespaceName: test.indexedRoles,
+				},
+				index: crByNSIndex,
+				err:   test.indexerError,
+			}
+			prtbIndexer := &FakeResourceIndexer[*v3.ProjectRoleTemplateBinding]{
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{
+					"c-123xyz:p-123xyz": test.indexedPRTBs,
+				},
+				err:   test.indexerError,
+				index: prtbByProjectIndex,
+			}
+
+			lifecycle := nsLifecycle{
+				m: &manager{
+					crIndexer:   crIndexer,
+					prtbIndexer: prtbIndexer,
+					rtLister: &v3fakes.RoleTemplateListerMock{
+						GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
+							return nil, apierrors.NewNotFound(schema.GroupResource{
+								Group:    "management.cattle.io",
+								Resource: "roletemplates",
+							}, name)
+						},
+					},
+				},
+				rq: &resourcequota.SyncController{
+					ProjectLister: &v3fakes.ProjectListerMock{
+						GetFunc: func(namespace string, name string) (*v3.Project, error) {
+							return nil, apierrors.NewNotFound(schema.GroupResource{
+								Group:    "management.cattle.io",
+								Resource: "projects",
+							}, name)
+						},
+					},
+				},
+			}
+			hasPRTBs, err := lifecycle.ensurePRTBAddToNamespace(&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespaceName,
+					Annotations: map[string]string{
+						projectIDAnnotation: test.projectNSAnnotation,
+					},
+				},
+			})
+			assert.Equal(t, test.wantHasPRTBs, hasPRTBs)
+			if test.wantError != "" {
+				assert.ErrorContains(t, err, test.wantError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
