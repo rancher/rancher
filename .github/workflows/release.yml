@@ -31,7 +31,6 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/build-images/server
   build-agent:
-    needs: [build-server]
     strategy:
       matrix:
         os: [linux]
