@@ -118,11 +118,11 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
-		return false, fmt.Errorf("ensuring PRTBs are added to namespace: %w", err)
+		return false, fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
 	}
 
 	if err := n.reconcileNamespaceProjectClusterRole(obj); err != nil {
-		return false, fmt.Errorf("reconciling namespace project cluster roles: %w", err)
+		return false, fmt.Errorf("reconciling namespace %s project cluster roles: %w", obj.Name, err)
 	}
 
 	return hasPRTBs, nil
@@ -189,7 +189,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
 	if len(projectID) == 0 {
-		logrus.Infof("namespace %s does not belong to a project - deleting rolebindings", ns.Name)
+		logrus.Debugf("Namespace %s does not belong to a project - deleting rolebindings", ns.Name)
 		// if namespace does not belong to a project, delete all rolebindings from that namespace that were created for a PRTB
 		// such rolebindings will have the label "authz.cluster.cattle.io/rtb-owner" prior to 2.5 and
 		// "authz.cluster.cattle.io/rtb-owner-updated" 2.5 onwards
@@ -265,7 +265,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		project, err := n.rq.ProjectLister.Get(parts[0], parts[1])
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				logrus.Warnf("namespace %s references project %s in namespace %s which does not exist", ns.Name, parts[1], parts[0])
+				logrus.Warnf("Namespace %s references project %s in namespace %s which does not exist", ns.Name, parts[1], parts[0])
 				return hasPRTBs, nil
 			}
 			return hasPRTBs, err
