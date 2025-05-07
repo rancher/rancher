@@ -6,6 +6,7 @@ node {
     job_names = job_name.split('/')
     job_name = job_names[job_names.size() - 1] 
   }
+  
   def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
   def imageName = "rancher-code-coverage-image-build-${job_name}${env.BUILD_NUMBER}"
   def buildDockerContainer = "build-code-cover-docker-container"
