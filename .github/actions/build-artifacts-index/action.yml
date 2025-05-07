@@ -10,7 +10,7 @@ runs:
         echo "ECM_DISTRO_TOOLS_VERSION=v0.48.0" >> $GITHUB_OUTPUT
         echo "ARTIFACTS_INDEX=${{ runner.temp }}/artifacts-index" >> $GITHUB_OUTPUT
     - name: setup ecm-distro-tools
-      uses: rancher/ecm-distro-tools@v0.48.0
+      uses: rancher/ecm-distro-tools@v0.49.1
       with:
         version: ${{ steps.vars.outputs.ECM_DISTRO_TOOLS_VERSION }}
         install-script-version: ${{ steps.vars.outputs.ECM_DISTRO_TOOLS_VERSION }}
