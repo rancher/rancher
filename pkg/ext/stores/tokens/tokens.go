@@ -635,11 +635,11 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 
 // update implements the core resource updating/modification of tokens
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
-	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
+	user, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
 	if err != nil {
 		return nil, err
 	}
-	if !isRancherUser || !userMatch(user, token) {
+	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
