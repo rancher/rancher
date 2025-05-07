@@ -2443,8 +2443,8 @@ github.com/rancher/dynamiclistener v0.6.2 h1:F0SEJhvO2aFe0eTvKGlQoy5x7HtwK8oJbyI
 github.com/rancher/dynamiclistener v0.6.2/go.mod h1:ncmVR7qR8kR1o6xNkTcVS2mZ9WtlljimBilIlNjdyzc=
 github.com/rancher/eks-operator v1.11.1 h1:X57qPh5umtyUIbH1e0TwiYo356H+XU8UCWCgrNqAzpI=
 github.com/rancher/eks-operator v1.11.1/go.mod h1:1UOnLZPqtRgjRChh1z+g8S3QUM2xdY/GFFVv46aderg=
-github.com/rancher/fleet/pkg/apis v0.12.1 h1:fj3yNGwKeHBha4k1sbOyS7etsp6xvMtbykcwUWFbDn8=
-github.com/rancher/fleet/pkg/apis v0.12.1/go.mod h1:jAGKi163cdgMOiQGNXHqoCKZT6DfSzAQWizP7K+PTiE=
+github.com/rancher/fleet/pkg/apis v0.12.3-beta.1 h1:TXVO8N+PIQ0LXdDfsGymTabMnKOaW0YsUvP8wpicuCg=
+github.com/rancher/fleet/pkg/apis v0.12.3-beta.1/go.mod h1:KAjRE0EDXanNiohC/OQyeQvxBmGqIX+yh/Y1kSF4OyE=
 github.com/rancher/gke-operator v1.11.1 h1:amLpdv0d6hSUitoW/Poz2EtI7qcL5K5nHG9VfcSIFA4=
 github.com/rancher/gke-operator v1.11.1/go.mod h1:3/Onzv8JIvbHqdt16ofGC1J9O9OAlSyiSbV60E623Bo=
 github.com/rancher/helm/v3 v3.17.0-rancher1 h1:CAitia3a0jagclTn+QACzpoV8s5fU52xNmfDP77FMUA=
@@ -3802,8 +3802,9 @@ k8s.io/pod-security-admission v0.32.2 h1:zDfAb/t0LbNU3z0ZMHtCb1zp8x05gWCGhmBYpUp
 k8s.io/pod-security-admission v0.32.2/go.mod h1:yxMPB3i1pGMLfxbe4BiWMuowMD7cdHR32y4nCj4wH+s=
 k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89/go.mod h1:sZAwmy6armz5eXlNoLmJcl4F1QuKu7sr+mFQ0byX7Ew=
 k8s.io/utils v0.0.0-20240711033017-18e509b52bc8/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 h1:M3sRQVHv7vB20Xc2ybTt7ODCeFj6JSWYFzOFnYeS6Ro=
 k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 h1:jgJW5IePPXLGB8e/1wvd0Ich9QE97RvvF3a8J3fP/Lg=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 lukechampine.com/uint128 v1.1.1/go.mod h1:c4eWIwlEGaxC/+H1VguhU4PHXNWDCDMUlWdIWl2j1gk=
 lukechampine.com/uint128 v1.2.0/go.mod h1:c4eWIwlEGaxC/+H1VguhU4PHXNWDCDMUlWdIWl2j1gk=
 lukechampine.com/uint128 v1.3.0/go.mod h1:c4eWIwlEGaxC/+H1VguhU4PHXNWDCDMUlWdIWl2j1gk=
