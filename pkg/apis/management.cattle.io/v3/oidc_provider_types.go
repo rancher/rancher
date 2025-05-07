@@ -3,8 +3,6 @@
 package v3
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -62,8 +60,10 @@ type OIDCClientSpec struct {
 	RedirectURIs []string `json:"redirectURIs"`
 	// TokenExpirationSeconds specifies the duration (in seconds) before
 	// an access token and ID token expire.
-	TokenExpirationSeconds time.Duration `json:"tokenExpirationSeconds"`
+	// +kubebuilder:validation:Minimum=1
+	TokenExpirationSeconds int64 `json:"tokenExpirationSeconds"`
 	// RefreshTokenExpirationSeconds defines how long (in seconds)
 	// a refresh token remains valid before expiration.
-	RefreshTokenExpirationSeconds time.Duration `json:"refreshTokenExpirationSeconds"`
+	// +kubebuilder:validation:Minimum=1
+	RefreshTokenExpirationSeconds int64 `json:"refreshTokenExpirationSeconds"`
 }

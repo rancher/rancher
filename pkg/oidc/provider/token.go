@@ -64,7 +64,7 @@ type TokenResponse struct {
 	// AccessToken is the refresh token generated.
 	RefreshToken string `json:"refresh_token,omitempty"`
 	// ExpiresIn indicates when id_token and access_token expire.
-	ExpiresIn int `json:"expires_in"`
+	ExpiresIn time.Duration `json:"expires_in"`
 	// TokenType is the OAuth 2.0 Token Type value. The value must be Bearer.
 	TokenType string `json:"token_type"`
 }
@@ -317,7 +317,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	// create id_token
 	idClaims := jwt.MapClaims{
 		"aud": []string{oidcClient.Status.ClientID},
-		"exp": h.now().Add(oidcClient.Spec.TokenExpirationSeconds * time.Second).Unix(),
+		"exp": h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
 		"iss": settings.ServerURL.Get() + "/oidc",
 		"iat": h.now().Unix(),
 		"sub": rancherToken.UserID,
@@ -345,7 +345,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	// create access_token
 	accessClaims := jwt.MapClaims{
 		"aud":   []string{oidcClient.Status.ClientID},
-		"exp":   h.now().Add(oidcClient.Spec.TokenExpirationSeconds * time.Second).Unix(),
+		"exp":   h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
 		"iss":   settings.ServerURL.Get() + "/oidc",
 		"iat":   h.now().Unix(),
 		"sub":   rancherToken.UserID,
@@ -374,7 +374,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		rancherTokenHash := hex.EncodeToString(hash[:])
 		refreshClaims := jwt.MapClaims{
 			"aud":                []string{oidcClient.Status.ClientID},
-			"exp":                h.now().Add(oidcClient.Spec.RefreshTokenExpirationSeconds * time.Second).Unix(),
+			"exp":                h.now().Add(time.Duration(oidcClient.Spec.RefreshTokenExpirationSeconds) * time.Second).Unix(),
 			"iat":                h.now().Unix(),
 			"sub":                rancherToken.UserID,
 			"rancher_token_hash": rancherTokenHash,
@@ -397,7 +397,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		}
 	}
 
-	resp.ExpiresIn = int(oidcClient.Spec.TokenExpirationSeconds * time.Second)
+	resp.ExpiresIn = time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second
 
 	return resp, nil
 }
