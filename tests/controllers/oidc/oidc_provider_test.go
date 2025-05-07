@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +28,7 @@ import (
 	"github.com/rancher/rancher/tests/controllers/common"
 	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
@@ -109,7 +109,7 @@ func (s *OIDCProviderSuite) SetupSuite() {
 	_, err = s.wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
 		Group:   "management.cattle.io",
 		Version: "v3",
-		Kind:    "OIDCCLient",
+		Kind:    "OIDCClient",
 	})
 	_, err = s.wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
 		Group:   "management.cattle.io",
@@ -233,7 +233,7 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 	assert.NoError(s.T(), err)
 
 	// wait for clientID and clientSecret to be created by the controller
-	assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
+	require.EventuallyWithT(s.T(), func(c *assert.CollectT) {
 		oidcClient, err = s.wranglerContext.Mgmt.OIDCClient().Get(oidcClient.Name, metav1.GetOptions{})
 		assert.NoError(c, err)
 		clientID = oidcClient.Status.ClientID
@@ -262,12 +262,13 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 
 	authURL := oauth2Config.AuthCodeURL(state, oauth2.S256ChallengeOption(fakeCodeVerifier))
 	req, err := http.NewRequest(http.MethodGet, authURL, nil)
-	assert.NoError(s.T(), err)
+	require.NoError(s.T(), err)
 	req.Header.Set("Authorization", "Bearer "+fakeToken+":"+fakeTokenValue)
 	s.wg.Add(1)
 	res, err := http.DefaultClient.Do(req)
-	assert.NoError(s.T(), err)
 	defer res.Body.Close()
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
 
 	// use a waitGroup to ensure the asserts inside the redirect function were executed.
 	go func() {
@@ -279,7 +280,6 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 		assert.Fail(s.T(), "timeout waiting for redirect to finish")
 	case <-s.done:
 	}
-
 }
 
 // redirect will be called with a valid code as part of the OIDC authorization code flow.
@@ -294,7 +294,11 @@ func (s *OIDCProviderSuite) redirect(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	oauth2Token, err := oauth2Config.Exchange(s.ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(fakeCodeVerifier))
-	assert.NoError(s.T(), err)
+	if err != nil {
+		http.Error(rw, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		assert.Fail(s.T(), err.Error())
+		return
+	}
 	s.verifyTokens(oauth2Token.Extra("id_token").(string), oauth2Token.AccessToken, oauth2Token.RefreshToken)
 
 	// Obtain new tokens using the refresh_token
@@ -306,7 +310,8 @@ func (s *OIDCProviderSuite) redirect(rw http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequest(http.MethodPost, provider.Endpoint().TokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
-		fmt.Printf("Failed to create HTTP request: %v\n", err)
+		http.Error(rw, "Failed to create HTTP request: "+err.Error(), http.StatusInternalServerError)
+		assert.Fail(s.T(), err.Error())
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -314,7 +319,8 @@ func (s *OIDCProviderSuite) redirect(rw http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("Failed to send HTTP request: %v\n", err)
+		http.Error(rw, "Failed to send HTTP request: "+err.Error(), http.StatusInternalServerError)
+		assert.Fail(s.T(), err.Error())
 		return
 	}
 	defer resp.Body.Close()
@@ -322,6 +328,7 @@ func (s *OIDCProviderSuite) redirect(rw http.ResponseWriter, r *http.Request) {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		assert.Fail(s.T(), "Failed to refresh token: %s\nResponse: %s\n", resp.Status, string(body))
+		http.Error(rw, "Failed to refresh token", http.StatusInternalServerError)
 		return
 	}
 
