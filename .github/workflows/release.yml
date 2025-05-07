@@ -220,3 +220,57 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
       - name: publish to gh
         uses: ./.github/actions/images-files/publish-gh
+  docker-image-digests:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      ARTIFACTS_BASE_DIR: "dist"
+      LINUX_AMD64_FILE: "rancher-images-digests-linux-amd64.txt"
+      LINUX_ARM64_FILE: "rancher-images-digests-linux-arm64.txt"
+      WINDOWS_2019_FILE: "rancher-images-digests-windows-ltsc2019.txt"
+      WINDOWS_2022_FILE: "rancher-images-digests-windows-ltsc2022.txt"
+      CHECKSUM_FILE: "images-digests-sha256sum.txt"
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: generate
+        uses: ./.github/actions/images-digests/generate
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+      - name: publish to gh
+        uses: ./.github/actions/images-digests/publish-gh
+  notify-release:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests, merge-installer-manifest]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL
+      - name: notify
+        uses: ./.github/actions/notify-release
