@@ -87,8 +87,8 @@ github.com/rancher/aks-operator v1.11.1 h1:Fgy6aDTLE0nfDfstPEuxdvk45fsN088m5WSxt
 github.com/rancher/aks-operator v1.11.1/go.mod h1:dzGWMbPvhjtYtae6Ksx5/c4qLAgGsEkt0MQHoAxupoQ=
 github.com/rancher/eks-operator v1.11.1 h1:X57qPh5umtyUIbH1e0TwiYo356H+XU8UCWCgrNqAzpI=
 github.com/rancher/eks-operator v1.11.1/go.mod h1:1UOnLZPqtRgjRChh1z+g8S3QUM2xdY/GFFVv46aderg=
-github.com/rancher/fleet/pkg/apis v0.12.1 h1:fj3yNGwKeHBha4k1sbOyS7etsp6xvMtbykcwUWFbDn8=
-github.com/rancher/fleet/pkg/apis v0.12.1/go.mod h1:jAGKi163cdgMOiQGNXHqoCKZT6DfSzAQWizP7K+PTiE=
+github.com/rancher/fleet/pkg/apis v0.12.3-beta.1 h1:TXVO8N+PIQ0LXdDfsGymTabMnKOaW0YsUvP8wpicuCg=
+github.com/rancher/fleet/pkg/apis v0.12.3-beta.1/go.mod h1:KAjRE0EDXanNiohC/OQyeQvxBmGqIX+yh/Y1kSF4OyE=
 github.com/rancher/gke-operator v1.11.1 h1:amLpdv0d6hSUitoW/Poz2EtI7qcL5K5nHG9VfcSIFA4=
 github.com/rancher/gke-operator v1.11.1/go.mod h1:3/Onzv8JIvbHqdt16ofGC1J9O9OAlSyiSbV60E623Bo=
 github.com/rancher/lasso v0.2.1 h1:SZTqMVQn8cAOqvwGBd1/EYOIJ/MGN+UfJrOWvHd4jHU=
@@ -195,8 +195,8 @@ k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f h1:GA7//TjRY9yWGy1poLzYYJ
 k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f/go.mod h1:R/HEjbvWI0qdfb8viZUeVZm0X6IZnxAydC7YU42CMw4=
 k8s.io/kubernetes v1.32.2 h1:mShetlA102UpjRVSGzB+5vjJwy8oPy8FMWrkTH5f37o=
 k8s.io/kubernetes v1.32.2/go.mod h1:tiIKO63GcdPRBHW2WiUFm3C0eoLczl3f7qi56Dm1W8I=
-k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 h1:M3sRQVHv7vB20Xc2ybTt7ODCeFj6JSWYFzOFnYeS6Ro=
-k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 h1:jgJW5IePPXLGB8e/1wvd0Ich9QE97RvvF3a8J3fP/Lg=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 sigs.k8s.io/cluster-api v1.9.5 h1:68164Q201Y5ANVkhyrOZenoMbfL2SEBjVYZs/ihhSro=
 sigs.k8s.io/cluster-api v1.9.5/go.mod h1:DyqyZ4jRvKGKewDRn1Q4OCHaVjsdTogymbO6mrgHEDI=
 sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 h1:/Rv+M11QRah1itp8VhT6HoVx1Ray9eB4DBr+K+/sCJ8=
