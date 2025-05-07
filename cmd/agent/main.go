@@ -64,7 +64,12 @@ func main() {
 
 		initFeatures()
 
-		go clean.UnusedCattleCredentials()
+		// The cleanup is only performed by the cattle-cluster-agent,
+		// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
+		if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
+			logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
+			go clean.UnusedCattleCredentials()
+		}
 
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
