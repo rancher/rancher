@@ -314,16 +314,23 @@ func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigNa
 
 	upgradeConfig := new(upgradeinput.Config)
 	config.LoadAndUpdateConfig(upgradeinput.ConfigurationFileKey, upgradeConfig, func() {
+		if isRKE1 {
+			provisioningConfig.RKE1KubernetesVersions = []string{cluster.KubernetesVersionToUpgrade}
+		} else if isRKE2 {
+			provisioningConfig.RKE2KubernetesVersions = []string{cluster.KubernetesVersionToUpgrade}
+		} else {
+			provisioningConfig.K3SKubernetesVersions = []string{cluster.KubernetesVersionToUpgrade}
+		}
 		clusters := []upgradeinput.Cluster{
 			{
-				VersionToUpgrade: cluster.KubernetesVersionToUpgrade,
-				FeaturesToTest:   cluster.FeaturesToTest,
+				ProvisioningInput: *provisioningConfig,
+				FeaturesToTest:    cluster.FeaturesToTest,
 			},
 		}
 		upgradeConfig.Clusters = clusters
 	})
 
-	return
+	return nil
 }
 
 //	NewRancherLocalClusterConfiguration is a function that accepts single cluster from the cluster matrix's local field.
