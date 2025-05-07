@@ -1,0 +1,18 @@
+name: "Build Rancher Windows Agent"
+description: "Build and upload the Rancher windows agent image"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Environment Variables
+      uses: ./.github/actions/setup-tag-env
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_PASSWORD }}
+        registry: ${{ env.REGISTRY }}
+    - name: Build Windows Server Image
+      shell: bash
+      run: |
+        docker build -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-${{ matrix.version }}

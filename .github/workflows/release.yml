@@ -1,8 +1,9 @@
-name: Hotfix Release
+name: Alpha Release
 on:
   push:
     tags:
-      - "v*-hotfix*"
+      - "v*"
+      - "!v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
   DOCKERIO_REGISTRY: "docker.io"
@@ -11,7 +12,7 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  REGISTRY: "stgregistry.suse.com"
+  REGISTRY: "docker.io"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -65,8 +66,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
         uses: ./.github/actions/build-images/agent-windows
   push-images:
@@ -89,8 +90,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: push
         uses: ./.github/actions/push-images
   build-publish-chart:
@@ -120,12 +121,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | AWS_ACCESS_KEY_ID_CHARTS ;
-            secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | AWS_SECRET_ACCESS_KEY_CHARTS ;
-            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
-            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: publish
-        uses: ./.github/actions/rancher-chart/publish-aws
+        uses: ./.github/actions/rancher-chart/publish-gcp
   merge-server-manifest:
     needs: [push-images]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -139,8 +137,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
         uses: ./.github/actions/merge-manifests/server
   merge-agent-manifest:
@@ -156,8 +154,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
         uses: ./.github/actions/merge-manifests/agent
   build-installer:
@@ -180,8 +178,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
         uses: ./.github/actions/build-images/installer
   merge-installer-manifest:
@@ -197,8 +195,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: merge
         uses: ./.github/actions/merge-manifests/installer
   create-images-files:
@@ -219,7 +217,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | AWS_ACCESS_KEY_ID ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | AWS_SECRET_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials artifactBucketName | ARTIFACT_BUCKET_NAME;
       - name: publish to aws
-        uses: ./.github/actions/images-files/publish-aws
+        uses: ./.github/actions/images-files/publish-gh

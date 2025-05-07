@@ -1,0 +1,23 @@
+name: "Publish images files to GitHub"
+description: "Upload images files to a GitHub release"
+runs:
+  using: "composite"
+  steps:
+    - name: Generate sha256sum file and upload artifacts
+      shell: bash
+      run: |
+        set -ex
+
+        source scripts/artifacts-list.sh
+
+        for artifact in "${ARTIFACTS[@]}"; do
+          mv "./bin/$artifact" "./dist/$artifact"
+        done
+
+        ./scripts/artifacts-hashes.sh ./dist
+
+        ARTIFACTS+=("sha256sum.txt")
+
+        for artifact in "${ARTIFACTS[@]}"; do
+          gh release upload -R ${{ github.repository_owner }}/rancher ${{ env.TAG }} "./dist/$artifact" --clobber
+        done
