@@ -367,9 +367,12 @@ func deepCopyIndex(src *repo.IndexFile) *repo.IndexFile {
 // Returns the filtered or unfiltered IndexFile of a chart repository
 func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Version, skipFilter bool) *repo.IndexFile {
 
-	// This block of code checks if the current version of the server is a dev version or not.
-	// If the server is version is dev or if skipFilter is true, it returns the current index.
-	if settings.ServerVersion.Get() == "dev" || skipFilter {
+	// This block of code checks if the current version of the server is a released version or not.
+	// The method settings.IsRelease() checks two things:
+	// 1. If the server version does not contain the "head" substring. If "head" is present, it means the server is not a released version.
+	// 2. If the server version matches the releasePattern. A valid release version should start with "v" followed by a single digit, such as v1, v2, v3, etc.
+	// If the server is not a released version (settings.IsRelease() returns false) or if skipFilter is true, it returns the current index.
+	if !settings.IsRelease() || skipFilter {
 		return index
 	}
 
