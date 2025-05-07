@@ -60,6 +60,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		clusterCache:      clients.Provisioning.Cluster().Cache(),
 		clusterController: clients.Provisioning.Cluster(),
 		capiClusters:      clients.CAPI.Cluster().Cache(),
+		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
+		mgmtClusterClient: clients.Mgmt.Cluster(),
 		rkeControlPlane:   clients.RKE.RKEControlPlane().Cache(),
 		etcdSnapshotCache: clients.RKE.ETCDSnapshot().Cache(),
 		capiMachineCache:  clients.CAPI.Machine().Cache(),
@@ -67,8 +69,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	if features.MCM.Enabled() {
 		h.dynamicSchema = clients.Mgmt.DynamicSchema().Cache()
-		h.mgmtClusterCache = clients.Mgmt.Cluster().Cache()
-		h.mgmtClusterClient = clients.Mgmt.Cluster()
 	}
 
 	clients.Dynamic.OnChange(ctx, "rke-dynamic", matchRKENodeGroup, h.infraWatch)
