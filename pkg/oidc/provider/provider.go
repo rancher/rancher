@@ -2,6 +2,9 @@ package provider
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/labels"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -76,9 +79,39 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 	}, nil
 }
 
+func (p *Provider) addSecurityHeadersMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		oidcClients, err := p.authHandler.oidcClientCache.List(labels.Everything())
+		if err != nil {
+			// TODO handle error
+			return
+		}
+
+		for _, oidcClient := range oidcClients {
+			for _, redirectURI := range oidcClient.Spec.RedirectURIs {
+				url, err := url.Parse(redirectURI)
+				if err != nil {
+					continue
+				}
+				if r.URL.Host == url.Host {
+					w.Header().Set("Access-Control-Allow-Origin", url.Host)
+					break
+				}
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
 // RegisterOIDCProviderHandles register all Handlers for the OIDC provider.
 func (p *Provider) RegisterOIDCProviderHandles(mux *mux.Router) {
-	mux.HandleFunc("/oidc/.well-known/openid-configuration", openIDConfigurationEndpoint)
+	mux.HandleFunc("/oidc/.well-known/openid-configuration", p.addSecurityHeadersMiddleware(openIDConfigurationEndpoint))
 	mux.HandleFunc("/oidc/.well-known/jwks.json", p.jwksHandler.jwksEndpoint)
 	mux.HandleFunc("/oidc/authorize", p.authHandler.authEndpoint)
 	mux.HandleFunc("/oidc/token", p.tokenHandler.tokenEndpoint)

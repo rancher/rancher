@@ -120,6 +120,8 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		err = json.NewEncoder(w).Encode(tokenResponse)
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to encode token response", http.StatusInternalServerError, w)
@@ -133,6 +135,8 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		err = json.NewEncoder(w).Encode(tokenResponse)
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to encode refresh token response", http.StatusInternalServerError, w)
