@@ -178,7 +178,6 @@ func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleCont
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            name.SafeConcatName(resourceName, context, "psa"),
 				OwnerReferences: []metav1.OwnerReference{ownerRef},
-				Annotations:     annotations,
 			},
 			Rules: []rbackv1.PolicyRule{
 				{
