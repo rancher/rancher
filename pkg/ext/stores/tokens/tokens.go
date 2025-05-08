@@ -419,6 +419,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, err
 	}
 
+	// ignore incoming status, persist new fields
 	token.Status = ext.TokenStatus{
 		Hash:           hashedValue,
 		LastUpdateTime: t.timer.Now(),
