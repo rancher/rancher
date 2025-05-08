@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	keyBits            = 2048
+	keyBits            = 3072
 	keySecretNamespace = "cattle-system"
 	keySecretName      = "oidc-signing-key"
 )
@@ -134,8 +134,12 @@ func (h *jwksHandler) jwksEndpoint(w http.ResponseWriter, r *http.Request) {
 		pubKey, err := getPublicKeyFromSecretData(value)
 		if err != nil {
 			logrus.Errorf("[OIDC provider] failed to extract public key from secret data %v", err)
-			http.Error(w, "failed to extract public key from secret data", http.StatusInternalServerError)
+			oidcerror.WriteError(oidcerror.ServerError, "failed to extract public key from secret data", http.StatusInternalServerError, w)
 			return
+		}
+		if pubKey.N.BitLen() < 2048 {
+			logrus.Warnf("[OIDC provider] ignoring key because the size is less than 2048 bits")
+			continue
 		}
 
 		keys = append(keys, JWK{

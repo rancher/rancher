@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 )
 
@@ -70,13 +72,64 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("error parsing parameters from request %v", err), http.StatusBadRequest, w)
 		return
 	}
+	token, err := h.getAndVerifyRancherTokenFromRequest(r)
+	// redirect to the login page if the token is not present or there is any error fetching it. We need to pass all the oidc parameters from the original request.
+	if err != nil {
+		u, err := url.Parse(settings.ServerURL.Get() + "/dashboard/auth/login")
+		if err != nil {
+			oidcerror.WriteError(oidcerror.InvalidRequest, "error parsing server url", http.StatusInternalServerError, w)
+			return
+		}
+		q := url.Values{}
+		q.Set("response_type", params.responseType)
+		q.Set("client_id", params.clientID)
+		q.Set("redirect_uri", params.redirectURI)
+		q.Set("scope", strings.Join(params.scopes, " "))
+		q.Set("code_challenge", params.codeChallenge)
+		if params.state != "" {
+			q.Set("state", params.state)
+		}
+		if params.nonce != "" {
+			q.Set("nonce", params.nonce)
+		}
+		u.RawQuery = q.Encode()
+
+		http.Redirect(w, r, u.String(), http.StatusFound)
+		return
+	}
+
 	// validate all parameter as per the oidc spec.
 	if params.redirectURI == "" {
 		oidcerror.WriteError(oidcerror.InvalidRequest, "missing redirect_uri", http.StatusBadRequest, w)
 		return
 	}
-	if _, err := url.Parse(params.redirectURI); err != nil {
+	redirectURL, err := url.Parse(params.redirectURI)
+	if err != nil {
 		oidcerror.WriteError(oidcerror.InvalidRequest, "invalid redirect_uri", http.StatusBadRequest, w)
+	}
+	if redirectURL.Host == r.URL.Host && redirectURL.Path == r.URL.Path {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri can't be the same as the host uri", http.StatusBadRequest, w)
+	}
+	// Although Access-Control-Allow-Origin is initially set in addHeadersMiddleware based on all OIDCClients' redirectURLs,
+	// we override it here because we know the exact redirectURL for this request.
+	w.Header().Set("Access-Control-Allow-Origin", redirectURL.Host)
+	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
+	if err != nil {
+		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("error retrieving OIDC client: %v", err), http.StatusBadRequest, w)
+		return
+	}
+	if len(oidcClients) == 0 {
+		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("OIDC client not found: %v", err), http.StatusBadRequest, w)
+		return
+	}
+	if len(oidcClients) > 1 {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "multiple OIDC clients with the same clientID found", http.StatusBadRequest, w)
+		return
+	}
+	oidcClient := oidcClients[0]
+	if !slices.Contains(oidcClient.Spec.RedirectURIs, params.redirectURI) {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri is not registered", http.StatusBadRequest, w)
+		return
 	}
 	if params.responseType != supportedResponseType {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.UnsupportedResponseType, "response type not supported", params.state, w, r)
@@ -98,47 +151,6 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 	if params.codeChallenge == "" {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "missing code_challenge", params.state, w, r)
-		return
-	}
-	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
-	if err != nil {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.ServerError, fmt.Sprintf("error retrieving OIDC client: %v", err), params.state, w, r)
-		return
-	}
-	if len(oidcClients) == 0 {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.ServerError, fmt.Sprintf("OIDC client not found: %v", err), params.state, w, r)
-		return
-	}
-	oidcClient := oidcClients[0]
-
-	if !slices.Contains(oidcClient.Spec.RedirectURIs, params.redirectURI) {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, fmt.Sprintf("redirect_uri %s is not registered", params.redirectURI), params.state, w, r)
-		return
-	}
-
-	token, err := h.getAndVerifyRancherTokenFromRequest(r)
-	// redirect to the login page if the token is not present or there is any error fetching it. We need to pass all the oidc parameters from the original request.
-	if err != nil {
-		u, err := url.Parse(settings.ServerURL.Get() + "/dashboard/auth/login")
-		if err != nil {
-			oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "error parsing server url", params.state, w, r)
-			return
-		}
-		q := url.Values{}
-		q.Set("response_type", params.responseType)
-		q.Set("client_id", params.clientID)
-		q.Set("redirect_uri", params.redirectURI)
-		q.Set("scope", strings.Join(params.scopes, " "))
-		q.Set("code_challenge", params.codeChallenge)
-		if params.state != "" {
-			q.Set("state", params.state)
-		}
-		if params.nonce != "" {
-			q.Set("nonce", params.nonce)
-		}
-		u.RawQuery = q.Encode()
-
-		http.Redirect(w, r, u.String(), http.StatusFound)
 		return
 	}
 
@@ -191,15 +203,11 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 	}
 	token, err := h.tokenCache.Get(tokenName)
 	if err != nil {
-		return nil, fmt.Errorf("can't get token: %w", err)
+		// do not return early to avoid timing attacks
+		fakeToken, _ := randomtoken.Generate()
+		_ = subtle.ConstantTimeCompare([]byte(fakeToken), []byte(fakeToken))
+		return nil, fmt.Errorf("invalid token")
 	}
-	if token.Token != tokenKey {
-		return nil, fmt.Errorf("token doesn't match")
-	}
-	if token.Enabled != nil && !*token.Enabled {
-		return nil, fmt.Errorf("token not enabled")
-	}
-
 	// If the auth provider is specified make sure it exists and enabled.
 	if token.AuthProvider != "" {
 		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
@@ -209,6 +217,9 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 		if disabled {
 			return nil, fmt.Errorf("auth provider is disabled")
 		}
+	}
+	if _, err := tokens.VerifyToken(token, tokenName, tokenKey); err != nil {
+		return nil, fmt.Errorf("failed to verify token: %w", err)
 	}
 
 	authUser, err := h.userLister.Get(token.UserID)
