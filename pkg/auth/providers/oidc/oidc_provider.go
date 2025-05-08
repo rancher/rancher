@@ -64,8 +64,9 @@ type ClaimInfo struct {
 	Email             string   `json:"email"`
 	EmailVerified     bool     `json:"email_verified"`
 	Groups            []string `json:"groups"`
-	FullGroupPath     []string `json:"full_group_path"`
+	FullGroupPath     []string `json:"full_group_path"` // GitLab-specific configuration
 	ACR               string   `json:"acr"`
+	Roles             []string `json:"roles"` // AzureAD-specific configuration
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -537,6 +538,7 @@ func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth
 func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
 	var groupPrincipals []v3.Principal
 
+	// GitLab uses the full_group_path claim
 	if claimInfo.FullGroupPath != nil {
 		for _, groupPath := range claimInfo.FullGroupPath {
 			groupsFromPath := strings.Split(groupPath, "/")
@@ -551,6 +553,16 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Princ
 	} else {
 		for _, group := range claimInfo.Groups {
 			groupPrincipal := o.groupToPrincipal(group)
+			groupPrincipal.MemberOf = true
+			groupPrincipals = append(groupPrincipals, groupPrincipal)
+		}
+	}
+
+	// If the claimInfo includes roles, we will treat them like groups
+	// AzureAD uses the roles claim
+	if len(claimInfo.Roles) > 0 {
+		for _, role := range claimInfo.Roles {
+			groupPrincipal := o.groupToPrincipal(role)
 			groupPrincipal.MemberOf = true
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
