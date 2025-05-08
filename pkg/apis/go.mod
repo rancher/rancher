@@ -5,6 +5,8 @@ go 1.23.4
 toolchain go1.23.7
 
 replace (
+	github.com/rancher/rke => github.com/krunalhinguu/rke v1.8.5-0.20250508031348-aacb36184d8c
+
 	k8s.io/api => k8s.io/api v0.32.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.32.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.32.2
@@ -73,7 +75,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

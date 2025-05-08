@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
-	"time"
 
 	rketypes "github.com/rancher/rke/types"
 
@@ -170,8 +169,10 @@ func remove(ctx context.Context, c *client.Client, id string) error {
 }
 
 func restart(ctx context.Context, c *client.Client, id string) error {
-	timeoutDuration := 10 * time.Second
-	return c.ContainerRestart(ctx, id, &timeoutDuration)
+	timeoutSeconds := 10
+	return c.ContainerRestart(ctx, id, container.StopOptions{
+		Timeout: &timeoutSeconds,
+	})
 }
 
 func changed(ctx context.Context, c *client.Client, expectedProcess rketypes.Process, container types.Container) (bool, error) {
