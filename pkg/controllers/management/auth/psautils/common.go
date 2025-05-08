@@ -13,7 +13,6 @@ const (
 
 // IsPSAAllowed get a list of roletemplates to verify if updatepsa verb is enabled on their rules
 func IsPSAAllowed(roleTemplates []*v3.RoleTemplate) bool {
-	isUpdatepsaAllowed := false
 	auth := authorizer.AttributesRecord{
 		Verb:            UpdatepsaVerb,
 		APIGroup:        management.GroupName,
@@ -22,8 +21,8 @@ func IsPSAAllowed(roleTemplates []*v3.RoleTemplate) bool {
 	}
 	for _, rt := range roleTemplates {
 		if rbacmgmt.RulesAllow(auth, rt.Rules...) {
-			isUpdatepsaAllowed = true
+			return true
 		}
 	}
-	return isUpdatepsaAllowed
+	return false
 }
