@@ -325,7 +325,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		tolerations, err = m.operation.AddCpTaintsToTolerations(tolerations)
 		if err != nil {
 			logrus.Warnf("failed to add tolerations for control plane taints: %v", err)
-		} else {
+		} else if len(tolerations) > 0 {
 			desiredValue["tolerations"] = tolerations
 		}
 	}
