@@ -133,7 +133,7 @@ require (
 	github.com/rancher/dynamiclistener v0.6.1
 	github.com/rancher/eks-operator v1.10.4
 	github.com/rancher/fleet/pkg/apis v0.11.6
-	github.com/rancher/gke-operator v1.10.4
+	github.com/rancher/gke-operator v1.10.5-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.1
 	github.com/rancher/machine v0.15.0-rancher125
@@ -154,12 +154,12 @@ require (
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vmware/govmomi v0.42.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/crypto v0.36.0
-	golang.org/x/mod v0.23.0
-	golang.org/x/net v0.37.0
-	golang.org/x/oauth2 v0.28.0
-	golang.org/x/sync v0.12.0
-	golang.org/x/text v0.23.0
+	golang.org/x/crypto v0.37.0
+	golang.org/x/mod v0.24.0
+	golang.org/x/net v0.39.0
+	golang.org/x/oauth2 v0.29.0
+	golang.org/x/sync v0.13.0
+	golang.org/x/text v0.24.0
 	google.golang.org/api v0.210.0
 	google.golang.org/grpc v1.67.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -379,7 +379,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.36.3 // indirect
+	github.com/onsi/gomega v1.37.0 // indirect
 	github.com/opencontainers/runc v1.1.14 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5 // indirect
@@ -418,10 +418,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
-	golang.org/x/tools v0.30.0 // indirect
+	golang.org/x/tools v0.31.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
