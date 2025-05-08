@@ -167,6 +167,8 @@ var (
 	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
 	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
+	invalidNameError        = apierrors.NewBadRequest("Token is invalid: metadata.name: Forbidden to be set. Use of 'generateName' is required")
+	missingGenerateNameError    = apierrors.NewBadRequest("Token is invalid: metadata.generateName: Required value is not set")
 
 	parseBoolError error
 	parseIntError  error
@@ -941,8 +943,8 @@ func Test_Store_Create(t *testing.T) {
 			},
 		},
 		{
-			name: "reject already existing token",
-			err:  helloAlreadyExistsError,
+			name: "reject specified name",
+			err:  invalidNameError,
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "hello",
@@ -964,9 +966,28 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
+			},
+		},
+		{
+			name: "reject missing generateName",
+			err:  missingGenerateNameError,
+			tok: &ext.Token{},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
 
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(&corev1.Secret{}, nil)
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("world", false, true, nil)
+
+				space.EXPECT().Create(gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 		// token generation and hash errors -- no mocking -- unable to induce and test
@@ -975,7 +996,7 @@ func Test_Store_Create(t *testing.T) {
 			err:  apierrors.NewInternalError(fmt.Errorf("failed to retrieve user world: %w", someerror)),
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -997,9 +1018,6 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 
 				users.EXPECT().Get("world").
 					Return(nil, someerror)
@@ -1010,7 +1028,7 @@ func Test_Store_Create(t *testing.T) {
 			err:  apierrors.NewBadRequest("operation references a disabled user"),
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1032,9 +1050,6 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1047,7 +1062,7 @@ func Test_Store_Create(t *testing.T) {
 			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token session-token")),
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1078,9 +1093,6 @@ func Test_Store_Create(t *testing.T) {
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
 
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
-
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
 			},
@@ -1090,7 +1102,7 @@ func Test_Store_Create(t *testing.T) {
 			err:  someerror,
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1121,9 +1133,6 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
@@ -1137,7 +1146,7 @@ func Test_Store_Create(t *testing.T) {
 			err:  apierrors.NewInternalError(fmt.Errorf("failed to store token hello: %w", someerror)),
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1168,9 +1177,6 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1194,7 +1200,7 @@ func Test_Store_Create(t *testing.T) {
 			err:  helloAlreadyExistsError,
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1225,9 +1231,6 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1248,10 +1251,10 @@ func Test_Store_Create(t *testing.T) {
 		},
 		{
 			name: "created secret reads back as bogus",
-			err:  apierrors.NewInternalError(fmt.Errorf("failed to regenerate token hello: %w", userIDMissingError)),
+			err:  apierrors.NewInternalError(fmt.Errorf("failed to regenerate token bogus: %w", userIDMissingError)),
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1282,9 +1285,6 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1306,7 +1306,7 @@ func Test_Store_Create(t *testing.T) {
 
 				// on failure to read back the secret is deleted again
 				secrets.EXPECT().
-					Delete("cattle-tokens", "hello", gomock.Any()).
+					Delete("cattle-tokens", "bogus", gomock.Any()).
 					Return(nil)
 
 			},
@@ -1316,7 +1316,7 @@ func Test_Store_Create(t *testing.T) {
 			err:  nil,
 			tok: &ext.Token{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
+					GenerateName: "hello",
 				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1347,9 +1347,6 @@ func Test_Store_Create(t *testing.T) {
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(nil, someerror)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1995,7 +1992,7 @@ func Test_SystemStore_Update(t *testing.T) {
 			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit user id"),
 		},
 		{
-			name:     "reject login flag change",
+			name:     "reject kind change",
 			fullPerm: true,
 			opts:     &metav1.UpdateOptions{},
 			token: func() *ext.Token {
