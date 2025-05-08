@@ -128,9 +128,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri is not registered", http.StatusBadRequest, w)
 		return
 	}
-	if r.URL.Host == redirectURL.Host {
-		w.Header().Set("Access-Control-Allow-Origin", redirectURL.Host)
-	}
+	w.Header().Set("Access-Control-Allow-Origin", redirectURL.Host)
 	if params.responseType != supportedResponseType {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.UnsupportedResponseType, "response type not supported", params.state, w, r)
 		return
