@@ -150,7 +150,6 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 // checkPSAMembershipRole creates (if needed) an additional cluster role to grant updatepsa permissions, if needed.
 func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleController, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) error {
 	var resourceName, resourceNamespace, resourceType, context string
-	var annotations map[string]string
 
 	switch v := obj.(type) {
 	case *apisv3.Project:
