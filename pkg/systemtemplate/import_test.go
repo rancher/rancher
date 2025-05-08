@@ -57,7 +57,6 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		namespace                         string
 		token                             string
 		url                               string
-		isWindowsCluster                  bool
 		isPreBootstrap                    bool
 		features                          map[string]bool
 		taints                            []corev1.Taint
@@ -85,7 +84,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "15dec55d3fc65ad72f88d0aa1573c45b20e1802eb4913e8449cf1b6a8005bf69",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -120,7 +119,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "15dec55d3fc65ad72f88d0aa1573c45b20e1802eb4913e8449cf1b6a8005bf69",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -169,7 +168,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "15dec55d3fc65ad72f88d0aa1573c45b20e1802eb4913e8449cf1b6a8005bf69",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -221,7 +220,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "2093af1547b1eef8b22527ecb1590fe3302c3287b317e0aed3e268ff2a6dc0df",
+				"cattle-cluster-agent": "5f608a6f2b5f727179e456495857fb889c46bfc0165894bc0eadab0b8c51824e",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -264,7 +263,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "48868d8d72bfe924be0eb248def83f78088c68f91e12cd2b67116e6d448d889a",
+				"cattle-cluster-agent": "2d99c7c613f69417bcf84ed4d7f68a9b98fe9d04a26644760bfca6040487768d",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -299,7 +298,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			if tt.cluster.Spec.ImportedConfig != nil && tt.cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
 				tt.agentImage = image.ResolveWithCluster(tt.agentImage, tt.cluster)
 			}
-			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isWindowsCluster, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister, tt.pcExists)
+			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister, tt.pcExists)
 
 			assert.Nil(t, err)
 			decoder := scheme.Codecs.UniversalDeserializer()

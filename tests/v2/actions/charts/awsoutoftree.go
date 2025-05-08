@@ -214,7 +214,7 @@ func awsChartInstallAction(awsChartInstallActionPayload *payloadOpts, repoName, 
 			map[string]interface{}{
 				"effect": "NoSchedule",
 				"value":  "true",
-				"key":    "node-role.kubernetes.io/master",
+				"key":    "node-role.kubernetes.io/control-plane",
 			},
 		},
 	}

@@ -56,7 +56,6 @@ var (
 	controlPlaneTaintsMutex sync.RWMutex
 	controlPlaneTaints      = make(map[string][]corev1.Taint)
 	controlPlaneLabels      = map[string]string{
-		"node-role.kubernetes.io/master":        "true",
 		"node-role.kubernetes.io/controlplane":  "true",
 		"node-role.kubernetes.io/control-plane": "true",
 	}
@@ -625,8 +624,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name,
-		token, url, cluster.Spec.WindowsPreferedCluster,
-		capr.PreBootstrap(cluster), cluster, features,
+		token, url, capr.PreBootstrap(cluster), cluster, features,
 		taints, cd.secretLister, priorityClassExists)
 
 	return buf.Bytes(), err
