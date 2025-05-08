@@ -1992,6 +1992,27 @@ func Test_SystemStore_Update(t *testing.T) {
 			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit user id"),
 		},
 		{
+			name:     "reject principal change",
+			fullPerm: true,
+			opts:     &metav1.UpdateOptions{},
+			token: func() *ext.Token {
+				changed := properToken.DeepCopy()
+				changed.Spec.UserPrincipal.DisplayName = "dummy"
+				return changed
+			}(),
+			storeSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+				scache.EXPECT().
+					Get("cattle-tokens", "bogus").
+					Return(&properSecret, nil)
+			},
+			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit principal data"),
+		},
+		{
 			name:     "reject kind change",
 			fullPerm: true,
 			opts:     &metav1.UpdateOptions{},

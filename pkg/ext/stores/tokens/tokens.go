@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	reflect "reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -677,6 +678,19 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 
 	if token.Spec.Kind != currentToken.Spec.Kind {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kind",
+			token.Name))
+	}
+
+	if token.Spec.UserPrincipal.Name != currentToken.Spec.UserPrincipal.Name ||
+		token.Spec.UserPrincipal.DisplayName != currentToken.Spec.UserPrincipal.DisplayName ||
+		token.Spec.UserPrincipal.LoginName != currentToken.Spec.UserPrincipal.LoginName ||
+		token.Spec.UserPrincipal.ProfilePicture != currentToken.Spec.UserPrincipal.ProfilePicture ||
+		token.Spec.UserPrincipal.PrincipalType != currentToken.Spec.UserPrincipal.PrincipalType ||
+		token.Spec.UserPrincipal.Me != currentToken.Spec.UserPrincipal.Me ||
+		token.Spec.UserPrincipal.MemberOf != currentToken.Spec.UserPrincipal.MemberOf ||
+		token.Spec.UserPrincipal.Provider != currentToken.Spec.UserPrincipal.Provider ||
+		!reflect.DeepEqual(token.Spec.UserPrincipal.ExtraInfo, currentToken.Spec.UserPrincipal.ExtraInfo) {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit principal data",
 			token.Name))
 	}
 
