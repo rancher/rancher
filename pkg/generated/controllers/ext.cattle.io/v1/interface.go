@@ -46,7 +46,7 @@ type version struct {
 }
 
 func (v *version) Token() TokenController {
-	return generic.NewController[*v1.Token, *v1.TokenList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Token"}, "tokens", true, v.controllerFactory)
+	return generic.NewNonNamespacedController[*v1.Token, *v1.TokenList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Token"}, "tokens", v.controllerFactory)
 }
 
 func (v *version) UserActivity() UserActivityController {

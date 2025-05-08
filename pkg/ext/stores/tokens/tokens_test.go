@@ -706,7 +706,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: "update"})
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Modified})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -720,7 +720,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		event, more := (<-consumer.ResultChan()) // receive update event
 		assert.True(t, more)
-		assert.Equal(t, watch.EventType("update"), event.Type)
+		assert.Equal(t, watch.Modified, event.Type)
 		assert.Equal(t, &properToken, event.Object)
 
 		watcher.Done() // close backend channel
@@ -744,7 +744,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: "update"})
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Modified})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -758,8 +758,116 @@ func Test_Store_Watch(t *testing.T) {
 
 		event, more := (<-consumer.ResultChan()) // receive update event
 		assert.True(t, more)
-		assert.Equal(t, watch.EventType("update"), event.Type)
+		assert.Equal(t, watch.Modified, event.Type)
 		assert.Equal(t, &properTokenCurrent, event.Object)
+
+		watcher.Done() // close backend channel
+
+		select {
+		case _, more := (<-consumer.ResultChan()):
+			// no events received, and none pending - should not trigger
+			assert.False(t, more)
+		case <-time.After(5 * time.Second):
+			// trigger and end - we close the consumer
+			consumer.Stop()
+		}
+	})
+
+	t.Run("event for error is ignored", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Error})
+		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+			Return(watcher, nil)
+
+		auth.EXPECT().SessionID(gomock.Any()).Return("")
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return("lkajdlksjlkds", false, true, nil)
+
+		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
+		assert.Nil(t, err)
+
+		watcher.Done() // close backend channel - no further events
+
+		select {
+		case _, more := (<-consumer.ResultChan()):
+			// no events received, and none pending - should not trigger
+			assert.False(t, more)
+		case <-time.After(5 * time.Second):
+			// trigger and end - we close the consumer
+			consumer.Stop()
+		}
+	})
+
+	t.Run("event for bad bookmark is ignored", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Bookmark})
+		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+			Return(watcher, nil)
+
+		auth.EXPECT().SessionID(gomock.Any()).Return("")
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return("lkajdlksjlkds", false, true, nil)
+
+		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
+		assert.Nil(t, err)
+
+		watcher.Done() // close backend channel - no further events
+
+		select {
+		case _, more := (<-consumer.ResultChan()):
+			// no events received, and none pending - should not trigger
+			assert.False(t, more)
+		case <-time.After(5 * time.Second):
+			// trigger and end - we close the consumer
+			consumer.Stop()
+		}
+	})
+
+	t.Run("receive event for bookmark", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
+		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
+			Return(watcher, nil)
+
+		auth.EXPECT().SessionID(gomock.Any()).Return("")
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return("lkajdlksjlkds", false, true, nil)
+
+		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
+		assert.Nil(t, err)
+
+		event, more := (<-consumer.ResultChan()) // receive update event
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "",
+			},
+		}, event.Object)
 
 		watcher.Done() // close backend channel
 
@@ -1347,6 +1455,11 @@ func Test_SystemStore_List(t *testing.T) {
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "1",
+					Continue:           "true",
+					RemainingItemCount: pointer.Int64(2),
+				},
 				Items: []ext.Token{
 					properToken,
 				},
@@ -1355,6 +1468,11 @@ func Test_SystemStore_List(t *testing.T) {
 				secrets.EXPECT().
 					List("cattle-tokens", gomock.Any()).
 					Return(&corev1.SecretList{
+						ListMeta: metav1.ListMeta{
+							ResourceVersion:    "1",
+							Continue:           "true",
+							RemainingItemCount: pointer.Int64(2),
+						},
 						Items: []corev1.Secret{
 							properSecret,
 						},
@@ -1368,6 +1486,11 @@ func Test_SystemStore_List(t *testing.T) {
 			opts:    &metav1.ListOptions{},
 			err:     nil,
 			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "",
+					Continue:           "",
+					RemainingItemCount: nil,
+				},
 				Items: []ext.Token{
 					properTokenCurrent,
 				},
@@ -1388,6 +1511,11 @@ func Test_SystemStore_List(t *testing.T) {
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "",
+					Continue:           "",
+					RemainingItemCount: nil,
+				},
 				Items: []ext.Token{
 					properToken,
 				},
