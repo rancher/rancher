@@ -380,6 +380,12 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, err
 	}
 
+	// reject any attempt to specify status fields
+	emptyStatus := ext.TokenStatus{}
+	if token.Status != emptyStatus {
+		return nil, apierrors.NewBadRequest("Token is invalid: status is not empty")
+	}
+
 	user, err := t.userClient.Get(token.Spec.UserID)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve user %s: %w",
