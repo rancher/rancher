@@ -110,6 +110,9 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	if redirectURL.Host == r.URL.Host && redirectURL.Path == r.URL.Path {
 		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri can't be the same as the host uri", http.StatusBadRequest, w)
 	}
+	// Although Access-Control-Allow-Origin is initially set in addHeadersMiddleware based on all OIDCClients' redirectURLs,
+	// we override it here because we know the exact redirectURL for this request.
+	w.Header().Set("Access-Control-Allow-Origin", redirectURL.Host)
 	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
 	if err != nil {
 		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("error retrieving OIDC client: %v", err), http.StatusBadRequest, w)
@@ -128,7 +131,6 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri is not registered", http.StatusBadRequest, w)
 		return
 	}
-	w.Header().Set("Access-Control-Allow-Origin", redirectURL.Host)
 	if params.responseType != supportedResponseType {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.UnsupportedResponseType, "response type not supported", params.state, w, r)
 		return
