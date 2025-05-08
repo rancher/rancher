@@ -77,7 +77,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		u, err := url.Parse(settings.ServerURL.Get() + "/dashboard/auth/login")
 		if err != nil {
-			oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "error parsing server url", params.state, w, r)
+			oidcerror.WriteError(oidcerror.InvalidRequest, "error parsing server url", http.StatusInternalServerError, w)
 			return
 		}
 		q := url.Values{}
