@@ -119,6 +119,10 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("OIDC client not found: %v", err), http.StatusBadRequest, w)
 		return
 	}
+	if len(oidcClients) > 1 {
+		oidcerror.WriteError(oidcerror.InvalidRequest, "multiple OIDC clients with the same clientID found", http.StatusBadRequest, w)
+		return
+	}
 	oidcClient := oidcClients[0]
 	if !slices.Contains(oidcClient.Spec.RedirectURIs, params.redirectURI) {
 		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri is not registered", http.StatusBadRequest, w)
