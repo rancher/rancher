@@ -375,15 +375,9 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		t.initialized = true
 	}
 
-	ensureNameOrGenerateName(token)
-	// we check the Name directly. because of the ensure... we know that
-	// GenerateName is not set. as it squashes the name in that case.
-	if token.Name != "" {
-		// reject creation of a token which already exists
-		currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
-		if err == nil && currentSecret != nil {
-			return nil, apierrors.NewAlreadyExists(group, token.Name)
-		}
+	// enforce our choice of required generateName, and forbidden name.
+	if err := ensureNoNameAndGenerateName(token); err != nil {
+		return nil, err
 	}
 
 	user, err := t.userClient.Get(token.Spec.UserID)
@@ -447,12 +441,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	newSecret, err := t.secretClient.Create(secret)
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
-			// can happen despite the early check for a pre-existing secret.
-			// another request may have raced us while the secret was assembled.
+			// note: should not be possible due to the forced use of generateName
 			return nil, err
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store token %s: %w",
-			token.Name, err))
+			token.GenerateName, err))
 	}
 
 	// Read changes back to return what was truly created, not what we thought we created
@@ -460,11 +453,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	if err != nil {
 		// An error here means that something broken was stored.
 		// Do not leave that broken thing behind.
-		t.secretClient.Delete(TokenNamespace, secret.Name, &metav1.DeleteOptions{})
+		t.secretClient.Delete(TokenNamespace, newSecret.Name, &metav1.DeleteOptions{})
 
 		// And report what was broken
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token %s: %w",
-			token.Name, err))
+			newSecret.Name, err))
 	}
 
 	// The newly created token is not the request token
@@ -1433,24 +1426,21 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-// ensureNameOrGenerateName ensures that the token has either a proper name, or
-// a generateName clause. Note, this function does __not generate__ the name if
-// the latter is present. That is delegated to the backend store, i.e. the
-// secrets holding tokens. See `secretFromToken` above.
-func ensureNameOrGenerateName(token *ext.Token) error {
-	// NOTE: When both name and generateName are set the generateName has precedence
-	if token.ObjectMeta.GenerateName != "" {
-		token.ObjectMeta.Name = ""
-		return nil
-	}
-
+// ensureNoNameAndGenerateName ensures that the token has the generateName
+// clause set, and no name specified. This enforces our decision (RFD Imperative
+// API Object Naming) to not allow users the choice of token names.
+func ensureNoNameAndGenerateName(token *ext.Token) error {
 	if token.ObjectMeta.Name != "" {
+		return apierrors.NewBadRequest(
+			"Token is invalid: metadata.name: Forbidden to be set. Use of 'generateName' is required")
+	}
+
+	if token.ObjectMeta.GenerateName != "" {
 		return nil
 	}
 
-	return apierrors.NewBadRequest(fmt.Sprintf(
-		"Token \"%s\" is invalid: metadata.name: Required value: name or generateName is required",
-		token.ObjectMeta.Name))
+	return apierrors.NewBadRequest(
+		"Token is invalid: metadata.generateName: Required value is not set")
 }
 
 func clampMaxTTL(ttl int64) (int64, error) {
