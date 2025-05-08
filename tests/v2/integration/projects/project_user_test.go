@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/v2/actions/namespaces"
+	"github.com/rancher/tests/actions/namespaces"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/users"

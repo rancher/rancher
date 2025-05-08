@@ -45,7 +45,7 @@ node {
           dir ("/home/jenkins/go/src/github.com/rancher/rancher") {
             try {
               stage('Configure and Build') {
-                sh "tests/v2/validation/configure.sh"
+                sh "tests/v2/codecoverage/configure.sh"
                 sh "docker build . -f tests/v2/codecoverage/Dockerfile.buildcodecoverage -t ${goImageName}"
               }
               stage('Build Code Coverage Test Image') {
