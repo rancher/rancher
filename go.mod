@@ -140,7 +140,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.12.3-beta.1
 	github.com/rancher/gke-operator v1.11.2-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.2.1
+	github.com/rancher/lasso v0.2.2
 	github.com/rancher/machine v0.15.0-rancher127
 	github.com/rancher/norman v0.5.2
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -150,7 +150,7 @@ require (
 	github.com/rancher/steve v0.5.13
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.2.0
+	github.com/rancher/wrangler/v3 v3.2.1-rc.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0

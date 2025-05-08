@@ -2452,8 +2452,8 @@ github.com/rancher/helm/v3 v3.17.0-rancher1/go.mod h1:Mo7eGyKPPHlS0Ml67W8z/lbkox
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
 github.com/rancher/kubernetes-provider-detector v0.1.5/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
 github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91/go.mod h1:G6Vv2aj6xB2YjTVagmu4NkhBvbE8nBcGykHRENH6arI=
-github.com/rancher/lasso v0.2.1 h1:SZTqMVQn8cAOqvwGBd1/EYOIJ/MGN+UfJrOWvHd4jHU=
-github.com/rancher/lasso v0.2.1/go.mod h1:KSV3jBXfdXqdCuMm2uC8kKB9q/wuDYb3h0eHZoRjShM=
+github.com/rancher/lasso v0.2.2 h1:oKP5d4+eSupwHftLMTWo6QS1tYYZ5XK+ZjP+VNhwmk8=
+github.com/rancher/lasso v0.2.2/go.mod h1:KSV3jBXfdXqdCuMm2uC8kKB9q/wuDYb3h0eHZoRjShM=
 github.com/rancher/machine v0.15.0-rancher127 h1:6i+NZQOok6Q98l/E4FC64f29P1BmhGYK6KAY42FMVsA=
 github.com/rancher/machine v0.15.0-rancher127/go.mod h1:9D7LZbLqfNNbHsregTNpjC4oKi4zI6qA54KMzWPeVB4=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
@@ -2479,8 +2479,8 @@ github.com/rancher/wrangler v0.6.2-0.20200622171942-7224e49a2407/go.mod h1:Nmtml
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
 github.com/rancher/wrangler-api v0.6.1-0.20200515193802-dcf70881b087/go.mod h1:s95VCVHV19b+EUo7BAwwe6nhaDx2/lHu91hxxDHbZs0=
-github.com/rancher/wrangler/v3 v3.2.0 h1:fZmhSOczW+pxAhyOaGG+9xbEwETPGA5gbS0x0Im2zWs=
-github.com/rancher/wrangler/v3 v3.2.0/go.mod h1:0C5QyvSrQOff8gQQzpB/L/FF03EQycjR3unSJcKCHno=
+github.com/rancher/wrangler/v3 v3.2.1-rc.1 h1:HCiuALgl8C1EtL8iT06cDsLJZ5RycWRQc9XUKUo1WZs=
+github.com/rancher/wrangler/v3 v3.2.1-rc.1/go.mod h1:RV8kkv5br5HaxXWamIbr95pOjvVeoC5CeBldcdw5Fv0=
 github.com/redis/go-redis/v9 v9.7.3 h1:YpPyAayJV+XErNsatSElgRZZVCwXX9QzkKYNvO7x0wM=
 github.com/redis/go-redis/v9 v9.7.3/go.mod h1:bGUrSggJ9X9GUmZpZNEOQKaANxSGgOEBRltRTZHSvrA=
 github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
