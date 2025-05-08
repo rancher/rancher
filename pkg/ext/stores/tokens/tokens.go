@@ -657,28 +657,23 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token: %w", err))
 	}
 	currentToken, err := tokenFromSecret(currentSecret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", err))
 	}
 
 	if token.ObjectMeta.UID != currentToken.ObjectMeta.UID {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kubernetes UID",
-			token.Name))
+		return nil, apierrors.NewBadRequest("forbidden to edit kubernetes UID")
 	}
 
 	if token.Spec.UserID != currentToken.Spec.UserID {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit user id",
-			token.Name))
+		return nil, apierrors.NewBadRequest("forbidden to edit user id")
 	}
 
 	if token.Spec.Kind != currentToken.Spec.Kind {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kind",
-			token.Name))
+		return nil, apierrors.NewBadRequest("forbidden to edit kind")
 	}
 
 	if token.Spec.UserPrincipal.Name != currentToken.Spec.UserPrincipal.Name ||
@@ -690,21 +685,18 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 		token.Spec.UserPrincipal.MemberOf != currentToken.Spec.UserPrincipal.MemberOf ||
 		token.Spec.UserPrincipal.Provider != currentToken.Spec.UserPrincipal.Provider ||
 		!reflect.DeepEqual(token.Spec.UserPrincipal.ExtraInfo, currentToken.Spec.UserPrincipal.ExtraInfo) {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit principal data",
-			token.Name))
+		return nil, apierrors.NewBadRequest("forbidden to edit principal data")
 	}
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
 		ttl, err := clampMaxTTL(token.Spec.TTL)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token %s ttl: %w",
-				token.Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
 		}
 		token.Spec.TTL = ttl
 		if ttlGreater(ttl, currentToken.Spec.TTL) {
-			return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to extend time-to-live",
-				token.Name))
+			return nil, apierrors.NewBadRequest("forbidden to extend time-to-live")
 		}
 	}
 
@@ -718,8 +710,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	// Save changes to backing secret, properly pass old secret labels/anotations into the new.
 	secret, err := secretFromToken(token, currentSecret.Labels, currentSecret.Annotations)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
 
 	// Abort, user does not wish to actually change anything.
@@ -729,15 +720,13 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 
 	newSecret, err := t.secretClient.Update(secret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to update token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to save updated token: %w", err))
 	}
 
 	// Read changes back to return what was truly saved, not what we thought we saved
 	newToken, err := tokenFromSecret(newSecret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token: %w", err))
 	}
 
 	newToken.Status.Current = newToken.Name == sessionID

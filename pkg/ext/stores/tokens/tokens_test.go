@@ -1795,8 +1795,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(nil, someerror)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", "bogus",
-				someerror)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to retrieve token: %w", someerror)),
 		},
 		{
 			name:     "empty secret (no kube id)",
@@ -1813,8 +1812,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&corev1.Secret{}, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus",
-				kubeIDMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", kubeIDMissingError)),
 		},
 		{
 			name:     "part-filled secret (no enabled)",
@@ -1835,7 +1833,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", parseBoolError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", parseBoolError)),
 		},
 		{
 			name:     "part-filled secret (no ttl)",
@@ -1856,7 +1854,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", parseIntError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", parseIntError)),
 		},
 		{
 			name:     "part-filled secret (no hash)",
@@ -1877,7 +1875,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", hashMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", hashMissingError)),
 		},
 		{
 			name:     "part-filled secret (no auth provider)",
@@ -1901,7 +1899,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", authProviderMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", authProviderMissingError)),
 		},
 		{
 			name:     "part-filled secret (no last update)",
@@ -1922,7 +1920,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", lastUpdateMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", lastUpdateMissingError)),
 		},
 		{
 			name:     "part-filled secret (no principal id)",
@@ -1946,7 +1944,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", principalIDMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", principalIDMissingError)),
 		},
 		{
 			name:     "part-filled secret (no kube id)",
@@ -1967,7 +1965,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus", kubeIDMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", kubeIDMissingError)),
 		},
 		// Second set of tests, compare inbound token against stored token, and reject forbidden changes
 		{
@@ -1989,7 +1987,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit user id"),
+			err: apierrors.NewBadRequest("forbidden to edit user id"),
 		},
 		{
 			name:     "reject principal change",
@@ -2010,7 +2008,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit principal data"),
+			err: apierrors.NewBadRequest("forbidden to edit principal data"),
 		},
 		{
 			name:     "reject kind change",
@@ -2031,7 +2029,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit kind"),
+			err: apierrors.NewBadRequest("forbidden to edit kind"),
 		},
 		// Third set, accepted changes and other errors
 		{
@@ -2131,7 +2129,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to extend time-to-live"),
+			err: apierrors.NewBadRequest("forbidden to extend time-to-live"),
 		},
 		{
 			name:     "accept ttl reduction (limited permission)",
@@ -2200,7 +2198,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Update(gomock.Any()).
 					Return(nil, someerror)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to update token bogus: %w", someerror)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to save updated token: %w", someerror)),
 		},
 		{
 			name:     "read back broken data after update",
@@ -2234,7 +2232,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Update(gomock.Any()).
 					Return(reduced, nil)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to regenerate token bogus: %w", userIDMissingError)),
+			err: apierrors.NewInternalError(fmt.Errorf("failed to regenerate token: %w", userIDMissingError)),
 		},
 		{
 			name:     "ok",
