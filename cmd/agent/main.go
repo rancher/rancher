@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
@@ -509,11 +510,11 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	for _, container := range containers {
-		if len(container.Names) > 0 && strings.Contains(container.Names[0], "kubelet") {
+	for _, ctr := range containers {
+		if len(ctr.Names) > 0 && strings.Contains(ctr.Names[0], "kubelet") {
 			nodeName := os.Getenv("CATTLE_NODE_NAME")
 			logrus.Infof("node %v is not registered, restarting kubelet now", nodeName)
-			if err := c.ContainerRestart(ctx, container.ID, nil); err != nil {
+			if err := c.ContainerRestart(ctx, ctr.ID, container.StopOptions{}); err != nil {
 				return false, err
 			}
 			break
