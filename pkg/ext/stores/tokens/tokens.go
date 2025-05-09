@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	reflect "reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,17 +35,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/kubernetes/pkg/printers"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 )
 
 const (
-	TokenNamespace = "cattle-tokens"
-	UserIDLabel    = "authn.management.cattle.io/token-userId"
-	KindLabel      = "authn.management.cattle.io/kind"
-	IsLogin        = "session"
+	TokenNamespace       = "cattle-tokens"
+	UserIDLabel          = "authn.management.cattle.io/token-userId"
+	KindLabel            = "authn.management.cattle.io/kind"
+	IsLogin              = "session"
+	SecretKindLabel      = "cattle.io/kind"
+	SecretKindLabelValue = "token"
 
 	// names of the data fields used by the backing secrets to store token information
 	FieldAnnotations      = "annotations"
@@ -102,15 +108,16 @@ type Store struct {
 // words, it generally has access to all the tokens, in all ways.
 type SystemStore struct {
 	authorizer      authorizer.Authorizer
-	initialized     bool               // flag. set when this store ensured presence of the backing namespace
-	namespaceClient v1.NamespaceClient // access to namespaces.
-	secretClient    v1.SecretClient    // direct access to the backing secrets
-	secretCache     v1.SecretCache     // cached access to the backing secrets
-	userClient      v3.UserCache       // cached access to the v3.Users
-	v3TokenClient   v3.TokenCache      // cached access to v3.Tokens. See Fetch.
-	timer           timeHandler        // access to timestamp generation
-	hasher          hashHandler        // access to generation and hashing of secret values
-	auth            authHandler        // access to user retrieval from context
+	initialized     bool                // flag. set when this store ensured presence of the backing namespace
+	namespaceClient v1.NamespaceClient  // access to namespaces.
+	secretClient    v1.SecretClient     // direct access to the backing secrets
+	secretCache     v1.SecretCache      // cached access to the backing secrets
+	userClient      v3.UserCache        // cached access to the v3.Users
+	v3TokenClient   v3.TokenCache       // cached access to v3.Tokens. See Fetch.
+	timer           timeHandler         // access to timestamp generation
+	hasher          hashHandler         // access to generation and hashing of secret values
+	auth            authHandler         // access to user retrieval from context
+	tableConverter  rest.TableConvertor // custom column formatting
 }
 
 // NewFromWrangler is a convenience function for creating a token store.
@@ -153,6 +160,9 @@ func New(
 			timer:           timer,
 			hasher:          hasher,
 			auth:            auth,
+			tableConverter: printerstorage.TableConvertor{
+				TableGenerator: printers.NewTableGenerator().With(printHandler),
+			},
 		},
 	}
 	return &tokenStore
@@ -307,14 +317,64 @@ func (t *Store) List(
 	return t.list(ctx, options)
 }
 
-// ConvertToTable implements [rest.Lister], the interface to support the `list` verb.
+// ConvertToTable implements [rest.Lister]/[rest.TableConvertor], the interface to support the `list` verb.
 func (t *Store) ConvertToTable(
 	ctx context.Context,
 	object runtime.Object,
 	tableOptions runtime.Object) (*metav1.Table, error) {
+	return t.tableConverter.ConvertToTable(ctx, object, tableOptions)
+}
 
-	return extcore.ConvertToTableDefault[*ext.Token](ctx, object, tableOptions,
-		GVR.GroupResource())
+// printHandler registers the column definitions and actual formatter functions
+func printHandler(h printers.PrintHandler) {
+	columnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "User", Type: "string", Description: "User is the owner of the token"},
+		{Name: "Kind", Type: "string", Description: "Kind/purpose of the token"},
+		{Name: "TTL", Type: "string", Description: "The time-to-live for the token"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Description", Type: "string", Priority: 1, Description: "Human readable description of the token"},
+	}
+	_ = h.TableHandler(columnDefinitions, printTokenList)
+	_ = h.TableHandler(columnDefinitions, printToken)
+}
+
+// printToken formats a single Token for table printing
+func printToken(token *ext.Token, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	return []metav1.TableRow{{
+		Object: runtime.RawExtension{Object: token},
+		Cells: []any{
+			token.Name,
+			token.Spec.UserID,
+			token.Spec.Kind,
+			duration.HumanDuration(time.Duration(token.Spec.TTL) * time.Millisecond),
+			translateTimestampSince(token.CreationTimestamp),
+			token.Spec.Description,
+		},
+	}}, nil
+}
+
+// printTokenList formats a set of Tokens for table printing
+func printTokenList(tokenList *ext.TokenList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(tokenList.Items))
+	for i := range tokenList.Items {
+		r, err := printToken(&tokenList.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+// translateTimestampSince returns a human-readable approximation of the elapsed
+// time since timestamp
+func translateTimestampSince(timestamp metav1.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }
 
 // Update implements [rest.Updater], the interface to support the `update` verb.
@@ -375,15 +435,15 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		t.initialized = true
 	}
 
-	ensureNameOrGenerateName(token)
-	// we check the Name directly. because of the ensure... we know that
-	// GenerateName is not set. as it squashes the name in that case.
-	if token.Name != "" {
-		// reject creation of a token which already exists
-		currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
-		if err == nil && currentSecret != nil {
-			return nil, apierrors.NewAlreadyExists(group, token.Name)
-		}
+	// enforce our choice of required generateName, and forbidden name.
+	if err := ensureNoNameAndGenerateName(token); err != nil {
+		return nil, err
+	}
+
+	// reject any attempt to specify status fields
+	emptyStatus := ext.TokenStatus{}
+	if token.Status != emptyStatus {
+		return nil, apierrors.NewBadRequest("Token is invalid: status is not empty")
 	}
 
 	user, err := t.userClient.Get(token.Spec.UserID)
@@ -447,12 +507,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	newSecret, err := t.secretClient.Create(secret)
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
-			// can happen despite the early check for a pre-existing secret.
-			// another request may have raced us while the secret was assembled.
+			// note: should not be possible due to the forced use of generateName
 			return nil, err
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store token %s: %w",
-			token.Name, err))
+			token.GenerateName, err))
 	}
 
 	// Read changes back to return what was truly created, not what we thought we created
@@ -460,11 +519,11 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	if err != nil {
 		// An error here means that something broken was stored.
 		// Do not leave that broken thing behind.
-		t.secretClient.Delete(TokenNamespace, secret.Name, &metav1.DeleteOptions{})
+		t.secretClient.Delete(TokenNamespace, newSecret.Name, &metav1.DeleteOptions{})
 
 		// And report what was broken
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token %s: %w",
-			token.Name, err))
+			newSecret.Name, err))
 	}
 
 	// The newly created token is not the request token
@@ -597,20 +656,17 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
 	}
-	empty := metav1.ListOptions{}
-	if localOptions == empty {
-		// The setup indicated that we can bail out. I.e the
-		// options ask for something which cannot match.
-		return &ext.TokenList{}, nil
-	}
 
 	// Core token listing from backing secrets
 	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
 	if err != nil {
+		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
+			return nil, apierrors.NewResourceExpired(err.Error())
+		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
 	}
 
-	var tokens []ext.Token
+	tokens := make([]ext.Token, 0, len(secrets.Items))
 	for _, secret := range secrets.Items {
 		token, err := tokenFromSecret(&secret)
 		// ignore broken tokens
@@ -635,11 +691,11 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 
 // update implements the core resource updating/modification of tokens
 func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
-	user, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
+	user, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
 	if err != nil {
 		return nil, err
 	}
-	if !isRancherUser || !userMatch(user, token) {
+	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
@@ -662,41 +718,46 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token: %w", err))
 	}
 	currentToken, err := tokenFromSecret(currentSecret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", err))
 	}
 
 	if token.ObjectMeta.UID != currentToken.ObjectMeta.UID {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kubernetes UID",
-			token.Name))
+		return nil, apierrors.NewBadRequest("forbidden to edit kubernetes UID")
 	}
 
 	if token.Spec.UserID != currentToken.Spec.UserID {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit user id",
-			token.Name))
+		return nil, apierrors.NewBadRequest("forbidden to edit user id")
 	}
 
 	if token.Spec.Kind != currentToken.Spec.Kind {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit kind",
-			token.Name))
+		return nil, apierrors.NewBadRequest("forbidden to edit kind")
+	}
+
+	if token.Spec.UserPrincipal.Name != currentToken.Spec.UserPrincipal.Name ||
+		token.Spec.UserPrincipal.DisplayName != currentToken.Spec.UserPrincipal.DisplayName ||
+		token.Spec.UserPrincipal.LoginName != currentToken.Spec.UserPrincipal.LoginName ||
+		token.Spec.UserPrincipal.ProfilePicture != currentToken.Spec.UserPrincipal.ProfilePicture ||
+		token.Spec.UserPrincipal.PrincipalType != currentToken.Spec.UserPrincipal.PrincipalType ||
+		token.Spec.UserPrincipal.Me != currentToken.Spec.UserPrincipal.Me ||
+		token.Spec.UserPrincipal.MemberOf != currentToken.Spec.UserPrincipal.MemberOf ||
+		token.Spec.UserPrincipal.Provider != currentToken.Spec.UserPrincipal.Provider ||
+		!reflect.DeepEqual(token.Spec.UserPrincipal.ExtraInfo, currentToken.Spec.UserPrincipal.ExtraInfo) {
+		return nil, apierrors.NewBadRequest("forbidden to edit principal data")
 	}
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
 		ttl, err := clampMaxTTL(token.Spec.TTL)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token %s ttl: %w",
-				token.Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
 		}
 		token.Spec.TTL = ttl
 		if ttlGreater(ttl, currentToken.Spec.TTL) {
-			return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to extend time-to-live",
-				token.Name))
+			return nil, apierrors.NewBadRequest("forbidden to extend time-to-live")
 		}
 	}
 
@@ -710,8 +771,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	// Save changes to backing secret, properly pass old secret labels/anotations into the new.
 	secret, err := secretFromToken(token, currentSecret.Labels, currentSecret.Annotations)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
 
 	// Abort, user does not wish to actually change anything.
@@ -721,15 +781,13 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 
 	newSecret, err := t.secretClient.Update(secret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to update token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to save updated token: %w", err))
 	}
 
 	// Read changes back to return what was truly saved, not what we thought we saved
 	newToken, err := tokenFromSecret(newSecret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token %s: %w",
-			token.Name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token: %w", err))
 	}
 
 	newToken.Status.Current = newToken.Name == sessionID
@@ -1243,6 +1301,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	}
 	backendLabels[UserIDLabel] = token.Spec.UserID
 	backendLabels[KindLabel] = token.Spec.Kind
+	backendLabels[SecretKindLabel] = SecretKindLabelValue
 
 	// ensure that only one of name or generateName is passed through.
 	name := token.Name
@@ -1433,24 +1492,21 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-// ensureNameOrGenerateName ensures that the token has either a proper name, or
-// a generateName clause. Note, this function does __not generate__ the name if
-// the latter is present. That is delegated to the backend store, i.e. the
-// secrets holding tokens. See `secretFromToken` above.
-func ensureNameOrGenerateName(token *ext.Token) error {
-	// NOTE: When both name and generateName are set the generateName has precedence
-	if token.ObjectMeta.GenerateName != "" {
-		token.ObjectMeta.Name = ""
-		return nil
-	}
-
+// ensureNoNameAndGenerateName ensures that the token has the generateName
+// clause set, and no name specified. This enforces our decision (RFD Imperative
+// API Object Naming) to not allow users the choice of token names.
+func ensureNoNameAndGenerateName(token *ext.Token) error {
 	if token.ObjectMeta.Name != "" {
+		return apierrors.NewBadRequest(
+			"Token is invalid: metadata.name: Forbidden to be set. Use of 'generateName' is required")
+	}
+
+	if token.ObjectMeta.GenerateName != "" {
 		return nil
 	}
 
-	return apierrors.NewBadRequest(fmt.Sprintf(
-		"Token \"%s\" is invalid: metadata.name: Required value: name or generateName is required",
-		token.ObjectMeta.Name))
+	return apierrors.NewBadRequest(
+		"Token is invalid: metadata.generateName: Required value is not set")
 }
 
 func clampMaxTTL(ttl int64) (int64, error) {
@@ -1520,3 +1576,19 @@ func ttlGreater(a, b int64) bool {
 
 	return a > b
 }
+
+// typecheck store type against the various interfaces we (have to) implement
+var (
+	_ rest.Creater                  = &Store{}
+	_ rest.Getter                   = &Store{}
+	_ rest.Lister                   = &Store{}
+	_ rest.Watcher                  = &Store{}
+	_ rest.GracefulDeleter          = &Store{}
+	_ rest.Updater                  = &Store{}
+	_ rest.Patcher                  = &Store{}
+	_ rest.TableConvertor           = &Store{}
+	_ rest.Storage                  = &Store{}
+	_ rest.Scoper                   = &Store{}
+	_ rest.SingularNameProvider     = &Store{}
+	_ rest.GroupVersionKindProvider = &Store{}
+)
