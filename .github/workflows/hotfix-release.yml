@@ -44,7 +44,7 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/build-images/agent
   integration-tests:
-    needs: [build-agent]
+    needs: [build-server, build-agent]
     with:
       parent_run_id: ${{ github.run_id }}
     uses: ./.github/workflows/integration-tests.yml

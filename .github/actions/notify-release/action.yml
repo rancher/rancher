@@ -1,0 +1,14 @@
+name: "Notify a release using a Slack Webhook"
+description: "Use a slack webhook to send release information"
+runs:
+  using: "composite"
+  steps:
+    - name: Send notification
+      env:
+        TAG: ${{ github.ref_name }}
+        STATUS: "Completed ✅"
+        COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      shell: bash
+      run: |
+        curl -X POST ${{ env.WEBHOOK_URL }} -d '{"tag": "${{ env.TAG }}","status": "${{ env.STATUS }}","commit_url": "${{ env.COMMIT_URL }}","workflow_url": "${{ env.WORKFLOW_URL }}"}'

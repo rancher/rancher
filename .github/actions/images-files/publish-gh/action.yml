@@ -3,7 +3,21 @@ description: "Upload images files to a GitHub release"
 runs:
   using: "composite"
   steps:
+    - name: Create App Token
+      uses: actions/create-github-app-token@v1
+      id: app-token
+      with:
+        app-id: ${{ env.APP_ID }}
+        private-key: ${{ env.PRIVATE_KEY }}
+    - name: Add release notes
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      run: |
+        NOTES=$(cat bin/rancher-components.txt)
+        gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
     - name: Generate sha256sum file and upload artifacts
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
       shell: bash
       run: |
         set -ex
