@@ -3,6 +3,9 @@ set -e
 
 GOBIN=${GOBIN-"go"}
 
+TEST_PKGS=$1
+RUN_TOX=$2
+
 cleanup()
 {
     EXIT=$?
@@ -140,16 +143,21 @@ export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and tes
   exit 1
 }
 
-echo Running go integration tests
-$GOBIN test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
-  dump_rancher_logs
-  exit 1
-}
-
-echo Running tox tests
-INT_TESTS_STARTED=true
-cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
+case $RUN_TOX in
+  true)
+    echo Running tox tests
+    INT_TESTS_STARTED=true
+    cd ./tests/integration
+    tox -e rancher -- -m "not nonparallel" -n $(nproc)
+    tox -e rancher -- -m nonparallel
+    ;;
+  *)
+    echo Running go integration tests
+    $GOBIN test -v -failfast -timeout 30m -p 1 "$TEST_PKGS" || {
+      dump_rancher_logs
+      exit 1
+    }
+    ;;
+esac
 
 tail -f /tmp/rancher-test.log &

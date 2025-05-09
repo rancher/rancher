@@ -6,6 +6,13 @@ on:
         type: string
         description: "parent run_id to download images from"
         required: true
+      packages:
+        type: string
+        description: "the packages inside to test from root of rancher/rancher (eg: ./tests/v2/integration/...)"
+        default: "./tests/v2/integration/..."
+      run_tox:
+        type: boolean
+        default: false
 permissions: {}
 env:
   TAG: v2.12-${{ github.sha }}-head
@@ -102,4 +109,4 @@ jobs:
           ./tests/v2/integration/scripts/build-integration-setup
       - name: Run Tests
         shell: bash
-        run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
+        run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests "${{ inputs.packages }}" "${{ inputs.run_tox }}"

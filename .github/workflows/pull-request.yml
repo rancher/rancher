@@ -61,11 +61,43 @@ jobs:
         uses: actions/checkout@v4
       - name: setup and build
         uses: ./.github/actions/build-images/agent
-  integration-tests:
+        # projects  README.md  rtbs  scripts  serviceaccount  setup  steveapi
+  integration-tests-steveapi:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
     with:
       parent_run_id: ${{ github.run_id }}
+      packages: "./tests/v2/integration/steveapi/..."
+  integration-tests-serviceaccount:
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
+      packages: "./tests/v2/integration/serviceaccount/..."
+  integration-tests-rtbs:
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
+      packages: "./tests/v2/integration/rtbs/..."
+  integration-tests-projects:
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
+      packages: "./tests/v2/integration/projects/..."
+  integration-tests-tox:
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
+      run_tox: true
+  integration-tests-catalogv2:
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
+      packages: "./tests/v2/integration/catalogv2/..."
   provisioning-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
