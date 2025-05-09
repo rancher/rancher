@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -580,29 +579,19 @@ func (s *Store) createTokenInput(kubeConfigID, userName string, authToken *apiv3
 }
 
 func tokenSelector(isAdmin bool, userID, tokenID string) (labels.Selector, error) {
-	kindReq, err := labels.NewRequirement(tokens.TokenKindLabel, selection.Equals, []string{"kubeconfig"})
-	if err != nil {
-		return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKindLabel, err)
+	set := labels.Set{
+		tokens.TokenKindLabel: KindLabelValue,
 	}
-	selector := labels.NewSelector().Add(*kindReq)
 
 	if tokenID != "" {
-		idReq, err := labels.NewRequirement(tokens.TokenKubeconfigIDLabel, selection.Equals, []string{tokenID})
-		if err != nil {
-			return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.TokenKubeconfigIDLabel, err)
-		}
-		selector = selector.Add(*idReq)
+		set = labels.Merge(set, labels.Set{tokens.TokenKubeconfigIDLabel: tokenID})
 	}
 
 	if !isAdmin {
-		userIDReq, err := labels.NewRequirement(tokens.UserIDLabel, selection.Equals, []string{userID})
-		if err != nil {
-			return nil, fmt.Errorf("error creating selector requirement for label %s: %w", tokens.UserIDLabel, err)
-		}
-		selector = selector.Add(*userIDReq)
+		set = labels.Merge(set, labels.Set{tokens.UserIDLabel: userID})
 	}
 
-	return selector, nil
+	return set.AsSelector(), nil
 }
 
 // Get implements [rest.Getter]
@@ -697,7 +686,10 @@ func (s *Store) List(
 
 	configMapList, err := s.configMapClient.List(Namespace, *listOptions)
 	if err != nil {
-		return nil, fmt.Errorf("error listing tokens for kubeconfigs: %w", err)
+		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
+			return nil, apierrors.NewResourceExpired(err.Error())
+		}
+		return nil, apierrors.NewInternalError(fmt.Errorf("error listing tokens for kubeconfigs: %w", err))
 	}
 
 	list := &ext.KubeconfigList{
@@ -794,7 +786,7 @@ func (s *Store) Watch(
 					logrus.Warnf("kubeconfig: watch: unknown event type %s", event.Type)
 				}
 
-				if !kubeconfigWatch.addEvent(watch.Event{
+				if !kubeconfigWatch.add(watch.Event{
 					Type:   event.Type,
 					Object: kubeconfig,
 				}) {
@@ -833,8 +825,8 @@ func (w *watcher) ResultChan() <-chan watch.Event {
 	return w.ch
 }
 
-// addEvent pushes a new event to the Result channel.
-func (w *watcher) addEvent(event watch.Event) bool {
+// add pushes a new event to the Result channel.
+func (w *watcher) add(event watch.Event) bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -970,12 +962,12 @@ func (s *Store) Delete(
 		}
 	}
 
-	err = s.configMapClient.Delete(Namespace, name, options)
+	err = s.configMapClient.Delete(Namespace, name, options) // TODO: Revisit the options. It's not clear if all options we'll play nicely.
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", name, err))
 	}
 
-	return nil, true, nil
+	return kubeconfig, true, nil
 }
 
 // Update implements [rest.Updater]
