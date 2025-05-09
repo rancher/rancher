@@ -13,32 +13,35 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/pborman/uuid"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
-	k8scorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
 )
 
 type fakeUserManager struct {
@@ -83,7 +86,7 @@ func (f *fakeUserManager) Generate() (string, runtime.Object, error) {
 	token := &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
-			UID:  types.UID(uuid.NewUUID().String()),
+			UID:  uuid.NewUUID(),
 		},
 	}
 
@@ -91,6 +94,8 @@ func (f *fakeUserManager) Generate() (string, runtime.Object, error) {
 }
 
 func TestIsUnique(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		ids    []string
@@ -124,10 +129,37 @@ func TestIsUnique(t *testing.T) {
 	}
 }
 func TestStoreNew(t *testing.T) {
+	t.Parallel()
+
 	store := &Store{}
 	obj := store.New()
 	require.NotNil(t, obj)
 	assert.IsType(t, &ext.Kubeconfig{}, obj)
+}
+
+func TestStoreNewList(t *testing.T) {
+	store := &Store{}
+	obj := store.NewList()
+	require.NotNil(t, obj)
+	require.IsType(t, &ext.KubeconfigList{}, obj)
+
+	list := obj.(*ext.KubeconfigList)
+	assert.Nil(t, list.Items)
+}
+
+func TestStoreGetSingularName(t *testing.T) {
+	store := &Store{}
+	assert.Equal(t, Singular, store.GetSingularName())
+}
+
+func TestStoreNamespaceScoped(t *testing.T) {
+	store := &Store{}
+	assert.False(t, store.NamespaceScoped())
+}
+
+func TestStoreGroupVersionKind(t *testing.T) {
+	store := &Store{}
+	assert.Equal(t, Kind, store.GroupVersionKind(ext.SchemeGroupVersion).Kind)
 }
 
 func TestStoreUserFrom(t *testing.T) {
@@ -143,7 +175,7 @@ func TestStoreUserFrom(t *testing.T) {
 		case "error":
 			return nil, fmt.Errorf("some error")
 		default:
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 		}
 	}).AnyTimes()
 
@@ -235,7 +267,7 @@ func TestStoreCreate(t *testing.T) {
 		case "error":
 			return nil, fmt.Errorf("some error")
 		default:
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 		}
 	}).AnyTimes()
 	tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
@@ -280,7 +312,7 @@ func TestStoreCreate(t *testing.T) {
 				Status: v3.ClusterStatus{CACert: downstream2CACert},
 			}, nil
 		default:
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 		}
 	}).AnyTimes()
 	nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
@@ -297,9 +329,9 @@ func TestStoreCreate(t *testing.T) {
 						ControlPlane:      true,
 					},
 					Status: v3.NodeStatus{
-						InternalNodeStatus: k8scorev1.NodeStatus{
-							Addresses: []k8scorev1.NodeAddress{
-								{Type: k8scorev1.NodeExternalIP, Address: "172.20.0.3"},
+						InternalNodeStatus: corev1.NodeStatus{
+							Addresses: []corev1.NodeAddress{
+								{Type: corev1.NodeExternalIP, Address: "172.20.0.3"},
 							},
 						},
 					},
@@ -308,9 +340,9 @@ func TestStoreCreate(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "worker"},
 					Spec:       v3.NodeSpec{RequestedHostname: "worker"},
 					Status: v3.NodeStatus{
-						InternalNodeStatus: k8scorev1.NodeStatus{
-							Addresses: []k8scorev1.NodeAddress{
-								{Type: k8scorev1.NodeExternalIP, Address: "172.20.0.4"},
+						InternalNodeStatus: corev1.NodeStatus{
+							Addresses: []corev1.NodeAddress{
+								{Type: corev1.NodeExternalIP, Address: "172.20.0.4"},
 							},
 						},
 					},
@@ -321,14 +353,15 @@ func TestStoreCreate(t *testing.T) {
 			return nil, nil
 		}
 	}).AnyTimes()
-	configMapCache := fake.NewMockCacheInterface[*k8scorev1.ConfigMap](ctrl)
-	configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*k8scorev1.ConfigMap, error) {
-		return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+
+	configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+	configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
+		return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 	})
 
-	var configMap *k8scorev1.ConfigMap
-	configMapClient := fake.NewMockClientInterface[*k8scorev1.ConfigMap, *k8scorev1.ConfigMapList](ctrl)
-	configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *k8scorev1.ConfigMap) (*k8scorev1.ConfigMap, error) {
+	var configMap *corev1.ConfigMap
+	configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+	configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 		configMap = obj.DeepCopy()
 		return configMap, nil
 	}).Times(1)
@@ -464,17 +497,786 @@ func generateCAKeyAndCert() (*ecdsa.PrivateKey, string, error) {
 	return key, base64.StdEncoding.EncodeToString(pem), nil
 }
 
-func TestWatcher(t *testing.T) {
+func TestWatcherStop(t *testing.T) {
+	t.Parallel()
+
 	t.Run("safe to call Stop more than once", func(t *testing.T) {
 		w := &watcher{
 			ch: make(chan watch.Event, 1),
 		}
 
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			w.Stop()
 		}()
 
 		w.Stop()
-
+		wg.Wait()
 	})
+}
+
+func TestWatcherAdd(t *testing.T) {
+	t.Parallel()
+
+	w := &watcher{
+		ch: make(chan watch.Event, 3),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		w.add(watch.Event{
+			Type: watch.Added,
+			Object: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "obj1",
+					Namespace: Namespace,
+				},
+			},
+		})
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		w.add(watch.Event{
+			Type: watch.Added,
+			Object: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "obj2",
+					Namespace: Namespace,
+				},
+			},
+		})
+	}()
+
+	wg.Wait()
+	w.Stop()
+
+	var added []string
+	for e := range w.ResultChan() {
+		objMeta, err := meta.Accessor(e.Object)
+		require.NoError(t, err)
+		added = append(added, objMeta.GetName())
+	}
+	assert.Len(t, added, 2)
+	assert.Contains(t, added, "obj1")
+	assert.Contains(t, added, "obj2")
+
+	assert.False(t, w.add(watch.Event{}))
+	_, ok := <-w.ResultChan()
+	assert.False(t, ok)
+}
+
+func TestStoreGet(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-w7drc"
+	authTokenID := "token-nh98r"
+	kubeconfigID := "kubeconfig-49d5p"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
+		switch name {
+		case userID:
+			return &v3.User{}, nil
+		case "error":
+			return nil, fmt.Errorf("some error")
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	defaultTTL := int64(43200)
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeconfigID,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				UserIDLabel: userID,
+				KindLabel:   KindLabelValue,
+			},
+			Annotations: map[string]string{
+				UIDAnnotation: string(uuid.NewUUID()),
+				"custom":      "annotation",
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-w7drcgc66",
+					UID:        uuid.NewUUID(),
+				},
+			},
+		},
+		Data: map[string]string{
+			TTLField:            strconv.FormatInt(defaultTTL, 10),
+			DescriptionField:    "test",
+			CurrentContextField: "c-m-tbgzfbgf",
+			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+		},
+	}
+
+	configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+	configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
+		switch name {
+		case kubeconfigID:
+			return configMap, nil
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	userManager := &fakeUserManager{}
+
+	ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+		Name: userID,
+		Extra: map[string][]string{
+			common.ExtraRequestTokenID: {authTokenID},
+		},
+	})
+
+	t.Run("admin gets kubeconfig", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		store := &Store{
+			authorizer:     auth,
+			configMapCache: configMapCache,
+			userCache:      userCache,
+			userMgr:        userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "user-2p7w6", // Admin user
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {"token-8wrqh"},
+			},
+		})
+
+		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{})
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.Kubeconfig{}, obj)
+
+		kubeconfig := obj.(*ext.Kubeconfig)
+		assert.Equal(t, configMap.Name, kubeconfig.Name)
+		assert.Empty(t, kubeconfig.Namespace)
+
+		require.NotNil(t, kubeconfig.Labels)
+		assert.Equal(t, userID, kubeconfig.Labels[UserIDLabel])
+
+		require.NotNil(t, kubeconfig.Annotations)
+		assert.Empty(t, kubeconfig.Annotations[UIDAnnotation])
+		assert.Equal(t, "annotation", kubeconfig.Annotations["custom"])
+
+		assert.Equal(t, defaultTTL, kubeconfig.Spec.TTL)
+		assert.Equal(t, configMap.Data[DescriptionField], kubeconfig.Spec.Description)
+		assert.Equal(t, configMap.Data[CurrentContextField], kubeconfig.Spec.CurrentContext)
+
+		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
+		require.NoError(t, err)
+		assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
+	})
+
+	t.Run("user gets kubeconfig", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionDeny, "", nil
+		})
+
+		store := &Store{
+			authorizer:     auth,
+			configMapCache: configMapCache,
+			userCache:      userCache,
+			userMgr:        userManager,
+		}
+
+		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{})
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.Kubeconfig{}, obj)
+
+		kubeconfig := obj.(*ext.Kubeconfig)
+		assert.Equal(t, kubeconfigID, kubeconfig.Name)
+	})
+
+	t.Run("user can't get other user's kubeconfig", func(t *testing.T) {
+		oldConfigMap := configMap.DeepCopy()
+		defer func() {
+			configMap = oldConfigMap.DeepCopy()
+		}()
+		configMap.Labels[UserIDLabel] = "other-user"
+
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionDeny, "", nil
+		})
+
+		store := &Store{
+			authorizer:     auth,
+			configMapCache: configMapCache,
+			userCache:      userCache,
+			userMgr:        userManager,
+		}
+
+		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{})
+		require.Error(t, err)
+		assert.True(t, apierrors.IsNotFound(err))
+		require.Nil(t, obj)
+	})
+
+	t.Run("configmap client is used if options are set", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionDeny, "", nil
+		})
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			assert.Equal(t, "1", options.ResourceVersion)
+			return configMap, nil
+		}).AnyTimes()
+
+		store := &Store{
+			authorizer:      auth,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{ResourceVersion: "1"})
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.Kubeconfig{}, obj)
+
+		kubeconfig := obj.(*ext.Kubeconfig)
+		assert.Equal(t, kubeconfigID, kubeconfig.Name)
+	})
+
+	t.Run("not found error points to correct resource", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionDeny, "", nil
+		})
+
+		store := &Store{
+			authorizer:     auth,
+			configMapCache: configMapCache,
+			userCache:      userCache,
+			userMgr:        userManager,
+		}
+
+		obj, err := store.Get(ctx, "non-existing", &metav1.GetOptions{})
+		require.Error(t, err)
+		require.Nil(t, obj)
+		assert.True(t, apierrors.IsNotFound(err))
+
+		statusErr, ok := err.(*apierrors.StatusError)
+		require.True(t, ok)
+		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
+		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
+		assert.Equal(t, "non-existing", statusErr.Status().Details.Name)
+	})
+}
+
+func TestStoreList(t *testing.T) {
+	t.Parallel()
+
+	userID1 := "u-w7drc"
+	userID2 := "u-2p7w6"
+	kubeconfigID1 := "kubeconfig-49d5p"
+	kubeconfigID2 := "kubeconfig-7kp6c"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
+		switch name {
+		case userID1, userID2:
+			return &v3.User{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
+		case "error":
+			return nil, fmt.Errorf("some error")
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	defaultTTL := int64(43200)
+	configMap1 := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeconfigID1,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				UserIDLabel: userID1,
+				KindLabel:   KindLabelValue,
+			},
+			Annotations: map[string]string{
+				UIDAnnotation: string(uuid.NewUUID()),
+				"custom":      "annotation",
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-w7drcgc66",
+					UID:        uuid.NewUUID(),
+				},
+			},
+		},
+		Data: map[string]string{
+			TTLField:            strconv.FormatInt(defaultTTL, 10),
+			DescriptionField:    "test1",
+			CurrentContextField: "c-m-tbgzfbgf",
+			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+		},
+	}
+	configMap2 := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeconfigID2,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				UserIDLabel: userID2,
+				KindLabel:   KindLabelValue,
+			},
+			Annotations: map[string]string{
+				UIDAnnotation: string(uuid.NewUUID()),
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-2p7w6gc66",
+					UID:        uuid.NewUUID(),
+				},
+			},
+		},
+		Data: map[string]string{
+			TTLField:            strconv.FormatInt(defaultTTL, 10),
+			DescriptionField:    "test2",
+			CurrentContextField: "c-m-tbgzfbgf",
+			ClustersField:       `["c-m-tbgzfbgf"]`,
+		},
+	}
+
+	configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+	configMapClient.EXPECT().List(Namespace, gomock.Any()).DoAndReturn(func(namespace string, opts metav1.ListOptions) (*corev1.ConfigMapList, error) {
+		labelSet, err := labels.ConvertSelectorToLabelsMap(opts.LabelSelector)
+		require.NoError(t, err)
+
+		var items []corev1.ConfigMap
+		switch labelSet[UserIDLabel] {
+		case userID1:
+			items = []corev1.ConfigMap{*configMap1}
+		case userID2:
+			items = []corev1.ConfigMap{*configMap2}
+		default:
+			items = []corev1.ConfigMap{*configMap1, *configMap2}
+		}
+
+		return &corev1.ConfigMapList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: "1",
+			},
+			Items: items,
+		}, nil
+	}).AnyTimes()
+
+	userManager := &fakeUserManager{}
+
+	t.Run("admin lists kubeconfigs", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		store := &Store{
+			authorizer:      auth,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "user-2p7w6",
+		})
+
+		obj, err := store.List(ctx, &metainternalversion.ListOptions{})
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.KubeconfigList{}, obj)
+
+		list := obj.(*ext.KubeconfigList)
+		assert.Len(t, list.Items, 2)
+
+		assert.Equal(t, configMap1.Name, list.Items[0].Name)
+		assert.Equal(t, configMap2.Name, list.Items[1].Name)
+
+		assert.NotEmpty(t, list.ResourceVersion)
+	})
+
+	t.Run("user lists kubeconfigs", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionDeny, "", nil
+		})
+
+		store := &Store{
+			authorizer:      auth,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID1,
+		})
+
+		obj, err := store.List(ctx, &metainternalversion.ListOptions{})
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.KubeconfigList{}, obj)
+
+		list := obj.(*ext.KubeconfigList)
+		assert.Len(t, list.Items, 1)
+
+		assert.Equal(t, configMap1.Name, list.Items[0].Name)
+
+		assert.NotEmpty(t, list.ResourceVersion)
+	})
+}
+
+func TestStoreWatch(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-w7drc"
+	kubeconfigID := "kubeconfig-49d5p"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
+		switch name {
+		case userID:
+			return &v3.User{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
+		case "error":
+			return nil, fmt.Errorf("some error")
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	defaultTTL := int64(43200)
+	configMap1 := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeconfigID,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				UserIDLabel: userID,
+				KindLabel:   KindLabelValue,
+			},
+			Annotations: map[string]string{
+				UIDAnnotation: string(uuid.NewUUID()),
+				"custom":      "annotation",
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-w7drcgc66",
+					UID:        uuid.NewUUID(),
+				},
+			},
+		},
+		Data: map[string]string{
+			TTLField:            strconv.FormatInt(defaultTTL, 10),
+			DescriptionField:    "test1",
+			CurrentContextField: "c-m-tbgzfbgf",
+			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+		},
+	}
+
+	userManager := &fakeUserManager{}
+
+	t.Run("admin watches kubeconfigs", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		configMapWatcher := &watcher{
+			ch: make(chan watch.Event),
+		}
+		defer configMapWatcher.Stop()
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Watch(Namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
+			labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
+			require.NoError(t, err)
+			assert.Equal(t, KindLabelValue, labelSet[KindLabel])
+			assert.NotContains(t, labelSet, UserIDLabel)
+
+			return configMapWatcher, nil
+		}).AnyTimes()
+
+		store := &Store{
+			authorizer:      auth,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "user-2p7w6",
+		})
+
+		watcher, err := store.Watch(ctx, &metainternalversion.ListOptions{})
+		require.NoError(t, err)
+		defer watcher.Stop()
+
+		configMapWatcher.add(watch.Event{
+			Type:   watch.Added,
+			Object: configMap1,
+		})
+
+		event := <-watcher.ResultChan()
+		assert.Equal(t, watch.Added, event.Type)
+		k, ok := event.Object.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, configMap1.Name, k.Name)
+
+		configMapWatcher.add(watch.Event{
+			Type: watch.Bookmark,
+			Object: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "1",
+				},
+			},
+		})
+		event = <-watcher.ResultChan()
+		assert.Equal(t, watch.Bookmark, event.Type)
+		k, ok = event.Object.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, "1", k.ResourceVersion)
+
+		configMapWatcher.add(watch.Event{
+			Type:   watch.Modified,
+			Object: configMap1,
+		})
+		event = <-watcher.ResultChan()
+		assert.Equal(t, watch.Modified, event.Type)
+		k, ok = event.Object.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, configMap1.Name, k.Name)
+
+		configMapWatcher.add(watch.Event{
+			Type:   watch.Deleted,
+			Object: configMap1,
+		})
+		event = <-watcher.ResultChan()
+		assert.Equal(t, watch.Deleted, event.Type)
+		k, ok = event.Object.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, configMap1.Name, k.Name)
+
+		// Error events are not produced onto the Kubeconfig watcher.
+		configMapWatcher.add(watch.Event{
+			Type: watch.Error,
+			Object: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Something went wrong",
+			},
+		})
+
+		// So we add another bookmark to be able to read from the watcher.
+		configMapWatcher.add(watch.Event{
+			Type: watch.Bookmark,
+			Object: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+				},
+			},
+		})
+		event = <-watcher.ResultChan()
+		assert.Equal(t, watch.Bookmark, event.Type)
+		k, ok = event.Object.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, "2", k.ResourceVersion)
+	})
+
+	t.Run("user watches kubeconfigs", func(t *testing.T) {
+		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionDeny, "", nil
+		})
+
+		configMapWatcher := &watcher{
+			ch: make(chan watch.Event),
+		}
+		defer configMapWatcher.Stop()
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Watch(Namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
+			labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
+			require.NoError(t, err)
+			assert.Equal(t, KindLabelValue, labelSet[KindLabel])
+			assert.Equal(t, userID, labelSet[UserIDLabel])
+
+			return configMapWatcher, nil
+		}).AnyTimes()
+
+		store := &Store{
+			authorizer:      auth,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+		})
+
+		watcher, err := store.Watch(ctx, &metainternalversion.ListOptions{})
+		require.NoError(t, err)
+		defer watcher.Stop()
+
+		configMapWatcher.add(watch.Event{
+			Type:   watch.Added,
+			Object: configMap1,
+		})
+
+		event := <-watcher.ResultChan()
+		assert.Equal(t, watch.Added, event.Type)
+		k, ok := event.Object.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, configMap1.Name, k.Name)
+	})
+}
+
+func TestStoreDelete(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-w7drc"
+	authTokenID := "token-nh98r"
+	kubeconfigID := "kubeconfig-49d5p"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
+		switch name {
+		case userID:
+			return &v3.User{}, nil
+		case "error":
+			return nil, fmt.Errorf("some error")
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeconfigID,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				UserIDLabel: userID,
+				KindLabel:   KindLabelValue,
+			},
+			Annotations: map[string]string{
+				UIDAnnotation: string(uuid.NewUUID()),
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-w7drcgc66",
+					UID:        uuid.NewUUID(),
+				},
+			},
+		},
+		Data: map[string]string{
+			TTLField:            "43200",
+			DescriptionField:    "test",
+			CurrentContextField: "c-m-tbgzfbgf",
+			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+		},
+	}
+
+	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+		return authorizer.DecisionAllow, "", nil
+	})
+
+	userManager := &fakeUserManager{}
+
+	ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+		Name: userID,
+		Extra: map[string][]string{
+			common.ExtraRequestTokenID: {authTokenID},
+		},
+	})
+
+	t.Run("admin deletes a kubeconfig", func(t *testing.T) {
+		var deleteValidationCalled bool
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			deleteValidationCalled = true
+			return nil
+		}
+		deleteOptions := &metav1.DeleteOptions{
+			GracePeriodSeconds: ptr.To(int64(60)),
+		}
+
+		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+		configMapCache.EXPECT().Get(Namespace, kubeconfigID).Return(configMap, nil).Times(1)
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.GetOptions) (*corev1.ConfigMap, error) {
+			switch name {
+			case kubeconfigID:
+				return configMap, nil
+			default:
+				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+			}
+		}).AnyTimes()
+		configMapClient.EXPECT().Delete(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+			assert.Equal(t, deleteOptions, options)
+			return nil
+		}).Times(1)
+
+		tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+		tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
+			set, err := labels.ConvertSelectorToLabelsMap(selector.String())
+			require.NoError(t, err)
+			assert.Equal(t, kubeconfigID, set.Get(tokens.TokenKubeconfigIDLabel))
+			assert.Equal(t, KindLabelValue, set.Get(tokens.TokenKindLabel))
+
+			return []*v3.Token{
+				{ObjectMeta: metav1.ObjectMeta{Name: "kubeconfig-user-2p7w6agc66"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kubeconfig-user-2p7w6d12fg"}},
+			}, nil
+		}).AnyTimes()
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+		tokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
+			assert.Contains(t, []string{"kubeconfig-user-2p7w6agc66", "kubeconfig-user-2p7w6d12fg"}, name)
+			assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
+			assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
+			assert.Equal(t, deleteOptions.DryRun, options.DryRun)
+
+			return nil
+		}).Times(2)
+
+		store := &Store{
+			authorizer:      authorizer,
+			configMapCache:  configMapCache,
+			configMapClient: configMapClient,
+			tokenCache:      tokenCache,
+			tokens:          tokenClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		obj, _, err := store.Delete(ctx, kubeconfigID, deleteValidation, deleteOptions)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.Kubeconfig{}, obj)
+
+		kubeconfig := obj.(*ext.Kubeconfig)
+		assert.Equal(t, kubeconfigID, kubeconfig.Name)
+
+		assert.True(t, deleteValidationCalled)
+	})
+
 }
