@@ -1,0 +1,64 @@
+name: Create CI Testing PR
+on:
+  workflow_dispatch:
+    inputs:
+      base_branch:
+        description: 'Base branch for the PR (leave empty for default branch)'
+        required: false
+        default: ''
+      max_ci_runs:
+        description: 'Maximum number of CI runs to perform'
+        required: false
+        default: 20
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-test-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup and create branch
+        id: branch-setup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.base_branch }}" ]; then
+            BASE_BRANCH="${{ inputs.base_branch }}"
+          else
+            BASE_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
+          fi
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git fetch origin $BASE_BRANCH
+          git checkout $BASE_BRANCH
+
+          BRANCH_NAME="ci_testing_$(date +'%Y%m%d_%H%M%S')"
+          git checkout -b $BRANCH_NAME
+
+          echo "base_branch=$BASE_BRANCH" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create and push empty commit
+        run: |
+          git commit --allow-empty -m "CI Testing - Empty PR"
+          git push origin ${{ steps.branch-setup.outputs.branch }}
+
+      - name: Create draft PR
+        env:
+          # Needs write permissions to Pull requests (CI does not trigger on prs created by GITHUB_TOKEN)
+          GH_TOKEN: ${{ secrets.CI_TESTING_PAT }}
+        run: |
+          PR_BODY=$(echo -e "This PR is for CI testing purposes only and can be ignored.\n\nMAX_CI_RUNS: ${{ inputs.max_ci_runs }}")
+          gh pr create \
+            --base ${{ steps.branch-setup.outputs.base_branch }} \
+            --head ${{ steps.branch-setup.outputs.branch }} \
+            --title "CI Testing PR" \
+            --body "$PR_BODY" \
+            --draft
