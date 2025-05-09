@@ -63,14 +63,6 @@ jobs:
         run: ./scripts/chart/test
       - name: Package
         run: ./scripts/chart/package
-      - name: Upload chart
-        uses: actions/upload-artifact@v4
-        with:
-          name: chart
-          path: ./bin/chart/*
-          if-no-files-found: error
-          retention-days: 4
-          overwrite: true
       - name: Load Secrets from Vault
         if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on tags
         uses: rancher-eio/read-vault-secrets@main
@@ -417,7 +409,7 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
   build-installer:
-    needs: [build-publish-chart, merge-server-manifest]
+    needs: [merge-server-manifest]
     strategy:
       matrix:
         os: [linux]
@@ -461,11 +453,6 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Download chart
-        uses: actions/download-artifact@v4
-        with:
-          name: chart
-          path: ./chart
       - name: Build and export agent
         id: build
         uses: docker/build-push-action@v5

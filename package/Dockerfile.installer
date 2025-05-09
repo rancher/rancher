@@ -1,7 +1,3 @@
-ARG RANCHER_TAG=dev
-ARG RANCHER_REPO=rancher
-FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} AS rancher
-
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:15.6 AS build
 
 RUN zypper in -y wget git
@@ -10,9 +6,11 @@ RUN zypper in -y wget git
 # therefore they can be based off the BUILD PLATFORM architecture.
 ARG BUILDARCH
 
+ARG VERSION
+ENV CHART_VERSION=${VERSION}
 
 # set up helm 3
-ENV HELM_VERSION v3.17.1
+ENV HELM_VERSION=v3.17.1
 RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O - | \
     tar -xz --strip-components=1 -C /usr/bin && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
