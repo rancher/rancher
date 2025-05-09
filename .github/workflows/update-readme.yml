@@ -9,7 +9,7 @@ jobs:
   update-readme:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
     - name: Get chart index.yaml files
       run: |
        wget https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
@@ -69,7 +69,7 @@ jobs:
       id: cpr
       env:
         SOURCE_BRANCH: ${{ steps.branch.outputs.branch }}
-      uses: actions/github-script@v5.0.0
+      uses: actions/github-script@211cb3fefb35a799baa5156f9321bb774fe56294 # v5.2.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
