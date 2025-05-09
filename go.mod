@@ -5,19 +5,19 @@ go 1.23.4
 toolchain go1.23.7
 
 replace (
-	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
+	github.com/containerd/containerd => github.com/containerd/containerd v1.7.6 // for compatibilty with docker 25.0.x
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
-	github.com/docker/docker => github.com/docker/docker v23.0.3+incompatible // rancher-machine requires a replace is set
+	github.com/docker/docker => github.com/docker/docker v25.0.8+incompatible // rancher-machine requires a replace is set
 
 	github.com/golang-jwt/jwt/v5 => github.com/golang-jwt/jwt/v5 v5.2.2 // CVE-2025-30204 Remove when azidentity is upgraded
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-	github.com/rancher/machine => github.com/krunalhinguu/machine v0.15.0-rancher113.0.20250421113824-af24b43843ef
+	github.com/rancher/machine => github.com/krunalhinguu/machine v0.15.0-rancher113.0.20250509073206-4c4ebd9b7b46
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	github.com/rancher/rke => github.com/krunalhinguu/rke v1.8.5-0.20250508031348-aacb36184d8c
+	github.com/rancher/rke => github.com/krunalhinguu/rke v1.8.5-0.20250509082431-75f3569eb916
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
@@ -61,7 +61,7 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.32.2
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.32.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.32.2
-	oras.land/oras-go => oras.land/oras-go v1.2.3 // for docker 20.10.x compatibility
+	oras.land/oras-go => oras.land/oras-go v1.2.5 // for docker 25.0.x compatibility
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.5
 )
 
@@ -96,7 +96,7 @@ require (
 	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.0.0-00010101000000-000000000000
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/docker/docker v27.1.0+incompatible
+	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v5.9.11+incompatible
@@ -108,7 +108,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/protobuf v1.5.4
 	github.com/google/gnostic-models v0.6.9
-	github.com/google/go-containerregistry v0.19.0
+	github.com/google/go-containerregistry v0.20.1
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru v1.0.2
@@ -195,10 +195,12 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.7 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
+	github.com/Microsoft/hcsshim v0.13.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.1.5 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
@@ -264,7 +266,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	google.golang.org/genproto v0.0.0-20240227224415-6ceb2ff114de // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
@@ -296,7 +297,6 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/Microsoft/hcsshim v0.12.0-rc.3 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -305,7 +305,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
-	github.com/containerd/containerd v1.7.24 // indirect
+	github.com/containerd/containerd v1.7.27 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/cyphar/filepath-securejoin v0.3.6
@@ -379,11 +379,9 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
-	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/onsi/gomega v1.37.0 // indirect
-	github.com/opencontainers/runc v1.2.1 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
