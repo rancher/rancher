@@ -651,12 +651,6 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
 	}
-	empty := metav1.ListOptions{}
-	if localOptions == empty {
-		// The setup indicated that we can bail out. I.e the
-		// options ask for something which cannot match.
-		return &ext.TokenList{}, nil
-	}
 
 	// Core token listing from backing secrets
 	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
