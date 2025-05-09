@@ -163,12 +163,12 @@ var (
 	userIDMissingError       = fmt.Errorf("user id missing")
 	invalidContext           = fmt.Errorf("context has no user info")
 
-	bogusNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
-	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
-	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
-	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
-	invalidNameError        = apierrors.NewBadRequest("Token is invalid: metadata.name: Forbidden to be set. Use of 'generateName' is required")
-	missingGenerateNameError    = apierrors.NewBadRequest("Token is invalid: metadata.generateName: Required value is not set")
+	bogusNotFoundError       = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
+	emptyNotFoundError       = apierrors.NewNotFound(GVR.GroupResource(), "")
+	createUserMismatch       = apierrors.NewBadRequest("unable to create token for other user")
+	helloAlreadyExistsError  = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
+	invalidNameError         = apierrors.NewBadRequest("Token is invalid: metadata.name: Forbidden to be set. Use of 'generateName' is required")
+	missingGenerateNameError = apierrors.NewBadRequest("Token is invalid: metadata.generateName: Required value is not set")
 
 	parseBoolError error
 	parseIntError  error
@@ -971,7 +971,7 @@ func Test_Store_Create(t *testing.T) {
 		{
 			name: "reject missing generateName",
 			err:  missingGenerateNameError,
-			tok: &ext.Token{},
+			tok:  &ext.Token{},
 			opts: &metav1.CreateOptions{},
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
@@ -1439,7 +1439,7 @@ func Test_SystemStore_List(t *testing.T) {
 			user: "",
 			opts: &metav1.ListOptions{},
 			err:  nil,
-			toks: &ext.TokenList{},
+			toks: &ext.TokenList{Items: []ext.Token{}},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					List("cattle-tokens", gomock.Any()).
@@ -1533,7 +1533,7 @@ func Test_SystemStore_List(t *testing.T) {
 			user: "other",
 			opts: &metav1.ListOptions{},
 			err:  nil,
-			toks: &ext.TokenList{},
+			toks: &ext.TokenList{Items: []ext.Token{}},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					List("cattle-tokens", metav1.ListOptions{

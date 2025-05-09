@@ -659,10 +659,13 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 	// Core token listing from backing secrets
 	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
 	if err != nil {
+		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
+			return nil, apierrors.NewResourceExpired(err.Error())
+		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
 	}
 
-	var tokens []ext.Token
+	tokens := make([]ext.Token, 0, len(secrets.Items))
 	for _, secret := range secrets.Items {
 		token, err := tokenFromSecret(&secret)
 		// ignore broken tokens
