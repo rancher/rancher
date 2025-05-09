@@ -9,7 +9,7 @@ RUN zypper in -y wget git
 ARG BUILDARCH
 
 # setup tag variable
-ENV GIT_TAG=${VERSION}
+ENV CHART_VERSION=${VERSION}
 
 # set up helm 3
 ENV HELM_VERSION v3.17.1
