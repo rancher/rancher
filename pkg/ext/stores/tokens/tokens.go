@@ -1571,3 +1571,19 @@ func ttlGreater(a, b int64) bool {
 
 	return a > b
 }
+
+// typecheck store type against the various interfaces we (have to) implement
+var (
+	_ rest.Creater                  = &Store{}
+	_ rest.Getter                   = &Store{}
+	_ rest.Lister                   = &Store{}
+	_ rest.Watcher                  = &Store{}
+	_ rest.GracefulDeleter          = &Store{}
+	_ rest.Updater                  = &Store{}
+	_ rest.Patcher                  = &Store{}
+	_ rest.TableConvertor           = &Store{}
+	_ rest.Storage                  = &Store{}
+	_ rest.Scoper                   = &Store{}
+	_ rest.SingularNameProvider     = &Store{}
+	_ rest.GroupVersionKindProvider = &Store{}
+)
