@@ -1,6 +1,4 @@
-ARG RANCHER_TAG=dev
-ARG RANCHER_REPO=rancher
-FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} AS rancher
+ARG VERSION
 
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:15.6 AS build
 
@@ -10,6 +8,8 @@ RUN zypper in -y wget git
 # therefore they can be based off the BUILD PLATFORM architecture.
 ARG BUILDARCH
 
+# setup tag variable
+ENV GIT_TAG=${VERSION}
 
 # set up helm 3
 ENV HELM_VERSION v3.17.1
