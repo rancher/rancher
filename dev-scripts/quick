@@ -53,8 +53,12 @@ add_context() {
     return 0
   fi
 
-  if [ -z "$(echo "$replace" | cut -d' ' -f4)" ]; then
-    godep=$(echo "$replace" | cut -d' ' -f3)
+  # Detect local replace directive or either form:
+  #             github.com/rancher/steve => /absolute/or/relative/path/to/steve
+  # or
+  #     replace github.com/rancher/steve => /absolute/or/relative/path/to/steve
+  if [ -z "$(echo "$replace" | cut -d= -f2 | cut -d' ' -f3)" ]; then
+    godep=$(echo "$replace" | cut -d= -f2 | cut -d' ' -f2)
     path=$(abs_path "$godep")
     BUILD_ARGS="$BUILD_ARGS --build-context=$2=$path"
     BUILD_ARGS="$BUILD_ARGS --build-arg=$3=$2"
