@@ -29,7 +29,7 @@ else
 fi
 
 # Chart tag.
-# if the chart version is set, us it
+# if the chart version is set, use it
 if [[ -n "${CHART_VERSION}" ]]; then
     CHART_VERSION="${CHART_VERSION}"
 # if there isn't any uncommited change and the tag is set, use the tag
