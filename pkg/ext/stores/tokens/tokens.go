@@ -35,10 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/kubernetes/pkg/printers"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 )
 
 const (
@@ -103,15 +106,16 @@ type Store struct {
 // words, it generally has access to all the tokens, in all ways.
 type SystemStore struct {
 	authorizer      authorizer.Authorizer
-	initialized     bool               // flag. set when this store ensured presence of the backing namespace
-	namespaceClient v1.NamespaceClient // access to namespaces.
-	secretClient    v1.SecretClient    // direct access to the backing secrets
-	secretCache     v1.SecretCache     // cached access to the backing secrets
-	userClient      v3.UserCache       // cached access to the v3.Users
-	v3TokenClient   v3.TokenCache      // cached access to v3.Tokens. See Fetch.
-	timer           timeHandler        // access to timestamp generation
-	hasher          hashHandler        // access to generation and hashing of secret values
-	auth            authHandler        // access to user retrieval from context
+	initialized     bool                // flag. set when this store ensured presence of the backing namespace
+	namespaceClient v1.NamespaceClient  // access to namespaces.
+	secretClient    v1.SecretClient     // direct access to the backing secrets
+	secretCache     v1.SecretCache      // cached access to the backing secrets
+	userClient      v3.UserCache        // cached access to the v3.Users
+	v3TokenClient   v3.TokenCache       // cached access to v3.Tokens. See Fetch.
+	timer           timeHandler         // access to timestamp generation
+	hasher          hashHandler         // access to generation and hashing of secret values
+	auth            authHandler         // access to user retrieval from context
+	tableConverter  rest.TableConvertor // custom column formatting
 }
 
 // NewFromWrangler is a convenience function for creating a token store.
@@ -154,6 +158,9 @@ func New(
 			timer:           timer,
 			hasher:          hasher,
 			auth:            auth,
+			tableConverter: printerstorage.TableConvertor{
+				TableGenerator: printers.NewTableGenerator().With(printHandler),
+			},
 		},
 	}
 	return &tokenStore
@@ -308,14 +315,64 @@ func (t *Store) List(
 	return t.list(ctx, options)
 }
 
-// ConvertToTable implements [rest.Lister], the interface to support the `list` verb.
+// ConvertToTable implements [rest.Lister]/[rest.TableConvertor], the interface to support the `list` verb.
 func (t *Store) ConvertToTable(
 	ctx context.Context,
 	object runtime.Object,
 	tableOptions runtime.Object) (*metav1.Table, error) {
+	return t.tableConverter.ConvertToTable(ctx, object, tableOptions)
+}
 
-	return extcore.ConvertToTableDefault[*ext.Token](ctx, object, tableOptions,
-		GVR.GroupResource())
+// printHandler registers the column definitions and actual formatter functions
+func printHandler(h printers.PrintHandler) {
+	columnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "User", Type: "string", Description: "User is the owner of the token"},
+		{Name: "Kind", Type: "string", Description: "Kind/purpose of the token"},
+		{Name: "TTL", Type: "string", Description: "The time-to-live for the token"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Description", Type: "string", Priority: 1, Description: "Human readable description of the token"},
+	}
+	_ = h.TableHandler(columnDefinitions, printTokenList)
+	_ = h.TableHandler(columnDefinitions, printToken)
+}
+
+// printToken formats a single Token for table printing
+func printToken(token *ext.Token, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	return []metav1.TableRow{{
+		Object: runtime.RawExtension{Object: token},
+		Cells: []any{
+			token.Name,
+			token.Spec.UserID,
+			token.Spec.Kind,
+			duration.HumanDuration(time.Duration(token.Spec.TTL) * time.Millisecond),
+			translateTimestampSince(token.CreationTimestamp),
+			token.Spec.Description,
+		},
+	}}, nil
+}
+
+// printTokenList formats a set of Tokens for table printing
+func printTokenList(tokenList *ext.TokenList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(tokenList.Items))
+	for i := range tokenList.Items {
+		r, err := printToken(&tokenList.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+// translateTimestampSince returns a human-readable approximation of the elapsed
+// time since timestamp
+func translateTimestampSince(timestamp metav1.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }
 
 // Update implements [rest.Updater], the interface to support the `update` verb.
