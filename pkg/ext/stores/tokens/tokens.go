@@ -45,10 +45,12 @@ import (
 )
 
 const (
-	TokenNamespace = "cattle-tokens"
-	UserIDLabel    = "authn.management.cattle.io/token-userId"
-	KindLabel      = "authn.management.cattle.io/kind"
-	IsLogin        = "session"
+	TokenNamespace       = "cattle-tokens"
+	UserIDLabel          = "authn.management.cattle.io/token-userId"
+	KindLabel            = "authn.management.cattle.io/kind"
+	IsLogin              = "session"
+	SecretKindLabel      = "cattle.io/kind"
+	SecretKindLabelValue = "token"
 
 	// names of the data fields used by the backing secrets to store token information
 	FieldAnnotations      = "annotations"
@@ -1300,6 +1302,7 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	}
 	backendLabels[UserIDLabel] = token.Spec.UserID
 	backendLabels[KindLabel] = token.Spec.Kind
+	backendLabels[SecretKindLabel] = SecretKindLabelValue
 
 	// ensure that only one of name or generateName is passed through.
 	name := token.Name
