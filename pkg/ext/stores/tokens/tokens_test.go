@@ -241,14 +241,14 @@ func Test_Store_Delete(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("laber", false, true, nil)
+			Return(&mockUser{name: "laber"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
 			Return(nil, someerror)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -265,14 +265,14 @@ func Test_Store_Delete(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("laber", false, true, nil)
+			Return(&mockUser{name: "laber"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
 			Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "bogus"))
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -287,10 +287,10 @@ func Test_Store_Delete(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("", false, false, apierrors.NewInternalError(invalidContext))
+			Return(&mockUser{name: ""}, false, false, apierrors.NewInternalError(invalidContext))
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -306,14 +306,14 @@ func Test_Store_Delete(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdl/ksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -329,7 +329,7 @@ func Test_Store_Delete(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil).Times(2)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil).Times(2)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
@@ -339,7 +339,7 @@ func Test_Store_Delete(t *testing.T) {
 			Delete("cattle-tokens", "bogus", gomock.Any()).
 			Return(nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.True(t, ok)
@@ -360,14 +360,14 @@ func Test_Store_Get(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdl/ksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Equal(t, bogusNotFoundError, err)
@@ -383,14 +383,14 @@ func Test_Store_Get(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
@@ -406,14 +406,14 @@ func Test_Store_Get(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
@@ -434,9 +434,9 @@ func Test_Store_Update(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdl/ksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.update(context.TODO(), &ext.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "bogus",
@@ -458,7 +458,7 @@ func Test_Store_Update(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
 			Get("cattle-tokens", "bogus").
@@ -479,7 +479,7 @@ func Test_Store_Update(t *testing.T) {
 		modified := properToken.DeepCopy()
 		modified.Spec.TTL = 2000
 
-		store := New(nil, nil, secrets, users, nil, timer, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, timer, nil, auth)
 		tok, err := store.update(context.TODO(), modified, &metav1.UpdateOptions{})
 
 		// set the expected status changes
@@ -510,11 +510,11 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
 		todo, cancel := context.WithCancel(context.TODO())
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -543,11 +543,11 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
 		todo, cancel := context.WithCancel(context.TODO())
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -578,9 +578,9 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -611,9 +611,9 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -644,9 +644,9 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -679,9 +679,9 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdl/ksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -712,9 +712,9 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -750,9 +750,9 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("lkajdlksjlkds", false, true, nil)
+			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -895,6 +895,7 @@ func Test_Store_Create(t *testing.T) {
 			scache *fake.MockCacheInterface[*corev1.Secret],
 			users *fake.MockNonNamespacedCacheInterface[*v3.User],
 			token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+			cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 			timer *MocktimeHandler,
 			hasher *MockhashHandler,
 			auth *MockauthHandler)
@@ -910,12 +911,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("lkajdlksjlkds", false, true, nil)
+					Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 			},
 		},
 		{
@@ -929,12 +931,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, someerror)
@@ -955,12 +958,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -988,12 +992,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -1023,12 +1028,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				space.EXPECT().Create(gomock.Any()).
 					Return(nil, nil)
@@ -1060,12 +1066,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				// fail fetch of session token, v3 and ext
 				auth.EXPECT().SessionID(gomock.Any()).
@@ -1103,12 +1110,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				// session token fetch for user principal
 				auth.EXPECT().SessionID(gomock.Any()).
@@ -1150,12 +1158,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				// session token fetch for user principal
 				auth.EXPECT().SessionID(gomock.Any()).
@@ -1207,12 +1216,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				// session token fetch for user principal
 				auth.EXPECT().SessionID(gomock.Any()).
@@ -1264,12 +1274,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				// session token fetch for user principal
 				auth.EXPECT().SessionID(gomock.Any()).
@@ -1329,12 +1340,13 @@ func Test_Store_Create(t *testing.T) {
 				scache *fake.MockCacheInterface[*corev1.Secret],
 				users *fake.MockNonNamespacedCacheInterface[*v3.User],
 				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
 				timer *MocktimeHandler,
 				hasher *MockhashHandler,
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
+					Return(&mockUser{name: "world"}, false, true, nil)
 
 				// session token fetch for user principal
 				auth.EXPECT().SessionID(gomock.Any()).
@@ -1387,6 +1399,7 @@ func Test_Store_Create(t *testing.T) {
 			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			ccache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
 			timer := NewMocktimeHandler(ctrl)
 			hasher := NewMockhashHandler(ctrl)
 			auth := NewMockauthHandler(ctrl)
@@ -1397,8 +1410,8 @@ func Test_Store_Create(t *testing.T) {
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			secrets.EXPECT().Cache().Return(scache)
 
-			store := New(nil, space, secrets, users, tcache, timer, hasher, auth)
-			test.storeSetup(space, secrets, scache, ucache, tcache, timer, hasher, auth)
+			store := New(nil, space, secrets, users, tcache, ccache, timer, hasher, auth)
+			test.storeSetup(space, secrets, scache, ucache, tcache, ccache, timer, hasher, auth)
 
 			// perform test and validate results
 			tok, err := store.create(context.TODO(), test.tok, test.opts)
@@ -1557,7 +1570,7 @@ func Test_SystemStore_List(t *testing.T) {
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(nil)
 
-			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+			store := NewSystem(nil, secrets, users, nil, nil, nil, nil, nil)
 			test.storeSetup(secrets)
 
 			// perform test and validate results
@@ -1629,7 +1642,7 @@ func Test_SystemStore_Delete(t *testing.T) {
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(nil)
 
-			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+			store := NewSystem(nil, secrets, users, nil, nil, nil, nil, nil)
 			test.storeSetup(secrets)
 
 			// perform test and validate results
@@ -1654,7 +1667,7 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil, nil)
 
 		var patchData []byte
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
@@ -1684,7 +1697,7 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil, nil)
 
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).
@@ -1707,7 +1720,7 @@ func Test_SystemStore_UpdateLastActivitySeen(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil, nil)
 
 		var patchData []byte
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
@@ -1737,7 +1750,7 @@ func Test_SystemStore_UpdateLastActivitySeen(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, secrets, users, nil, nil, nil, nil, nil)
 
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).
@@ -1995,7 +2008,7 @@ func Test_SystemStore_Update(t *testing.T) {
 			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit user id"),
 		},
 		{
-			name:     "reject login flag change",
+			name:     "reject login flag (kind) change",
 			fullPerm: true,
 			opts:     &metav1.UpdateOptions{},
 			token: func() *ext.Token {
@@ -2014,6 +2027,27 @@ func Test_SystemStore_Update(t *testing.T) {
 					Return(&properSecret, nil)
 			},
 			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit kind"),
+		},
+		{
+			name:     "reject cluster name change",
+			fullPerm: true,
+			opts:     &metav1.UpdateOptions{},
+			token: func() *ext.Token {
+				changed := properToken.DeepCopy()
+				changed.Spec.ClusterName = "foo"
+				return changed
+			}(),
+			storeSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+				scache.EXPECT().
+					Get("cattle-tokens", "bogus").
+					Return(&properSecret, nil)
+			},
+			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit cluster name"),
 		},
 		// Third set, accepted changes and other errors
 		{
@@ -2278,7 +2312,7 @@ func Test_SystemStore_Update(t *testing.T) {
 			hasher := NewMockhashHandler(ctrl)
 			auth := NewMockauthHandler(ctrl)
 
-			store := NewSystem(nil, secrets, users, nil, timer, hasher, auth)
+			store := NewSystem(nil, secrets, users, nil, nil, timer, hasher, auth)
 			test.storeSetup(secrets, scache, timer, hasher, auth)
 
 			// perform test and validate results
@@ -2512,7 +2546,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(scache)
 
-			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+			store := NewSystem(nil, secrets, users, nil, nil, nil, nil, nil)
 			test.storeSetup(scache)
 
 			// perform test and validate results

@@ -20,7 +20,6 @@ import (
 type MockcodeCreator struct {
 	ctrl     *gomock.Controller
 	recorder *MockcodeCreatorMockRecorder
-	isgomock struct{}
 }
 
 // MockcodeCreatorMockRecorder is the mock recorder for MockcodeCreator.
@@ -59,7 +58,6 @@ func (mr *MockcodeCreatorMockRecorder) GenerateCode() *gomock.Call {
 type MocksessionAdder struct {
 	ctrl     *gomock.Controller
 	recorder *MocksessionAdderMockRecorder
-	isgomock struct{}
 }
 
 // MocksessionAdderMockRecorder is the mock recorder for MocksessionAdder.
