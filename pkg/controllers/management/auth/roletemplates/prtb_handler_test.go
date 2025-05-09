@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/user"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -21,7 +21,7 @@ func Test_reconcileSubject(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                string
-		setupUserManager    func(*user.MockManager)
+		setupUserManager    func(*userMocks.MockManager)
 		setupUserController func(*fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList])
 		binding             *v3.ProjectRoleTemplateBinding
 		want                *v3.ProjectRoleTemplateBinding
@@ -75,7 +75,7 @@ func Test_reconcileSubject(t *testing.T) {
 				UserName:          "",
 				UserPrincipalName: "test-principal",
 			},
-			setupUserManager: func(m *user.MockManager) {
+			setupUserManager: func(m *userMocks.MockManager) {
 				m.EXPECT().EnsureUser("test-principal", "display-name").Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-user"},
 				}, nil)
@@ -101,7 +101,7 @@ func Test_reconcileSubject(t *testing.T) {
 				UserName:          "",
 				UserPrincipalName: "test-principal",
 			},
-			setupUserManager: func(m *user.MockManager) {
+			setupUserManager: func(m *userMocks.MockManager) {
 				m.EXPECT().EnsureUser("test-principal", "display-name").Return(nil, fmt.Errorf("error"))
 			},
 			want: &v3.ProjectRoleTemplateBinding{
@@ -151,7 +151,7 @@ func Test_reconcileSubject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			mockUserManager := user.NewMockManager(ctrl)
+			mockUserManager := userMocks.NewMockManager(ctrl)
 			mockUserController := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 			if tt.setupUserManager != nil {
 				tt.setupUserManager(mockUserManager)
