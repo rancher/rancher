@@ -117,11 +117,11 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
 	}
 
 	if err := n.reconcileNamespaceProjectClusterRole(obj); err != nil {
-		return false, err
+		return false, fmt.Errorf("reconciling namespace %s project cluster roles: %w", obj.Name, err)
 	}
 
 	return hasPRTBs, nil
@@ -130,7 +130,7 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces()
 	if err != nil {
-		return err
+		return fmt.Errorf("assigning namespace %s to initial projects: %w", ns.Name, err)
 	}
 	for projectName, namespaces := range initialProjectsToNamespaces {
 		for _, nsToCheck := range namespaces {
@@ -141,7 +141,7 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 				}
 				projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[projectName].AsSelector())
 				if err != nil {
-					return err
+					return fmt.Errorf("listing projects for cluster %s: %w", n.m.clusterName, err)
 				}
 				if len(projects) == 0 {
 					continue
@@ -166,7 +166,7 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 func (n *nsLifecycle) GetSystemProjectName() (string, error) {
 	projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[project.System].AsSelector())
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getting system project name for cluster %s: %w", n.m.clusterName, err)
 	}
 	if len(projects) == 0 {
 		return "", nil
@@ -188,6 +188,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
 	if len(projectID) == 0 {
+		logrus.Debugf("Namespace %s does not belong to a project - deleting rolebindings", ns.Name)
 		// if namespace does not belong to a project, delete all rolebindings from that namespace that were created for a PRTB
 		// such rolebindings will have the label "authz.cluster.cattle.io/rtb-owner" prior to 2.5 and
 		// "authz.cluster.cattle.io/rtb-owner-updated" 2.5 onwards
@@ -262,6 +263,10 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
 		project, err := n.rq.ProjectLister.Get(parts[0], parts[1])
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logrus.Warnf("Namespace %s references project %s in namespace %s which does not exist", ns.Name, parts[1], parts[0])
+				return hasPRTBs, nil
+			}
 			return hasPRTBs, err
 		}
 		namespace = project.GetProjectBackingNamespace()
