@@ -167,8 +167,8 @@ var (
 	emptyNotFoundError       = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch       = apierrors.NewBadRequest("unable to create token for other user")
 	helloAlreadyExistsError  = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
-	invalidNameError         = apierrors.NewBadRequest("Token is invalid: metadata.name: Forbidden to be set. Use of 'generateName' is required")
-	missingGenerateNameError = apierrors.NewBadRequest("Token is invalid: metadata.generateName: Required value is not set")
+	invalidNameError         = apierrors.NewBadRequest("Token is invalid: metadata.name: Locked by system. Do not set.")
+	invalidGenerateNameError = apierrors.NewBadRequest("Token is invalid: metadata.generateName: Locked by system. Do not set.")
 
 	parseBoolError error
 	parseIntError  error
@@ -969,9 +969,13 @@ func Test_Store_Create(t *testing.T) {
 			},
 		},
 		{
-			name: "reject missing generateName",
-			err:  missingGenerateNameError,
-			tok:  &ext.Token{},
+			name: "reject specified generateName",
+			err:  invalidGenerateNameError,
+			tok:  &ext.Token{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "hello",
+				},
+			},
 			opts: &metav1.CreateOptions{},
 			storeSetup: func( // configure store backend clients
 				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
@@ -995,9 +999,6 @@ func Test_Store_Create(t *testing.T) {
 			name: "user retrieval error",
 			err:  apierrors.NewInternalError(fmt.Errorf("failed to retrieve user world: %w", someerror)),
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
@@ -1027,9 +1028,6 @@ func Test_Store_Create(t *testing.T) {
 			name: "user disabled",
 			err:  apierrors.NewBadRequest("operation references a disabled user"),
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
@@ -1061,9 +1059,6 @@ func Test_Store_Create(t *testing.T) {
 			name: "provider/principal retrieval error",
 			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token session-token")),
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
@@ -1101,9 +1096,6 @@ func Test_Store_Create(t *testing.T) {
 			name: "generation or hash error",
 			err:  someerror,
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
@@ -1143,11 +1135,8 @@ func Test_Store_Create(t *testing.T) {
 		},
 		{
 			name: "failed to create secret - some error",
-			err:  apierrors.NewInternalError(fmt.Errorf("failed to store token hello: %w", someerror)),
+			err:  apierrors.NewInternalError(fmt.Errorf("failed to store token: %w", someerror)),
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
@@ -1199,9 +1188,6 @@ func Test_Store_Create(t *testing.T) {
 			name: "failed to create secret - already exists",
 			err:  helloAlreadyExistsError,
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
@@ -1253,9 +1239,6 @@ func Test_Store_Create(t *testing.T) {
 			name: "created secret reads back as bogus",
 			err:  apierrors.NewInternalError(fmt.Errorf("failed to regenerate token bogus: %w", userIDMissingError)),
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
@@ -1315,9 +1298,6 @@ func Test_Store_Create(t *testing.T) {
 			name: "created secret ok",
 			err:  nil,
 			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
 				Spec: ext.TokenSpec{
 					UserID: "world",
 				},
