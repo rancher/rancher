@@ -44,6 +44,15 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+var commonAuthorizer = authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	switch a.GetUser().GetName() {
+	case "system:admin", "user-2p7w6":
+		return authorizer.DecisionAllow, "", nil
+	default:
+		return authorizer.DecisionDeny, "", nil
+	}
+})
+
 type fakeUserManager struct {
 	clusterTokens          []string
 	tokens                 []string
@@ -366,15 +375,11 @@ func TestStoreCreate(t *testing.T) {
 		return configMap, nil
 	}).Times(1)
 
-	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-		return authorizer.DecisionAllow, "", nil
-	})
-
 	userManager := &fakeUserManager{}
 	defaultTTL := int64(43200)
 
 	store := &Store{
-		authorizer:      authorizer,
+		authorizer:      commonAuthorizer,
 		configMapCache:  configMapCache,
 		configMapClient: configMapClient,
 		userCache:       userCache,
@@ -641,12 +646,8 @@ func TestStoreGet(t *testing.T) {
 	})
 
 	t.Run("admin gets kubeconfig", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		store := &Store{
-			authorizer:     auth,
+			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
 			userMgr:        userManager,
@@ -685,12 +686,8 @@ func TestStoreGet(t *testing.T) {
 	})
 
 	t.Run("user gets kubeconfig", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionDeny, "", nil
-		})
-
 		store := &Store{
-			authorizer:     auth,
+			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
 			userMgr:        userManager,
@@ -712,12 +709,8 @@ func TestStoreGet(t *testing.T) {
 		}()
 		configMap.Labels[UserIDLabel] = "other-user"
 
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionDeny, "", nil
-		})
-
 		store := &Store{
-			authorizer:     auth,
+			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
 			userMgr:        userManager,
@@ -730,10 +723,6 @@ func TestStoreGet(t *testing.T) {
 	})
 
 	t.Run("configmap client is used if options are set", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionDeny, "", nil
-		})
-
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			assert.Equal(t, "1", options.ResourceVersion)
@@ -741,7 +730,7 @@ func TestStoreGet(t *testing.T) {
 		}).AnyTimes()
 
 		store := &Store{
-			authorizer:      auth,
+			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
 			userMgr:         userManager,
@@ -757,12 +746,8 @@ func TestStoreGet(t *testing.T) {
 	})
 
 	t.Run("not found error points to correct resource", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionDeny, "", nil
-		})
-
 		store := &Store{
-			authorizer:     auth,
+			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
 			userMgr:        userManager,
@@ -885,12 +870,8 @@ func TestStoreList(t *testing.T) {
 	userManager := &fakeUserManager{}
 
 	t.Run("admin lists kubeconfigs", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		store := &Store{
-			authorizer:      auth,
+			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
 			userMgr:         userManager,
@@ -915,12 +896,8 @@ func TestStoreList(t *testing.T) {
 	})
 
 	t.Run("user lists kubeconfigs", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionDeny, "", nil
-		})
-
 		store := &Store{
-			authorizer:      auth,
+			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
 			userMgr:         userManager,
@@ -996,10 +973,6 @@ func TestStoreWatch(t *testing.T) {
 	userManager := &fakeUserManager{}
 
 	t.Run("admin watches kubeconfigs", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		configMapWatcher := &watcher{
 			ch: make(chan watch.Event),
 		}
@@ -1016,7 +989,7 @@ func TestStoreWatch(t *testing.T) {
 		}).AnyTimes()
 
 		store := &Store{
-			authorizer:      auth,
+			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
 			userMgr:         userManager,
@@ -1101,10 +1074,6 @@ func TestStoreWatch(t *testing.T) {
 	})
 
 	t.Run("user watches kubeconfigs", func(t *testing.T) {
-		auth := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionDeny, "", nil
-		})
-
 		configMapWatcher := &watcher{
 			ch: make(chan watch.Event),
 		}
@@ -1121,7 +1090,7 @@ func TestStoreWatch(t *testing.T) {
 		}).AnyTimes()
 
 		store := &Store{
-			authorizer:      auth,
+			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
 			userMgr:         userManager,
@@ -1145,6 +1114,413 @@ func TestStoreWatch(t *testing.T) {
 		k, ok := event.Object.(*ext.Kubeconfig)
 		assert.True(t, ok)
 		assert.Equal(t, configMap1.Name, k.Name)
+	})
+}
+
+type fakeUpdatedObjectInfo struct {
+	obj runtime.Object
+	err error
+}
+
+func (i *fakeUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
+	return nil
+}
+
+func (i *fakeUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (newObj runtime.Object, err error) {
+	return i.obj, i.err
+}
+
+func TestStoreUpdate(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-w7drc"
+	kubeconfigID := "kubeconfig-49d5p"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
+		switch name {
+		case userID:
+			return &v3.User{}, nil
+		case "error":
+			return nil, fmt.Errorf("some error")
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	oldConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeconfigID,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				UserIDLabel: userID,
+				KindLabel:   KindLabelValue,
+			},
+			Annotations: map[string]string{
+				UIDAnnotation: string(uuid.NewUUID()),
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-w7drcgc66",
+					UID:        uuid.NewUUID(),
+				},
+			},
+		},
+		Data: map[string]string{
+			TTLField:            "43200",
+			DescriptionField:    "test",
+			CurrentContextField: "c-m-tbgzfbgf",
+			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+		},
+	}
+
+	userManager := &fakeUserManager{}
+
+	t.Run("admin updates a kubeconfig", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return oldConfigMap.DeepCopy(), nil
+		})
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			assert.Equal(t, "bar", configMap.Labels["foo"])
+			assert.Equal(t, "bar", configMap.Annotations["foo"])
+			assert.Equal(t, "updated", configMap.Data[DescriptionField])
+			return configMap.DeepCopy(), nil
+		})
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		createValidation := func(ctx context.Context, obj runtime.Object) error {
+			assert.Fail(t, "createValidation should not be called")
+			return nil
+		}
+
+		var updateValidationCalled bool
+		updateValidation := func(ctx context.Context, obj, old runtime.Object) error {
+			updateValidationCalled = true
+			require.NotNil(t, obj)
+			require.IsType(t, &ext.Kubeconfig{}, obj)
+			require.NotNil(t, old)
+			require.IsType(t, &ext.Kubeconfig{}, old)
+			return nil
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "user-2p7w6", // Admin user
+		})
+
+		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
+		assert.NoError(t, err)
+
+		update := oldKubeconfig.DeepCopy()
+		update.Spec.Description = "updated"
+		update.Annotations["foo"] = "bar"
+		update.Labels["foo"] = "bar"
+		update.Finalizers = append(update.Finalizers, "foo/bar")
+		objInfo := &fakeUpdatedObjectInfo{obj: update}
+
+		options := &metav1.UpdateOptions{}
+
+		obj, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, createValidation, updateValidation, false, options)
+		require.NoError(t, err)
+		assert.NotNil(t, obj)
+		assert.IsType(t, &ext.Kubeconfig{}, obj)
+		assert.False(t, isCreated)
+
+		assert.True(t, updateValidationCalled)
+
+		newKubeconfig, ok := obj.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, "bar", newKubeconfig.Labels["foo"])
+		assert.Equal(t, "bar", newKubeconfig.Annotations["foo"])
+		assert.Equal(t, "updated", newKubeconfig.Spec.Description)
+		require.Len(t, newKubeconfig.Finalizers, 1)
+		assert.Equal(t, "foo/bar", newKubeconfig.Finalizers[0])
+		require.Len(t, newKubeconfig.OwnerReferences, 1)
+		assert.Equal(t, oldConfigMap.OwnerReferences[0].UID, newKubeconfig.OwnerReferences[0].UID)
+	})
+	t.Run("user updates their kubeconfig", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return oldConfigMap.DeepCopy(), nil
+		})
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			assert.Equal(t, "bar", configMap.Labels["foo"])
+			assert.Equal(t, "bar", configMap.Annotations["foo"])
+			assert.Equal(t, "updated", configMap.Data[DescriptionField])
+			return configMap.DeepCopy(), nil
+		})
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		createValidation := func(ctx context.Context, obj runtime.Object) error {
+			assert.Fail(t, "createValidation should not be called")
+			return nil
+		}
+
+		var updateValidationCalled bool
+		updateValidation := func(ctx context.Context, obj, old runtime.Object) error {
+			updateValidationCalled = true
+			require.NotNil(t, obj)
+			require.IsType(t, &ext.Kubeconfig{}, obj)
+			require.NotNil(t, old)
+			require.IsType(t, &ext.Kubeconfig{}, old)
+			return nil
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID, // Kubeconfig owner.
+		})
+
+		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
+		assert.NoError(t, err)
+
+		update := oldKubeconfig.DeepCopy()
+		update.Spec.Description = "updated"
+		update.Annotations["foo"] = "bar"
+		update.Labels["foo"] = "bar"
+		update.Finalizers = append(update.Finalizers, "foo/bar")
+		objInfo := &fakeUpdatedObjectInfo{obj: update}
+
+		options := &metav1.UpdateOptions{}
+
+		obj, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, createValidation, updateValidation, false, options)
+		require.NoError(t, err)
+		assert.NotNil(t, obj)
+		assert.IsType(t, &ext.Kubeconfig{}, obj)
+		assert.False(t, isCreated)
+
+		assert.True(t, updateValidationCalled)
+
+		newKubeconfig, ok := obj.(*ext.Kubeconfig)
+		assert.True(t, ok)
+		assert.Equal(t, "bar", newKubeconfig.Labels["foo"])
+		assert.Equal(t, "bar", newKubeconfig.Annotations["foo"])
+		assert.Equal(t, "updated", newKubeconfig.Spec.Description)
+		require.Len(t, newKubeconfig.Finalizers, 1)
+		assert.Equal(t, "foo/bar", newKubeconfig.Finalizers[0])
+		require.Len(t, newKubeconfig.OwnerReferences, 1)
+		assert.Equal(t, oldConfigMap.OwnerReferences[0].UID, newKubeconfig.OwnerReferences[0].UID)
+	})
+
+	t.Run("user can't update other user's kubeconfig", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return oldConfigMap.DeepCopy(), nil
+		})
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "not-an-owner",
+		})
+
+		options := &metav1.UpdateOptions{}
+
+		kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, nil, nil, nil, false, options)
+		require.Error(t, err)
+		assert.Nil(t, kubeconfig)
+		assert.False(t, isCreated)
+		assert.True(t, apierrors.IsNotFound(err))
+
+		statusErr, ok := err.(*apierrors.StatusError)
+		require.True(t, ok)
+		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
+		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
+		assert.Equal(t, kubeconfigID, statusErr.Status().Details.Name)
+	})
+	t.Run("configMap doen't have correct kind label", func(t *testing.T) {
+		oldConfigMap := oldConfigMap.DeepCopy()
+		oldConfigMap.Labels[KindLabel] = "not-a-kubeconfig"
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return oldConfigMap.DeepCopy(), nil
+		})
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+		})
+
+		options := &metav1.UpdateOptions{}
+
+		kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, nil, nil, nil, false, options)
+		require.Error(t, err)
+		assert.Nil(t, kubeconfig)
+		assert.False(t, isCreated)
+		assert.True(t, apierrors.IsNotFound(err))
+
+		statusErr, ok := err.(*apierrors.StatusError)
+		require.True(t, ok)
+		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
+		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
+		assert.Equal(t, kubeconfigID, statusErr.Status().Details.Name)
+	})
+	t.Run("configMap doen't exist", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		})
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+		})
+
+		options := &metav1.UpdateOptions{}
+
+		kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, nil, nil, nil, false, options)
+		require.Error(t, err)
+		assert.Nil(t, kubeconfig)
+		assert.False(t, isCreated)
+		assert.True(t, apierrors.IsNotFound(err))
+
+		statusErr, ok := err.(*apierrors.StatusError)
+		require.True(t, ok)
+		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
+		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
+		assert.Equal(t, kubeconfigID, statusErr.Status().Details.Name)
+	})
+	t.Run("immutable fields", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return oldConfigMap.DeepCopy(), nil
+		}).AnyTimes()
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		updateValidation := func(ctx context.Context, obj, old runtime.Object) error { return nil }
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+		})
+
+		options := &metav1.UpdateOptions{}
+
+		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
+		assert.NoError(t, err)
+
+		t.Run("spec.clusters", func(t *testing.T) {
+			newKubeconfig := oldKubeconfig.DeepCopy()
+			newKubeconfig.Spec.Clusters = []string{"foo", "bar"}
+			objInfo := &fakeUpdatedObjectInfo{obj: newKubeconfig}
+
+			kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, options)
+			require.Error(t, err)
+			assert.Nil(t, kubeconfig)
+			assert.False(t, isCreated)
+			assert.True(t, apierrors.IsBadRequest(err))
+		})
+		t.Run("spec.currentContext", func(t *testing.T) {
+			newKubeconfig := oldKubeconfig.DeepCopy()
+			newKubeconfig.Spec.CurrentContext = "foo"
+			objInfo := &fakeUpdatedObjectInfo{obj: newKubeconfig}
+
+			kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, options)
+			require.Error(t, err)
+			assert.Nil(t, kubeconfig)
+			assert.False(t, isCreated)
+			assert.True(t, apierrors.IsBadRequest(err))
+		})
+		t.Run("spec.ttl", func(t *testing.T) {
+			newKubeconfig := oldKubeconfig.DeepCopy()
+			newKubeconfig.Spec.TTL = oldKubeconfig.Spec.TTL + 1
+			objInfo := &fakeUpdatedObjectInfo{obj: newKubeconfig}
+
+			kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, options)
+			require.Error(t, err)
+			assert.Nil(t, kubeconfig)
+			assert.False(t, isCreated)
+			assert.True(t, apierrors.IsBadRequest(err))
+		})
+	})
+	t.Run("dryRun", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return oldConfigMap.DeepCopy(), nil
+		})
+		configMapClient.EXPECT().Update(gomock.Any()).Times(0)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		var updateValidationCalled bool
+		updateValidation := func(ctx context.Context, obj, old runtime.Object) error {
+			updateValidationCalled = true
+			require.NotNil(t, obj)
+			require.IsType(t, &ext.Kubeconfig{}, obj)
+			require.NotNil(t, old)
+			require.IsType(t, &ext.Kubeconfig{}, old)
+			return nil
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID, // Kubeconfig owner.
+		})
+
+		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
+		assert.NoError(t, err)
+
+		newKubeconfig := oldKubeconfig.DeepCopy()
+		newKubeconfig.Spec.Description = "updated"
+		newKubeconfig.Annotations["foo"] = "bar"
+		newKubeconfig.Labels["foo"] = "bar"
+		objInfo := &fakeUpdatedObjectInfo{obj: newKubeconfig}
+
+		options := &metav1.UpdateOptions{
+			DryRun: []string{metav1.DryRunAll},
+		}
+
+		kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, options)
+		require.NoError(t, err)
+		assert.NotNil(t, kubeconfig)
+		assert.IsType(t, &ext.Kubeconfig{}, kubeconfig)
+		assert.False(t, isCreated)
+
+		assert.True(t, updateValidationCalled)
+
+		assert.Equal(t, "bar", newKubeconfig.Labels["foo"])
+		assert.Equal(t, "bar", newKubeconfig.Annotations["foo"])
+		assert.Equal(t, "updated", newKubeconfig.Spec.Description)
 	})
 }
 
