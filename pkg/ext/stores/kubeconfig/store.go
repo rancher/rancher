@@ -196,7 +196,7 @@ func (s *Store) userFrom(ctx context.Context, verb string) (k8suser.Info, bool, 
 }
 
 // Create implements [rest.Creater]
-// Note: Name and GenerateNamre are not respected. A name is generated with a predefined prefix instead.
+// Note: Name and GenerateName are not respected. A name is generated with a predefined prefix instead.
 func (s *Store) Create(
 	ctx context.Context,
 	obj runtime.Object,
@@ -226,7 +226,10 @@ func (s *Store) Create(
 
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
-			return nil, err
+			if _, ok := err.(apierrors.APIStatus); ok {
+				return nil, err
+			}
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("create validation failed for kubeconfig: %s", err))
 		}
 	}
 
@@ -347,7 +350,7 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid currentContext %s", kubeconfig.Spec.CurrentContext))
 	}
 
-	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
+	dryRun := options != nil && len(options.DryRun) > 0
 
 	generateToken := s.shouldGenerateToken()
 	input := make([]kconfig.GenerateInput, 0, len(kubeconfig.Spec.Clusters)+1)
@@ -623,6 +626,10 @@ func (s *Store) Get(
 		}
 
 		return nil, fmt.Errorf("error getting configmap for kubeconfig %s: %w", name, err)
+	}
+
+	if configMap.Labels[KindLabel] != KindLabelValue {
+		return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
 	if configMap.Labels[UserIDLabel] != userInfo.GetName() && !isAdmin {
@@ -981,31 +988,55 @@ func (s *Store) Update(
 	forceAllowCreate bool,
 	options *metav1.UpdateOptions,
 ) (runtime.Object, bool, error) {
-	// TODO: We may need to read the backing configmap instead.
-	oldObj, err := s.Get(ctx, name, &metav1.GetOptions{})
+	userInfo, isAdmin, _, err := s.userFrom(ctx, "update")
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
 	}
 
-	newObj, err := objInfo.UpdatedObject(ctx, oldObj)
-	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object: %w", err))
-	}
+	oldConfigMap, err := s.configMapClient.Get(Namespace, name, metav1.GetOptions{})
 
-	if updateValidation != nil {
-		err = updateValidation(ctx, newObj, oldObj)
-		if err != nil {
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Rethrow the NotFound error with the correct group and resource information.
+			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
 		}
+
+		return nil, false, fmt.Errorf("error getting configmap for kubeconfig %s: %w", name, err)
 	}
 
-	oldKubeconfig, ok := oldObj.(*ext.Kubeconfig)
-	if !ok {
-		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", oldObj))
+	if oldConfigMap.Labels[KindLabel] != KindLabelValue {
+		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
+
+	if oldConfigMap.Labels[UserIDLabel] != userInfo.GetName() && !isAdmin {
+		// An ordinary user can only access their own kubeconfigs.
+		// We return a NotFound error to avoid leaking information about other users' kubeconfigs.
+		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
+	}
+
+	oldKubeconfig, err := s.fromConfigMap(oldConfigMap)
+	if err != nil {
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+	}
+
+	newObj, err := objInfo.UpdatedObject(ctx, oldKubeconfig)
+	if err != nil {
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object for kubeconfig %s: %w", name, err))
+	}
+
 	newKubeconfig, ok := newObj.(*ext.Kubeconfig)
 	if !ok {
 		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", newObj))
+	}
+
+	if updateValidation != nil {
+		err = updateValidation(ctx, newKubeconfig, oldKubeconfig)
+		if err != nil {
+			if _, ok := err.(apierrors.APIStatus); ok {
+				return nil, false, err
+			}
+			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("update validation for kubeconfig %s failed: %s", name, err))
+		}
 	}
 
 	if !reflect.DeepEqual(oldKubeconfig.Spec.Clusters, newKubeconfig.Spec.Clusters) {
@@ -1021,35 +1052,33 @@ func (s *Store) Update(
 	if newKubeconfig.Annotations == nil {
 		newKubeconfig.Annotations = make(map[string]string)
 	}
-	newKubeconfig.Annotations[UIDAnnotation] = string(oldKubeconfig.UID)
+	newKubeconfig.Annotations[UIDAnnotation] = string(oldKubeconfig.UID) // Preserve the UID.
 
 	if newKubeconfig.Labels == nil {
 		newKubeconfig.Labels = make(map[string]string)
 	}
 	newKubeconfig.Labels[UserIDLabel] = oldKubeconfig.Labels[UserIDLabel]
+	newKubeconfig.Labels[KindLabel] = KindLabelValue
 
-	// TODO: Handle owner references.
-
-	configMap, err := s.toConfigMap(newKubeconfig)
+	newConfigMap, err := s.toConfigMap(newKubeconfig)
 	if err != nil {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %w", name, err))
 	}
 
-	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
+	dryRun := options != nil && len(options.DryRun) > 0
 	if !dryRun {
-		configMap, err = s.configMapClient.Update(configMap)
+		newConfigMap, err = s.configMapClient.Update(newConfigMap)
 		if err != nil {
 			return nil, false, apierrors.NewInternalError(fmt.Errorf("error updating configmap for kubeconfig %s: %w", name, err))
 		}
 	}
 
-	newKubeconfig, err = s.fromConfigMap(configMap)
+	newKubeconfig, err = s.fromConfigMap(newConfigMap)
 	if err != nil {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
 	}
 
 	return newKubeconfig, false, nil
-
 }
 
 // GetSingularName implements [rest.SingularNameProvider]
