@@ -329,7 +329,7 @@ func (t *Store) ConvertToTable(
 func printHandler(h printers.PrintHandler) {
 	columnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "User", Type: "string", Description: "User is the owner of the token"},
+		{Name: "User", Type: "string", Priority: 1, Description: "User is the owner of the token"},
 		{Name: "Kind", Type: "string", Description: "Kind/purpose of the token"},
 		{Name: "TTL", Type: "string", Description: "The time-to-live for the token"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
@@ -721,15 +721,15 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	}
 
 	if token.ObjectMeta.UID != currentToken.ObjectMeta.UID {
-		return nil, apierrors.NewBadRequest("forbidden to edit kubernetes UID")
+		return nil, apierrors.NewBadRequest("UID is immutable")
 	}
 
 	if token.Spec.UserID != currentToken.Spec.UserID {
-		return nil, apierrors.NewBadRequest("forbidden to edit user id")
+		return nil, apierrors.NewBadRequest("user id is immutable")
 	}
 
 	if token.Spec.Kind != currentToken.Spec.Kind {
-		return nil, apierrors.NewBadRequest("forbidden to edit kind")
+		return nil, apierrors.NewBadRequest("kind is immutable")
 	}
 
 	if token.Spec.UserPrincipal.Name != currentToken.Spec.UserPrincipal.Name ||
@@ -741,7 +741,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 		token.Spec.UserPrincipal.MemberOf != currentToken.Spec.UserPrincipal.MemberOf ||
 		token.Spec.UserPrincipal.Provider != currentToken.Spec.UserPrincipal.Provider ||
 		!reflect.DeepEqual(token.Spec.UserPrincipal.ExtraInfo, currentToken.Spec.UserPrincipal.ExtraInfo) {
-		return nil, apierrors.NewBadRequest("forbidden to edit principal data")
+		return nil, apierrors.NewBadRequest("principal is immutable")
 	}
 
 	// Regular users are not allowed to extend the TTL.
@@ -757,7 +757,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	}
 
 	// Keep the status of the resource unchanged, never store a token value, etc.
-	// IOW changes to display name, login name, etc. are all ignored without a peep.
+	// IOW changes to hash, value, etc. are all ignored without a peep.
 	token.Status = currentToken.Status
 	token.Status.Value = ""
 	// Refresh time of last update to current.
@@ -1572,7 +1572,6 @@ func ttlGreater(a, b int64) bool {
 	return a > b
 }
 
-// typecheck store type against the various interfaces we (have to) implement
 var (
 	_ rest.Creater                  = &Store{}
 	_ rest.Getter                   = &Store{}
