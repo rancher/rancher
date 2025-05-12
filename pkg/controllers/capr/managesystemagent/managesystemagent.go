@@ -177,6 +177,9 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 				CorrectDrift: &v1alpha1.CorrectDrift{
 					Enabled: true,
 				},
+				Helm: &v1alpha1.HelmOptions{
+					TakeOwnership: true,
+				},
 			},
 			Resources: resources,
 			Targets: []v1alpha1.BundleTarget{
