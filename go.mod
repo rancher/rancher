@@ -43,6 +43,7 @@ replace (
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.31.6
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.31.6
 	k8s.io/endpointslice => k8s.io/endpointslice v0.31.6
+	k8s.io/gengo/v2 => k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70
 	k8s.io/kms => k8s.io/kms v0.31.6
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.31.6
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.31.6
@@ -97,7 +98,7 @@ require (
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
-	github.com/evanphx/json-patch v5.9.0+incompatible
+	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/go-ldap/ldap/v3 v3.4.1
@@ -135,17 +136,17 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.11.6
 	github.com/rancher/gke-operator v1.10.5-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.2.1
+	github.com/rancher/lasso v0.2.2
 	github.com/rancher/machine v0.15.0-rancher125
 	github.com/rancher/norman v0.4.2
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.6
 	github.com/rancher/shepherd v0.0.0-20241217192141-80755a9de656
-	github.com/rancher/steve v0.4.5
+	github.com/rancher/steve v0.4.6
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.1.0
+	github.com/rancher/wrangler/v3 v3.2.1-rc.4
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
@@ -174,7 +175,7 @@ require (
 	k8s.io/cli-runtime v0.31.6
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/helm v2.17.0+incompatible
-	k8s.io/kube-aggregator v0.31.6
+	k8s.io/kube-aggregator v0.32.1
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kubectl v0.31.6
 	k8s.io/kubernetes v1.31.6
@@ -265,8 +266,8 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241118233622-e639e219e697 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	k8s.io/gengo v0.0.0-20240826214909-a7b603a56eb7 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
+	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
+	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
 	k8s.io/kms v0.32.2 // indirect
 	k8s.io/pod-security-admission v0.31.6 // indirect
 	modernc.org/libc v1.61.13 // indirect
@@ -321,7 +322,7 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
-	github.com/go-openapi/jsonreference v0.20.2 // indirect
+	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/gobuffalo/flect v1.0.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
@@ -427,7 +428,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	k8s.io/cluster-bootstrap v0.30.3 // indirect
-	k8s.io/code-generator v0.31.6 // indirect
+	k8s.io/code-generator v0.32.1 // indirect
 	k8s.io/component-base v0.32.2 // indirect
 	k8s.io/component-helpers v0.31.6 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
@@ -437,5 +438,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
 )
