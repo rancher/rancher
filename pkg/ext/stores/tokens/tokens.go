@@ -532,8 +532,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 			// note: should not be possible due to the forced use of generateName
 			return nil, err
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store token %s: %w",
-			token.GenerateName, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store token: %w", err))
 	}
 
 	// Read changes back to return what was truly created, not what we thought we created
@@ -1520,15 +1519,16 @@ func setExpired(token *ext.Token) error {
 func ensureNoNameAndGenerateName(token *ext.Token) error {
 	if token.ObjectMeta.Name != "" {
 		return apierrors.NewBadRequest(
-			"Token is invalid: metadata.name: Forbidden to be set. Use of 'generateName' is required")
+			"Token is invalid: metadata.name: Locked by system. Do not set.")
 	}
 
-	if token.ObjectMeta.GenerateName != "" {
-		return nil
+	if token.ObjectMeta.GenerateName != "" && token.ObjectMeta.GenerateName != "token-" {
+		return apierrors.NewBadRequest(
+			"Token is invalid: metadata.generateName: Locked by system. Do not set.")
 	}
 
-	return apierrors.NewBadRequest(
-		"Token is invalid: metadata.generateName: Required value is not set")
+	token.ObjectMeta.GenerateName = "token-"
+	return nil
 }
 
 func clampMaxTTL(ttl int64) (int64, error) {
