@@ -43,11 +43,12 @@ func TestAuthEndpoint(t *testing.T) {
 	fakeTime := time.Unix(0, 0)
 	ctrl := gomock.NewController(t)
 	tests := map[string]struct {
-		req          func() *http.Request
-		mockSetup    func(mockParams)
-		wantRedirect string
-		wantHttpCode int
-		wantError    string
+		req                                func() *http.Request
+		mockSetup                          func(mockParams)
+		wantRedirect                       string
+		wantHttpCode                       int
+		wantError                          string
+		wantAccessControlAllowOriginHeader string
 	}{
 		"redirect with code when Rancher token in present": {
 			mockSetup: func(m mockParams) {
@@ -100,8 +101,9 @@ func TestAuthEndpoint(t *testing.T) {
 
 				return req
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?code=fake-code",
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?code=fake-code",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
 		"redirect to login page if Rancher token is not present": {
 			req: func() *http.Request {
@@ -188,8 +190,9 @@ func TestAuthEndpoint(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=unsupported_response_type&error_description=response+type+not+supported",
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?error=unsupported_response_type&error_description=response+type+not+supported",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
 		"code challenge method not supported": {
 			req: func() *http.Request {
@@ -234,8 +237,9 @@ func TestAuthEndpoint(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=invalid_request&error_description=challenge_method+not+supported%2C+only+S256+is+supported",
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?error=invalid_request&error_description=challenge_method+not+supported%2C+only+S256+is+supported",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
 		"missing openid": {
 			req: func() *http.Request {
@@ -280,8 +284,9 @@ func TestAuthEndpoint(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=invalid_scope&error_description=missing+openid+scope",
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?error=invalid_scope&error_description=missing+openid+scope",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
 		"invalid scope": {
 			req: func() *http.Request {
@@ -326,8 +331,9 @@ func TestAuthEndpoint(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=invalid_scope&error_description=invalid+scope%3A+invalidscope",
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?error=invalid_scope&error_description=invalid+scope%3A+invalidscope",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
 		"missing code challenge": {
 			req: func() *http.Request {
@@ -372,8 +378,9 @@ func TestAuthEndpoint(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeRedirectUri + "?error=invalid_request&error_description=missing+code_challenge",
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?error=invalid_request&error_description=missing+code_challenge",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
 		"missing redirect uri": {
 			req: func() *http.Request {
@@ -515,6 +522,7 @@ func TestAuthEndpoint(t *testing.T) {
 			if test.wantRedirect != "" {
 				assert.Equal(t, test.wantRedirect, rec.Header().Get("Location"))
 			}
+			assert.Equal(t, test.wantAccessControlAllowOriginHeader, rec.Header().Get("Access-Control-Allow-Origin"))
 			if test.wantError != "" {
 				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			}
