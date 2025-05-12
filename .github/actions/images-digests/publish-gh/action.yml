@@ -12,6 +12,7 @@ runs:
     - name: Upload digests
       env:
         GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      shell: bash
       run: |
         gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE" --clobber
         gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$LINUX_ARM64_FILE" --clobber

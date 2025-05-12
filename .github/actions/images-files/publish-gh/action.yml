@@ -12,6 +12,7 @@ runs:
     - name: Add release notes
       env:
         GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      shell: bash
       run: |
         NOTES=$(cat bin/rancher-components.txt)
         gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"

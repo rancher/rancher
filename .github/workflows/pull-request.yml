@@ -5,6 +5,7 @@ on:
       # omit tests from triggering CI except when CI tests are changed
       - 'tests/v2/codecoverage/**'
       - 'tests/validation/**'
+      - 'README.md'
 
 env:
   ARCH: amd64
