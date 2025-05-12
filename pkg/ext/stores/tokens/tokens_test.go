@@ -1967,7 +1967,7 @@ func Test_SystemStore_Update(t *testing.T) {
 			},
 			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", kubeIDMissingError)),
 		},
-		// Second set of tests, compare inbound token against stored token, and reject forbidden changes
+		// Second set of tests, compare inbound token against stored token, and reject changes of immutable fields
 		{
 			name:     "reject user id change",
 			fullPerm: true,
@@ -1987,7 +1987,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("forbidden to edit user id"),
+			err: apierrors.NewBadRequest("spec.userID is immutable"),
 		},
 		{
 			name:     "reject principal change",
@@ -2008,7 +2008,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("forbidden to edit principal data"),
+			err: apierrors.NewBadRequest("spec.userprincipal is immutable"),
 		},
 		{
 			name:     "reject kind change",
@@ -2029,7 +2029,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("forbidden to edit kind"),
+			err: apierrors.NewBadRequest("spec.kind is immutable"),
 		},
 		// Third set, accepted changes and other errors
 		{

@@ -386,9 +386,36 @@ func (t *Store) Update(
 	updateValidation rest.ValidateObjectUpdateFunc,
 	forceAllowCreate bool,
 	options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	return extcore.CreateOrUpdate(ctx, name, objInfo, createValidation,
-		updateValidation, forceAllowCreate, options,
-		t.get, t.create, t.update)
+
+	oldObj, err := t.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+
+	newObj, err := objInfo.UpdatedObject(ctx, oldObj)
+	if err != nil {
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object: %w", err))
+	}
+
+	if updateValidation != nil {
+		err = updateValidation(ctx, newObj, oldObj)
+		if err != nil {
+			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
+		}
+	}
+
+	_, ok := oldObj.(*ext.Token)
+	if !ok {
+		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", oldObj))
+	}
+	newToken, ok := newObj.(*ext.Token)
+	if !ok {
+		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", newObj))
+	}
+
+	resultToken, err := t.update(ctx, newToken, options)
+
+	return resultToken, false, err
 }
 
 // Watch implements [rest.Watcher], the interface to support the `watch` verb.
@@ -721,15 +748,15 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	}
 
 	if token.ObjectMeta.UID != currentToken.ObjectMeta.UID {
-		return nil, apierrors.NewBadRequest("UID is immutable")
+		return nil, apierrors.NewBadRequest("meta.UID is immutable")
 	}
 
 	if token.Spec.UserID != currentToken.Spec.UserID {
-		return nil, apierrors.NewBadRequest("user id is immutable")
+		return nil, apierrors.NewBadRequest("spec.userID is immutable")
 	}
 
 	if token.Spec.Kind != currentToken.Spec.Kind {
-		return nil, apierrors.NewBadRequest("kind is immutable")
+		return nil, apierrors.NewBadRequest("spec.kind is immutable")
 	}
 
 	if token.Spec.UserPrincipal.Name != currentToken.Spec.UserPrincipal.Name ||
@@ -741,7 +768,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 		token.Spec.UserPrincipal.MemberOf != currentToken.Spec.UserPrincipal.MemberOf ||
 		token.Spec.UserPrincipal.Provider != currentToken.Spec.UserPrincipal.Provider ||
 		!reflect.DeepEqual(token.Spec.UserPrincipal.ExtraInfo, currentToken.Spec.UserPrincipal.ExtraInfo) {
-		return nil, apierrors.NewBadRequest("principal is immutable")
+		return nil, apierrors.NewBadRequest("spec.userprincipal is immutable")
 	}
 
 	// Regular users are not allowed to extend the TTL.
