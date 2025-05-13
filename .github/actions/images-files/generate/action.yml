@@ -14,9 +14,9 @@ runs:
     - name: Download data.json
       shell: bash
       run: |
-        mkdir -p bin
-        curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
-        cp ./bin/data.json ./bin/rancher-data.json
+        mkdir -p "$ARTIFACTS_BASE_DIR"
+        curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > "./$ARTIFACTS_BASE_DIR/data.json"
+        cp "./$ARTIFACTS_BASE_DIR/data.json" "./$ARTIFACTS_BASE_DIR/rancher-data.json"
     - name: Create k3s images file
       uses: ./.github/actions/k3s-images
       with:
@@ -31,4 +31,9 @@ runs:
       run: ./scripts/create-components-images-files.sh
     - name: Move rke-k8s version file
       shell: bash
-      run: mv $HOME/bin/rancher-rke-k8s-versions.txt ./bin
+      run: mv $HOME/bin/rancher-rke-k8s-versions.txt "./$ARTIFACTS_BASE_DIR"
+    - name: Generate sha256sum
+      shell: bash
+      env:
+        ARTIFACTS_TYPE: "components"
+      run: scripts/artifacts-hashes.sh
