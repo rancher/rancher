@@ -27,13 +27,13 @@ func TestVersionServeHTTP(t *testing.T) {
 			name:     "prime=true",
 			setPrime: func() { os.Setenv("RANCHER_VERSION_TYPE", "prime") },
 			cleanup:  func() { os.Unsetenv("RANCHER_VERSION_TYPE") },
-			want:     `{"Version":"dev","GitCommit":"HEAD","RancherPrime":"prime"}`,
+			want:     `{"Version":"dev","GitCommit":"HEAD","RancherPrime":"true"}`,
 		},
 		{
 			name:     "prime=false",
 			setPrime: func() { os.Setenv("RANCHER_VERSION_TYPE", "prime") },
 			cleanup:  func() { os.Unsetenv("RANCHER_VERSION_TYPE") },
-			want:     `{"Version":"dev","GitCommit":"HEAD","RancherPrime":"prime"}`,
+			want:     `{"Version":"dev","GitCommit":"HEAD","RancherPrime":"true"}`,
 		},
 	}
 
