@@ -4,6 +4,8 @@ runs:
   using: "composite"
   steps:
     - name: Generate sha256sum file and upload artifacts
+      env:
+        ARTIFACTS_TYPE: "components"
       shell: bash
       run: |
         set -ex
