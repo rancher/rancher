@@ -2,6 +2,8 @@ package rbac
 
 import (
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"testing"
 	"time"
 
@@ -102,6 +104,28 @@ func TestSyncCRTB(t *testing.T) {
 					Type:    clusterRolesExists,
 					Status:  v1.ConditionFalse,
 					Message: "couldn't get role template rt-name: " + e.Error(),
+					Reason:  failedToGetRoleTemplate,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+			},
+		},
+		{
+			name: "error getting roletemplate when role template is not found",
+			stateSetup: func(cts crtbTestState) {
+				cts.rtListerMock.GetFunc = func(namespace, name string) (*v3.RoleTemplate, error) {
+					notFoundErr := apierrors.NewNotFound(schema.GroupResource{}, "roletemplates.management.cattle.io \"rt-name\" not found")
+					return nil, notFoundErr
+				}
+			},
+			crtb:      defaultCRTB.DeepCopy(),
+			wantError: false,
+			wantConditions: []v1.Condition{
+				{
+					Type:    clusterRolesExists,
+					Status:  v1.ConditionFalse,
+					Message: "couldn't get role template rt-name:  \"roletemplates.management.cattle.io \\\"rt-name\\\" not found\" not found",
 					Reason:  failedToGetRoleTemplate,
 					LastTransitionTime: v1.Time{
 						Time: mockTime,
