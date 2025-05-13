@@ -11,5 +11,5 @@ runs:
         ARTIFACTS+=("$CHECKSUM_FILE")
 
         for artifact in "${ARTIFACTS[@]}"; do
-          aws s3 cp "./$ARTIFACTS_BASE_DIR/$artifact" "s3://${{ env.ARTIFACT_BUCKET_NAME }}/rancher/${{ env.TAG }}/$artifact"
+          aws s3 cp "./$ARTIFACTS_BASE_DIR/$artifact" "s3://${{ env.ARTIFACTS_BUCKET_NAME }}/rancher/${{ env.TAG }}/$artifact"
         done
