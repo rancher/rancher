@@ -47,6 +47,8 @@ abs_path() {
   echo "$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
 }
 
+needs_workdir="false"
+
 # add_context adds _some_ support for local replace directives of dependency.
 add_context() {
   if ! replace=$(grep "$1 =>" go.mod); then
@@ -63,11 +65,7 @@ add_context() {
     BUILD_ARGS="$BUILD_ARGS --build-context=$2=$path"
     BUILD_ARGS="$BUILD_ARGS --build-arg=$3=$2"
     BUILD_ARGS="$BUILD_ARGS --build-arg=$3_PATH=$path"
-
-    if [ -z "$workdir_set" ]; then
-      BUILD_ARGS="$BUILD_ARGS --build-arg=BUILD_WORKDIR=$PWD"
-      workdir_set="true"
-    fi
+    needs_workdir="true"
   fi
 }
 
@@ -75,6 +73,10 @@ add_context "github.com/rancher/remotedialer" "remotedialer-context" "GODEP_REMO
 add_context "github.com/rancher/shepherd" "shepherd-context" "GODEP_SHEPHERD"
 add_context "github.com/rancher/steve" "steve-context" "GODEP_STEVE"
 add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
+
+if [ "$needs_workdir" = "true" ]; then
+  BUILD_ARGS="$BUILD_ARGS --build-arg=BUILD_WORKDIR=$PWD"
+fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
