@@ -19,6 +19,7 @@ runs:
     - name: Generate sha256sum file and upload artifacts
       env:
         GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        ARTIFACTS_TYPE: "components"
       shell: bash
       run: |
         set -ex
