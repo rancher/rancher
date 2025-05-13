@@ -36,7 +36,7 @@ type versionHandler struct {
 // and uses that along with build-time version information to create an HTTP handler.
 func NewVersionHandler() http.Handler {
 	rancherPrime := "false"
-	if isPrime, ok := os.LookupEnv(primeEnv); ok && isPrime == "prime" {
+	if versionType, ok := os.LookupEnv(primeEnv); ok && versionType == "prime" {
 		rancherPrime = "true"
 	}
 	return &versionHandler{info: Info{Version, GitCommit, rancherPrime}}
