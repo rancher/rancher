@@ -246,3 +246,7 @@ go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
      dump_rancher_logs
      exit 1
 }
+
+echo -e "-----K3S-LOG-DUMP-START-EXTRA-----"
+cat build/testdata/k3s.log | gzip | base64 -w 0
+echo -e "\n-----K3S-LOG-DUMP-END-----"
