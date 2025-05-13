@@ -54,6 +54,7 @@ const (
 
 	// names of the data fields used by the backing secrets to store token information
 	FieldAnnotations      = "annotations"
+	FieldDeletionTime     = "deletion-time"
 	FieldDescription      = "description"
 	FieldEnabled          = "enabled"
 	FieldFinalizers       = "finalizers"
@@ -568,6 +569,14 @@ func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.De
 		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
 	}
 
+	// finalizer handling - do not actually delete while finalizers are present, just mark for deletion
+	if len(token.ObjectMeta.Finalizers) > 0 {
+		now := metav1.Now()
+		token.ObjectMeta.DeletionTimestamp = &now
+		_, err := t.update(ctx, token, &metav1.UpdateOptions{})
+		return err
+	}
+
 	return t.SystemStore.Delete(token.Name, options)
 }
 
@@ -718,6 +727,11 @@ func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.Up
 	}
 	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
+	}
+
+	// finalizer handling - with all finalizers gone finally delete the object marked for deletion
+	if token.ObjectMeta.DeletionTimestamp != nil && len(token.ObjectMeta.Finalizers) == 0 {
+		return token, t.delete(ctx, token, &metav1.DeleteOptions{})
 	}
 
 	sessionID := t.auth.SessionID(ctx)
@@ -1351,6 +1365,12 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	secret.StringData[FieldFinalizers] = string(finalizerBytes)
 	secret.StringData[FieldOwnerReferences] = string(ownerBytes)
 
+	deletionTimeAsString := ""
+	if token.DeletionTimestamp != nil {
+		deletionTimeAsString = token.DeletionTimestamp.Format(time.RFC3339)
+	}
+	secret.StringData[FieldDeletionTime] = deletionTimeAsString
+
 	// spec values
 
 	// injects default on creation and update
@@ -1402,6 +1422,12 @@ func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	if token.ObjectMeta.UID = types.UID(string(secret.Data[FieldUID])); token.ObjectMeta.UID == "" {
 		return nil, fmt.Errorf("kube uid missing")
 	}
+
+	deletionTime, err := decodeTime("deletionTimestamp", secret.Data[FieldDeletionTime])
+	if err != nil {
+		return nil, err
+	}
+	token.ObjectMeta.DeletionTimestamp = deletionTime
 
 	// system - finalizers - decode the field and place into the token
 	if err := json.Unmarshal(secret.Data[FieldFinalizers], &token.Finalizers); err != nil {
