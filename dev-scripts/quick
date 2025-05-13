@@ -28,19 +28,19 @@ xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
 # download kontainer driver metadata
 curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json > ./data.json
 
-BUILD_ARGS=""
-BUILD_ARGS="$BUILD_ARGS --build-arg=VERSION=${TAG}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=ARCH=${ARCH}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=IMAGE_REPO=${REPO}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=COMMIT=${COMMIT}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=RKE_VERSION=${RKE_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=RANCHER_TAG=${TAG}"
-BUILD_ARGS="$BUILD_ARGS --build-arg=RANCHER_REPO=${REPO}"
+BUILD_ARGS=()
+BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
+BUILD_ARGS+=("--build-arg=ARCH=${ARCH}")
+BUILD_ARGS+=("--build-arg=IMAGE_REPO=${REPO}")
+BUILD_ARGS+=("--build-arg=COMMIT=${COMMIT}")
+BUILD_ARGS+=("--build-arg=RKE_VERSION=${RKE_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
+BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
+BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
 
 # because macos doesn't have realpath apparently
 abs_path() {
@@ -62,9 +62,10 @@ add_context() {
   if [ -z "$(echo "$replace" | cut -d= -f2 | cut -d' ' -f3)" ]; then
     godep=$(echo "$replace" | cut -d= -f2 | cut -d' ' -f2)
     path=$(abs_path "$godep")
-    BUILD_ARGS="$BUILD_ARGS --build-context=$2=$path"
-    BUILD_ARGS="$BUILD_ARGS --build-arg=$3=$2"
-    BUILD_ARGS="$BUILD_ARGS --build-arg=$3_PATH=$path"
+    BUILD_ARGS+=("--build-context=$2=$path")
+    BUILD_ARGS+=("--build-arg=$3=$2")
+    BUILD_ARGS+=("--build-arg=$3_PATH=$path")
+    echo "HI"
     needs_workdir="true"
   fi
 }
@@ -75,13 +76,13 @@ add_context "github.com/rancher/steve" "steve-context" "GODEP_STEVE"
 add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
 
 if [ "$needs_workdir" = "true" ]; then
-  BUILD_ARGS="$BUILD_ARGS --build-arg=BUILD_WORKDIR=$PWD"
+  BUILD_ARGS+=("--build-arg=BUILD_WORKDIR=$PWD")
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
   docker buildx build \
-    $BUILD_ARGS \
+    "${BUILD_ARGS[@]}" \
     --tag "${REPO}"/rancher:"${TAG}" \
     --platform="${OS}/${ARCH}" \
     --target server \
@@ -94,7 +95,7 @@ fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
   docker buildx build \
-    $BUILD_ARGS \
+    "${BUILD_ARGS[@]}" \
     --tag "${REPO}"/rancher-agent:"${TAG}" \
     --platform="${OS}/${ARCH}" \
     --target agent \
