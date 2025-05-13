@@ -679,8 +679,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials accessKeyId | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY
       - name: Upload artifacts to bucket
         run: |
           AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp --recursive ./dist s3://prime-artifacts/rancher/${{ env.TAG }}
