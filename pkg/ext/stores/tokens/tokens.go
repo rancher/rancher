@@ -1159,6 +1159,7 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
+		logrus.Errorf("ext token store (%s request) no user information in request context", verb)
 		return "", false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
 	}
 
@@ -1169,6 +1170,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 		ResourceRequest: true,
 	})
 	if err != nil {
+		logrus.Errorf("ext token store (%s request) by user %q: auth error: %v", verb, userInfo.GetName(), err)
 		return "", false, false, err
 	}
 
@@ -1185,11 +1187,13 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 			isRancherUser = true
 		} else if !apierrors.IsNotFound(err) {
 			// some general error
+			logrus.Errorf("ext token store (%s request) by user %q: general error: %v", verb, userName, err)
 			return "", false, false,
 				apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
 		} // else: not a rancher user, may still be an admin
 	} // else: some system user, not a rancher user, may still be an admin
 
+	logrus.Debugf("ext token store (%s request) by user %q (full-access=%v, rancher-user=%v)", verb, userName, fullAccess, isRancherUser)
 	return userName, fullAccess, isRancherUser, nil
 }
 
