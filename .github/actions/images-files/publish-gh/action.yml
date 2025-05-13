@@ -14,25 +14,17 @@ runs:
         GH_TOKEN: ${{ steps.app-token.outputs.token }}
       shell: bash
       run: |
-        NOTES=$(cat bin/rancher-components.txt)
+        NOTES=$(cat "$ARTIFACTS_BASE_DIR/rancher-components.txt")
         gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
-    - name: Generate sha256sum file and upload artifacts
+    - name: Upload artifacts
       env:
         GH_TOKEN: ${{ steps.app-token.outputs.token }}
       shell: bash
       run: |
         set -ex
-
         source scripts/artifacts-list.sh
+        ARTIFACTS+=("$CHECKSUM_FILE")
 
         for artifact in "${ARTIFACTS[@]}"; do
-          mv "./bin/$artifact" "./dist/$artifact"
-        done
-
-        ./scripts/artifacts-hashes.sh ./dist
-
-        ARTIFACTS+=("sha256sum.txt")
-
-        for artifact in "${ARTIFACTS[@]}"; do
-          gh release upload -R ${{ github.repository_owner }}/rancher ${{ env.TAG }} "./dist/$artifact" --clobber
+          gh release upload -R ${{ github.repository_owner }}/rancher ${{ env.TAG }} "./$ARTIFACTS_BASE_DIR/$artifact" --clobber
         done
