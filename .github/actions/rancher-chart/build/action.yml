@@ -1,0 +1,48 @@
+name: "Setup and build chart"
+description: "Install dependencies, pull files and build the Rancher chart"
+runs:
+  using: "composite"
+  steps:
+    # git is assumed to be installed because it is a requirement to run from the same repo
+    - name: install dependencies
+      shell: bash
+      run: zypper install -y jq awk aws-cli
+    - name: Setup Tag Env Variables
+      uses: ./.github/actions/setup-tag-env
+    - name: install yq
+      uses: ./.github/actions/install-yq
+      with:
+        arch: ${{ env.ARCH }}
+    - id: env
+      name: Setup Dependencies Env Variables
+      uses: ./.github/actions/setup-build-env
+    - name: Install Helm dependencies
+      env:
+        HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
+        HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
+      shell: bash
+      run: |
+        curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
+        mv /tmp/helm /usr/bin/helm_v3 && \
+        chmod +x /usr/bin/helm_v3
+        helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
+    - name: Build
+      shell: bash
+      run: ./scripts/chart/build chart
+    - name: Validate
+      shell: bash
+      run: ./scripts/chart/validate
+    - name: Test
+      shell: bash
+      run: ./scripts/chart/test
+    - name: Package
+      shell: bash
+      run: ./scripts/chart/package
+    - name: Upload chart
+      uses: actions/upload-artifact@v4
+      with:
+        name: chart
+        path: ./bin/chart/*
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: true
