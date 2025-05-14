@@ -116,16 +116,16 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 	tests := map[string]struct {
 		config                    func(string) *v32.OIDCConfig
 		authCode                  string
-		claimInfo                 *ClaimInfo
 		tokenManagerMock          func(token *Token) tokenManager
 		oidcProviderResponses     func(string) oidcResponses
 		expectedUserInfoSubject   string
 		expectedUserInfoClaimInfo ClaimInfo
+		expectedClaimInfo         *ClaimInfo
 		expectedErrorMessage      string
 	}{
 		"token is updated and userInfo returned": {
 			config: func(port string) *v32.OIDCConfig {
-				return newOIDCContext(port)
+				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
@@ -140,11 +140,68 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			expectedUserInfoClaimInfo: ClaimInfo{
 				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 				PreferredUsername: "admin",
-				EmailVerified:     true,
+				Groups:            []string{"admingroup"},
+				FullGroupPath:     []string{"/admingroup"},
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				PreferredUsername: "admin",
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
 			},
 		},
+		"get groups with GroupsClaims": {
+			config: func(port string) *v32.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "custom:groups"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":           "test",
+					"exp":           time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+					"iss":           "http://localhost:" + port,
+					"custom:groups": []string{"group1", "group2"},
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute), // expires in the future
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"preferred_username": "admin"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				PreferredUsername: "admin",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				PreferredUsername: "admin",
+				Groups:            []string{"group1", "group2"},
+			},
+		},
+
 		"error - invalid certificate": {
 			config: func(port string) *v32.OIDCConfig {
 				return &v32.OIDCConfig{
@@ -165,7 +222,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 		},
 		"error - invalid token from server": {
 			config: func(port string) *v32.OIDCConfig {
-				return newOIDCContext(port)
+				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				return mocks.NewMocktokenManager(ctrl)
@@ -180,7 +237,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 		},
 		"error - invalid user response": {
 			config: func(port string) *v32.OIDCConfig {
-				return newOIDCContext(port)
+				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
@@ -212,14 +269,16 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				TokenMGR: test.tokenManagerMock(oidcResp.token),
 			}
 			ctx := context.TODO()
+			claimInfo := &ClaimInfo{}
 
-			userInfo, token, err := o.getUserInfoFromAuthCode(&ctx, test.config(port), test.authCode, test.claimInfo, userId)
+			userInfo, token, err := o.getUserInfoFromAuthCode(&ctx, test.config(port), test.authCode, claimInfo, userId)
 
 			if test.expectedErrorMessage != "" {
 				assert.ErrorContains(t, err, test.expectedErrorMessage)
 			} else {
 				assert.NoError(t, err)
 				claims := ClaimInfo{}
+				assert.Equal(t, test.expectedClaimInfo, claimInfo)
 				assert.NoError(t, userInfo.Claims(&claims))
 				assert.Equal(t, test.expectedUserInfoSubject, userInfo.Subject)
 				assert.Equal(t, test.expectedUserInfoClaimInfo, claims)
@@ -251,7 +310,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 	}{
 		"get claims with valid token": {
 			config: func(port string) *v32.OIDCConfig {
-				return newOIDCContext(port)
+				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
@@ -277,14 +336,13 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			expectedClaimInfo: &ClaimInfo{
 				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 				PreferredUsername: "admin",
-				EmailVerified:     true,
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
 			},
 		},
 		"token is refreshed and updated when expired": {
 			config: func(port string) *v32.OIDCConfig {
-				return newOIDCContext(port)
+				return newOIDCConfig(port)
 			},
 			oidcProviderResponses: func(port string) oidcResponses {
 				return newOIDCResponses(privateKey, port)
@@ -316,7 +374,6 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			expectedClaimInfo: &ClaimInfo{
 				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 				PreferredUsername: "admin",
-				EmailVerified:     true,
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
 			},
@@ -351,7 +408,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 		},
 		"error - invalid token": {
 			config: func(port string) *v32.OIDCConfig {
-				return newOIDCContext(port)
+				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
 				return &oauth2.Token{
@@ -369,7 +426,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 		},
 		"error - invalid user response": {
 			config: func(port string) *v32.OIDCConfig {
-				return newOIDCContext(port)
+				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
@@ -523,7 +580,7 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	}
 }
 
-func newOIDCContext(port string) *v32.OIDCConfig {
+func newOIDCConfig(port string) *v32.OIDCConfig {
 	return &v32.OIDCConfig{
 		Issuer:           "http://localhost:" + port,
 		ClientID:         "test",

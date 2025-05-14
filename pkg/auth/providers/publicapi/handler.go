@@ -48,6 +48,7 @@ var authProviderTypes = []string{
 	v3public.OIDCProviderType,
 	v3public.KeyCloakOIDCProviderType,
 	v3public.GenericOIDCProviderType,
+	v3public.CognitoProviderType,
 }
 
 func authProviderSchemas(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
