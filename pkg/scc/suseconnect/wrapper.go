@@ -60,7 +60,7 @@ func (sw *SccWrapper) SystemRegistration(regCode string) (RegistrationSystemId, 
 		return EmptyRegistrationSystemId, err
 	}
 
-	id, regErr := registration.Register(sw.conn, regCode, systemInfo.ServerUrl(), preparedSystemInfo)
+	id, regErr := registration.Register(sw.conn, regCode, systemInfo.ServerUrl(), preparedSystemInfo, registration.NoExtraData)
 	if regErr != nil {
 		return ErrorRegistrationSystemId, errors.Wrap(regErr, "Cannot register system to SCC")
 	}
@@ -76,7 +76,7 @@ func (sw *SccWrapper) KeepAlive() error {
 		return err
 	}
 	// 2 call Status
-	status, statusErr := registration.Status(sw.conn, systemInfo.ServerUrl(), preparedSystemInfo)
+	status, statusErr := registration.Status(sw.conn, systemInfo.ServerUrl(), preparedSystemInfo, registration.NoExtraData)
 	if status != registration.Registered {
 		return fmt.Errorf("trying to send keepalive on a system that is not yet registered. register this system first: %v", statusErr)
 	}
