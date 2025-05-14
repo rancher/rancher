@@ -2,7 +2,7 @@
 shopt -s extglob
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    DIRTY="-dirty"
+  DIRTY="-dirty"
 fi
 
 COMMIT=$(git rev-parse --short HEAD)
@@ -10,30 +10,36 @@ COMMIT_DATE=$(git --no-pager log -1 --format='%ct')
 COMMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed -E 's/[^a-zA-Z0-9]+/-/g')
 GIT_TAG=${GIT_TAG:-$(git tag -l --contains HEAD | head -n 1)}
 LAST_TAG=${GIT_TAG:-'v0.0.0'}
+CHART_VERSION=${CHART_VERSION:-""}
 
 if [ -n "$GIT_TAG" ]; then
   TAG=$GIT_TAG
 fi
 
 if [[ -z "$DIRTY" && -n "$GIT_TAG" ]]; then
-    VERSION=$GIT_TAG
+  VERSION=$GIT_TAG
 else
-    VERSION="${COMMIT}${DIRTY}"
+  VERSION="${COMMIT}${DIRTY}"
 fi
 
 if [ -z "$GIT_TAG" ] && [ -n "$GIT_COMMIT" ] && [ -n "$GIT_BRANCH" ]; then
-    APP_VERSION=${GIT_BRANCH/release\//}-${GIT_COMMIT}-head
+  APP_VERSION=${GIT_BRANCH/release\//}-${GIT_COMMIT}-head
 else
-    APP_VERSION=$VERSION
+  APP_VERSION=$VERSION
 fi
 
 # Chart tag.
-if [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
-    CHART_VERSION="${GIT_TAG}"
+# if the chart version is set, use it
+if [[ -n "${CHART_VERSION}" ]]; then
+  CHART_VERSION="${CHART_VERSION}"
+# if there isn't any uncommited change and the tag is set, use the tag
+elif [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
+  CHART_VERSION="${GIT_TAG}"
+# if there is uncommited changes, use the default last tag and mark it as dirty
 elif [[ "$DIRTY" ]]; then
-    CHART_VERSION="${LAST_TAG}${DIRTY}.commit-${COMMIT}"
+  CHART_VERSION="${LAST_TAG}${DIRTY}.commit-${COMMIT}"
 else
-    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.commit-${COMMIT}.${COMMIT_BRANCH}"
+  CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.commit-${COMMIT}.${COMMIT_BRANCH}"
 fi
 
 # Drop the v prefix for Chart Version to follow existing pattern.
@@ -41,20 +47,20 @@ CHART_VERSION="$(echo ${CHART_VERSION} | sed -E 's/^v//' | sed -e 's/^\(.\{55\}\
 
 # Chart Repo - Target Repo for releases.
 case $CHART_VERSION in
-    *-alpha*) # All alpha tags
-        CHART_REPO="alpha" ;;
-    *-rc*) # All rc tags
-        CHART_REPO="latest" ;;
-    *-hotfix*) # All hotfix tags
-        CHART_REPO="latest" ;;
-    +([0-9]).+([0-9]).+([0-9])) # All release tags
-        CHART_REPO="latest" ;;
-    *) # Anything else - Future use
-        CHART_REPO="dev" ;;
+*-alpha*) # All alpha tags
+  CHART_REPO="alpha" ;;
+*-rc*) # All rc tags
+  CHART_REPO="latest" ;;
+*-hotfix*) # All hotfix tags
+  CHART_REPO="latest" ;;
++([0-9]).+([0-9]).+([0-9])) # All release tags
+  CHART_REPO="latest" ;;
+*) # Anything else - Future use
+  CHART_REPO="dev" ;;
 esac
 
 if [ -z "$ARCH" ]; then
-    ARCH=amd64
+  ARCH=amd64
 fi
 
 SUFFIX=""
@@ -64,12 +70,12 @@ TAG=${TAG:-${VERSION}${SUFFIX}}
 REPO=${REPO:-rancher}
 
 if echo $TAG | grep -q dirty; then
-    TAG=dev
+  TAG=dev
 fi
 
 AGENT_TAG="$TAG"
 if [ "$AGENT_TAG" = dev ]; then
-    AGENT_TAG="master-head"
+  AGENT_TAG="master-head"
 fi
 
 echo "ARCH: $ARCH"
