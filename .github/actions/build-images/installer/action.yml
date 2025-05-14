@@ -36,8 +36,6 @@ runs:
         build-args: |
           "VERSION=${{ env.TAG }}"
           "ARCH=${{ matrix.arch }}"
-          "RANCHER_TAG=${{ env.TAG }}"
-          "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
         tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-${{ env.ARCH }}
         context: .
         platforms: "${{ env.OS }}/${{ env.ARCH }}"
