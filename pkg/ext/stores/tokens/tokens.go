@@ -37,9 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 )
@@ -51,20 +54,16 @@ const (
 	IsLogin              = "session"
 	SecretKindLabel      = "cattle.io/kind"
 	SecretKindLabelValue = "token"
+	GeneratePrefix       = "token-"
 
 	// names of the data fields used by the backing secrets to store token information
-	FieldAnnotations      = "annotations"
-	FieldDeletionTime     = "deletion-time"
 	FieldDescription      = "description"
 	FieldEnabled          = "enabled"
-	FieldFinalizers       = "finalizers"
 	FieldHash             = "hash"
 	FieldKind             = "kind"
-	FieldLabels           = "labels"
 	FieldLastActivitySeen = "last-activity-seen"
 	FieldLastUpdateTime   = "last-update-time"
 	FieldLastUsedAt       = "last-used-at"
-	FieldOwnerReferences  = "owners"
 	FieldPrincipal        = "principal"
 	FieldTTL              = "ttl"
 	FieldUID              = "kube-uid"
@@ -237,6 +236,8 @@ func (t *Store) Destroy() {
 
 // Create implements [rest.Creator], the interface to support the `create`
 // verb. Delegates to the actual store method after some generic boilerplate.
+// Note: Name and GenerateName are not respected. A name is generated with a
+// predefined prefix instead.
 func (t *Store) Create(
 	ctx context.Context,
 	obj runtime.Object,
@@ -282,8 +283,7 @@ func (t *Store) Delete(
 	}
 
 	// and now actually delete
-	err = t.delete(ctx, obj, options)
-	if err != nil {
+	if err := t.delete(ctx, obj, options); err != nil {
 		return nil, false, err
 	}
 
@@ -379,6 +379,7 @@ func translateTimestampSince(timestamp metav1.Time) string {
 }
 
 // Update implements [rest.Updater], the interface to support the `update` verb.
+// Note: Create on update is not supported because names are always auto-generated.
 func (t *Store) Update(
 	ctx context.Context,
 	name string,
@@ -388,33 +389,55 @@ func (t *Store) Update(
 	forceAllowCreate bool,
 	options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 
-	oldObj, err := t.Get(ctx, name, &metav1.GetOptions{})
+	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
 	if err != nil {
 		return nil, false, err
 	}
 
-	newObj, err := objInfo.UpdatedObject(ctx, oldObj)
+	oldSecret, err := t.secretCache.Get(TokenNamespace, name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Rethrow the NotFound error with the correct group and resource information.
+			return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
+		}
+		return nil, false, fmt.Errorf("error getting secret for token %s: %w", name, err)
+	}
+
+	// validate that secret is indeed holding an ext token
+	if oldSecret.Labels[SecretKindLabel] != SecretKindLabelValue {
+		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
+	}
+
+	oldToken, err := fromSecret(oldSecret)
+	if err != nil {
+		return nil, false, apierrors.NewInternalError(
+			fmt.Errorf("error converting secret %s to token: %w", name, err))
+	}
+
+	newObj, err := objInfo.UpdatedObject(ctx, oldToken)
 	if err != nil {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object: %w", err))
 	}
 
-	if updateValidation != nil {
-		err = updateValidation(ctx, newObj, oldObj)
-		if err != nil {
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
-		}
-	}
-
-	_, ok := oldObj.(*ext.Token)
-	if !ok {
-		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", oldObj))
-	}
 	newToken, ok := newObj.(*ext.Token)
 	if !ok {
 		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", newObj))
 	}
 
-	resultToken, err := t.update(ctx, newToken, options)
+	if updateValidation != nil {
+		err = updateValidation(ctx, newObj, oldToken)
+		if err != nil {
+			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
+		}
+	}
+
+	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), newToken)) {
+		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), newToken.Name)
+	}
+
+	sessionID := t.auth.SessionID(ctx)
+
+	resultToken, err := t.SystemStore.update(sessionID, false, oldToken, newToken, options)
 
 	return resultToken, false, err
 }
@@ -432,15 +455,15 @@ func (t *Store) Watch(
 
 // create implements the core resource creation for tokens
 func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
-	userName, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "create")
+	userInfo, _, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "create")
 	if err != nil {
 		return nil, err
 	}
 	if !isRancherUser {
 		return nil, apierrors.NewForbidden(GVR.GroupResource(), "",
-			fmt.Errorf("user %s is not a Rancher user", userName))
+			fmt.Errorf("user %s is not a Rancher user", userInfo.GetName()))
 	}
-	if !userMatchOrDefault(userName, token) {
+	if !userMatchOrDefault(userInfo.GetName(), token) {
 		return nil, apierrors.NewBadRequest("unable to create token for other user")
 	}
 	return t.SystemStore.Create(ctx, GVR.GroupResource(), token, options)
@@ -462,10 +485,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		}
 		t.initialized = true
 	}
-
-	// enforce our choice of name, generateName
-	token.ObjectMeta.Name = ""
-	token.ObjectMeta.GenerateName = "token-"
 
 	user, err := t.userClient.Get(token.Spec.UserID)
 	if err != nil {
@@ -514,18 +533,27 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	rest.FillObjectMetaSystemFields(token)
 
-	secret, err := toSecret(token, nil, nil)
+	// Return early as the user does not wish to actually change anything.
+	if dryRun {
+		// enforce our choice of name
+		token.ObjectMeta.Name, err = t.generateName(GeneratePrefix)
+		token.ObjectMeta.GenerateName = ""
+		if err != nil {
+			return nil, err
+		}
+		return token, nil
+	}
+
+	secret, err := toSecret(token)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
 			token.Name, err))
 	}
 
-	// Return early as the user does not wish to actually change anything.
-	if dryRun {
-		return token, nil
-	}
+	// enforce our choice of name, without racing create
+	secret.ObjectMeta.Name = ""
+	secret.ObjectMeta.GenerateName = GeneratePrefix
 
-	// Save new secret
 	newSecret, err := t.secretClient.Create(secret)
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
@@ -560,20 +588,12 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 // delete implements the core resource destruction for tokens
 func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
-	user, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
+	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
 	if err != nil {
 		return err
 	}
-	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
+	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), token)) {
 		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
-	}
-
-	// finalizer handling - do not actually delete while finalizers are present, just mark for deletion
-	if len(token.ObjectMeta.Finalizers) > 0 {
-		now := metav1.Now()
-		token.ObjectMeta.DeletionTimestamp = &now
-		_, err := t.update(ctx, token, &metav1.UpdateOptions{})
-		return err
 	}
 
 	return t.SystemStore.Delete(token.Name, options)
@@ -592,7 +612,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 
 // get implements the core resource retrieval for tokens
 func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
-	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +626,7 @@ func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions
 	if fullAccess {
 		return token, nil
 	}
-	if !userMatch(userName, token) {
+	if !userMatch(userInfo.GetName(), token) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
@@ -642,12 +662,12 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 
 // list implements the core resource listing of tokens
 func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.TokenList, error) {
-	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "list")
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "list")
 	if err != nil {
 		return nil, err
 	}
 
-	return t.SystemStore.list(fullAccess, userName, t.auth.SessionID(ctx), options)
+	return t.SystemStore.list(fullAccess, userInfo.GetName(), t.auth.SessionID(ctx), options)
 }
 
 // ListForUser returns the set of token owned by the named user. It is an
@@ -718,68 +738,36 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 	}, nil
 }
 
-// update implements the core resource updating/modification of tokens
-func (t *Store) update(ctx context.Context, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
-	user, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "update")
-	if err != nil {
-		return nil, err
-	}
-	if !fullAccess && (!isRancherUser || !userMatch(user, token)) {
-		return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
-	}
-
-	// finalizer handling - with all finalizers gone finally delete the object marked for deletion
-	if token.ObjectMeta.DeletionTimestamp != nil && len(token.ObjectMeta.Finalizers) == 0 {
-		return token, t.delete(ctx, token, &metav1.DeleteOptions{})
-	}
-
-	sessionID := t.auth.SessionID(ctx)
-
-	return t.SystemStore.update(sessionID, false, token, options)
+func (t *SystemStore) Update(oldToken, token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
+	return t.update("", true, oldToken, token, options)
 }
 
-func (t *SystemStore) Update(token *ext.Token, options *metav1.UpdateOptions) (*ext.Token, error) {
-	return t.update("", true, token, options)
-}
-
-func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.Token,
+func (t *SystemStore) update(sessionID string, fullPermission bool, oldToken, token *ext.Token,
 	options *metav1.UpdateOptions) (*ext.Token, error) {
 	// check if the user does not wish to actually change anything
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
-	currentSecret, err := t.secretCache.Get(TokenNamespace, token.Name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewNotFound(GVR.GroupResource(), token.Name)
-		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token: %w", err))
-	}
-	currentToken, err := fromSecret(currentSecret)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", err))
-	}
-
-	if token.ObjectMeta.UID != currentToken.ObjectMeta.UID {
+	if token.ObjectMeta.UID != oldToken.ObjectMeta.UID {
 		return nil, apierrors.NewBadRequest("meta.UID is immutable")
 	}
 
-	if token.Spec.UserID != currentToken.Spec.UserID {
+	if token.Spec.UserID != oldToken.Spec.UserID {
 		return nil, apierrors.NewBadRequest("spec.userID is immutable")
 	}
 
-	if token.Spec.Kind != currentToken.Spec.Kind {
+	if token.Spec.Kind != oldToken.Spec.Kind {
 		return nil, apierrors.NewBadRequest("spec.kind is immutable")
 	}
 
-	if token.Spec.UserPrincipal.Name != currentToken.Spec.UserPrincipal.Name ||
-		token.Spec.UserPrincipal.DisplayName != currentToken.Spec.UserPrincipal.DisplayName ||
-		token.Spec.UserPrincipal.LoginName != currentToken.Spec.UserPrincipal.LoginName ||
-		token.Spec.UserPrincipal.ProfilePicture != currentToken.Spec.UserPrincipal.ProfilePicture ||
-		token.Spec.UserPrincipal.PrincipalType != currentToken.Spec.UserPrincipal.PrincipalType ||
-		token.Spec.UserPrincipal.Me != currentToken.Spec.UserPrincipal.Me ||
-		token.Spec.UserPrincipal.MemberOf != currentToken.Spec.UserPrincipal.MemberOf ||
-		token.Spec.UserPrincipal.Provider != currentToken.Spec.UserPrincipal.Provider ||
-		!reflect.DeepEqual(token.Spec.UserPrincipal.ExtraInfo, currentToken.Spec.UserPrincipal.ExtraInfo) {
+	if token.Spec.UserPrincipal.Name != oldToken.Spec.UserPrincipal.Name ||
+		token.Spec.UserPrincipal.DisplayName != oldToken.Spec.UserPrincipal.DisplayName ||
+		token.Spec.UserPrincipal.LoginName != oldToken.Spec.UserPrincipal.LoginName ||
+		token.Spec.UserPrincipal.ProfilePicture != oldToken.Spec.UserPrincipal.ProfilePicture ||
+		token.Spec.UserPrincipal.PrincipalType != oldToken.Spec.UserPrincipal.PrincipalType ||
+		token.Spec.UserPrincipal.Me != oldToken.Spec.UserPrincipal.Me ||
+		token.Spec.UserPrincipal.MemberOf != oldToken.Spec.UserPrincipal.MemberOf ||
+		token.Spec.UserPrincipal.Provider != oldToken.Spec.UserPrincipal.Provider ||
+		!reflect.DeepEqual(token.Spec.UserPrincipal.ExtraInfo, oldToken.Spec.UserPrincipal.ExtraInfo) {
 		return nil, apierrors.NewBadRequest("spec.userprincipal is immutable")
 	}
 
@@ -790,20 +778,19 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
 		}
 		token.Spec.TTL = ttl
-		if ttlGreater(ttl, currentToken.Spec.TTL) {
+		if ttlGreater(ttl, oldToken.Spec.TTL) {
 			return nil, apierrors.NewBadRequest("forbidden to extend time-to-live")
 		}
 	}
 
 	// Keep the status of the resource unchanged, never store a token value, etc.
 	// IOW changes to hash, value, etc. are all ignored without a peep.
-	token.Status = currentToken.Status
+	token.Status = oldToken.Status
 	token.Status.Value = ""
 	// Refresh time of last update to current.
 	token.Status.LastUpdateTime = t.timer.Now()
 
-	// Save changes to backing secret, properly pass old secret labels/anotations into the new.
-	secret, err := toSecret(token, currentSecret.Labels, currentSecret.Annotations)
+	secret, err := toSecret(token)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
@@ -896,7 +883,7 @@ func (t *SystemStore) Disable(name string) error {
 
 // watch implements the core resource watcher for tokens
 func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
-	userName, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "watch")
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "watch")
 	if err != nil {
 		return nil, err
 	}
@@ -908,7 +895,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		ch: make(chan watch.Event, 100),
 	}
 
-	localOptions, err := ListOptionMerge(fullAccess, userName, options)
+	localOptions, err := ListOptionMerge(fullAccess, userInfo.GetName(), options)
 	if err != nil {
 		return nil,
 			apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w",
@@ -1069,6 +1056,34 @@ func userMatchOrDefault(name string, token *ext.Token) bool {
 	return name == token.Spec.UserID
 }
 
+// generateName computes a unique name for a new token, from a fixed prefix.
+func (t *SystemStore) generateName(prefix string) (string, error) {
+	var tokenID string
+
+	err := retry.OnError(retry.DefaultRetry, func(_ error) bool {
+		return true // Retry all errors.
+	}, func() error {
+		tokenID = names.SimpleNameGenerator.GenerateName(prefix)
+		_, err := t.secretCache.Get(TokenNamespace, tokenID)
+		if err == nil {
+			return fmt.Errorf("token %s already exists", tokenID)
+		}
+
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return fmt.Errorf("error getting token %s: %w", tokenID, err)
+	})
+
+	if err != nil {
+		return "", apierrors.NewInternalError(
+			fmt.Errorf("error checking if token %s exists: %w", tokenID, err))
+	}
+
+	return tokenID, nil
+}
+
 // Fetch is a convenience function for retrieving a token by name, regardless of
 // type. I.e. this function auto-detects if the referenced token is a v3 or ext
 // token, and returns a proper interface hiding the differences from the caller.
@@ -1108,7 +1123,7 @@ type hashHandler interface {
 // makes these operations mockable for store testing.
 type authHandler interface {
 	SessionID(ctx context.Context) string
-	UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error)
+	UserName(ctx context.Context, store *SystemStore, verb string) (user.Info, bool, bool, error)
 }
 
 // Standard implementations for the above interfaces.
@@ -1155,11 +1170,11 @@ func (tp *tokenHasher) MakeAndHashSecret() (string, string, error) {
 
 // UserName hides the details of extracting a user name and its permission
 // status from the request context
-func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error) {
+func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb string) (user.Info, bool, bool, error) {
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
 		logrus.Errorf("ext token store (%s request) no user information in request context", verb)
-		return "", false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
+		return nil, false, false, apierrors.NewInternalError(fmt.Errorf("context has no user info"))
 	}
 
 	decision, _, err := store.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
@@ -1170,7 +1185,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 	})
 	if err != nil {
 		logrus.Errorf("ext token store (%s request) by user %q: auth error: %v", verb, userInfo.GetName(), err)
-		return "", false, false, err
+		return nil, false, false, err
 	}
 
 	fullAccess := decision == authorizer.DecisionAllow
@@ -1187,13 +1202,13 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 		} else if !apierrors.IsNotFound(err) {
 			// some general error
 			logrus.Errorf("ext token store (%s request) by user %q: general error: %v", verb, userName, err)
-			return "", false, false,
+			return nil, false, false,
 				apierrors.NewInternalError(fmt.Errorf("error getting user %s: %w", userName, err))
 		} // else: not a rancher user, may still be an admin
 	} // else: some system user, not a rancher user, may still be an admin
 
 	logrus.Debugf("ext token store (%s request) by user %q (full-access=%v, rancher-user=%v)", verb, userName, fullAccess, isRancherUser)
-	return userName, fullAccess, isRancherUser, nil
+	return userInfo, fullAccess, isRancherUser, nil
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
@@ -1288,93 +1303,45 @@ func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptio
 }
 
 // toSecret converts a Token object into the equivalent Secret resource.
-func toSecret(token *ext.Token, oldBackendLabels, oldBackendAnnotations map[string]string) (*corev1.Secret, error) {
+func toSecret(token *ext.Token) (*corev1.Secret, error) {
+	// base structure
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: TokenNamespace,
+			Name:      token.Name,
+		},
+		StringData: make(map[string]string),
+		Data:       make(map[string][]byte),
+	}
+
+	if len(token.Annotations) > 0 {
+		secret.Annotations = make(map[string]string)
+		for k, v := range token.Annotations {
+			secret.Annotations[k] = v
+		}
+	}
+
+	secret.Labels = make(map[string]string)
+	for k, v := range token.Labels {
+		secret.Labels[k] = v
+	}
+	secret.Labels[SecretKindLabel] = SecretKindLabelValue
+	secret.Labels[UserIDLabel] = token.Spec.UserID
+	secret.Labels[KindLabel] = token.Spec.Kind
+
+	secret.Finalizers = append(secret.Finalizers, token.Finalizers...)
+	secret.OwnerReferences = append(secret.OwnerReferences, token.OwnerReferences...)
+
 	// user principal
 	principalBytes, err := json.Marshal(token.Spec.UserPrincipal)
 	if err != nil {
 		return nil, err
 	}
 
-	// finalizers -- encode and store into a data field. on reading decode
-	// that field.  this fully separates the finalizers on the tokens from
-	// finalizers on the backing secrets.
-	finalizerBytes, err := json.Marshal(token.Finalizers)
-	if err != nil {
-		return nil, err
-	}
-
-	// ownerReferences -- encode and store into a data field. on reading
-	// decode that field.  this fully separates the ownerReferences on the
-	// tokens from ownerReferences on the backing secrets.
-	ownerBytes, err := json.Marshal(token.OwnerReferences)
-	if err != nil {
-		return nil, err
-	}
-
-	// annotations -- encode and store into a data field. on reading decode
-	// that field.  this fully separates the annotations on the tokens from
-	// the annotations on the backing secrets.
-	annotationBytes, err := json.Marshal(token.Annotations)
-	if err != nil {
-		return nil, err
-	}
-
-	// labels -- encode and store into a data field. on reading decode that
-	// field.  this fully separates the user-visible labels on the tokens
-	// from the labels on the backing secrets.
-	labelBytes, err := json.Marshal(token.Labels)
-	if err != nil {
-		return nil, err
-	}
-
-	// labels again -- for proper filtering and searching both referenced
-	// user id and kind of the token are placed into labels of the backing
-	// secret -- the keys for these labels are part of the public API. This
-	// may have to be merged with labels set on the secrets by other apps
-	// with access to the secrets.
-	backendLabels := oldBackendLabels
-	if backendLabels == nil {
-		backendLabels = map[string]string{}
-	}
-	backendLabels[UserIDLabel] = token.Spec.UserID
-	backendLabels[KindLabel] = token.Spec.Kind
-	backendLabels[SecretKindLabel] = SecretKindLabelValue
-
-	// ensure that only one of name or generateName is passed through.
-	name := token.Name
-	genName := token.GenerateName
-	if genName != "" {
-		name = ""
-	}
-
-	// base structure
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    TokenNamespace,
-			Name:         name,
-			GenerateName: genName,
-			Labels:       backendLabels,
-			Annotations:  oldBackendAnnotations,
-		},
-		StringData: make(map[string]string),
-		Data:       make(map[string][]byte),
-	}
-
-	// system information
+	// system information. remainder is handled through secret's ObjectMeta
 	secret.StringData[FieldUID] = string(token.ObjectMeta.UID)
-	secret.StringData[FieldLabels] = string(labelBytes)
-	secret.StringData[FieldAnnotations] = string(annotationBytes)
-	secret.StringData[FieldFinalizers] = string(finalizerBytes)
-	secret.StringData[FieldOwnerReferences] = string(ownerBytes)
-
-	deletionTimeAsString := ""
-	if token.DeletionTimestamp != nil {
-		deletionTimeAsString = token.DeletionTimestamp.Format(time.RFC3339)
-	}
-	secret.StringData[FieldDeletionTime] = deletionTimeAsString
 
 	// spec values
-
 	// injects default on creation and update
 	ttl, err := clampMaxTTL(token.Spec.TTL)
 	if err != nil {
@@ -1413,41 +1380,14 @@ func fromSecret(secret *corev1.Secret) (*ext.Token, error) {
 			Kind:       GVK.Kind,
 			APIVersion: GV.String(),
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              secret.Name,
-			CreationTimestamp: secret.CreationTimestamp,
-		},
+		ObjectMeta: *secret.ObjectMeta.DeepCopy(),
 	}
+	token.Namespace = ""                  // token is not namespaced.
+	delete(token.Labels, SecretKindLabel) // Remove an internal label.
 
 	// system - kubernetes uid
 	if token.ObjectMeta.UID = types.UID(string(secret.Data[FieldUID])); token.ObjectMeta.UID == "" {
 		return nil, fmt.Errorf("kube uid missing")
-	}
-
-	deletionTime, err := decodeTime("deletionTimestamp", secret.Data[FieldDeletionTime])
-	if err != nil {
-		return nil, err
-	}
-	token.ObjectMeta.DeletionTimestamp = deletionTime
-
-	// system - finalizers - decode the field and place into the token
-	if err := json.Unmarshal(secret.Data[FieldFinalizers], &token.Finalizers); err != nil {
-		return nil, err
-	}
-
-	// system - owner references - decode the field and place into the token
-	if err := json.Unmarshal(secret.Data[FieldOwnerReferences], &token.OwnerReferences); err != nil {
-		return nil, err
-	}
-
-	// system - labels - decode the field and place into the token
-	if err := json.Unmarshal(secret.Data[FieldLabels], &token.Labels); err != nil {
-		return nil, err
-	}
-
-	// system - annotations - decode the fields and place into the token
-	if err := json.Unmarshal(secret.Data[FieldAnnotations], &token.Annotations); err != nil {
-		return nil, err
 	}
 
 	// spec - user id, required

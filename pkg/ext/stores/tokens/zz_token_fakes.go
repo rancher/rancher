@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
+	user "k8s.io/apiserver/pkg/authentication/user"
 )
 
 // MocktimeHandler is a mock of timeHandler interface.
@@ -130,10 +131,10 @@ func (mr *MockauthHandlerMockRecorder) SessionID(ctx any) *gomock.Call {
 }
 
 // UserName mocks base method.
-func (m *MockauthHandler) UserName(ctx context.Context, store *SystemStore, verb string) (string, bool, bool, error) {
+func (m *MockauthHandler) UserName(ctx context.Context, store *SystemStore, verb string) (user.Info, bool, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UserName", ctx, store, verb)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(user.Info)
 	ret1, _ := ret[1].(bool)
 	ret2, _ := ret[2].(bool)
 	ret3, _ := ret[3].(error)
