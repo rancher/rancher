@@ -17,7 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -84,11 +84,11 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	}
 
 	k8sSecret, err := c.secretCache.Get(secretNamespace, clientID)
-	if err != nil && !kerrors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	// generate client secret and store it in a k8s secret.
-	if kerrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		clientSecret, err := c.generator.GenerateClientSecret()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate client secret: %w", err)
@@ -114,7 +114,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 				clientSecretName: clientSecret,
 			},
 		})
-		if err != nil && !kerrors.IsAlreadyExists(err) {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return nil, fmt.Errorf("failed to create client secret: %w", err)
 		}
 
