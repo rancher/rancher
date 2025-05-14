@@ -116,8 +116,9 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Description: "Standard kubernetes object meta information. BEWARE of non-standard behaviour: Name and GenerateName are not respected. A name is generated with a predefined prefix instead ('token-').",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
