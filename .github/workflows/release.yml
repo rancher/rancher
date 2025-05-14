@@ -3,7 +3,6 @@ on:
   push:
     tags:
       - "v*"
-      - "!v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
   DOCKERIO_REGISTRY: "docker.io"
@@ -221,4 +220,6 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials accessKeyId | AWS_ACCESS_KEY_ID ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY
       - name: publish to aws
+        env:
+          ARTIFACTS_BUCKET_NAME: "prime-artifacts"
         uses: ./.github/actions/images-files/publish-aws
