@@ -25,15 +25,15 @@ func TestVersionServeHTTP(t *testing.T) {
 		},
 		{
 			name:     "prime=true",
-			setPrime: func() { os.Setenv("RANCHER_PRIME", "true") },
-			cleanup:  func() { os.Unsetenv("RANCHER_PRIME") },
+			setPrime: func() { os.Setenv("RANCHER_VERSION_TYPE", "prime") },
+			cleanup:  func() { os.Unsetenv("RANCHER_VERSION_TYPE") },
 			want:     `{"Version":"dev","GitCommit":"HEAD","RancherPrime":"true"}`,
 		},
 		{
 			name:     "prime=false",
-			setPrime: func() { os.Setenv("RANCHER_PRIME", "false") },
-			cleanup:  func() { os.Unsetenv("RANCHER_PRIME") },
-			want:     `{"Version":"dev","GitCommit":"HEAD","RancherPrime":"false"}`,
+			setPrime: func() { os.Setenv("RANCHER_VERSION_TYPE", "prime") },
+			cleanup:  func() { os.Unsetenv("RANCHER_VERSION_TYPE") },
+			want:     `{"Version":"dev","GitCommit":"HEAD","RancherPrime":"true"}`,
 		},
 	}
 
