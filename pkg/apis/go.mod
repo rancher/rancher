@@ -35,7 +35,7 @@ replace (
 require (
 	github.com/rancher/aks-operator v1.10.5-rc.1
 	github.com/rancher/eks-operator v1.10.5-rc.1
-	github.com/rancher/fleet/pkg/apis v0.11.6
+	github.com/rancher/fleet/pkg/apis v0.11.8-rc.1
 	github.com/rancher/gke-operator v1.10.5-rc.1
 	github.com/rancher/norman v0.4.2
 	github.com/rancher/rke v1.7.7-rc.2
@@ -96,7 +96,7 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	k8s.io/kubernetes v1.31.1 // indirect
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
+	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
