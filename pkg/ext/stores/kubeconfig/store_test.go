@@ -41,12 +41,19 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/utils/ptr"
+)
+
+var (
+	adminID = "user-2p7w6"
+	adminSA = "system:admin"
+	userID  = "u-w7drc"
 )
 
 var commonAuthorizer = authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	switch a.GetUser().GetName() {
-	case "system:admin", "user-2p7w6":
+	case adminSA, adminID:
 		return authorizer.DecisionAllow, "", nil
 	default:
 		return authorizer.DecisionDeny, "", nil
@@ -188,17 +195,8 @@ func TestStoreUserFrom(t *testing.T) {
 		}
 	}).AnyTimes()
 
-	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-		switch a.GetUser().GetName() {
-		case "system:admin":
-			return authorizer.DecisionAllow, "", nil
-		default:
-			return authorizer.DecisionDeny, "", nil
-		}
-	})
-
 	store := &Store{
-		authorizer: authorizer,
+		authorizer: commonAuthorizer,
 		userCache:  userCache,
 	}
 
@@ -254,7 +252,6 @@ func TestStoreUserFrom(t *testing.T) {
 }
 
 func TestStoreCreate(t *testing.T) {
-	userID := "user-2p7w6"
 	authTokenID := "token-nh98r"
 	serverURL := "https://rancher.example.com"
 	downstream1 := "c-m-tbgzfbgf"
@@ -271,7 +268,7 @@ func TestStoreCreate(t *testing.T) {
 	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
 		switch name {
-		case userID:
+		case userID, adminID:
 			return &v3.User{}, nil
 		case "error":
 			return nil, fmt.Errorf("some error")
@@ -281,198 +278,341 @@ func TestStoreCreate(t *testing.T) {
 	}).AnyTimes()
 	tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 	tokenCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Token, error) {
-		return &v3.Token{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: authTokenID,
-			},
-			UserID: userID,
-		}, nil
-	}).Times(1)
-	tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
-		return nil, nil
-	}).AnyTimes()
-
-	clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
-	clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Cluster, error) {
 		switch name {
-		case "local":
-			return &v3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: "local"},
-				Spec:       v3.ClusterSpec{DisplayName: "local"},
-				Status:     v3.ClusterStatus{CACert: localCACert},
-			}, nil
-		case downstream1:
-			return &v3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: downstream1},
-				Spec:       v3.ClusterSpec{DisplayName: "downstream1"},
-				Status:     v3.ClusterStatus{CACert: downstream1CACert},
-			}, nil
-		case downstream2:
-			return &v3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{Name: downstream2},
-				Spec: v3.ClusterSpec{
-					DisplayName: "downstream2",
-					ClusterSpecBase: v3.ClusterSpecBase{
-						LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{
-							Enabled: true,
-						},
-					},
+		case authTokenID:
+			return &v3.Token{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
 				},
-				Status: v3.ClusterStatus{CACert: downstream2CACert},
+				UserID: userID,
 			}, nil
 		default:
 			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 		}
 	}).AnyTimes()
-	nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
-	nodeCache.EXPECT().List(gomock.Any(), labels.Everything()).DoAndReturn(func(namespace string, selector labels.Selector) ([]*v3.Node, error) {
-		switch namespace {
-		case downstream1:
-			return nil, nil
-		case downstream2:
-			return []*v3.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "cp"},
-					Spec: v3.NodeSpec{
-						RequestedHostname: "cp",
-						ControlPlane:      true,
-					},
-					Status: v3.NodeStatus{
-						InternalNodeStatus: corev1.NodeStatus{
-							Addresses: []corev1.NodeAddress{
-								{Type: corev1.NodeExternalIP, Address: "172.20.0.3"},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "worker"},
-					Spec:       v3.NodeSpec{RequestedHostname: "worker"},
-					Status: v3.NodeStatus{
-						InternalNodeStatus: corev1.NodeStatus{
-							Addresses: []corev1.NodeAddress{
-								{Type: corev1.NodeExternalIP, Address: "172.20.0.4"},
-							},
-						},
-					},
-				},
-			}, nil
-		default:
-			require.Fail(t, "unexpected call")
-			return nil, nil
-		}
+	tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
+		return nil, nil
 	}).AnyTimes()
-
-	configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
-	configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
-		return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-	})
-
-	var configMap *corev1.ConfigMap
-	configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-	configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-		configMap = obj.DeepCopy()
-		return configMap, nil
-	}).Times(1)
 
 	userManager := &fakeUserManager{}
 	defaultTTL := int64(43200)
-
-	store := &Store{
-		authorizer:      commonAuthorizer,
-		configMapCache:  configMapCache,
-		configMapClient: configMapClient,
-		userCache:       userCache,
-		tokenCache:      tokenCache,
-		clusterCache:    clusterCache,
-		nodeCache:       nodeCache,
-		userMgr:         userManager,
-		getServerURL: func() string {
-			return serverURL
-		},
-		getDefaultTTL: func() (*int64, error) {
-			return &defaultTTL, nil
-		},
-		shouldGenerateToken: func() bool {
-			return true
-		},
-	}
-
-	ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-		Name: userID,
-		Extra: map[string][]string{
-			common.ExtraRequestTokenID: {authTokenID},
-		},
-	})
-	kubeconfig := &ext.Kubeconfig{
-		Spec: ext.KubeconfigSpec{
-			Clusters:       []string{downstream1, downstream2},
-			CurrentContext: downstream1,
-		},
-	}
-	var createValidationCalled bool
-	createValidation := func(ctx context.Context, obj runtime.Object) error {
-		createValidationCalled = true
-		return nil
-	}
+	getDefaultTTL := func() (*int64, error) { return &defaultTTL, nil }
+	shouldGenerateToken := func() bool { return true }
 	options := &metav1.CreateOptions{}
 
-	obj, err := store.Create(ctx, kubeconfig, createValidation, options)
-	require.NoError(t, err)
-	assert.NotNil(t, obj)
-	assert.IsType(t, &ext.Kubeconfig{}, obj)
+	t.Run("user creates a kubeconfig", func(t *testing.T) {
+		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
 
-	assert.True(t, createValidationCalled)
+		clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+		clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Cluster, error) {
+			switch name {
+			case "local":
+				return &v3.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "local"},
+					Spec:       v3.ClusterSpec{DisplayName: "local"},
+					Status:     v3.ClusterStatus{CACert: localCACert},
+				}, nil
+			case downstream1:
+				return &v3.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: downstream1},
+					Spec:       v3.ClusterSpec{DisplayName: "downstream1"},
+					Status:     v3.ClusterStatus{CACert: downstream1CACert},
+				}, nil
+			case downstream2:
+				return &v3.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: downstream2},
+					Spec: v3.ClusterSpec{
+						DisplayName: "downstream2",
+						ClusterSpecBase: v3.ClusterSpecBase{
+							LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{
+								Enabled: true,
+							},
+						},
+					},
+					Status: v3.ClusterStatus{CACert: downstream2CACert},
+				}, nil
+			default:
+				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+			}
+		}).AnyTimes()
+		nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
+		nodeCache.EXPECT().List(gomock.Any(), labels.Everything()).DoAndReturn(func(namespace string, selector labels.Selector) ([]*v3.Node, error) {
+			switch namespace {
+			case downstream1:
+				return nil, nil
+			case downstream2:
+				return []*v3.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "cp"},
+						Spec: v3.NodeSpec{
+							RequestedHostname: "cp",
+							ControlPlane:      true,
+						},
+						Status: v3.NodeStatus{
+							InternalNodeStatus: corev1.NodeStatus{
+								Addresses: []corev1.NodeAddress{
+									{Type: corev1.NodeExternalIP, Address: "172.20.0.3"},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "worker"},
+						Spec:       v3.NodeSpec{RequestedHostname: "worker"},
+						Status: v3.NodeStatus{
+							InternalNodeStatus: corev1.NodeStatus{
+								Addresses: []corev1.NodeAddress{
+									{Type: corev1.NodeExternalIP, Address: "172.20.0.4"},
+								},
+							},
+						},
+					},
+				}, nil
+			default:
+				require.Fail(t, "unexpected call")
+				return nil, nil
+			}
+		}).AnyTimes()
 
-	created := obj.(*ext.Kubeconfig)
-	assert.NotEmpty(t, created.Status)
-	assert.NotEmpty(t, created.Status.Value)
-	assert.NotEmpty(t, created.Name)
-	assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
-	assert.Equal(t, defaultTTL, created.Spec.TTL)
-	assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
-	assert.NotEmpty(t, kubeconfig.Spec.CurrentContext)
-	assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
+		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+		configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		})
 
-	require.NotNil(t, configMap)
-	assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
-	assert.Equal(t, Namespace, configMap.Namespace)
-	require.NotNil(t, configMap.Labels)
-	assert.Equal(t, userID, configMap.Labels[UserIDLabel])
-	assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
-	require.NotNil(t, configMap.Annotations)
-	assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
-	require.NotNil(t, configMap.Data)
-	assert.Equal(t, strconv.FormatInt(defaultTTL, 10), configMap.Data[TTLField])
-	assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
-	assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
-	clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
-	require.NoError(t, err)
-	assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
 
-	require.Len(t, userManager.tokens, 1)
+		store := &Store{
+			authorizer:      authorizer,
+			configMapCache:  configMapCache,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenCache:      tokenCache,
+			clusterCache:    clusterCache,
+			nodeCache:       nodeCache,
+			userMgr:         userManager,
+			getServerURL: func() string {
+				return serverURL
+			},
+			getDefaultTTL:       getDefaultTTL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
 
-	config, err := clientcmd.Load([]byte(created.Status.Value))
-	require.NoError(t, err)
-	require.Len(t, config.Clusters, 4)
-	assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream1), config.Clusters["downstream1"].Server)
-	assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream2), config.Clusters["downstream2"].Server)
-	assert.Equal(t, "https://172.20.0.3:6443", config.Clusters["downstream2-cp"].Server)
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1, downstream2},
+				CurrentContext: downstream1,
+			},
+		}
+		var createValidationCalled bool
+		createValidation := func(ctx context.Context, obj runtime.Object) error {
+			createValidationCalled = true
+			return nil
+		}
 
-	require.Len(t, config.Contexts, 4)
-	assert.Equal(t, "downstream1", config.Contexts["downstream1"].Cluster)
-	assert.Equal(t, "downstream1", config.Contexts["downstream1"].AuthInfo)
-	assert.Equal(t, "downstream2", config.Contexts["downstream2"].Cluster)
-	assert.Equal(t, "downstream2", config.Contexts["downstream2"].AuthInfo)
-	assert.Equal(t, "downstream2-cp", config.Contexts["downstream2-cp"].Cluster)
-	assert.Equal(t, "downstream2", config.Contexts["downstream2"].AuthInfo)
+		obj, err := store.Create(ctx, kubeconfig, createValidation, options)
+		require.NoError(t, err)
+		assert.NotNil(t, obj)
+		assert.IsType(t, &ext.Kubeconfig{}, obj)
 
-	require.Len(t, userManager.tokens, 1)
-	require.Len(t, userManager.clusterTokens, 1)
+		assert.True(t, createValidationCalled)
 
-	require.Len(t, config.AuthInfos, 3)
-	assert.Equal(t, userManager.tokens[0], config.AuthInfos["downstream1"].Token)
-	assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
+		created := obj.(*ext.Kubeconfig)
+		assert.NotEmpty(t, created.Status)
+		assert.NotEmpty(t, created.Status.Value)
+		assert.NotEmpty(t, created.Name)
+		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
+		assert.Equal(t, defaultTTL, created.Spec.TTL)
+		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
+		assert.NotEmpty(t, kubeconfig.Spec.CurrentContext)
+		assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
+
+		require.NotNil(t, configMap)
+		assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
+		assert.Equal(t, Namespace, configMap.Namespace)
+		require.NotNil(t, configMap.Labels)
+		assert.Equal(t, userID, configMap.Labels[UserIDLabel])
+		assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
+		require.NotNil(t, configMap.Annotations)
+		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
+		require.NotNil(t, configMap.Data)
+		assert.Equal(t, strconv.FormatInt(defaultTTL, 10), configMap.Data[TTLField])
+		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
+		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
+		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
+		require.NoError(t, err)
+		assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
+
+		require.Len(t, userManager.tokens, 1)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+		require.Len(t, config.Clusters, 4)
+		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream1), config.Clusters["downstream1"].Server)
+		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream2), config.Clusters["downstream2"].Server)
+		assert.Equal(t, "https://172.20.0.3:6443", config.Clusters["downstream2-cp"].Server)
+
+		require.Len(t, config.Contexts, 4)
+		assert.Equal(t, "downstream1", config.Contexts["downstream1"].Cluster)
+		assert.Equal(t, "downstream1", config.Contexts["downstream1"].AuthInfo)
+		assert.Equal(t, "downstream2", config.Contexts["downstream2"].Cluster)
+		assert.Equal(t, "downstream2", config.Contexts["downstream2"].AuthInfo)
+		assert.Equal(t, "downstream2-cp", config.Contexts["downstream2-cp"].Cluster)
+		assert.Equal(t, "downstream2", config.Contexts["downstream2"].AuthInfo)
+
+		require.Len(t, userManager.tokens, 1)
+		require.Len(t, userManager.clusterTokens, 1)
+
+		require.Len(t, config.AuthInfos, 3)
+		assert.Equal(t, userManager.tokens[0], config.AuthInfos["downstream1"].Token)
+		assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
+	})
+
+	t.Run("only a rancher user can create kubeconfig", func(t *testing.T) {
+		store := &Store{
+			authorizer: commonAuthorizer,
+			userCache:  userCache,
+			tokenCache: tokenCache,
+			userMgr:    userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminSA,
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1, downstream2},
+				CurrentContext: downstream1,
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err))
+		assert.Contains(t, err.Error(), "user "+adminSA+" is not a Rancher user")
+	})
+	t.Run("missing request token", func(t *testing.T) {
+		store := &Store{
+			authorizer: commonAuthorizer,
+			userCache:  userCache,
+			tokenCache: tokenCache,
+			userMgr:    userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1, downstream2},
+				CurrentContext: downstream1,
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err))
+		assert.Contains(t, err.Error(), "missing request token ID")
+	})
+	t.Run("request token doesn't exist", func(t *testing.T) {
+		store := &Store{
+			authorizer: commonAuthorizer,
+			userCache:  userCache,
+			tokenCache: tokenCache,
+			userMgr:    userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {"non-existent"},
+			},
+			Name: userID,
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1, downstream2},
+				CurrentContext: downstream1,
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err))
+		assert.Contains(t, err.Error(), "\"non-existent\" not found")
+	})
+	t.Run("negative ttl", func(t *testing.T) {
+		store := &Store{
+			authorizer:    commonAuthorizer,
+			userCache:     userCache,
+			tokenCache:    tokenCache,
+			userMgr:       userManager,
+			getDefaultTTL: getDefaultTTL,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+			Name: userID,
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1, downstream2},
+				CurrentContext: downstream1,
+				TTL:            -1,
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsBadRequest(err))
+		assert.Contains(t, err.Error(), "spec.ttl can't be negative")
+	})
+	t.Run("ttl exceeds the max", func(t *testing.T) {
+		store := &Store{
+			authorizer:    commonAuthorizer,
+			userCache:     userCache,
+			tokenCache:    tokenCache,
+			userMgr:       userManager,
+			getDefaultTTL: getDefaultTTL,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+			Name: userID,
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1, downstream2},
+				CurrentContext: downstream1,
+				TTL:            defaultTTL + 1,
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsBadRequest(err))
+		assert.Contains(t, err.Error(), "exceeds max tll")
+	})
 }
 
 func generateCAKeyAndCert() (*ecdsa.PrivateKey, string, error) {
@@ -654,7 +794,7 @@ func TestStoreGet(t *testing.T) {
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "user-2p7w6", // Admin user
+			Name: adminID,
 			Extra: map[string][]string{
 				common.ExtraRequestTokenID: {"token-8wrqh"},
 			},
@@ -878,7 +1018,7 @@ func TestStoreList(t *testing.T) {
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "user-2p7w6",
+			Name: adminID,
 		})
 
 		obj, err := store.List(ctx, &metainternalversion.ListOptions{})
@@ -996,7 +1136,7 @@ func TestStoreWatch(t *testing.T) {
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "user-2p7w6",
+			Name: adminID,
 		})
 
 		watcher, err := store.Watch(ctx, &metainternalversion.ListOptions{})
@@ -1214,7 +1354,7 @@ func TestStoreUpdate(t *testing.T) {
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "user-2p7w6", // Admin user
+			Name: adminID,
 		})
 
 		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
@@ -1527,8 +1667,6 @@ func TestStoreUpdate(t *testing.T) {
 func TestStoreDelete(t *testing.T) {
 	t.Parallel()
 
-	userID := "u-w7drc"
-	authTokenID := "token-nh98r"
 	kubeconfigID := "kubeconfig-49d5p"
 
 	ctrl := gomock.NewController(t)
@@ -1572,18 +1710,7 @@ func TestStoreDelete(t *testing.T) {
 		},
 	}
 
-	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-		return authorizer.DecisionAllow, "", nil
-	})
-
 	userManager := &fakeUserManager{}
-
-	ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-		Name: userID,
-		Extra: map[string][]string{
-			common.ExtraRequestTokenID: {authTokenID},
-		},
-	})
 
 	t.Run("admin deletes a kubeconfig", func(t *testing.T) {
 		var deleteValidationCalled bool
@@ -1595,22 +1722,17 @@ func TestStoreDelete(t *testing.T) {
 			GracePeriodSeconds: ptr.To(int64(60)),
 		}
 
-		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
-		configMapCache.EXPECT().Get(Namespace, kubeconfigID).Return(configMap, nil).Times(1)
-
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.GetOptions) (*corev1.ConfigMap, error) {
-			switch name {
-			case kubeconfigID:
-				return configMap, nil
-			default:
-				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-			}
-		}).AnyTimes()
+		configMapClient.EXPECT().Get(Namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return configMap.DeepCopy(), nil
+		}).Times(1)
 		configMapClient.EXPECT().Delete(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
 			assert.Equal(t, deleteOptions, options)
 			return nil
 		}).Times(1)
+
+		tokenID1 := "kubeconfig-" + adminID + "agc66"
+		tokenID2 := "kubeconfig-" + adminID + "d12fg"
 
 		tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 		tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
@@ -1620,13 +1742,13 @@ func TestStoreDelete(t *testing.T) {
 			assert.Equal(t, KindLabelValue, set.Get(tokens.TokenKindLabel))
 
 			return []*v3.Token{
-				{ObjectMeta: metav1.ObjectMeta{Name: "kubeconfig-user-2p7w6agc66"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "kubeconfig-user-2p7w6d12fg"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: tokenID1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: tokenID2}},
 			}, nil
 		}).AnyTimes()
 		tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
 		tokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
-			assert.Contains(t, []string{"kubeconfig-user-2p7w6agc66", "kubeconfig-user-2p7w6d12fg"}, name)
+			assert.Contains(t, []string{tokenID1, tokenID2}, name)
 			assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
 			assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
 			assert.Equal(t, deleteOptions.DryRun, options.DryRun)
@@ -1635,14 +1757,17 @@ func TestStoreDelete(t *testing.T) {
 		}).Times(2)
 
 		store := &Store{
-			authorizer:      authorizer,
-			configMapCache:  configMapCache,
+			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			tokenCache:      tokenCache,
 			tokens:          tokenClient,
 			userCache:       userCache,
 			userMgr:         userManager,
 		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminID,
+		})
 
 		obj, _, err := store.Delete(ctx, kubeconfigID, deleteValidation, deleteOptions)
 		require.NoError(t, err)
@@ -1654,5 +1779,63 @@ func TestStoreDelete(t *testing.T) {
 
 		assert.True(t, deleteValidationCalled)
 	})
+	t.Run("user can't delete other user's kubeconfig", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(Namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return configMap.DeepCopy(), nil
+		}).Times(1)
 
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: "not-an-owner",
+		})
+
+		obj, _, err := store.Delete(ctx, kubeconfigID, nil, &metav1.DeleteOptions{})
+		require.Error(t, err)
+		require.Nil(t, obj)
+		assert.True(t, apierrors.IsNotFound(err))
+
+		statusErr, ok := err.(*apierrors.StatusError)
+		require.True(t, ok)
+		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
+		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
+		assert.Equal(t, kubeconfigID, statusErr.Status().Details.Name)
+	})
+}
+
+func TestPrintKubeconfig(t *testing.T) {
+	kubeconfig := &ext.Kubeconfig{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(time.Now()),
+			Name:              "kubeconfig-49d5p",
+			Labels: map[string]string{
+				UserIDLabel: "u-w7drc",
+			},
+		},
+		Spec: ext.KubeconfigSpec{
+			Description:    "test",
+			CurrentContext: "c-m-tbgzfbgf",
+			Clusters:       []string{"c-m-tbgzfbgf", "c-m-bxn2p7w6"},
+			TTL:            43200,
+		},
+	}
+
+	rows, err := printKubeconfig(kubeconfig, printers.GenerateOptions{})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	row := rows[0]
+	require.Len(t, row.Cells, 7)
+	assert.Equal(t, kubeconfig.Name, row.Cells[0].(string))
+	assert.Equal(t, "0s", row.Cells[1].(string))
+	assert.Equal(t, "43s", row.Cells[2].(string))
+	assert.Equal(t, kubeconfig.Spec.Description, row.Cells[3].(string))
+	assert.Equal(t, "c-m-tbgzfbgf,c-m-bxn2p7w6", row.Cells[4].(string))
+	assert.Equal(t, kubeconfig.Spec.CurrentContext, row.Cells[5].(string))
+	assert.Equal(t, kubeconfig.Labels[UserIDLabel], row.Cells[6].(string))
 }

@@ -224,6 +224,11 @@ func (s *Store) Create(
 		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
 	}
 
+	kubeconfig, ok := obj.(*ext.Kubeconfig)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", obj))
+	}
+
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
 			if _, ok := err.(apierrors.APIStatus); ok {
@@ -233,17 +238,23 @@ func (s *Store) Create(
 		}
 	}
 
-	kubeconfig, ok := obj.(*ext.Kubeconfig)
-	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", obj))
-	}
-
-	if len(kubeconfig.Spec.Clusters) == 0 {
-		return nil, apierrors.NewBadRequest("spec.clusters is required")
-	}
-
 	if !isUnique(kubeconfig.Spec.Clusters) {
 		return nil, apierrors.NewBadRequest("spec.clusters must be unique")
+	}
+
+	defaultTokenTTL, err := s.getDefaultTTL()
+	if err != nil {
+		return nil, fmt.Errorf("error getting default token TTL: %w", err)
+	}
+
+	switch {
+	case kubeconfig.Spec.TTL < 0:
+		return nil, apierrors.NewBadRequest("spec.ttl can't be negative")
+	case kubeconfig.Spec.TTL == 0:
+		kubeconfig.Spec.TTL = *defaultTokenTTL
+	case kubeconfig.Spec.TTL > *defaultTokenTTL:
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max tll %d", kubeconfig.Spec.TTL, *defaultTokenTTL))
+	default: // Valid TTL.
 	}
 
 	host := s.getServerURL()
@@ -312,11 +323,6 @@ func (s *Store) Create(
 		}
 	}
 
-	defaultTokenTTL, err := s.getDefaultTTL()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get default token TTL: %w", err)
-	}
-
 	var foundCurrentContext bool
 	if kubeconfig.Spec.CurrentContext == "" {
 		kubeconfig.Spec.CurrentContext = "rancher"
@@ -379,7 +385,7 @@ func (s *Store) Create(
 
 	// Generate a shared token for the default and non-ACE clusters.
 	if !dryRun && generateToken {
-		input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, defaultTokenTTL)
+		input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &kubeconfig.Spec.TTL)
 		sharedTokenKey, sharedToken, err = s.userMgr.EnsureToken(input)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
@@ -415,7 +421,7 @@ func (s *Store) Create(
 		)
 		if !dryRun && generateToken {
 			if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, defaultTokenTTL)
+				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &kubeconfig.Spec.TTL)
 				tokenKey, token, err = s.userMgr.EnsureClusterToken(cluster.Name, input)
 				if err != nil {
 					return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
@@ -447,8 +453,7 @@ func (s *Store) Create(
 	}
 
 	kubeconfigToStore := kubeconfig.DeepCopy()
-	kubeconfigToStore.Name = kubeConfigID         // Overwrite the name.
-	kubeconfigToStore.Spec.TTL = *defaultTokenTTL // Set the TTL.
+	kubeconfigToStore.Name = kubeConfigID // Overwrite the name.
 
 	if kubeconfigToStore.Labels == nil {
 		kubeconfigToStore.Labels = make(map[string]string)
@@ -597,6 +602,31 @@ func tokenSelector(isAdmin bool, userID, tokenID string) (labels.Selector, error
 	return set.AsSelector(), nil
 }
 
+func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache bool) (*corev1.ConfigMap, error) {
+	var (
+		configMap *corev1.ConfigMap
+		err       error
+	)
+
+	if useCache {
+		configMap, err = s.configMapCache.Get(Namespace, name)
+	} else {
+		configMap, err = s.configMapClient.Get(Namespace, name, *options)
+	}
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+		return nil, fmt.Errorf("error getting configmap %s: %w", name, err)
+	}
+
+	if configMap.Labels[KindLabel] != KindLabelValue {
+		return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+	}
+
+	return configMap, nil
+}
+
 // Get implements [rest.Getter]
 func (s *Store) Get(
 	ctx context.Context,
@@ -608,28 +638,11 @@ func (s *Store) Get(
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
 	}
 
-	var (
-		configMap       *corev1.ConfigMap
-		emptyGetOptions metav1.GetOptions
-	)
-
-	if options == nil || *options == emptyGetOptions {
-		// If no options are provided, we use the fast path.
-		configMap, err = s.configMapCache.Get(Namespace, name)
-	} else {
-		configMap, err = s.configMapClient.Get(Namespace, name, *options)
-	}
+	var emptyGetOptions metav1.GetOptions
+	useCache := options == nil || *options == emptyGetOptions
+	configMap, err := s.getConfigMap(name, options, useCache)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Rethrow the NotFound error with the correct group and resource information.
-			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-		}
-
-		return nil, fmt.Errorf("error getting configmap for kubeconfig %s: %w", name, err)
-	}
-
-	if configMap.Labels[KindLabel] != KindLabelValue {
-		return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		return nil, err
 	}
 
 	if configMap.Labels[UserIDLabel] != userInfo.GetName() && !isAdmin {
@@ -913,12 +926,10 @@ func (s *Store) Delete(
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
 	}
 
-	configMap, err := s.configMapCache.Get(Namespace, name)
+	useCache := false
+	configMap, err := s.getConfigMap(name, &metav1.GetOptions{}, useCache)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
-		}
-		return nil, false, fmt.Errorf("error getting configmap for kubeconfig %s: %w", name, err)
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
 	if configMap.Labels[UserIDLabel] != userInfo.GetName() && !isAdmin {
@@ -993,19 +1004,10 @@ func (s *Store) Update(
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
 	}
 
-	oldConfigMap, err := s.configMapClient.Get(Namespace, name, metav1.GetOptions{})
-
+	useCache := false
+	oldConfigMap, err := s.getConfigMap(name, &metav1.GetOptions{}, useCache)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Rethrow the NotFound error with the correct group and resource information.
-			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
-		}
-
-		return nil, false, fmt.Errorf("error getting configmap for kubeconfig %s: %w", name, err)
-	}
-
-	if oldConfigMap.Labels[KindLabel] != KindLabelValue {
-		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
 	if oldConfigMap.Labels[UserIDLabel] != userInfo.GetName() && !isAdmin {
