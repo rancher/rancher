@@ -238,7 +238,7 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref common.ReferenceCallback)
 					},
 					"ttl": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TTL is the time-to-live of the kubeconfig tokens, in milliseconds.",
+							Description: "TTL is the time-to-live of the kubeconfig tokens, in seconds.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

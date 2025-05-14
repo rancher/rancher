@@ -225,7 +225,7 @@ type KubeconfigSpec struct {
 	// Description is a human readable description of the kubeconfig.
 	// +optional
 	Description string `json:"description,omitempty"`
-	// TTL is the time-to-live of the kubeconfig tokens, in milliseconds.
+	// TTL is the time-to-live of the kubeconfig tokens, in seconds.
 	// +optional
 	TTL int64 `json:"ttl,omitempty"`
 }
