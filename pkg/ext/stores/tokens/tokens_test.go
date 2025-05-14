@@ -942,58 +942,6 @@ func Test_Store_Create(t *testing.T) {
 					Return(nil, someerror)
 			},
 		},
-		{
-			name: "reject specified name",
-			err:  invalidNameError,
-			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
-				},
-			},
-			opts: &metav1.CreateOptions{},
-			storeSetup: func( // configure store backend clients
-				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				scache *fake.MockCacheInterface[*corev1.Secret],
-				users *fake.MockNonNamespacedCacheInterface[*v3.User],
-				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
-				timer *MocktimeHandler,
-				hasher *MockhashHandler,
-				auth *MockauthHandler) {
-
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-			},
-		},
-		{
-			name: "reject specified generateName",
-			err:  invalidGenerateNameError,
-			tok:  &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "hello",
-				},
-			},
-			opts: &metav1.CreateOptions{},
-			storeSetup: func( // configure store backend clients
-				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				scache *fake.MockCacheInterface[*corev1.Secret],
-				users *fake.MockNonNamespacedCacheInterface[*v3.User],
-				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
-				timer *MocktimeHandler,
-				hasher *MockhashHandler,
-				auth *MockauthHandler) {
-
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return("world", false, true, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-			},
-		},
 		// token generation and hash errors -- no mocking -- unable to induce and test
 		{
 			name: "user retrieval error",

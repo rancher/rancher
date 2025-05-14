@@ -463,10 +463,9 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		t.initialized = true
 	}
 
-	// enforce our choice of required generateName, and forbidden name.
-	if err := ensureNoNameAndGenerateName(token); err != nil {
-		return nil, err
-	}
+	// enforce our choice of name, generateName
+	token.ObjectMeta.Name = ""
+	token.ObjectMeta.GenerateName = "token-"
 
 	user, err := t.userClient.Get(token.Spec.UserID)
 	if err != nil {
@@ -1540,24 +1539,6 @@ func setExpired(token *ext.Token) error {
 	expiresAt := token.ObjectMeta.CreationTimestamp.Add(time.Duration(token.Spec.TTL) * time.Millisecond)
 	token.Status.Expired = time.Now().After(expiresAt)
 	token.Status.ExpiresAt = expiresAt.Format(time.RFC3339)
-	return nil
-}
-
-// ensureNoNameAndGenerateName ensures that the token has the generateName
-// clause set, and no name specified. This enforces our decision (RFD Imperative
-// API Object Naming) to not allow users the choice of token names.
-func ensureNoNameAndGenerateName(token *ext.Token) error {
-	if token.ObjectMeta.Name != "" {
-		return apierrors.NewBadRequest(
-			"Token is invalid: metadata.name: Locked by system. Do not set.")
-	}
-
-	if token.ObjectMeta.GenerateName != "" && token.ObjectMeta.GenerateName != "token-" {
-		return apierrors.NewBadRequest(
-			"Token is invalid: metadata.generateName: Locked by system. Do not set.")
-	}
-
-	token.ObjectMeta.GenerateName = "token-"
 	return nil
 }
 
