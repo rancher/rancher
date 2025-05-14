@@ -35,7 +35,12 @@ type UserActivityStatus struct {
 
 // Token is used to authenticate requests to Rancher.
 type Token struct {
-	metav1.TypeMeta   `json:",inline"`
+	// Standard kubernetes type meta information
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard kubernetes object meta information.
+	// BEWARE of non-standard behaviour: Name and GenerateName are not respected.
+	// A name is generated with a predefined prefix instead ('token-').
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the desired state of the Token.
