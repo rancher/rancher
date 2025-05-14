@@ -295,8 +295,11 @@ func TestStoreCreate(t *testing.T) {
 	}).AnyTimes()
 
 	userManager := &fakeUserManager{}
-	defaultTTL := int64(43200)
-	getDefaultTTL := func() (*int64, error) { return &defaultTTL, nil }
+	defaultTTLSeconds := int64(43200)
+	getDefaultTTL := func() (*int64, error) {
+		millis := defaultTTLSeconds * 1000
+		return &millis, nil
+	}
 	shouldGenerateToken := func() bool { return true }
 	options := &metav1.CreateOptions{}
 
@@ -434,7 +437,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.NotEmpty(t, created.Status.Value)
 		assert.NotEmpty(t, created.Name)
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
-		assert.Equal(t, defaultTTL, created.Spec.TTL)
+		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
 		assert.NotEmpty(t, kubeconfig.Spec.CurrentContext)
 		assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
@@ -448,7 +451,7 @@ func TestStoreCreate(t *testing.T) {
 		require.NotNil(t, configMap.Annotations)
 		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
 		require.NotNil(t, configMap.Data)
-		assert.Equal(t, strconv.FormatInt(defaultTTL, 10), configMap.Data[TTLField])
+		assert.Equal(t, strconv.FormatInt(defaultTTLSeconds, 10), configMap.Data[TTLField])
 		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
 		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
 		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
@@ -603,7 +606,7 @@ func TestStoreCreate(t *testing.T) {
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
 				CurrentContext: downstream1,
-				TTL:            defaultTTL + 1,
+				TTL:            defaultTTLSeconds + 1,
 			},
 		}
 
@@ -1833,7 +1836,7 @@ func TestPrintKubeconfig(t *testing.T) {
 	require.Len(t, row.Cells, 7)
 	assert.Equal(t, kubeconfig.Name, row.Cells[0].(string))
 	assert.Equal(t, "0s", row.Cells[1].(string))
-	assert.Equal(t, "43s", row.Cells[2].(string))
+	assert.Equal(t, "12h", row.Cells[2].(string))
 	assert.Equal(t, kubeconfig.Spec.Description, row.Cells[3].(string))
 	assert.Equal(t, "c-m-tbgzfbgf,c-m-bxn2p7w6", row.Cells[4].(string))
 	assert.Equal(t, kubeconfig.Spec.CurrentContext, row.Cells[5].(string))

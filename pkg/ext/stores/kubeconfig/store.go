@@ -242,18 +242,21 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest("spec.clusters must be unique")
 	}
 
-	defaultTokenTTL, err := s.getDefaultTTL()
+	defaultTTL, err := s.getDefaultTTL()
 	if err != nil {
 		return nil, fmt.Errorf("error getting default token TTL: %w", err)
 	}
+	defaultTTLSeconds := *defaultTTL / 1000
 
+	ttl := kubeconfig.Spec.TTL * 1000 // Milliseconds.
 	switch {
-	case kubeconfig.Spec.TTL < 0:
+	case ttl < 0:
 		return nil, apierrors.NewBadRequest("spec.ttl can't be negative")
-	case kubeconfig.Spec.TTL == 0:
-		kubeconfig.Spec.TTL = *defaultTokenTTL
-	case kubeconfig.Spec.TTL > *defaultTokenTTL:
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max tll %d", kubeconfig.Spec.TTL, *defaultTokenTTL))
+	case ttl == 0:
+		ttl = *defaultTTL
+		kubeconfig.Spec.TTL = defaultTTLSeconds
+	case ttl > *defaultTTL:
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max tll %d", kubeconfig.Spec.TTL, defaultTTLSeconds))
 	default: // Valid TTL.
 	}
 
@@ -385,7 +388,7 @@ func (s *Store) Create(
 
 	// Generate a shared token for the default and non-ACE clusters.
 	if !dryRun && generateToken {
-		input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &kubeconfig.Spec.TTL)
+		input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttl)
 		sharedTokenKey, sharedToken, err = s.userMgr.EnsureToken(input)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
@@ -421,7 +424,7 @@ func (s *Store) Create(
 		)
 		if !dryRun && generateToken {
 			if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &kubeconfig.Spec.TTL)
+				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttl)
 				tokenKey, token, err = s.userMgr.EnsureClusterToken(cluster.Name, input)
 				if err != nil {
 					return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
@@ -492,8 +495,7 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 			Name:      kubeconfig.Name,
 			Namespace: Namespace,
 		},
-		Data:       make(map[string]string),
-		BinaryData: make(map[string][]byte),
+		Data: make(map[string]string),
 	}
 
 	if len(kubeconfig.Annotations) > 0 {
@@ -893,7 +895,7 @@ func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOption
 		Cells: []any{
 			kubeconfig.Name,
 			translateTimestampSince(kubeconfig.CreationTimestamp),
-			duration.HumanDuration(time.Duration(kubeconfig.Spec.TTL) * time.Millisecond),
+			duration.HumanDuration(time.Duration(kubeconfig.Spec.TTL) * time.Second),
 			kubeconfig.Spec.Description,
 			strings.Join(kubeconfig.Spec.Clusters, ","),
 			kubeconfig.Spec.CurrentContext,
