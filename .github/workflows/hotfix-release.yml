@@ -12,6 +12,7 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   REGISTRY: "stgregistry.suse.com"
+  GH_CLI_VERSION: 2.61.0
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -160,7 +161,6 @@ jobs:
       - name: merge
         uses: ./.github/actions/merge-manifests/agent
   build-installer:
-    needs: [merge-server-manifest]
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
       matrix:
@@ -218,7 +218,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | AWS_ACCESS_KEY_ID ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | AWS_SECRET_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials accessKeyId | AWS_ACCESS_KEY_ID ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY
       - name: publish to aws
+        env:
+          ARTIFACTS_BUCKET_NAME: "prime-artifacts"
         uses: ./.github/actions/images-files/publish-aws
