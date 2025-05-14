@@ -1,0 +1,30 @@
+name: "Publish images files to GitHub"
+description: "Upload images files to a GitHub release"
+runs:
+  using: "composite"
+  steps:
+    - name: Create App Token
+      uses: actions/create-github-app-token@v1
+      id: app-token
+      with:
+        app-id: ${{ env.APP_ID }}
+        private-key: ${{ env.PRIVATE_KEY }}
+    - name: Add release notes
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      shell: bash
+      run: |
+        NOTES=$(cat "$ARTIFACTS_BASE_DIR/rancher-components.txt")
+        gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
+    - name: Upload artifacts
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      shell: bash
+      run: |
+        set -ex
+        source scripts/artifacts-list.sh
+        ARTIFACTS+=("$CHECKSUM_FILE")
+
+        for artifact in "${ARTIFACTS[@]}"; do
+          gh release upload -R ${{ github.repository_owner }}/rancher ${{ env.TAG }} "./$ARTIFACTS_BASE_DIR/$artifact" --clobber
+        done

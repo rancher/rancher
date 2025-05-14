@@ -1,0 +1,15 @@
+name: "Publish images files to aws"
+description: "Upload images files to an s3 bucket"
+runs:
+  using: "composite"
+  steps:
+    - name: Upload artifacts
+      shell: bash
+      run: |
+        set -ex
+        source scripts/artifacts-list.sh
+        ARTIFACTS+=("$CHECKSUM_FILE")
+
+        for artifact in "${ARTIFACTS[@]}"; do
+          aws s3 cp "./$ARTIFACTS_BASE_DIR/$artifact" "s3://${{ env.ARTIFACTS_BUCKET_NAME }}/rancher/${{ env.TAG }}/$artifact"
+        done

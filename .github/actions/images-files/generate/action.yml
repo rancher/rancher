@@ -1,0 +1,39 @@
+name: "Generate images files"
+description: "Setup and generate images files"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Environment Variables
+      uses: ./.github/actions/setup-tag-env
+    - id: env 
+      name: Setup Dependencies Env Variables
+      uses: ./.github/actions/setup-build-env
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '${{ steps.env.outputs.GO_VERSION }}'
+    - name: Download data.json
+      shell: bash
+      run: |
+        mkdir -p "$ARTIFACTS_BASE_DIR"
+        curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > "./$ARTIFACTS_BASE_DIR/data.json"
+        cp "./$ARTIFACTS_BASE_DIR/data.json" "./$ARTIFACTS_BASE_DIR/rancher-data.json"
+    - name: Create k3s images file
+      uses: ./.github/actions/k3s-images
+      with:
+        k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
+    - name: Create files
+      shell: bash
+      run: |
+        mkdir -p $HOME/bin
+        touch $HOME/bin/rancher-rke-k8s-versions.txt
+    - name: Create components and images files
+      shell: bash
+      run: ./scripts/create-components-images-files.sh
+    - name: Move rke-k8s version file
+      shell: bash
+      run: mv $HOME/bin/rancher-rke-k8s-versions.txt "./$ARTIFACTS_BASE_DIR"
+    - name: Generate sha256sum
+      shell: bash
+      env:
+        ARTIFACTS_TYPE: "components"
+      run: scripts/artifacts-hashes.sh

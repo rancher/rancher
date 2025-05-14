@@ -1,0 +1,276 @@
+name: Rancher release
+on:
+  push:
+    tags:
+      - "v*"
+      - "!v*-hotfix*"
+env:
+  COMMIT: ${{ github.sha }}
+  DOCKERIO_REGISTRY: "docker.io"
+  AWS_DEFAULT_REGION: "us-east-1"
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+  REGISTRY: "docker.io"
+  GH_CLI_VERSION: 2.61.0
+jobs:
+  unit-tests:
+    uses: ./.github/workflows/unit-test.yml
+  build-server:
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/build-images/server
+  build-agent:
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/build-images/agent
+  integration-tests:
+    needs: [build-server, build-agent]
+    with:
+      parent_run_id: ${{ github.run_id }}
+    uses: ./.github/workflows/integration-tests.yml
+  build-agent-windows:
+    strategy:
+      matrix:
+        os: [windows]
+        version: [2019, 2022]
+    runs-on: ${{ matrix.os }}-${{ matrix.version }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: build
+        uses: ./.github/actions/build-images/agent-windows
+  push-images:
+    needs: [unit-tests, integration-tests]
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=2cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: push
+        uses: ./.github/actions/push-images
+  build-publish-chart:
+    needs: [push-images]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: 'build-chart-tag'
+      # instead of cancelling other runs, wait until they are finished
+      cancel-in-progress: false
+    env:
+      ARCH: amd64
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/rancher-chart/build
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
+      - name: publish
+        uses: ./.github/actions/rancher-chart/publish-gcp
+  merge-server-manifest:
+    needs: [push-images]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: merge
+        uses: ./.github/actions/merge-manifests/server
+  merge-agent-manifest:
+    needs: [push-images, build-agent-windows]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: merge
+        uses: ./.github/actions/merge-manifests/agent
+  build-installer:
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: build
+        uses: ./.github/actions/build-images/installer
+  merge-installer-manifest:
+    needs: [build-installer]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: merge
+        uses: ./.github/actions/merge-manifests/installer
+  create-images-files:
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      REGISTRY: ""
+      CHECKSUM_FILE: "sha256sum.txt"
+      ARTIFACTS_BASE_DIR: "bin"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: generate
+        uses: ./.github/actions/images-files/generate
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+      - name: publish to gh
+        uses: ./.github/actions/images-files/publish-gh
+  docker-image-digests:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      ARTIFACTS_BASE_DIR: "dist"
+      LINUX_AMD64_FILE: "rancher-images-digests-linux-amd64.txt"
+      LINUX_ARM64_FILE: "rancher-images-digests-linux-arm64.txt"
+      WINDOWS_2019_FILE: "rancher-images-digests-windows-ltsc2019.txt"
+      WINDOWS_2022_FILE: "rancher-images-digests-windows-ltsc2022.txt"
+      CHECKSUM_FILE: "images-digests-sha256sum.txt"
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: generate
+        uses: ./.github/actions/images-digests/generate
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+      - name: publish to gh
+        uses: ./.github/actions/images-digests/publish-gh
+  notify-release:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests, merge-installer-manifest]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL
+      - name: notify
+        uses: ./.github/actions/notify-release
