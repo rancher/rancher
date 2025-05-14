@@ -820,8 +820,8 @@ github.com/rancher/dynamiclistener v0.6.1 h1:sw4fxjutSedm7uIPD4I/hhAS2zIJIk3wOZL
 github.com/rancher/dynamiclistener v0.6.1/go.mod h1:0KhUMHy3VcGMGavTY3i1/Mr8rVM02wFqNlUzjc+Cplg=
 github.com/rancher/eks-operator v1.10.5-rc.1 h1:VZohkk8cp1eK71xAQy5QOrrVjos4BpstigwWio4VfKY=
 github.com/rancher/eks-operator v1.10.5-rc.1/go.mod h1:0t7Jod6TkA7nTA4ajDWuiN/VI7JODDQFmPrR8RoFKPs=
-github.com/rancher/fleet/pkg/apis v0.11.6 h1:aXMXmmhuC09YrSOalk2bX0y2h0Ydn0nHLcvF5fM/w3I=
-github.com/rancher/fleet/pkg/apis v0.11.6/go.mod h1:U4Qwo/xK31GechBvU6Of6ZWLajJrFPculiCnHrFknVE=
+github.com/rancher/fleet/pkg/apis v0.11.8-rc.1 h1:WRzlWCTo5R3yyIOwoI6E/Xt4QN2T2sBJMDBxroyLB5s=
+github.com/rancher/fleet/pkg/apis v0.11.8-rc.1/go.mod h1:BTKg8EJYIT2+DdeAkMhxbOtR7+A1yPF95MWAkNyIiuE=
 github.com/rancher/gke-operator v1.10.5-rc.1 h1:9lJ+nC3NRcQDCE1FHEJzKl/iJ1pS/bymuuHmtKIMj24=
 github.com/rancher/gke-operator v1.10.5-rc.1/go.mod h1:vL/OfMicFXbQlMl4h+HEVBjv5DhubLXmEfNVB6ukyKI=
 github.com/rancher/helm/v3 v3.16.1-rancher1 h1:2tOo82q3UF4PQm5rOmNjQZ3r/sIAGqLzCUX4r/1ayCA=
@@ -1552,8 +1552,8 @@ k8s.io/pod-security-admission v0.31.6 h1:5WnXyl+UNmQb73O0L1w82uaUEPuvp+sxdhXRiOL
 k8s.io/pod-security-admission v0.31.6/go.mod h1:b+ZpSSR+XMx3t9Pvy/GdcXoI0CEpiWGT7IGAhcOBcGM=
 k8s.io/utils v0.0.0-20230726121419-3b25d923346b/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 k8s.io/utils v0.0.0-20240711033017-18e509b52bc8/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 h1:M3sRQVHv7vB20Xc2ybTt7ODCeFj6JSWYFzOFnYeS6Ro=
-k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 h1:jgJW5IePPXLGB8e/1wvd0Ich9QE97RvvF3a8J3fP/Lg=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 modernc.org/cc/v4 v4.24.4 h1:TFkx1s6dCkQpd6dKurBNmpo+G8Zl4Sq/ztJ+2+DEsh0=
 modernc.org/cc/v4 v4.24.4/go.mod h1:uVtb5OGqUKpoLWhqwNQo/8LwvoiEBLvZXIQ/SmO6mL0=
 modernc.org/ccgo/v4 v4.23.16 h1:Z2N+kk38b7SfySC1ZkpGLN2vthNJP1+ZzGZIlH7uBxo=
