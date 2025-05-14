@@ -514,7 +514,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	rest.FillObjectMetaSystemFields(token)
 
-	secret, err := secretFromToken(token, nil, nil)
+	secret, err := toSecret(token, nil, nil)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token %s for storage: %w",
 			token.Name, err))
@@ -536,7 +536,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	}
 
 	// Read changes back to return what was truly created, not what we thought we created
-	newToken, err := tokenFromSecret(newSecret)
+	newToken, err := fromSecret(newSecret)
 	if err != nil {
 		// An error here means that something broken was stored.
 		// Do not leave that broken thing behind.
@@ -630,7 +630,7 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", name, err))
 	}
-	token, err := tokenFromSecret(currentSecret)
+	token, err := fromSecret(currentSecret)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", name, err))
 	}
@@ -664,7 +664,7 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 
 	var tokens []ext.Token
 	for _, secret := range secrets {
-		token, err := tokenFromSecret(secret)
+		token, err := fromSecret(secret)
 		// ignore broken tokens
 		if err != nil {
 			continue
@@ -697,7 +697,7 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 
 	tokens := make([]ext.Token, 0, len(secrets.Items))
 	for _, secret := range secrets.Items {
-		token, err := tokenFromSecret(&secret)
+		token, err := fromSecret(&secret)
 		// ignore broken tokens
 		if err != nil {
 			continue
@@ -754,7 +754,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token: %w", err))
 	}
-	currentToken, err := tokenFromSecret(currentSecret)
+	currentToken, err := fromSecret(currentSecret)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token: %w", err))
 	}
@@ -803,7 +803,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	token.Status.LastUpdateTime = t.timer.Now()
 
 	// Save changes to backing secret, properly pass old secret labels/anotations into the new.
-	secret, err := secretFromToken(token, currentSecret.Labels, currentSecret.Annotations)
+	secret, err := toSecret(token, currentSecret.Labels, currentSecret.Annotations)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
@@ -819,7 +819,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, token *ext.T
 	}
 
 	// Read changes back to return what was truly saved, not what we thought we saved
-	newToken, err := tokenFromSecret(newSecret)
+	newToken, err := fromSecret(newSecret)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token: %w", err))
 	}
@@ -979,7 +979,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 						continue
 					}
 
-					token, err = tokenFromSecret(secret)
+					token, err = fromSecret(secret)
 					if err != nil {
 						logrus.Errorf("tokens: watch: error converting secret '%s' to token: %s", secret.Name, err)
 						continue
@@ -1287,9 +1287,8 @@ func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptio
 	return localOptions, nil
 }
 
-// secretFromToken converts the token argument into the equivalent secrets to
-// store in k8s.
-func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations map[string]string) (*corev1.Secret, error) {
+// toSecret converts a Token object into the equivalent Secret resource.
+func toSecret(token *ext.Token, oldBackendLabels, oldBackendAnnotations map[string]string) (*corev1.Secret, error) {
 	// user principal
 	principalBytes, err := json.Marshal(token.Spec.UserPrincipal)
 	if err != nil {
@@ -1404,9 +1403,8 @@ func secretFromToken(token *ext.Token, oldBackendLabels, oldBackendAnnotations m
 	return secret, nil
 }
 
-// tokenFromSecret converts the secret argument (retrieved from the k8s store)
-// into the equivalent token.
-func tokenFromSecret(secret *corev1.Secret) (*ext.Token, error) {
+// fromSecret converts a Secret object into the equivalent Token resource.
+func fromSecret(secret *corev1.Secret) (*ext.Token, error) {
 	// Basic result. This will be incrementally filled as data is extracted from the secret.
 	// On error a partially filled token is returned.
 	// See the token store `Delete` (marker **) for where this is important.
