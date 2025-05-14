@@ -105,6 +105,8 @@ github.com/ProtonMail/go-crypto v1.0.0 h1:LRuvITjQWX+WIfr930YHG2HNfjR1uOfyf5vE0k
 github.com/ProtonMail/go-crypto v1.0.0/go.mod h1:EjAoLdwvbIOoOQr3ihjnSoLZRtE8azugULFRteWMNc0=
 github.com/SUSE/connect-ng v1.12.1-0.20250313082504-77fedb477e82 h1:qNAQkBGyxzQclgIOdGZJo9eyXeUCOx0OhwrgTg+cnGA=
 github.com/SUSE/connect-ng v1.12.1-0.20250313082504-77fedb477e82/go.mod h1:iOl7a5Dn2kX9tJtDVzNblhtaS640WyhvgibCBk9Bt4s=
+github.com/SUSE/connect-ng v1.12.1-0.20250513101505-e838eaa16210 h1:9Q6BXbYq0ZJ0KgwR8x2JAmIf63XguYBKq58/kAHYWLI=
+github.com/SUSE/connect-ng v1.12.1-0.20250513101505-e838eaa16210/go.mod h1:iOl7a5Dn2kX9tJtDVzNblhtaS640WyhvgibCBk9Bt4s=
 github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d h1:UrqY+r/OJnIp5u0s1SbQ8dVfLCZJsnvazdBP5hS4iRs=
 github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d/go.mod h1:HI8ITrYtUY+O+ZhtlqUnD8+KwNPOyugEhfP9fdUIaEQ=
 github.com/adrg/xdg v0.5.3 h1:xRnxJXne7+oWDatRhR1JLnvuccuIeCoBu2rtuLqQB78=
