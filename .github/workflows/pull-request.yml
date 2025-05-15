@@ -137,7 +137,7 @@ jobs:
         ports:
           - 5000:5000
     env:
-      REGISTRY: "localhost:5000"
+      REGISTRY: "127.0.0.1:5000"
       ARCH: ${{ matrix.arch }}
     steps:
       - name: Environment variables

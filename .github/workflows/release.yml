@@ -44,6 +44,7 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.os }}
+      REGISTRY: "127.0.0.1:5000"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
