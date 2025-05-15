@@ -245,8 +245,8 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.11.2-alpha1
-ENV CATTLE_DASHBOARD_UI_VERSION v2.11.2-alpha1
+ENV CATTLE_UI_VERSION 2.11.2-alpha2
+ENV CATTLE_DASHBOARD_UI_VERSION v2.11.2-alpha2
 ENV CATTLE_CLI_VERSION v2.11.1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
@@ -355,6 +355,13 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TAR
 FROM base AS server
 
 ARG VERSION=${VERSION}
+ARG BASE_REGISTRY
+ARG BASE_UI_BRAND
+ARG RANCHER_VERSION_TYPE
+
+ENV CATTLE_BASE_REGISTRY=$BASE_REGISTRY
+ENV CATTLE_BASE_UI_BRAND=$BASE_UI_BRAND
+ENV RANCHER_VERSION_TYPE=$RANCHER_VERSION_TYPE
 ENV CATTLE_SERVER_VERSION ${VERSION}
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
@@ -379,8 +386,7 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
     "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
     "org.opencontainers.image.version"=${VERSION} \
-    "org.opensuse.reference"=rancher/rancher:${VERSION}
-
+    "org.opensuse.reference"=${BASE_REGISTRY}/rancher/rancher:${VERSION}
 ENTRYPOINT ["entrypoint.sh"]
 
 
