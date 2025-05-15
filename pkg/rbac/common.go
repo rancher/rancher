@@ -369,26 +369,23 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 //   - client is the Wrangler client to use to get/create/update resource.
 //   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
 //     T is an updated version of the resource.
-func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
+func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) (T, error) {
 	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return err
+			return obj, err
 		}
 		// resource doesn't exist, create it
 		logrus.Infof("%T %s being created in namespace %s", obj, obj.GetName(), obj.GetNamespace())
-		_, err = client.Create(obj)
-		return err
+		return client.Create(obj)
 	}
 
 	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
 		logrus.Infof("%T %s in namespace %s needs to be updated", obj, obj.GetName(), obj.GetNamespace())
-		_, err := client.Update(updatedResource)
-		if err != nil {
-			return err
-		}
+		return client.Update(updatedResource)
+
 	}
-	return nil
+	return obj, nil
 }
 
 // AreClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.

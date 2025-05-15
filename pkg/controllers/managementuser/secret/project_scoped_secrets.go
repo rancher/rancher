@@ -20,6 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -60,16 +63,14 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 	}
 
 	var errs error
-	desiredSecrets := make(map[string]bool, len(secrets))
+	desiredSecrets := sets.New[types.NamespacedName]()
 
 	// create/update project scoped secrets
 	for _, secret := range secrets {
-		desiredSecrets[secret.Name] = true
 		secretCopy := getNamespacedSecret(secret, namespace.Name)
 
-		err = rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretController, func(s1, s2 *corev1.Secret) (bool, *corev1.Secret) {
-			return reflect.DeepEqual(s1.Data, s2.Data), s2
-		})
+		s, err := rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretController, areSecretsSame)
+		desiredSecrets.Insert(client.ObjectKeyFromObject(s))
 		errs = errors.Join(errs, err)
 	}
 	if errs != nil {
@@ -108,7 +109,7 @@ func (n *namespaceHandler) getProjectScopedSecretsFromNamespace(namespace *corev
 }
 
 // removeUndesiredProjectScopedSecrets removes project scoped secrets from the namespace that are not in the desiredSecrets map.
-func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1.Namespace, desiredSecrets map[string]bool) error {
+func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1.Namespace, desiredSecrets sets.Set[types.NamespacedName]) error {
 	// remove any project scoped secrets that don't belong in the project
 	downstreamProjectScopedSecrets, err := n.secretController.List(namespace.Name, metav1.ListOptions{
 		LabelSelector: projectScopedSecretLabel,
@@ -116,11 +117,16 @@ func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1
 	if err != nil {
 		return err
 	}
-	var errs error
+
+	allSecrets := sets.New[types.NamespacedName]()
 	for _, secret := range downstreamProjectScopedSecrets.Items {
-		if desiredSecrets[secret.Name] {
-			continue
-		}
+		allSecrets.Insert(client.ObjectKeyFromObject(&secret))
+	}
+
+	secretsToDelete := allSecrets.Difference(desiredSecrets)
+
+	var errs error
+	for _, secret := range secretsToDelete.UnsortedList() {
 		// secret in namespace does not belong here
 		logrus.Infof("deleting secret %s from namespace %s", secret.Name, secret.Namespace)
 		errs = errors.Join(errs, n.secretController.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}))
@@ -196,4 +202,8 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 	maps.Copy(namespacedSecret.Labels, obj.Labels)
 	namespacedSecret.Annotations[userSecretAnnotation] = "true"
 	return namespacedSecret
+}
+
+func areSecretsSame(s1, s2 *corev1.Secret) (bool, *corev1.Secret) {
+	return reflect.DeepEqual(s1.Data, s2.Data) && s1.Annotations[projectScopedSecretLabel] == s2.Annotations[projectScopedSecretLabel], s2
 }

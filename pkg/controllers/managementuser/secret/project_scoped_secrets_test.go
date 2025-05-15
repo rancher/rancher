@@ -12,6 +12,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -307,7 +309,7 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 	type args struct {
 		namespace      *corev1.Namespace
-		desiredSecrets map[string]bool
+		desiredSecrets sets.Set[types.NamespacedName]
 	}
 	tests := []struct {
 		name                  string
@@ -319,9 +321,9 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			name: "error getting secrets",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
-				desiredSecrets: map[string]bool{
-					"secret1": true,
-					"secret2": true,
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "secret1", Namespace: "ns1"}: {},
+					{Name: "secret2", Namespace: "ns1"}: {},
 				},
 			},
 			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
@@ -335,19 +337,19 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			name: "desired secrets match existing secrets, no deletion",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
-				desiredSecrets: map[string]bool{
-					"secret1": true,
-					"secret2": true,
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "secret1", Namespace: "ns1"}: {},
+					{Name: "secret2", Namespace: "ns1"}: {},
 				},
 			},
 			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
 						},
 					},
 				}, nil)
@@ -357,9 +359,9 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			name: "no undesired secrets",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
-				desiredSecrets: map[string]bool{
-					"secret1": true,
-					"secret2": true,
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "secret1", Namespace: "ns1"}: {},
+					{Name: "secret2", Namespace: "ns1"}: {},
 				},
 			},
 			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
@@ -372,18 +374,18 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			name: "remove undesired secrets",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
-				desiredSecrets: map[string]bool{
-					"secret1": true,
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "secret1", Namespace: "ns1"}: {},
 				},
 			},
 			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
 						},
 					},
 				}, nil)
@@ -394,16 +396,16 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			name: "remove multiple secrets",
 			args: args{
 				namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
-				desiredSecrets: map[string]bool{},
+				desiredSecrets: sets.Set[types.NamespacedName]{},
 			},
 			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
 						},
 					},
 				}, nil)
@@ -415,18 +417,18 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 			name: "error deleting secrets",
 			args: args{
 				namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
-				desiredSecrets: map[string]bool{
-					"secret1": true,
+				desiredSecrets: sets.Set[types.NamespacedName]{
+					{Name: "secret1", Namespace: "ns1"}: {},
 				},
 			},
 			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2"},
+							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
 						},
 					},
 				}, nil)
