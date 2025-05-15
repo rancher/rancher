@@ -25,7 +25,7 @@ func TestApplyChanges(t *testing.T) {
 	testScheme := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(testScheme))
 
-	t.Run("ApplyChanges patching an existing resource", func(t *testing.T) {
+	t.Run("ApplyChanges patching an existing resource - json-patch", func(t *testing.T) {
 		svc := test.NewService()
 
 		change := ResourceChange{
@@ -78,6 +78,93 @@ func TestApplyChanges(t *testing.T) {
 							"port":       int64(80),
 							"protocol":   "TCP",
 							"targetPort": int64(9371),
+						},
+					},
+				},
+				"status": map[string]any{
+					"loadBalancer": map[string]any{},
+				},
+			},
+		}
+		if diff := cmp.Diff(want, updated); diff != "" {
+			t.Errorf("failed to apply migrations: diff -want +got\n%s", diff)
+		}
+		wantMetrics := &ApplyMetrics{Patch: 1}
+		if diff := cmp.Diff(wantMetrics, metrics); diff != "" {
+			t.Errorf("failed calculate metrics: diff -want +got\n%s", diff)
+		}
+	})
+
+	t.Run("ApplyChanges patching an existing resource - merge-patch", func(t *testing.T) {
+		svc := test.NewService(func(svc *corev1.Service) {
+			svc.ObjectMeta.Labels = map[string]string{
+				"app.kubernetes.io/name": "test-svc",
+			}
+		})
+		change := ResourceChange{
+			Operation: OperationPatch,
+			Patch: &PatchChange{
+				ResourceRef: ResourceReference{
+					ObjectRef: types.NamespacedName{
+						Name:      svc.Name,
+						Namespace: svc.Namespace,
+					},
+					Resource: "services",
+					Version:  "v1",
+				},
+				MergePatch: map[string]any{
+					"metadata": map[string]any{
+						"labels": map[string]any{
+							"example.com/testing": "test",
+						},
+					},
+					"spec": map[string]any{
+						"clusterIPs": []any{
+							"10.43.25.18",
+							"10.43.26.16",
+						},
+					},
+				},
+				Type: MergePatchJSON,
+			},
+		}
+
+		changes := []ResourceChange{
+			change,
+		}
+
+		k8sClient := newFakeClient(testScheme, svc)
+
+		metrics, err := ApplyChanges(context.TODO(), k8sClient, changes, ApplyOptions{}, test.NewFakeMapper())
+		require.NoError(t, err)
+
+		updated, err := k8sClient.Resource(change.Patch.ResourceRef.GVR()).Namespace(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		assert.NoError(t, err)
+
+		want := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "v1",
+				"kind":       "Service",
+				"metadata": map[string]any{
+					"name":              "test-svc",
+					"namespace":         "default",
+					"creationTimestamp": nil,
+					"labels": map[string]any{
+						"app.kubernetes.io/name": "test-svc",
+						"example.com/testing":    "test",
+					},
+				},
+				"spec": map[string]any{
+					"clusterIPs": []any{
+						"10.43.25.18",
+						"10.43.26.16",
+					},
+					"ports": []any{
+						map[string]any{
+							"name":       "http-80",
+							"port":       int64(80),
+							"protocol":   "TCP",
+							"targetPort": int64(9376),
 						},
 					},
 				},

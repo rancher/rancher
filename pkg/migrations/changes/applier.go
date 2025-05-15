@@ -24,8 +24,12 @@ const (
 	// Delete Operation.
 	OperationDelete string = "delete"
 
+	// TODO: Better naming for these?
 	// Content-Type for json-patch formatted Patches.
 	PatchApplicationJSON string = "application/json-patch+json"
+
+	// Content-Type for merge-patch formatted Patches.
+	MergePatchJSON string = "application/merge-patch+json"
 )
 
 // ApplyOptions modifies application of resources.
@@ -44,12 +48,13 @@ type PatchOperation struct {
 type PatchChange struct {
 	ResourceRef ResourceReference `json:"resourceRef"`
 	Operations  []PatchOperation  `json:"operations"`
+	MergePatch  map[string]any    `json:"mergePatch"`
 	Type        string            `json:"type"`
 }
 
 // CreateChange is resource creation operation.
 type CreateChange struct {
-	Resource *unstructured.Unstructured
+	Resource *unstructured.Unstructured `json:"resource"`
 }
 
 // DeleteChange describes a resource to be deleted.
@@ -72,6 +77,10 @@ func (r ResourceReference) GVR() schema.GroupVersionResource {
 		Version:  r.Version,
 		Resource: r.Resource,
 	}
+}
+
+func (r ResourceReference) String() string {
+	return fmt.Sprintf("%s.%s.%s %s", r.Resource, r.Group, r.Version, r.ObjectRef)
 }
 
 // ResourceChange is a change to be applied in-cluster.

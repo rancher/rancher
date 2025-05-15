@@ -21,6 +21,8 @@ func ApplyPatchChanges(res *unstructured.Unstructured, patch PatchChange) (*unst
 		if err != nil {
 			return nil, err
 		}
+	case MergePatchJSON:
+		objCopy, err = applyMergePatch(objCopy, patch.MergePatch)
 	default:
 		return nil, fmt.Errorf("unknown patch type: %q", patch.Type)
 	}
@@ -41,6 +43,17 @@ func applyJSONPatch(obj *unstructured.Unstructured, operations []PatchOperation)
 
 	return applyPatch(obj, func(b []byte) ([]byte, error) {
 		return patch.Apply(b)
+	})
+}
+
+func applyMergePatch(obj *unstructured.Unstructured, diff map[string]any) (*unstructured.Unstructured, error) {
+	rawDiff, err := json.Marshal(diff)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling MergePatch for application: %w", err)
+	}
+
+	return applyPatch(obj, func(b []byte) ([]byte, error) {
+		return jsonpatch.MergePatch(b, rawDiff)
 	})
 }
 
