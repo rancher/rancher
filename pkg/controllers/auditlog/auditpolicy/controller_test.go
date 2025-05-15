@@ -14,15 +14,13 @@ import (
 )
 
 const (
-	defaultNamespace   = "cattle-system"
 	testHandlerFuncKey = "cattle-system/auditpolicy"
 )
 
 var (
 	samplePolicy = auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: defaultNamespace,
-			Name:      "test",
+			Name: "test",
 		},
 		Spec: auditlogv1.AuditPolicySpec{
 			Enabled: true,
@@ -64,9 +62,7 @@ func setup(t *testing.T, level auditlogv1.Level) handler {
 
 	h := handler{
 		auditpolicy: &fake.MockController{
-			Objs: map[string]map[string]auditlogv1.AuditPolicy{
-				defaultNamespace: map[string]auditlogv1.AuditPolicy{},
-			},
+			Objs: make(map[string]auditlogv1.AuditPolicy),
 		},
 		writer: writer,
 
@@ -79,7 +75,6 @@ func setup(t *testing.T, level auditlogv1.Level) handler {
 func inject(t *testing.T, p auditlogv1.AuditPolicy, name string) auditlogv1.AuditPolicy {
 	t.Helper()
 
-	p.Namespace = TargetNamespace
 	p.Name = name
 
 	return p
@@ -290,7 +285,7 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 	expected := policy
 	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
 
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err := h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, expected, *actual)
 
@@ -305,11 +300,11 @@ func TestOnChangeDisableActivePolicy(t *testing.T) {
 	expected.Spec.Enabled = false
 	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
 
-	actual, err = h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err = h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, expected, *actual)
 
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
+	_, ok := h.writer.GetPolicy(policy.Name)
 	assert.False(t, ok)
 }
 
@@ -327,14 +322,14 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 	expected := policy
 	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
 
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err := h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, &expected, actual)
 
 	expectedPolicy, err := audit.PolicyFromAuditPolicy(&policy)
 	assert.NoError(t, err)
 
-	actualPolicy, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
+	actualPolicy, ok := h.writer.GetPolicy(policy.Name)
 	assert.True(t, ok)
 	assert.Equal(t, expectedPolicy, actualPolicy)
 
@@ -355,14 +350,14 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 	expected = invalidPolicy
 	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
 
-	actual, err = h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err = h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, &expected, actual)
 
 	expectedPolicy, err = audit.PolicyFromAuditPolicy(&policy)
 	assert.NoError(t, err)
 
-	actualPolicy, ok = h.writer.GetPolicy(policy.Namespace, policy.Name)
+	actualPolicy, ok = h.writer.GetPolicy(policy.Name)
 	assert.True(t, ok)
 	assert.Equal(t, expectedPolicy, actualPolicy)
 }
@@ -387,11 +382,11 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 	expected := invalidPolicy
 	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
 
-	actual, err := h.auditpolicy.Get(invalidPolicy.Namespace, invalidPolicy.Name, metav1.GetOptions{})
+	actual, err := h.auditpolicy.Get(invalidPolicy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, &expected, actual)
 
-	_, ok := h.writer.GetPolicy(invalidPolicy.Namespace, invalidPolicy.Name)
+	_, ok := h.writer.GetPolicy(invalidPolicy.Name)
 	assert.False(t, ok)
 
 	policy := samplePolicy
@@ -405,14 +400,14 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 	expected = policy
 	// updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
 
-	actual, err = h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err = h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, &expected, actual)
 
 	expectedPolicy, err := audit.PolicyFromAuditPolicy(&policy)
 	assert.NoError(t, err)
 
-	actualPolicy, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
+	actualPolicy, ok := h.writer.GetPolicy(policy.Name)
 	assert.True(t, ok)
 	assert.Equal(t, expectedPolicy, actualPolicy)
 }
@@ -431,7 +426,7 @@ func TestOnRemoveActivePolicy(t *testing.T) {
 	expected := policy
 	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionTrue, "")
 
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err := h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, expected, *actual)
 
@@ -454,17 +449,17 @@ func TestOnRemoveDisabledPolicy(t *testing.T) {
 	expected := policy
 	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeActive, metav1.ConditionFalse, "")
 
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err := h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, expected, *actual)
 
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
+	_, ok := h.writer.GetPolicy(policy.Name)
 	assert.False(t, ok)
 
 	_, err = h.OnRemove(testHandlerFuncKey, &policy)
 	assert.NoError(t, err)
 
-	_, ok = h.writer.GetPolicy(policy.Namespace, policy.Name)
+	_, ok = h.writer.GetPolicy(policy.Name)
 	assert.False(t, ok)
 }
 
@@ -488,17 +483,17 @@ func TestOnRemoveInvalidPolicy(t *testing.T) {
 	expected := policy
 	h.updateStatus(&expected, auditlogv1.AuditPolicyConditionTypeValid, metav1.ConditionFalse, "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`")
 
-	actual, err := h.auditpolicy.Get(policy.Namespace, policy.Name, metav1.GetOptions{})
+	actual, err := h.auditpolicy.Get(policy.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, &expected, actual)
 
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
+	_, ok := h.writer.GetPolicy(policy.Name)
 	assert.False(t, ok)
 
 	_, err = h.OnRemove(testHandlerFuncKey, &policy)
 	assert.Error(t, err, "failed to remove policy '%s/%s' from writer", policy.Namespace, policy.Name)
 
-	_, ok = h.writer.GetPolicy(policy.Namespace, policy.Name)
+	_, ok = h.writer.GetPolicy(policy.Name)
 	assert.False(t, ok)
 }
 
@@ -510,6 +505,6 @@ func TestOnRemoveNonexistantPolicy(t *testing.T) {
 	_, err := h.OnRemove(testHandlerFuncKey, &policy)
 	assert.Error(t, err)
 
-	_, ok := h.writer.GetPolicy(policy.Namespace, policy.Name)
+	_, ok := h.writer.GetPolicy(policy.Name)
 	assert.False(t, ok)
 }
