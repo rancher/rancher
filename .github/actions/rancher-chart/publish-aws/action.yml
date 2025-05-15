@@ -1,0 +1,21 @@
+name: "Publish chart to aws"
+description: "Build index and upload chart to aws s3"
+runs:
+  using: "composite"
+  steps:
+    - name: Upload chart to bucket
+      shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CHARTS }}
+        AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CHARTS }}
+        CHARTS_BUCKET_NAME: charts.optimus.rancher.io
+      run: |
+        aws s3 cp --recursive ./bin/chart s3://${{ env.CHARTS_BUCKET_NAME }}/server-charts
+    - name: Invalidate Cloudfront cache
+      env:
+        CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
+        AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }}
+        AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }}
+      shell: bash
+      run: |
+        aws cloudfront create-invalidation --distribution-id ${{ env.CHARTS_DISTRIBUTION_ID }} --paths "/*"

@@ -8,7 +8,7 @@ cd $(dirname $0)/..
 . ./version
 
 # A Promotion is from Latest to Stable.
-if [[ -z "${DRONE_TAG}" ]]; then
+if [[ -z "${GIT_TAG}" ]]; then
     echo "We can only promote Tags from the 'latest' chart repo to 'stable'"
     exit 1
 fi

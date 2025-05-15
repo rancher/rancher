@@ -1,0 +1,76 @@
+name: "Build Rancher Agent"
+description: "Build and upload the Rancher agent image"
+runs:
+  using: "composite"
+  steps:
+    - name: Arch environment variable
+      shell: bash
+      run: |
+        if [[ "$ARCH" == "x64" ]]; then
+          echo "ARCH=amd64" >> $GITHUB_ENV
+        fi
+    - name: install yq
+      uses: ./.github/actions/install-yq
+      with:
+        arch: ${{ env.ARCH }}
+        use-sudo: true
+    - id: env 
+      name: Setup Dependencies Env Variables
+      uses: ./.github/actions/setup-build-env
+    - name: Setup TAG Variables
+      uses: ./.github/actions/setup-tag-env
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ github.repository_owner }}/rancher
+        flavor: |
+          latest=false
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: network=host
+    - name: Download rancher image
+      uses: actions/download-artifact@v4
+      with:
+        name: "rancher-${{ matrix.os }}-${{ env.ARCH }}"
+        path: /tmp
+    - name: Load image
+      shell: bash
+      run: |
+        image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        if [ -z "$image_id" ]; then
+          echo "Error: Failed to load image from tarball!"
+          exit 1
+        fi
+        docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
+        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
+    - name: Build agent
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        push: false
+        build-args: |
+          "VERSION=${{ env.TAG }}"
+          "ARCH=${{ env.ARCH }}"
+          "RANCHER_TAG=${{ env.TAG }}"
+          "RANCHER_REPO=${{ github.repository_owner }}"
+          "REGISTRY=${{ env.REGISTRY }}"
+          "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+          "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_PROVISIONING_CAPI_VERSION }}"
+        tags: ${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
+        context: .
+        platforms: "${{ env.OS }}/${{ env.ARCH }}"
+        file: ./package/Dockerfile.agent
+        labels: "${{ steps.meta.outputs.labels }}"
+        outputs: type=docker,dest=/tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar
+    - name: Upload image
+      uses: actions/upload-artifact@v4
+      with:
+        name: "rancher-agent-${{ env.OS }}-${{ env.ARCH }}"
+        path: /tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: false
