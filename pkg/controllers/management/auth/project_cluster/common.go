@@ -225,7 +225,7 @@ func needsPSARole(projectName, projectNamespace string, prtbLister v32.ProjectRo
 	return psautils.IsPSAAllowed(roleTemplates), nil
 }
 
-// roleTemplatesLookup returns the list of roletemplates associated to the project.
+// roleTemplatesLookup returns the list of roletemplates associated with the project.
 func roleTemplatesLookup(projectName, projectNamespace string, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) ([]*v3.RoleTemplate, error) {
 	// list all the prtbs in the project namespace
 	prtbs, err := prtbLister.List(projectNamespace, labels.Everything())
