@@ -45,8 +45,8 @@ runs:
           echo "Error: Failed to load image from tarball!"
           exit 1
         fi
-        docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}
-        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}
+        docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
+        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}
     - name: Build agent
       id: build
       uses: docker/build-push-action@v5
