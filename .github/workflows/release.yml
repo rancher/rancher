@@ -229,25 +229,25 @@ jobs:
         env:
           ARTIFACTS_BUCKET_NAME: "prime-artifacts"
         uses: ./.github/actions/images-files/publish-aws
-    notify-release:
-      runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-      container: registry.suse.com/bci/bci-base:latest
-      needs: [merge-server-manifest, merge-agent-manifest, merge-installer-manifest]
-      permissions:
-        contents: read
-        id-token: write
-      steps:
-        - name: install dependencies
-          shell: bash
-          run: zypper install -y git
-        - name: Git safe directory
-          run: git config --global --add safe.directory "$PWD"
-        - name: Checkout code
-          uses: actions/checkout@v4
-        - name: Read App Secrets
-          uses: rancher-eio/read-vault-secrets@main
-          with:
-            secrets: |
-              secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL
-        - name: notify
-          uses: ./.github/actions/notify-release
+  notify-release:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:latest
+    needs: [merge-server-manifest, merge-agent-manifest, merge-installer-manifest]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL
+      - name: notify
+        uses: ./.github/actions/notify-release
