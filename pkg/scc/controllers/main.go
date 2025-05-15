@@ -70,7 +70,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationHandler.Call(name, registrationObj)
 	}
 
-	registrationHandler := activation.New(
+	activationHandler := activation.New(
 		h.ctx,
 		h.registrations,
 		h.secrets,
@@ -78,7 +78,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		h.systemInfo,
 	)
 
-	return registrationHandler.Call(name, registrationObj)
+	return activationHandler.Call(name, registrationObj)
 }
 
 func (h *handler) isServerUrlReady() bool {
