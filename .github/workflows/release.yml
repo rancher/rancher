@@ -232,7 +232,7 @@ jobs:
     notify-release:
       runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
       container: registry.suse.com/bci/bci-base:latest
-      needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests, merge-installer-manifest]
+      needs: [merge-server-manifest, merge-agent-manifest, merge-installer-manifest]
       permissions:
         contents: read
         id-token: write
