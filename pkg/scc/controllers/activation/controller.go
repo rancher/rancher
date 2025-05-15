@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"time"
 )
 
@@ -140,19 +141,30 @@ func (h *Handler) processOnlineActivation(registrationObj *v1.Registration) (*v1
 	}
 
 	logrus.Info("[scc.activation-controller]: Successfully registered activation")
-	updated := registrationObj.DeepCopy()
-	v1.RegistrationConditionSccUrlReady.True(updated)
-	v1.ResourceConditionProgressing.False(updated)
-	v1.ResourceConditionReady.True(updated)
-	v1.ResourceConditionDone.True(updated)
-	updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
-		Time: time.Now(),
-	}
-	updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{
-		Time: time.Now().Add(24 * time.Hour),
-	}
-	updated.Status.ActivationStatus.Activated = true
-	return h.registrations.UpdateStatus(updated)
+	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		updated := registrationObj.DeepCopy()
+		v1.RegistrationConditionSccUrlReady.True(updated)
+		v1.ResourceConditionProgressing.False(updated)
+		v1.ResourceConditionReady.True(updated)
+		v1.ResourceConditionDone.True(updated)
+		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
+			Time: time.Now(),
+		}
+		updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{
+			Time: time.Now().Add(24 * time.Hour),
+		}
+		updated.Status.ActivationStatus.Activated = true
+		registrationObj, err = h.registrations.UpdateStatus(updated)
+		return err
+	})
+
+	return registrationObj, updateErr
 }
 
 func (h *Handler) processOfflineActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
