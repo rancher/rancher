@@ -431,8 +431,8 @@ func (t *Store) Update(
 		}
 	}
 
-	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), newToken)) {
-		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), newToken.Name)
+	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), oldToken)) {
+		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), oldToken.Name)
 	}
 
 	sessionID := t.auth.SessionID(ctx)
