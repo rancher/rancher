@@ -1,4 +1,4 @@
-package example
+package service
 
 import (
 	"context"

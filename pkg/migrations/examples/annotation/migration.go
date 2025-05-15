@@ -1,4 +1,4 @@
-package sample
+package annotation
 
 import (
 	"context"
@@ -15,7 +15,8 @@ import (
 )
 
 func init() {
-	migrations.Register(namespaceMigration{})
+	// NOTE: This is not registered.
+	// migrations.Register(namespaceMigration{})
 }
 
 type namespaceMigration struct {

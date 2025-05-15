@@ -1,4 +1,4 @@
-package example
+package service
 
 import (
 	"context"
@@ -9,7 +9,8 @@ import (
 )
 
 func init() {
-	migrations.Register(exampleMigration{})
+	// NOTE: This is not registered.
+	//	migrations.Register(exampleMigration{})
 }
 
 type exampleMigration struct {

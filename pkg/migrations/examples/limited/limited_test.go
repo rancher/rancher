@@ -1,10 +1,13 @@
-package example
+package limited
 
 import (
 	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic/fake"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/rancher/rancher/pkg/migrations"
 	"github.com/rancher/rancher/pkg/migrations/changes"
@@ -33,4 +36,10 @@ func countChanges(sets []migrations.ChangeSet) int {
 	}
 
 	return count
+}
+
+func newFakeClient(t *testing.T, objs ...runtime.Object) *fake.FakeDynamicClient {
+	testScheme := runtime.NewScheme()
+	require.NoError(t, clientgoscheme.AddToScheme(testScheme))
+	return fake.NewSimpleDynamicClient(testScheme, objs...)
 }

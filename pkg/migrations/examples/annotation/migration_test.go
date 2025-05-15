@@ -1,4 +1,4 @@
-package sample
+package annotation
 
 import (
 	"context"

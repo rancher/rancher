@@ -12,7 +12,7 @@ import (
 
 	// importing to setup migrations
 	"github.com/rancher/rancher/pkg/migrations/changes"
-	_ "github.com/rancher/rancher/pkg/migrations/sample"
+	_ "github.com/rancher/rancher/pkg/migrations/projectscopedsecrets"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -63,7 +63,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -633,19 +632,21 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 }
 
 func applyAllMigrations(ctx context.Context, cfg *rest.Config) error {
+	logrus.Info("**applyAllMigrations**")
 	clientset, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return err
 	}
 
-	dynClient, err := dynamic.NewForConfig(cfg)
+	dynClient, err := k8dynamic.NewForConfig(cfg)
 	if err != nil {
 		return err
 	}
 
 	cache := memory.NewMemCacheClient(clientset.Discovery())
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
-	applied, err := migrations.ApplyUnappliedMigrations(ctx, migrations.NewStatusClient(clientset.CoreV1()), dynClient, changes.ApplyOptions{}, mapper)
+	logrus.Info("Applying migrations")
+	_, err = migrations.ApplyUnappliedMigrations(ctx, migrations.NewStatusClient(clientset.CoreV1()), dynClient, changes.ApplyOptions{}, mapper)
 	if err != nil {
 		return fmt.Errorf("applying all migrations on startup: %w", err)
 	}
