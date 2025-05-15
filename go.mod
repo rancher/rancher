@@ -134,7 +134,7 @@ require (
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1
 	github.com/rancher/eks-operator v1.9.9-rc.1
-	github.com/rancher/fleet/pkg/apis v0.10.11
+	github.com/rancher/fleet/pkg/apis v0.10.13-rc.1
 	github.com/rancher/gke-operator v1.9.9-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.1
@@ -178,7 +178,7 @@ require (
 	k8s.io/kube-aggregator v0.31.1
 	k8s.io/kubectl v0.30.10
 	k8s.io/kubernetes v1.30.10
-	k8s.io/utils v0.0.0-20241210054802-24370beab758
+	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.7.3
