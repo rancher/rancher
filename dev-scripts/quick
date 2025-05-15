@@ -65,7 +65,6 @@ add_context() {
     BUILD_ARGS+=("--build-context=$2=$path")
     BUILD_ARGS+=("--build-arg=$3=$2")
     BUILD_ARGS+=("--build-arg=$3_PATH=$path")
-    echo "HI"
     needs_workdir="true"
   fi
 }
