@@ -266,8 +266,8 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 	req.Header.Set("Authorization", "Bearer "+fakeToken+":"+fakeTokenValue)
 	s.wg.Add(1)
 	res, err := http.DefaultClient.Do(req)
-	defer res.Body.Close()
 	require.NoError(s.T(), err)
+	defer res.Body.Close()
 	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
 
 	// use a waitGroup to ensure the asserts inside the redirect function were executed.
