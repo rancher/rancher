@@ -105,6 +105,7 @@ func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccCon
 		Namespace: credentials.Namespace,
 		Name:      credentials.SecretName,
 	}
+	newRegObj.Status.ActivationStatus.SccUrl = sccSystemUrl
 
 	var updateErr error
 	newRegObj, updateErr = oh.rootHandler.registrations.UpdateStatus(newRegObj)

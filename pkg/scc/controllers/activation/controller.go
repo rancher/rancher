@@ -70,7 +70,7 @@ func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Regist
 		} else {
 			updated := registrationObj.DeepCopy()
 			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
-			updated.Status.ActivationStatus.Valid = false
+			updated.Status.ActivationStatus.Activated = false
 			updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{}
 			updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{}
 			v1.ResourceConditionProgressing.True(updated)
@@ -151,7 +151,7 @@ func (h *Handler) processOnlineActivation(registrationObj *v1.Registration) (*v1
 	updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{
 		Time: time.Now().Add(24 * time.Hour),
 	}
-	updated.Status.ActivationStatus.Valid = true
+	updated.Status.ActivationStatus.Activated = true
 	return h.registrations.UpdateStatus(updated)
 }
 
