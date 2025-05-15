@@ -233,7 +233,7 @@ func roleTemplatesLookup(projectName, projectNamespace string, prtbLister v32.Pr
 		return nil, err
 	}
 	if len(prtbs) == 0 {
-		return nil, fmt.Errorf("PRTBs not found")
+		return []*v3.RoleTemplate{}, nil
 	}
 
 	// find all the roletemplate names associated to the prtbs
