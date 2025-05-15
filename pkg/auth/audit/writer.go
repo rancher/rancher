@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -84,7 +83,7 @@ type Writer struct {
 	WriterOptions
 
 	policiesMutex sync.RWMutex
-	policies      map[types.NamespacedName]Policy
+	policies      map[string]Policy
 
 	output io.Writer
 }
@@ -93,7 +92,7 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 	w := &Writer{
 		WriterOptions: opts,
 
-		policies: make(map[types.NamespacedName]Policy),
+		policies: make(map[string]Policy),
 		output:   output,
 	}
 
@@ -169,13 +168,8 @@ func (w *Writer) UpdatePolicy(policy *auditlogv1.AuditPolicy) error {
 		return err
 	}
 
-	name := types.NamespacedName{
-		Name:      policy.Name,
-		Namespace: policy.Namespace,
-	}
-
 	w.policiesMutex.Lock()
-	w.policies[name] = newPolicy
+	w.policies[policy.Name] = newPolicy
 	w.policiesMutex.Unlock()
 
 	return nil
@@ -185,24 +179,19 @@ func (w *Writer) RemovePolicy(policy *auditlogv1.AuditPolicy) bool {
 	w.policiesMutex.Lock()
 	defer w.policiesMutex.Unlock()
 
-	name := types.NamespacedName{
-		Name:      policy.Name,
-		Namespace: policy.Namespace,
-	}
-
-	if _, ok := w.policies[name]; ok {
-		delete(w.policies, name)
+	if _, ok := w.policies[policy.Name]; ok {
+		delete(w.policies, policy.Name)
 		return true
 	}
 
 	return false
 }
 
-func (w *Writer) GetPolicy(namespace string, name string) (Policy, bool) {
+func (w *Writer) GetPolicy(name string) (Policy, bool) {
 	w.policiesMutex.RLock()
 	defer w.policiesMutex.RUnlock()
 
-	p, ok := w.policies[types.NamespacedName{Name: name, Namespace: namespace}]
+	p, ok := w.policies[name]
 
 	return p, ok
 }
