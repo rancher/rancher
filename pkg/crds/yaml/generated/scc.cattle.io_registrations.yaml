@@ -15,11 +15,11 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.activationStatus.valid
-      name: Registered
+    - jsonPath: .status.activationStatus.activated
+      name: Registration Active
       type: boolean
     - jsonPath: .status.activationStatus.lastValidatedTS
-      name: Last SCC Sync
+      name: Last Sync
       type: date
     name: v1
     schema:
@@ -111,18 +111,21 @@ spec:
             properties:
               activationStatus:
                 properties:
+                  activated:
+                    default: false
+                    type: boolean
                   certificate:
                     type: string
                   lastValidatedTS:
                     format: date-time
                     type: string
-                  valid:
-                    type: boolean
+                  sccUrl:
+                    type: string
                   validUntilTS:
                     format: date-time
                     type: string
                 required:
-                - valid
+                - activated
                 type: object
               conditions:
                 items:

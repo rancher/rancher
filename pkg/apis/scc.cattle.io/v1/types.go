@@ -40,8 +40,8 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Registered",type=boolean,JSONPath=`.status.activationStatus.valid`
-// +kubebuilder:printcolumn:name="Last SCC Sync",type="date",JSONPath=".status.activationStatus.lastValidatedTS"
+// +kubebuilder:printcolumn:name="Registration Active",type=boolean,JSONPath=`.status.activationStatus.activated`
+// +kubebuilder:printcolumn:name="Last Sync",type="date",JSONPath=".status.activationStatus.lastValidatedTS"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Registration struct {
@@ -100,12 +100,14 @@ type RegistrationStatus struct {
 }
 
 type SystemActivationState struct {
-	Valid bool `json:"valid"`
+	// +default:value=false
+	Activated bool `json:"activated"`
 	// +optional
 	LastValidatedTS *metav1.Time `json:"lastValidatedTS"`
 	// +optional
 	ValidUntilTS *metav1.Time `json:"validUntilTS"`
 	Certificate  string       `json:"certificate,omitempty"`
+	SccUrl       string       `json:"sccUrl,omitempty"`
 }
 
 func (r *Registration) HasCondition(matchCond condition.Cond) bool {
