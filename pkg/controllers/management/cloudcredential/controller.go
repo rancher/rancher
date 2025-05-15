@@ -5,9 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/kontainer-engine/store"
-	"github.com/rancher/wrangler/v3/pkg/yaml"
 	"slices"
 	"strings"
 
@@ -93,7 +92,8 @@ func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secr
 
 		// in practice a kubeconfig will only ever have one token, but we need to handle the case where users may be
 		// modifying the secret directly and properly extend/delete tokens as necessary.
-		tokenNames, err := c.tokensFromHarvesterCloudCredential(secret)
+		tokenNames := make(cred.Set[string])
+		err := cred.TokenNamesFromContent(secret.Data["harvestercredentialConfig-kubeconfigContent"], tokenNames)
 		if err != nil {
 			return nil, err
 		}
@@ -132,36 +132,6 @@ func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secr
 		}
 	}
 	return secret, nil
-}
-
-type set[E comparable] = map[E]struct{}
-
-func (c *Controller) tokensFromHarvesterCloudCredential(secret *v1.Secret) (set[string], error) {
-	var kcc []byte
-	if kcc = secret.Data["harvestercredentialConfig-kubeconfigContent"]; len(kcc) == 0 {
-		// not a (valid) harvester cloud credential
-		return nil, fmt.Errorf("secret %s/%s is not a harvester cloud credential", secret.Namespace, secret.Name)
-	}
-
-	var kc store.KubeConfig
-	err := yaml.Unmarshal(kcc, &kc)
-	if err != nil {
-		return nil, err
-	}
-
-	tokens := make(set[string])
-
-	for _, user := range kc.Users {
-		if !strings.HasPrefix(user.User.Token, "kubeconfig-u-") && !strings.HasPrefix(user.User.Token, "kubeconfig-user-") {
-			continue
-		}
-		tokenName, _, found := strings.Cut(user.User.Token, ":")
-		if !found {
-			return nil, fmt.Errorf("unable to get token name from token for harvester cloud credential secret %s/%s", secret.Namespace, secret.Name)
-		}
-		tokens[tokenName] = struct{}{}
-	}
-	return tokens, nil
 }
 
 // removeFromSlice removes the first element from the slice that is equal to e.
