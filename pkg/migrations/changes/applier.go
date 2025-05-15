@@ -81,7 +81,6 @@ type ResourceChange struct {
 	Patch  *PatchChange  `json:"patch,omitempty"`
 	Create *CreateChange `json:"create,omitempty"`
 	Delete *DeleteChange `json:"delete,omitempty"`
-	// Copy
 }
 
 // Validate returns an error if the ResourceChange is not valid.
@@ -211,8 +210,7 @@ func applyPatchChangesToResource(ctx context.Context, client dynamic.Interface, 
 
 	// TODO: PATCH!
 	if _, err := resources.Update(ctx, res, updateOptions); err != nil {
-		// TODO: Improve error
-		return err
+		return fmt.Errorf("failed to apply update to resource %s %s: %w", res.GetKind(), nameFromUnstructured(res), err)
 	}
 
 	return nil

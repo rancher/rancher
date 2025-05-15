@@ -6,6 +6,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ApplyPatchChanges applies a PatchChange to an Unstructured and returns a copy
@@ -48,18 +49,24 @@ type patchApplier func([]byte) ([]byte, error)
 func applyPatch(obj *unstructured.Unstructured, f patchApplier) (*unstructured.Unstructured, error) {
 	b, err := obj.MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("marshalling resource to JSON for patching: %w", err)
+		return nil, fmt.Errorf("marshalling resource to JSON for patching %s %s: %w", obj.GetKind(), nameFromUnstructured(obj), err)
 	}
 
 	patched, err := f(b)
 	if err != nil {
-		// TODO
-		return nil, err
+		return nil, fmt.Errorf("applying patch to resource %s %s: %w", obj.GetKind(), nameFromUnstructured(obj), err)
 	}
 
 	if err := obj.UnmarshalJSON(patched); err != nil {
-		return nil, fmt.Errorf("unmarshalling resource to JSON after patching: %w", err)
+		return nil, fmt.Errorf("unmarshalling resource to JSON after patching %s %s: %w", obj.GetKind(), nameFromUnstructured(obj), err)
 	}
 
 	return obj, nil
+}
+
+func nameFromUnstructured(obj *unstructured.Unstructured) types.NamespacedName {
+	return types.NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}
 }
