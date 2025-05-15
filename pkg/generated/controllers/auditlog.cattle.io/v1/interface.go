@@ -45,5 +45,5 @@ type version struct {
 }
 
 func (v *version) AuditPolicy() AuditPolicyController {
-	return generic.NewController[*v1.AuditPolicy, *v1.AuditPolicyList](schema.GroupVersionKind{Group: "auditlog.cattle.io", Version: "v1", Kind: "AuditPolicy"}, "auditpolicies", true, v.controllerFactory)
+	return generic.NewNonNamespacedController[*v1.AuditPolicy, *v1.AuditPolicyList](schema.GroupVersionKind{Group: "auditlog.cattle.io", Version: "v1", Kind: "AuditPolicy"}, "auditpolicies", v.controllerFactory)
 }
