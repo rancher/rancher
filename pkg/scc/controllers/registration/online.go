@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"time"
 )
 
@@ -30,10 +31,14 @@ func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration
 	}
 
 	progressingObj := registrationObj.DeepCopy()
-	v1.ResourceConditionProgressing.True(progressingObj)
-	progressingObj, err := oh.rootHandler.registrations.UpdateStatus(progressingObj)
-	if err != nil {
-		return registrationObj, err
+	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		v1.ResourceConditionProgressing.True(progressingObj)
+		progressingObj, err = oh.rootHandler.registrations.UpdateStatus(progressingObj)
+		return err
+	})
+	if updateErr != nil {
+		return registrationObj, updateErr
 	}
 
 	// Set to global default, or user configured value from the Registration resource
@@ -61,14 +66,20 @@ func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration
 
 	// Prepare the Registration for Activation phase next
 	updatingObj := announcedReg.DeepCopy()
-	updatingObj.Status.RegistrationProcessedTS = &metav1.Time{
-		Time: time.Now(),
-	}
-	v1.ResourceConditionFailure.SetStatusBool(updatingObj, false)
-	v1.ResourceConditionReady.SetStatusBool(updatingObj, true)
-	updatingObj, finalUpdateErr := oh.rootHandler.registrations.UpdateStatus(updatingObj)
-	if finalUpdateErr != nil {
-		return announcedReg, finalUpdateErr
+	updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+
+		updatingObj.Status.RegistrationProcessedTS = &metav1.Time{
+			Time: time.Now(),
+		}
+		v1.ResourceConditionFailure.SetStatusBool(updatingObj, false)
+		v1.ResourceConditionReady.SetStatusBool(updatingObj, true)
+		updatingObj, err = oh.rootHandler.registrations.UpdateStatus(updatingObj)
+
+		return err
+	})
+	if updateErr != nil {
+		return registrationObj, updateErr
 	}
 
 	return updatingObj, nil
@@ -96,19 +107,22 @@ func (oh *onlineHandler) announceSystem(registrationObj *v1.Registration, sccCon
 	logrus.Debugf("[scc.registration-controller]: system announced, check %s", sccSystemUrl)
 
 	newRegObj := registrationObj.DeepCopy()
-	v1.RegistrationConditionSccUrlReady.SetStatusBool(newRegObj, false) // This must be false until successful activation too.
-	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(newRegObj, fmt.Sprintf("system announced, check %s", sccSystemUrl))
-	v1.RegistrationConditionAnnounced.SetStatusBool(newRegObj, true)
+	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		v1.RegistrationConditionSccUrlReady.SetStatusBool(newRegObj, false) // This must be false until successful activation too.
+		v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(newRegObj, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+		v1.RegistrationConditionAnnounced.SetStatusBool(newRegObj, true)
 
-	newRegObj.Status.SCCSystemId = int(id)
-	newRegObj.Status.SystemCredentialsSecretRef = &corev1.SecretReference{
-		Namespace: credentials.Namespace,
-		Name:      credentials.SecretName,
-	}
-	newRegObj.Status.ActivationStatus.SccUrl = sccSystemUrl
+		newRegObj.Status.SCCSystemId = int(id)
+		newRegObj.Status.SystemCredentialsSecretRef = &corev1.SecretReference{
+			Namespace: credentials.Namespace,
+			Name:      credentials.SecretName,
+		}
+		newRegObj.Status.ActivationStatus.SccUrl = sccSystemUrl
 
-	var updateErr error
-	newRegObj, updateErr = oh.rootHandler.registrations.UpdateStatus(newRegObj)
+		newRegObj, err = oh.rootHandler.registrations.UpdateStatus(newRegObj)
+		return err
+	})
 	if updateErr != nil {
 		return registrationObj, updateErr
 	}
