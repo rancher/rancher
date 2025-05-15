@@ -105,6 +105,7 @@ type LogVerbosity struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
 // +kubebuilder:printcolumn:name="Enabled",type=string,JSONPath=`.spec.enabled`
 // +kubebuilder:printcolumn:name="Active",type=string,JSONPath=`.status.conditions[?(@.type == "Active")].status`
 // +kubebuilder:printcolumn:name="Valid",type=string,JSONPath=`.status.conditions[?(@.type == "Valid")].status`

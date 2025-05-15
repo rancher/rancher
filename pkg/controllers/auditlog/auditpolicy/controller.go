@@ -12,10 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	TargetNamespace = "cattle-system"
-)
-
 func hasCondition(obj *auditlogv1.AuditPolicy, t auditlogv1.AuditPolicyConditionType) bool {
 	return slices.ContainsFunc(obj.Status.Conditions, func(c metav1.Condition) bool {
 		return c.Type == string(t)
@@ -46,10 +42,6 @@ func (h *handler) updateStatus(obj *auditlogv1.AuditPolicy, condition auditlogv1
 }
 
 func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
-	if obj.Namespace != TargetNamespace {
-		return obj, nil
-	}
-
 	if !hasCondition(obj, auditlogv1.AuditPolicyConditionTypeActive) {
 		obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
 			Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
@@ -105,7 +97,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 func (h *handler) OnRemove(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
 	if obj.Spec.Enabled {
 		if ok := h.writer.RemovePolicy(obj); !ok {
-			return obj, fmt.Errorf("failed to remove policy '%s/%s' from writer", obj.Namespace, obj.Name)
+			return obj, fmt.Errorf("failed to remove policy '%s' from writer", obj.Name)
 		}
 	}
 
