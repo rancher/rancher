@@ -20,7 +20,7 @@ import (
 var _ v1.AuditPolicyController = &MockController{}
 
 type MockController struct {
-	Objs map[string]map[string]auditlogv1.AuditPolicy
+	Objs map[string]auditlogv1.AuditPolicy
 }
 
 func (m *MockController) AddGenericHandler(context.Context, string, generic.Handler) {
@@ -31,44 +31,38 @@ func (m *MockController) AddGenericRemoveHandler(context.Context, string, generi
 	panic("unimplemented")
 }
 
-func (m *MockController) Cache() generic.CacheInterface[*auditlogv1.AuditPolicy] {
+func (m *MockController) Cache() generic.NonNamespacedCacheInterface[*auditlogv1.AuditPolicy] {
 	panic("unimplemented")
 }
 
 func (m *MockController) Create(obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
-	ns, ok := m.Objs[obj.Namespace]
-	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
+	if _, ok := m.Objs[obj.Name]; ok {
+		return nil, errors.NewAlreadyExists(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), obj.Name)
 	}
 
-	ns[obj.Name] = *obj
+	m.Objs[obj.Name] = *obj
 
 	return obj, nil
 }
 
-func (m *MockController) Delete(string, string, *metav1.DeleteOptions) error {
+func (m *MockController) Delete(string, *metav1.DeleteOptions) error {
 	panic("unimplemented")
 }
 
-func (m *MockController) Enqueue(namespace, name string) {
+func (m *MockController) Enqueue(string) {
 	panic("unimplemented")
 }
 
 // EnqueueAfter implements v1.AuditLogController.
-func (m *MockController) EnqueueAfter(namespace string, name string, duration time.Duration) {
+func (m *MockController) EnqueueAfter(string, time.Duration) {
 	panic("unimplemented")
 }
 
 // Get implements v1.AuditPolicyController.
-func (m *MockController) Get(namespace string, name string, options metav1.GetOptions) (*auditlogv1.AuditPolicy, error) {
-	ns, ok := m.Objs[namespace]
+func (m *MockController) Get(name string, options metav1.GetOptions) (*auditlogv1.AuditPolicy, error) {
+	obj, ok := m.Objs[name]
 	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", namespace, name))
-	}
-
-	obj, ok := ns[name]
-	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", namespace, name))
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), name)
 	}
 
 	return &obj, nil
@@ -85,7 +79,7 @@ func (m *MockController) Informer() cache.SharedIndexInformer {
 }
 
 // List implements v1.AuditPolicyController.
-func (m *MockController) List(namespace string, opts metav1.ListOptions) (*auditlogv1.AuditPolicyList, error) {
+func (m *MockController) List(opts metav1.ListOptions) (*auditlogv1.AuditPolicyList, error) {
 	panic("unimplemented")
 }
 
@@ -100,37 +94,31 @@ func (m *MockController) OnRemove(ctx context.Context, name string, sync generic
 }
 
 // Patch implements v1.AuditPolicyController.
-func (m *MockController) Patch(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (result *auditlogv1.AuditPolicy, err error) {
+func (m *MockController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *auditlogv1.AuditPolicy, err error) {
 	panic("unimplemented")
 }
 
 // Update implements v1.AuditPolicyController.
 func (m *MockController) Update(obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
-	ns, ok := m.Objs[obj.Namespace]
-	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
+	if _, ok := m.Objs[obj.Name]; !ok {
+		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), obj.Name)
 	}
 
-	ns[obj.Name] = *obj
+	m.Objs[obj.Name] = *obj
 
 	return obj, nil
 }
 
 // UpdateStatus implements v1.AuditPolicyController.
 func (m *MockController) UpdateStatus(obj *auditlogv1.AuditPolicy) (*auditlogv1.AuditPolicy, error) {
-	ns, ok := m.Objs[obj.Namespace]
-	if !ok {
-		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
-	}
-
-	existing, ok := ns[obj.Name]
+	existing, ok := m.Objs[obj.Name]
 	if !ok {
 		return nil, errors.NewNotFound(auditlogv1.Resource(auditlogv1.AuditPolicyResourceName), fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
 	}
 
 	existing.Status = obj.Status
 
-	ns[obj.Name] = existing
+	m.Objs[obj.Name] = existing
 
 	return obj, nil
 }
@@ -141,11 +129,11 @@ func (m *MockController) Updater() generic.Updater {
 }
 
 // Watch implements v1.AuditPolicyController.
-func (m *MockController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (m *MockController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	panic("unimplemented")
 }
 
 // WithImpersonation implements v1.AuditPolicyController.
-func (m *MockController) WithImpersonation(impersonate rest.ImpersonationConfig) (generic.ClientInterface[*auditlogv1.AuditPolicy, *auditlogv1.AuditPolicyList], error) {
+func (m *MockController) WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*auditlogv1.AuditPolicy, *auditlogv1.AuditPolicyList], error) {
 	panic("unimplemented")
 }

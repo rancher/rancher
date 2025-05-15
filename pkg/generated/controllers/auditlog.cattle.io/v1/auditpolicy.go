@@ -36,17 +36,17 @@ import (
 
 // AuditPolicyController interface for managing AuditPolicy resources.
 type AuditPolicyController interface {
-	generic.ControllerInterface[*v1.AuditPolicy, *v1.AuditPolicyList]
+	generic.NonNamespacedControllerInterface[*v1.AuditPolicy, *v1.AuditPolicyList]
 }
 
 // AuditPolicyClient interface for managing AuditPolicy resources in Kubernetes.
 type AuditPolicyClient interface {
-	generic.ClientInterface[*v1.AuditPolicy, *v1.AuditPolicyList]
+	generic.NonNamespacedClientInterface[*v1.AuditPolicy, *v1.AuditPolicyList]
 }
 
 // AuditPolicyCache interface for retrieving AuditPolicy resources in memory.
 type AuditPolicyCache interface {
-	generic.CacheInterface[*v1.AuditPolicy]
+	generic.NonNamespacedCacheInterface[*v1.AuditPolicy]
 }
 
 // AuditPolicyStatusHandler is executed for every added or modified AuditPolicy. Should return the new status to be updated
