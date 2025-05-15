@@ -14,7 +14,7 @@ var (
 	GitCommit = "HEAD"
 )
 
-const primeEnv = "RANCHER_PRIME"
+const primeEnv = "RANCHER_VERSION_TYPE"
 
 // Info encapsulates version metadata.
 type Info struct {
@@ -32,11 +32,11 @@ type versionHandler struct {
 	info Info
 }
 
-// NewVersionHandler checks the runtime environment for the RANCHER_PRIME environment variable
+// NewVersionHandler checks the runtime environment for the RANCHER_VERSION_TYPE environment variable
 // and uses that along with build-time version information to create an HTTP handler.
 func NewVersionHandler() http.Handler {
-	var rancherPrime = "false"
-	if isPrime, ok := os.LookupEnv(primeEnv); ok && isPrime == "true" {
+	rancherPrime := "false"
+	if versionType, ok := os.LookupEnv(primeEnv); ok && versionType == "prime" {
 		rancherPrime = "true"
 	}
 	return &versionHandler{info: Info{Version, GitCommit, rancherPrime}}
