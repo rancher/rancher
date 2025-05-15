@@ -1,0 +1,47 @@
+name: "Build Rancher Installer"
+description: "Build and upload the Rancher installer image"
+runs:
+  using: "composite"
+  steps:
+    - name: Environment variables
+      shell: bash
+      run: |
+        if [[ "$ARCH" == "x64" ]]; then
+          echo "ARCH=amd64" >> $GITHUB_ENV
+        fi
+    - name: Setup Environment Variables
+      uses: ./.github/actions/setup-tag-env
+    - id: env 
+      name: Setup Dependencies Env Variables
+      uses: ./.github/actions/setup-build-env
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher
+        flavor: |
+          latest=false
+    - name: Login to Docker Registry
+      uses: docker/login-action@v3
+      with:
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_PASSWORD }}
+        registry: ${{ env.REGISTRY }}
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Build and export agent
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        push:  true
+        build-args: |
+          "VERSION=${{ env.TAG }}"
+          "ARCH=${{ matrix.arch }}"
+          "HELM_VERSION=${{ steps.env.outputs.HELM_VERSION }}"
+        tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/system-agent-installer-rancher:${{ env.TAG }}-${{ env.ARCH }}
+        context: .
+        platforms: "${{ env.OS }}/${{ env.ARCH }}"
+        file: ./package/Dockerfile.installer
+        labels: "${{ steps.meta.outputs.labels }}"

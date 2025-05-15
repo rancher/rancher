@@ -1,0 +1,45 @@
+name: "Push Rancher images"
+description: "Download Rancher image files and push them to a registry"
+runs:
+  using: "composite"
+  steps:
+    - name: Environment variables
+      shell: bash
+      run: |
+        if [[ "$ARCH" == "x64" ]]; then
+          echo "ARCH=amd64" >> $GITHUB_ENV
+        fi
+    - name: Download rancher image
+      uses: actions/download-artifact@v4
+      with:
+        pattern: "*-${{ env.OS }}-${{ env.ARCH }}"
+        path: /tmp
+        merge-multiple: true
+    - name: Setup Environment Variables
+      uses: ./.github/actions/setup-tag-env
+    - name: Docker Registry Login
+      uses: docker/login-action@v3
+      with:
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_PASSWORD }}
+        registry: ${{ env.REGISTRY }}
+    - name: Push server image
+      shell: bash
+      run: |
+        image_id=$(docker load --input /tmp/rancher-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        if [ -z "$image_id" ]; then
+          echo "Error: Failed to load image from tarball!"
+          exit 1
+        fi
+        docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
+        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
+    - name: Push agent image
+      shell: bash
+      run: |
+        image_agent_id=$(docker load --input /tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        if [ -z "$image_agent_id" ]; then
+          echo "Error: Failed to load image from tarball!"
+          exit 1
+        fi
+        docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
+        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
