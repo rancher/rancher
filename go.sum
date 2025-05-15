@@ -1506,8 +1506,8 @@ github.com/rancher/dynamiclistener v0.6.1 h1:sw4fxjutSedm7uIPD4I/hhAS2zIJIk3wOZL
 github.com/rancher/dynamiclistener v0.6.1/go.mod h1:0KhUMHy3VcGMGavTY3i1/Mr8rVM02wFqNlUzjc+Cplg=
 github.com/rancher/eks-operator v1.9.9-rc.1 h1:OU1aRSdtcol6ec2G7Eq5Z3hrNSbr/+I+LiM2UwLQ+gA=
 github.com/rancher/eks-operator v1.9.9-rc.1/go.mod h1:oOKJOjXdqZnWhpfmk6NjCla0p/fT1djc7gZotWMlIJc=
-github.com/rancher/fleet/pkg/apis v0.10.11 h1:jOQap5Z+YkbREmCB14yXyBDvGOFx3YbHwqjaskaYTJU=
-github.com/rancher/fleet/pkg/apis v0.10.11/go.mod h1:/3TD2+EfAgmdTn4ZI4dHN13qerU5x7DzikhGVOcZG8c=
+github.com/rancher/fleet/pkg/apis v0.10.13-rc.1 h1:G3iikUlrHW4dDERTjCCVkSEb7bb6p9NcnBQkSPMTX5Q=
+github.com/rancher/fleet/pkg/apis v0.10.13-rc.1/go.mod h1:+JHCQlKSNmsLh2vTI20rBojTnQ0ELgrijZTE+qOjqrQ=
 github.com/rancher/gke-operator v1.9.9-rc.1 h1:kUZbXI/cqCL2pHzfGRB1yp8oOI6VW9fpFmd2Irn7iLQ=
 github.com/rancher/gke-operator v1.9.9-rc.1/go.mod h1:4l479nrS7ZW4q4bojHFySRmidBZNjv5ZokuAoHF7cu8=
 github.com/rancher/helm/v3 v3.15.1-rancher2 h1:yrMhOjghReT3O+xt/Yb6hhmZgQrgWgBWJ2kOm8j6RNA=
@@ -2559,8 +2559,8 @@ k8s.io/pod-security-admission v0.30.10 h1:0LPfv9pvZ6XzDY2xkQlPpE3IBxP8RtCdXNtXsF
 k8s.io/pod-security-admission v0.30.10/go.mod h1:BXfCHNKujtBm/YYoyrr5Na1GyVbidV0o/pK5F64WhZM=
 k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20230726121419-3b25d923346b/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-k8s.io/utils v0.0.0-20241210054802-24370beab758 h1:sdbE21q2nlQtFh65saZY+rRM6x6aJJI8IUa1AmH/qa0=
-k8s.io/utils v0.0.0-20241210054802-24370beab758/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 h1:jgJW5IePPXLGB8e/1wvd0Ich9QE97RvvF3a8J3fP/Lg=
+k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 lukechampine.com/uint128 v1.1.1/go.mod h1:c4eWIwlEGaxC/+H1VguhU4PHXNWDCDMUlWdIWl2j1gk=
 lukechampine.com/uint128 v1.2.0/go.mod h1:c4eWIwlEGaxC/+H1VguhU4PHXNWDCDMUlWdIWl2j1gk=
 modernc.org/cc/v3 v3.36.0/go.mod h1:NFUHyPn4ekoC/JHeZFfZurN6ixxawE1BnVonP/oahEI=
