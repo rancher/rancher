@@ -28,6 +28,8 @@ const (
 	clusterAuthTokenController     = "cat-cluster-auth-token-controller"
 )
 
+// RegisterExtIndexers adds indexing of ext tokens by user and cluster to their
+// controller.
 func RegisterExtIndexers(extAPI ext.Interface) error {
 	return extAPI.Token().Informer().
 		AddIndexers(map[string]cache.IndexFunc{
@@ -35,6 +37,8 @@ func RegisterExtIndexers(extAPI ext.Interface) error {
 		})
 }
 
+// RegisterIndexers adds indexing of v3 tokens by user and cluster to their
+// controller.
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	return scaledContext.Management.Tokens("").Controller().Informer().
 		AddIndexers(map[string]cache.IndexFunc{
@@ -42,6 +46,7 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 		})
 }
 
+// Register sets up cluster initializations to run when the cluster has started.
 func Register(ctx context.Context, cluster *config.UserContext) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
 		registerDeferred(ctx, cluster)
@@ -59,6 +64,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	})
 }
 
+// registerDeferred sets up the handlers for the incoming cluster which sync
+// tokens (v3 and ext) to the cluster auth tokens in the remote.
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	ext := wrangler.GetExtAPI(cluster.Management.Wrangler)
 
@@ -132,10 +139,13 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	}).sync)
 }
 
+// tokenUserClusterKey computes the v3 token's key for indexing by user and
+// cluster
 func tokenUserClusterKey(token *managementv3.Token) string {
 	return fmt.Sprintf("%s/%s", token.UserID, token.ClusterName)
 }
 
+// tokenByUserAndCluster indexes v3 tokens by the user and cluster they belong to
 func tokenByUserAndCluster(obj interface{}) ([]string, error) {
 	t, ok := obj.(*managementv3.Token)
 	if !ok {
@@ -144,6 +154,7 @@ func tokenByUserAndCluster(obj interface{}) ([]string, error) {
 	return []string{tokenUserClusterKey(t)}, nil
 }
 
+// extTokenByUserAndCluster indexes ext tokens by the user and cluster they belong to
 func extTokenByUserAndCluster(obj interface{}) ([]string, error) {
 	t, ok := obj.(*extv1.Token)
 	if !ok {
@@ -152,10 +163,15 @@ func extTokenByUserAndCluster(obj interface{}) ([]string, error) {
 	return []string{extTokenUserClusterKey(t)}, nil
 }
 
+// extTokenUserClusterKey computes the ext token's key for indexing by user and
+// cluster
 func extTokenUserClusterKey(token *extv1.Token) string {
 	return fmt.Sprintf("%s/%s", token.Spec.UserID, token.Spec.ClusterName)
 }
 
+// eTokenLifecycle registers handlers watching for tokens scoped to the given
+// cluster. The handlers sync changes in these tokens to the remote cluster, as
+// cluster auth tokens.
 func eTokenLifecycle(ctx context.Context, tok ext.TokenController, controller, clusterName string, h *tokenHandler) {
 	tok.OnChange(ctx,
 		controller+"-change-"+clusterName,
@@ -164,7 +180,7 @@ func eTokenLifecycle(ctx context.Context, tok ext.TokenController, controller, c
 			if obj == nil {
 				return obj, nil
 			}
-			// ignore tokens of no or other clusters
+			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
 			}
@@ -174,7 +190,7 @@ func eTokenLifecycle(ctx context.Context, tok ext.TokenController, controller, c
 	tok.OnRemove(ctx,
 		controller+"-remove-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
-			// ignore tokens of no or other clusters
+			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
 			}
