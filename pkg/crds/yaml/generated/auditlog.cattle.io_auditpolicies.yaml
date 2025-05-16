@@ -12,7 +12,7 @@ spec:
     listKind: AuditPolicyList
     plural: auditpolicies
     singular: auditpolicy
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .spec.enabled
