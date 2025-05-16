@@ -5,21 +5,20 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
-	"github.com/rancher/rancher/pkg/features"
 	"slices"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-
 	typesv1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/apply"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +28,7 @@ import (
 const (
 	harvesterCloudCredentialTokenChecksumAnnotation = "management.cattle.io/harvester-token-checksum"
 	harvesterCloudCredentialFinalizer               = "management.cattle.io/harvester-token-cleanup"
+	harvesterCloudCredentialExpirationAnnotation    = "rancher.io/expiration-timestamp"
 )
 
 type Controller struct {
@@ -55,7 +55,14 @@ func Register(ctx context.Context, management *config.ManagementContext, clients
 }
 
 // syncHarvesterToken will extend the ttl of a token owned by a harvester cloud credential to infinite, as well as
-// handle deletion when the cloud credential secret is deleted.
+// handle deletion of tokens when the cloud credential secret is deleted. Under normal circumstances, kubeconfigs
+// tokens are subject to the settings.KubeconfigDefaultTokenTTLMinutes setting, which denotes a max ttl of default 30
+// days. This does not make for a particularly satisfying UX for administrators of Harvester provisioned node driver
+// clusters, as cloud credentials require manual rotation or be subject to failures during machine creation/deletion.
+// Deletion is managed by this handler via wrangler's apply mechanism, which is used to indicate the secret is the
+// owner of the token, sans owner references. A finalizer is applied to the secret, which will be used to delete the
+// now infinitely lived tokens when the cloud credential itself is deleted, preventing a resource leak within the
+// local cluster.
 func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secret, error) {
 	if secret == nil || secret.Namespace != namespace.GlobalNamespace {
 		return secret, nil
@@ -84,6 +91,12 @@ func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secr
 		if !slices.Contains(secret.Finalizers, harvesterCloudCredentialFinalizer) {
 			secret = secret.DeepCopy()
 			secret.Finalizers = append(secret.Finalizers, harvesterCloudCredentialFinalizer)
+
+			// remove now defunct expiration annotation if present
+			if secret.Annotations[harvesterCloudCredentialExpirationAnnotation] != "" {
+				delete(secret.Annotations, harvesterCloudCredentialExpirationAnnotation)
+			}
+
 			secret, err = c.secretClient.Update(secret)
 			if err != nil {
 				return nil, fmt.Errorf("unable to update harvester cloud credential secret %s: %w", key, err)
@@ -103,6 +116,7 @@ func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secr
 			if err != nil {
 				return nil, fmt.Errorf("unable to get token %s for harvester cloud credential secret %s: %w", tokenName, key, err)
 			}
+
 			token = token.DeepCopy()
 			token.TTLMillis = 0
 			// although the token is updated here, the resource version must be empty because apply expects to create the token
