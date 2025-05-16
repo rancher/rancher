@@ -1,5 +1,5 @@
-webhookVersion: 105.0.5+up0.6.6
+webhookVersion: 105.0.6+up0.6.7-rc.1
 provisioningCAPIVersion: 105.1.0+up0.6.0
 cspAdapterMinVersion: 105.0.0+up5.0.1
 defaultShellVersion: rancher/shell:v0.3.1
-fleetVersion: 105.1.1+up0.11.8-rc.1
+fleetVersion: 105.1.1+up0.11.8
