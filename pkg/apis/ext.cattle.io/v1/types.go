@@ -204,10 +204,10 @@ type Kubeconfig struct {
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	// Spec is the desired state of the kubeconfig.
+	// Spec is the desired state of the Kubeconfig.
 	// +optional
 	Spec KubeconfigSpec `json:"spec,omitempty"`
-	// Status is the most recently observed status of the kubeconfig.
+	// Status is the most recently observed status of the Kubeconfig.
 	// +optional
 	Status *KubeconfigStatus `json:"status,omitempty"`
 }
@@ -222,7 +222,7 @@ type KubeconfigSpec struct {
 	// If omitted, the first cluster in the list is considered for setting the current context.
 	// +optional
 	CurrentContext string `json:"currentContext,omitempty"`
-	// Description is a human readable description of the kubeconfig.
+	// Description is a human readable description of the Kubeconfig.
 	// +optional
 	Description string `json:"description,omitempty"`
 	// TTL is the time-to-live of the kubeconfig tokens, in seconds.
@@ -230,8 +230,21 @@ type KubeconfigSpec struct {
 	TTL int64 `json:"ttl,omitempty"`
 }
 
-// KubeconfigStatus defines the most recently observed status of the kubeconfig.
+// KubeconfigStatus defines the most recently observed status of the Kubeconfig.
 type KubeconfigStatus struct {
-	// Value contains the generated kubeconfig.
+	// Conditions indicate state for particular aspects of the Kubeconfig.
+	// +listType=map
+	// +listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	// Summary of the Kubeconfig status. Can be "Complete" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+	// Tokens is a list of Kubeconfig tokens.
+	// +optional
+	Tokens []string `json:"tokens,omitempty"`
+	// Value contains the generated content of the kubeconfig.
 	Value string `json:"value,omitempty"`
 }

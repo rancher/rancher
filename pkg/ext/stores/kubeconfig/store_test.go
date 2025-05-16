@@ -481,6 +481,10 @@ func TestStoreCreate(t *testing.T) {
 		require.Len(t, config.AuthInfos, 3)
 		assert.Equal(t, userManager.tokens[0], config.AuthInfos["downstream1"].Token)
 		assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
+
+		require.NotNil(t, created.Status)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+		require.Len(t, created.Status.Conditions, 3)
 	})
 
 	t.Run("only a rancher user can create kubeconfig", func(t *testing.T) {
@@ -1813,12 +1817,22 @@ func TestStoreDelete(t *testing.T) {
 }
 
 func TestPrintKubeconfig(t *testing.T) {
+	t.Parallel()
+
 	kubeconfig := &ext.Kubeconfig{
 		ObjectMeta: metav1.ObjectMeta{
 			CreationTimestamp: metav1.NewTime(time.Now()),
 			Name:              "kubeconfig-49d5p",
 			Labels: map[string]string{
 				UserIDLabel: "u-w7drc",
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-w7drcd12fg",
+					UID:        uuid.NewUUID(),
+				},
 			},
 		},
 		Spec: ext.KubeconfigSpec{
@@ -1827,18 +1841,41 @@ func TestPrintKubeconfig(t *testing.T) {
 			Clusters:       []string{"c-m-tbgzfbgf", "c-m-bxn2p7w6"},
 			TTL:            43200,
 		},
+		Status: &ext.KubeconfigStatus{
+			Summary: StatusSummaryComplete,
+			Tokens: []string{
+				"kubeconfig-u-w7drcgc66",
+				"kubeconfig-u-w7drcd12fg",
+			},
+		},
 	}
 
-	rows, err := printKubeconfig(kubeconfig, printers.GenerateOptions{})
-	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	row := rows[0]
-	require.Len(t, row.Cells, 7)
-	assert.Equal(t, kubeconfig.Name, row.Cells[0].(string))
-	assert.Equal(t, "0s", row.Cells[1].(string))
-	assert.Equal(t, "12h", row.Cells[2].(string))
-	assert.Equal(t, kubeconfig.Spec.Description, row.Cells[3].(string))
-	assert.Equal(t, "c-m-tbgzfbgf,c-m-bxn2p7w6", row.Cells[4].(string))
-	assert.Equal(t, kubeconfig.Spec.CurrentContext, row.Cells[5].(string))
-	assert.Equal(t, kubeconfig.Labels[UserIDLabel], row.Cells[6].(string))
+	t.Run("completed kubeconfig", func(t *testing.T) {
+		rows, err := printKubeconfig(kubeconfig, printers.GenerateOptions{})
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		row := rows[0]
+		require.Len(t, row.Cells, 8)
+		assert.Equal(t, kubeconfig.Name, row.Cells[0].(string))
+		assert.Equal(t, "12h", row.Cells[1].(string))
+		assert.Equal(t, "1/2", row.Cells[2].(string))
+		assert.Equal(t, "Complete", row.Cells[3].(string))
+		assert.Equal(t, "0s", row.Cells[4].(string))
+		assert.Equal(t, kubeconfig.Labels[UserIDLabel], row.Cells[5].(string))
+		assert.Equal(t, "c-m-tbgzfbgf,c-m-bxn2p7w6", row.Cells[6].(string))
+		assert.Equal(t, kubeconfig.Spec.Description, row.Cells[7].(string))
+	})
+	t.Run("missing age and status", func(t *testing.T) {
+		kubeconfig := kubeconfig.DeepCopy()
+		kubeconfig.CreationTimestamp = metav1.Time{}
+		kubeconfig.Status = nil
+
+		rows, err := printKubeconfig(kubeconfig, printers.GenerateOptions{})
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		row := rows[0]
+		require.Len(t, row.Cells, 8)
+		assert.Equal(t, unknownValue, row.Cells[3].(string))
+		assert.Equal(t, unknownValue, row.Cells[4].(string))
+	})
 }

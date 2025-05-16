@@ -127,14 +127,14 @@ func schema_pkg_apis_extcattleio_v1_Kubeconfig(ref common.ReferenceCallback) com
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec is the desired state of the kubeconfig.",
+							Description: "Spec is the desired state of the Kubeconfig.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is the most recently observed status of the kubeconfig.",
+							Description: "Status is the most recently observed status of the Kubeconfig.",
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigStatus"),
 						},
 					},
@@ -231,7 +231,7 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref common.ReferenceCallback)
 					},
 					"description": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Description is a human readable description of the kubeconfig.",
+							Description: "Description is a human readable description of the Kubeconfig.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -253,12 +253,58 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigStatus(ref common.ReferenceCallbac
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "KubeconfigStatus defines the most recently observed status of the kubeconfig.",
+				Description: "KubeconfigStatus defines the most recently observed status of the Kubeconfig.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions indicate state for particular aspects of the Kubeconfig.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
+									},
+								},
+							},
+						},
+					},
+					"summary": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Summary of the Kubeconfig status. Can be \"Complete\" or \"Error\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"tokens": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Tokens is a list of Kubeconfig tokens.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Value contains the generated kubeconfig.",
+							Description: "Value contains the generated content of the kubeconfig.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -266,6 +312,8 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigStatus(ref common.ReferenceCallbac
 				},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
 	}
 }
 
