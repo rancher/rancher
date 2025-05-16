@@ -134,7 +134,7 @@ require (
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1
 	github.com/rancher/eks-operator v1.9.9-rc.1
-	github.com/rancher/fleet/pkg/apis v0.10.13-rc.1
+	github.com/rancher/fleet/pkg/apis v0.10.13
 	github.com/rancher/gke-operator v1.9.9-rc.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.1
