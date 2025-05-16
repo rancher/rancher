@@ -48,7 +48,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	kontainerdriver.Register(ctx, management)
 	nodedriver.Register(ctx, management)
 	nodepool.Register(ctx, management)
-	cloudcredential.Register(ctx, management)
+	cloudcredential.Register(ctx, management, wrangler)
 	node.Register(ctx, management, manager)
 
 	etcdbackup.Register(ctx, management)
