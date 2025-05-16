@@ -166,7 +166,7 @@ func checkPSAMembershipRole(obj runtime.Object, crClient crbacv1.ClusterRoleCont
 		return err
 	}
 
-	psaNeeded, err := needsPSARole(resourceName, resourceNamespace, prtbLister, rtLister)
+	psaNeeded, err := needsPSARole(resourceName, resourceNamespace, crClient, prtbLister, rtLister)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func newOwnerReference(obj runtime.Object) (metav1.OwnerReference, error) {
 }
 
 // needsPSARole ensure that given the project name, it needs a psa role to work properly.
-func needsPSARole(projectName, projectNamespace string, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) (bool, error) {
+func needsPSARole(projectName, projectNamespace string, crClient crbacv1.ClusterRoleController, prtbLister v32.ProjectRoleTemplateBindingCache, rtLister v32.RoleTemplateCache) (bool, error) {
 	// lookup the roletemplate(s) associated with the project name
 	// to check if those contain updatepsa verb
 	roleTemplates, err := roleTemplatesLookup(projectName, projectNamespace, prtbLister, rtLister)
@@ -222,7 +222,18 @@ func needsPSARole(projectName, projectNamespace string, prtbLister v32.ProjectRo
 		return false, err
 	}
 
-	return psautils.IsPSAAllowed(roleTemplates), nil
+	for _, rt := range roleTemplates {
+		// using aggregated ClusterRole we don't need to care about inherited RoleTemplates,
+		// since all the rules are included in the aggregated ClusterRole already.
+		aggregatedCR, err := crClient.Get(rt.Name+"-aggregated", metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("unable to find aggregated ClusterRole for %s RoleTemplate", rt.Name)
+		}
+		if psautils.IsPSAAllowed(aggregatedCR.Rules) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // roleTemplatesLookup returns the list of roletemplates associated with the project.

@@ -253,7 +253,7 @@ func getProjectMembershipRoleName(rt *v3.RoleTemplate, prtb *v3.ProjectRoleTempl
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	if isProjectOwnerRole(rt) {
 		return name.SafeConcatName(projectName, projectContext, "owner")
-	} else if psautils.IsPSAAllowed([]*v3.RoleTemplate{rt}) {
+	} else if psautils.IsPSAAllowed(rt.Rules) {
 		return name.SafeConcatName(projectName, projectContext, "psa")
 	} else {
 		return name.SafeConcatName(projectName, projectContext, "member")
