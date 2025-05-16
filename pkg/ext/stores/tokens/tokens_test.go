@@ -1672,7 +1672,7 @@ func Test_SystemStore_Update(t *testing.T) {
 					Get("cattle-tokens", "bogus").
 					Return(&properSecret, nil)
 			},
-			err: apierrors.NewBadRequest("rejecting change of token bogus: forbidden to edit cluster name"),
+			err: apierrors.NewBadRequest("spec.clusterName is immutable"),
 		},
 		// Tests comparing inbound token against stored token, acceptable changes, and other errors
 		{
