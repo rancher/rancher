@@ -814,9 +814,8 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, oldToken, to
 		return nil, apierrors.NewBadRequest("spec.userprincipal is immutable")
 	}
 
-	if token.Spec.ClusterName != currentToken.Spec.ClusterName {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("rejecting change of token %s: forbidden to edit cluster name",
-			token.Name))
+	if token.Spec.ClusterName != oldToken.Spec.ClusterName {
+		return nil, apierrors.NewBadRequest("spec.clusterName is immutable")
 	}
 
 	// Regular users are not allowed to extend the TTL.
