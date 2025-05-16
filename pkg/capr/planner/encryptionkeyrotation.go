@@ -452,7 +452,7 @@ func (p *Planner) encryptionKeyRotationRestartService(controlPlane *rkev1.RKECon
 	// - the plan failing with the k3s/rke2-server services crashing the first, and resuming subsequent times
 	// It's not necessarily ideal if encryption key rotation can never complete, especially since we don't have access to
 	// the downstream k3s/rke2-server service logs, but it has to be done in order for encryption key rotation to succeed
-	err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation [%s] for machine [%s]", controlPlane.Status.RotateEncryptionKeysPhase, entry.Machine.Name), entry, nodePlan, joinedServer, 5, 5)
+	err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation [%s] for machine [%s]", controlPlane.Status.RotateEncryptionKeysPhase, entry.Machine.Name), entry, nodePlan, joinedServer, 100, 100)
 	if err != nil {
 		if IsErrWaiting(err) {
 			if planAppliedButWaitingForProbes(entry) {
