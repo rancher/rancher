@@ -386,7 +386,7 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
     "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
     "org.opencontainers.image.version"=${VERSION} \
-    "org.opensuse.reference"=${BASE_REGISTRY}/rancher/rancher:${VERSION}
+    "org.opensuse.reference"=rancher/rancher:${VERSION}
 ENTRYPOINT ["entrypoint.sh"]
 
 
