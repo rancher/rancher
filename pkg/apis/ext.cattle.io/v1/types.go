@@ -35,7 +35,12 @@ type UserActivityStatus struct {
 
 // Token is used to authenticate requests to Rancher.
 type Token struct {
-	metav1.TypeMeta   `json:",inline"`
+	// Standard kubernetes type meta information
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard kubernetes object meta information.
+	// BEWARE of non-standard behaviour: Name and GenerateName are not respected.
+	// A name is generated with a predefined prefix instead ('token-').
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the desired state of the Token.
@@ -75,6 +80,10 @@ type TokenSpec struct {
 	// enabled token.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
+	// ClusterName holds the name of the cluster the token is scoped to, if any.
+	// An empty string indicates that the token is not scoped to a specific cluster.
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
 }
 
 // TokenPrincipal contains the data about the user principal owning the token.
@@ -187,4 +196,8 @@ func (t *Token) GetLastActivitySeen() *metav1.Time {
 
 func (t *Token) GetCreationTime() metav1.Time {
 	return t.CreationTimestamp
+}
+
+func (t *Token) GetExpiresAt() string {
+	return t.Status.ExpiresAt
 }

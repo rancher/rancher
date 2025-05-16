@@ -19,7 +19,6 @@ import (
 type MockClientIDAndSecretGenerator struct {
 	ctrl     *gomock.Controller
 	recorder *MockClientIDAndSecretGeneratorMockRecorder
-	isgomock struct{}
 }
 
 // MockClientIDAndSecretGeneratorMockRecorder is the mock recorder for MockClientIDAndSecretGenerator.

@@ -139,19 +139,15 @@ func TestStoreCreate(t *testing.T) {
 						Name: "token-12345",
 					},
 					Data: map[string][]byte{
-						exttokenstore.FieldAnnotations:     []byte("null"),
-						exttokenstore.FieldDescription:     []byte(""),
-						exttokenstore.FieldEnabled:         []byte("true"),
-						exttokenstore.FieldFinalizers:      []byte("null"),
-						exttokenstore.FieldHash:            []byte("kla9jkdmj"),
-						exttokenstore.FieldKind:            []byte(exttokenstore.IsLogin),
-						exttokenstore.FieldLabels:          []byte("null"),
-						exttokenstore.FieldLastUpdateTime:  []byte("13:00:05"),
-						exttokenstore.FieldOwnerReferences: []byte("null"),
-						exttokenstore.FieldPrincipal:       ePrincipalBytes,
-						exttokenstore.FieldTTL:             []byte("4000"),
-						exttokenstore.FieldUID:             []byte("2905498-kafld-lkad"),
-						exttokenstore.FieldUserID:          []byte("lkajdlksjlkds"),
+						exttokenstore.FieldDescription:    []byte(""),
+						exttokenstore.FieldEnabled:        []byte("true"),
+						exttokenstore.FieldHash:           []byte("kla9jkdmj"),
+						exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+						exttokenstore.FieldLastUpdateTime: []byte("13:00:05"),
+						exttokenstore.FieldPrincipal:      ePrincipalBytes,
+						exttokenstore.FieldTTL:            []byte("4000"),
+						exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+						exttokenstore.FieldUserID:         []byte("lkajdlksjlkds"),
 					},
 				}
 				gomock.InOrder(
@@ -334,7 +330,7 @@ func TestStoreCreate(t *testing.T) {
 			users = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(scache)
-			store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+			store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil, nil)
 
 			uas := &Store{
 				tokens:        mockTokenControllerFake,
@@ -455,16 +451,12 @@ func TestStoreGet(t *testing.T) {
 						Name: "token-12345",
 					},
 					Data: map[string][]byte{
-						exttokenstore.FieldAnnotations:      []byte("null"),
 						exttokenstore.FieldDescription:      []byte(""),
 						exttokenstore.FieldEnabled:          []byte("true"),
-						exttokenstore.FieldFinalizers:       []byte("null"),
 						exttokenstore.FieldHash:             []byte("kla9jkdmj"),
 						exttokenstore.FieldKind:             []byte(exttokenstore.IsLogin),
-						exttokenstore.FieldLabels:           []byte("null"),
 						exttokenstore.FieldLastActivitySeen: []byte("2025-01-31T16:44:00Z"),
 						exttokenstore.FieldLastUpdateTime:   []byte("13:00:05"),
-						exttokenstore.FieldOwnerReferences:  []byte("null"),
 						exttokenstore.FieldPrincipal:        ePrincipalBytes,
 						exttokenstore.FieldTTL:              []byte("4000"),
 						exttokenstore.FieldUID:              []byte("2905498-kafld-lkad"),
@@ -542,7 +534,7 @@ func TestStoreGet(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
-		store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+		store = exttokenstore.NewSystem(nil, secrets, users, mockTokenCacheFake, nil, nil, nil, nil)
 
 		uas := &Store{
 			tokens:        mockTokenControllerFake,
