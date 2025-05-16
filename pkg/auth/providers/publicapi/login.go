@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
+	"github.com/rancher/rancher/pkg/auth/providers/cognito"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
@@ -176,6 +177,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.GenericOIDCProviderType:
 		input = &apiv3.OIDCLogin{}
 		providerName = genericoidc.Name
+	case client.CognitoProviderType:
+		input = &apiv3.OIDCLogin{}
+		providerName = cognito.Name
 	default:
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}

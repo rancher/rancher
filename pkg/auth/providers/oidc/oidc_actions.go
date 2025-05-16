@@ -14,9 +14,12 @@ import (
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"k8s.io/client-go/util/retry"
 )
+
+const cognitoGroupsClaim = "cognito:groups"
 
 func (o *OpenIDCProvider) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	common.AddCommonActions(apiContext, resource)
@@ -77,6 +80,10 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
 		falseBool := false
 		oidcConfig.GroupSearchEnabled = &falseBool
+	}
+	// we need to set cognito:groups as GroupsClaim in order to be able to fetch groups from aws cognito
+	if oidcConfig.Type == client.CognitoConfigType {
+		oidcConfig.GroupsClaim = cognitoGroupsClaim
 	}
 	oidcLogin := &v32.OIDCLogin{
 		Code: oidcConfigApplyInput.Code,

@@ -247,6 +247,23 @@ func NewClusterTemplateRevision(namespace, name string, obj ClusterTemplateRevis
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CognitoProviderList is a list of CognitoProvider resources
+type CognitoProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []CognitoProvider `json:"items"`
+}
+
+func NewCognitoProvider(namespace, name string, obj CognitoProvider) *CognitoProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CognitoProvider").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ComposeConfigList is a list of ComposeConfig resources
 type ComposeConfigList struct {
 	metav1.TypeMeta `json:",inline"`

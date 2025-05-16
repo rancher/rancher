@@ -41,6 +41,7 @@ var (
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
 	ClusterTemplateResourceName                           = "clustertemplates"
 	ClusterTemplateRevisionResourceName                   = "clustertemplaterevisions"
+	CognitoProviderResourceName                           = "cognitoproviders"
 	ComposeConfigResourceName                             = "composeconfigs"
 	DynamicSchemaResourceName                             = "dynamicschemas"
 	EtcdBackupResourceName                                = "etcdbackups"
@@ -130,6 +131,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterTemplateList{},
 		&ClusterTemplateRevision{},
 		&ClusterTemplateRevisionList{},
+		&CognitoProvider{},
+		&CognitoProviderList{},
 		&ComposeConfig{},
 		&ComposeConfigList{},
 		&DynamicSchema{},
