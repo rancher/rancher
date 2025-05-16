@@ -859,39 +859,6 @@ func Test_Store_Create(t *testing.T) {
 					Return(nil, someerror)
 			},
 		},
-<<<<<<< HEAD
-=======
-		{
-			name: "reject already existing token",
-			err:  helloAlreadyExistsError,
-			tok: &ext.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "hello",
-				},
-			},
-			opts: &metav1.CreateOptions{},
-			storeSetup: func( // configure store backend clients
-				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				scache *fake.MockCacheInterface[*corev1.Secret],
-				users *fake.MockNonNamespacedCacheInterface[*v3.User],
-				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
-				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
-				timer *MocktimeHandler,
-				hasher *MockhashHandler,
-				auth *MockauthHandler) {
-
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(&mockUser{name: "world"}, false, true, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-
-				scache.EXPECT().Get("cattle-tokens", "hello").
-					Return(&corev1.Secret{}, nil)
-			},
-		},
->>>>>>> e332d961b (feat: bring cluster-scoping back to ext tokens)
 		// token generation and hash errors -- no mocking -- unable to induce and test
 		{
 			name: "user retrieval error",
@@ -1935,15 +1902,10 @@ func Test_SystemStore_Update(t *testing.T) {
 			hasher := NewMockhashHandler(ctrl)
 			auth := NewMockauthHandler(ctrl)
 
-<<<<<<< HEAD
-			store := NewSystem(nil, secrets, users, nil, timer, hasher, auth)
+			store := NewSystem(nil, secrets, users, nil, nil, timer, hasher, auth)
 			if test.storeSetup != nil {
 				test.storeSetup(secrets, scache, timer, hasher, auth)
 			}
-=======
-			store := NewSystem(nil, secrets, users, nil, nil, timer, hasher, auth)
-			test.storeSetup(secrets, scache, timer, hasher, auth)
->>>>>>> e332d961b (feat: bring cluster-scoping back to ext tokens)
 
 			// perform test and validate results
 			tok, err := store.update("", test.fullPerm, test.old, test.token, test.opts)
