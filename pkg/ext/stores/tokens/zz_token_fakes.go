@@ -116,11 +116,12 @@ func (m *MockauthHandler) EXPECT() *MockauthHandlerMockRecorder {
 }
 
 // SessionID mocks base method.
-func (m *MockauthHandler) SessionID(ctx context.Context) string {
+func (m *MockauthHandler) SessionID(ctx context.Context) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SessionID", ctx)
 	ret0, _ := ret[0].(string)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SessionID indicates an expected call of SessionID.
