@@ -4,13 +4,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type AuditPolicyConditionType string
 type FilterAction string
 
 const (
-	AuditPolicyConditionTypeUnknown AuditPolicyConditionType = "Unknown"
-	AuditPolicyConditionTypeActive  AuditPolicyConditionType = "Active"
-	AuditPolicyConditionTypeValid   AuditPolicyConditionType = "Valid"
+	AuditPolicyConditionTypeUnknown string = "Unknown"
+	AuditPolicyConditionTypeActive  string = "Active"
+	AuditPolicyConditionTypeValid   string = "Valid"
 
 	FilterActionUnknown FilterAction = ""
 	FilterActionAllow   FilterAction = "allow"
