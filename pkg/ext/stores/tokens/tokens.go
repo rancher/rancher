@@ -1311,7 +1311,6 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 			Name:      token.Name,
 		},
 		StringData: make(map[string]string),
-		Data:       make(map[string][]byte),
 	}
 
 	if len(token.Annotations) > 0 {
