@@ -501,7 +501,7 @@ def create_validate_wokloads_with_secret():
     secret_wl_name_create1 = create_prefix + "-testwl1withsec"
     secret_wl_name_create2 = create_prefix + "-testwl2withsec"
 
-    secret = create_secret(keyvaluepair, p_client=p_client, name=secret_name)
+    secret = create_secret(keyvaluepair, p_client=p_client, name=secret_name, singlenamespace=True, ns=ns)
     create_and_validate_workload_with_secret_as_volume(
         p_client, secret, ns, keyvaluepair, name=secret_wl_name_create1)
     create_and_validate_workload_with_secret_as_env_variable(
