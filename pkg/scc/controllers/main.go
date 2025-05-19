@@ -13,6 +13,7 @@ import (
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 type handler struct {
@@ -39,8 +40,24 @@ func Register(
 
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
-	// TODO: EnqueueAfter - revalidate every 24 hours
-	// Ex: https://github.com/rancher/rancher/blob/d6b40c3acd945f0c8fe463ff96d144561c9640c3/pkg/controllers/dashboard/helm/repo.go#L95
+	// Ensure that when a registration is over 20 hours since last validation they are enqueued.
+	go func() {
+		for {
+			registrationsList, err := registrations.List(metav1.ListOptions{})
+			if err != nil {
+				logrus.Errorf("Failed to list registrations: %v", err)
+				continue
+			}
+			for _, registrationObj := range registrationsList.Items {
+				lastValidated := registrationObj.Status.ActivationStatus.LastValidatedTS
+				timeSinceLastValidation := time.Since(lastValidated.Time)
+				if timeSinceLastValidation >= time.Hour*20 {
+					registrations.Enqueue(registrationObj.Name)
+				}
+			}
+			time.Sleep(9 * time.Second)
+		}
+	}()
 }
 
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
