@@ -28,6 +28,11 @@ func FriendlyVersion() string {
 	return fmt.Sprintf("%s (%s)", Version, GitCommit)
 }
 
+func VersionIsDev() bool {
+	// todo: think about what head and rc builds look like too
+	return Version == "dev"
+}
+
 type versionHandler struct {
 	info Info
 }

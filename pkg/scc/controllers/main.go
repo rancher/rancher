@@ -10,9 +10,12 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/util"
+	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
+	"github.com/rancher/rancher/pkg/version"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 type handler struct {
@@ -39,8 +42,56 @@ func Register(
 
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
-	// TODO: EnqueueAfter - revalidate every 24 hours
-	// Ex: https://github.com/rancher/rancher/blob/d6b40c3acd945f0c8fe463ff96d144561c9640c3/pkg/controllers/dashboard/helm/repo.go#L95
+
+	// Configure jitter based daily revalidation trigger
+	jitterbugConfig := jitterbug.Config{
+		BaseInterval:    20 * time.Hour,
+		JitterMax:       3,
+		JitterMaxScale:  time.Hour,
+		PollingInterval: 9 * time.Minute,
+	}
+	if version.IsDevBuild() {
+		jitterbugConfig = jitterbug.Config{
+			BaseInterval:    8 * time.Hour,
+			JitterMax:       30,
+			JitterMaxScale:  time.Minute,
+			PollingInterval: 9 * time.Second,
+		}
+	}
+	jitterCheckin := jitterbug.NewJitterChecker(
+		&jitterbugConfig,
+		func(dailyTriggerTime, strictDeadline time.Duration) (bool, error) {
+			registrationsList, err := registrations.List(metav1.ListOptions{})
+			if err != nil {
+				logrus.Errorf("Failed to list registrations: %v", err)
+				return false, err
+			}
+
+			checkInWasTriggered := false
+			for _, registrationObj := range registrationsList.Items {
+				// Always skip offline mode registrations, or Registrations that haven't progressed to activation
+				if registrationObj.Spec.Mode == v1.Offline ||
+					needsRegistration(&registrationObj) {
+					continue
+				}
+
+				lastValidated := registrationObj.Status.ActivationStatus.LastValidatedTS
+				timeSinceLastValidation := time.Since(lastValidated.Time)
+				// If the time since last validation is after the daily trigger (which includes jitter), we revalidate.
+				// Also, ensure that when a registration is over the strictDeadline it is checked.
+				if timeSinceLastValidation >= dailyTriggerTime || timeSinceLastValidation >= strictDeadline {
+					checkInWasTriggered = true
+					// Potentially this we should update the registration here too?
+					// Mark it as `checkNow` or something similar? (not sure enqueue alone will cause the check to happen)
+					registrations.Enqueue(registrationObj.Name)
+				}
+			}
+
+			return checkInWasTriggered, nil
+		},
+	)
+	jitterCheckin.Start()
+	go jitterCheckin.Run()
 }
 
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
@@ -55,10 +106,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
-	// That is why these conditions may look a bit odd, as it helps ensure registration logic is used as needed.
-	if registrationObj.Status.RegistrationProcessedTS == nil || registrationObj.Status.RegistrationProcessedTS.IsZero() ||
-		!registrationObj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
-		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced) {
+	if needsRegistration(registrationObj) {
 		registrationHandler := registration.New(
 			h.ctx,
 			h.registrations,
@@ -70,6 +118,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationHandler.Call(name, registrationObj)
 	}
 
+	// Due to the above noted choice, this means if the Registration becomes invalid outside of Rancher
+	// Then the activation handler is what should deal with reconciling the state when that happens
 	activationHandler := activation.New(
 		h.ctx,
 		h.registrations,
@@ -79,6 +129,12 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	)
 
 	return activationHandler.Call(name, registrationObj)
+}
+
+func needsRegistration(obj *v1.Registration) bool {
+	return obj.Status.RegistrationProcessedTS == nil || obj.Status.RegistrationProcessedTS.IsZero() ||
+		!obj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
+		!obj.HasCondition(v1.RegistrationConditionAnnounced)
 }
 
 func (h *handler) isServerUrlReady() bool {
