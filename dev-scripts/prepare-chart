@@ -32,4 +32,5 @@ echo "Preparing Rancher Chart for release: ${CHART_VERSION}"
 sed_i_wrapper -i -e "s/%VERSION%/${CHART_VERSION}/g" ./chart/Chart.yaml
 sed_i_wrapper -i -e "s/%APP_VERSION%/${APP_VERSION}/g" ./chart/Chart.yaml
 sed_i_wrapper -i -e "s@%POST_DELETE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
+sed_i_wrapper -i -e "s@%PRE_UPGRADE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
 sed_i_wrapper -i -e "s/%POST_DELETE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
