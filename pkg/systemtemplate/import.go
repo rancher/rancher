@@ -53,6 +53,7 @@ type clusterAgentContext struct {
 	ClusterRegistry       string
 	EnablePriorityClass   bool
 	PodDisruptionBudget   string
+	SUCAppNameOverride    string
 }
 
 type priorityClassContext struct {
@@ -235,6 +236,17 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		ClusterRegistry:       registryURL,
 		PodDisruptionBudget:   pdb,
 		EnablePriorityClass:   pcExists && pcEnabled,
+		SUCAppNameOverride: func() string {
+			// Set the field to ensure backward compatibility in the case of node-driver RKE2/K3s cluster
+			if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
+				(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
+				if cluster.Spec.DisplayName != "" {
+					return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
+						capr.SafeConcatName(48, cluster.Spec.DisplayName, "managed", "system-upgrade-controller"))
+				}
+			}
+			return ""
+		}(),
 	}
 
 	return t.Execute(resp, context)
@@ -243,10 +255,14 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	enableMSUC := false
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
-		// the case of imported rke2/k3s cluster
+		// the case of imported RKE2/K3s cluster
 		enableMSUC = importedclusterversionmanagement.Enabled(cluster)
 	}
-
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
+		(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
+		// the case of node-driver RKE2/K3s cluster
+		enableMSUC = true
+	}
 	return map[string]bool{
 		features.MCM.Name():                            false,
 		features.MCMAgent.Name():                       true,

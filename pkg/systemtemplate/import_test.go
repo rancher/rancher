@@ -84,7 +84,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "c320a23c4620b7843d2f96ed114841e06873054c3d2b159355a056e1890acf82",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -115,11 +115,16 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "7a316ba9d7aa643173f0ce0c4e2a0367bd8bea435ed82eb9cffd47e14aaaea0d",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -151,6 +156,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},
 					ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 						ClusterAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
@@ -166,9 +172,13 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 						},
 					},
 				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "7a316ba9d7aa643173f0ce0c4e2a0367bd8bea435ed82eb9cffd47e14aaaea0d",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -203,6 +213,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},
 					ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 						ClusterAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
@@ -218,9 +229,13 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 						},
 					},
 				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "2093af1547b1eef8b22527ecb1590fe3302c3287b317e0aed3e268ff2a6dc0df",
+				"cattle-cluster-agent": "341be40eb0356bccad79900b965c70dc10ca189a94dd0f2ed40576cd565d5ce4",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -254,16 +269,21 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName: "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{
 						PrivateRegistryURL: "localhost:5001",
 					},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
 				},
 			},
 			url:        "some-dummy-url",
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "48868d8d72bfe924be0eb248def83f78088c68f91e12cd2b67116e6d448d889a",
+				"cattle-cluster-agent": "1dc709fd8333e74a79ff23470aecd426379cb6d64513a22586eaee27e0f1687e",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
