@@ -15,13 +15,13 @@ replace (
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
-	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.28.0
-	go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v1.28.0
-	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.28.0
-	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.28.0
-	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v1.3.1
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0
+	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.33.0
+	go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v1.33.0
+	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.33.0
+	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.33.0
+	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v1.4.0
 	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.17.0-rancher1
@@ -266,6 +266,7 @@ require (
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.33.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.33.0 // indirect
