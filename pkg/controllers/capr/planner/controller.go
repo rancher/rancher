@@ -3,9 +3,10 @@ package planner
 import (
 	"context"
 	"errors"
-	"github.com/rancher/wrangler/v3/pkg/condition"
 	"strings"
 	"time"
+
+	"github.com/rancher/wrangler/v3/pkg/condition"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"

@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
+	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2"
@@ -218,6 +219,7 @@ type UserContext struct {
 	Networking     knetworkingv1.Interface
 	Cluster        clusterv3.Interface
 	Storage        storagev1.Interface
+	Plan           upgrade.Interface // the field is initialized only for rancher-provisioned rke2/k3s cluster
 
 	RBACw wrbacv1.Interface
 	Corew wcorev1.Interface
