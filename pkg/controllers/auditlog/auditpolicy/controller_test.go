@@ -104,12 +104,6 @@ func TestOnChange(t *testing.T) {
 						LastTransitionTime: mockTimeFactory(),
 						Reason:             reasonPolicyIsActive,
 					},
-					metav1.Condition{
-						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
-						Status:             metav1.ConditionTrue,
-						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonPolicyIsValid,
-					},
 				},
 			},
 		},
@@ -131,15 +125,9 @@ func TestOnChange(t *testing.T) {
 				Conditions: []metav1.Condition{
 					metav1.Condition{
 						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
-						Status:             metav1.ConditionUnknown,
-						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonPolicyNotYetActivated,
-					},
-					metav1.Condition{
-						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
 						Status:             metav1.ConditionFalse,
 						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonFailedToAddToLogWriter,
+						Reason:             reasonPolicyIsInvalid,
 						Message:            "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`",
 					},
 				},
@@ -162,15 +150,9 @@ func TestOnChange(t *testing.T) {
 				Conditions: []metav1.Condition{
 					metav1.Condition{
 						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
-						Status:             metav1.ConditionUnknown,
-						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonPolicyNotYetActivated,
-					},
-					metav1.Condition{
-						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
 						Status:             metav1.ConditionFalse,
 						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonFailedToAddToLogWriter,
+						Reason:             reasonPolicyIsInvalid,
 						Message:            "failed to create filter: invalid filter action: 'do not allow'",
 					},
 				},
@@ -195,15 +177,9 @@ func TestOnChange(t *testing.T) {
 				Conditions: []metav1.Condition{
 					metav1.Condition{
 						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
-						Status:             metav1.ConditionUnknown,
-						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonPolicyNotYetActivated,
-					},
-					metav1.Condition{
-						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
 						Status:             metav1.ConditionFalse,
 						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonFailedToAddToLogWriter,
+						Reason:             reasonPolicyIsInvalid,
 						Message:            "failed to create redactor: failed to compile headers regexes: failed to compile regex: error parsing regexp: missing argument to repetition operator: `*`",
 					},
 				},
@@ -228,15 +204,9 @@ func TestOnChange(t *testing.T) {
 				Conditions: []metav1.Condition{
 					metav1.Condition{
 						Type:               string(auditlogv1.AuditPolicyConditionTypeActive),
-						Status:             metav1.ConditionUnknown,
-						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonPolicyNotYetActivated,
-					},
-					metav1.Condition{
-						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
 						Status:             metav1.ConditionFalse,
 						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonFailedToAddToLogWriter,
+						Reason:             reasonPolicyIsInvalid,
 						Message:            "failed to create redactor: failed to parse paths: failed to parse jsonpath: paths must begin with the root object identifier: '$'",
 					},
 				},
@@ -255,12 +225,6 @@ func TestOnChange(t *testing.T) {
 						Status:             metav1.ConditionFalse,
 						LastTransitionTime: mockTimeFactory(),
 						Reason:             reasonPolicyWasDisabled,
-					},
-					metav1.Condition{
-						Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
-						Status:             metav1.ConditionUnknown,
-						LastTransitionTime: mockTimeFactory(),
-						Reason:             reasonPolicyNotYetValidated,
 					},
 				},
 			},
@@ -373,10 +337,10 @@ func TestOnChangeOverwriteActiveWithInvalid(t *testing.T) {
 
 	expected = invalidPolicy
 	meta.SetStatusCondition(&expected.Status.Conditions, metav1.Condition{
-		Type:               auditlogv1.AuditPolicyConditionTypeValid,
+		Type:               auditlogv1.AuditPolicyConditionTypeActive,
 		Status:             metav1.ConditionFalse,
 		LastTransitionTime: mockTimeFactory(),
-		Reason:             reasonFailedToAddToLogWriter,
+		Reason:             reasonPolicyIsInvalid,
 		Message:            "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`",
 	})
 
@@ -411,10 +375,10 @@ func TestOnChangeOverwriteInvalidWithActive(t *testing.T) {
 
 	expected := invalidPolicy
 	meta.SetStatusCondition(&expected.Status.Conditions, metav1.Condition{
-		Type:               auditlogv1.AuditPolicyConditionTypeValid,
+		Type:               auditlogv1.AuditPolicyConditionTypeActive,
 		Status:             metav1.ConditionFalse,
 		LastTransitionTime: mockTimeFactory(),
-		Reason:             reasonFailedToAddToLogWriter,
+		Reason:             reasonPolicyIsInvalid,
 		Message:            "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`",
 	})
 
@@ -533,9 +497,10 @@ func TestOnRemoveInvalidPolicy(t *testing.T) {
 
 	expected := policy
 	meta.SetStatusCondition(&expected.Status.Conditions, metav1.Condition{
-		Type:               auditlogv1.AuditPolicyConditionTypeValid,
+		Type:               auditlogv1.AuditPolicyConditionTypeActive,
 		Status:             metav1.ConditionFalse,
 		LastTransitionTime: mockTimeFactory(),
+		Reason:             reasonPolicyIsInvalid,
 		Message:            "failed to create filter: failed to compile regex '*': error parsing regexp: missing argument to repetition operator: `*`",
 	})
 
