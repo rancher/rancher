@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
@@ -343,6 +344,12 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {
 			return err
+		}
+
+		if features.RKE2.Enabled() {
+			if err := resetConditions(r.Wrangler); err != nil {
+				return err
+			}
 		}
 
 		return runMigrations(r.Wrangler)
@@ -715,4 +722,37 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	}
 
 	return found, nil
+}
+
+// Starting with Rancher 2.12.0 and system-agent 0.3.13, the upgrade Plan includes instruction to delete
+// the old cluster-agent.yaml manifest from nodes. If this Plan is applied before the system-agent
+// is actually upgraded to 0.3.13, it can lead to the unintended removal of the cattle-system namespace.
+//
+// To avoid this issue - especially in scenarios where Rancher is upgraded to 2.12.x, then rolled back to 2.11.x,
+// and later upgraded to 2.12.x again *without* restoring the local cluster - the SystemAgentUpgraded and
+// SystemUpgradeControllerReady conditions are explicitly reset to False if their status is True.
+func resetConditions(w *wrangler.Context) error {
+	rkeControlPlanes, err := w.RKE.RKEControlPlane().List("fleet-default", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, rkeControlPlane := range rkeControlPlanes.Items {
+		if capr.SystemAgentUpgraded.IsTrue(rkeControlPlane) || capr.SystemUpgradeControllerReady.IsTrue(rkeControlPlane) {
+			logrus.Debugf("resetting SystemAgentUpgraded and SystemUpgradeControllerReady conditions for control plane %s/%s",
+				rkeControlPlane.Namespace, rkeControlPlane.Name)
+			rkeControlPlane := rkeControlPlane.DeepCopy()
+			capr.SystemAgentUpgraded.False(rkeControlPlane)
+			capr.SystemAgentUpgraded.Message(rkeControlPlane, "")
+			capr.SystemAgentUpgraded.Reason(rkeControlPlane, "waiting for initialization")
+
+			capr.SystemUpgradeControllerReady.False(rkeControlPlane)
+			capr.SystemUpgradeControllerReady.Message(rkeControlPlane, "")
+			capr.SystemUpgradeControllerReady.Reason(rkeControlPlane, "waiting for initialization")
+
+			if _, err := w.RKE.RKEControlPlane().UpdateStatus(rkeControlPlane); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

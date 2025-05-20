@@ -250,8 +250,12 @@ var (
 	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
 
 	// K3sBasedUpgraderUninstallConcurrency defines the maximum number of clusters
-	// for which the K3s-based-upgrade handler can simultaneously uninstall the legacy K3s-based upgrade app.
+	// for which Rancher can simultaneously uninstall the legacy K3s-based upgrade app.
 	K3sBasedUpgraderUninstallConcurrency = NewSetting("k3s-based-upgrader-uninstall-concurrency", "5")
+
+	// SystemAgentUpgraderInstallConcurrency defines the maximum number of clusters
+	// for which Rancher can simultaneously install or upgrade the resources needed for upgrading system-agent.
+	SystemAgentUpgraderInstallConcurrency = NewSetting("system-agent-upgrader-install-concurrency", "5")
 
 	// UIBanners holds configuration to display a custom fixed banner in the header, footer, or both
 	UIBanners = NewSetting("ui-banners", "{}")
