@@ -13,6 +13,7 @@ import (
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"time"
 )
 
@@ -41,17 +42,30 @@ func Register(
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
 	// Ensure that when a registration is over 20 hours since last validation they are enqueued.
+
 	go func() {
+		dailyTriggerBase := 20
+		jitter := rand.Intn(3)
+		jitterDirection := rand.Intn(2)
+		if jitterDirection >= 1 {
+			jitter *= -1
+		}
+		dailyTriggerBase += jitter
+		dailyTriggerTime := time.Duration(dailyTriggerBase) * time.Hour
+
 		for {
 			registrationsList, err := registrations.List(metav1.ListOptions{})
 			if err != nil {
 				logrus.Errorf("Failed to list registrations: %v", err)
 				continue
 			}
+
 			for _, registrationObj := range registrationsList.Items {
 				lastValidated := registrationObj.Status.ActivationStatus.LastValidatedTS
 				timeSinceLastValidation := time.Since(lastValidated.Time)
-				if timeSinceLastValidation >= time.Hour*20 {
+				if timeSinceLastValidation >= dailyTriggerTime {
+					// Potentially this we should update the registration here too?
+					// Mark it as `checkNow` or something similar? (not sure enqueue alone will cause the check to happen)
 					registrations.Enqueue(registrationObj.Name)
 				}
 			}
