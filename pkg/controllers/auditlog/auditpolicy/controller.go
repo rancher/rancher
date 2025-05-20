@@ -13,12 +13,10 @@ import (
 )
 
 var (
-	reasonPolicyNotYetActivated  = "PolicyNotYetActivated"
-	reasonPolicyNotYetValidated  = "PolicyNotYetValidated"
-	reasonPolicyIsActive         = "PolicyIsActive"
-	reasonPolicyIsValid          = "PolicyIsValid"
-	reasonPolicyWasDisabled      = "PolicyWasDisabled"
-	reasonFailedToAddToLogWriter = "FailedToAddToLogWriter"
+	reasonPolicyNotYetActivated = "PolicyNotYetActivated"
+	reasonPolicyIsActive        = "PolicyIsActive"
+	reasonPolicyIsInvalid       = "PolicyIsInvalid"
+	reasonPolicyWasDisabled     = "PolicyWasDisabled"
 )
 
 type handler struct {
@@ -43,16 +41,6 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 		})
 	}
 
-	if meta.FindStatusCondition(obj.Status.Conditions, auditlogv1.AuditPolicyConditionTypeValid) == nil {
-		meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{
-			Type:               string(auditlogv1.AuditPolicyConditionTypeValid),
-			Status:             metav1.ConditionUnknown,
-			ObservedGeneration: obj.GetGeneration(),
-			LastTransitionTime: h.time(),
-			Reason:             reasonPolicyNotYetValidated,
-		})
-	}
-
 	var err error
 
 	if !obj.Spec.Enabled {
@@ -74,10 +62,10 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 
 	if err := h.writer.UpdatePolicy(obj); err != nil {
 		meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{
-			Type:               auditlogv1.AuditPolicyConditionTypeValid,
+			Type:               auditlogv1.AuditPolicyConditionTypeActive,
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: h.time(),
-			Reason:             reasonFailedToAddToLogWriter,
+			Reason:             reasonPolicyIsInvalid,
 			Message:            err.Error(),
 		})
 
@@ -93,13 +81,6 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: h.time(),
 		Reason:             reasonPolicyIsActive,
-	})
-
-	meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{
-		Type:               auditlogv1.AuditPolicyConditionTypeValid,
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: h.time(),
-		Reason:             reasonPolicyIsValid,
 	})
 
 	if obj, err := h.auditpolicy.UpdateStatus(obj); err != nil {

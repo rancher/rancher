@@ -9,7 +9,6 @@ type FilterAction string
 const (
 	AuditPolicyConditionTypeUnknown string = "Unknown"
 	AuditPolicyConditionTypeActive  string = "Active"
-	AuditPolicyConditionTypeValid   string = "Valid"
 
 	FilterActionUnknown FilterAction = ""
 	FilterActionAllow   FilterAction = "allow"
