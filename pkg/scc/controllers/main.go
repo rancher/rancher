@@ -84,8 +84,9 @@ func Register(
 				// Also, ensure that when a registration is over the strictDeadline it is checked.
 				if timeSinceLastValidation >= dailyTriggerTime || timeSinceLastValidation >= strictDeadline {
 					checkInWasTriggered = true
-					// Potentially this we should update the registration here too?
-					// Mark it as `checkNow` or something similar? (not sure enqueue alone will cause the check to happen)
+					// TODO (o&b): 95% sure that enqueue alone won't be good enough based on other controller logic.
+					// Either we need to adjust that controller logic so enqueue alone is enough, or use `CheckNow`.
+					// Seems check now is most simple as it reuses controller logic
 					registrations.Enqueue(registrationObj.Name)
 				}
 			}

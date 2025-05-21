@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	_ "net/http/pprof"
 )
 
 type JitterFunction func(dailyTriggerTime, maxTriggerTime time.Duration) (bool, error)
 
 type JitterChecker struct {
-	config               *Config
-	calculator           Calculator
-	callable             JitterFunction
-	ticker               *time.Ticker
-	dailyCheckinInterval time.Duration
+	config          *Config
+	calculator      Calculator
+	callable        JitterFunction
+	tickChan        <-chan time.Time
+	ticker          *time.Ticker
+	triggerInterval time.Duration
 }
 
 // NewJitterChecker will complete initialization of optional Config fields and return a jitter checker
@@ -42,16 +42,17 @@ func NewJitterCheckerFromCalculator(calculator JitterCalculator, callable Jitter
 // Start prepares the first checkin interval and starts the ticker
 func (j *JitterChecker) Start() {
 	j.calculateCheckinInterval()
-	j.ticker = time.NewTicker(j.config.PollingInterval)
+	if j.tickChan == nil {
+		j.tickChan = time.Tick(j.config.PollingInterval)
+	}
 }
 
 func (j *JitterChecker) calculateCheckinInterval() {
-	j.dailyCheckinInterval = j.calculator.CalculateCheckinInterval()
+	j.triggerInterval = j.calculator.CalculateCheckinInterval()
 }
 
 func (j *JitterChecker) Run() {
-	defer j.ticker.Stop()
-	for range j.ticker.C {
+	for range j.tickChan {
 		logrus.Debugf("JitterChecker Run: tick")
 		j.run()
 	}
@@ -66,7 +67,7 @@ func (j *JitterChecker) run() {
 			// Proceed
 		}
 	}
-	refresh, err := j.callable(j.dailyCheckinInterval, j.config.StrictDeadline)
+	refresh, err := j.callable(j.triggerInterval, j.config.StrictDeadline)
 	if err != nil {
 		logrus.Errorf("JitterChecker Run-error: %v", err)
 		return
