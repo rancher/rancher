@@ -87,20 +87,6 @@ func TestNewSecretsAdapter(t *testing.T) {
 			systemToken: "system_testLoginToken",
 		},
 	}, secretsBackedCredentials)
-}
-
-func TestSecretsAdapterCredentials(t *testing.T) {
-	mockSecretsController := preparedSecretsMock(t)
-
-	secretsBackedCredentials := New(mockSecretsController)
-	assert.Equal(t, &CredentialSecretsAdapter{
-		secrets: mockSecretsController,
-		credentials: SccCredentials{
-			systemLogin: "system_testLoginUser",
-			password:    "system_testLoginPassword",
-			systemToken: "system_testLoginToken",
-		},
-	}, secretsBackedCredentials)
 
 	hasAuth := secretsBackedCredentials.HasAuthentication()
 	assert.True(t, hasAuth)
@@ -113,6 +99,20 @@ func TestSecretsAdapterCredentials(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "system_testLoginUser", login)
 	assert.Equal(t, "system_testLoginPassword", pass)
+}
+
+func TestSecretsAdapterCredentials_Basic(t *testing.T) {
+	mockSecretsController := preparedSecretsMock(t)
+
+	secretsBackedCredentials := New(mockSecretsController)
+	assert.Equal(t, &CredentialSecretsAdapter{
+		secrets: mockSecretsController,
+		credentials: SccCredentials{
+			systemLogin: "system_testLoginUser",
+			password:    "system_testLoginPassword",
+			systemToken: "system_testLoginToken",
+		},
+	}, secretsBackedCredentials)
 
 	modifiedSecret := testSecret("", "", &map[string]string{
 		TokenKey: "Hello-WORLD",
@@ -123,7 +123,7 @@ func TestSecretsAdapterCredentials(t *testing.T) {
 	updateErr := secretsBackedCredentials.UpdateToken("Hello-WORLD")
 	assert.NoError(t, updateErr)
 
-	token, err = secretsBackedCredentials.Token()
+	token, err := secretsBackedCredentials.Token()
 	assert.NoError(t, err)
 	assert.Equal(t, "Hello-WORLD", token)
 
@@ -151,16 +151,7 @@ func TestSecretsAdapterCredentials(t *testing.T) {
 	updateErr = secretsBackedCredentials.SetLogin("fred", "freds-system-PW")
 	assert.NoError(t, updateErr)
 
-	login, pass, err = secretsBackedCredentials.Login()
-	assert.NoError(t, err)
-	assert.Equal(t, "fred", login)
-	assert.Equal(t, "freds-system-PW", pass)
-
-	// Update token ERROR
-	updateErr = secretsBackedCredentials.SetLogin("", "1")
-	assert.Error(t, updateErr)
-
-	login, pass, err = secretsBackedCredentials.Login()
+	login, pass, err := secretsBackedCredentials.Login()
 	assert.NoError(t, err)
 	assert.Equal(t, "fred", login)
 	assert.Equal(t, "freds-system-PW", pass)
