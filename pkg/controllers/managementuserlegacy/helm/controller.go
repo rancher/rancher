@@ -135,9 +135,8 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 		return obj, nil
 	}
 	// always refresh app to avoid updating app twice
-	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	var err error
-	obj, err = l.AppsLister.Get(projectName, obj.Name)
+	obj, err = l.AppsLister.Get(obj.Namespace, obj.Name)
 	if err != nil {
 		return obj, err
 	}
@@ -150,7 +149,7 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 	}
 
 	obj = newObj.(*v3.App)
-	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
+	appRevisionClient := l.AppRevisionGetter.AppRevisions(obj.Namespace)
 	if obj.Spec.AppRevisionName != "" {
 		currentRevision, err := appRevisionClient.Get(obj.Spec.AppRevisionName, metav1.GetOptions{})
 		if err != nil {
