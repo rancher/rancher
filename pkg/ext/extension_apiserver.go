@@ -28,6 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type Options struct {
+	// AppSelector is the expected value for the "app" label on the rancher service.
+	AppSelector string
+}
+
 const (
 	// Port is the port that the separate extension API server listen to as
 	// defined in the Imperative API RFC.
@@ -77,8 +82,7 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 	return nil
 }
 
-func CreateOrUpdateService(service wranglercorev1.ServiceController) error {
-	appSelector := "rancher"
+func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector string) error {
 	if RDPEnabled() {
 		appSelector = "api-extension"
 	}
@@ -130,7 +134,7 @@ func CleanupExtensionAPIServer(wranglerContext *wrangler.Context) error {
 	return nil
 }
 
-func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Context) (steveserver.ExtensionAPIServer, error) {
+func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Context, opts Options) (steveserver.ExtensionAPIServer, error) {
 	// Only the local cluster runs an extension API server
 	if features.MCMAgent.Enabled() {
 		return nil, nil
@@ -187,7 +191,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
 
-		if err := CreateOrUpdateService(wranglerContext.Core.Service()); err != nil {
+		if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
 			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
 		}
 

@@ -153,6 +153,13 @@ func main() {
 			Usage:       "Declare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
 			Destination: &config.Features,
 		},
+		cli.StringFlag{
+			Name:        "extension-api-app-selector",
+			EnvVar:      "EXTENSION_API_APP_SELECTOR",
+			Value:       "rancher",
+			Usage:       "Defines the value to use the constructing the label selector for the imperative api APIService",
+			Destination: &config.ExtensionOpts.AppSelector,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
