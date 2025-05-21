@@ -157,7 +157,7 @@ func (h *handler) deployK3sBasedUpgradeController(cluster *mgmtv3.Cluster) error
 	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
 		appName = Rke2AppName
 	}
-	systemProjectBackingNamespace := systemProject.Status.BackingNamespace
+	systemProjectBackingNamespace := systemProject.GetProjectBackingNamespace()
 	app, err := appLister.Get(systemProjectBackingNamespace, appName)
 	if err != nil {
 		if !errors.IsNotFound(err) {
