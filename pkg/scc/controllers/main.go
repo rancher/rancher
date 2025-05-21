@@ -43,21 +43,24 @@ func Register(
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
 
-	pollingInterval := 9 * time.Minute
-	if version.VersionIsDev() {
-		pollingInterval = 9 * time.Second
-	}
-
 	// Configure jitter based daily revalidation trigger
 	jitterbugConfig := jitterbug.Config{
 		BaseInterval:    20 * time.Hour,
 		JitterMax:       3,
 		JitterMaxScale:  time.Hour,
-		PollingInterval: pollingInterval,
+		PollingInterval: 9 * time.Minute,
+	}
+	if version.IsDevBuild() {
+		jitterbugConfig = jitterbug.Config{
+			BaseInterval:    8 * time.Hour,
+			JitterMax:       30,
+			JitterMaxScale:  time.Minute,
+			PollingInterval: 9 * time.Second,
+		}
 	}
 	jitterCheckin := jitterbug.NewJitterChecker(
-		jitterbugConfig,
-		func(dailyTriggerTime time.Duration) (bool, error) {
+		&jitterbugConfig,
+		func(dailyTriggerTime, strictDeadline time.Duration) (bool, error) {
 			registrationsList, err := registrations.List(metav1.ListOptions{})
 			if err != nil {
 				logrus.Errorf("Failed to list registrations: %v", err)
@@ -75,8 +78,8 @@ func Register(
 				lastValidated := registrationObj.Status.ActivationStatus.LastValidatedTS
 				timeSinceLastValidation := time.Since(lastValidated.Time)
 				// If the time since last validation is after the daily trigger (which includes jitter), we revalidate.
-				// Also, ensure that when a registration is over 23 hours since last validation they are revalidate.
-				if timeSinceLastValidation >= dailyTriggerTime || timeSinceLastValidation >= time.Hour*23 {
+				// Also, ensure that when a registration is over the strictDeadline it is checked.
+				if timeSinceLastValidation >= dailyTriggerTime || timeSinceLastValidation >= strictDeadline {
 					checkInWasTriggered = true
 					// Potentially this we should update the registration here too?
 					// Mark it as `checkNow` or something similar? (not sure enqueue alone will cause the check to happen)
@@ -103,7 +106,6 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
-	// That is why these conditions may look a bit odd, as it helps ensure registration logic is used as needed.
 	if needsRegistration(registrationObj) {
 		registrationHandler := registration.New(
 			h.ctx,
@@ -116,6 +118,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationHandler.Call(name, registrationObj)
 	}
 
+	// Due to the above noted choice, this means if the Registration becomes invalid outside of Rancher
+	// Then the activation handler is what should deal with reconciling the state when that happens
 	activationHandler := activation.New(
 		h.ctx,
 		h.registrations,

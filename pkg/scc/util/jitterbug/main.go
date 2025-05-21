@@ -1,61 +1,56 @@
 package jitterbug
 
 // jitterbug is a package to implement a lightweight jitter based task system
+// The key principal
 
 import (
-	"github.com/sirupsen/logrus"
-	"math/rand"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	_ "net/http/pprof"
 )
 
-type JitterFunction func(dailyTriggerTime time.Duration) (bool, error)
-
-type Config struct {
-	BaseInterval    time.Duration
-	JitterMax       int
-	JitterMaxScale  time.Duration
-	PollingInterval time.Duration
-	InitialDelay    time.Duration
-}
+type JitterFunction func(dailyTriggerTime, maxTriggerTime time.Duration) (bool, error)
 
 type JitterChecker struct {
-	config               Config
+	config               *Config
+	calculator           Calculator
 	callable             JitterFunction
 	ticker               *time.Ticker
 	dailyCheckinInterval time.Duration
 }
 
-func NewJitterChecker(config Config, callable JitterFunction) *JitterChecker {
-	if config.BaseInterval == 0 {
-		panic("BaseInterval can't be zero")
-	}
-	if config.PollingInterval == 0 {
-		config.PollingInterval = 30 * time.Second
-	}
-
+// NewJitterChecker will complete initialization of optional Config fields and return a jitter checker
+func NewJitterChecker(config *Config, callable JitterFunction) *JitterChecker {
+	calculator := NewJitterCalculator(config, nil)
 	return &JitterChecker{
-		config:   config,
-		callable: callable,
+		config:     config,
+		calculator: calculator,
+		callable:   callable,
 	}
 }
 
+// NewJitterCheckerFromCalculator will complete initialization of optional Config fields and return a jitter checker
+func NewJitterCheckerFromCalculator(calculator JitterCalculator, callable JitterFunction) *JitterChecker {
+	return &JitterChecker{
+		config:     calculator.config,
+		calculator: &calculator,
+		callable:   callable,
+	}
+}
+
+// Start prepares the first checkin interval and starts the ticker
 func (j *JitterChecker) Start() {
 	j.calculateCheckinInterval()
 	j.ticker = time.NewTicker(j.config.PollingInterval)
-	//defer j.ticker.Stop()
 }
 
 func (j *JitterChecker) calculateCheckinInterval() {
-	jitterValue := rand.Intn(j.config.JitterMax)
-	jitterTime := time.Duration(jitterValue) * j.config.JitterMaxScale
-	jitterDirection := rand.Intn(2)
-	if jitterDirection >= 1 {
-		jitterTime *= -1
-	}
-	j.dailyCheckinInterval = j.config.BaseInterval + jitterTime
+	j.dailyCheckinInterval = j.calculator.CalculateCheckinInterval()
 }
 
 func (j *JitterChecker) Run() {
+	defer j.ticker.Stop()
 	for range j.ticker.C {
 		logrus.Debugf("JitterChecker Run: tick")
 		j.run()
@@ -71,7 +66,7 @@ func (j *JitterChecker) run() {
 			// Proceed
 		}
 	}
-	refresh, err := j.callable(j.dailyCheckinInterval)
+	refresh, err := j.callable(j.dailyCheckinInterval, j.config.StrictDeadline)
 	if err != nil {
 		logrus.Errorf("JitterChecker Run-error: %v", err)
 		return
