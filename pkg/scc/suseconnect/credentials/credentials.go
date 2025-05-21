@@ -34,6 +34,19 @@ type SccCredentials struct {
 	password    string
 }
 
+func (c *SccCredentials) DeepCopy() *SccCredentials {
+	if c == nil {
+		return nil
+	}
+
+	out := &SccCredentials{
+		systemToken: c.systemToken,
+		systemLogin: c.systemLogin,
+		password:    c.password,
+	}
+	return out
+}
+
 // CredentialsType Returns the mode (or modes) that are configured for authentication
 func (c *SccCredentials) CredentialsType() CredentialType {
 	if c.systemToken != "" && c.systemLogin != "" && c.password != "" {
@@ -73,7 +86,7 @@ func (c *SccCredentials) UpdateToken(newToken string) error {
 // Login returns the username and password
 func (c *SccCredentials) Login() (string, string, error) {
 	configuredType := c.CredentialsType()
-	if configuredType != CredentialTypeLogin && configuredType != CredentialTypeBoth {
+	if configuredType == CredentialTypeUnconfigured || configuredType == CredentialTypeToken {
 		return "", "", errors.New("cannot use systemLogin credentials when they are not properly configured")
 	}
 
