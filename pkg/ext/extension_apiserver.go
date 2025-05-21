@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -28,9 +29,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	imperativeApiExtensionEnvVar = "IMPERATIVE_API_APP_SELECTOR"
+)
+
 type Options struct {
 	// AppSelector is the expected value for the "app" label on the rancher service.
 	AppSelector string
+}
+
+func DefaultOptions() Options {
+	return Options{
+		AppSelector: os.Getenv(imperativeApiExtensionEnvVar),
+	}
 }
 
 const (
