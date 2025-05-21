@@ -67,7 +67,7 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 	}, nil
 }
 
-func (so *sccOperator) waitForSystemReady(done func()) {
+func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 	// Currently we only wait for ServerUrl not being empty, this is a good start as with out the URL we cannot start.
 	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
 	if so.systemInformation.ServerUrl() != "" {
@@ -83,7 +83,7 @@ func (so *sccOperator) waitForSystemReady(done func()) {
 			logrus.Info("[scc-operator] cannot start controllers yet; server URL is not ready.")
 		}
 	}, 15*time.Second, so.systemRegistrationReady)
-	done()
+	onSystemReady()
 }
 
 // maybeFirstInit will check if the initial `Registration` seeding values exist
