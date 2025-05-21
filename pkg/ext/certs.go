@@ -2,31 +2,30 @@ package ext
 
 import (
 	"bytes"
+	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"math"
 	"math/big"
+	"net"
+	"net/http"
 	"sync"
 	"time"
 
+	"github.com/rancher/dynamiclistener"
+	"github.com/rancher/dynamiclistener/storage/kubernetes"
+	"github.com/rancher/dynamiclistener/storage/memory"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/util/keyutil"
 	netutils "k8s.io/utils/net"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -130,11 +129,12 @@ func GenerateSelfSignedCertKeyWithOpts(host string, expireAfter time.Duration) (
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
 }
 
-var _ dynamiccertificates.SNICertKeyContentProvider = &rotatingSNIProvider{}
-var _ dynamiccertificates.Notifier = &rotatingSNIProvider{}
-var _ dynamiccertificates.CertKeyContentProvider = &rotatingSNIProvider{}
+var _ dynamiccertificates.SNICertKeyContentProvider = &provider{}
+var _ dynamiccertificates.Notifier = &provider{}
+var _ dynamiccertificates.CertKeyContentProvider = &provider{}
+var _ dynamiclistener.TLSStorage = &provider{}
 
-type rotatingSNIProvider struct {
+type provider struct {
 	name       string
 	secretName string
 
@@ -143,38 +143,44 @@ type rotatingSNIProvider struct {
 	listenerM sync.RWMutex
 	listeners []dynamiccertificates.Listener
 
-	expiresAfter time.Duration
-
-	contentMu sync.RWMutex
-	cert      []byte
-	key       []byte
-
-	secrets wranglercorev1.SecretController
+	storage dynamiclistener.TLSStorage
 }
 
-func NewSNIProviderForCname(name string, cnames []string, secrets wranglercorev1.SecretController) (*rotatingSNIProvider, error) {
-	content := &rotatingSNIProvider{
+func NewSNIProviderForCname(ctx context.Context, l net.Listener, name string, cnames []string, secrets wranglercorev1.SecretClient) (*provider, net.Listener, http.Handler, error) {
+	secretName := fmt.Sprintf("%s-cert-ca", name)
+	storage := kubernetes.New(ctx, nil, Namespace, secretName, memory.New())
+
+	provider := &provider{
 		name:       name,
-		secretName: fmt.Sprintf("%s-cert-ca", name),
+		secretName: secretName,
 
 		sninames: cnames,
 
-		expiresAfter: time.Hour * 24 * 90,
-
-		secrets: secrets,
+		storage: storage,
 	}
 
-	return content, nil
+	// todo: we can probably separate this out later
+	ca, key, err := kubernetes.LoadOrGenCAChain(secrets, Namespace, provider.secretName)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	ln, h, err := dynamiclistener.NewListenerWithChain(l, storage, ca, key, dynamiclistener.Config{})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return provider, ln, h, nil
 }
 
-func (p *rotatingSNIProvider) AddListener(listener dynamiccertificates.Listener) {
+func (p *provider) AddListener(listener dynamiccertificates.Listener) {
 	p.listenerM.Lock()
 	defer p.listenerM.Unlock()
 
 	p.listeners = append(p.listeners, listener)
 }
 
-func (p *rotatingSNIProvider) notify() {
+func (p *provider) notify() {
 	p.listenerM.RLock()
 	defer p.listenerM.RUnlock()
 
@@ -183,192 +189,29 @@ func (p *rotatingSNIProvider) notify() {
 	}
 }
 
-func (p *rotatingSNIProvider) SNINames() []string {
+func (p *provider) SNINames() []string {
 	return p.sninames
 }
 
-func (p *rotatingSNIProvider) Name() string {
+func (p *provider) Name() string {
 	return p.name
 }
 
-func (p *rotatingSNIProvider) CurrentCertKeyContent() ([]byte, []byte) {
-	p.contentMu.RLock()
-	defer p.contentMu.RUnlock()
-
-	return bytes.Clone(p.cert), bytes.Clone(p.key)
+func (p *provider) CurrentCertKeyContent() ([]byte, []byte) {
+	// todo: implement this
+	return nil, nil
 }
 
-func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
-	logrus.Info("starting imperative api cert rotator")
-
-	req, err := labels.NewRequirement(SecretLabelProvider, selection.Equals, []string{p.name})
-	if err != nil {
-		return fmt.Errorf("failed to create label requirement: %w", err)
-	}
-
-	watcher, err := p.secrets.Watch(Namespace, metav1.ListOptions{
-		LabelSelector: labels.NewSelector().Add(*req).String(),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create secret watcher: %w", err)
-	}
-	defer watcher.Stop()
-
-	if err := p.handleCert(); err != nil {
-		logrus.Error(err)
-	}
-
-	ticker := time.NewTicker(certCheckInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-stopChan:
-			logrus.Info("stopping imperative api cert rotator")
-
-			if err := p.secrets.Delete(Namespace, p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-				logrus.Error(err)
-			}
-
-			return nil
-		case <-ticker.C:
-			if err := p.handleCert(); err != nil {
-				logrus.Error(err)
-			}
-		case event, ok := <-watcher.ResultChan():
-			if !ok || event.Type == watch.Error {
-				logrus.Errorf("watcher channel closed: %v", err)
-				return nil
-			}
-			if err := p.handleCertEvent(event); err != nil {
-				logrus.Error(err)
-			}
-		}
-	}
+func (p *provider) Get() (*corev1.Secret, error) {
+	return p.storage.Get()
 }
 
-func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
-	cert, key, err := GenerateSelfSignedCertKeyWithOpts(p.sninames[0], p.expiresAfter)
-	if err != nil {
-		return fmt.Errorf("failed to generate cert: %w", err)
+func (p *provider) Update(s *corev1.Secret) error {
+	if err := p.storage.Update(s); err != nil {
+		return err
 	}
-
-	if secret == nil {
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      p.secretName,
-				Namespace: Namespace,
-				Labels: map[string]string{
-					SecretLabelProvider: p.name,
-				},
-			},
-			Data: map[string][]byte{
-				corev1.TLSPrivateKeyKey: key,
-				corev1.TLSCertKey:       cert,
-			},
-		}
-
-		if _, err := p.secrets.Create(secret); err != nil {
-			return fmt.Errorf("failed to create secret: %w", err)
-		}
-
-		logrus.Info("created imperative api cert secret")
-	} else {
-		secret.Data[corev1.TLSCertKey] = cert
-		secret.Data[corev1.TLSPrivateKeyKey] = key
-
-		if _, err := p.secrets.Update(secret); err != nil {
-			return fmt.Errorf("failed to update secret: %w", err)
-		}
-
-		logrus.Info("updated imperative api cert secret")
-	}
-
-	p.contentMu.Lock()
-	p.cert = cert
-	p.key = key
-	p.contentMu.Unlock()
 
 	p.notify()
-
-	return nil
-}
-
-func (p *rotatingSNIProvider) willCertExpireWithinDuration(secret *corev1.Secret, d time.Duration) (bool, error) {
-	certData, ok := secret.Data[corev1.TLSCertKey]
-	if !ok {
-		return false, fmt.Errorf("secret does not contain field '%s'", corev1.TLSCertKey)
-	}
-
-	keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
-	if !ok {
-		return false, fmt.Errorf("secret does not contain field '%s'", corev1.TLSPrivateKeyKey)
-	}
-
-	cert, err := tls.X509KeyPair(certData, keyData)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse cert: %w", err)
-	}
-
-	if time.Now().Add(d).After(cert.Leaf.NotAfter) {
-		return true, nil
-	}
-
-	return false, nil
-}
-
-func (p *rotatingSNIProvider) handleCert() error {
-	secret, err := p.secrets.Get(Namespace, p.secretName, metav1.GetOptions{})
-
-	if apierrors.IsNotFound(err) {
-		if err := p.createOrUpdateCerts(nil); err != nil {
-			return fmt.Errorf("failed to create new cert: %w", err)
-		}
-
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("failed to get secret: %w", err)
-	}
-
-	willExpire, err := p.willCertExpireWithinDuration(secret, maxRemainingCertLifetime)
-	if err != nil {
-		return fmt.Errorf("failed to check if cert will expire: %w", err)
-	}
-
-	if willExpire {
-		logrus.Infof("imperative api cabundle will expire within '%s', regenerating", maxRemainingCertLifetime)
-		if err := p.createOrUpdateCerts(secret); err != nil {
-			return fmt.Errorf("failed to update expired cert: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (p *rotatingSNIProvider) handleCertEvent(event watch.Event) error {
-	switch event.Type {
-	case watch.Added, watch.Modified:
-		secret := event.Object.(*corev1.Secret)
-		certData, ok := secret.Data[corev1.TLSCertKey]
-		if !ok {
-			return fmt.Errorf("secret does not contain field '%s'", corev1.TLSCertKey)
-		}
-
-		keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
-		if !ok {
-			return fmt.Errorf("secret does not contain field '%s'", corev1.TLSPrivateKeyKey)
-		}
-
-		p.contentMu.Lock()
-		p.cert = certData
-		p.key = keyData
-		p.contentMu.Unlock()
-
-		p.notify()
-	case watch.Deleted:
-		if err := p.createOrUpdateCerts(nil); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }

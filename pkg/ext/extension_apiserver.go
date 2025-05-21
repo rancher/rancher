@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
@@ -154,7 +153,16 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
-		sniProvider, err := NewSNIProviderForCname(
+		// Only need to listen on localhost because that port will be reached
+		// from a remotedialer tunnel on localhost
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
+		}
+
+		sniProvider, ln, _, err := NewSNIProviderForCname(
+			ctx,
+			ln,
 			"imperative-api-sni-provider",
 			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
 			wranglerContext.Core.Secret(),
@@ -164,26 +172,6 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		}
 
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
-
-		go func() {
-			// sniProvider.Run uses a Watch that could be aborted due to external reasons, make sure we retry unless the context was already canceled
-			for {
-				if err := sniProvider.Run(ctx.Done()); err != nil {
-					logrus.Errorf("sni provider failed: %s", err)
-					if ctx.Err() != nil {
-						return
-					}
-				}
-				time.Sleep(10 * time.Second)
-			}
-		}()
-
-		// Only need to listen on localhost because that port will be reached
-		// from a remotedialer tunnel on localhost
-		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
-		}
 
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
 
