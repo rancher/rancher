@@ -15,15 +15,17 @@ import (
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"time"
 )
 
 type handler struct {
-	ctx            context.Context
-	registrations  registrationControllers.RegistrationController
-	secrets        v1core.SecretController
-	sccCredentials *credentials.CredentialSecretsAdapter
-	systemInfo     *util.RancherSystemInfo
+	ctx               context.Context
+	registrations     registrationControllers.RegistrationController
+	registrationCache registrationControllers.RegistrationCache
+	secrets           v1core.SecretController
+	sccCredentials    *credentials.CredentialSecretsAdapter
+	systemInfo        *util.RancherSystemInfo
 }
 
 func Register(
@@ -33,11 +35,12 @@ func Register(
 	systemInfo *util.RancherSystemInfo,
 ) {
 	controller := &handler{
-		ctx:            ctx,
-		registrations:  registrations,
-		secrets:        secrets,
-		sccCredentials: credentials.New(secrets),
-		systemInfo:     systemInfo,
+		ctx:               ctx,
+		registrations:     registrations,
+		registrationCache: registrations.Cache(),
+		secrets:           secrets,
+		sccCredentials:    credentials.New(secrets),
+		systemInfo:        systemInfo,
 	}
 
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
@@ -61,17 +64,17 @@ func Register(
 	jitterCheckin := jitterbug.NewJitterChecker(
 		&jitterbugConfig,
 		func(dailyTriggerTime, strictDeadline time.Duration) (bool, error) {
-			registrationsList, err := registrations.List(metav1.ListOptions{})
+			registrationsCacheList, err := controller.registrationCache.List(labels.Everything())
 			if err != nil {
 				logrus.Errorf("Failed to list registrations: %v", err)
 				return false, err
 			}
 
 			checkInWasTriggered := false
-			for _, registrationObj := range registrationsList.Items {
+			for _, registrationObj := range registrationsCacheList {
 				// Always skip offline mode registrations, or Registrations that haven't progressed to activation
 				if registrationObj.Spec.Mode == v1.Offline ||
-					needsRegistration(&registrationObj) {
+					needsRegistration(registrationObj) {
 					continue
 				}
 

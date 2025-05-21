@@ -25,28 +25,31 @@ func TestNewCredentials(t *testing.T) {
 }
 
 func TestSetLogin(t *testing.T) {
-	credential := SccCredentials{
+	credentials := SccCredentials{
 		systemLogin: "",
 		password:    "",
 	}
-	err := credential.SetLogin("newLogin", "newPassword")
+	err := credentials.SetLogin("newLogin", "newPassword")
 	assert.NoError(t, err)
 
-	credential = SccCredentials{
-		systemLogin: "",
-		password:    "",
-	}
-	err = credential.SetLogin("", "newPassword")
-	assert.Error(t, err)
+	credsCopy := credentials.DeepCopy()
+	assert.Equal(t, &credentials, credsCopy)
+	err = credsCopy.SetLogin("", "newPassword2")
+	assert.NoError(t, err)
+	assert.NotEqual(t, &credentials, credsCopy)
 }
 
 func TestSetLoginEmptyFields(t *testing.T) {
 	credential := SccCredentials{
-		systemLogin: "",
-		password:    "",
+		systemLogin: "123",
+		password:    "321",
 	}
+	assert.Equal(t, "123", credential.systemLogin)
+	assert.Equal(t, "321", credential.password)
 	err := credential.SetLogin("", "")
-	assert.Error(t, err)
+	assert.NoError(t, err)
+	assert.Equal(t, "", credential.systemLogin)
+	assert.Equal(t, "", credential.password)
 }
 
 func TestSetLoginMultipleErrors(t *testing.T) {
@@ -55,10 +58,19 @@ func TestSetLoginMultipleErrors(t *testing.T) {
 		password:    "",
 	}
 	err := credential.SetLogin("", "newPassword")
-	assert.Error(t, err)
+	assert.NoError(t, err)
+	assert.Equal(t, "", credential.systemLogin)
+	assert.Equal(t, "newPassword", credential.password)
+
+	err = credential.SetLogin("newLogin", "newPassword")
+	assert.NoError(t, err)
+	assert.Equal(t, "newLogin", credential.systemLogin)
+	assert.Equal(t, "newPassword", credential.password)
 
 	err = credential.SetLogin("newLogin", "")
-	assert.Error(t, err)
+	assert.NoError(t, err)
+	assert.Equal(t, "newLogin", credential.systemLogin)
+	assert.Equal(t, "", credential.password)
 }
 
 func TestHasAuthentication(t *testing.T) {
@@ -197,13 +209,19 @@ func TestLoginErrors(t *testing.T) {
 	assert.Error(t, err)
 
 	err = credential.SetLogin("user3", "")
-	assert.Error(t, err)
+	assert.NoError(t, err)
 
 	err = credential.SetLogin("", "pass3")
-	assert.Error(t, err)
+	assert.NoError(t, err)
 
 	err = credential.SetLogin("user3", "pass3")
 	assert.NoError(t, err)
+
+	err = credential.SetLogin("", "")
+	err = credential.UpdateToken("token")
+
+	_, _, err = credential.Login()
+	assert.Error(t, err)
 }
 
 func TestSccCredentialsInterface(t *testing.T) {

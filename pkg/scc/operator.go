@@ -165,6 +165,9 @@ func Setup(
 		return
 	}()
 
+	// Because the controller `Register` call will start activation refresh timers,
+	// we need to wait for the system to be ready before starting the controller.
+	// Doing it this way is more simple than tying the controller starting those timers to `systemRegistrationReady`
 	go initOperator.waitForSystemReady(func() {
 		controllers.Register(
 			ctx,
