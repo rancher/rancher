@@ -10,10 +10,10 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/util"
+	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"time"
 )
 
@@ -41,37 +41,48 @@ func Register(
 
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
-	// Ensure that when a registration is over 20 hours since last validation they are enqueued.
 
-	go func() {
-		dailyTriggerBase := 20
-		jitter := rand.Intn(3)
-		jitterDirection := rand.Intn(2)
-		if jitterDirection >= 1 {
-			jitter *= -1
-		}
-		dailyTriggerBase += jitter
-		dailyTriggerTime := time.Duration(dailyTriggerBase) * time.Hour
-
-		for {
+	// Configure jitter based daily revalidation trigger
+	jitterbugConfig := jitterbug.Config{
+		BaseInterval:    20 * time.Hour,
+		JitterMax:       3,
+		JitterMaxScale:  time.Hour,
+		PollingInterval: 9 * time.Second,
+	}
+	jitterCheckin := jitterbug.NewJitterChecker(
+		jitterbugConfig,
+		func(dailyTriggerTime time.Duration) (bool, error) {
 			registrationsList, err := registrations.List(metav1.ListOptions{})
 			if err != nil {
 				logrus.Errorf("Failed to list registrations: %v", err)
-				continue
+				return false, err
 			}
 
+			checkInWasTriggered := false
 			for _, registrationObj := range registrationsList.Items {
+				// Always skip offline mode registrations, or Registrations that haven't progressed to activation
+				if registrationObj.Spec.Mode == v1.Offline ||
+					needsRegistration(&registrationObj) {
+					continue
+				}
+
 				lastValidated := registrationObj.Status.ActivationStatus.LastValidatedTS
 				timeSinceLastValidation := time.Since(lastValidated.Time)
-				if timeSinceLastValidation >= dailyTriggerTime {
+				// If the time since last validation is after the daily trigger (which includes jitter), we revalidate.
+				// Also, ensure that when a registration is over 23 hours since last validation they are revalidate.
+				if timeSinceLastValidation >= dailyTriggerTime || timeSinceLastValidation >= time.Hour*23 {
+					checkInWasTriggered = true
 					// Potentially this we should update the registration here too?
 					// Mark it as `checkNow` or something similar? (not sure enqueue alone will cause the check to happen)
 					registrations.Enqueue(registrationObj.Name)
 				}
 			}
-			time.Sleep(9 * time.Second)
-		}
-	}()
+
+			return checkInWasTriggered, nil
+		},
+	)
+	jitterCheckin.Start()
+	go jitterCheckin.Run()
 }
 
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
@@ -87,9 +98,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	// That is why these conditions may look a bit odd, as it helps ensure registration logic is used as needed.
-	if registrationObj.Status.RegistrationProcessedTS == nil || registrationObj.Status.RegistrationProcessedTS.IsZero() ||
-		!registrationObj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
-		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced) {
+	if needsRegistration(registrationObj) {
 		registrationHandler := registration.New(
 			h.ctx,
 			h.registrations,
@@ -110,6 +119,12 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	)
 
 	return activationHandler.Call(name, registrationObj)
+}
+
+func needsRegistration(obj *v1.Registration) bool {
+	return obj.Status.RegistrationProcessedTS == nil || obj.Status.RegistrationProcessedTS.IsZero() ||
+		!obj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
+		!obj.HasCondition(v1.RegistrationConditionAnnounced)
 }
 
 func (h *handler) isServerUrlReady() bool {
