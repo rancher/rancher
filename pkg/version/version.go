@@ -5,6 +5,8 @@ package version
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Masterminds/semver/v3"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 )
@@ -28,9 +30,18 @@ func FriendlyVersion() string {
 	return fmt.Sprintf("%s (%s)", Version, GitCommit)
 }
 
-func VersionIsDev() bool {
-	// todo: think about what head and rc builds look like too
-	return Version == "dev"
+func IsDevBuild() bool {
+	if Version == "dev" {
+		return true
+	}
+
+	parsedVer, err := semver.NewVersion(Version)
+	if err != nil {
+		logrus.Errorf("Error parsing version %s: %s", Version, err)
+		logrus.Warnf("The version will be interpreted as a development build")
+		return true
+	}
+	return parsedVer.Prerelease() != ""
 }
 
 type versionHandler struct {

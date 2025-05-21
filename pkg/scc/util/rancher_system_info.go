@@ -22,7 +22,7 @@ type RancherSystemInfo struct {
 func NewRancherSystemInfo(rancherUuid uuid.UUID, clusterUuid uuid.UUID, wcontext *wrangler.Context) *RancherSystemInfo {
 	var version string
 	version = coreVersion.Version
-	if coreVersion.VersionIsDev() {
+	if coreVersion.IsDevBuild() {
 		// TODO: maybe SCC devs can give us a static dev version?
 		version = "2.10.3"
 	}
