@@ -151,7 +151,7 @@ spec:
 {{- end }}
         - name: IMPERATIVE_API_DIRECT
           value: "true"
-        - name: EXTENSION_API_APP_SELECTOR
+        - name: IMPERATIVE_API_APP_SELECTOR
           value: {{ template "rancher.fullname" . }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
