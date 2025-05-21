@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
@@ -19,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -155,23 +157,39 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 		// Only need to listen on localhost because that port will be reached
 		// from a remotedialer tunnel on localhost
-		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
+		tcpLn, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
 		}
 
-		sniProvider, ln, _, err := NewSNIProviderForCname(
+		sniProvider, err := newCertProvider(
 			ctx,
-			ln,
+			*wranglerContext,
+			tcpLn,
 			"imperative-api-sni-provider",
 			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
-			wranglerContext.Core.Secret(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
 		}
 
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
+
+		ln, _, err = getListener(sniProvider, tcpLn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dynamiclistener: %w", err)
+		}
+
+		timeoutCtx, _ := context.WithTimeout(ctx, time.Second*30)
+		// err = wait.PollUntilContextCancel(timeoutCtx, time.Millisecond*500, false, wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
+		err = wait.PollUntilContextCancel(timeoutCtx, time.Second*2, false, wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
+			logrus.Info("checking for initial imperative api cert data...")
+			ca, key := sniProvider.CurrentCertKeyContent()
+			return len(ca) > 0 && len(key) > 0, nil
+		}))
+		if err != nil {
+			return nil, fmt.Errorf("failed to wait for initial cert data: %w", err)
+		}
 
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
 

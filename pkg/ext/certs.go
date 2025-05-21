@@ -1,13 +1,12 @@
 package ext
 
 import (
-	"bytes"
 	"context"
+	"crypto"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"math"
 	"math/big"
@@ -19,27 +18,21 @@ import (
 	"github.com/rancher/dynamiclistener"
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	"github.com/rancher/dynamiclistener/storage/memory"
+	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
-	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	"k8s.io/client-go/util/keyutil"
 	netutils "k8s.io/utils/net"
 )
 
 const (
-	CertificateBlockType = "CERTIFICATE"
-
-	SecretLabelProvider = "provider"
-
-	certCheckInterval        = time.Hour
-	maxRemainingCertLifetime = time.Hour
+	certCheckInterval = time.Hour
 )
 
 // GenerateSelfSignedCertKey generates a self-signed certificate.
 // Based on the self-signed cert generate code in client-go: https://pkg.go.dev/k8s.io/client-go/util/cert#GenerateSelfSignedCertKeyWithFixtures
-func GenerateSelfSignedCertKeyWithOpts(host string, expireAfter time.Duration) ([]byte, []byte, error) {
+func GenerateSelfSignedCertKeyWithOpts(host string, expireAfter time.Duration) (*x509.Certificate, crypto.Signer, error) {
 	// valid for an extra check interval before current time to ensure total cert coverage and avoid any issues with clock skew
 	validFrom := time.Now().Add(-certCheckInterval)
 	maxAge := expireAfter
@@ -81,6 +74,7 @@ func GenerateSelfSignedCertKeyWithOpts(host string, expireAfter time.Duration) (
 	if err != nil {
 		return nil, nil, err
 	}
+
 	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
 	serial, err = cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
 	if err != nil {
@@ -111,22 +105,12 @@ func GenerateSelfSignedCertKeyWithOpts(host string, expireAfter time.Duration) (
 		return nil, nil, err
 	}
 
-	// Generate cert, followed by ca
-	certBuffer := bytes.Buffer{}
-	if err := pem.Encode(&certBuffer, &pem.Block{Type: CertificateBlockType, Bytes: derBytes}); err != nil {
-		return nil, nil, err
-	}
-	if err := pem.Encode(&certBuffer, &pem.Block{Type: CertificateBlockType, Bytes: caDERBytes}); err != nil {
+	ca, err := x509.ParseCertificate(derBytes)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	// Generate key
-	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return nil, nil, err
-	}
-
-	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+	return ca, priv, nil
 }
 
 var _ dynamiccertificates.SNICertKeyContentProvider = &provider{}
@@ -146,9 +130,9 @@ type provider struct {
 	storage dynamiclistener.TLSStorage
 }
 
-func NewSNIProviderForCname(ctx context.Context, l net.Listener, name string, cnames []string, secrets wranglercorev1.SecretClient) (*provider, net.Listener, http.Handler, error) {
-	secretName := fmt.Sprintf("%s-cert-ca", name)
-	storage := kubernetes.New(ctx, nil, Namespace, secretName, memory.New())
+func newCertProvider(ctx context.Context, wranglerCtx wrangler.Context, l net.Listener, name string, cnames []string) (*provider, error) {
+	secretName := fmt.Sprintf("%s-ca", name)
+	storage := kubernetes.Load(ctx, wranglerCtx.Core.Secret(), Namespace, secretName, memory.New())
 
 	provider := &provider{
 		name:       name,
@@ -159,18 +143,7 @@ func NewSNIProviderForCname(ctx context.Context, l net.Listener, name string, cn
 		storage: storage,
 	}
 
-	// todo: we can probably separate this out later
-	ca, key, err := kubernetes.LoadOrGenCAChain(secrets, Namespace, provider.secretName)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	ln, h, err := dynamiclistener.NewListenerWithChain(l, storage, ca, key, dynamiclistener.Config{})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return provider, ln, h, nil
+	return provider, nil
 }
 
 func (p *provider) AddListener(listener dynamiccertificates.Listener) {
@@ -198,8 +171,13 @@ func (p *provider) Name() string {
 }
 
 func (p *provider) CurrentCertKeyContent() ([]byte, []byte) {
-	// todo: implement this
-	return nil, nil
+	secret, err := p.Get()
+	if err != nil {
+		logrus.Errorf("could not getimperative api cert content: %w", err)
+		return nil, nil
+	}
+
+	return secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey]
 }
 
 func (p *provider) Get() (*corev1.Secret, error) {
@@ -231,4 +209,32 @@ func ApiServiceCertListener(provider dynamiccertificates.SNICertKeyContentProvid
 			logrus.WithError(err).Error("failed to update api service")
 		}
 	})
+}
+
+func getListener(p *provider, tcp net.Listener) (net.Listener, http.Handler, error) {
+	ca, signer, err := GenerateSelfSignedCertKeyWithOpts(p.sninames[0], time.Hour*24*30*3)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gailed to generate initial certs: %w", err)
+	}
+
+	ln, h, err := dynamiclistener.NewListenerWithChain(tcp, p, []*x509.Certificate{ca}, signer, dynamiclistener.Config{
+		CN: p.sninames[0],
+		// Organization:          []string{},
+		// TLSConfig: &tls.Config{},
+		// SANs:                  []string{},
+		// MaxSANs:               0,
+		// ExpirationDaysCheck:   0,
+		// CloseConnOnCertChange: false,
+		RegenerateCerts: func() bool {
+			return true
+		},
+		// FilterCN: func(...string) []string {
+		// panic("TODO")
+		// },
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ln, h, nil
 }
