@@ -312,10 +312,10 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 		desiredSecrets sets.Set[types.NamespacedName]
 	}
 	tests := []struct {
-		name                  string
-		args                  args
-		setupSecretController func(*fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList])
-		wantErr               bool
+		name              string
+		args              args
+		setupSecretClient func(*fake.MockClientInterface[*corev1.Secret, *corev1.SecretList])
+		wantErr           bool
 	}{
 		{
 			name: "error getting secrets",
@@ -326,7 +326,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 					{Name: "secret2", Namespace: "ns1"}: {},
 				},
 			},
-			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{},
 				}, errDefault)
@@ -342,7 +342,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 					{Name: "secret2", Namespace: "ns1"}: {},
 				},
 			},
-			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
@@ -364,7 +364,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 					{Name: "secret2", Namespace: "ns1"}: {},
 				},
 			},
-			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{},
 				}, nil)
@@ -378,7 +378,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 					{Name: "secret1", Namespace: "ns1"}: {},
 				},
 			},
-			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
@@ -398,7 +398,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 				desiredSecrets: sets.Set[types.NamespacedName]{},
 			},
-			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
@@ -421,7 +421,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 					{Name: "secret1", Namespace: "ns1"}: {},
 				},
 			},
-			setupSecretController: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
@@ -440,12 +440,12 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			secretController := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-			if tt.setupSecretController != nil {
-				tt.setupSecretController(secretController)
+			secretClient := fake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			if tt.setupSecretClient != nil {
+				tt.setupSecretClient(secretClient)
 			}
 			n := &namespaceHandler{
-				secretController: secretController,
+				secretClient: secretClient,
 			}
 			if err := n.removeUndesiredProjectScopedSecrets(tt.args.namespace, tt.args.desiredSecrets); (err != nil) != tt.wantErr {
 				t.Errorf("namespaceHandler.removeUndesiredProjectScopedSecrets() error = %v, wantErr %v", err, tt.wantErr)

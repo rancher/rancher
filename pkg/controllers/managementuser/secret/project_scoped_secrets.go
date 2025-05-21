@@ -36,13 +36,13 @@ type namespaceHandler struct {
 	managementSecretCache wcorev1.SecretCache
 	clusterNamespaceCache wcorev1.NamespaceCache
 	projectCache          mgmtv3.ProjectCache
-	secretController      wcorev1.SecretController
+	secretClient          wcorev1.SecretClient
 	clusterName           string
 }
 
 func RegisterProjectScopedSecretHandler(ctx context.Context, cluster *config.UserContext) {
 	n := &namespaceHandler{
-		secretController:      cluster.Corew.Secret(),
+		secretClient:          cluster.Corew.Secret(),
 		managementSecretCache: cluster.Management.Wrangler.Core.Secret().Cache(),
 		projectCache:          cluster.Management.Wrangler.Mgmt.Project().Cache(),
 		clusterNamespaceCache: cluster.Corew.Namespace().Cache(),
@@ -69,7 +69,7 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 	for _, secret := range secrets {
 		secretCopy := getNamespacedSecret(secret, namespace.Name)
 
-		s, err := rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretController, areSecretsSame)
+		s, err := rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretClient, areSecretsSame)
 		desiredSecrets.Insert(client.ObjectKeyFromObject(s))
 		errs = errors.Join(errs, err)
 	}
@@ -111,7 +111,7 @@ func (n *namespaceHandler) getProjectScopedSecretsFromNamespace(namespace *corev
 // removeUndesiredProjectScopedSecrets removes project scoped secrets from the namespace that are not in the desiredSecrets map.
 func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1.Namespace, desiredSecrets sets.Set[types.NamespacedName]) error {
 	// remove any project scoped secrets that don't belong in the project
-	downstreamProjectScopedSecrets, err := n.secretController.List(namespace.Name, metav1.ListOptions{
+	downstreamProjectScopedSecrets, err := n.secretClient.List(namespace.Name, metav1.ListOptions{
 		LabelSelector: projectScopedSecretLabel,
 	})
 	if err != nil {
@@ -129,7 +129,7 @@ func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1
 	for _, secret := range secretsToDelete.UnsortedList() {
 		// secret in namespace does not belong here
 		logrus.Infof("deleting secret %s from namespace %s", secret.Name, secret.Namespace)
-		errs = errors.Join(errs, n.secretController.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}))
+		errs = errors.Join(errs, n.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}))
 	}
 	return errs
 }
