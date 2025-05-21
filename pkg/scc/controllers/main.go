@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
+	"github.com/rancher/rancher/pkg/version"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,12 +43,17 @@ func Register(
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
 
+	pollingInterval := 9 * time.Minute
+	if version.VersionIsDev() {
+		pollingInterval = 9 * time.Second
+	}
+
 	// Configure jitter based daily revalidation trigger
 	jitterbugConfig := jitterbug.Config{
 		BaseInterval:    20 * time.Hour,
 		JitterMax:       3,
 		JitterMaxScale:  time.Hour,
-		PollingInterval: 9 * time.Second,
+		PollingInterval: pollingInterval,
 	}
 	jitterCheckin := jitterbug.NewJitterChecker(
 		jitterbugConfig,
