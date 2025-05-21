@@ -84,6 +84,7 @@ type Options struct {
 	AuditLevel        int
 	Features          string
 	ClusterRegistry   string
+	ExtensionOpts     ext.Options
 }
 
 type Rancher struct {
@@ -202,7 +203,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext)
+	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext, opts.ExtensionOpts)
 	if err != nil {
 		return nil, fmt.Errorf("extension api server: %w", err)
 	}
