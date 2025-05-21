@@ -157,7 +157,9 @@ func (h *handler) deployK3sBasedUpgradeController(cluster *mgmtv3.Cluster) error
 	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
 		appName = Rke2AppName
 	}
-	app, err := appLister.Get(systemProjectName, appName)
+
+	systemProjectBackingNamespace := systemProject.GetProjectBackingNamespace()
+	app, err := appLister.Get(systemProjectBackingNamespace, appName)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
@@ -166,7 +168,7 @@ func (h *handler) deployK3sBasedUpgradeController(cluster *mgmtv3.Cluster) error
 		desiredApp := &prjv3.App{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      appName,
-				Namespace: systemProjectName,
+				Namespace: systemProjectBackingNamespace,
 				Annotations: map[string]string{
 					"field.cattle.io/creatorId": creator.Name,
 				},
