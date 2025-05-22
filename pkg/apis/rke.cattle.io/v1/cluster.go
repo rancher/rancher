@@ -63,40 +63,75 @@ type DataDirectories struct {
 	K8sDistro string `json:"k8sDistro,omitempty"`
 }
 
+// RKEClusterSpecCommon contains
 type RKEClusterSpecCommon struct {
-	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
-	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
-	MachineGlobalConfig   GenericMap             `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
-	MachineSelectorConfig []RKESystemConfig      `json:"machineSelectorConfig,omitempty"`
-	MachineSelectorFiles  []RKEProvisioningFiles `json:"machineSelectorFiles,omitempty"`
-	AdditionalManifest    string                 `json:"additionalManifest,omitempty"`
-	Registries            *Registry              `json:"registries,omitempty"`
-	ETCD                  *ETCD                  `json:"etcd,omitempty"`
+	// +optional
+	UpgradeStrategy ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	ChartValues GenericMap `json:"chartValues,omitempty" wrangler:"nullable"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	MachineGlobalConfig GenericMap `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
+	// MachineSelectorConfig is a list of distro arguments which will be copied to
+	// /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the machine matches
+	// the label selector.
+	// +optional
+	MachineSelectorConfig []RKESystemConfig `json:"machineSelectorConfig,omitempty"`
+	// MachineSelectorFiles is a list of files which will be copied to the machine if the machine matches the label selector.
+	// +optional
+	MachineSelectorFiles []RKEProvisioningFiles `json:"machineSelectorFiles,omitempty"`
+	// AdditionalManifest is a string containing a yaml blob to insert in the
+	// /var/lib/rancher/<rke2/k3s>/server/manifests/rancher/addons.yaml file.
+	// The distro will automatically create these resources.
+	// +optional
+	AdditionalManifest string `json:"additionalManifest,omitempty"`
+	// Registries defines the list of mirrors and configurations for the cluster's container registries.
+	// +optional
+	Registries *Registry `json:"registries,omitempty"`
+	// ETCD contains the etcd snapshot configuration for the cluster.
+	// +optional
+	ETCD *ETCD `json:"etcd,omitempty"`
 
-	// Networking contains information regarding the desired and actual networking stack of the cluster.
+	// Networking contains information regarding the desired networking stack of the cluster.
+	// +optional
 	Networking *Networking `json:"networking,omitempty"`
 
 	// DataDirectories contains the configuration for the data directories typically stored within /var/lib/rancher.
+	// +optional
 	DataDirectories DataDirectories `json:"dataDirectories,omitempty"`
 
-	// Increment to force all nodes to re-provision
+	// ProvisionGeneration is used to force the planner to reconcile the cluster,
+	// regardless of whether a reconciliation is required.
+	// +optional
 	ProvisionGeneration int `json:"provisionGeneration,omitempty"`
 }
 
 type LocalClusterAuthEndpoint struct {
-	Enabled bool   `json:"enabled,omitempty"`
-	FQDN    string `json:"fqdn,omitempty"`
+	// Enabled indicates whether the local cluster auth endpoint should be enabled.
+	Enabled bool `json:"enabled,omitempty"`
+	// FQDN is the fully qualified domain name of the local cluster auth endpoint.
+	FQDN string `json:"fqdn,omitempty"`
+	// CACerts is the CA certificate for the local cluster auth endpoint.
 	CACerts string `json:"caCerts,omitempty"`
 }
 
 type RKESystemConfig struct {
+	// MachineLabelSelector is a label selector that is used to match machines.
+	// An empty label selector matches all machines.
+	// +optional
 	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
-	Config               GenericMap            `json:"config,omitempty" wrangler:"nullable"`
+	// Config is a map of distro arguments which will be copied to /etc/rancher/<rke2/k3s>/config.yaml.d/5o-rancher.yaml if the machine matches the label selector.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	Config GenericMap `json:"config,omitempty" wrangler:"nullable"`
 }
 
 type RKEProvisioningFiles struct {
-	MachineLabelSelector *metav1.LabelSelector    `json:"machineLabelSelector,omitempty"`
-	FileSources          []ProvisioningFileSource `json:"fileSources,omitempty"`
+	// MachineLabelSelector is a label selector that is used to match machines.
+	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
+	// FileSources is a list of file sources that will be copied to the machine if the machine matches the label selector.
+	FileSources []ProvisioningFileSource `json:"fileSources,omitempty"`
 }
 
 type RKEClusterSpec struct {
@@ -115,39 +150,45 @@ type ClusterUpgradeStrategy struct {
 	WorkerDrainOptions DrainOptions `json:"workerDrainOptions,omitempty"`
 }
 
+// DrainOptions contains the drain configuration for a machine pool.
 type DrainOptions struct {
-	// Enable will require nodes be drained before upgrade
+	// Enabled specifies whether draining is required for the machine pool before upgrading.
 	Enabled bool `json:"enabled"`
-	// Drain node even if there are pods not managed by a ReplicationController, Job, or DaemonSet
-	// Drain will not proceed without Force set to true if there are such pods
+	// Force specifies whether to drain the node even if there are pods not managed by a ReplicationController, Job, or DaemonSet.
+	// Drain will not proceed without Force set to true if there are such pods.
 	Force bool `json:"force"`
+	// IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
 	// If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
 	// (even when set to true, kubectl won't delete pods - so setting default to true)
 	IgnoreDaemonSets *bool `json:"ignoreDaemonSets"`
 	// IgnoreErrors Ignore errors occurred between drain nodes in group
+	// NOTE: currently unimplemented
+	// +optional
 	IgnoreErrors bool `json:"ignoreErrors"`
 	// Continue even if there are pods using emptyDir
 	DeleteEmptyDirData bool `json:"deleteEmptyDirData"`
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool `json:"disableEviction"`
-	// Period of time in seconds given to each pod to terminate gracefully.
-	// If negative, the default value specified in the pod will be used
+	// GracePeriod is the period of time in seconds given to each pod to terminate gracefully.
+	// If negative, the default value specified in the pod will be used.
 	GracePeriod int `json:"gracePeriod"`
 	// Time to wait (in seconds) before giving up for one try
 	Timeout int `json:"timeout"`
 	// SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.
 	SkipWaitForDeleteTimeoutSeconds int `json:"skipWaitForDeleteTimeoutSeconds"`
 
-	// PreDrainHooks A list of hooks to run prior to draining a node
-	PreDrainHooks []DrainHook `json:"preDrainHooks"`
-	// PostDrainHook A list of hooks to run after draining AND UPDATING a node
-	PostDrainHooks []DrainHook `json:"postDrainHooks"`
+	// PreDrainHooks is a list of hooks to run prior to draining a node
+	// +optional
+	PreDrainHooks []DrainHook `json:"preDrainHooks,omitempty"`
+	// PostDrainHooks is a list of hooks to run after draining AND UPDATING a node
+	// +optional
+	PostDrainHooks []DrainHook `json:"postDrainHooks,omitempty"`
 }
 
 type DrainHook struct {
-	// Annotation This annotation will need to be populated on the machine-plan secret with the value from the annotation
-	// "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node.  The annotation
-	// "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post drain.
+	// Annotation that will need to be populated on the machine-plan secret with the value from the annotation
+	// "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node. The annotation
+	// "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post-drain.
 	Annotation string `json:"annotation,omitempty"`
 }
 
