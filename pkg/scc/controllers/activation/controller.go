@@ -8,7 +8,7 @@ import (
 	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
-	"github.com/rancher/rancher/pkg/scc/util"
+	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
@@ -18,11 +18,11 @@ import (
 )
 
 type Handler struct {
-	ctx            context.Context
-	registrations  registrationControllers.RegistrationController
-	secrets        v1core.SecretController
-	sccCredentials *credentials.CredentialSecretsAdapter
-	systemInfo     *util.RancherSystemInfo
+	ctx                context.Context
+	registrations      registrationControllers.RegistrationController
+	secrets            v1core.SecretController
+	sccCredentials     *credentials.CredentialSecretsAdapter
+	systemInfoExporter *systeminfo.InfoExporter
 }
 
 func New(
@@ -30,14 +30,14 @@ func New(
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
 	sccCredentials *credentials.CredentialSecretsAdapter,
-	systemInfo *util.RancherSystemInfo,
+	systemInfoExporter *systeminfo.InfoExporter,
 ) *Handler {
 	controller := &Handler{
-		ctx:            ctx,
-		registrations:  registrations,
-		secrets:        secrets,
-		sccCredentials: sccCredentials,
-		systemInfo:     systemInfo,
+		ctx:                ctx,
+		registrations:      registrations,
+		secrets:            secrets,
+		sccCredentials:     sccCredentials,
+		systemInfoExporter: systemInfoExporter,
 	}
 
 	return controller
@@ -124,9 +124,9 @@ func (h *Handler) setReconcilingCondition(registrationObj *v1.Registration, orig
 func (h *Handler) processOnlineActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
 	_ = h.sccCredentials.Refresh()
 	regCode := suseconnect.FetchSccRegistrationCodeFrom(h.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
-	sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfo)
+	sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfoExporter)
 
-	identifier, version, arch := h.systemInfo.GetProductIdentifier()
+	identifier, version, arch := h.systemInfoExporter.Provider().GetProductIdentifier()
 	metaData, product, err := sccConnection.Activate(identifier, version, arch, regCode)
 	if err != nil {
 		return registrationObj, err
