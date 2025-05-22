@@ -4,31 +4,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
-	"github.com/rancher/rancher/pkg/scc/controllers"
-	"github.com/rancher/rancher/pkg/scc/systeminfo"
-	"github.com/rancher/wrangler/v3/pkg/start"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+	k8sv1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
+
+	sccv1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
+	"github.com/rancher/rancher/pkg/scc/controllers"
+	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
-	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-
 	"github.com/rancher/rancher/pkg/wrangler"
+	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/start"
 )
 
 type sccOperator struct {
-	configMaps              v1core.ConfigMapController
+	configMaps              corev1.ConfigMapController
 	sccResourceFactory      *scc.Factory
-	secrets                 v1core.SecretController
+	secrets                 corev1.SecretController
 	systemInfoProvider      *systeminfo.InfoProvider
 	systemInfoExporter      *systeminfo.InfoExporter
 	systemRegistrationReady chan struct{}
@@ -36,10 +37,26 @@ type sccOperator struct {
 
 func setup(wContext *wrangler.Context) (*sccOperator, error) {
 	namespaces := wContext.Core.Namespace()
-	kubeSystemNS, err := namespaces.Get("kube-system", metav1.GetOptions{})
-	if err != nil {
+	var kubeSystemNS *k8sv1.Namespace
+
+	kubeNsErr := retry.OnError(
+		retry.DefaultRetry,
+		func(err error) bool {
+			return apierrors.IsNotFound(err)
+		},
+		func() error {
+			maybeNs, err := namespaces.Get("kube-system", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			kubeSystemNS = maybeNs
+			return nil
+		},
+	)
+	if kubeNsErr != nil {
 		// fatal log here, because we need the kube-system ns UID while creating any backup file
-		logrus.Fatalf("Error getting namespace kube-system %v", err)
+		logrus.Fatalf("Error getting namespace kube-system: %v", kubeNsErr)
 	}
 
 	rancherUuid := settings.InstallUUID.Get()
@@ -72,8 +89,9 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 }
 
 func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
-	// Currently we only wait for ServerUrl not being empty, this is a good start as with out the URL we cannot start.
+	// Currently we only wait for ServerUrl not being empty, this is a good start as without the URL we cannot start.
 	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
+	// TODO: expand wait to include verifying at least local cluster is ready too - this prevents issues with offline clusters
 	if systeminfo.IsServerUrlReady() {
 		close(so.systemRegistrationReady)
 		return
@@ -92,7 +110,7 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 
 // maybeFirstInit will check if the initial `Registration` seeding values exist
 // and if they need to be processed into a new `Registration` (used during first boot ever)
-func (so *sccOperator) maybeFirstInit() (*v1.Registration, error) {
+func (so *sccOperator) maybeFirstInit() (*sccv1.Registration, error) {
 	logrus.Debug("[scc-operator] Running maybeFirstInit")
 	if strings.EqualFold(settings.SCCFirstStart.Get(), "false") {
 		logrus.Warn("Skipping the SCC controller first start; first start already completed previously.")
@@ -102,7 +120,7 @@ func (so *sccOperator) maybeFirstInit() (*v1.Registration, error) {
 	// Check if the `cattle-system:initial-scc-registration` ConfigMap exists
 	// If it does not exist, then we skip initialization via ConfigMap and proceed to set SCCFirstStart to false
 	configMap, err := so.configMaps.Get("cattle-system", "initial-scc-registration", metav1.GetOptions{})
-	var newRegistration *v1.Registration
+	var newRegistration *sccv1.Registration
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			logrus.Errorf("Error getting cattle-system initial-scc-registration: %v", err)
@@ -114,16 +132,16 @@ func (so *sccOperator) maybeFirstInit() (*v1.Registration, error) {
 		if err != nil {
 			logrus.Warn("Cannot validate initial-scc-registration configmap; it will be skipped")
 		} else {
-			newRegistration = &v1.Registration{
+			newRegistration = &sccv1.Registration{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "rancher-",
 				},
-				Spec: v1.RegistrationSpec{
-					RegistrationRequest: &v1.RegistrationRequest{},
+				Spec: sccv1.RegistrationSpec{
+					RegistrationRequest: &sccv1.RegistrationRequest{},
 				},
 			}
 			newRegistration.Spec.Mode = *mode
-			if *mode == v1.Online {
+			if *mode == sccv1.Online {
 				newRegistration.Spec.RegistrationRequest.RegistrationCodeSecretRef = secretRef
 			}
 
@@ -146,6 +164,7 @@ func (so *sccOperator) maybeFirstInit() (*v1.Registration, error) {
 	return newRegistration, nil
 }
 
+// Setup initializes the SCC Operator and configures it to start when Rancher is in appropriate state.
 func Setup(
 	ctx context.Context,
 	wContext *wrangler.Context,
