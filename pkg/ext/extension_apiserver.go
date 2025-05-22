@@ -175,13 +175,12 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
 
-		ln, _, err = getListener(sniProvider, tcpLn)
+		ln, _, err = getListener(ctx, wranglerContext.Core.Secret(), sniProvider, tcpLn)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dynamiclistener: %w", err)
 		}
 
 		timeoutCtx, _ := context.WithTimeout(ctx, time.Second*30)
-		// err = wait.PollUntilContextCancel(timeoutCtx, time.Millisecond*500, false, wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
 		err = wait.PollUntilContextCancel(timeoutCtx, time.Second*2, false, wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
 			logrus.Info("checking for initial imperative api cert data...")
 			ca, key := sniProvider.CurrentCertKeyContent()

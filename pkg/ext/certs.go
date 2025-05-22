@@ -17,9 +17,9 @@ import (
 
 	"github.com/rancher/dynamiclistener"
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
-	"github.com/rancher/dynamiclistener/storage/memory"
 	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -122,25 +122,24 @@ type provider struct {
 	name       string
 	secretName string
 
+	// todo: this only needs to be 1 long
 	sninames []string
 
 	listenerM sync.RWMutex
 	listeners []dynamiccertificates.Listener
 
-	storage dynamiclistener.TLSStorage
+	secretMu sync.RWMutex
+	secret   *corev1.Secret
 }
 
 func newCertProvider(ctx context.Context, wranglerCtx wrangler.Context, l net.Listener, name string, cnames []string) (*provider, error) {
 	secretName := fmt.Sprintf("%s-ca", name)
-	storage := kubernetes.Load(ctx, wranglerCtx.Core.Secret(), Namespace, secretName, memory.New())
 
 	provider := &provider{
 		name:       name,
 		secretName: secretName,
 
 		sninames: cnames,
-
-		storage: storage,
 	}
 
 	return provider, nil
@@ -173,7 +172,11 @@ func (p *provider) Name() string {
 func (p *provider) CurrentCertKeyContent() ([]byte, []byte) {
 	secret, err := p.Get()
 	if err != nil {
-		logrus.Errorf("could not getimperative api cert content: %w", err)
+		logrus.Errorf("could not get imperative api cert content: %w", err)
+		return nil, nil
+	}
+
+	if secret == nil {
 		return nil, nil
 	}
 
@@ -181,13 +184,16 @@ func (p *provider) CurrentCertKeyContent() ([]byte, []byte) {
 }
 
 func (p *provider) Get() (*corev1.Secret, error) {
-	return p.storage.Get()
+	p.secretMu.RLock()
+	defer p.secretMu.RUnlock()
+
+	return p.secret, nil
 }
 
 func (p *provider) Update(s *corev1.Secret) error {
-	if err := p.storage.Update(s); err != nil {
-		return err
-	}
+	p.secretMu.Lock()
+	p.secret = s
+	p.secretMu.Unlock()
 
 	p.notify()
 
@@ -211,13 +217,15 @@ func ApiServiceCertListener(provider dynamiccertificates.SNICertKeyContentProvid
 	})
 }
 
-func getListener(p *provider, tcp net.Listener) (net.Listener, http.Handler, error) {
+func getListener(ctx context.Context, secrets wranglercorev1.SecretController, p *provider, tcp net.Listener) (net.Listener, http.Handler, error) {
+	storage := kubernetes.Load(ctx, secrets, Namespace, p.secretName, p)
+
 	ca, signer, err := GenerateSelfSignedCertKeyWithOpts(p.sninames[0], time.Hour*24*30*3)
 	if err != nil {
 		return nil, nil, fmt.Errorf("gailed to generate initial certs: %w", err)
 	}
 
-	ln, h, err := dynamiclistener.NewListenerWithChain(tcp, p, []*x509.Certificate{ca}, signer, dynamiclistener.Config{
+	ln, h, err := dynamiclistener.NewListenerWithChain(tcp, storage, []*x509.Certificate{ca}, signer, dynamiclistener.Config{
 		CN: p.sninames[0],
 		// Organization:          []string{},
 		// TLSConfig: &tls.Config{},
@@ -228,9 +236,9 @@ func getListener(p *provider, tcp net.Listener) (net.Listener, http.Handler, err
 		RegenerateCerts: func() bool {
 			return true
 		},
-		// FilterCN: func(...string) []string {
-		// panic("TODO")
-		// },
+		FilterCN: func(...string) []string {
+			return []string{p.sninames[0]}
+		},
 	})
 	if err != nil {
 		return nil, nil, err
