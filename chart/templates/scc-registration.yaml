@@ -16,7 +16,7 @@ metadata:
 type: Opaque
 data:
   regCode: {{ .Values.registration.regCode | b64enc }}
-{{- end -}}
+{{ end -}}
 {{- if .Values.registration.certificate }}
 ---
 apiVersion: v1
@@ -29,7 +29,7 @@ metadata:
 type: Opaque
 data:
   certificate: {{ .Values.registration.certificate | b64enc }}
-{{- end -}}
+{{ end -}}
 {{- if (lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "registrations.scc.cattle.io") }}
 ---
 apiVersion: scc.cattle.io/v1
@@ -38,6 +38,7 @@ metadata:
   name: rancher-chart-{{ .Release.Name }}-{{ .Release.Revision }}
 spec:
   mode: {{ include "registration.mode" . | quote }}
+  {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}}
   registrationRequest:
     {{- if .Values.registration.regCode }}
     registrationCodeSecretRef:
@@ -49,6 +50,7 @@ spec:
       name: "{{ .Values.registration.regCodeRef.secretName | default "rancher-scc-registration-code" }}"
       namespace: {{ .Values.registration.regCodeRef.secretNamespace | default .Release.Namespace }}
     {{- end }}
+  {{- end }}
   {{- if or .Values.registration.certificate .Values.registration.certificateRef }}
   registrationCertificateSecretRef:
     name: "{{ .Values.registration.certificateRef.secretName | default "rancher-scc-registration-certificate" }}"
@@ -65,6 +67,7 @@ metadata:
     app.kubernetes.io/part-of: "rancher"
 data:
   mode: {{ include "registration.mode" . | quote }}
+  {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}}
   {{- if .Values.registration.regCode }}
   regCodeSecretNamespace: {{ .Release.Namespace }}
   regCodeSecretName: "rancher-scc-registration-code"
@@ -72,6 +75,8 @@ data:
   regCodeSecretNamespace: {{ .Values.registration.regCodeRef.secretNamespace | default .Release.Namespace }}
   regCodeSecretName: "{{ .Values.registration.regCodeRef.secretName | default "rancher-scc-registration-code" }}"
   {{- end }}
+  {{- end }}
+  {{- if or .Values.registration.certificate .Values.registration.certificateRef }}}
   {{- if .Values.registration.certificate }}
   certificateSecretNamespace: {{ .Release.Namespace }}
   certificateSecretName: "rancher-scc-registration-certificate"
@@ -79,5 +84,6 @@ data:
   certificateSecretNamespace: {{ .Values.registration.certificateRef.secretNamespace | default .Release.Namespace }}
   certificateSecretName: "{{ .Values.registration.certificateRef.secretName | default "rancher-scc-registration-certificate" }}"
   {{- end }}
-{{- end -}}
+  {{- end }}
+{{ end -}}
 {{ end -}}
