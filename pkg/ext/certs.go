@@ -122,8 +122,7 @@ type provider struct {
 	name       string
 	secretName string
 
-	// todo: this only needs to be 1 long
-	sninames []string
+	sniname string
 
 	listenerM sync.RWMutex
 	listeners []dynamiccertificates.Listener
@@ -132,14 +131,14 @@ type provider struct {
 	secret   *corev1.Secret
 }
 
-func newCertProvider(ctx context.Context, wranglerCtx wrangler.Context, l net.Listener, name string, cnames []string) (*provider, error) {
+func newCertProvider(ctx context.Context, wranglerCtx wrangler.Context, l net.Listener, name string, cname string) (*provider, error) {
 	secretName := fmt.Sprintf("%s-ca", name)
 
 	provider := &provider{
 		name:       name,
 		secretName: secretName,
 
-		sninames: cnames,
+		sniname: cname,
 	}
 
 	return provider, nil
@@ -162,7 +161,7 @@ func (p *provider) notify() {
 }
 
 func (p *provider) SNINames() []string {
-	return p.sninames
+	return []string{p.sniname}
 }
 
 func (p *provider) Name() string {
@@ -220,13 +219,13 @@ func ApiServiceCertListener(provider dynamiccertificates.SNICertKeyContentProvid
 func getListener(ctx context.Context, secrets wranglercorev1.SecretController, p *provider, tcp net.Listener) (net.Listener, http.Handler, error) {
 	storage := kubernetes.Load(ctx, secrets, Namespace, p.secretName, p)
 
-	ca, signer, err := GenerateSelfSignedCertKeyWithOpts(p.sninames[0], time.Hour*24*30*3)
+	ca, signer, err := GenerateSelfSignedCertKeyWithOpts(p.sniname, time.Hour*24*30*3)
 	if err != nil {
 		return nil, nil, fmt.Errorf("gailed to generate initial certs: %w", err)
 	}
 
 	ln, h, err := dynamiclistener.NewListenerWithChain(tcp, storage, []*x509.Certificate{ca}, signer, dynamiclistener.Config{
-		CN: p.sninames[0],
+		CN: p.sniname,
 		// Organization:          []string{},
 		// TLSConfig: &tls.Config{},
 		// SANs:                  []string{},
@@ -237,7 +236,7 @@ func getListener(ctx context.Context, secrets wranglercorev1.SecretController, p
 			return true
 		},
 		FilterCN: func(...string) []string {
-			return []string{p.sninames[0]}
+			return []string{p.sniname}
 		},
 	})
 	if err != nil {

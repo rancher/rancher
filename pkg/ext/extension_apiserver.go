@@ -167,7 +167,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			*wranglerContext,
 			tcpLn,
 			"imperative-api-sni-provider",
-			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
+			fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
