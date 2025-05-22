@@ -52,6 +52,8 @@ tests:
         value: RELEASE-NAME-rancher
       - name: IMPERATIVE_API_DIRECT
         value: "true"
+      - name: IMPERATIVE_API_APP_SELECTOR
+        value: RELEASE-NAME-rancher
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
   - equal:

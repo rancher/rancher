@@ -202,7 +202,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext)
+	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext, ext.DefaultOptions())
 	if err != nil {
 		return nil, fmt.Errorf("extension api server: %w", err)
 	}
