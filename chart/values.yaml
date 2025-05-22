@@ -258,13 +258,28 @@ extraObjects: []
 registration:
   enabled: false
   regCode: ""
-  # Optionally, specify the name of a secret that contains the registration code.
+  # Optionally, specify the namespace+name of a secret that contains the registration code.
+  # This is preferred if you pre-create the secret before using helm to install Rancher.
   # regCodeRef:
   #   secretName: ""
   #   secretNamespace: ""
-  # The default mode is online and this is preferred for most users.
-  # If your cluster is in an air-gap, or otherwise cannot reach the SUSE SCC
+  ## Alternative Registration Endpoint
+  # For users with a local RMT server you can use an alternative registration endpoint to register your cluster.
+  # This will cause the registration process to sync with your RMT server instead of with the SCC.
+  # registrationEndpointURL: "https://my-rmt-server.example.com"
+  ## Air-gap Users
+  # If your cluster is in an air-gap, then using offline mode (or a local RMT server) may be necessary.
+  # To complete the offline registration via helm is a multi-step process - or you can complete it via the Rancher UI.
+  # Step 1. Enable registration (above) and then uncomment the next line to set mode to offline; then complete the initial helm install.
   # mode: offline
+  # Step 2. Fetch the offline registration Request needed for the SCC
+  # Step 2.a. Using kubectl fetch the offline registration request and save to local file, OR
+  # Step 2.b. Using the Rancher UI download the offline registration request file.
+  # Step 3. Upload that certificate file to the SCC to begin the offline registration process.
+  # Step 4. Download the offline registration certificate file and save it to local file,
+  # Step 5. Finally, upload the offline registration certificate to the Rancher
+  # Step 5.a. Using either kubectl or helm, configure the certificate (or secret ref) value and then `helm upgrade` rancher, OR
+  # Step 5.b. Using Rancher UI upload the certificate to complete the registration.
   # certificate: {}
   # Optionally, specify the name of a secret that contains the certificate.
   # certificateRef:
