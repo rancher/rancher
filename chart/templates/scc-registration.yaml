@@ -37,7 +37,7 @@ kind: Registration
 metadata:
   name: rancher-chart-{{ .Release.Name }}-{{ .Release.Revision }}
 spec:
-  mode: {{ include "registration.mode" . | quote }}
+  mode: {{ template "registration.mode" . }}
   {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}}
   registrationRequest:
     {{- if .Values.registration.regCode }}
@@ -66,7 +66,7 @@ metadata:
   labels: {{ include "rancher.labels" . | nindent 4 }}
     app.kubernetes.io/part-of: "rancher"
 data:
-  mode: {{ include "registration.mode" . | quote }}
+  mode: {{ template "registration.mode" . }}
   {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}}
   {{- if .Values.registration.regCode }}
   regCodeSecretNamespace: {{ .Release.Namespace }}

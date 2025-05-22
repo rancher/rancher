@@ -86,3 +86,10 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
     {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
   {{- end }}
 {{- end -}}
+
+{{/*
+    Determine the registration mode, defaulting to online if not specified
+*/}}
+{{ define "registration.mode" -}}
+{{ default "online" .Values.registration.mode | quote }}
+{{- end -}}
