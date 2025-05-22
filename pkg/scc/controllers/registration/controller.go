@@ -3,6 +3,7 @@ package registration
 import (
 	"context"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -10,16 +11,15 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
-	"github.com/rancher/rancher/pkg/scc/util"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 )
 
 type Handler struct {
-	ctx            context.Context
-	registrations  registrationControllers.RegistrationController
-	secrets        v1core.SecretController
-	sccCredentials *credentials.CredentialSecretsAdapter
-	systemInfo     *util.RancherSystemInfo
+	ctx                context.Context
+	registrations      registrationControllers.RegistrationController
+	secrets            v1core.SecretController
+	sccCredentials     *credentials.CredentialSecretsAdapter
+	systemInfoExporter *systeminfo.InfoExporter
 }
 
 func New(
@@ -27,14 +27,14 @@ func New(
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
 	sccCredentials *credentials.CredentialSecretsAdapter,
-	systemInfo *util.RancherSystemInfo,
+	systemInfoExporter *systeminfo.InfoExporter,
 ) *Handler {
 	controller := &Handler{
-		ctx:            ctx,
-		registrations:  registrations,
-		secrets:        secrets,
-		sccCredentials: sccCredentials,
-		systemInfo:     systemInfo,
+		ctx:                ctx,
+		registrations:      registrations,
+		secrets:            secrets,
+		sccCredentials:     sccCredentials,
+		systemInfoExporter: systemInfoExporter,
 	}
 
 	return controller
