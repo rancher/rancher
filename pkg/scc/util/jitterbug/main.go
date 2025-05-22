@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type JitterFunction func(dailyTriggerTime, maxTriggerTime time.Duration) (bool, error)
+type JitterFunction func(nextTrigger, strictDeadline time.Duration) (bool, error)
 
 type JitterChecker struct {
 	config          *Config
