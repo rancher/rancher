@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
 	"github.com/rancher/rancher/pkg/scc/controllers"
+	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/wrangler/v3/pkg/start"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -28,7 +29,8 @@ type sccOperator struct {
 	configMaps              v1core.ConfigMapController
 	sccResourceFactory      *scc.Factory
 	secrets                 v1core.SecretController
-	systemInformation       *util.RancherSystemInfo
+	systemInfoProvider      *systeminfo.InfoProvider
+	systemInfoExporter      *systeminfo.InfoExporter
 	systemRegistrationReady chan struct{}
 }
 
@@ -53,16 +55,18 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 		return nil, err
 	}
 
+	infoProvider := systeminfo.NewInfoProvider(
+		uuid.MustParse(rancherUuid),
+		uuid.MustParse(string(kubeSystemNS.UID)),
+	)
+
 	// TODO(o&b): also get Node, Sockets, v-cpus, Clusters and watch those
 	return &sccOperator{
-		configMaps:         wContext.Core.ConfigMap(),
-		sccResourceFactory: sccResources,
-		secrets:            wContext.Core.Secret(),
-		systemInformation: util.NewRancherSystemInfo(
-			uuid.MustParse(rancherUuid),
-			uuid.MustParse(string(kubeSystemNS.UID)),
-			wContext,
-		),
+		configMaps:              wContext.Core.ConfigMap(),
+		sccResourceFactory:      sccResources,
+		secrets:                 wContext.Core.Secret(),
+		systemInfoProvider:      infoProvider,
+		systemInfoExporter:      systeminfo.NewInfoExporter(infoProvider, wContext),
 		systemRegistrationReady: make(chan struct{}),
 	}, nil
 }
@@ -70,13 +74,13 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 	// Currently we only wait for ServerUrl not being empty, this is a good start as with out the URL we cannot start.
 	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
-	if so.systemInformation.ServerUrl() != "" {
+	if systeminfo.IsServerUrlReady() {
 		close(so.systemRegistrationReady)
 		return
 	}
 	logrus.Info("[scc-operator] Waiting for server-url to be ready")
 	wait.Until(func() {
-		if so.systemInformation.ServerUrl() != "" {
+		if systeminfo.IsServerUrlReady() {
 			logrus.Info("[scc-operator] can now start controllers; server URL is now ready.")
 			close(so.systemRegistrationReady)
 		} else {
@@ -173,7 +177,7 @@ func Setup(
 			ctx,
 			initOperator.sccResourceFactory.Scc().V1().Registration(),
 			initOperator.secrets,
-			initOperator.systemInformation,
+			initOperator.systemInfoExporter,
 		)
 
 		if err := start.All(ctx, 2, initOperator.sccResourceFactory); err != nil {

@@ -56,7 +56,7 @@ func (oh *onlineHandler) Run(registrationObj *v1.Registration) (*v1.Registration
 	}
 
 	// Initiate connection to SCC & verify reg code is for Rancher
-	sccConnection := suseconnect.DefaultRancherConnection(oh.rootHandler.sccCredentials.SccCredentials(), oh.rootHandler.systemInfo)
+	sccConnection := suseconnect.DefaultRancherConnection(oh.rootHandler.sccCredentials.SccCredentials(), oh.rootHandler.systemInfoExporter)
 
 	// Announce this Rancher cluster to SCC
 	announcedReg, announceErr := oh.announceSystem(progressingObj, &sccConnection, regCodeSecretRef)

@@ -3,17 +3,17 @@ package suseconnect
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/scc/systeminfo"
 
 	"github.com/SUSE/connect-ng/pkg/connection"
 	"github.com/SUSE/connect-ng/pkg/registration"
-	"github.com/rancher/rancher/pkg/scc/util"
 )
 
 type SccWrapper struct {
 	credentials connection.Credentials
 	conn        *connection.ApiConnection
 	registered  bool
-	systemInfo  *util.RancherSystemInfo
+	systemInfo  *systeminfo.InfoExporter
 }
 
 func DefaultConnectionOptions() connection.Options {
@@ -23,7 +23,7 @@ func DefaultConnectionOptions() connection.Options {
 	return connection.DefaultOptions("rancher-scc-integration", "0.0.1", "en_US")
 }
 
-func DefaultRancherConnection(credentials connection.Credentials, systemInfo *util.RancherSystemInfo) SccWrapper {
+func DefaultRancherConnection(credentials connection.Credentials, systemInfo *systeminfo.InfoExporter) SccWrapper {
 	if credentials == nil {
 		panic("credentials must be set")
 	}
@@ -60,7 +60,7 @@ func (sw *SccWrapper) SystemRegistration(regCode string) (RegistrationSystemId, 
 		return EmptyRegistrationSystemId, err
 	}
 
-	id, regErr := registration.Register(sw.conn, regCode, systemInfo.ServerUrl(), preparedSystemInfo, registration.NoExtraData)
+	id, regErr := registration.Register(sw.conn, regCode, systeminfo.ServerHostname(), preparedSystemInfo, registration.NoExtraData)
 	if regErr != nil {
 		return ErrorRegistrationSystemId, errors.Wrap(regErr, "Cannot register system to SCC")
 	}
@@ -76,7 +76,7 @@ func (sw *SccWrapper) KeepAlive() error {
 		return err
 	}
 	// 2 call Status
-	status, statusErr := registration.Status(sw.conn, systemInfo.ServerUrl(), preparedSystemInfo, registration.NoExtraData)
+	status, statusErr := registration.Status(sw.conn, systeminfo.ServerHostname(), preparedSystemInfo, registration.NoExtraData)
 	if status != registration.Registered {
 		return fmt.Errorf("trying to send keepalive on a system that is not yet registered. register this system first: %v", statusErr)
 	}

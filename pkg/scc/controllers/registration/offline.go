@@ -32,7 +32,7 @@ func (oh *offlineHandler) Run(registrationObj *v1.Registration) (*v1.Registratio
 
 func (oh *offlineHandler) prepareOfflineRegistrationRequest(registrationObj *v1.Registration) (*v1.Registration, error) {
 	logrus.Info("[scc.registration-controller]: offline mode create request")
-	sccOfflineBlob, jsonErr := oh.rootHandler.systemInfo.PreparedForSCCOffline()
+	sccOfflineBlob, jsonErr := oh.rootHandler.systemInfoExporter.PreparedForSCCOffline()
 	if jsonErr != nil {
 		return registrationObj, jsonErr
 	}

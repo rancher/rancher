@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/scc/controllers/registration"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
-	"github.com/rancher/rancher/pkg/scc/util"
+	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
 	"github.com/rancher/rancher/pkg/version"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -20,27 +20,27 @@ import (
 )
 
 type handler struct {
-	ctx               context.Context
-	registrations     registrationControllers.RegistrationController
-	registrationCache registrationControllers.RegistrationCache
-	secrets           v1core.SecretController
-	sccCredentials    *credentials.CredentialSecretsAdapter
-	systemInfo        *util.RancherSystemInfo
+	ctx                context.Context
+	registrations      registrationControllers.RegistrationController
+	registrationCache  registrationControllers.RegistrationCache
+	secrets            v1core.SecretController
+	sccCredentials     *credentials.CredentialSecretsAdapter
+	systemInfoExporter *systeminfo.InfoExporter
 }
 
 func Register(
 	ctx context.Context,
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
-	systemInfo *util.RancherSystemInfo,
+	systemInfoExporter *systeminfo.InfoExporter,
 ) {
 	controller := &handler{
-		ctx:               ctx,
-		registrations:     registrations,
-		registrationCache: registrations.Cache(),
-		secrets:           secrets,
-		sccCredentials:    credentials.New(secrets),
-		systemInfo:        systemInfo,
+		ctx:                ctx,
+		registrations:      registrations,
+		registrationCache:  registrations.Cache(),
+		secrets:            secrets,
+		sccCredentials:     credentials.New(secrets),
+		systemInfoExporter: systemInfoExporter,
 	}
 
 	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
@@ -63,7 +63,7 @@ func Register(
 	}
 	jitterCheckin := jitterbug.NewJitterChecker(
 		&jitterbugConfig,
-		func(dailyTriggerTime, strictDeadline time.Duration) (bool, error) {
+		func(nextTrigger, strictDeadline time.Duration) (bool, error) {
 			registrationsCacheList, err := controller.registrationCache.List(labels.Everything())
 			if err != nil {
 				logrus.Errorf("Failed to list registrations: %v", err)
@@ -82,7 +82,7 @@ func Register(
 				timeSinceLastValidation := time.Since(lastValidated.Time)
 				// If the time since last validation is after the daily trigger (which includes jitter), we revalidate.
 				// Also, ensure that when a registration is over the strictDeadline it is checked.
-				if timeSinceLastValidation >= dailyTriggerTime || timeSinceLastValidation >= strictDeadline {
+				if timeSinceLastValidation >= nextTrigger || timeSinceLastValidation >= strictDeadline {
 					checkInWasTriggered = true
 					// TODO (o&b): 95% sure that enqueue alone won't be good enough based on other controller logic.
 					// Either we need to adjust that controller logic so enqueue alone is enough, or use `CheckNow`.
@@ -103,7 +103,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return nil, nil
 	}
 
-	if !h.isServerUrlReady() {
+	if !systeminfo.IsServerUrlReady() {
 		logrus.Info("[scc.registration-controller]: Server URL not set")
 		return registrationObj, errors.New("no server url found in the system info")
 	}
@@ -116,7 +116,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			h.registrations,
 			h.secrets,
 			h.sccCredentials,
-			h.systemInfo,
+			h.systemInfoExporter,
 		)
 
 		return registrationHandler.Call(name, registrationObj)
@@ -129,7 +129,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		h.registrations,
 		h.secrets,
 		h.sccCredentials,
-		h.systemInfo,
+		h.systemInfoExporter,
 	)
 
 	return activationHandler.Call(name, registrationObj)
@@ -141,10 +141,6 @@ func needsRegistration(obj *v1.Registration) bool {
 		!obj.HasCondition(v1.RegistrationConditionAnnounced)
 }
 
-func (h *handler) isServerUrlReady() bool {
-	return h.systemInfo.ServerUrl() != ""
-}
-
 func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	if registrationObj == nil {
 		return nil, nil
@@ -153,7 +149,7 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	// For online mode, call deregister
 	if registrationObj.Spec.Mode == v1.Online {
 		_ = h.sccCredentials.Refresh()
-		sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfo)
+		sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfoExporter)
 		err := sccConnection.Deregister()
 		if err != nil {
 			return nil, err
