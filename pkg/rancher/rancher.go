@@ -644,7 +644,12 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	// Check for RKE1 clusters
 	clusters, err := wranglerContext.Mgmt.Cluster().List(metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error checking RKE1 clusters: %w", err)
+		if k8serror.IsNotFound(err) {
+			// No clusters CRD installed, treat as no resources
+			clusters = &v3.ClusterList{}
+		} else {
+			return nil, fmt.Errorf("error checking RKE1 clusters: %w", err)
+		}
 	}
 	for _, cluster := range clusters.Items {
 		if cluster.Spec.RancherKubernetesEngineConfig != nil {
@@ -655,7 +660,12 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	// NodeTemplates in the global node template namespace
 	nodeTemplates, err := wranglerContext.Mgmt.NodeTemplate().List(namespace.NodeTemplateGlobalNamespace, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error checking nodeTemplates: %w", err)
+		if k8serror.IsNotFound(err) {
+			// No NodeTemplate CRD installed, treat as no resources
+			nodeTemplates = &v3.NodeTemplateList{}
+		} else {
+			return nil, fmt.Errorf("error checking nodeTemplates: %w", err)
+		}
 	}
 	for _, obj := range nodeTemplates.Items {
 		found = append(found, fmt.Sprintf("NodeTemplate: name=%s, displayName=%s", obj.Name, obj.Spec.DisplayName))
@@ -664,7 +674,12 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	// ClusterTemplates in the global namespace
 	clusterTemplates, err := wranglerContext.Mgmt.ClusterTemplate().List(namespace.GlobalNamespace, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error checking clusterTemplates: %w", err)
+		if k8serror.IsNotFound(err) {
+			// No ClusterTemplate CRD installed, treat as no resources
+			clusterTemplates = &v3.ClusterTemplateList{}
+		} else {
+			return nil, fmt.Errorf("error checking clusterTemplates: %w", err)
+		}
 	}
 	for _, obj := range clusterTemplates.Items {
 		found = append(found, fmt.Sprintf("ClusterTemplate: name=%s, displayName=%s", obj.Name, obj.Spec.DisplayName))
