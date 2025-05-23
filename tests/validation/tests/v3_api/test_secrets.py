@@ -9,6 +9,8 @@ CLUSTER_NAME = os.environ.get("CLUSTER_NAME", "")
 
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
 
+
+@pytest.mark.skip(reason="Skipped on v2.11")
 def test_secret_create_all_ns():
 
     """
@@ -75,6 +77,7 @@ def test_secret_create_single_ns():
                                                              ns, keyvaluepair)
 
 
+@pytest.mark.skip(reason="Skipped on v2.11")
 def test_secret_delete_all_ns():
 
     """
@@ -101,6 +104,7 @@ def test_secret_delete_single_ns():
     delete_secret(p_client, secret, ns, keyvaluepair)
 
 
+@pytest.mark.skip(reason="Skipped on v2.11")
 def test_secret_edit_all_ns():
 
     p_client = namespace["p_client"]

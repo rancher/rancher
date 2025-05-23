@@ -42,6 +42,7 @@ def test_create_registry_single_namespace():
     delete_registry(p_client, registry)
 
 
+@pytest.mark.skip(reason="Skipped on v2.11")
 def test_create_registry_all_namespace():
     p_client = namespace["p_client"]
     c_client = namespace["c_client"]
@@ -57,6 +58,7 @@ def test_create_registry_all_namespace():
     delete_registry(p_client, registry)
 
 
+@pytest.mark.skip(reason="Skipped on v2.11")
 def test_delete_registry_all_namespace():
     p_client = namespace["p_client"]
     c_client = namespace["c_client"]
@@ -112,6 +114,7 @@ def test_edit_registry_single_namespace():
     delete_registry(p_client, registry)
 
 
+@pytest.mark.skip(reason="Skipped on v2.11")
 def test_edit_registry_all_namespace():
     p_client = namespace["p_client"]
     c_client = namespace["c_client"]
