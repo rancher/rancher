@@ -35,12 +35,12 @@ type UserActivityStatus struct {
 
 // Token is used to authenticate requests to Rancher.
 type Token struct {
-	// Standard kubernetes type meta information
 	metav1.TypeMeta `json:",inline"`
 
-	// Standard kubernetes object meta information.
-	// BEWARE of non-standard behaviour: Name and GenerateName are not respected.
-	// A name is generated with a predefined prefix instead ('token-').
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// Note: Name and GenerateName are not respected. A name is always generated with a predefined prefix.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the desired state of the Token.
