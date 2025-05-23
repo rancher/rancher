@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"bufio"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -13,6 +14,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -254,6 +256,9 @@ func TestStoreUserFrom(t *testing.T) {
 func TestStoreCreate(t *testing.T) {
 	authTokenID := "token-nh98r"
 	serverURL := "https://rancher.example.com"
+	getServerURL := func() string {
+		return serverURL
+	}
 	downstream1 := "c-m-tbgzfbgf"
 	downstream2 := "c-m-bxn2p7w6" // ACE enabled.
 
@@ -276,6 +281,7 @@ func TestStoreCreate(t *testing.T) {
 			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 		}
 	}).AnyTimes()
+
 	tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 	tokenCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Token, error) {
 		switch name {
@@ -294,7 +300,78 @@ func TestStoreCreate(t *testing.T) {
 		return nil, nil
 	}).AnyTimes()
 
-	userManager := &fakeUserManager{}
+	clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+	clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Cluster, error) {
+		switch name {
+		case "local":
+			return &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "local"},
+				Spec:       v3.ClusterSpec{DisplayName: "local"},
+				Status:     v3.ClusterStatus{CACert: localCACert},
+			}, nil
+		case downstream1:
+			return &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: downstream1},
+				Spec:       v3.ClusterSpec{DisplayName: "downstream1"},
+				Status:     v3.ClusterStatus{CACert: downstream1CACert},
+			}, nil
+		case downstream2:
+			return &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: downstream2},
+				Spec: v3.ClusterSpec{
+					DisplayName: "downstream2",
+					ClusterSpecBase: v3.ClusterSpecBase{
+						LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{
+							Enabled: true,
+						},
+					},
+				},
+				Status: v3.ClusterStatus{CACert: downstream2CACert},
+			}, nil
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
+	nodeCache.EXPECT().List(gomock.Any(), labels.Everything()).DoAndReturn(func(namespace string, selector labels.Selector) ([]*v3.Node, error) {
+		switch namespace {
+		case downstream1:
+			return nil, nil
+		case downstream2:
+			return []*v3.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "cp"},
+					Spec: v3.NodeSpec{
+						RequestedHostname: "cp",
+						ControlPlane:      true,
+					},
+					Status: v3.NodeStatus{
+						InternalNodeStatus: corev1.NodeStatus{
+							Addresses: []corev1.NodeAddress{
+								{Type: corev1.NodeExternalIP, Address: "172.20.0.3"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "worker"},
+					Spec:       v3.NodeSpec{RequestedHostname: "worker"},
+					Status: v3.NodeStatus{
+						InternalNodeStatus: corev1.NodeStatus{
+							Addresses: []corev1.NodeAddress{
+								{Type: corev1.NodeExternalIP, Address: "172.20.0.4"},
+							},
+						},
+					},
+				},
+			}, nil
+		default:
+			require.Fail(t, "unexpected call")
+			return nil, nil
+		}
+	}).AnyTimes()
+
 	defaultTTLSeconds := int64(43200)
 	getDefaultTTL := func() (*int64, error) {
 		millis := defaultTTLSeconds * 1000
@@ -302,82 +379,12 @@ func TestStoreCreate(t *testing.T) {
 	}
 	shouldGenerateToken := func() bool { return true }
 	options := &metav1.CreateOptions{}
+	userManager := &fakeUserManager{}
 
 	t.Run("user creates a kubeconfig", func(t *testing.T) {
 		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 			return authorizer.DecisionAllow, "", nil
 		})
-
-		clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
-		clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Cluster, error) {
-			switch name {
-			case "local":
-				return &v3.Cluster{
-					ObjectMeta: metav1.ObjectMeta{Name: "local"},
-					Spec:       v3.ClusterSpec{DisplayName: "local"},
-					Status:     v3.ClusterStatus{CACert: localCACert},
-				}, nil
-			case downstream1:
-				return &v3.Cluster{
-					ObjectMeta: metav1.ObjectMeta{Name: downstream1},
-					Spec:       v3.ClusterSpec{DisplayName: "downstream1"},
-					Status:     v3.ClusterStatus{CACert: downstream1CACert},
-				}, nil
-			case downstream2:
-				return &v3.Cluster{
-					ObjectMeta: metav1.ObjectMeta{Name: downstream2},
-					Spec: v3.ClusterSpec{
-						DisplayName: "downstream2",
-						ClusterSpecBase: v3.ClusterSpecBase{
-							LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{
-								Enabled: true,
-							},
-						},
-					},
-					Status: v3.ClusterStatus{CACert: downstream2CACert},
-				}, nil
-			default:
-				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-			}
-		}).AnyTimes()
-		nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
-		nodeCache.EXPECT().List(gomock.Any(), labels.Everything()).DoAndReturn(func(namespace string, selector labels.Selector) ([]*v3.Node, error) {
-			switch namespace {
-			case downstream1:
-				return nil, nil
-			case downstream2:
-				return []*v3.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "cp"},
-						Spec: v3.NodeSpec{
-							RequestedHostname: "cp",
-							ControlPlane:      true,
-						},
-						Status: v3.NodeStatus{
-							InternalNodeStatus: corev1.NodeStatus{
-								Addresses: []corev1.NodeAddress{
-									{Type: corev1.NodeExternalIP, Address: "172.20.0.3"},
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "worker"},
-						Spec:       v3.NodeSpec{RequestedHostname: "worker"},
-						Status: v3.NodeStatus{
-							InternalNodeStatus: corev1.NodeStatus{
-								Addresses: []corev1.NodeAddress{
-									{Type: corev1.NodeExternalIP, Address: "172.20.0.4"},
-								},
-							},
-						},
-					},
-				}, nil
-			default:
-				require.Fail(t, "unexpected call")
-				return nil, nil
-			}
-		}).AnyTimes()
 
 		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
 		configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
@@ -388,21 +395,22 @@ func TestStoreCreate(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.Now()
 			return configMap, nil
 		}).Times(1)
 
+		userManager := &fakeUserManager{} // Subtest specific instance.
+
 		store := &Store{
-			authorizer:      authorizer,
-			configMapCache:  configMapCache,
-			configMapClient: configMapClient,
-			userCache:       userCache,
-			tokenCache:      tokenCache,
-			clusterCache:    clusterCache,
-			nodeCache:       nodeCache,
-			userMgr:         userManager,
-			getServerURL: func() string {
-				return serverURL
-			},
+			authorizer:          authorizer,
+			configMapCache:      configMapCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenCache:          tokenCache,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			userMgr:             userManager,
+			getServerURL:        getServerURL,
 			getDefaultTTL:       getDefaultTTL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -433,8 +441,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.True(t, createValidationCalled)
 
 		created := obj.(*ext.Kubeconfig)
-		assert.NotEmpty(t, created.Status)
-		assert.NotEmpty(t, created.Status.Value)
 		assert.NotEmpty(t, created.Name)
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
 		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
@@ -458,33 +464,149 @@ func TestStoreCreate(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
 
-		require.Len(t, userManager.tokens, 1)
+		require.NotNil(t, created.Status)
+		assert.NotEmpty(t, created.Status.Value)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+		require.Len(t, created.Status.Conditions, 3)
+		require.Len(t, created.Status.Tokens, 2)
+
+		scanner := bufio.NewScanner(strings.NewReader(created.Status.Value))
+		var lines int
+		for scanner.Scan() && lines < 4 {
+			line := scanner.Text()
+
+			switch lines {
+			case 0:
+				assert.Equal(t, "# Generated by Rancher", line)
+			case 1:
+				assert.Equal(t, "# name: "+created.Name, line)
+			case 2:
+				assert.Equal(t, "# createdTimestamp: "+configMap.CreationTimestamp.Time.Format(time.RFC3339), line)
+			case 3:
+				assert.Equal(t, "# ttl: "+strconv.FormatInt(defaultTTLSeconds, 10), line)
+			default:
+			}
+			lines++
+		}
+		require.NoError(t, scanner.Err())
 
 		config, err := clientcmd.Load([]byte(created.Status.Value))
 		require.NoError(t, err)
 		require.Len(t, config.Clusters, 4)
+		assert.Equal(t, serverURL, config.Clusters[defaultClusterName].Server)
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream1), config.Clusters["downstream1"].Server)
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream2), config.Clusters["downstream2"].Server)
 		assert.Equal(t, "https://172.20.0.3:6443", config.Clusters["downstream2-cp"].Server)
 
 		require.Len(t, config.Contexts, 4)
+		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].Cluster)
+		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].AuthInfo)
 		assert.Equal(t, "downstream1", config.Contexts["downstream1"].Cluster)
-		assert.Equal(t, "downstream1", config.Contexts["downstream1"].AuthInfo)
+		assert.Equal(t, defaultClusterName, config.Contexts["downstream1"].AuthInfo)
 		assert.Equal(t, "downstream2", config.Contexts["downstream2"].Cluster)
 		assert.Equal(t, "downstream2", config.Contexts["downstream2"].AuthInfo)
 		assert.Equal(t, "downstream2-cp", config.Contexts["downstream2-cp"].Cluster)
-		assert.Equal(t, "downstream2", config.Contexts["downstream2"].AuthInfo)
+		assert.Equal(t, "downstream2", config.Contexts["downstream2-cp"].AuthInfo)
 
+		require.Len(t, config.AuthInfos, 2)
 		require.Len(t, userManager.tokens, 1)
+		assert.Equal(t, userManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
 		require.Len(t, userManager.clusterTokens, 1)
-
-		require.Len(t, config.AuthInfos, 3)
-		assert.Equal(t, userManager.tokens[0], config.AuthInfos["downstream1"].Token)
 		assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
+	})
+	t.Run("no cluster specified", func(t *testing.T) {
+		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+		configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		userManager := &fakeUserManager{} // Subtest specific instance.
+
+		store := &Store{
+			authorizer:          commonAuthorizer,
+			configMapCache:      configMapCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenCache:          tokenCache,
+			clusterCache:        clusterCache,
+			userMgr:             userManager,
+			getServerURL:        getServerURL,
+			getDefaultTTL:       getDefaultTTL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Description: "Test Kubeconfig",
+			},
+		}
+		var createValidationCalled bool
+		createValidation := func(ctx context.Context, obj runtime.Object) error {
+			createValidationCalled = true
+			return nil
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, createValidation, options)
+		require.NoError(t, err)
+		assert.NotNil(t, obj)
+		assert.IsType(t, &ext.Kubeconfig{}, obj)
+
+		assert.True(t, createValidationCalled)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.NotEmpty(t, created.Name)
+		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
+		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
+		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
+		assert.NotEmpty(t, kubeconfig.Spec.CurrentContext)
+		assert.Len(t, created.Spec.Clusters, 0)
+
+		require.NotNil(t, configMap)
+		assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
+		assert.Equal(t, Namespace, configMap.Namespace)
+		require.NotNil(t, configMap.Labels)
+		assert.Equal(t, userID, configMap.Labels[UserIDLabel])
+		assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
+		require.NotNil(t, configMap.Annotations)
+		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
+		require.NotNil(t, configMap.Data)
+		assert.Equal(t, strconv.FormatInt(defaultTTLSeconds, 10), configMap.Data[TTLField])
+		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
+		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
+		assert.Empty(t, configMap.Data[ClustersField])
 
 		require.NotNil(t, created.Status)
+		assert.NotEmpty(t, created.Status.Value)
 		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
-		require.Len(t, created.Status.Conditions, 3)
+		require.Len(t, created.Status.Conditions, 2)
+		require.Equal(t, 1, len(created.Status.Tokens))
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+		require.Len(t, config.Clusters, 1)
+		assert.Equal(t, serverURL, config.Clusters["rancher"].Server)
+
+		require.Len(t, config.Contexts, 1)
+		assert.Equal(t, "rancher", config.Contexts["rancher"].Cluster)
+		assert.Equal(t, "rancher", config.Contexts["rancher"].AuthInfo)
+
+		require.Len(t, config.AuthInfos, 1)
+		require.Len(t, userManager.tokens, 1)
+		assert.Equal(t, userManager.tokens[0], config.AuthInfos["rancher"].Token)
+		require.Len(t, userManager.clusterTokens, 0)
 	})
 
 	t.Run("only a rancher user can create kubeconfig", func(t *testing.T) {
