@@ -126,6 +126,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	// Check for deprecated RKE1 resources in the cluster
+	if err := validateRKE1Resources(wranglerContext); err != nil {
+		return nil, fmt.Errorf("rke1 pre-upgrade validation failed: %w", err)
+	}
+
 	if err := dashboarddata.EarlyData(ctx, wranglerContext.K8s); err != nil {
 		return nil, err
 	}
@@ -617,4 +622,68 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 		allErrors = errors.Join(err, allErrors)
 	}
 	return allErrors
+}
+
+// checks for deprecated RKE1 resources in the cluster to ensure that the cluster is not using any deprecated resources.
+func validateRKE1Resources(wranglerContext *wrangler.Context) error {
+	resources, err := checkForRKE1Resources(wranglerContext)
+	if err != nil {
+		return fmt.Errorf("checking for RKE1 resources: %w", err)
+	}
+	if len(resources) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Rancher startup halted due to deprecated RKE1 resources detected:\n - %s\n\nRemove these resources to proceed", strings.Join(resources, "\n - "))
+}
+
+// checkForRKE1Resources scans for deprecated RKE1 (Rancher Kubernetes Engine v1) resources in the Rancher management context.
+func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) {
+	var found []string
+
+	// Check for RKE1 clusters
+	clusters, err := wranglerContext.Mgmt.Cluster().List(metav1.ListOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			// No clusters CRD installed, treat as no resources
+			clusters = &v3.ClusterList{}
+		} else {
+			return nil, fmt.Errorf("error checking RKE1 clusters: %w", err)
+		}
+	}
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.RancherKubernetesEngineConfig != nil {
+			found = append(found, fmt.Sprintf("Cluster: name=%s, displayName=%s", cluster.Name, cluster.Spec.DisplayName))
+		}
+	}
+
+	// NodeTemplates in the global node template namespace
+	nodeTemplates, err := wranglerContext.Mgmt.NodeTemplate().List(namespace.NodeTemplateGlobalNamespace, metav1.ListOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			// No NodeTemplate CRD installed, treat as no resources
+			nodeTemplates = &v3.NodeTemplateList{}
+		} else {
+			return nil, fmt.Errorf("error checking nodeTemplates: %w", err)
+		}
+	}
+	for _, obj := range nodeTemplates.Items {
+		found = append(found, fmt.Sprintf("NodeTemplate: name=%s, displayName=%s", obj.Name, obj.Spec.DisplayName))
+	}
+
+	// ClusterTemplates in the global namespace
+	clusterTemplates, err := wranglerContext.Mgmt.ClusterTemplate().List(namespace.GlobalNamespace, metav1.ListOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			// No ClusterTemplate CRD installed, treat as no resources
+			clusterTemplates = &v3.ClusterTemplateList{}
+		} else {
+			return nil, fmt.Errorf("error checking clusterTemplates: %w", err)
+		}
+	}
+	for _, obj := range clusterTemplates.Items {
+		found = append(found, fmt.Sprintf("ClusterTemplate: name=%s, displayName=%s", obj.Name, obj.Spec.DisplayName))
+	}
+
+	return found, nil
 }
