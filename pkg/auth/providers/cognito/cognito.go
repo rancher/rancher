@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 )
 
-// CognitoProvider represents an AWS Cognito auth provider
+// CognitoProvider represents AWS Cognito auth provider
 type CognitoProvider struct {
 	genericoidc.GenOIDCProvider
 }
