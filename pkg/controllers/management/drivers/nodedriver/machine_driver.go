@@ -40,7 +40,7 @@ var (
 		"packet":        {"userdata": "userdata"},
 		"pod":           {"userdata": "userdata"},
 		"vmwarevsphere": {"cloud-config": "cloudConfig"},
-		"google":        {"authEncodedJson": "authEncodedJson"},
+		"google":        {"authEncodedJson": "authEncodedJson", "userdata": "userdata"},
 	}
 	SSHKeyFields = map[string]bool{
 		"sshKeyContents": true,
