@@ -1,11 +1,16 @@
-Rancher Server has been installed.
+{{- $action := "installed" -}}
+{{ if .Release.IsUpgrade -}}
+{{ $action = "upgraded" -}}
+{{ end -}}
+Rancher Server has been {{ $action }}.
 
 NOTE: Rancher may take several minutes to fully initialize. Please standby while Certificates are being issued, Containers are started and the Ingress rule comes up.
 
 Check out our docs at https://rancher.com/docs/
 
-If you provided your own bootstrap password during installation, browse to https://{{ .Values.hostname }} to get started.
+## First Time Login
 
+If you provided your own bootstrap password during installation, browse to https://{{ .Values.hostname }} to get started.
 If this is the first time you installed Rancher, get started by running this command and clicking the URL it generates:
 
 ```

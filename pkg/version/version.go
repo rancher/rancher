@@ -5,6 +5,8 @@ package version
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Masterminds/semver/v3"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 )
@@ -26,6 +28,20 @@ type Info struct {
 // FriendlyVersion returns a human-readable string that can be included in log output.
 func FriendlyVersion() string {
 	return fmt.Sprintf("%s (%s)", Version, GitCommit)
+}
+
+func IsDevBuild() bool {
+	if Version == "dev" {
+		return true
+	}
+
+	parsedVer, err := semver.NewVersion(Version)
+	if err != nil {
+		logrus.Errorf("Error parsing version %s: %s", Version, err)
+		logrus.Warnf("The version will be interpreted as a development build")
+		return true
+	}
+	return parsedVer.Prerelease() != ""
 }
 
 type versionHandler struct {
