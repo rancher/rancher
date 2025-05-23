@@ -59,7 +59,14 @@ type Context struct {
 	Cluster string
 }
 
+type Meta struct {
+	Name              string
+	CreationTimestamp string
+	TTL               string
+}
 type KubeConfig struct {
+	Meta           Meta
+	CACert         string
 	Clusters       []Cluster
 	Users          []User
 	Contexts       []Context
@@ -90,6 +97,14 @@ func caCertString() string {
 	}
 	certData = base64.StdEncoding.EncodeToString([]byte(certData))
 	return formatCertString(certData)
+}
+
+func FormatCert(data string) string {
+	if data == "" {
+		return ""
+	}
+
+	return formatCertString(base64.StdEncoding.EncodeToString([]byte(data)))
 }
 
 func getDefaultNode(clusterName, clusterID, host string) kubeNode {
@@ -171,6 +186,13 @@ func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clu
 }
 
 type GenerateInput struct {
+	Name              string
+	CreationTimestamp string
+	TTL               string
+	Entries           []GenerateEntry
+}
+
+type GenerateEntry struct {
 	ClusterID        string
 	Cluster          *apiv3.Cluster
 	Nodes            []*apiv3.Node
@@ -178,11 +200,18 @@ type GenerateInput struct {
 	IsCurrentContext bool
 }
 
-func Generate(host string, input []GenerateInput) (string, error) {
+func Generate(input KubeConfig) (string, error) {
+	buf := &bytes.Buffer{}
+	err := multiClusterTemplate.Execute(buf, input)
+
+	return buf.String(), err
+}
+
+func Generate2(host string, input GenerateInput) (string, error) {
 	k := KubeConfig{}
 	caCert := caCertString()
 
-	for _, entry := range input {
+	for _, entry := range input.Entries {
 		clusterName := entry.Cluster.Spec.DisplayName
 		if clusterName == "" || entry.ClusterID == "rancher" {
 			clusterName = entry.ClusterID
