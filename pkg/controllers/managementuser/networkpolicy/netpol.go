@@ -6,6 +6,7 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
@@ -23,6 +24,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
@@ -482,4 +484,52 @@ func generateNodesNetworkPolicy() *knetworkingv1.NetworkPolicy {
 
 func portToString(port knetworkingv1.NetworkPolicyPort) string {
 	return fmt.Sprintf("%v/%v", port.Port, port.Protocol)
+}
+
+func (npmgr *netpolMgr) SyncDefaultNetworkPolicies(key string, np *rnetworkingv1.NetworkPolicy) (runtime.Object, error) {
+	nsName, npName := splitKey(key)
+	if npName != defaultNamespacePolicyName && npName != defaultSystemProjectNamespacePolicyName && npName != hostNetworkPolicyName {
+		return nil, nil
+	}
+
+	disabled, err := isNetworkPolicyDisabled(npmgr.clusterNamespace, npmgr.clusterLister)
+	if err != nil {
+		return nil, err
+	}
+	if disabled {
+		return nil, nil
+	}
+
+	if np == nil {
+		logrus.Debugf("netpolMgr: SyncDefaultNetworkPolicies: default network policy %s in namespace %s was deleted", npName, nsName)
+	} else {
+		logrus.Debugf("netpolMgr: SyncDefaultNetworkPolicies: default network policy %s in namespace %s was edited", npName, nsName)
+	}
+
+	if npName == hostNetworkPolicyName {
+		if err := npmgr.handleHostNetwork(npmgr.clusterNamespace); err != nil {
+			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: error handling host network policy: %v", err)
+		}
+	} else {
+		namespace, err := npmgr.nsLister.Get("", nsName)
+		if err != nil {
+			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: failed to get namespace %s: %v", nsName, err)
+		}
+
+		projectID := namespace.Labels[nslabels.ProjectIDFieldLabel]
+		if err := npmgr.programNetworkPolicy(projectID, npmgr.clusterNamespace); err != nil {
+			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: failed to program network policy for project %s: %v", projectID, err)
+		}
+	}
+
+	return nil, nil
+}
+
+// Helper function to split key
+func splitKey(key string) (namespace, name string) {
+	parts := strings.Split(key, "/")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return "", parts[0]
 }
