@@ -177,6 +177,11 @@ postDelete:
   # by default, the job will fail if it fail to uninstall any of the apps
   ignoreTimeoutError: false
 
+preUpgrade:
+  image:
+    repository: %PRE_UPGRADE_IMAGE_NAME%
+    tag: %PRE_UPGRADE_IMAGE_TAG%
+
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
 

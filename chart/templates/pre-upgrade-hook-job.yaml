@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "rancher.fullname" . }}-pre-upgrade
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "rancher.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: {{ template "rancher.fullname" . }}-pre-upgrade
+      labels: {{ include "rancher.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ template "rancher.fullname" . }}-pre-upgrade
+      restartPolicy: Never
+      containers:
+        - name: {{ template "rancher.name" . }}-pre-upgrade
+          image: "{{ include "system_default_registry" . }}{{ .Values.preUpgrade.image.repository }}:{{ .Values.preUpgrade.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          command:
+            - /scripts/pre-upgrade-hook.sh
+          volumeMounts:
+            - mountPath: /scripts
+              name: config-volume
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ template "rancher.fullname" . }}-pre-upgrade
+            defaultMode: 0777
