@@ -62,7 +62,6 @@ type ClaimInfo struct {
 	GivenName         string   `json:"given_name"`
 	FamilyName        string   `json:"family_name"`
 	Email             string   `json:"email"`
-	EmailVerified     bool     `json:"email_verified"`
 	Groups            []string `json:"groups"`
 	FullGroupPath     []string `json:"full_group_path"`
 	ACR               string   `json:"acr"`
@@ -414,6 +413,30 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 
 	if err := idToken.Claims(&claimInfo); err != nil {
 		return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
+	}
+
+	// read groups from GroupsClaim if provided
+	if config.GroupsClaim != "" {
+		var mapClaims jwt.MapClaims
+		err = idToken.Claims(&mapClaims)
+		if err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("failed to parse groups claims: %w", err)
+		}
+		groupsClaim, ok := mapClaims[config.GroupsClaim].([]interface{})
+		if !ok {
+			logrus.Warn("failed to use custom groups claim")
+		} else {
+			logrus.Debugf("using custom groups claim")
+			var groups []string
+			for _, g := range groupsClaim {
+				group, ok := g.(string)
+				if !ok {
+					logrus.Warn("failed to convert group to string")
+				}
+				groups = append(groups, group)
+			}
+			claimInfo.Groups = groups
+		}
 	}
 
 	// Valid will return false if access token is expired

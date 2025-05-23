@@ -659,3 +659,8 @@ type GenericOIDCTestOutput struct {
 type GenericOIDCApplyInput struct {
 	OIDCApplyInput `json:",inline" mapstructure:",squash"`
 }
+
+// GenericOIDCConfig is a wrapper for the AWS Cognito provider holding the OIDC Configuration
+type CognitoConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
+}
