@@ -95,6 +95,8 @@ type Rancher struct {
 	auditLog   *audit.LogWriter
 	authServer *auth.Server
 	opts       *Options
+
+	kubeAggregationReadyChan chan struct{}
 }
 
 func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options) (*Rancher, error) {
@@ -202,7 +204,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext, ext.DefaultOptions())
+	extensionOpts := ext.DefaultOptions()
+	extensionOpts.KubeAggregatorReadyChan = make(chan struct{})
+
+	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext, extensionOpts)
 	if err != nil {
 		return nil, fmt.Errorf("extension api server: %w", err)
 	}
@@ -270,11 +275,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			additionalAPI,
 			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
 		}.Handler(steve),
-		Wrangler:   wranglerContext,
-		Steve:      steve,
-		auditLog:   auditLogWriter,
-		authServer: authServer,
-		opts:       opts,
+		Wrangler:                 wranglerContext,
+		Steve:                    steve,
+		auditLog:                 auditLogWriter,
+		authServer:               authServer,
+		opts:                     opts,
+		kubeAggregationReadyChan: extensionOpts.KubeAggregatorReadyChan,
 	}, nil
 }
 
@@ -332,6 +338,14 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
+
+	select {
+	case <-r.kubeAggregationReadyChan:
+		logrus.Info("Kube-APIServer connected to imperative api")
+	case <-time.After(time.Minute * 2):
+		logrus.Fatal("Kube-APIServer did not contact the rancher imperative api in time")
+	}
+
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
