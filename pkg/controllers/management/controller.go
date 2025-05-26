@@ -2,7 +2,9 @@ package management
 
 import (
 	"context"
+	"fmt"
 
+	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/agentupgrade"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
@@ -31,6 +33,10 @@ import (
 )
 
 func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager, wrangler *wrangler.Context) {
+	wrangler.Ext.Token().OnChange(ctx, "test-ext", func(key string, token *extv1.Token) (*extv1.Token, error) {
+		fmt.Println("HITHERE HELLO!!")
+		return nil, nil
+	})
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
 	auth.RegisterEarly(ctx, management, manager)

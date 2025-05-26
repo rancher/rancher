@@ -339,6 +339,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
 
+	logrus.Info("Wainting for imperative api to be ready")
 	select {
 	case <-r.kubeAggregationReadyChan:
 		logrus.Info("Kube-APIServer connected to imperative api")
