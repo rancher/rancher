@@ -323,7 +323,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		"sub": rancherToken.UserID,
 	}
 	if slices.Contains(scopes, "profile") {
-		idClaims["preferred_username"] = user.DisplayName
+		idClaims["name"] = user.DisplayName
 	}
 	if nonce != "" {
 		idClaims["nonce"] = nonce
