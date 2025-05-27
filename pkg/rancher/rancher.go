@@ -339,11 +339,13 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
 
+	logrus.Info("Waiting for imperative API to be ready")
+
 	select {
 	case <-r.kubeAggregationReadyChan:
-		logrus.Info("Kube-APIServer connected to imperative api")
+		logrus.Info("kube-apierver connected to imperative api")
 	case <-time.After(time.Minute * 2):
-		logrus.Fatal("Kube-APIServer did not contact the rancher imperative api in time")
+		logrus.Fatal("kube-apiServer did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
 	}
 
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,

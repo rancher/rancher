@@ -249,7 +249,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		},
 		Authenticator: authenticator,
 		Authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			if a.GetUser().GetName() == "system:aggregator" {
+			if a.GetUser().GetName() == "system:aggregator" || a.GetUser().GetName() == "system:kube-aggregator" {
 				once.Do(func() {
 					close(opts.KubeAggregatorReadyChan)
 				})
