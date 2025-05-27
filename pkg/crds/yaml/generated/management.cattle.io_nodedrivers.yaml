@@ -1,0 +1,159 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (devel)
+  name: nodedrivers.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: NodeDriver
+    listKind: NodeDriverList
+    plural: nodedrivers
+    singular: nodedriver
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.active
+      name: Activated
+      type: string
+    - jsonPath: .spec.url
+      name: Binary URL
+      type: string
+    name: v3
+    schema:
+      openAPIV3Schema:
+        description: NodeDriver represents a Rancher node driver for a specific cloud
+          provider used to provision cluster nodes.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              Specification of the desired behavior of the cluster. More info:
+              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+            properties:
+              active:
+                description: Active specifies if the driver can be used to provision
+                  clusters
+                type: boolean
+              addCloudCredential:
+                description: |-
+                  AddCloudCredential determines if an associated cloud credential dynamic schema
+                  should be created for this driver. This field must be set in order for users
+                  to be able to create cloud credentials for this driver within the Rancher UI
+                type: boolean
+              builtin:
+                description: Builtin specifies if a driver is built into Rancher via
+                  rancher-machine
+                type: boolean
+              checksum:
+                description: |-
+                  Checksum is used to represent the current content of the driver binary. When this value
+                  changes, the driver binary will be redownloaded from its URL
+                type: string
+              description:
+                description: Description provides a short explanation of what the
+                  driver does
+                type: string
+              displayName:
+                description: DisplayName specifies the publicly visible name of the
+                  driver shown in the Rancher UI
+                type: string
+              externalId:
+                description: ExternalID is not currently used
+                type: string
+              uiUrl:
+                description: UIURL is the url to load for customized Add Nodes screen
+                  for this driver
+                type: string
+              url:
+                description: |-
+                  URL defines the location of the driver binary that will
+                  be downloaded when the driver is enabled. This can either be
+                  an absolute url to a remote resource, or a reference to localhost
+                type: string
+              whitelistDomains:
+                description: |-
+                  WhitelistDomains is a list of domains which will be automatically white-listed by Rancher
+                  to allow for the driver to be downloaded
+                items:
+                  type: string
+                type: array
+            required:
+            - uiUrl
+            type: object
+          status:
+            description: |-
+              Most recent observed status of the cluster. More info:
+              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+            properties:
+              appliedChecksum:
+                description: |-
+                  AppliedChecksum is the last known checksum of the driver. This is used to determine when
+                  a Driver needs to be redownloaded from its URL
+                type: string
+              appliedDockerMachineVersion:
+                description: |-
+                  AppliedDockerMachineVersion specifies the last docker machine version (a.k.a rancher-machine)
+                  which provides this driver. When this version is incremented, Rancher will query the rancher-machine
+                  driver to obtain its arguments and update the automatically generated schema and associated machine
+                  config object. This field is only specified for drivers bundled within Rancher via rancher-machine
+                type: string
+              appliedURL:
+                description: AppliedURL is the url last used to download the driver
+                type: string
+              conditions:
+                description: Conditions is a representation of the current state of
+                  the driver
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of cluster condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
