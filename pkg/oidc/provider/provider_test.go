@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-func TestAddHeadersMiddleware(t *testing.T) {
+func TestMiddleware(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	const fakeRedirectUrl = "http://test.com"
 	fakeUrl, _ := url.Parse(fakeRedirectUrl)
@@ -96,6 +96,27 @@ func TestAddHeadersMiddleware(t *testing.T) {
 			expectedCallNext: false,
 			expectedBody:     `{"error":"server_error","error_description":"failed to list OIDCCLients"}`,
 		},
+		"no OIDCClients created": {
+			r: &http.Request{
+				URL: fakeUrl,
+			},
+			oidcClientCache: func() *fake.MockNonNamespacedCacheInterface[*v3.OIDCClient] {
+				mock := fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl)
+				mock.EXPECT().List(labels.Everything()).Return(nil, nil)
+
+				return mock
+			},
+			expectedHeaders: http.Header{
+				"X-Content-Type-Options":       []string{"nosniff"},
+				"X-Frame-Options":              []string{"SAMEORIGIN"},
+				"Referrer-Policy":              []string{"strict-origin-when-cross-origin"},
+				"Strict-Transport-Security":    []string{"max-age=31536000"},
+				"Access-Control-Allow-Methods": []string{"GET, POST"},
+				"Content-Type":                 []string{"application/json"},
+			},
+			expectedCallNext: false,
+			expectedBody:     `{"error":"server_error","error_description":"no OIDCClients configured"}`,
+		},
 	}
 
 	for name, test := range tests {
@@ -108,7 +129,7 @@ func TestAddHeadersMiddleware(t *testing.T) {
 			}
 			rec := httptest.NewRecorder()
 
-			p.addHeadersMiddleware(func(writer http.ResponseWriter, request *http.Request) {
+			p.middleware(func(writer http.ResponseWriter, request *http.Request) {
 				if !test.expectedCallNext {
 					assert.Fail(t, "unexpected call")
 				}

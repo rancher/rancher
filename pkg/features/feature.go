@@ -2,6 +2,7 @@ package features
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const primeEnv = "RANCHER_VERSION_TYPE"
 
 var (
 	features = make(map[string]*Feature)
@@ -176,7 +179,7 @@ var (
 	OIDCProvider = newFeature(
 		"oidc-provider",
 		"Provide an OIDC provider embedded in Rancher. Required to enable SSO in Rancher Prime components.",
-		false,
+		isPrime(),
 		false,
 		true)
 )
@@ -408,4 +411,13 @@ func newFeature(name, description string, def, dynamic, install bool) *Feature {
 	features[name] = feature
 
 	return feature
+}
+
+// isPrime returns true if it is a Rancher Prime installation
+func isPrime() bool {
+	if versionType, ok := os.LookupEnv(primeEnv); ok && versionType == "prime" {
+		return true
+	}
+
+	return false
 }

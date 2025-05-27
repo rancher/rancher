@@ -80,7 +80,8 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 	}, nil
 }
 
-func (p *Provider) addHeadersMiddleware(next http.HandlerFunc) http.HandlerFunc {
+// middleware adds security headers, and returns not found if there aren't any OIDCClients
+func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
@@ -90,6 +91,10 @@ func (p *Provider) addHeadersMiddleware(next http.HandlerFunc) http.HandlerFunc 
 		oidcClients, err := p.authHandler.oidcClientCache.List(labels.Everything())
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to list OIDCCLients", http.StatusInternalServerError, w)
+			return
+		}
+		if len(oidcClients) == 0 {
+			oidcerror.WriteError(oidcerror.ServerError, "no OIDCClients configured", http.StatusInternalServerError, w)
 			return
 		}
 
@@ -112,9 +117,9 @@ func (p *Provider) addHeadersMiddleware(next http.HandlerFunc) http.HandlerFunc 
 
 // RegisterOIDCProviderHandles register all Handlers for the OIDC provider.
 func (p *Provider) RegisterOIDCProviderHandles(mux *mux.Router) {
-	mux.HandleFunc("/oidc/.well-known/openid-configuration", p.addHeadersMiddleware(openIDConfigurationEndpoint))
-	mux.HandleFunc("/oidc/.well-known/jwks.json", p.addHeadersMiddleware(p.jwksHandler.jwksEndpoint))
-	mux.HandleFunc("/oidc/authorize", p.addHeadersMiddleware(p.authHandler.authEndpoint))
-	mux.HandleFunc("/oidc/token", p.addHeadersMiddleware(p.tokenHandler.tokenEndpoint))
-	mux.HandleFunc("/oidc/userinfo", p.addHeadersMiddleware(p.userInfoHandler.userInfoEndpoint))
+	mux.HandleFunc("/oidc/.well-known/openid-configuration", p.middleware(openIDConfigurationEndpoint))
+	mux.HandleFunc("/oidc/.well-known/jwks.json", p.middleware(p.jwksHandler.jwksEndpoint))
+	mux.HandleFunc("/oidc/authorize", p.middleware(p.authHandler.authEndpoint))
+	mux.HandleFunc("/oidc/token", p.middleware(p.tokenHandler.tokenEndpoint))
+	mux.HandleFunc("/oidc/userinfo", p.middleware(p.userInfoHandler.userInfoEndpoint))
 }
