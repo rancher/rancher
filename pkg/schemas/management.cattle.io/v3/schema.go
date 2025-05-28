@@ -575,6 +575,21 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
+		MustImportAndCustomize(&Version, v3.CognitoConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "genericOIDCConfig",
+					Output: "genericOIDCTestOutput",
+				},
+				"testAndApply": {
+					Input: "genericOIDCApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
 		MustImport(&Version, v3.GenericOIDCApplyInput{}).
 		MustImport(&Version, v3.GenericOIDCTestOutput{}).
 		//KeyCloakOIDC Config
