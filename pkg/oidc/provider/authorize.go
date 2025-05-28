@@ -128,7 +128,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri is not registered", http.StatusBadRequest, w)
 		return
 	}
-	// Although Access-Control-Allow-Origin is initially set in addHeadersMiddleware based on all OIDCClients' redirectURLs,
+	// Although Access-Control-Allow-Origin is initially set in middleware based on all OIDCClients' redirectURLs,
 	// we override it here because we know the exact redirectURL for this request.
 	w.Header().Set("Access-Control-Allow-Origin", params.redirectURI)
 	if params.responseType != supportedResponseType {
