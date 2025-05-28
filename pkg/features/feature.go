@@ -415,9 +415,5 @@ func newFeature(name, description string, def, dynamic, install bool) *Feature {
 
 // isPrime returns true if it is a Rancher Prime installation
 func isPrime() bool {
-	if versionType, ok := os.LookupEnv(primeEnv); ok && versionType == "prime" {
-		return true
-	}
-
-	return false
+	return os.Getenv(primeEnv) == "prime"
 }
