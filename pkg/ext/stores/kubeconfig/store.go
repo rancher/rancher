@@ -758,13 +758,13 @@ func (s *Store) createTokenInput(kubeConfigID, userName string, authToken *apiv3
 	}
 }
 
-func tokenSelector(isAdmin bool, userID, tokenID string) (labels.Selector, error) {
+func tokenSelector(isAdmin bool, userID, kubeconfigID string) (labels.Selector, error) {
 	set := labels.Set{
 		tokens.TokenKindLabel: KindLabelValue,
 	}
 
-	if tokenID != "" {
-		set = labels.Merge(set, labels.Set{tokens.TokenKubeconfigIDLabel: tokenID})
+	if kubeconfigID != "" {
+		set = labels.Merge(set, labels.Set{tokens.TokenKubeconfigIDLabel: kubeconfigID})
 	}
 
 	if !isAdmin {
@@ -881,7 +881,7 @@ func (s *Store) List(
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
 			return nil, apierrors.NewResourceExpired(err.Error())
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("error listing tokens for kubeconfigs: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %w", err))
 	}
 
 	list := &ext.KubeconfigList{
@@ -1113,8 +1113,53 @@ func (s *Store) DeleteCollection(
 	options *metav1.DeleteOptions,
 	listOptions *metainternalversion.ListOptions,
 ) (runtime.Object, error) {
-	// TODO: Implement.
-	return nil, nil
+	userInfo, isAdmin, _, err := s.userFrom(ctx, "delete")
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+	}
+
+	lOptions, err := toListOptions(listOptions, userInfo, isAdmin)
+	if err != nil {
+		return nil, apierrors.NewInternalError(err)
+	}
+
+	configMapList, err := s.configMapClient.List(Namespace, *lOptions)
+	if err != nil {
+		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
+			return nil, apierrors.NewResourceExpired(err.Error())
+		}
+		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %w", err))
+	}
+
+	list := &ext.KubeconfigList{
+		ListMeta: metav1.ListMeta{
+			Continue:           configMapList.Continue,
+			ResourceVersion:    configMapList.ResourceVersion,
+			RemainingItemCount: configMapList.RemainingItemCount,
+		},
+		Items: make([]ext.Kubeconfig, 0, len(configMapList.Items)),
+	}
+
+	for _, configMap := range configMapList.Items {
+		tokenSelector, err := tokenSelector(isAdmin, userInfo.GetName(), configMap.Name)
+		if err != nil {
+			return nil, apierrors.NewInternalError(err)
+		}
+
+		obj, _, err := s.delete(ctx, &configMap, tokenSelector, deleteValidation, options)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting kubeconfig %s: %w", configMap.Name, err))
+		}
+
+		kubeconfig, ok := obj.(*ext.Kubeconfig)
+		if !ok { // Sanity check.
+			return nil, apierrors.NewInternalError(fmt.Errorf("expected kubeconfig object, got %T", obj))
+		}
+
+		list.Items = append(list.Items, *kubeconfig)
+	}
+
+	return list, nil
 }
 
 // Delete implements [rest.GracefulDeleter]
@@ -1141,9 +1186,24 @@ func (s *Store) Delete(
 		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
+	tokenSelector, err := tokenSelector(isAdmin, userInfo.GetName(), name)
+	if err != nil {
+		return nil, false, apierrors.NewInternalError(err)
+	}
+
+	return s.delete(ctx, configMap, tokenSelector, deleteValidation, options)
+}
+
+func (s *Store) delete(
+	ctx context.Context,
+	configMap *corev1.ConfigMap,
+	tokenSelector labels.Selector,
+	deleteValidation rest.ValidateObjectFunc,
+	options *metav1.DeleteOptions,
+) (runtime.Object, bool, error) {
 	kubeconfig, err := s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
 	}
 
 	if deleteValidation != nil {
@@ -1153,17 +1213,12 @@ func (s *Store) Delete(
 		}
 	}
 
-	selector, err := tokenSelector(isAdmin, userInfo.GetName(), name)
-	if err != nil {
-		return nil, false, apierrors.NewInternalError(err)
-	}
-
-	tokenList, err := s.tokenCache.List(selector)
+	tokenList, err := s.tokenCache.List(tokenSelector)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
+			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), configMap.Name)
 		}
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error listing tokens for kubeconfig %s: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error listing tokens for kubeconfig %s: %w", configMap.Name, err))
 	}
 
 	var tokenNames []string
@@ -1177,15 +1232,16 @@ func (s *Store) Delete(
 			PropagationPolicy:  options.PropagationPolicy,
 			DryRun:             options.DryRun, // Pass through the dry run flag instead of handling it explicitly.
 		}
+
 		err := s.tokens.Delete(tokenName, delOptions)
 		if err != nil && !apierrors.IsNotFound(err) {
-			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, name, err))
+			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
 		}
 	}
 
-	err = s.configMapClient.Delete(Namespace, name, options) // TODO: Revisit the options. It's not clear if all options we'll play nicely.
+	err = s.configMapClient.Delete(Namespace, configMap.Name, options) // TODO: Revisit the options. It's not clear if all options we'll play nicely.
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", configMap.Name, err))
 	}
 
 	return kubeconfig, true, nil
