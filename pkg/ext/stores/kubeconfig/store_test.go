@@ -1938,6 +1938,141 @@ func TestStoreDelete(t *testing.T) {
 	})
 }
 
+func TestStoreDeleteCollection(t *testing.T) {
+	t.Parallel()
+
+	kubeconfigID := "kubeconfig-49d5p"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
+		switch name {
+		case userID:
+			return &v3.User{}, nil
+		case "error":
+			return nil, fmt.Errorf("some error")
+		default:
+			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+		}
+	}).AnyTimes()
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeconfigID,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				UserIDLabel: userID,
+				KindLabel:   KindLabelValue,
+			},
+			Annotations: map[string]string{
+				UIDAnnotation: string(uuid.NewUUID()),
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "Token",
+					Name:       "kubeconfig-u-w7drcgc66",
+					UID:        uuid.NewUUID(),
+				},
+			},
+		},
+		Data: map[string]string{
+			TTLField:            "43200",
+			DescriptionField:    "test",
+			CurrentContextField: "c-m-tbgzfbgf",
+			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+		},
+	}
+
+	userManager := &fakeUserManager{}
+
+	t.Run("admin deletes users kubeconfigs with a label", func(t *testing.T) {
+		var deleteValidationCalledTimes int
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			deleteValidationCalledTimes++
+			return nil
+		}
+		deleteOptions := &metav1.DeleteOptions{
+			GracePeriodSeconds: ptr.To(int64(60)),
+		}
+		listOptions := &metainternalversion.ListOptions{
+			LabelSelector: labels.Set{
+				UserIDLabel: userID,
+				"custom":    "label",
+			}.AsSelector(),
+		}
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().List(Namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (*corev1.ConfigMapList, error) {
+			labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
+			require.NoError(t, err)
+			assert.Equal(t, KindLabelValue, labelSet[KindLabel])
+			assert.Equal(t, userID, labelSet[UserIDLabel])
+			assert.Equal(t, "label", labelSet["custom"])
+
+			return &corev1.ConfigMapList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "1",
+				},
+				Items: []corev1.ConfigMap{*configMap.DeepCopy()},
+			}, nil
+		}).Times(1)
+		configMapClient.EXPECT().Delete(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+			assert.Equal(t, deleteOptions, options)
+			return nil
+		}).Times(1)
+
+		tokenID1 := "kubeconfig-" + userID + "agc66"
+		tokenID2 := "kubeconfig-" + userID + "d12fg"
+
+		tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+		tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
+			set, err := labels.ConvertSelectorToLabelsMap(selector.String())
+			require.NoError(t, err)
+			assert.Equal(t, kubeconfigID, set.Get(tokens.TokenKubeconfigIDLabel))
+			assert.Equal(t, KindLabelValue, set.Get(tokens.TokenKindLabel))
+
+			return []*v3.Token{
+				{ObjectMeta: metav1.ObjectMeta{Name: tokenID1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: tokenID2}},
+			}, nil
+		}).AnyTimes()
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+		tokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
+			assert.Contains(t, []string{tokenID1, tokenID2}, name)
+			assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
+			assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
+			assert.Equal(t, deleteOptions.DryRun, options.DryRun)
+
+			return nil
+		}).Times(2)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenCache:      tokenCache,
+			tokens:          tokenClient,
+			userCache:       userCache,
+			userMgr:         userManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminID,
+		})
+
+		obj, err := store.DeleteCollection(ctx, deleteValidation, deleteOptions, listOptions)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.KubeconfigList{}, obj)
+
+		list := obj.(*ext.KubeconfigList)
+		require.Len(t, list.Items, 1)
+		assert.Equal(t, "1", list.ResourceVersion)
+
+		assert.Equal(t, deleteValidationCalledTimes, 1)
+	})
+}
+
 func TestPrintKubeconfig(t *testing.T) {
 	t.Parallel()
 
