@@ -7,14 +7,8 @@ declare -A COUNTS
 RESOURCES_FOUND=false
 
 check_prerequisites() {
-  local missing_tools=()
-
-  for tool in kubectl jq; do
-    command -v "$tool" &>/dev/null || missing_tools+=("$tool")
-  done
-
-  if [ ${#missing_tools[@]} -gt 0 ]; then
-    echo "Missing required tools: ${missing_tools[*]}"
+  if ! command -v kubectl &>/dev/null; then
+    echo "Missing required tool: kubectl"
     exit 1
   fi
 }
@@ -109,7 +103,7 @@ print_summary() {
   echo "Total resources detected: $total"
 
   if [ "$RESOURCES_FOUND" = true ]; then
-    echo "Error: RKE related resources were found, please delete the mentioned resources to continue"
+    echo "Error: Rancher v2.12 does not support RKE1. RKE-related resources were found. Please delete the mentioned resources to continue."
     exit 1
   else
     echo "No RKE related resources found."
