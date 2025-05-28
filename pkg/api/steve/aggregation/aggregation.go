@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/proxy"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
@@ -115,6 +116,9 @@ func (h *aggregationHandler) makeHandler(uuid string) http.Handler {
 }
 
 func (h *aggregationHandler) OnChange(key string, obj *v3.APIService) (*v3.APIService, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve aggregationHandler.OnChange()")
+
 	if key != relatedresource.AllKey {
 		return obj, nil
 	}

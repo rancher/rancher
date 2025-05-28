@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	zed "github.com/rancher/rancher/pkg/zdbg"
+
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -111,7 +113,6 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 		return cluster, nil
 	}
 
-	// Clusters annotated with "provisioning.cattle.io/externally-managed": "true" to manage fleet deployment externally
 	var clusterExternallyManaged bool
 	// For legacy purposes of the way our API generally works, make sure the value is not set to "false"
 	if ann := cluster.Annotations[externallyManagedAnn]; ann != "" && (strings.ToLower(ann) != "false") {
@@ -143,6 +144,9 @@ func (h *handler) ensureAgentMigrated(key string, cluster *fleet.Cluster) (*flee
 }
 
 func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterStatus) ([]runtime.Object, provv1.ClusterStatus, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "createCluster()")
+
 	if status.ClusterName == "" || status.ClientSecretName == "" {
 		return nil, status, nil
 	}

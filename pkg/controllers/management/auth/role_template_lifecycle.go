@@ -3,11 +3,13 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +73,9 @@ func (rtl *roleTemplateLifecycle) enqueueRtbs(obj *v3.RoleTemplate) (runtime.Obj
 }
 
 func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "role Remove()")
+
 	clusters, err := rtl.clusters.List(metav1.ListOptions{})
 	if err != nil {
 		return obj, err

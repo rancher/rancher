@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	ruser "github.com/rancher/rancher/pkg/user"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -66,6 +67,8 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 			t.Stop()
 		}()
 		defer t.Stop()
+
+		//vf keep reading from ticker channel for the hearbeats and gather telemetry every tick
 		for range t.C {
 			if settings.TelemetryOpt.Get() == "in" && isLeader(management) {
 				if !p.running {
@@ -104,6 +107,9 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 
 	go func() {
 		for range ticker.Context(ctx, time.Second*5) {
+			startTime := time.Now()
+			defer zed.Log(startTime, "p.GetRunningState()")
+
 			if settings.TelemetryOpt.Get() != "in" || !isLeader(management) {
 				if p.getRunningState() {
 					p.kill()

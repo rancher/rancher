@@ -2,12 +2,14 @@ package catalog
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/rancher/apiserver/pkg/types"
 	catalogtypes "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/settings"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
@@ -49,6 +51,9 @@ func newOperation(
 //
 // All chart actions (install, upgrade, and uninstall) are served through this method.
 func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "steve::operation.ServerHTTP()")
+
 	// Get the APIContext from the current request's context. This APIContext
 	// encapsulates the details of the API request, which will be used to
 	// determine the necessary operation and respond accordingly.
@@ -104,6 +109,9 @@ func (o *operation) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // It purges old roles related to the object being added.
 // These old roles will be purged upon timeout.
 func (o *operation) OnAdd(gvk schema2.GroupVersionKind, key string, obj runtime.Object) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "operation.OnAdd()")
+
 	return o.ops.Impersonator.PurgeOldRoles(gvk, key, obj)
 }
 
@@ -112,5 +120,8 @@ func (o *operation) OnAdd(gvk schema2.GroupVersionKind, key string, obj runtime.
 // It purges old roles related to the object being modified.
 // These old roles will be purged upon timeout.
 func (o *operation) OnChange(gvk schema2.GroupVersionKind, key string, obj, oldObj runtime.Object) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "operation.OnChange()")
+
 	return o.ops.Impersonator.PurgeOldRoles(gvk, key, obj)
 }

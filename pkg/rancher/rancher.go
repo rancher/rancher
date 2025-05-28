@@ -42,6 +42,7 @@ import (
 	"github.com/rancher/rancher/pkg/ui"
 	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/pkg/wrangler"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
@@ -275,6 +276,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	// load Zededa config for whatever instrumentation we might need
+	// always succeeds - if no config map, defaults values
+	zed.InitZConfig(ctx)
+
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
@@ -550,6 +555,9 @@ func bumpRancherWebhookIfNecessary(ctx context.Context, restConfig *rest.Config)
 // tools are strict with casing so the fields would be dropped before getting saved back in the proper casing
 // if any controller touches the cluster first. See https://github.com/rancher/rancher/issues/31385
 func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "migrateEncryptionConfig()")
+
 	dynamicClient, err := k8dynamic.NewForConfig(restConfig)
 	if err != nil {
 		return err

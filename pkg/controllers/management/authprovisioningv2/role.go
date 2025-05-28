@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	apiextcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -278,6 +279,9 @@ func (h *handler) OnRemoveClusterRoleBinding(key string, roleBinding *rbacv1.Clu
 }
 
 func (h *handler) objects(rt *v3.RoleTemplate, enqueue bool, cluster *v1.Cluster) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "handler.objects()")
+
 	var (
 		matchResults []match
 	)

@@ -7,7 +7,9 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -231,6 +233,9 @@ func listTagCategories(ctx context.Context, tagsManager *tags.Manager) ([]map[st
 }
 
 func listClusters(ctx context.Context, finder *find.Finder) ([]string, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "listClusters()")
+
 	clusters, err := finder.ClusterComputeResourceList(ctx, "*")
 	if err != nil {
 		return nil, err
