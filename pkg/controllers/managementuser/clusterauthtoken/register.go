@@ -7,6 +7,8 @@ import (
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	ext "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -89,8 +91,6 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	userAttributeLister := cluster.Management.Management.UserAttributes("").Controller().Lister()
 	settingInterface := cluster.Management.Management.Settings("")
 
-	extTokenIndexer := ext.Token().Informer().GetIndexer()
-
 	cluster.Management.Management.Settings("").AddHandler(ctx, settingController, (&settingHandler{
 		namespace,
 		clusterConfigMap,
@@ -99,17 +99,16 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	}).Sync)
 
 	handler := &tokenHandler{
-		namespace,
-		clusterAuthToken,
-		clusterAuthTokenLister,
-		clusterUserAttribute,
-		clusterUserAttributeLister,
-		tokenIndexer,
-		extTokenIndexer,
-		userLister,
-		userAttributeLister,
-		clusterSecret,
-		clusterSecretLister,
+		namespace:                  namespace,
+		clusterAuthToken:           clusterAuthToken,
+		clusterAuthTokenLister:     clusterAuthTokenLister,
+		clusterUserAttribute:       clusterUserAttribute,
+		clusterUserAttributeLister: clusterUserAttributeLister,
+		tokenIndexer:               tokenIndexer,
+		userLister:                 userLister,
+		userAttributeLister:        userAttributeLister,
+		clusterSecret:              clusterSecret,
+		clusterSecretLister:        clusterSecretLister,
 	}
 
 	cluster.Management.Management.Tokens("").AddClusterScopedLifecycle(ctx,
@@ -117,7 +116,10 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 		clusterName,
 		handler)
 
-	eTokenLifecycle(ctx, ext.Token(), extTokenController, clusterName, handler)
+	if features.ExtTokens.Enabled() {
+		handler.extTokenIndexer = ext.Token().Informer().GetIndexer()
+		eTokenLifecycle(ctx, ext.Token(), extTokenController, clusterName, handler)
+	}
 
 	cluster.Management.Management.Users("").AddHandler(ctx, userController, (&userHandler{
 		namespace,
@@ -137,10 +139,17 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 		clusterUserAttribute,
 	}).Sync)
 
-	cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, (&clusterAuthTokenHandler{
+	catHandler := &clusterAuthTokenHandler{
 		tokenCache:  tokenCache,
 		tokenClient: tokenClient,
-	}).sync)
+	}
+
+	if features.ExtTokens.Enabled() {
+		catHandler.eTokenCache = ext.Token().Cache()
+		catHandler.eTokenStore = extstore.NewSystemFromWrangler(cluster.Management.Wrangler)
+	}
+
+	cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, catHandler.sync)
 }
 
 // tokenUserClusterKey computes the v3 token's key for indexing by user and
