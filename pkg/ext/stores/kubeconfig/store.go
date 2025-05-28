@@ -352,7 +352,7 @@ func (s *Store) Create(
 
 	var foundCurrentContext bool
 	if kubeconfig.Spec.CurrentContext == "" {
-		kubeconfig.Spec.CurrentContext = "rancher"
+		kubeconfig.Spec.CurrentContext = defaultClusterName
 		foundCurrentContext = true
 	}
 
@@ -438,6 +438,7 @@ func (s *Store) Create(
 			CreationTimestamp: time.Now().Format(time.RFC3339), // TODO: Use the timestamp from the backing ConfigMap.
 			TTL:               strconv.FormatInt(kubeconfig.Spec.TTL, 10),
 		},
+		CurrentContext: kubeconfig.Spec.CurrentContext,
 	}
 
 	// The default entry that points to the Rancher URL.
@@ -487,7 +488,7 @@ func (s *Store) Create(
 			continue
 		}
 
-		// For the ACE cluster we generate a cluster-scoped token.
+		// Generate a cluster-scoped token for the ACE cluster.
 		if !dryRun && generateToken {
 			input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
 			tokenKey, token, err = s.userMgr.EnsureClusterToken(cluster.Name, input)
@@ -535,6 +536,10 @@ func (s *Store) Create(
 				User:    clusterName,
 			})
 
+			if kubeconfig.Spec.CurrentContext == cluster.Name {
+				data.CurrentContext = fqdnName
+			}
+
 			continue
 		}
 
@@ -545,9 +550,13 @@ func (s *Store) Create(
 		}
 
 		clusterCerts := kconfig.FormatCert(cluster.Status.CACert)
+		var isCurrentContextSet bool
 		for _, node := range nodes {
 			if !node.Spec.ControlPlane {
 				continue
+			}
+			if !isCurrentContextSet {
+				isCurrentContextSet = true
 			}
 
 			nodeName := clusterName + "-" + strings.TrimPrefix(node.Spec.RequestedHostname, clusterName+"-")
@@ -561,6 +570,11 @@ func (s *Store) Create(
 				Cluster: nodeName,
 				User:    clusterName,
 			})
+
+			if kubeconfig.Spec.CurrentContext == cluster.Name && !isCurrentContextSet {
+				data.CurrentContext = nodeName
+				isCurrentContextSet = true
+			}
 		}
 	}
 
