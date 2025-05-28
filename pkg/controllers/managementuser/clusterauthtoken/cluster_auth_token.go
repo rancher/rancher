@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	extcontrollers "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -15,8 +17,12 @@ import (
 )
 
 type clusterAuthTokenHandler struct {
+	// v3 token support
 	tokenCache  mgmtcontrollers.TokenCache
 	tokenClient mgmtcontrollers.TokenClient
+	// ext token support
+	eTokenCache extcontrollers.TokenCache
+	eTokenStore *extstore.SystemStore
 }
 
 // Sync ClusterAuthToken back to Token.
@@ -32,6 +38,35 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 	}
 
 	tokenName := clusterAuthToken.Name
+
+	// check ext token first ...
+	eToken, err := h.eTokenCache.Get(tokenName)
+	if err == nil {
+		// do nothing when token is set and uptodate wrt CAT, or expired
+
+		if eToken.Status.LastUsedAt != nil &&
+			eToken.Status.LastUsedAt.After(clusterAuthToken.LastUsedAt.Time) {
+			return clusterAuthToken, nil // Nothing to do.
+		}
+
+		if eToken.Status.Expired {
+			return clusterAuthToken, nil // Should not update expired token.
+		}
+
+		if err := h.eTokenStore.UpdateLastUsedAt(tokenName, clusterAuthToken.LastUsedAt.Time); err != nil {
+			return nil, fmt.Errorf("error updating lastUsedAt for token %s: %v", tokenName, err)
+		}
+
+		logrus.Debugf("[%s] Updated lastUsedAt for token %s", clusterAuthTokenController, tokenName)
+
+		return clusterAuthToken, nil
+	} else {
+		if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+			return nil, fmt.Errorf("error getting token %s: %w", tokenName, err)
+		}
+	}
+
+	// and v3 token as fallback
 	token, err := h.tokenCache.Get(tokenName)
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
