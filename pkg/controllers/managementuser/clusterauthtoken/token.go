@@ -326,9 +326,13 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 		return err
 	}
 
-	eTokens, err := h.extTokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	// skip ext tokens if feature is disabled
+	var eTokens []interface{}
+	if h.extTokenIndexer != nil {
+		eTokens, err = h.extTokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
 	}
 
 	err = h.clusterSecret.Delete(common.ClusterAuthTokenSecretName(name), &metav1.DeleteOptions{})
