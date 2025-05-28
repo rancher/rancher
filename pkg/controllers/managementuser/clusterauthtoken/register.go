@@ -7,6 +7,7 @@ import (
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	ext "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -88,6 +89,8 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	settingInterface := cluster.Management.Management.Settings("")
 
 	extTokenIndexer := ext.Token().Informer().GetIndexer()
+	eTokenCache := ext.Token().Cache()
+	eTokenStore := extstore.NewSystemFromWrangler(cluster.Management.Wrangler)
 
 	cluster.Management.Management.Settings("").AddHandler(ctx, settingController, (&settingHandler{
 		namespace,
@@ -136,6 +139,8 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, (&clusterAuthTokenHandler{
 		tokenCache:  tokenCache,
 		tokenClient: tokenClient,
+		eTokenCache: eTokenCache,
+		eTokenStore: eTokenStore,
 	}).sync)
 }
 
