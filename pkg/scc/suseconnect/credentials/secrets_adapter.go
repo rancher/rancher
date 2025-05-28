@@ -19,6 +19,8 @@ const (
 type CredentialSecretsAdapter struct {
 	secrets     v1core.SecretController
 	credentials SccCredentials
+	// TODO: implement secret reconcile logic
+	currentSHA string
 }
 
 func New(secrets v1core.SecretController) *CredentialSecretsAdapter {
