@@ -98,6 +98,7 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 	}
 	logrus.Info("[scc-operator] Waiting for server-url to be ready")
 	wait.Until(func() {
+		// Todo: also wait for local cluster ready
 		if systeminfo.IsServerUrlReady() {
 			logrus.Info("[scc-operator] can now start controllers; server URL is now ready.")
 			close(so.systemRegistrationReady)
