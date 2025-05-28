@@ -131,7 +131,7 @@ var (
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher127")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "csociety/machine:v0.16.0-rancher")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -160,7 +160,7 @@ var (
 
 	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
 	// debug purposes.
-	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
+	ChartDefaultURL = NewSetting("chart-default-url", "https://github.com/chiukapoor/charts")
 	// DisableInactiveUserAfter is the duration a user can be inactive after which it's disabled by the user retention process.
 	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
 	// DisableInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.

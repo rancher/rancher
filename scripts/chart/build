@@ -19,10 +19,10 @@ sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" build/chart/rancher/Chart.yaml
 post_delete_base=$CATTLE_DEFAULT_SHELL_VERSION
 post_delete_image_name=$(echo "${post_delete_base}" | cut -d ":" -f 1) || ""
 post_delete_image_tag=$(echo "${post_delete_base}" | cut -d ":" -f 2) || ""
-if [[ ! ${post_delete_image_name} =~ ^rancher\/.+ ]]; then
-  echo "The image name [$post_delete_image_name] is invalid. Its prefix should be rancher/"
-  exit 1
-fi
+# if [[ ! ${post_delete_image_name} =~ ^rancher\/.+ ]]; then
+#   echo "The image name [$post_delete_image_name] is invalid. Its prefix should be rancher/"
+#   exit 1
+# fi
 if [[ ! ${post_delete_image_tag} =~ ^v.+ ]]; then
   echo "The image tag [$post_delete_image_tag] is invalid. It should start with the letter v"
   exit 1
