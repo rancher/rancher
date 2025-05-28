@@ -513,6 +513,8 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, userManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
 		require.Len(t, userManager.clusterTokens, 1)
 		assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
+
+		assert.Equal(t, downstream1, config.CurrentContext)
 	})
 	t.Run("no cluster specified", func(t *testing.T) {
 		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
@@ -607,6 +609,8 @@ func TestStoreCreate(t *testing.T) {
 		require.Len(t, userManager.tokens, 1)
 		assert.Equal(t, userManager.tokens[0], config.AuthInfos["rancher"].Token)
 		require.Len(t, userManager.clusterTokens, 0)
+
+		assert.Equal(t, "rancher", config.CurrentContext)
 	})
 
 	t.Run("only a rancher user can create kubeconfig", func(t *testing.T) {
