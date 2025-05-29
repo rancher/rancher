@@ -774,7 +774,7 @@ func schema_pkg_apis_scccattleio_v1_SystemActivationState(ref common.ReferenceCa
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"valid": {
+					"activated": {
 						SchemaProps: spec.SchemaProps{
 							Default: false,
 							Type:    []string{"boolean"},
@@ -797,8 +797,14 @@ func schema_pkg_apis_scccattleio_v1_SystemActivationState(ref common.ReferenceCa
 							Format: "",
 						},
 					},
+					"systemUrl": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
 				},
-				Required: []string{"valid"},
+				Required: []string{"activated"},
 			},
 		},
 		Dependencies: []string{

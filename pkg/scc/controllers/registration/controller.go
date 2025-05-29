@@ -52,7 +52,7 @@ func (h *Handler) Call(name string, registrationObj *v1.Registration) (*v1.Regis
 	}
 
 	var err error
-	if registrationObj.Spec.Mode == v1.Online {
+	if registrationObj.Spec.Mode == v1.RegistrationModeOnline {
 		onlineHandlerObj := &onlineHandler{
 			rootHandler: h,
 		}

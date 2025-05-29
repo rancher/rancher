@@ -73,7 +73,7 @@ func Register(
 			checkInWasTriggered := false
 			for _, registrationObj := range registrationsCacheList {
 				// Always skip offline mode registrations, or Registrations that haven't progressed to activation
-				if registrationObj.Spec.Mode == v1.Offline ||
+				if registrationObj.Spec.Mode == v1.RegistrationModeOffline ||
 					needsRegistration(registrationObj) {
 					continue
 				}
@@ -147,7 +147,7 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	}
 
 	// For online mode, call deregister
-	if registrationObj.Spec.Mode == v1.Online {
+	if registrationObj.Spec.Mode == v1.RegistrationModeOnline {
 		_ = h.sccCredentials.Refresh()
 		sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfoExporter)
 		err := sccConnection.Deregister()
