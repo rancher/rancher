@@ -13,12 +13,12 @@ import (
 type RegistrationMode string
 
 func (rm *RegistrationMode) Valid() bool {
-	return *rm == Online || *rm == Offline
+	return *rm == RegistrationModeOnline || *rm == RegistrationModeOffline
 }
 
 const (
-	Online  RegistrationMode = "online"
-	Offline RegistrationMode = "offline"
+	RegistrationModeOnline  RegistrationMode = "online"
+	RegistrationModeOffline RegistrationMode = "offline"
 )
 
 const (
@@ -107,7 +107,7 @@ type SystemActivationState struct {
 	// +optional
 	ValidUntilTS *metav1.Time `json:"validUntilTS"`
 	Certificate  string       `json:"certificate,omitempty"`
-	SccUrl       string       `json:"sccUrl,omitempty"`
+	SystemUrl    string       `json:"systemUrl,omitempty"`
 }
 
 func (r *Registration) HasCondition(matchCond condition.Cond) bool {
