@@ -13,6 +13,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/resource-policy": keep
+  labels: {{ include "rancher.labels" . | nindent 4 }}{{ include "rancher.commonLabels" (dict "context" . "partOf" "rancher") | indent 4 }}
 type: Opaque
 data:
   regCode: {{ .Values.registration.regCode | b64enc }}
@@ -26,6 +27,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/resource-policy": keep
+  labels: {{ include "rancher.labels" . | nindent 4 }}{{ include "rancher.commonLabels" (dict "context" . "partOf" "rancher") | indent 4 }}
 type: Opaque
 data:
   certificate: {{ .Values.registration.certificate | b64enc }}
@@ -36,6 +38,7 @@ apiVersion: scc.cattle.io/v1
 kind: Registration
 metadata:
   name: rancher-chart-{{ .Release.Name }}-{{ .Release.Revision }}
+  labels: {{ include "rancher.labels" . | nindent 4 }}{{ include "rancher.commonLabels" (dict "context" . "component" "registration" "partOf" "rancher") | indent 4 }}
 spec:
   mode: {{ template "registration.mode" . }}
   {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}}
@@ -63,8 +66,7 @@ kind: ConfigMap
 metadata:
   name: initial-scc-registration
   namespace: {{ .Release.Namespace }}
-  labels: {{ include "rancher.labels" . | nindent 4 }}
-    app.kubernetes.io/part-of: "rancher"
+  labels: {{ include "rancher.labels" . | nindent 4 }}{{ include "rancher.commonLabels" (dict "context" . "component" "config" "partOf" "rancher") | indent 4 }}
 data:
   mode: {{ template "registration.mode" . }}
   {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}}

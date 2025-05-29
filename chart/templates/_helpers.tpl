@@ -44,6 +44,26 @@ heritage: {{ .Release.Service }}
 release: {{ .Release.Name }}
 {{- end }}
 
+{{/*
+Generate the Kubernetes recommended common labels.
+
+Usage:
+  include "rancher.commonLabels" (dict "context" . "component" "xyz" "partOf" "abc")
+*/}}
+{{- define "rancher.commonLabels" -}}
+{{- $ctx := .context }}
+app.kubernetes.io/name: {{ $ctx.Chart.Name | quote }}
+app.kubernetes.io/instance: {{ $ctx.Release.Name | quote }}
+app.kubernetes.io/version: {{ $ctx.Chart.AppVersion | quote }}
+app.kubernetes.io/managed-by: {{ $ctx.Release.Service | quote }}
+{{- with .component }}
+app.kubernetes.io/component: {{ . | quote }}
+{{- end }}
+{{- with .partOf }}
+app.kubernetes.io/part-of: {{ . | quote }}
+{{- end }}
+{{- end }}
+
 # Windows Support
 
 {{/*
