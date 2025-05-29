@@ -61,7 +61,7 @@ func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Regist
 		lastValidatedTS = registrationObj.Status.ActivationStatus.LastValidatedTS.Time
 	}
 
-	if registrationObj.Spec.CheckNow && !lastValidatedTS.IsZero() {
+	if *registrationObj.Spec.CheckNow && !lastValidatedTS.IsZero() {
 		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 			updated := registrationObj.DeepCopy()
 			// TODO(o&b): Also update the status to warn RegistrationModeOffline users that `CheckNow` does nothing
