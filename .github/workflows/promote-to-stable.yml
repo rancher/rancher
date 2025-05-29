@@ -6,19 +6,11 @@ on:
         type: string
         description: "e.g: v2.8.4"
         required: true
-      promote-to:
-        type: choice
-        description: "Promote to latest or stable"
-        options:
-          - "latest"
-          - "stable"
-        required: true
 env:
   REGISTRY: "docker.io"
   IMAGE: ${{ github.repository }}
   TAG: ${{ github.event.inputs.tag }}
   GIT_TAG: ${{ github.event.inputs.tag }}
-  NEW_TAG: ${{ github.event.inputs.promote-to }}
 jobs:
   promote-docker-image:
     runs-on: ubuntu-latest
@@ -36,10 +28,11 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Skopeo login
         run: echo ${{ env.DOCKER_PASSWORD }} | skopeo login ${{ env.REGISTRY }} --username ${{ env.DOCKER_USERNAME }} --password-stdin
-      - name: Copy image to new tag
-        run: skopeo copy docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.NEW_TAG }} --all
+      - name: Copy image to latest
+        run: skopeo copy docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:latest --all
+      - name: Copy image to stable
+        run: skopeo copy docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:stable --all
   promote-chart:
-    if: ${{ github.event.inputs.promote-to }} == "stable" # Only promote the chart if it's being promoted to stable
     runs-on: ubuntu-latest
     permissions:
       contents: read
