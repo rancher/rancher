@@ -8,6 +8,11 @@ import (
 	"net/url"
 )
 
+const (
+	RancherProductIdentifier = "rancher"
+	RancherCPUArch           = "unknown"
+)
+
 type InfoProvider struct {
 	RancherUuid uuid.UUID
 	ClusterUuid uuid.UUID
@@ -33,10 +38,13 @@ func (i *InfoProvider) GetVersion() string {
 	return version
 }
 
-// GetProductIdentifier returns a triple of product, version and architecture
-// Rancher always returns "rancher" as product, and "unknown" as the architecture
+// GetProductIdentifier returns a triple of product ID, version and CPU architecture
 func (i *InfoProvider) GetProductIdentifier() (string, string, string) {
-	return "rancher", i.GetVersion(), "unknown"
+	// Rancher always returns "rancher" as product, and "unknown" as the architecture
+	// The CPU architecture must match what SCC has product codes for; unless SCC adds other arches we always return unknown.
+	// It is unlikely SCC should add these as that would require customers purchasing different RegCodes to run Rancher on arm64 and amd64.
+	// In turn, that would lead to complications like "should Arm run Ranchers allow x86 downstream clusters?"
+	return RancherProductIdentifier, i.GetVersion(), RancherCPUArch
 }
 
 // ServerHostname returns the hostname of the Rancher server URL

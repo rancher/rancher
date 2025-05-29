@@ -67,7 +67,7 @@ type RegistrationSpec struct {
 	// +optional
 	RegistrationRequest                     *RegistrationRequest    `json:"registrationRequest,omitempty"`
 	OfflineRegistrationCertificateSecretRef *corev1.SecretReference `json:"offlineRegistrationCertificateSecretRef,omitempty"`
-	CheckNow                                bool                    `json:"checkNow,omitempty"`
+	CheckNow                                *bool                   `json:"checkNow,omitempty"`
 }
 
 func (rs *RegistrationSpec) WithoutCheckNow() *RegistrationSpec {
