@@ -47,7 +47,7 @@ func (oh *offlineHandler) prepareOfflineRegistrationRequest(registrationObj *v1.
 		Namespace: offlineRegistrationSecret.Namespace,
 	}
 
-	// TODO(o&b): also set a status/condition to indicate Offline is ready for user
+	// TODO(o&b): also set a status/condition to indicate RegistrationModeOffline is ready for user
 	// The message could potentially even give command to fetch secret?
 
 	updatedRequest, err = oh.rootHandler.registrations.UpdateStatus(updatedRequest)

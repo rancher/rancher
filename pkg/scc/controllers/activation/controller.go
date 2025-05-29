@@ -62,9 +62,9 @@ func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Regist
 	}
 
 	if registrationObj.Spec.CheckNow && !lastValidatedTS.IsZero() {
-		if registrationObj.Spec.Mode == v1.Offline {
+		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 			updated := registrationObj.DeepCopy()
-			// TODO(o&b): Also update the status to warn Offline users that `CheckNow` does nothing
+			// TODO(o&b): Also update the status to warn RegistrationModeOffline users that `CheckNow` does nothing
 			// Better alternative, webhook prevent updates if mode=offline
 			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
 			return h.registrations.Update(updated)
@@ -91,7 +91,7 @@ func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Regist
 		return registrationObj, nil
 	}
 
-	if registrationObj.Spec.Mode == v1.Online {
+	if registrationObj.Spec.Mode == v1.RegistrationModeOnline {
 		registration, err := h.processOnlineActivation(registrationObj)
 		if err != nil {
 			return h.setReconcilingCondition(registration, err)

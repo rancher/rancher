@@ -119,7 +119,7 @@ spec:
                   lastValidatedTS:
                     format: date-time
                     type: string
-                  sccUrl:
+                  systemUrl:
                     type: string
                   validUntilTS:
                     format: date-time

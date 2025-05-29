@@ -142,7 +142,7 @@ func (so *sccOperator) maybeFirstInit() (*sccv1.Registration, error) {
 				},
 			}
 			newRegistration.Spec.Mode = *mode
-			if *mode == sccv1.Online {
+			if *mode == sccv1.RegistrationModeOnline {
 				newRegistration.Spec.RegistrationRequest.RegistrationCodeSecretRef = secretRef
 			}
 

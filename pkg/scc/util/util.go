@@ -34,7 +34,7 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 
 	credentialNameKey := ""
 	credentialNamespaceKey := ""
-	if mode == v1.Online {
+	if mode == v1.RegistrationModeOnline {
 		credentialNameKey = RegCodeInitializerNameKey
 		credentialNamespaceKey = RegCodeInitializerNamespaceKey
 	} else {
