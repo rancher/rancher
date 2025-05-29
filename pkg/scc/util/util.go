@@ -3,7 +3,9 @@ package util
 import (
 	"errors"
 	"fmt"
+	"github.com/Masterminds/semver/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/version"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -64,4 +66,19 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 	secretReference.Namespace = secretNamespace
 
 	return secretReference, &mode, nil
+}
+
+func VersionIsDevBuild() bool {
+	if version.Version == "dev" {
+		return true
+	}
+
+	// TODO replace with regex
+	parsedVer, err := semver.NewVersion(version.Version)
+	if err != nil {
+		logrus.Errorf("Error parsing version %s: %s", version.Version, err)
+		logrus.Warnf("The version will be interpreted as a development build")
+		return true
+	}
+	return parsedVer.Prerelease() != ""
 }
