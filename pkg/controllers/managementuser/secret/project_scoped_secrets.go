@@ -128,7 +128,7 @@ func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1
 	var errs error
 	for _, secret := range secretsToDelete.UnsortedList() {
 		// secret in namespace does not belong here
-		logrus.Infof("deleting secret %s from namespace %s", secret.Name, secret.Namespace)
+		logrus.Infof("Cleaning project scoped secret %s from namespace %s", secret.Name, secret.Namespace)
 		errs = errors.Join(errs, n.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}))
 	}
 	return errs
@@ -176,7 +176,7 @@ func (n *namespaceHandler) getNamespacesFromSecret(secret *corev1.Secret) ([]*co
 		return nil, err
 	}
 	if project.GetProjectBackingNamespace() != secret.Namespace {
-		logrus.Tracef("secret [%s] not in the project namespace, not copying", secret.Name)
+		logrus.Tracef("Secret [%s] not in the project namespace, not copying", secret.Name)
 		return nil, nil
 	}
 
