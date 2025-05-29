@@ -69,7 +69,7 @@ metadata:
   labels: {{ include "rancher.labels" . | nindent 4 }}{{ include "rancher.commonLabels" (dict "context" . "component" "config" "partOf" "rancher") | indent 4 }}
 data:
   mode: {{ template "registration.mode" . }}
-  {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}}
+  {{- if or .Values.registration.regCode .Values.registration.regCodeRef }}
   {{- if .Values.registration.regCode }}
   regCodeSecretNamespace: {{ .Release.Namespace }}
   regCodeSecretName: "rancher-scc-registration-code"
