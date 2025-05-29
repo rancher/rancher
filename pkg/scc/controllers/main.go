@@ -10,8 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
+	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
-	"github.com/rancher/rancher/pkg/version"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +53,7 @@ func Register(
 		JitterMaxScale:  time.Hour,
 		PollingInterval: 9 * time.Minute,
 	}
-	if version.IsDevBuild() {
+	if util.VersionIsDevBuild() {
 		jitterbugConfig = jitterbug.Config{
 			BaseInterval:    8 * time.Hour,
 			JitterMax:       30,

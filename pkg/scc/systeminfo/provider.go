@@ -2,6 +2,7 @@ package systeminfo
 
 import (
 	"github.com/google/uuid"
+	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/settings"
 	coreVersion "github.com/rancher/rancher/pkg/version"
 	"net/url"
@@ -24,7 +25,7 @@ func NewInfoProvider(rancherUuid uuid.UUID, clusterUuid uuid.UUID) *InfoProvider
 func (i *InfoProvider) GetVersion() string {
 	var version string
 	version = coreVersion.Version
-	if coreVersion.IsDevBuild() {
+	if util.VersionIsDevBuild() {
 		// TODO: maybe SCC devs can give us a static dev version?
 		version = "2.10.3"
 	}

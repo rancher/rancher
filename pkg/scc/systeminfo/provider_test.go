@@ -1,6 +1,7 @@
 package systeminfo
 
 import (
+	"github.com/rancher/rancher/pkg/scc/util"
 	"testing"
 
 	"github.com/google/uuid"
@@ -38,7 +39,7 @@ func TestGetProductIdentifier(t *testing.T) {
 	assert.Equal(t, "rancher", product)
 	// When in dev mode, the info provider has to "lie" in order to connect with SCC
 	// however, when not in dev mode, the info provider should return the correct version
-	if coreVersion.IsDevBuild() {
+	if util.VersionIsDevBuild() {
 		assert.NotEqual(t, coreVersion.Version, version)
 	} else {
 		assert.Equal(t, coreVersion.Version, version)
