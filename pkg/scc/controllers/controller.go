@@ -5,9 +5,6 @@ import (
 	"errors"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/scc/controllers/activation"
-	"github.com/rancher/rancher/pkg/scc/controllers/registration"
-	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util"
@@ -18,6 +15,15 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"time"
 )
+
+type SCCHandler interface {
+	NeedsRegistration(*v1.Registration) bool
+	RegisterSystem(*v1.Registration) (*v1.Registration, error) // Equal to first time registration w/ SCC, or Offline Request creation
+	NeedsActivation(*v1.Registration) bool
+	Activate(*v1.Registration) (*v1.Registration, error)  // Equal to activating with SCC, or verifying offline Request
+	Keepalive(*v1.Registration) (*v1.Registration, error) // Provides a heartbeat to SCC and validates status
+	Deregister() error
+}
 
 type handler struct {
 	ctx                context.Context
@@ -72,13 +78,17 @@ func Register(
 
 			checkInWasTriggered := false
 			for _, registrationObj := range registrationsCacheList {
+				registrationHandler := controller.prepareHandler(registrationObj.Spec.Mode)
+
 				// Always skip offline mode registrations, or Registrations that haven't progressed to activation
 				if registrationObj.Spec.Mode == v1.RegistrationModeOffline ||
-					needsRegistration(registrationObj) {
+					registrationHandler.NeedsRegistration(registrationObj) ||
+					registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero() {
 					continue
 				}
 
 				lastValidated := registrationObj.Status.ActivationStatus.LastValidatedTS
+
 				timeSinceLastValidation := time.Since(lastValidated.Time)
 				// If the time since last validation is after the daily trigger (which includes jitter), we revalidate.
 				// Also, ensure that when a registration is over the strictDeadline it is checked.
@@ -98,6 +108,18 @@ func Register(
 	go jitterCheckin.Run()
 }
 
+func (h *handler) prepareHandler(mode v1.RegistrationMode) SCCHandler {
+	if mode == v1.RegistrationModeOffline {
+		return sccOfflineMode{}
+	}
+	return sccOnlineMode{
+		registrations:      h.registrations,
+		sccCredentials:     h.sccCredentials,
+		systemInfoExporter: h.systemInfoExporter,
+		secrets:            h.secrets,
+	}
+}
+
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	if registrationObj == nil {
 		return nil, nil
@@ -108,37 +130,72 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, errors.New("no server url found in the system info")
 	}
 
-	// Only on the first time an object passes through here should it need to be registered
-	// The logical default condition should always be to try activation, unless we know it's not registered.
-	if needsRegistration(registrationObj) {
-		registrationHandler := registration.New(
-			h.ctx,
-			h.registrations,
-			h.secrets,
-			h.sccCredentials,
-			h.systemInfoExporter,
-		)
-
-		return registrationHandler.Call(name, registrationObj)
+	if v1.ResourceConditionFailure.IsTrue(registrationObj) {
+		return registrationObj, errors.New("registration has failed status; create a new one to retry")
 	}
 
-	// Due to the above noted choice, this means if the Registration becomes invalid outside of Rancher
-	// Then the activation handler is what should deal with reconciling the state when that happens
-	activationHandler := activation.New(
-		h.ctx,
-		h.registrations,
-		h.secrets,
-		h.sccCredentials,
-		h.systemInfoExporter,
-	)
+	registrationHandler := h.prepareHandler(registrationObj.Spec.Mode)
 
-	return activationHandler.Call(name, registrationObj)
-}
+	// Only on the first time an object passes through here should it need to be registered
+	// The logical default condition should always be to try activation, unless we know it's not registered.
+	if registrationHandler.NeedsRegistration(registrationObj) {
+		announced, err := registrationHandler.RegisterSystem(registrationObj)
+		if err != nil {
+			// reconcile state
+			return nil, err
+		}
 
-func needsRegistration(obj *v1.Registration) bool {
-	return obj.Status.RegistrationProcessedTS == nil || obj.Status.RegistrationProcessedTS.IsZero() ||
-		!obj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
-		!obj.HasCondition(v1.RegistrationConditionAnnounced)
+		// Upon successful registration the processed TS is set, so enqueue for activation
+		if registrationObj.Status.RegistrationProcessedTS != nil {
+			h.registrations.Enqueue(registrationObj.Name)
+		}
+
+		return announced, nil
+	}
+
+	if registrationHandler.NeedsActivation(registrationObj) {
+		activated, err := registrationHandler.Activate(registrationObj)
+		if err != nil {
+			// reconcile state
+			return nil, err
+		}
+
+		return activated, nil
+	}
+
+	// Handle what to do when CheckNow is used...
+	if registrationObj.Spec.CheckNow != nil && *registrationObj.Spec.CheckNow {
+		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
+			updated := registrationObj.DeepCopy()
+			// TODO(o&b): Also update the status to warn RegistrationModeOffline users that `CheckNow` does nothing
+			// Better alternative, webhook prevent updates if mode=offline
+			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
+			return h.registrations.Update(updated)
+		} else {
+			updated := registrationObj.DeepCopy()
+			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
+			updated.Status.ActivationStatus.Activated = false
+			updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{}
+			v1.ResourceConditionProgressing.True(updated)
+			v1.ResourceConditionReady.False(updated)
+			v1.ResourceConditionDone.False(updated)
+
+			var err error
+			updated, err = h.registrations.UpdateStatus(updated)
+
+			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
+			updated, err = h.registrations.Update(updated)
+			return updated, err
+		}
+	}
+
+	heartbeat, err := registrationHandler.Keepalive(registrationObj)
+	if err != nil {
+		// reconcile state
+		return nil, err
+	}
+
+	return heartbeat, nil
 }
 
 func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
@@ -146,20 +203,10 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 		return nil, nil
 	}
 
-	// For online mode, call deregister
-	if registrationObj.Spec.Mode == v1.RegistrationModeOnline {
-		_ = h.sccCredentials.Refresh()
-		sccConnection := suseconnect.DefaultRancherConnection(h.sccCredentials.SccCredentials(), h.systemInfoExporter)
-		err := sccConnection.Deregister()
-		if err != nil {
-			return nil, err
-		}
-
-		// Delete SCC credentials after successful Deregister
-		credErr := h.sccCredentials.Remove()
-		if credErr != nil {
-			return nil, credErr
-		}
+	regHandler := h.prepareHandler(registrationObj.Spec.Mode)
+	deRegErr := regHandler.Deregister()
+	if deRegErr != nil {
+		logrus.Warn(deRegErr)
 	}
 
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
