@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -124,6 +125,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check for deprecated RKE1 resources in the cluster
+	if err := validateRKE1Resources(wranglerContext); err != nil {
+		return nil, fmt.Errorf("rke1 pre-upgrade validation failed: %w", err)
 	}
 
 	if err := dashboarddata.EarlyData(ctx, wranglerContext.K8s); err != nil {
@@ -617,4 +623,83 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 		allErrors = errors.Join(err, allErrors)
 	}
 	return allErrors
+}
+
+// checks for deprecated RKE1 resources in the cluster to ensure that the cluster is not using any deprecated resources.
+func validateRKE1Resources(wranglerContext *wrangler.Context) error {
+	resources, err := checkForRKE1Resources(wranglerContext)
+	if err != nil {
+		return fmt.Errorf("checking for RKE1 resources: %w", err)
+	}
+	if len(resources) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Rancher v2.12 no longer supports RKE1.\nDetected RKE1-related resources (listed below).\nPlease migrate these clusters to RKE2 or K3s, or delete the related resources.\nMore info: https://www.suse.com/c/rke-end-of-life-by-july-2025-replatform-to-rke2-or-k3s/\n - %s", strings.Join(resources, "\n - "))
+}
+
+// checkForRKE1Resources scans for deprecated RKE1 (Rancher Kubernetes Engine v1) resources in the Rancher management context.
+func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) {
+	var found []string
+
+	logrus.Infof("Scanning NodeTemplates in namespace: %s, group: nodetemplates.management.cattle.io", namespace.NodeTemplateGlobalNamespace)
+	logrus.Infof("Scanning ClusterTemplates in namespace: %s, group: clustertemplates.management.cattle.io", namespace.GlobalNamespace)
+
+	// Check for RKE1 clusters
+	clusters, err := wranglerContext.Mgmt.Cluster().List(metav1.ListOptions{})
+	if k8serror.IsNotFound(err) {
+		clusters = &v3.ClusterList{}
+	} else if err != nil {
+		return nil, fmt.Errorf("error checking RKE1 clusters: %w", err)
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.RancherKubernetesEngineConfig != nil {
+			found = append(found, fmt.Sprintf("Cluster: name=%s, displayName=%s", cluster.Name, cluster.Spec.DisplayName))
+		}
+	}
+
+	// NodeTemplates in the global node template namespace
+	nodeTemplates, err := wranglerContext.Mgmt.NodeTemplate().List(namespace.NodeTemplateGlobalNamespace, metav1.ListOptions{})
+
+	if k8serror.IsNotFound(err) {
+		nodeTemplates = &v3.NodeTemplateList{}
+	} else if err != nil {
+		return nil, fmt.Errorf("error checking nodeTemplates: %w", err)
+	}
+
+	for _, obj := range nodeTemplates.Items {
+		found = append(found, fmt.Sprintf("NodeTemplate: name=%s, displayName=%s, namespace=%s", obj.Name, obj.Spec.DisplayName, obj.Namespace))
+	}
+
+	// ClusterTemplates in the global namespace
+	clusterTemplates, err := wranglerContext.Mgmt.ClusterTemplate().List(namespace.GlobalNamespace, metav1.ListOptions{})
+
+	if k8serror.IsNotFound(err) {
+		clusterTemplates = &v3.ClusterTemplateList{}
+	} else if err != nil {
+		return nil, fmt.Errorf("error checking clusterTemplates: %w", err)
+	}
+
+	for _, obj := range clusterTemplates.Items {
+		found = append(found, fmt.Sprintf("ClusterTemplate: name=%s, displayName=%s, namespace=%s", obj.Name, obj.Spec.DisplayName, obj.Namespace))
+	}
+
+	// Check for associated v1 provisioning clusters
+	provisioningClusters, err := wranglerContext.Provisioning.Cluster().List("", metav1.ListOptions{})
+
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			// No provisioning cluster CRD installed, treat as no resources
+			provisioningClusters = &provisioningv1.ClusterList{}
+		} else {
+			return nil, fmt.Errorf("error checking provisioning clusters: %w", err)
+		}
+	}
+
+	for _, provisioningCluster := range provisioningClusters.Items {
+		found = append(found, fmt.Sprintf("ProvisioningCluster: name=%s", provisioningCluster.Name))
+	}
+
+	return found, nil
 }
