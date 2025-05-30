@@ -1011,11 +1011,6 @@ func schema_pkg_apis_scccattleio_v1_SystemActivationState(ref common.ReferenceCa
 							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
-					"validUntilTS": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-						},
-					},
 					"certificate": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},

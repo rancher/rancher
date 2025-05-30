@@ -121,9 +121,6 @@ spec:
                     type: string
                   systemUrl:
                     type: string
-                  validUntilTS:
-                    format: date-time
-                    type: string
                 required:
                 - activated
                 type: object
