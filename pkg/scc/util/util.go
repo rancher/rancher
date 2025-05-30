@@ -3,11 +3,11 @@ package util
 import (
 	"errors"
 	"fmt"
-	"github.com/Masterminds/semver/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"regexp"
 )
 
 const (
@@ -68,17 +68,14 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 	return secretReference, &mode, nil
 }
 
+var semverRegex = regexp.MustCompile(`(?m)^v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+
 func VersionIsDevBuild() bool {
-	if version.Version == "dev" {
+	rancherVersion := version.Version
+	if rancherVersion == "dev" {
 		return true
 	}
 
-	// TODO replace with regex
-	parsedVer, err := semver.NewVersion(version.Version)
-	if err != nil {
-		logrus.Errorf("Error parsing version %s: %s", version.Version, err)
-		logrus.Warnf("The version will be interpreted as a development build")
-		return true
-	}
-	return parsedVer.Prerelease() != ""
+	matches := semverRegex.FindStringSubmatch(rancherVersion)
+	return matches[4] != "" || matches[3] == ""
 }
