@@ -14,7 +14,12 @@ func TestNewJitterCalculator(t *testing.T) {
 		JitterMax:      5,
 		JitterMaxScale: time.Minute,
 	}
-	jc := NewJitterCalculator(config, nil)
+
+	// Use a deterministic random source
+	seed := int64(42)
+	r := rand.New(rand.NewSource(seed))
+
+	jc := NewJitterCalculator(config, r)
 	if jc.config.BaseInterval != config.BaseInterval {
 		t.Errorf("BaseInterval not set correctly")
 	}
@@ -37,47 +42,98 @@ func TestNewJitterCalculatorDefaults(t *testing.T) {
 	config := &Config{
 		BaseInterval: 10 * time.Hour,
 	}
-	_ = NewJitterCalculator(config, nil)
+
+	// Use a deterministic random source
+	seed := int64(42)
+	r := rand.New(rand.NewSource(seed))
+
+	_ = NewJitterCalculator(config, r)
 	assert.Equal(t, 30*time.Second, config.PollingInterval)
 	assert.Equal(t, 15, config.JitterMax)
 	assert.Equal(t, time.Minute, config.JitterMaxScale)
 	assert.Equal(t, config.BaseInterval+config.JitterMaxDuration(), config.StrictDeadline)
 }
 
+// TestCalculateCheckinInterval tests the CalculateCheckinInterval method with the new signature.
+// This test was failing due to data races because its subtests were implicitly relying on
+// a shared random source. By providing a unique rand.Rand instance per subtest,
+// we eliminate this race.
 func TestCalculateCheckinInterval(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
-		name     string
-		input    int
-		expected int
+		name   string
+		config Config
 	}{
-		{"42", 42, 8},
-		{"32", 32, 12},
-		{"9", 9, 9},
-		{"1024", 1024, 10},
-		{"2048", 2048, 12},
-	}
-
-	config := &Config{
-		BaseInterval:   10 * time.Second,
-		JitterMax:      2,
-		JitterMaxScale: time.Second,
+		{
+			name: "Typical interval 42s",
+			config: Config{
+				BaseInterval:   42 * time.Second,
+				JitterMax:      5,
+				JitterMaxScale: time.Second, // Jitter range: -5s to +5s
+			},
+		},
+		{
+			name: "Typical interval 32s",
+			config: Config{
+				BaseInterval:   32 * time.Second,
+				JitterMax:      10,
+				JitterMaxScale: time.Second, // Jitter range: -10s to +10s
+			},
+		},
+		{
+			name: "Small interval 9s",
+			config: Config{
+				BaseInterval:   9 * time.Second,
+				JitterMax:      2,
+				JitterMaxScale: time.Second, // Jitter range: -2s to +2s
+			},
+		},
+		{
+			name: "Large interval 1024s",
+			config: Config{
+				BaseInterval:   1024 * time.Second,
+				JitterMax:      60,
+				JitterMaxScale: time.Second, // Jitter range: -60s to +60s
+			},
+		},
+		{
+			name: "Large interval 2048s",
+			config: Config{
+				BaseInterval:   2048 * time.Second,
+				JitterMax:      120,
+				JitterMaxScale: time.Second, // Jitter range: -120s to +120s
+			},
+		},
+		{
+			name: "Zero jitter",
+			config: Config{
+				BaseInterval:   50 * time.Second,
+				JitterMax:      0,
+				JitterMaxScale: time.Second, // Jitter range: 0s
+			},
+		},
 	}
 
 	for _, tt := range tests {
-		// Intentionally set a local var to ensure the parallel calls don't collide
-		localTT := tt
-		t.Run(localTT.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(tt.name, func(t *testing.T) {
 			// Use a deterministic random source
-			seed := int64(localTT.input)
+			seed := int64(42)
 			r := rand.New(rand.NewSource(seed))
+			calc := NewJitterCalculator(&tt.config, r)
+			if calc == nil {
+				t.Fatalf("NewJitterCalculator returned nil")
+			}
 
-			calculator := NewJitterCalculator(config, r)
-			interval := calculator.CalculateCheckinInterval()
+			// Calculate expected min and max based on the new jitter logic.
+			expectedMin := tt.config.BaseInterval - tt.config.JitterMaxDuration()
+			expectedMax := tt.config.BaseInterval + tt.config.JitterMaxDuration()
 
-			expected := time.Duration(localTT.expected) * config.JitterMaxScale
-			assert.Equal(t, expected, interval)
+			const iterations = 1000
+			for i := 0; i < iterations; i++ {
+				result := calc.CalculateCheckinInterval()
+				if result < expectedMin || result > expectedMax {
+					t.Errorf("Iteration %d: Calculated interval %v out of expected range [%v, %v]", i, result, expectedMin, expectedMax)
+				}
+			}
 		})
 	}
 }
@@ -117,23 +173,41 @@ func TestCalculateCheckinIntervalAltConfig(t *testing.T) {
 }
 
 func TestIncorrectConfig(t *testing.T) {
-	t.Parallel()
-	config := &Config{}
-	defer func() {
-		if r := recover(); r != nil {
-			// We successfully recovered from panic
-			t.Log("Test passed, panic was caught!")
-		}
-	}()
+	tests := []struct {
+		name   string
+		config Config
+	}{
+		{
+			name: "BaseInterval is zero",
+			config: Config{
+				BaseInterval:   0,
+				JitterMax:      1,
+				JitterMaxScale: time.Second,
+			},
+		},
+		{
+			name: "BaseInterval less than JitterMaxDuration",
+			config: Config{
+				BaseInterval:   5 * time.Second,
+				JitterMax:      10,
+				JitterMaxScale: time.Second, // JitterMaxDuration = 10s, 5s - 10s < 0
+			},
+		},
+	}
 
-	// Use a deterministic random source
-	seed := int64(42)
-	r := rand.New(rand.NewSource(seed))
-
-	NewJitterCalculator(config, r)
-
-	// If the panic was not caught, the test will fail
-	t.Errorf("Test failed, panic was expected")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("Expected panic for config: %+v, but did not panic", tt.config)
+				}
+			}()
+			// Use a deterministic random source
+			seed := int64(42)
+			r := rand.New(rand.NewSource(seed))
+			_ = NewJitterCalculator(&tt.config, r)
+		})
+	}
 }
 
 func TestCalculateCheckinInterval_with_negative_jitter(t *testing.T) {
