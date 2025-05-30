@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -36,6 +38,9 @@ const (
 type Options struct {
 	// AppSelector is the expected value for the "app" label on the rancher service.
 	AppSelector string
+
+	// KubeAggregatorReadyChan is the channel to close once the extension server receives a request from the kube API.
+	KubeAggregatorReadyChan chan struct{}
 }
 
 func DefaultOptions() Options {
@@ -226,6 +231,8 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	authenticator := steveext.NewUnionAuthenticator(authenticators...)
 
+	var once sync.Once
+
 	aslAuthorizer := steveext.NewAccessSetAuthorizer(wranglerContext.ASL)
 	codecs := serializer.NewCodecFactory(scheme)
 	extOpts := steveext.ExtensionAPIServerOptions{
@@ -243,6 +250,16 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		},
 		Authenticator: authenticator,
 		Authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			logrus.Infof("ZZZZZ authorize <<%s>>", a.GetUser().GetName())
+
+			if a.GetUser().GetName() == "system:aggregator" {
+				once.Do(func() {
+					logrus.Infof("ZZZZZ signal aggregator ready")
+
+					close(opts.KubeAggregatorReadyChan)
+				})
+			}
+
 			if a.IsResourceRequest() {
 				return aslAuthorizer.Authorize(ctx, a)
 			}
@@ -251,7 +268,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			// we just want to expose these. Note /api is needed for client-go's
 			// discovery even though not strictly necessary
 			maybeAllowed := false
-			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3"}
+			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3", "/version"}
 			for _, path := range allowedPathsPrefix {
 				if strings.HasPrefix(a.GetPath(), path) {
 					maybeAllowed = true
@@ -260,7 +277,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			}
 
 			if !maybeAllowed {
-				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2 and /openapi/v3 supported", nil
+				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2, /openapi/v3, and /version supported", nil
 			}
 
 			return aslAuthorizer.Authorize(ctx, a)
@@ -276,6 +293,23 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	if err = extstores.InstallStores(extensionAPIServer, wranglerContext, scheme); err != nil {
 		return nil, fmt.Errorf("failed to install stores: %w", err)
 	}
+
+	// Note to self: the extension api server is handed to the caller to be
+	// run, which is done by handing it to a steveserver constructor. Not
+	// having direct access to the `Run` a goro with a delay is used to wait
+	// for the start and then perform the necessary factory action for
+	// ext'ension controllers.
+
+	logrus.Infof("ZZZZZ ext api server post stores - %T %+v", wranglerContext.Ext, wranglerContext.Ext)
+
+	err = clusterauthtoken.RegisterExtIndexers(wranglerContext.Ext)
+	if err != nil {
+		logrus.Infof("ZZZZZ ext api indexer error: %v", err)
+
+		return nil, err
+	}
+
+	logrus.Infof("ZZZZZ ext api server new done")
 
 	return extensionAPIServer, nil
 }
