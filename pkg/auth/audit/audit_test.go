@@ -11,7 +11,6 @@ import (
 	"os"
 	"reflect"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/data/management"
@@ -38,20 +37,24 @@ func (a *AuditTest) TestRedactSensitiveData() {
 	}
 
 	machineDataInput, machineDataWant := []byte("{"), []byte("{")
-	for _, v := range management.DriverData {
-		for key, value := range v {
-			if strings.HasPrefix(key, "optional") {
-				continue
-			}
-			public := strings.HasPrefix(key, "public")
-			for _, item := range value {
-				machineDataInput = append(machineDataInput, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
-				if public {
-					machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
-				} else {
-					machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \""+redacted+"\",")...)
-				}
-			}
+	redactData := func(item string, redact bool) {
+		machineDataInput = append(machineDataInput, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
+		if redact {
+			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \""+redacted+"\",")...)
+		} else {
+			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
+		}
+	}
+
+	for _, fields := range management.DriverData {
+		for _, item := range fields.PrivateCredentialFields {
+			redactData(item, true)
+		}
+		for _, item := range fields.PasswordFields {
+			redactData(item, true)
+		}
+		for _, item := range fields.PublicCredentialFields {
+			redactData(item, false)
 		}
 	}
 	machineDataInput[len(machineDataInput)-1] = byte('}')
