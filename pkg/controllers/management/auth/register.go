@@ -92,6 +92,8 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
+	project_cluster.Enqueue(ctx, management)
+
 	p := project_cluster.NewProjectLifecycle(management)
 	c := project_cluster.NewClusterLifecycle(management)
 	management.Management.Projects("").AddLifecycle(ctx, project_cluster.ProjectRemoveController, p)
