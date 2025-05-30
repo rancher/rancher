@@ -25,6 +25,7 @@ import (
 	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	sccv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/scc.cattle.io/v1"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -36,6 +37,7 @@ type Interface interface {
 	CatalogV1() catalogv1.CatalogV1Interface
 	ProvisioningV1() provisioningv1.ProvisioningV1Interface
 	RkeV1() rkev1.RkeV1Interface
+	SccV1() sccv1.SccV1Interface
 	UpgradeV1() upgradev1.UpgradeV1Interface
 }
 
@@ -45,6 +47,7 @@ type Clientset struct {
 	catalogV1      *catalogv1.CatalogV1Client
 	provisioningV1 *provisioningv1.ProvisioningV1Client
 	rkeV1          *rkev1.RkeV1Client
+	sccV1          *sccv1.SccV1Client
 	upgradeV1      *upgradev1.UpgradeV1Client
 }
 
@@ -61,6 +64,11 @@ func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {
 // RkeV1 retrieves the RkeV1Client
 func (c *Clientset) RkeV1() rkev1.RkeV1Interface {
 	return c.rkeV1
+}
+
+// SccV1 retrieves the SccV1Client
+func (c *Clientset) SccV1() sccv1.SccV1Interface {
+	return c.sccV1
 }
 
 // UpgradeV1 retrieves the UpgradeV1Client
@@ -124,6 +132,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.sccV1, err = sccv1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.upgradeV1, err = upgradev1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -152,6 +164,7 @@ func New(c rest.Interface) *Clientset {
 	cs.catalogV1 = catalogv1.New(c)
 	cs.provisioningV1 = provisioningv1.New(c)
 	cs.rkeV1 = rkev1.New(c)
+	cs.sccV1 = sccv1.New(c)
 	cs.upgradeV1 = upgradev1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
