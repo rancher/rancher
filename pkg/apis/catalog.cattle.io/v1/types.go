@@ -33,6 +33,7 @@ type ClusterRepo struct {
 	// RepoStatus contains details of the Helm repository that is currently being used in the cluster.
 	// More info: kubectl explain clusterrepo.status
 	// +optional
+	// +kubebuilder:default={"observedGeneration":-1}
 	Status RepoStatus `json:"status,omitempty"`
 }
 
