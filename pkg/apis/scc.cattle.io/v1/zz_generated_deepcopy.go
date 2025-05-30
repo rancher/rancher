@@ -127,6 +127,11 @@ func (in *RegistrationSpec) DeepCopyInto(out *RegistrationSpec) {
 		*out = new(corev1.SecretReference)
 		**out = **in
 	}
+	if in.CheckNow != nil {
+		in, out := &in.CheckNow, &out.CheckNow
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -181,10 +186,6 @@ func (in *SystemActivationState) DeepCopyInto(out *SystemActivationState) {
 	*out = *in
 	if in.LastValidatedTS != nil {
 		in, out := &in.LastValidatedTS, &out.LastValidatedTS
-		*out = (*in).DeepCopy()
-	}
-	if in.ValidUntilTS != nil {
-		in, out := &in.ValidUntilTS, &out.ValidUntilTS
 		*out = (*in).DeepCopy()
 	}
 	return

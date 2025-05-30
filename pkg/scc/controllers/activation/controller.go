@@ -73,7 +73,6 @@ func (h *Handler) Call(key string, registrationObj *v1.Registration) (*v1.Regist
 			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
 			updated.Status.ActivationStatus.Activated = false
 			updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{}
-			updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{}
 			v1.ResourceConditionProgressing.True(updated)
 			v1.ResourceConditionReady.False(updated)
 			v1.ResourceConditionDone.False(updated)
@@ -155,9 +154,6 @@ func (h *Handler) processOnlineActivation(registrationObj *v1.Registration) (*v1
 		v1.ResourceConditionDone.True(updated)
 		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
 			Time: time.Now(),
-		}
-		updated.Status.ActivationStatus.ValidUntilTS = &metav1.Time{
-			Time: time.Now().Add(24 * time.Hour),
 		}
 		updated.Status.ActivationStatus.Activated = true
 		registrationObj, err = h.registrations.UpdateStatus(updated)

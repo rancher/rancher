@@ -33,6 +33,7 @@ const (
 
 	RegistrationConditionAnnounced   condition.Cond = "RegistrationAnnounced"
 	RegistrationConditionSccUrlReady condition.Cond = "RegistrationSccUrlReady"
+	RegistrationConditionActivated   condition.Cond = "RegistrationActivated"
 )
 
 // +genclient
@@ -104,10 +105,8 @@ type SystemActivationState struct {
 	Activated bool `json:"activated"`
 	// +optional
 	LastValidatedTS *metav1.Time `json:"lastValidatedTS"`
-	// +optional
-	ValidUntilTS *metav1.Time `json:"validUntilTS"`
-	Certificate  string       `json:"certificate,omitempty"`
-	SystemUrl    string       `json:"systemUrl,omitempty"`
+	Certificate     string       `json:"certificate,omitempty"`
+	SystemUrl       string       `json:"systemUrl,omitempty"`
 }
 
 func (r *Registration) HasCondition(matchCond condition.Cond) bool {
