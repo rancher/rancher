@@ -386,16 +386,18 @@ func TestStoreCreate(t *testing.T) {
 			return authorizer.DecisionAllow, "", nil
 		})
 
-		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
-		configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
-			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			require.Equal(t, namePrefix, obj.GenerateName)
+
 			configMap = obj.DeepCopy()
 			configMap.CreationTimestamp = metav1.Now()
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
 			return configMap, nil
 		}).Times(1)
 
@@ -403,7 +405,6 @@ func TestStoreCreate(t *testing.T) {
 
 		store := &Store{
 			authorizer:          authorizer,
-			configMapCache:      configMapCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
 			tokenCache:          tokenCache,
@@ -467,7 +468,7 @@ func TestStoreCreate(t *testing.T) {
 		require.NotNil(t, created.Status)
 		assert.NotEmpty(t, created.Status.Value)
 		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
-		require.Len(t, created.Status.Conditions, 3)
+		require.Len(t, created.Status.Conditions, 2)
 		require.Len(t, created.Status.Tokens, 2)
 
 		scanner := bufio.NewScanner(strings.NewReader(created.Status.Value))
@@ -517,14 +518,17 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, downstream1, config.CurrentContext)
 	})
 	t.Run("no cluster specified", func(t *testing.T) {
-		configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
-		configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
-			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			require.Equal(t, namePrefix, obj.GenerateName)
+
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.Now()
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 			configMap = obj.DeepCopy()
 			return configMap, nil
 		}).Times(1)
@@ -533,7 +537,6 @@ func TestStoreCreate(t *testing.T) {
 
 		store := &Store{
 			authorizer:          commonAuthorizer,
-			configMapCache:      configMapCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
 			tokenCache:          tokenCache,
@@ -593,8 +596,8 @@ func TestStoreCreate(t *testing.T) {
 		require.NotNil(t, created.Status)
 		assert.NotEmpty(t, created.Status.Value)
 		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
-		require.Len(t, created.Status.Conditions, 2)
-		require.Equal(t, 1, len(created.Status.Tokens))
+		require.Len(t, created.Status.Conditions, 1)
+		require.Len(t, created.Status.Tokens, 1)
 
 		config, err := clientcmd.Load([]byte(created.Status.Value))
 		require.NoError(t, err)
