@@ -3,6 +3,7 @@ package kubeconfig
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -43,7 +44,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 )
@@ -58,9 +58,10 @@ const (
 	UIDAnnotation      = "cattle.io/uid"
 	unknownValue       = "<unknown>"
 	defaultClusterName = "rancher"
+	namePrefix         = Singular + "-"
 )
 
-// Names of the ConfigMap fields that to persist the Kubeconfig data.
+// List of fields that hold Kubeconfig data.
 const (
 	ClustersField         = "clusters"
 	CurrentContextField   = "current-context"
@@ -71,21 +72,25 @@ const (
 	StatusTokensField     = "status-tokens"
 )
 
+// List of statuses.
 const (
+	StatusSummaryPending  = "Pending"
 	StatusSummaryComplete = "Complete"
 	StatusSummaryError    = "Error"
 )
 
+// List of conditions types.
 const (
-	CreatedCond          = "Created"
-	UpdatedCond          = "Updated"
-	TokenCreatedCond     = "TokenCreated"
-	ContentGeneratedCond = "ContentGenerated"
-	FailedToGenerateCond = "FailedToGenerate"
+	UpdatedCond                  = "Updated"
+	TokenCreatedCond             = "TokenCreated"
+	FailedToCreateTokenCond      = "FailedToCreateToken"
+	FailedToListClusterNodesCond = "FailedToListClusterNodes"
+	FailedToGenerateCond         = "FailedToGenerate"
 )
 
 var gvr = ext.SchemeGroupVersion.WithResource(ext.KubeconfigResourceName)
 
+// userManager abstracts [user.Manager].
 type userManager interface {
 	EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error)
 	EnsureToken(input user.TokenInput) (string, runtime.Object, error)
@@ -113,7 +118,7 @@ type Store struct {
 }
 
 // New creates a new instance of [Store].
-func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, userMgr user.Manager) *Store {
+func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, userMgr userManager) *Store {
 	return &Store{
 		configMapCache:  wranglerContext.Core.ConfigMap().Cache(),
 		configMapClient: wranglerContext.Core.ConfigMap(),
@@ -174,7 +179,7 @@ func isUnique(ids []string) bool {
 	return true
 }
 
-// New implements [rest.Creater]
+// New implements [rest.Creater].
 func (s *Store) New() runtime.Object {
 	return &ext.Kubeconfig{}
 }
@@ -212,7 +217,7 @@ func (s *Store) userFrom(ctx context.Context, verb string) (k8suser.Info, bool, 
 	return userInfo, isAdmin, isRancherUser, nil
 }
 
-// Create implements [rest.Creater]
+// Create implements [rest.Creater].
 // Note: Name and GenerateName are not respected. A name is generated with a predefined prefix instead.
 func (s *Store) Create(
 	ctx context.Context,
@@ -296,26 +301,6 @@ func (s *Store) Create(
 		tokenIDs   []string
 	)
 
-	var kubeConfigID string
-	err = retry.OnError(retry.DefaultRetry, func(_ error) bool {
-		return true // Retry all errors.
-	}, func() error {
-		kubeConfigID = names.SimpleNameGenerator.GenerateName("kubeconfig-")
-		_, err := s.configMapCache.Get(Namespace, kubeConfigID)
-		if err == nil {
-			return fmt.Errorf("kubeconfig %s already exists", kubeConfigID)
-		}
-
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-
-		return fmt.Errorf("error getting kubeconfig %s: %w", kubeConfigID, err)
-	})
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error checking if kubeconfig %s exists: %w", kubeConfigID, err))
-	}
-
 	localCluster, err := s.clusterCache.Get("local")
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting local cluster: %w", err))
@@ -371,7 +356,7 @@ func (s *Store) Create(
 		}
 
 		if decision != authorizer.DecisionAllow {
-			return nil, apierrors.NewForbidden(gvr.GroupResource(), kubeConfigID, fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), cluster.Name))
+			return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), cluster.Name))
 		}
 
 		if !foundCurrentContext && kubeconfig.Spec.CurrentContext == cluster.Name {
@@ -386,10 +371,48 @@ func (s *Store) Create(
 	dryRun := options != nil && len(options.DryRun) > 0
 	generateToken := s.shouldGenerateToken()
 
+	kubeconfigToStore := kubeconfig.DeepCopy()
+	kubeconfigToStore.Name = ""
+	kubeconfigToStore.GenerateName = ""
+	if kubeconfigToStore.Labels == nil {
+		kubeconfigToStore.Labels = make(map[string]string)
+	}
+	kubeconfigToStore.Labels[UserIDLabel] = userInfo.GetName()
+	kubeconfigToStore.UID = uuid.NewUUID()
+
+	kubeconfigToStore.Status = &ext.KubeconfigStatus{
+		Summary: StatusSummaryPending,
+	}
+
+	configMap, err := s.toConfigMap(kubeconfigToStore)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig to configmap: %w", err))
+	}
+	configMap.GenerateName = namePrefix
+
+	var kubeConfigID string
+
+	if dryRun {
+		kubeConfigID = names.SimpleNameGenerator.GenerateName(namePrefix)
+		configMap.Name = kubeConfigID
+	} else {
+		configMap, err = s.configMapClient.Create(configMap)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error creating configmap for kubeconfig: %w", err))
+		}
+		kubeConfigID = configMap.Name
+	}
+
+	kubeconfigToStore, err = s.fromConfigMap(configMap)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", kubeConfigID, err))
+	}
+
 	var (
 		sharedTokenKey string
 		sharedToken    runtime.Object
 		ownerRefs      []metav1.OwnerReference
+		v1Config       string
 	)
 
 	ownerReferenceFrom := func(obj runtime.Object) (metav1.OwnerReference, error) {
@@ -407,98 +430,36 @@ func (s *Store) Create(
 		return ref, nil
 	}
 
-	// Generate a shared token for the default and non-ACE clusters.
-	if !dryRun && generateToken {
-		input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-		sharedTokenKey, sharedToken, err = s.userMgr.EnsureToken(input)
-		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
-		}
-
-		ownerRef, err := ownerReferenceFrom(sharedToken)
-		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error getting owner reference for shared token: %w", err))
-		}
-		ownerRefs = append(ownerRefs, ownerRef)
-		tokenIDs = append(tokenIDs, ownerRef.Name)
-
-		conditions = append(conditions, metav1.Condition{
-			Type:               TokenCreatedCond,
-			Status:             metav1.ConditionTrue,
-			Reason:             TokenCreatedCond,
-			Message:            ownerRef.Name,
-			LastTransitionTime: metav1.NewTime(time.Now()),
-		})
-	}
-
 	caCert := kconfig.FormatCert(settings.CACerts.Get())
 	data := kconfig.KubeConfig{
 		Meta: kconfig.Meta{
 			Name:              kubeConfigID,
-			CreationTimestamp: time.Now().Format(time.RFC3339), // TODO: Use the timestamp from the backing ConfigMap.
+			CreationTimestamp: configMap.CreationTimestamp.Format(time.RFC3339),
 			TTL:               strconv.FormatInt(kubeconfig.Spec.TTL, 10),
 		},
 		CurrentContext: kubeconfig.Spec.CurrentContext,
 	}
 
-	// The default entry that points to the Rancher URL.
-	// Even a base user without access to any cluster should be able to use a kubeconfig
-	// to interact with Rancher via Public API.
-	data.Clusters = append(data.Clusters, kconfig.Cluster{
-		Name:   defaultClusterName,
-		Server: "https://" + host,
-		Cert:   caCert,
-	})
-	data.Users = append(data.Users, kconfig.User{
-		Name:  defaultClusterName,
-		Token: sharedTokenKey,
-	})
-	data.Contexts = append(data.Contexts, kconfig.Context{
-		Name:    defaultClusterName,
-		Cluster: defaultClusterName,
-		User:    defaultClusterName,
-	})
-
-	for _, cluster := range clusters {
-		var (
-			tokenKey string
-			token    runtime.Object
-		)
-
-		clusterName := cluster.Name
-		if name := cluster.Spec.DisplayName; name != "" {
-			// Use cluster display name if available.
-			clusterName = name
-		}
-
-		// Both ACE and non-ACE clusters should have an entry that points to the Rancher proxy.
-		data.Clusters = append(data.Clusters, kconfig.Cluster{
-			Name:   clusterName,
-			Server: "https://" + host + "/k8s/clusters/" + cluster.Name,
-			Cert:   caCert,
-		})
-
-		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-			data.Contexts = append(data.Contexts, kconfig.Context{
-				Name:    clusterName,
-				Cluster: clusterName,
-				User:    defaultClusterName, // Reuse the auth info with the shared token.
-			})
-
-			continue
-		}
-
-		// Generate a cluster-scoped token for the ACE cluster.
+	err = func() error {
+		// Generate a shared token for the default and non-ACE clusters.
 		if !dryRun && generateToken {
 			input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-			tokenKey, token, err = s.userMgr.EnsureClusterToken(cluster.Name, input)
+			sharedTokenKey, sharedToken, err = s.userMgr.EnsureToken(input)
 			if err != nil {
-				return nil, apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
+				conditions = append(conditions, metav1.Condition{
+					Type:               FailedToCreateTokenCond,
+					Status:             metav1.ConditionTrue,
+					Reason:             FailedToCreateTokenCond,
+					Message:            fmt.Sprintf("error creating kubeconfig token: %s", err),
+					LastTransitionTime: metav1.NewTime(time.Now()),
+				})
+
+				return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
 			}
 
-			ownerRef, err := ownerReferenceFrom(token)
+			ownerRef, err := ownerReferenceFrom(sharedToken)
 			if err != nil {
-				return nil, apierrors.NewInternalError(fmt.Errorf("error getting owner reference for token: %w", err))
+				return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for shared token: %w", err))
 			}
 			ownerRefs = append(ownerRefs, ownerRef)
 			tokenIDs = append(tokenIDs, ownerRef.Name)
@@ -512,111 +473,207 @@ func (s *Store) Create(
 			})
 		}
 
-		data.Contexts = append(data.Contexts, kconfig.Context{
-			Name:    clusterName,
-			Cluster: clusterName,
-			User:    clusterName,
+		// The default entry that points to the Rancher URL.
+		// Even a base user without access to any cluster should be able to use a kubeconfig
+		// to interact with Rancher via Public API.
+		data.Clusters = append(data.Clusters, kconfig.Cluster{
+			Name:   defaultClusterName,
+			Server: "https://" + host,
+			Cert:   caCert,
 		})
 		data.Users = append(data.Users, kconfig.User{
-			Name:  clusterName,
-			Token: tokenKey,
+			Name:  defaultClusterName,
+			Token: sharedTokenKey,
+		})
+		data.Contexts = append(data.Contexts, kconfig.Context{
+			Name:    defaultClusterName,
+			Cluster: defaultClusterName,
+			User:    defaultClusterName,
 		})
 
-		// If the ACE cluster has a FQDN, add a single entry for it.
-		if authEndpoint := cluster.Spec.LocalClusterAuthEndpoint; authEndpoint.FQDN != "" {
-			fqdnName := clusterName + "-fqdn"
-			data.Clusters = append(data.Clusters, kconfig.Cluster{
-				Name:   fqdnName,
-				Server: "https://" + authEndpoint.FQDN,
-				Cert:   kconfig.FormatCert(authEndpoint.CACerts),
-			})
-			data.Contexts = append(data.Contexts, kconfig.Context{
-				Name:    fqdnName,
-				Cluster: fqdnName,
-				User:    clusterName,
-			})
+		for _, cluster := range clusters {
+			var (
+				tokenKey string
+				token    runtime.Object
+			)
 
-			if kubeconfig.Spec.CurrentContext == cluster.Name {
-				data.CurrentContext = fqdnName
+			clusterName := cluster.Name
+			if name := cluster.Spec.DisplayName; name != "" {
+				// Use cluster display name if available.
+				clusterName = name
 			}
 
-			continue
-		}
+			// Both ACE and non-ACE clusters should have an entry that points to the Rancher proxy.
+			data.Clusters = append(data.Clusters, kconfig.Cluster{
+				Name:   clusterName,
+				Server: "https://" + host + "/k8s/clusters/" + cluster.Name,
+				Cert:   caCert,
+			})
 
-		// Otherwise produce entries for each control plane node.
-		nodes, err := s.nodeCache.List(cluster.Name, labels.Everything())
-		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %w", cluster.Name, err))
-		}
+			if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
+				data.Contexts = append(data.Contexts, kconfig.Context{
+					Name:    clusterName,
+					Cluster: clusterName,
+					User:    defaultClusterName, // Reuse the auth info with the shared token.
+				})
 
-		clusterCerts := kconfig.FormatCert(cluster.Status.CACert)
-		var isCurrentContextSet bool
-		for _, node := range nodes {
-			if !node.Spec.ControlPlane {
 				continue
 			}
-			if !isCurrentContextSet {
-				isCurrentContextSet = true
+
+			// Generate a cluster-scoped token for the ACE cluster.
+			if !dryRun && generateToken {
+				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
+				tokenKey, token, err = s.userMgr.EnsureClusterToken(cluster.Name, input)
+				if err != nil {
+					conditions = append(conditions, metav1.Condition{
+						Type:               FailedToCreateTokenCond,
+						Status:             metav1.ConditionTrue,
+						Reason:             FailedToCreateTokenCond,
+						Message:            fmt.Sprintf("error creating kubeconfig token for cluster %s: %s", cluster.Name, err),
+						LastTransitionTime: metav1.NewTime(time.Now()),
+					})
+
+					return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
+				}
+
+				ownerRef, err := ownerReferenceFrom(token)
+				if err != nil {
+					return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for token: %w", err))
+				}
+				ownerRefs = append(ownerRefs, ownerRef)
+				tokenIDs = append(tokenIDs, ownerRef.Name)
+
+				conditions = append(conditions, metav1.Condition{
+					Type:               TokenCreatedCond,
+					Status:             metav1.ConditionTrue,
+					Reason:             TokenCreatedCond,
+					Message:            ownerRef.Name,
+					LastTransitionTime: metav1.NewTime(time.Now()),
+				})
 			}
 
-			nodeName := clusterName + "-" + strings.TrimPrefix(node.Spec.RequestedHostname, clusterName+"-")
-			data.Clusters = append(data.Clusters, kconfig.Cluster{
-				Name:   nodeName,
-				Server: "https://" + v3node.GetEndpointNodeIP(node) + ":6443",
-				Cert:   clusterCerts,
-			})
 			data.Contexts = append(data.Contexts, kconfig.Context{
-				Name:    nodeName,
-				Cluster: nodeName,
+				Name:    clusterName,
+				Cluster: clusterName,
 				User:    clusterName,
 			})
+			data.Users = append(data.Users, kconfig.User{
+				Name:  clusterName,
+				Token: tokenKey,
+			})
 
-			if kubeconfig.Spec.CurrentContext == cluster.Name && !isCurrentContextSet {
-				data.CurrentContext = nodeName
-				isCurrentContextSet = true
+			// If the ACE cluster has a FQDN, add a single entry for it.
+			if authEndpoint := cluster.Spec.LocalClusterAuthEndpoint; authEndpoint.FQDN != "" {
+				fqdnName := clusterName + "-fqdn"
+				data.Clusters = append(data.Clusters, kconfig.Cluster{
+					Name:   fqdnName,
+					Server: "https://" + authEndpoint.FQDN,
+					Cert:   kconfig.FormatCert(authEndpoint.CACerts),
+				})
+				data.Contexts = append(data.Contexts, kconfig.Context{
+					Name:    fqdnName,
+					Cluster: fqdnName,
+					User:    clusterName,
+				})
+
+				if kubeconfig.Spec.CurrentContext == cluster.Name {
+					data.CurrentContext = fqdnName
+				}
+
+				continue
+			}
+
+			// Otherwise produce entries for each control plane node.
+			nodes, err := s.nodeCache.List(cluster.Name, labels.Everything())
+			if err != nil {
+				conditions = append(conditions, metav1.Condition{
+					Type:               FailedToListClusterNodesCond,
+					Status:             metav1.ConditionTrue,
+					Reason:             FailedToListClusterNodesCond,
+					Message:            fmt.Sprintf("error listing nodes for cluster %s: %s", cluster.Name, err),
+					LastTransitionTime: metav1.NewTime(time.Now()),
+				})
+
+				return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %w", cluster.Name, err))
+			}
+
+			clusterCerts := kconfig.FormatCert(cluster.Status.CACert)
+			var isCurrentContextSet bool
+			for _, node := range nodes {
+				if !node.Spec.ControlPlane {
+					continue
+				}
+				if !isCurrentContextSet {
+					isCurrentContextSet = true
+				}
+
+				nodeName := clusterName + "-" + strings.TrimPrefix(node.Spec.RequestedHostname, clusterName+"-")
+				data.Clusters = append(data.Clusters, kconfig.Cluster{
+					Name:   nodeName,
+					Server: "https://" + v3node.GetEndpointNodeIP(node) + ":6443",
+					Cert:   clusterCerts,
+				})
+				data.Contexts = append(data.Contexts, kconfig.Context{
+					Name:    nodeName,
+					Cluster: nodeName,
+					User:    clusterName,
+				})
+
+				if kubeconfig.Spec.CurrentContext == cluster.Name && !isCurrentContextSet {
+					data.CurrentContext = nodeName
+					isCurrentContextSet = true
+				}
 			}
 		}
-	}
 
-	v1Config, err := kconfig.Generate(data)
+		v1Config, err = kconfig.Generate(data)
+		if err != nil {
+			conditions = []metav1.Condition{{
+				Type:               FailedToGenerateCond,
+				Status:             metav1.ConditionTrue,
+				Reason:             FailedToGenerateCond,
+				Message:            fmt.Sprintf("error generating kubeconfig content: %s", err),
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			}}
+
+			return apierrors.NewInternalError(fmt.Errorf("error generating kubeconfig content: %w", err))
+		}
+
+		return nil
+	}()
+
+	statusSummary := StatusSummaryComplete
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error generating kubeconfig content: %w", err))
-	}
-
-	conditions = append(conditions, metav1.Condition{
-		Type:               ContentGeneratedCond,
-		Status:             metav1.ConditionTrue,
-		Reason:             ContentGeneratedCond,
-		LastTransitionTime: metav1.NewTime(time.Now()),
-	})
-
-	kubeconfigToStore := kubeconfig.DeepCopy()
-	kubeconfigToStore.Name = kubeConfigID // Overwrite the name.
-
-	if kubeconfigToStore.Labels == nil {
-		kubeconfigToStore.Labels = make(map[string]string)
-	}
-	kubeconfigToStore.Labels[UserIDLabel] = userInfo.GetName()
-	kubeconfigToStore.OwnerReferences = append(kubeconfigToStore.OwnerReferences, ownerRefs...)
-	kubeconfigToStore.Annotations = map[string]string{
-		UIDAnnotation: string(uuid.NewUUID()),
+		statusSummary = StatusSummaryError
 	}
 
 	kubeconfigToStore.Status = &ext.KubeconfigStatus{
-		Summary:    StatusSummaryComplete,
-		Conditions: conditions,
+		Summary:    statusSummary,
+		Conditions: append(kubeconfigToStore.Status.Conditions, conditions...),
 		Tokens:     tokenIDs,
 	}
+	kubeconfigToStore.OwnerReferences = append(kubeconfigToStore.OwnerReferences, ownerRefs...)
 
-	configMap, err := s.toConfigMap(kubeconfigToStore)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig to configmap: %w", err))
-	}
-	if !dryRun {
-		_, err = s.configMapClient.Create(configMap)
-		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error creating configmap for kubeconfig %s: %w", kubeConfigID, err))
+	var convertErr error
+	configMap, convertErr = s.toConfigMap(kubeconfigToStore)
+	if convertErr == nil {
+		if !dryRun {
+			var updateErr error
+			configMap, updateErr = s.configMapClient.Update(configMap)
+			if updateErr != nil {
+				if err == nil {
+					err = apierrors.NewInternalError(fmt.Errorf("error updating configmap for kubeconfig %s: %w", kubeConfigID, updateErr))
+				} // else preserve the original error.
+			}
 		}
+	} else {
+		if err == nil {
+			err = apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %w", kubeConfigID, convertErr))
+		} // else preserve the original error.
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	kubeconfig, err = s.fromConfigMap(configMap)
@@ -624,6 +681,7 @@ func (s *Store) Create(
 		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig after saving: %w", kubeConfigID, err))
 	}
 
+	// Note: Status.Value contains tokens' secret keys and mustn't be persisted.
 	kubeconfig.Status.Value = v1Config
 
 	return kubeconfig, nil
@@ -632,28 +690,21 @@ func (s *Store) Create(
 // toConfigMap converts a Kubeconfig object to a ConfigMap object.
 func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeconfig.Name,
-			Namespace: Namespace,
-		},
-		Data: make(map[string]string),
+		ObjectMeta: *kubeconfig.ObjectMeta.DeepCopy(),
+		Data:       make(map[string]string),
 	}
+	configMap.Namespace = Namespace
+	configMap.UID = ""
 
-	if len(kubeconfig.Annotations) > 0 {
+	if configMap.Annotations == nil {
 		configMap.Annotations = make(map[string]string)
-		for k, v := range kubeconfig.Annotations {
-			configMap.Annotations[k] = v
-		}
 	}
+	configMap.Annotations[UIDAnnotation] = string(kubeconfig.UID)
 
-	configMap.Labels = make(map[string]string)
-	for k, v := range kubeconfig.Labels {
-		configMap.Labels[k] = v
+	if configMap.Labels == nil {
+		configMap.Labels = make(map[string]string)
 	}
 	configMap.Labels[KindLabel] = KindLabelValue
-
-	configMap.Finalizers = append(configMap.Finalizers, kubeconfig.Finalizers...)
-	configMap.OwnerReferences = append(configMap.OwnerReferences, kubeconfig.OwnerReferences...)
 
 	if len(kubeconfig.Spec.Clusters) > 0 {
 		serialized, err := json.Marshal(kubeconfig.Spec.Clusters)
@@ -703,6 +754,7 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 
 	if kubeconfig.Annotations != nil {
 		uid, ok := kubeconfig.Annotations[UIDAnnotation]
+
 		if ok {
 			kubeconfig.UID = types.UID(uid)
 			delete(kubeconfig.Annotations, UIDAnnotation) // Remove an internal annotation.
@@ -772,6 +824,7 @@ func (s *Store) createTokenInput(kubeConfigID, userName string, authToken *apiv3
 	}
 }
 
+// tokenSelector builds a label selector for kubeconfig tokens.
 func tokenSelector(isAdmin bool, userID, kubeconfigID string) (labels.Selector, error) {
 	set := labels.Set{
 		tokens.TokenKindLabel: KindLabelValue,
@@ -788,6 +841,7 @@ func tokenSelector(isAdmin bool, userID, kubeconfigID string) (labels.Selector, 
 	return set.AsSelector(), nil
 }
 
+// getConfigMap retrieves a ConfigMap by name, optionally using the cache.
 func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache bool) (*corev1.ConfigMap, error) {
 	var (
 		configMap *corev1.ConfigMap
@@ -813,7 +867,7 @@ func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache b
 	return configMap, nil
 }
 
-// Get implements [rest.Getter]
+// Get implements [rest.Getter].
 func (s *Store) Get(
 	ctx context.Context,
 	name string,
@@ -845,7 +899,7 @@ func (s *Store) Get(
 	return kubeconfig, nil
 }
 
-// List implements [rest.Lister]
+// List implements [rest.Lister].
 func (s *Store) NewList() runtime.Object {
 	return &ext.KubeconfigList{}
 }
@@ -875,7 +929,7 @@ func toListOptions(options *metainternalversion.ListOptions, userInfo k8suser.In
 	return listOptions, nil
 }
 
-// List implements [rest.Lister]
+// List implements [rest.Lister].
 func (s *Store) List(
 	ctx context.Context,
 	options *metainternalversion.ListOptions,
@@ -918,7 +972,7 @@ func (s *Store) List(
 	return list, nil
 }
 
-// Watch implements [rest.Watcher], the interface to support the `watch` verb.
+// Watch implements [rest.Watcher].
 func (s *Store) Watch(
 	ctx context.Context,
 	options *metainternalversion.ListOptions,
@@ -1005,14 +1059,15 @@ func (s *Store) Watch(
 	return kubeconfigWatch, nil
 }
 
-// watcher implements [watch.Interface]
+// watcher implements [watch.Interface].
 type watcher struct {
 	mu     sync.RWMutex
 	closed bool
 	ch     chan watch.Event
 }
 
-// Stop implements [watch.Interface]
+// Stop tells the producer that the consumer is done watching, so the
+// producer should stop sending events and close the result channel.
 func (w *watcher) Stop() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -1026,7 +1081,7 @@ func (w *watcher) Stop() {
 	w.closed = true
 }
 
-// ResultChan implements [watch.Interface]
+// ResultChan returns a channel which will receive events from the event producer.
 func (w *watcher) ResultChan() <-chan watch.Event {
 	return w.ch
 }
@@ -1054,11 +1109,12 @@ func translateTimestampSince(timestamp metav1.Time) string {
 	return duration.HumanDuration(time.Since(timestamp.Time))
 }
 
-// ConvertToTable implements [rest.TableConvertor]
+// ConvertToTable implements [rest.TableConvertor].
 func (s *Store) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return s.tableConverter.ConvertToTable(ctx, object, tableOptions)
 }
 
+// printHandler registers the table printer for Kubeconfig objects.
 func printHandler(h printers.PrintHandler) {
 	columnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -1074,6 +1130,7 @@ func printHandler(h printers.PrintHandler) {
 	_ = h.TableHandler(columnDefinitions, printKubeconfig)
 }
 
+// printKubeconfig prints a single Kubeconfig object as a table row.
 func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	status := unknownValue
 	allTokenCount := 0
@@ -1108,6 +1165,7 @@ func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOption
 	}}, nil
 }
 
+// printKubeconfigList prints a list of Kubeconfig objects as table rows.
 func printKubeconfigList(kubeconfigList *ext.KubeconfigList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(kubeconfigList.Items))
 	for i := range kubeconfigList.Items {
@@ -1176,7 +1234,7 @@ func (s *Store) DeleteCollection(
 	return list, nil
 }
 
-// Delete implements [rest.GracefulDeleter]
+// Delete implements [rest.GracefulDeleter].
 func (s *Store) Delete(
 	ctx context.Context,
 	name string,
@@ -1208,6 +1266,7 @@ func (s *Store) Delete(
 	return s.delete(ctx, configMap, tokenSelector, deleteValidation, options)
 }
 
+// delete a kubeconfig's configmap and associated tokens.
 func (s *Store) delete(
 	ctx context.Context,
 	configMap *corev1.ConfigMap,
@@ -1223,7 +1282,10 @@ func (s *Store) delete(
 	if deleteValidation != nil {
 		err := deleteValidation(ctx, kubeconfig)
 		if err != nil {
-			return nil, false, err
+			if _, ok := err.(apierrors.APIStatus); ok {
+				return nil, false, err
+			}
+			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
 		}
 	}
 
@@ -1233,6 +1295,34 @@ func (s *Store) delete(
 			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), configMap.Name)
 		}
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error listing tokens for kubeconfig %s: %w", configMap.Name, err))
+	}
+
+	if options.Preconditions != nil {
+		// If the UID precondition matches the kubeconfig's UID, we need
+		// to replace it with the corresponding configmap's UID.
+		if options.Preconditions.UID != nil && *options.Preconditions.UID == kubeconfig.UID {
+			options.Preconditions.UID = &configMap.UID
+		}
+	}
+
+	err = s.configMapClient.Delete(Namespace, configMap.Name, options)
+	switch {
+	case err == nil:
+	case apierrors.IsNotFound(err):
+		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), configMap.Name)
+	case apierrors.IsConflict(err):
+		// Massage the err details to refer to Kubeconfigs instead of ConfigMaps.
+		var errMessage string
+		conflictErr, ok := err.(*apierrors.StatusError)
+		if ok {
+			_, errMessage, ok = strings.Cut(conflictErr.ErrStatus.Message, `ConfigMap "`+configMap.Name+`": `)
+			if !ok {
+				errMessage = ""
+			}
+		}
+		return nil, false, apierrors.NewConflict(gvr.GroupResource(), configMap.Name, errors.New(errMessage))
+	default:
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", configMap.Name, err))
 	}
 
 	var tokenNames []string
@@ -1251,11 +1341,6 @@ func (s *Store) delete(
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
 		}
-	}
-
-	err = s.configMapClient.Delete(Namespace, configMap.Name, options) // TODO: Revisit the options. It's not clear if all options we'll play nicely.
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", configMap.Name, err))
 	}
 
 	return kubeconfig, true, nil
@@ -1324,16 +1409,12 @@ func (s *Store) Update(
 		return nil, false, apierrors.NewBadRequest("spec.ttl is immutable")
 	}
 
-	if newKubeconfig.Annotations == nil {
-		newKubeconfig.Annotations = make(map[string]string)
-	}
-	newKubeconfig.Annotations[UIDAnnotation] = string(oldKubeconfig.UID) // Preserve the UID.
+	newKubeconfig.UID = oldKubeconfig.UID // Make sure UID is preserved.
 
 	if newKubeconfig.Labels == nil {
 		newKubeconfig.Labels = make(map[string]string)
 	}
 	newKubeconfig.Labels[UserIDLabel] = oldKubeconfig.Labels[UserIDLabel]
-	newKubeconfig.Labels[KindLabel] = KindLabelValue
 	newKubeconfig.Status = oldKubeconfig.Status // Carry over the status.
 
 	if newKubeconfig.Status == nil {
@@ -1346,6 +1427,7 @@ func (s *Store) Update(
 		LastTransitionTime: metav1.NewTime(time.Now()),
 	})
 
+	// Note: [Store.toConfigMap] takes care of enforcing [KindLabel] label and [UIDAnnotation] annotation.
 	newConfigMap, err := s.toConfigMap(newKubeconfig)
 	if err != nil {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %w", name, err))
@@ -1367,20 +1449,20 @@ func (s *Store) Update(
 	return newKubeconfig, false, nil
 }
 
-// GetSingularName implements [rest.SingularNameProvider]
+// GetSingularName implements [rest.SingularNameProvider].
 func (s *Store) GetSingularName() string {
 	return Singular
 }
 
-// GroupVersionKind implements [rest.GroupVersionKindProvider]
+// GroupVersionKind implements [rest.GroupVersionKindProvider].
 func (s *Store) GroupVersionKind(gv schema.GroupVersion) schema.GroupVersionKind {
 	return gv.WithKind(Kind)
 }
 
-// Destroy implements [rest.Storage]
+// Destroy implements [rest.Storage].
 func (s *Store) Destroy() {}
 
-// NamespaceScoped implements [rest.Scoper]
+// NamespaceScoped implements [rest.Scoper].
 func (t *Store) NamespaceScoped() bool {
 	return false
 }
@@ -1391,6 +1473,7 @@ var (
 	_ rest.Lister                   = &Store{}
 	_ rest.Watcher                  = &Store{}
 	_ rest.GracefulDeleter          = &Store{}
+	_ rest.CollectionDeleter        = &Store{}
 	_ rest.Updater                  = &Store{}
 	_ rest.Patcher                  = &Store{}
 	_ rest.TableConvertor           = &Store{}
