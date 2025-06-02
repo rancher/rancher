@@ -3,7 +3,7 @@ ARG ARCH=amd64
 ARG VERSION
 ARG GO_TAG
 
-FROM library/golang:1.24 as build
+FROM library/golang:1.23.9 as build
 
 WORKDIR C:/app
 COPY . .
