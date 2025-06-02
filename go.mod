@@ -133,7 +133,7 @@ require (
 	github.com/rancher/apiserver v0.3.0
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1
-	github.com/rancher/eks-operator v1.9.9
+	github.com/rancher/eks-operator v1.9.10-rc.1
 	github.com/rancher/fleet/pkg/apis v0.10.13
 	github.com/rancher/gke-operator v1.9.9
 	github.com/rancher/kubernetes-provider-detector v0.1.5
@@ -205,8 +205,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.34 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.59.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.214.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.41.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.224.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/iam v1.42.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.3 // indirect
