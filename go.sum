@@ -172,12 +172,12 @@ github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 h1:bIqFDwgGXXN1Kpp99pDOdKMTTb5d
 github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3/go.mod h1:H5O/EsxDWyU+LP/V8i5sm8cxoZgc2fdNR9bxlOFrQTo=
 github.com/aws/aws-sdk-go-v2/service/cloudformation v1.59.2 h1:o9cuZdZlI9VWMqsNa2mnf2IRsFAROHnaYA1BW3lHGuY=
 github.com/aws/aws-sdk-go-v2/service/cloudformation v1.59.2/go.mod h1:penaZKzGmqHGZId4EUCBIW/f9l4Y7hQ5NKd45yoCYuI=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.213.0 h1:9nUhN6dRT2chbA7E9y3JDGpIV1C7cZpfiRvX63EB5XA=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.213.0/go.mod h1:ouvGEfHbLaIlWwpDpOVWPWR+YwO0HDv3vm5tYLq8ImY=
+github.com/aws/aws-sdk-go-v2/service/ec2 v1.224.0 h1:i7FB/N5pSvEzNOGHm7n6KQiBx2/X8UkrE/Ppb5Bh3QQ=
+github.com/aws/aws-sdk-go-v2/service/ec2 v1.224.0/go.mod h1:ouvGEfHbLaIlWwpDpOVWPWR+YwO0HDv3vm5tYLq8ImY=
 github.com/aws/aws-sdk-go-v2/service/eks v1.64.0 h1:EYeOThTRysemFtC6J6h6b7dNg3jN03QuO5cg92ojIQE=
 github.com/aws/aws-sdk-go-v2/service/eks v1.64.0/go.mod h1:v1xXy6ea0PHtWkjFUvAUh6B/5wv7UF909Nru0dOIJDk=
-github.com/aws/aws-sdk-go-v2/service/iam v1.41.1 h1:Kq3R+K49y23CGC5UQF3Vpw5oZEQk5gF/nn+MekPD0ZY=
-github.com/aws/aws-sdk-go-v2/service/iam v1.41.1/go.mod h1:mPJkGQzeCoPs82ElNILor2JzZgYENr4UaSKUT8K27+c=
+github.com/aws/aws-sdk-go-v2/service/iam v1.42.0 h1:G6+UzGvubaet9QOh0664E9JeT+b6Zvop3AChozRqkrA=
+github.com/aws/aws-sdk-go-v2/service/iam v1.42.0/go.mod h1:mPJkGQzeCoPs82ElNILor2JzZgYENr4UaSKUT8K27+c=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 h1:eAh2A4b5IzM/lum78bZ590jy36+d/aFLgKF/4Vd1xPE=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3/go.mod h1:0yKJC/kb8sAnmlYa6Zs3QVYqaC8ug2AbnNChv5Ox3uA=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 h1:dM9/92u2F1JbDaGooxTq18wmmFzbJRfXfVfy96/1CXM=
@@ -818,8 +818,8 @@ github.com/rancher/cis-operator v1.0.11 h1:3fOkwk45no0S9NaGFYgIINqxjBChqvvGhXWY/
 github.com/rancher/cis-operator v1.0.11/go.mod h1:tSfpBeEcxYizMRT+rPtvQebJ5CcSJCKL9LW16Zdm7Zc=
 github.com/rancher/dynamiclistener v0.6.1 h1:sw4fxjutSedm7uIPD4I/hhAS2zIJIk3wOZLEZEElcYI=
 github.com/rancher/dynamiclistener v0.6.1/go.mod h1:0KhUMHy3VcGMGavTY3i1/Mr8rVM02wFqNlUzjc+Cplg=
-github.com/rancher/eks-operator v1.10.5 h1:GzmOPgZC5sO4QjkGPDG2eKKrs50j0Vg9JqGy2ofOrWQ=
-github.com/rancher/eks-operator v1.10.5/go.mod h1:0t7Jod6TkA7nTA4ajDWuiN/VI7JODDQFmPrR8RoFKPs=
+github.com/rancher/eks-operator v1.10.6-rc.1 h1:tb7/Cxhpz22o7K214q8sz46/tE4rALOd9/uw8OPuFwk=
+github.com/rancher/eks-operator v1.10.6-rc.1/go.mod h1:aaevsYiGWQ6CezX9ie6FbW5D13EtBbPa1UtnHKziWRo=
 github.com/rancher/fleet/pkg/apis v0.11.8 h1:Pgk5S5klqpgeQ5iV61i5x8awwgN5+AVCQssPS9D5Nw8=
 github.com/rancher/fleet/pkg/apis v0.11.8/go.mod h1:BTKg8EJYIT2+DdeAkMhxbOtR7+A1yPF95MWAkNyIiuE=
 github.com/rancher/gke-operator v1.10.5 h1:4ZntRbPYOusqHAeO4Bo0KR8mywFWpQnnrr383z3DUAY=
