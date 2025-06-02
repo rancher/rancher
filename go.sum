@@ -822,8 +822,8 @@ github.com/rancher/eks-operator v1.10.5 h1:GzmOPgZC5sO4QjkGPDG2eKKrs50j0Vg9JqGy2
 github.com/rancher/eks-operator v1.10.5/go.mod h1:0t7Jod6TkA7nTA4ajDWuiN/VI7JODDQFmPrR8RoFKPs=
 github.com/rancher/fleet/pkg/apis v0.11.8 h1:Pgk5S5klqpgeQ5iV61i5x8awwgN5+AVCQssPS9D5Nw8=
 github.com/rancher/fleet/pkg/apis v0.11.8/go.mod h1:BTKg8EJYIT2+DdeAkMhxbOtR7+A1yPF95MWAkNyIiuE=
-github.com/rancher/gke-operator v1.10.5 h1:4ZntRbPYOusqHAeO4Bo0KR8mywFWpQnnrr383z3DUAY=
-github.com/rancher/gke-operator v1.10.5/go.mod h1:vL/OfMicFXbQlMl4h+HEVBjv5DhubLXmEfNVB6ukyKI=
+github.com/rancher/gke-operator v1.10.6-rc.1 h1:ZHfY98BgrWZFkotk4V6t8054nS/AWCDSye73v+7jDTg=
+github.com/rancher/gke-operator v1.10.6-rc.1/go.mod h1:ntwnJdnknr98LdUv4d8fsaq2vxRjVNrfUbFVQ2CIHj0=
 github.com/rancher/helm/v3 v3.16.1-rancher1 h1:2tOo82q3UF4PQm5rOmNjQZ3r/sIAGqLzCUX4r/1ayCA=
 github.com/rancher/helm/v3 v3.16.1-rancher1/go.mod h1:r+xBHHP20qJeEqtvBXMf7W35QDJnzY/eiEBzt+TfHps=
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
@@ -1156,8 +1156,8 @@ golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6/go.mod h1:gOpvHmFTYa4Iltr
 golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
 golang.org/x/oauth2 v0.0.0-20211005180243-6b3c2da341f1/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.21.0/go.mod h1:XYTD2NtWslqkgxebSiOHnXEap4TF09sJSc7H1sXbhtI=
-golang.org/x/oauth2 v0.29.0 h1:WdYw2tdTK1S8olAzWHdgeqfy+Mtm9XNhv/xJsY65d98=
-golang.org/x/oauth2 v0.29.0/go.mod h1:onh5ek6nERTohokkhCD/y2cV4Do3fxFHFuAejCkRWT8=
+golang.org/x/oauth2 v0.30.0 h1:dnDm7JmhM45NNpd8FDDeLhK6FwqbOf4MLCM9zb1BOHI=
+golang.org/x/oauth2 v0.30.0/go.mod h1:B++QgG3ZKulg6sRPGD/mqlHQs5rB3Ml9erfeDY7xKlU=
 golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20181108010431-42b317875d0f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
