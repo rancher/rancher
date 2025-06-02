@@ -16,6 +16,11 @@ import (
 	"time"
 )
 
+const (
+	prodMinCheckin = time.Hour * 20
+	devMinCheckin  = time.Minute * 30
+)
+
 type SCCHandler interface {
 	NeedsRegistration(*v1.Registration) bool
 	RegisterSystem(*v1.Registration) (*v1.Registration, error) // Equal to first time registration w/ SCC, or Offline Request creation
@@ -54,15 +59,15 @@ func Register(
 
 	// Configure jitter based daily revalidation trigger
 	jitterbugConfig := jitterbug.Config{
-		BaseInterval:    20 * time.Hour,
+		BaseInterval:    prodMinCheckin,
 		JitterMax:       3,
 		JitterMaxScale:  time.Hour,
 		PollingInterval: 9 * time.Minute,
 	}
 	if util.VersionIsDevBuild() {
 		jitterbugConfig = jitterbug.Config{
-			BaseInterval:    8 * time.Hour,
-			JitterMax:       30,
+			BaseInterval:    devMinCheckin,
+			JitterMax:       10,
 			JitterMaxScale:  time.Minute,
 			PollingInterval: 9 * time.Second,
 		}
@@ -135,6 +140,18 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	registrationHandler := h.prepareHandler(registrationObj.Spec.Mode)
+	if !registrationHandler.NeedsRegistration(registrationObj) &&
+		!registrationHandler.NeedsActivation(registrationObj) &&
+		registrationObj.Spec.CheckNow == nil {
+		// Skip keepalive for anything activated within the last 20 hours
+		recheckTime := time.Now().Add(-prodMinCheckin)
+		if util.VersionIsDevBuild() {
+			recheckTime = time.Now().Add(-devMinCheckin)
+		}
+		if registrationObj.Status.ActivationStatus.LastValidatedTS.Time.After(recheckTime) {
+			return registrationObj, nil
+		}
+	}
 
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
@@ -145,7 +162,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			return nil, err
 		}
 
-		// Upon successful registration the processed TS is set, so enqueue for activation
+		// Upon successful registration the processed TS should be set, so when it is enqueue for activation
 		if registrationObj.Status.RegistrationProcessedTS != nil {
 			h.registrations.Enqueue(registrationObj.Name)
 		}
