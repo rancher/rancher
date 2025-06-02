@@ -12,7 +12,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	"github.com/rancher/rancher/pkg/controllers/management/node"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -805,11 +804,21 @@ func getCondition(d data.Object, conditionType string) *summary.Condition {
 	return nil
 }
 
-func constructFilesSecret(driver string, config map[string]interface{}) *corev1.Secret {
+func constructFilesSecret(annotations map[string]string, config map[string]interface{}) *corev1.Secret {
 	secretData := make(map[string][]byte)
 	// Check if the required driver has aliased fields
-	if fields, ok := node.SchemaToDriverFields[driver]; ok {
-		for schemaField, driverField := range fields {
+	if aliasedFields, exists := annotations["fileToFieldAliases"]; exists {
+		fileToFieldAliasList := strings.Split(aliasedFields, ",")
+		fileToFieldAliasMap := make(map[string]string)
+
+		for _, pairs := range fileToFieldAliasList {
+			kv := strings.SplitN(pairs, ":", 2)
+			if len(kv) == 2 {
+				fileToFieldAliasMap[kv[0]] = kv[1]
+			}
+		}
+
+		for schemaField, driverField := range fileToFieldAliasMap {
 			if fileContents, ok := config[schemaField].(string); ok {
 				// Delete our aliased fields
 				delete(config, schemaField)

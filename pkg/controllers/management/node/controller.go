@@ -38,6 +38,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,6 +84,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodePoolLister:            management.Management.NodePools("").Controller().Lister(),
 		nodePoolController:        management.Management.NodePools("").Controller(),
 		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
+		nodeDriverLister:          management.Management.NodeDrivers("").Controller().Lister(),
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
@@ -105,6 +107,7 @@ type Lifecycle struct {
 	nodeTemplateClient        v3.NodeTemplateInterface
 	nodePoolLister            v3.NodePoolLister
 	nodePoolController        v3.NodePoolController
+	nodeDriverLister          v3.NodeDriverLister
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
@@ -227,9 +230,16 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node)
 		return obj, fmt.Errorf("error from nodeclient.Update: %w", err)
 	}
 
-	err = aliasToPath(obj.Status.NodeTemplateSpec.Driver, configRawMap, obj.Namespace)
-	if err != nil {
-		return obj, fmt.Errorf("error from aliasToPath: %w", err)
+	nodeDriver, err := m.nodeDriverLister.Get("", obj.Status.NodeTemplateSpec.Driver)
+	if err != nil && !apiErrors.IsNotFound(err) {
+		logrus.Fatalf("failed to list the node driver to fetch field annotations: %v", err)
+	}
+	if nodeDriver != nil {
+		logrus.Infof("fetching the fileToField aliases for nodeDriver: %v, nodeDriverName: %s", nodeDriver, obj.Status.NodeTemplateSpec.Driver)
+		err = aliasToPath(nodeDriver.Annotations, configRawMap, obj.Namespace)
+		if err != nil {
+			return obj, fmt.Errorf("error from aliasToPath: %w", err)
+		}
 	}
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
@@ -265,16 +275,30 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node)
 	return obj, nil
 }
 
-func aliasToPath(driver string, config map[string]interface{}, ns string) error {
+// aliasToPath replaces config fields containing file content with file paths.
+// It reads alias mappings from the "fileToFieldAliases" annotation,
+// writes the content to files, and updates the config to point to those file paths.
+func aliasToPath(annotations map[string]string, config map[string]interface{}, ns string) error {
 	devMode := os.Getenv("CATTLE_DEV_MODE") != ""
 	baseDir := path.Join("/opt/jail", ns)
 	if devMode {
 		baseDir = os.TempDir()
 	}
+
 	// Check if the required driver has aliased fields
-	if fields, ok := SchemaToDriverFields[driver]; ok {
+	if aliasedFields, exists := annotations["fileToFieldAliases"]; exists {
+		fileToFieldAliasList := strings.Split(aliasedFields, ",")
+		fileToFieldAliasMap := make(map[string]string)
+
+		for _, pairs := range fileToFieldAliasList {
+			kv := strings.SplitN(pairs, ":", 2)
+			if len(kv) == 2 {
+				fileToFieldAliasMap[kv[0]] = kv[1]
+			}
+		}
+
 		hasher := sha256.New()
-		for schemaField, driverField := range fields {
+		for schemaField, driverField := range fileToFieldAliasMap {
 			if fileRaw, ok := config[schemaField]; ok {
 				fileContents := fileRaw.(string)
 				// Delete our aliased fields
