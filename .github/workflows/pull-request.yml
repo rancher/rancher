@@ -21,8 +21,8 @@ jobs:
   test-win-2019:
     runs-on: windows-2019
     steps:
-       run: |
-        powershell.exe Write-Output foo
+    - name: test-win-2019
+      run: powershell.exe Write-Output foo
   build-agent-windows:
     strategy:
       matrix:
