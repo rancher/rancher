@@ -72,7 +72,7 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.6.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5 v5.0.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.1.1
@@ -128,7 +128,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
-	github.com/rancher/aks-operator v1.10.5
+	github.com/rancher/aks-operator v1.10.6-rc.1
 	github.com/rancher/apiserver v0.4.2
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.1
