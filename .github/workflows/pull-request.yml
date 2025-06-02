@@ -33,8 +33,5 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Build Windows Agent Image
-<<<<<<< HEAD
-      run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version.version }} --build-arg GO_TAG=${{ matrix.version.go_tag }} -f package/windows/Dockerfile.agent .
-=======
       run: docker build -D -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
->>>>>>> c0bd81949 (action)
+
