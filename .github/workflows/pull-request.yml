@@ -18,11 +18,6 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
-  test-win-2019:
-    runs-on: windows-2019
-    steps:
-    - name: test-win-2019
-      run: powershell.exe Write-Output foo
   build-agent-windows:
     strategy:
       matrix:
