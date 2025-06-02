@@ -49,7 +49,7 @@ import (
 
 const (
 	TokenNamespace       = "cattle-tokens"
-	UserIDLabel          = "authn.management.cattle.io/token-userId"
+	UserIDLabel          = "cattle.io/user-id"
 	KindLabel            = "authn.management.cattle.io/kind"
 	IsLogin              = "session"
 	SecretKindLabel      = "cattle.io/kind"
