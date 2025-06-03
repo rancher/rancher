@@ -292,7 +292,7 @@ func (s *Store) Create(
 	if host == "" {
 		host = first(extras[common.ExtraRequestHost])
 		if host == "" {
-			return nil, apierrors.NewBadRequest("can't determine the server URL")
+			return nil, apierrors.NewInternalError(errors.New("can't determine the server URL"))
 		}
 	}
 
@@ -312,7 +312,7 @@ func (s *Store) Create(
 			// The first id in the spec.clusters "*" means all clusters.
 			clusters, err = s.clusterCache.List(labels.Everything())
 			if err != nil {
-				return nil, fmt.Errorf("error listing clusters: %w", err)
+				return nil, apierrors.NewInternalError(fmt.Errorf("error listing clusters: %w", err))
 			}
 		} else {
 			// Individually listed clusters.
