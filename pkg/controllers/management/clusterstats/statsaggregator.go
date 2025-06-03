@@ -203,10 +203,6 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	}
 	versionChanged := s.updateVersion(cluster)
 
-	if statusChanged(origStatus, &cluster.Status) || versionChanged {
-		return s.Clusters.Update(cluster)
-	}
-
 	// If the cluster went through an upgrade from <=1.21 to >=1.22, restart
 	// the cluster agent in order to restart controllers that will no longer work
 	// with the new API.
@@ -223,7 +219,10 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 		}
 	}
 
-	return cluster, nil
+	if statusChanged(origStatus, &cluster.Status) || versionChanged {
+		return s.Clusters.Update(cluster)
+	}
+	return nil, nil
 }
 
 func minorVersion(cluster *v3.Cluster) (int, error) {
