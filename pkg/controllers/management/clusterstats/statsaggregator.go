@@ -79,12 +79,11 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object,
 		return nil, nil
 	}
 
-	if err := s.aggregate(cluster); err != nil {
-		return nil, err
+	updated, err := s.aggregate(cluster)
+	if err == nil {
+		s.lastReconcile.Store(key, time.Now())
 	}
-
-	s.lastReconcile.Store(key, time.Now())
-	return nil, nil
+	return updated, err
 }
 
 func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
@@ -95,10 +94,10 @@ func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
 	return 0
 }
 
-func (s *StatsAggregator) aggregate(cluster *v3.Cluster) error {
+func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	allMachines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	workerCounts := make(map[string]int)
@@ -107,7 +106,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) error {
 	for _, m := range allMachines {
 		// if none are set, then nodes syncer has not completed
 		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
-			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying", m.Status.NodeName)
+			return nil, errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying", m.Status.NodeName)
 		}
 		if isTaintedNoExecuteNoSchedule(m) && !m.Spec.Worker {
 			continue
@@ -199,14 +198,13 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) error {
 	if cluster.Status.Version != nil {
 		oldVersion, err = minorVersion(cluster)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	versionChanged := s.updateVersion(cluster)
 
 	if statusChanged(origStatus, &cluster.Status) || versionChanged {
-		_, err = s.Clusters.Update(cluster)
-		return err
+		return s.Clusters.Update(cluster)
 	}
 
 	// If the cluster went through an upgrade from <=1.21 to >=1.22, restart
@@ -215,17 +213,17 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) error {
 	if versionChanged && !cluster.Spec.Internal {
 		newVersion, err := minorVersion(cluster)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if newVersion >= 22 && oldVersion <= 21 {
 			err := s.restartAgentDeployment(cluster)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 
-	return nil
+	return cluster, nil
 }
 
 func minorVersion(cluster *v3.Cluster) (int, error) {
