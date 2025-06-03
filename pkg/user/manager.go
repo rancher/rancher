@@ -20,7 +20,6 @@ type TokenInput struct {
 }
 
 type Manager interface {
-	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
 	GetUser(apiContext *types.APIContext) string
 	EnsureToken(input TokenInput) (string, runtime.Object, error)
 	EnsureClusterToken(clusterName string, input TokenInput) (string, runtime.Object, error)
@@ -28,6 +27,7 @@ type Manager interface {
 	EnsureUser(principalName, displayName string) (*v3.User, error)
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error)
 	SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error)
+	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
 	CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error
 	GetUserByPrincipalID(principalName string) (*v3.User, error)
 	GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error)
