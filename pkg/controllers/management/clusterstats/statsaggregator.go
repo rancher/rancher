@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,9 @@ const (
 	nodeRoleETCD               = "node-role.kubernetes.io/etcd"
 	nodeRoleMaster             = "node-role.kubernetes.io/master"
 	agentVersionUpgraded       = "agent.cluster.cattle.io/upgraded-v1.22"
+
+	// quietPeriod marks the minimum period between sync calls for the same Cluster
+	quietPeriod = time.Second * 10
 )
 
 var numericReg = regexp.MustCompile("[^0-9]")
@@ -35,6 +39,9 @@ type StatsAggregator struct {
 	NodesLister    v3.NodeLister
 	Clusters       v3.ClusterInterface
 	ClusterManager *clustermanager.Manager
+
+	// lastReconcile is a map[string]time.Time storing the last execution time of the sync reconciler for every Cluster key
+	lastReconcile sync.Map
 }
 
 type ClusterNodeData struct {
@@ -62,10 +69,30 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 
 func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil {
+		s.lastReconcile.Delete(key)
 		return nil, nil
 	}
 
-	return nil, s.aggregate(cluster, cluster.Name)
+	if d := s.getMininumWaitTime(key); d > 0 {
+		// re-enqueue this controller after the quiet period
+		s.Clusters.Controller().EnqueueAfter(cluster.Namespace, cluster.Name, d)
+		return nil, nil
+	}
+
+	if err := s.aggregate(cluster, cluster.Name); err != nil {
+		return nil, err
+	}
+
+	s.lastReconcile.Store(key, time.Now())
+	return nil, nil
+}
+
+func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
+	if v, ok := s.lastReconcile.Load(key); ok {
+		lastReconcile := v.(time.Time)
+		return time.Since(lastReconcile) - quietPeriod
+	}
+	return 0
 }
 
 func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
@@ -317,9 +344,13 @@ func callWithTimeout(do func()) {
 }
 
 func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
-	if machine != nil {
-		s.Clusters.Controller().Enqueue("", machine.Namespace)
+	if machine == nil {
+		return nil, nil
 	}
+
+	d := s.getMininumWaitTime(machine.Namespace)
+	s.Clusters.Controller().EnqueueAfter("", machine.Namespace, d)
+
 	return nil, nil
 }
 
