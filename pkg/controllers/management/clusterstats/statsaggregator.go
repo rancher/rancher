@@ -171,10 +171,10 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 			lcpu.Add(*limits.Cpu())
 		}
 
-		if condDisk == v1.ConditionTrue && v32.ClusterConditionNoDiskPressure.IsTrue(machine) {
+		if v32.ClusterConditionNoDiskPressure.IsTrue(machine) {
 			condDisk = v1.ConditionFalse
 		}
-		if condMem == v1.ConditionTrue && v32.ClusterConditionNoMemoryPressure.IsTrue(machine) {
+		if v32.ClusterConditionNoMemoryPressure.IsTrue(machine) {
 			condMem = v1.ConditionFalse
 		}
 	}
