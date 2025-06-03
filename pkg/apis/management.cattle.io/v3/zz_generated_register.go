@@ -49,6 +49,7 @@ var (
 	FleetWorkspaceResourceName                            = "fleetworkspaces"
 	FreeIpaProviderResourceName                           = "freeipaproviders"
 	GenericOIDCProviderResourceName                       = "genericoidcproviders"
+	GithubAppProviderResourceName                         = "githubappproviders"
 	GithubProviderResourceName                            = "githubproviders"
 	GlobalRoleResourceName                                = "globalroles"
 	GlobalRoleBindingResourceName                         = "globalrolebindings"
@@ -147,6 +148,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&FreeIpaProviderList{},
 		&GenericOIDCProvider{},
 		&GenericOIDCProviderList{},
+		&GithubAppProvider{},
+		&GithubAppProviderList{},
 		&GithubProvider{},
 		&GithubProviderList{},
 		&GlobalRole{},

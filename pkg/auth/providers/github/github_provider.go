@@ -197,6 +197,8 @@ func (g *ghProvider) LoginUser(host string, githubCredential *v32.GithubLogin, c
 		}
 	}
 
+	logrus.Info("ghProvider.LoginUser")
+
 	config = choseClientID(host, config)
 	securityCode := githubCredential.Code
 

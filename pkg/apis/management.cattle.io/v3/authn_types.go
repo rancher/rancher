@@ -367,6 +367,47 @@ type GithubConfigApplyInput struct {
 	Enabled      bool         `json:"enabled,omitempty"`
 }
 
+// +genclient
+// +kubebuilder:skipversion
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+//
+// GithubAppConfig provides a combination of the GithubConfig and additional
+// fields to configure the app for synchronization of user data.
+type GithubAppConfig struct {
+	AuthConfig `json:",inline" mapstructure:",squash"`
+
+	// Hostname is the API server for the GitHub installation.
+	Hostname     string `json:"hostname,omitempty" norman:"default=github.com" norman:"required"`
+	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"required"`
+	ClientID     string `json:"clientId,omitempty" norman:"required"`
+	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
+
+	// AdditionalClientIDs is a map of clientID to client secrets
+	AdditionalClientIDs map[string]string `json:"additionalClientIds,omitempty" norman:"nocreate,noupdate"`
+	HostnameToClientID  map[string]string `json:"hostnameToClientId,omitempty" norman:"nocreate,noupdate"`
+
+	// AppID is the GitHub App ID and is provided on the GitHub apps page.
+	AppID string `json:"appId,omitempty" norman:"required"`
+
+	// The Installation ID to query (this will be bound to a specific
+	// Organization) and without it, we query all installations for for the App.
+	InstallationID string `json:"installationId,omitempty"`
+
+	// PrivateKey is a PEM format private key for signing requests.
+	PrivateKey string `json:"privateKey,omitempty" norman:"type=password" norman:"required"`
+}
+
+type GithubAppConfigTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
+}
+
+type GithubAppConfigApplyInput struct {
+	GithubConfig GithubAppConfig `json:"githubConfig,omitempty"`
+	Code         string          `json:"code,omitempty"`
+	Enabled      bool            `json:"enabled,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type GoogleOauthConfig struct {
