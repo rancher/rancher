@@ -1,0 +1,7 @@
+# Apps markeplace & ui extensions
+pkg/catalogv2 @rancher/observation-backup
+pkg/api/steve/catalog @rancher/observation-backup
+pkg/apis/catalog.cattle.io @rancher/observation-backup
+pkg/controllers/dashboard/helm @rancher/observation-backup
+pkg/controllers/dashboard/plugin @rancher/observation-backup
+tests/v2/integration/catalogv2 @rancher/observation-backup
