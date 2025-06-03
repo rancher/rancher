@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
+	extv1api "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	projectv3api "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -30,6 +31,9 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
+	extctrl "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
+	extv1 "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -87,6 +91,7 @@ import (
 
 var (
 	localSchemeBuilder = runtime.SchemeBuilder{
+		extv1api.AddToScheme,
 		provisioningv1api.AddToScheme,
 		capiv1beta1api.AddToScheme,
 		fleetv1alpha1api.AddToScheme,
@@ -112,6 +117,7 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
+	Ext                 extv1.Interface
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
 	CAPI                capicontrollers.Interface
@@ -149,6 +155,7 @@ type Context struct {
 	HelmOperations        *helmop.Operations
 	SystemChartsManager   *system.Manager
 
+	extfact      *ext.Factory
 	mgmt         *management.Factory
 	rbac         *rbac.Factory
 	project      *project.Factory
@@ -246,6 +253,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
 	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
+	wContextCopy.Ext = wContextCopy.extfact.WithAgent(userAgent).V1()
 	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
 	wContextCopy.Admission = wContextCopy.adminReg.WithAgent(userAgent).V1()
 	wContextCopy.Batch = wContextCopy.batch.WithAgent(userAgent).V1()
@@ -264,7 +272,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 
 func enableProtobuf(cfg *rest.Config) *rest.Config {
 	cpy := rest.CopyConfig(cfg)
-	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
+	cpy.AcceptContentTypes = "application/json"
 	cpy.ContentType = "application/json"
 	return cpy
 }
@@ -281,6 +289,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	apply, err := apply.NewForConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	exten, err := extctrl.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -424,6 +437,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		RESTConfig:              restConfig,
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
+		Ext:                     exten.Ext().V1(),
 		Dynamic:                 dynamic.New(k8s.Discovery()),
 		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
@@ -458,6 +472,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Plan:                    plan.Upgrade().V1(),
 
 		mgmt:         mgmt,
+		extfact:      exten,
 		apps:         apps,
 		adminReg:     adminReg,
 		project:      project,
