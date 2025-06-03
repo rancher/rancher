@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -29,8 +27,6 @@ import (
 	"github.com/rancher/rancher/pkg/agent/rancher"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
-	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
-	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/shepherd/pkg/killserver"
 	"github.com/rancher/wrangler/v3/pkg/signals"
@@ -189,15 +185,7 @@ func run(ctx context.Context) error {
 	topContext := signals.SetupSignalContext()
 
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
-	params, err := getParams()
-	if err != nil {
-		return err
-	}
 	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
-	bytes, err := json.Marshal(params)
-	if err != nil {
-		return err
-	}
 
 	token, server, err := getTokenAndURL()
 	if err != nil {
@@ -205,8 +193,7 @@ func run(ctx context.Context) error {
 	}
 
 	headers := http.Header{
-		Token:                      {token},
-		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
+		Token: {token},
 	}
 
 	err = KubeletNeedsNewCertificate(headers)
@@ -315,14 +302,6 @@ func run(ctx context.Context) error {
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
-		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		httpClient := http.Client{
-			Timeout: 300 * time.Second,
-		}
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-		if err != nil {
-			return err
-		}
 
 		if writeCertsOnly {
 			exitCertWriter(ctx)
@@ -339,32 +318,6 @@ func run(ctx context.Context) error {
 		if err := cleanup(context.Background()); err != nil {
 			logrus.Warnf("Unable to perform docker cleanup: %v", err)
 		}
-
-		go func() {
-			logrus.Infof("Starting plan monitor, checking every %v seconds", interval)
-			tt := time.Duration(interval) * time.Second
-			for {
-				select {
-				case <-time.After(tt):
-					// each time we request a plan we should
-					// check if our cert about to expire
-					err = KubeletNeedsNewCertificate(headers)
-					if err != nil {
-						logrus.Errorf("failed to check validity of kubelet certs: %v", err)
-					}
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-					if err != nil {
-						logrus.Errorf("failed to check plan: %v", err)
-					} else if receivedInterval != 0 && receivedInterval != interval {
-						tt = time.Duration(receivedInterval) * time.Second
-						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
-					}
-
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
 
 		return nil
 	}
@@ -521,32 +474,6 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 // delivered by Rancher if the generate_serving_certificate property
 // is set to 'true' for the clusters kubelet service.
 func KubeletNeedsNewCertificate(headers http.Header) error {
-	currentHostname := os.Getenv("CATTLE_NODE_NAME")
-
-	// RKE will save the certs on the node using either the public or private IP address, depending on the infrastructure provider.
-	// For example, the certs will be stored using the public IP address for VM's on digital ocean, but will use the private IP
-	// address for VM's on AWS. We do not know which IP address RKE decided to use, so we need to check both locations.
-	kubeletCertFile, kubeletCertKeyFile, ipAddress := findCertificateFiles(os.Getenv("CATTLE_ADDRESS"), os.Getenv("CATTLE_INTERNAL_ADDRESS"))
-	if kubeletCertFile == "" || kubeletCertKeyFile == "" || ipAddress == "" {
-		logrus.Tracef("did not find kubelet certificate files using either public ip address (%s) or private ip address (%s)", os.Getenv("CATTLE_ADDRESS"), os.Getenv("CATTLE_INTERNAL_ADDRESS"))
-	}
-
-	cert, err := tls.LoadX509KeyPair(kubeletCertFile, kubeletCertKeyFile)
-	if err != nil && !strings.Contains(err.Error(), "no such file") {
-		return err
-	}
-
-	needsRegen, err := KubeletCertificateNeedsRegeneration(ipAddress, currentHostname, cert, time.Now())
-	if err != nil {
-		return err
-	}
-
-	if needsRegen {
-		headers.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "true")
-	} else {
-		headers.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "false")
-	}
-
 	return nil
 }
 

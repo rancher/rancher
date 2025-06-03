@@ -339,16 +339,12 @@ func run(ctx context.Context) error {
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
-		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
+
 		httpClient := http.Client{
 			Timeout: 300 * time.Second,
 		}
 		if transport != nil {
 			httpClient.Transport = transport
-		}
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-		if err != nil {
-			return err
 		}
 
 		if writeCertsOnly {
@@ -366,25 +362,6 @@ func run(ctx context.Context) error {
 		if err := cleanup(context.Background()); err != nil {
 			logrus.Warnf("Unable to perform docker cleanup: %v", err)
 		}
-
-		go func() {
-			logrus.Infof("Starting plan monitor, checking every %v seconds", interval)
-			tt := time.Duration(interval) * time.Second
-			for {
-				select {
-				case <-time.After(tt):
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-					if err != nil {
-						logrus.Errorf("failed to check plan: %v", err)
-					} else if receivedInterval != 0 && receivedInterval != interval {
-						tt = time.Duration(receivedInterval) * time.Second
-						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
 
 		return nil
 	}
