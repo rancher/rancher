@@ -357,7 +357,8 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	desiredResourceNames := sets.New(baseRule.ResourceNames...)
 
 	// if the currentVerbs and the currentResourceNames matches the desired state we can return
-	if currentVerbs.Equal(newVerbs) && currentResourceNames.Equal(desiredResourceNames) {
+	// if the number of verbs desired is 0, we don't need to check ResourceNames because we don't want any rule
+	if currentVerbs.Equal(newVerbs) && (newVerbs.Len() == 0 || currentResourceNames.Equal(desiredResourceNames)) {
 		return roleName, nil
 	}
 
