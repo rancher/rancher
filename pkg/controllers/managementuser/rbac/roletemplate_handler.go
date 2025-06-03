@@ -48,9 +48,8 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 	if err != nil {
 		return obj, err
 	}
-	hasPRTBs := len(prtbs) > 0
-	hasRTBs := hasPRTBs
-	var crtbs []interface{}
+	hasRTBs := len(prtbs) > 0
+	var crtbs []any
 	if !hasRTBs {
 		crtbs, err = c.m.crtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, c.m.workload.ClusterName+"-"+obj.Name)
 		if err != nil {
@@ -64,11 +63,11 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 		return obj, nil
 	}
 
-	err = c.syncRT(obj, hasPRTBs, prtbs, crtbs)
+	err = c.syncRT(obj, prtbs, crtbs)
 	return obj, err
 }
 
-func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []interface{}, crtbs []interface{}) error {
+func (c *rtSync) syncRT(template *v3.RoleTemplate, prtbs []any, crtbs []any) error {
 	roleTemplates := map[string]*v3.RoleTemplate{}
 	if err := c.m.gatherRoles(template, roleTemplates, 0); err != nil {
 		return err
@@ -76,22 +75,6 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 
 	if err := c.m.ensureRoles(roleTemplates); err != nil {
 		return errors.Wrapf(err, "couldn't ensure roles")
-	}
-
-	if usedInProjects {
-		for _, rt := range roleTemplates {
-			for resource, baseRule := range globalResourceRulesNeededInProjects {
-				verbs, err := c.m.checkForGlobalResourceRules(rt, resource, baseRule)
-				if err != nil {
-					return err
-				}
-
-				roleName, err := c.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt.Name, verbs, baseRule)
-				if err != nil {
-					return errors.Wrapf(err, "couldn't reconcile role '%s' for project access to global resources", roleName)
-				}
-			}
-		}
 	}
 
 	for _, obj := range prtbs {
