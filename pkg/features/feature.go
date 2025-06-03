@@ -164,12 +164,6 @@ var (
 		false,
 		true,
 		true)
-	ImperativeApiExtension = newFeature(
-		"imperative-api-extension",
-		"Enable imperative API extension as a k8s aggregation layer as proxy to the kube apiserver",
-		true,
-		false,
-		true)
 	Provisioningv2ETCDSnapshotBackPopulation = newFeature(
 		"v2prov-etcd-snapshot-backpopulate",
 		"Allow Rancher to create ETCD Snapshot CRs for downstream clusters in the local cluster",
