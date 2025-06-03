@@ -79,7 +79,7 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object,
 		return nil, nil
 	}
 
-	if err := s.aggregate(cluster, cluster.Name); err != nil {
+	if err := s.aggregate(cluster); err != nil {
 		return nil, err
 	}
 
@@ -95,7 +95,7 @@ func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
 	return 0
 }
 
-func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
+func (s *StatsAggregator) aggregate(cluster *v3.Cluster) error {
 	allMachines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return err
