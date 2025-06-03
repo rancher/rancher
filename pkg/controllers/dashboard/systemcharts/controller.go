@@ -194,7 +194,6 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 
 				return ext.RDPEnabled()
 			},
-			Uninstall:       !ext.RDPEnabled(),
 			RemoveNamespace: false,
 		},
 		{
