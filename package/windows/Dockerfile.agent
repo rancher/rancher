@@ -1,8 +1,9 @@
 ARG SERVERCORE_VERSION
 ARG ARCH=amd64
 ARG VERSION
+ARG GO_TAG
 
-FROM library/golang:1.23 as build
+FROM library/golang:${GO_TAG} as build
 
 WORKDIR C:/app
 COPY . .
