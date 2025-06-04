@@ -4,14 +4,18 @@ package jitterbug
 // The key principal
 
 import (
+	"github.com/rancher/rancher/pkg/scc/util/log"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 type JitterFunction func(nextTrigger, strictDeadline time.Duration) (bool, error)
 
+func jitterbugContextLogger() log.StructuredLogger {
+	return log.NewLog().WithField("subcomponent", "jitterbug")
+}
+
 type JitterChecker struct {
+	log             log.StructuredLogger
 	config          *Config
 	calculator      Calculator
 	callable        JitterFunction
@@ -23,16 +27,13 @@ type JitterChecker struct {
 // NewJitterChecker will complete initialization of optional Config fields and return a jitter checker
 func NewJitterChecker(config *Config, callable JitterFunction) *JitterChecker {
 	calculator := NewJitterCalculator(config, nil)
-	return &JitterChecker{
-		config:     config,
-		calculator: calculator,
-		callable:   callable,
-	}
+	return NewJitterCheckerFromCalculator(*calculator, callable)
 }
 
 // NewJitterCheckerFromCalculator will complete initialization of optional Config fields and return a jitter checker
 func NewJitterCheckerFromCalculator(calculator JitterCalculator, callable JitterFunction) *JitterChecker {
 	return &JitterChecker{
+		log:        jitterbugContextLogger(),
 		config:     calculator.config,
 		calculator: &calculator,
 		callable:   callable,
@@ -53,7 +54,7 @@ func (j *JitterChecker) calculateCheckinInterval() {
 
 func (j *JitterChecker) Run() {
 	for range j.tickChan {
-		logrus.Debugf("JitterChecker Run: tick")
+		j.log.Debugf("JitterChecker Run: tick")
 		j.run()
 	}
 }
@@ -61,7 +62,7 @@ func (j *JitterChecker) Run() {
 func (j *JitterChecker) run() {
 	// Apply initial delay if configured
 	if j.config.InitialDelay > 0 {
-		logrus.Debugf("[Checker] Initial delay of %s...\n", j.config.InitialDelay)
+		j.log.Debugf("[Checker] Initial delay of %s...\n", j.config.InitialDelay)
 		select {
 		case <-time.After(j.config.InitialDelay):
 			// Proceed
@@ -69,7 +70,7 @@ func (j *JitterChecker) run() {
 	}
 	refresh, err := j.callable(j.triggerInterval, j.config.StrictDeadline)
 	if err != nil {
-		logrus.Errorf("JitterChecker Run-error: %v", err)
+		j.log.Errorf("JitterChecker Run-error: %v", err)
 		return
 	}
 

@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +27,7 @@ import (
 )
 
 type sccOperator struct {
+	log                     log.StructuredLogger
 	configMaps              corev1.ConfigMapController
 	sccResourceFactory      *scc.Factory
 	secrets                 corev1.SecretController
@@ -35,7 +36,7 @@ type sccOperator struct {
 	systemRegistrationReady chan struct{}
 }
 
-func setup(wContext *wrangler.Context) (*sccOperator, error) {
+func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperator, error) {
 	namespaces := wContext.Core.Namespace()
 	var kubeSystemNS *k8sv1.Namespace
 
@@ -56,19 +57,19 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 	)
 	if kubeNsErr != nil {
 		// fatal log here, because we need the kube-system ns UID while creating any backup file
-		logrus.Fatalf("Error getting namespace kube-system: %v", kubeNsErr)
+		logger.Fatalf("Error getting namespace kube-system: %v", kubeNsErr)
 	}
 
 	rancherUuid := settings.InstallUUID.Get()
 	if rancherUuid == "" {
 		err := errors.New("no rancher uuid found")
-		logrus.Fatalf("Error getting rancher uuid: %v", err)
+		logger.Fatalf("Error getting rancher uuid: %v", err)
 		return nil, err
 	}
 
 	sccResources, err := scc.NewFactoryFromConfig(wContext.RESTConfig)
 	if err != nil {
-		logrus.Fatalf("Error getting scc resources: %v", err)
+		logger.Fatalf("Error getting scc resources: %v", err)
 		return nil, err
 	}
 
@@ -79,6 +80,7 @@ func setup(wContext *wrangler.Context) (*sccOperator, error) {
 
 	// TODO(o&b): also get Node, Sockets, v-cpus, Clusters and watch those
 	return &sccOperator{
+		log:                     logger,
 		configMaps:              wContext.Core.ConfigMap(),
 		sccResourceFactory:      sccResources,
 		secrets:                 wContext.Core.Secret(),
@@ -96,14 +98,14 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 		close(so.systemRegistrationReady)
 		return
 	}
-	logrus.Info("[scc-operator] Waiting for server-url to be ready")
+	so.log.Info("Waiting for server-url to be ready")
 	wait.Until(func() {
 		// Todo: also wait for local cluster ready
 		if systeminfo.IsServerUrlReady() {
-			logrus.Info("[scc-operator] can now start controllers; server URL is now ready.")
+			so.log.Info("can now start controllers; server URL is now ready.")
 			close(so.systemRegistrationReady)
 		} else {
-			logrus.Info("[scc-operator] cannot start controllers yet; server URL is not ready.")
+			so.log.Info("cannot start controllers yet; server URL is not ready.")
 		}
 	}, 15*time.Second, so.systemRegistrationReady)
 	onSystemReady()
@@ -112,9 +114,9 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 // maybeFirstInit will check if the initial `Registration` seeding values exist
 // and if they need to be processed into a new `Registration` (used during first boot ever)
 func (so *sccOperator) maybeFirstInit() (*sccv1.Registration, error) {
-	logrus.Debug("[scc-operator] Running maybeFirstInit")
+	so.log.Debug("Running maybeFirstInit")
 	if strings.EqualFold(settings.SCCFirstStart.Get(), "false") {
-		logrus.Warn("Skipping the SCC controller first start; first start already completed previously.")
+		so.log.Warn("Skipping the SCC controller first start; first start already completed previously.")
 		return nil, nil
 	}
 
@@ -124,14 +126,14 @@ func (so *sccOperator) maybeFirstInit() (*sccv1.Registration, error) {
 	var newRegistration *sccv1.Registration
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			logrus.Errorf("Error getting cattle-system initial-scc-registration: %v", err)
+			so.log.Errorf("Error getting cattle-system initial-scc-registration: %v", err)
 			return nil, err
 		}
-		logrus.Warn("Cannot find initial-scc-registration configmap; it will be skipped")
+		so.log.Warn("Cannot find initial-scc-registration configmap; it will be skipped")
 	} else {
 		secretRef, mode, err := util.ValidateInitializingConfigMap(configMap)
 		if err != nil {
-			logrus.Warn("Cannot validate initial-scc-registration configmap; it will be skipped")
+			so.log.Warn("Cannot validate initial-scc-registration configmap; it will be skipped")
 		} else {
 			newRegistration = &sccv1.Registration{
 				ObjectMeta: metav1.ObjectMeta{
@@ -148,7 +150,7 @@ func (so *sccOperator) maybeFirstInit() (*sccv1.Registration, error) {
 
 			_, err = so.sccResourceFactory.Scc().V1().Registration().Create(newRegistration)
 			if err != nil {
-				logrus.Errorf("Cannot create registration request; %s", err)
+				so.log.Errorf("Cannot create registration request; %s", err)
 				return nil, err
 			}
 			_ = so.configMaps.Delete(configMap.Namespace, configMap.Name, &metav1.DeleteOptions{})
@@ -170,20 +172,22 @@ func Setup(
 	ctx context.Context,
 	wContext *wrangler.Context,
 ) error {
-	logrus.Debug("Starting SCC Operator")
-	initOperator, err := setup(wContext)
+	operatorLogger := log.NewLog()
+
+	operatorLogger.Debug("Starting SCC Operator")
+	initOperator, err := setup(wContext, operatorLogger)
 	if err != nil {
 		return fmt.Errorf("error setting up scc operator: %s", err.Error())
 	}
 
 	// Start goroutine to wait for systemRegistrationReady to complete; currently based on server-url only
 	go func() {
-		logrus.Debug("[scc-operator] Waiting to run first init until system is ready for registration")
+		initOperator.log.Debug("waiting to run first init until after system ready signal")
 		<-initOperator.systemRegistrationReady
 
 		_, err = initOperator.maybeFirstInit()
 		if err != nil {
-			logrus.Errorf("error creating first-start `Registration`: %s", err.Error())
+			initOperator.log.Errorf("error creating first-start `Registration`: %s", err.Error())
 		}
 
 		return
@@ -201,12 +205,12 @@ func Setup(
 		)
 
 		if err := start.All(ctx, 2, initOperator.sccResourceFactory); err != nil {
-			logrus.Errorf("error starting scc operator: %s", err.Error())
+			initOperator.log.Errorf("error starting operator: %s", err.Error())
 		}
 	})
 
 	if initOperator.systemRegistrationReady != nil {
-		logrus.Info("[scc-operator] Initial setup initiated. When Server URL is configured full setup will complete.")
+		initOperator.log.Info("Initial startup initiated; the setup will complete when Server URL is configured.")
 	}
 
 	return nil
