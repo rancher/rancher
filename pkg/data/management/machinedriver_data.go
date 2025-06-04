@@ -48,6 +48,8 @@ type DriverDataConfig struct {
 	Defaults                 map[string]string
 }
 
+// DriverData[fileToFieldAliases] maps Schema field => driver field
+// This mapping is inverse of DriverToSchemaFields in pkg/controllers/management/drivers/nodedriver/machine_driver.go
 var DriverData = map[string]DriverDataConfig{
 	AlibabaDriver: {
 		FileToFieldAliases: map[string]string{"sshKeyContents": "sshKeypath"},

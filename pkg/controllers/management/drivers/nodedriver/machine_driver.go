@@ -28,7 +28,7 @@ var (
 	SchemaLock = sync.Mutex{}
 	driverLock = sync.Mutex{}
 	// DriverToSchemaFields maps Driver field => schema field
-	// The opposite of this lives in pkg/controllers/management/node/controller.go
+	// This mapping is the inverse of `FileToFieldAliases` field of DriverData in pkg/data/management/machinedriver_data.go,
 	DriverToSchemaFields = map[string]map[string]string{
 		"aliyunecs":     {"sshKeypath": "sshKeyContents"},
 		"amazonec2":     {"sshKeypath": "sshKeyContents", "userdata": "userdata"},
