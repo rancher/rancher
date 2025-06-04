@@ -53,7 +53,7 @@ const (
 	Kind               = "Kubeconfig"
 	Singular           = "kubeconfig"
 	Namespace          = exttokens.TokenNamespace
-	UserIDLabel        = "cattle.io/userId"
+	UserIDLabel        = "cattle.io/user-id"
 	KindLabel          = "cattle.io/kind"
 	KindLabelValue     = "kubeconfig"
 	UIDAnnotation      = "cattle.io/uid"
