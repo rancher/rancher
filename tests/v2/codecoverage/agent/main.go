@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -38,8 +40,8 @@ var (
 )
 
 const (
-	Token                    = "X-API-Tunnel-Token"
-	KubeletCertValidityLimit = time.Hour * 72
+	Token  = "X-API-Tunnel-Token"
+	Params = "X-API-Tunnel-Params"
 )
 
 func main() {
@@ -185,7 +187,15 @@ func run(ctx context.Context) error {
 	topContext := signals.SetupSignalContext()
 
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
+	params, err := getParams()
+	if err != nil {
+		return err
+	}
 	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
+	bytes, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
 
 	token, server, err := getTokenAndURL()
 	if err != nil {
@@ -193,12 +203,8 @@ func run(ctx context.Context) error {
 	}
 
 	headers := http.Header{
-		Token: {token},
-	}
-
-	err = KubeletNeedsNewCertificate(headers)
-	if err != nil {
-		return err
+		Token:  {token},
+		Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
 
 	serverURL, err := url.Parse(server)
@@ -334,12 +340,6 @@ func run(ctx context.Context) error {
 			wsURL += "/register"
 		}
 
-		// check if we need a new kubelet cert on reconnection
-		err = KubeletNeedsNewCertificate(headers)
-		if err != nil {
-			return err
-		}
-
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
 		logrus.Tracef("Connecting to %s with token %s", wsURL, token)
 		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
@@ -459,90 +459,4 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-// KubeletNeedsNewCertificate will set the
-// 'RegenerateKubeletCertificate' header field to true if
-// a) the kubelet serving certificate does not exist
-// b) the certificate will expire in 72 hours
-// c) the certificate does not accurately represent the
-//
-//	current IP address and Hostname of the node
-//
-// While the agent may denote it needs a new kubelet certificate
-// in its connection request, a new certificate will only be
-// delivered by Rancher if the generate_serving_certificate property
-// is set to 'true' for the clusters kubelet service.
-func KubeletNeedsNewCertificate(headers http.Header) error {
-	return nil
-}
-
-func findCertificateFiles(IPAddresses ...string) (string, string, string) {
-	for _, ip := range IPAddresses {
-		fileSafeIPAddress := strings.ReplaceAll(ip, ".", "-")
-		certFile := fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s.pem", fileSafeIPAddress)
-		certKeyFile := fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s-key.pem", fileSafeIPAddress)
-		_, certErr := os.Stat(certFile)
-		_, keyErr := os.Stat(certKeyFile)
-		// check that both files exist
-		if certErr == nil && keyErr == nil {
-			return certFile, certKeyFile, ip
-		}
-	}
-	return "", "", ""
-}
-
-func KubeletCertificateNeedsRegeneration(ipAddress, currentHostname string, cert tls.Certificate, currentTime time.Time) (bool, error) {
-	if len(cert.Certificate) == 0 {
-		return true, nil
-	}
-
-	parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return false, err
-	}
-
-	if !CertificateIncludesHostname(currentHostname, parsedCert) {
-		logrus.Tracef("certificate does not include current hostname, requesting new certificate")
-		return true, nil
-	}
-
-	if CertificateIsExpiring(parsedCert, currentTime) {
-		logrus.Tracef("certificate is expiring soon, requesting new certificate")
-		return true, nil
-	}
-
-	if !CertificateIncludesCurrentIP(ipAddress, parsedCert) {
-		logrus.Tracef("certificate does not include current IP address, requesting new certificate")
-		return true, nil
-	}
-
-	return false, nil
-}
-
-// CertificateIsExpiring checks if the passed certificate will expire within
-// the KubeletCertValidityLimit
-func CertificateIsExpiring(cert *x509.Certificate, currentTime time.Time) bool {
-	return cert.NotAfter.Sub(currentTime) < KubeletCertValidityLimit
-}
-
-// CertificateIncludesHostname checks that the passed certificate includes
-// the provided hostname in its SAN list
-func CertificateIncludesHostname(hostname string, cert *x509.Certificate) bool {
-	for _, name := range cert.DNSNames {
-		if name == hostname {
-			return true
-		}
-	}
-	return false
-}
-
-// CertificateIncludesCurrentIP checks that the passed certificate includes the provided IP address
-func CertificateIncludesCurrentIP(ipAddress string, cert *x509.Certificate) bool {
-	for _, ip := range cert.IPAddresses {
-		if ipAddress == ip.String() {
-			return true
-		}
-	}
-	return false
 }
