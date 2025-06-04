@@ -55,9 +55,7 @@ runs:
         build-args: |
           "VERSION=${{ env.TAG }}"
           "ARCH=${{ env.ARCH }}"
-          "RANCHER_TAG=${{ env.TAG }}"
           "RANCHER_REPO=${{ github.repository_owner }}"
-          "REGISTRY=${{ env.REGISTRY }}"
           "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
           "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_PROVISIONING_CAPI_VERSION }}"
         tags: ${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
