@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"time"
@@ -31,6 +31,7 @@ type SCCHandler interface {
 }
 
 type handler struct {
+	log                log.StructuredLogger
 	ctx                context.Context
 	registrations      registrationControllers.RegistrationController
 	registrationCache  registrationControllers.RegistrationCache
@@ -46,6 +47,7 @@ func Register(
 	systemInfoExporter *systeminfo.InfoExporter,
 ) {
 	controller := &handler{
+		log:                log.NewControllerLogger("registration-controller"),
 		ctx:                ctx,
 		registrations:      registrations,
 		registrationCache:  registrations.Cache(),
@@ -77,7 +79,7 @@ func Register(
 		func(nextTrigger, strictDeadline time.Duration) (bool, error) {
 			registrationsCacheList, err := controller.registrationCache.List(labels.Everything())
 			if err != nil {
-				logrus.Errorf("Failed to list registrations: %v", err)
+				controller.log.Errorf("Failed to list registrations: %v", err)
 				return false, err
 			}
 
@@ -115,9 +117,12 @@ func Register(
 
 func (h *handler) prepareHandler(mode v1.RegistrationMode) SCCHandler {
 	if mode == v1.RegistrationModeOffline {
-		return sccOfflineMode{}
+		return sccOfflineMode{
+			log: h.log.WithField("handler", "offline"),
+		}
 	}
 	return sccOnlineMode{
+		log:                h.log.WithField("handler", "online"),
 		registrations:      h.registrations,
 		sccCredentials:     h.sccCredentials,
 		systemInfoExporter: h.systemInfoExporter,
@@ -131,7 +136,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	if !systeminfo.IsServerUrlReady() {
-		logrus.Info("[scc.registration-controller]: Server URL not set")
+		h.log.Info("Server URL not set")
 		return registrationObj, errors.New("no server url found in the system info")
 	}
 
@@ -223,7 +228,7 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	regHandler := h.prepareHandler(registrationObj.Spec.Mode)
 	deRegErr := regHandler.Deregister()
 	if deRegErr != nil {
-		logrus.Warn(deRegErr)
+		h.log.Warn(deRegErr)
 	}
 
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})

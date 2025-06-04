@@ -1,8 +1,12 @@
 package controllers
 
-import v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+import (
+	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/util/log"
+)
 
 type sccOfflineMode struct {
+	log log.StructuredLogger
 }
 
 func (s sccOfflineMode) NeedsRegistration(registration *v1.Registration) bool {

@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 
 	"github.com/SUSE/connect-ng/pkg/connection"
 	"github.com/SUSE/connect-ng/pkg/registration"
 )
+
+func sccContextLogger() log.StructuredLogger {
+	return log.NewLog().WithField("subcomponent", "suse-connect")
+}
 
 type SccWrapper struct {
 	credentials connection.Credentials

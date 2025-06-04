@@ -1,12 +1,16 @@
 package jitterbug
 
 import (
-	"github.com/sirupsen/logrus"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
 	"time"
 )
+
+func utilTestsContextLogger() log.StructuredLogger {
+	return log.NewLog().WithField("subcomponent", "jitterbug-tests")
+}
 
 func TestNewJitterChecker(t *testing.T) {
 	t.Parallel()
@@ -20,7 +24,7 @@ func TestNewJitterChecker(t *testing.T) {
 		func(dailyTriggerTime, maxTriggerTime time.Duration) (bool, error) {
 			timeDiff := time.Since(lastCheck)
 			if timeDiff > dailyTriggerTime {
-				logrus.Infof("Hi IAN!")
+				utilTestsContextLogger().Infof("Hi IAN!")
 				lastCheck = time.Now()
 				return true, nil
 			}
@@ -48,7 +52,7 @@ func TestNewJitterCheckerFromCalculator(t *testing.T) {
 		func(dailyTriggerTime, maxTriggerTime time.Duration) (bool, error) {
 			timeDiff := time.Since(lastCheck)
 			if timeDiff > dailyTriggerTime {
-				logrus.Infof("Hi IAN!")
+				utilTestsContextLogger().Infof("Hi IAN!")
 				lastCheck = time.Now()
 				return true, nil
 			}

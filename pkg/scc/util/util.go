@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 	"github.com/rancher/rancher/pkg/version"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"regexp"
 )
@@ -23,6 +23,10 @@ const (
 	RancherSCCOfflineRequestSecretName    = "rancher-scc-offline-registration-request"
 )
 
+func utilContextLogger() log.StructuredLogger {
+	return log.NewLog().WithField("subcomponent", "util")
+}
+
 func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*corev1.SecretReference, *v1.RegistrationMode, error) {
 	secretReference := &corev1.SecretReference{}
 	// Verify the expected fields are on the config map
@@ -30,7 +34,7 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 	mode := v1.RegistrationMode(modeString)
 	if !mode.Valid() {
 		errorMsg := fmt.Sprintf("the configmap does not have a valid mode set")
-		logrus.Error(errorMsg)
+		utilContextLogger().Error(errorMsg)
 		return secretReference, nil, errors.New(errorMsg)
 	}
 
@@ -49,7 +53,7 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 		// TODO bail here if OK is bad
 		// Just unclear if we should: a) error, or b) silent error (letting `SCCFirstStart` get updated).
 		errorMsg := fmt.Sprintf("cannot find the credential value key %s", credentialNameKey)
-		logrus.Error(errorMsg)
+		utilContextLogger().Error(errorMsg)
 		return secretReference, nil, errors.New(errorMsg)
 	}
 
@@ -58,7 +62,7 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 		// TODO bail here if OK is bad
 		// Just unclear if we should: a) error, or b) silent error (letting `SCCFirstStart` get updated).
 		errorMsg := fmt.Sprintf("cannot find the credential value key %s", credentialNamespaceKey)
-		logrus.Error(errorMsg)
+		utilContextLogger().Error(errorMsg)
 		secretNamespace = "cattle-system"
 	}
 
