@@ -380,10 +380,7 @@ func (s *Store) Create(
 	}
 	kubeconfigToStore.Labels[UserIDLabel] = userInfo.GetName()
 	kubeconfigToStore.UID = uuid.NewUUID()
-
-	kubeconfigToStore.Status = &ext.KubeconfigStatus{
-		Summary: StatusSummaryPending,
-	}
+	kubeconfigToStore.Status.Summary = StatusSummaryPending
 
 	configMap, err := s.toConfigMap(kubeconfigToStore)
 	if err != nil {
@@ -648,11 +645,9 @@ func (s *Store) Create(
 		statusSummary = StatusSummaryError
 	}
 
-	kubeconfigToStore.Status = &ext.KubeconfigStatus{
-		Summary:    statusSummary,
-		Conditions: append(kubeconfigToStore.Status.Conditions, conditions...),
-		Tokens:     tokenIDs,
-	}
+	kubeconfigToStore.Status.Summary = statusSummary
+	kubeconfigToStore.Status.Conditions = append(kubeconfigToStore.Status.Conditions, conditions...)
+	kubeconfigToStore.Status.Tokens = tokenIDs
 	kubeconfigToStore.OwnerReferences = append(kubeconfigToStore.OwnerReferences, ownerRefs...)
 
 	var convertErr error
@@ -719,23 +714,21 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 	configMap.Data[DescriptionField] = kubeconfig.Spec.Description
 	configMap.Data[TTLField] = strconv.FormatInt(kubeconfig.Spec.TTL, 10)
 
-	if kubeconfig.Status != nil { // Note: Value should never be persisted!
-		configMap.Data[StatusSummaryField] = kubeconfig.Status.Summary
-
-		if len(kubeconfig.Status.Conditions) > 0 {
-			serialized, err := json.Marshal(kubeconfig.Status.Conditions)
-			if err != nil {
-				return nil, fmt.Errorf("error serializing status.conditions: %w", err)
-			}
-			configMap.Data[StatusConditionsField] = string(serialized)
+	// Note: Value should never be persisted!
+	configMap.Data[StatusSummaryField] = kubeconfig.Status.Summary
+	if len(kubeconfig.Status.Conditions) > 0 {
+		serialized, err := json.Marshal(kubeconfig.Status.Conditions)
+		if err != nil {
+			return nil, fmt.Errorf("error serializing status.conditions: %w", err)
 		}
-		if len(kubeconfig.Status.Tokens) > 0 {
-			serialized, err := json.Marshal(kubeconfig.Status.Tokens)
-			if err != nil {
-				return nil, fmt.Errorf("error serializing status.tokens: %w", err)
-			}
-			configMap.Data[StatusTokensField] = string(serialized)
+		configMap.Data[StatusConditionsField] = string(serialized)
+	}
+	if len(kubeconfig.Status.Tokens) > 0 {
+		serialized, err := json.Marshal(kubeconfig.Status.Tokens)
+		if err != nil {
+			return nil, fmt.Errorf("error serializing status.tokens: %w", err)
 		}
+		configMap.Data[StatusTokensField] = string(serialized)
 	}
 
 	return configMap, nil
@@ -775,26 +768,20 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 		}
 	}
 
-	status := &ext.KubeconfigStatus{
-		Summary: configMap.Data[StatusSummaryField],
-	}
+	kubeconfig.Status.Summary = configMap.Data[StatusSummaryField]
 
 	if serialized := configMap.Data[StatusConditionsField]; serialized != "" {
-		err = json.Unmarshal([]byte(serialized), &status.Conditions)
+		err = json.Unmarshal([]byte(serialized), &kubeconfig.Status.Conditions)
 		if err != nil {
 			return nil, fmt.Errorf("error unmarshaling status.conditions for %s: %w", configMap.Name, err)
 		}
 	}
 
 	if serialized := configMap.Data[StatusTokensField]; serialized != "" {
-		err = json.Unmarshal([]byte(serialized), &status.Tokens)
+		err = json.Unmarshal([]byte(serialized), &kubeconfig.Status.Tokens)
 		if err != nil {
 			return nil, fmt.Errorf("error unmarshaling status.tokens for %s: %w", configMap.Name, err)
 		}
-	}
-
-	if status.Summary != "" || len(status.Conditions) > 0 || len(status.Tokens) > 0 {
-		kubeconfig.Status = status
 	}
 
 	return kubeconfig, nil
@@ -1141,13 +1128,11 @@ func printHandler(h printers.PrintHandler) {
 func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	status := unknownValue
 	allTokenCount := 0
-	if kubeconfig.Status != nil {
-		if kubeconfig.Status.Summary != "" {
-			status = kubeconfig.Status.Summary
-		}
-
-		allTokenCount = len(kubeconfig.Status.Tokens)
+	if kubeconfig.Status.Summary != "" {
+		status = kubeconfig.Status.Summary
 	}
+
+	allTokenCount = len(kubeconfig.Status.Tokens)
 
 	var ownedTokenCount int
 	for _, ref := range kubeconfig.OwnerReferences {
@@ -1424,9 +1409,6 @@ func (s *Store) Update(
 	newKubeconfig.Labels[UserIDLabel] = oldKubeconfig.Labels[UserIDLabel]
 	newKubeconfig.Status = oldKubeconfig.Status // Carry over the status.
 
-	if newKubeconfig.Status == nil {
-		newKubeconfig.Status = &ext.KubeconfigStatus{}
-	}
 	newKubeconfig.Status.Conditions = append(newKubeconfig.Status.Conditions, metav1.Condition{
 		Type:               UpdatedCond,
 		Status:             metav1.ConditionTrue,

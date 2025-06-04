@@ -209,7 +209,7 @@ type Kubeconfig struct {
 	Spec KubeconfigSpec `json:"spec,omitempty"`
 	// Status is the most recently observed status of the Kubeconfig.
 	// +optional
-	Status *KubeconfigStatus `json:"status,omitempty"`
+	Status KubeconfigStatus `json:"status,omitempty"`
 }
 
 // KubeconfigSpec defines the desired state of Kubeconfig.

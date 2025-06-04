@@ -135,6 +135,7 @@ func schema_pkg_apis_extcattleio_v1_Kubeconfig(ref common.ReferenceCallback) com
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the Kubeconfig.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigStatus"),
 						},
 					},

@@ -2105,7 +2105,7 @@ func TestPrintKubeconfig(t *testing.T) {
 			Clusters:       []string{"c-m-tbgzfbgf", "c-m-bxn2p7w6"},
 			TTL:            43200,
 		},
-		Status: &ext.KubeconfigStatus{
+		Status: ext.KubeconfigStatus{
 			Summary: StatusSummaryComplete,
 			Tokens: []string{
 				"kubeconfig-u-w7drcgc66",
@@ -2132,7 +2132,7 @@ func TestPrintKubeconfig(t *testing.T) {
 	t.Run("missing age and status", func(t *testing.T) {
 		kubeconfig := kubeconfig.DeepCopy()
 		kubeconfig.CreationTimestamp = metav1.Time{}
-		kubeconfig.Status = nil
+		kubeconfig.Status = ext.KubeconfigStatus{}
 
 		rows, err := printKubeconfig(kubeconfig, printers.GenerateOptions{})
 		require.NoError(t, err)
