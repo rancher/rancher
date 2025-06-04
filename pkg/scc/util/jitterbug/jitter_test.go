@@ -87,6 +87,7 @@ func TestJitterChecker_Run(t *testing.T) {
 	r := rand.New(rand.NewSource(seed))
 
 	jc := &JitterChecker{
+		log:        jitterbugContextLogger(),
 		config:     &config,
 		calculator: NewJitterCalculator(&config, r),
 		callable:   mockCallable,
@@ -143,6 +144,7 @@ func TestJitterChecker_RunIntervalChanged(t *testing.T) {
 	mockCalculator.On("CalculateCheckinInterval").Return(calculatedIntervals[1]).Once()
 
 	jc := &JitterChecker{
+		log:        jitterbugContextLogger(),
 		config:     &config,
 		calculator: mockCalculator,
 		callable:   mockCallable,

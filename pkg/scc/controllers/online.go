@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -18,6 +18,7 @@ import (
 )
 
 type sccOnlineMode struct {
+	log                log.StructuredLogger
 	registrations      registrationControllers.RegistrationController
 	sccCredentials     *credentials.CredentialSecretsAdapter
 	systemInfoExporter *systeminfo.InfoExporter
@@ -33,7 +34,7 @@ func (s sccOnlineMode) NeedsRegistration(obj *v1.Registration) bool {
 func (s sccOnlineMode) RegisterSystem(registrationObj *v1.Registration) (*v1.Registration, error) {
 	if v1.ResourceConditionDone.IsTrue(registrationObj) ||
 		v1.RegistrationConditionAnnounced.IsTrue(registrationObj) {
-		logrus.Debugf("[scc.registration-controller]: registration already complete, nothing to process for %s", registrationObj.Name)
+		s.log.Debugf("registration already complete, nothing to process for %s", registrationObj.Name)
 		return registrationObj, nil
 	}
 
@@ -63,7 +64,7 @@ func (s sccOnlineMode) RegisterSystem(registrationObj *v1.Registration) (*v1.Reg
 		if regObjRegCodeSecretRef.Name != "" && regObjRegCodeSecretRef.Namespace != "" {
 			regCodeSecretRef = regObjRegCodeSecretRef
 		} else {
-			logrus.Warn("[scc.registration-controller]: registration code secret reference was set but cannot be used")
+			s.log.Warn("registration code secret reference was set but cannot be used")
 		}
 	}
 
@@ -116,7 +117,7 @@ func (s sccOnlineMode) announceSystem(registrationObj *v1.Registration, sccConne
 	}
 
 	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", id)
-	logrus.Debugf("[scc.registration-controller]: system announced, check %s", sccSystemUrl)
+	s.log.Debugf("system announced, check %s", sccSystemUrl)
 
 	newRegObj := registrationObj.DeepCopy()
 	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -153,8 +154,8 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) (*v1.Registrat
 		return registrationObj, errors.New("cannot activate system that hasn't been announced to SCC")
 	}
 
-	logrus.Infof("[scc.activations-controller]: Received registration ready for activations %q", registrationObj.Name)
-	logrus.Info("[scc.activations-controller]: registration ", registrationObj)
+	s.log.Infof("Received registration ready for activations %q", registrationObj.Name)
+	s.log.Info("registration ", registrationObj)
 
 	credRefreshErr := s.sccCredentials.Refresh() // We must always refresh the sccCredentials - this ensures they are current from the secrets
 	if credRefreshErr != nil {
@@ -169,8 +170,8 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) (*v1.Registrat
 	if err != nil {
 		return registrationObj, err
 	}
-	logrus.Info(metaData)
-	logrus.Info(product)
+	s.log.Info(metaData)
+	s.log.Info(product)
 
 	// If no error, then system is still registered with valid activation status...
 	keepAliveErr := sccConnection.KeepAlive()
@@ -178,7 +179,7 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) (*v1.Registrat
 		return registrationObj, keepAliveErr
 	}
 
-	logrus.Info("[scc.activation-controller]: Successfully registered activation")
+	s.log.Info("Successfully registered activation")
 	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
 		registrationObj, err = s.registrations.Get(registrationObj.Name, metav1.GetOptions{})
@@ -217,8 +218,8 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) (*v1.Registra
 	if err != nil {
 		return registrationObj, err
 	}
-	logrus.Info(metaData)
-	logrus.Info(product)
+	s.log.Info(metaData)
+	s.log.Info(product)
 
 	// If no error, then system is still registered with valid activation status...
 	keepAliveErr := sccConnection.KeepAlive()
@@ -226,7 +227,7 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) (*v1.Registra
 		return registrationObj, keepAliveErr
 	}
 
-	logrus.Info("[scc.activation-controller]: Successfully checked in with SCC")
+	s.log.Info("Successfully checked in with SCC")
 	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
 		registrationObj, err = s.registrations.Get(registrationObj.Name, metav1.GetOptions{})

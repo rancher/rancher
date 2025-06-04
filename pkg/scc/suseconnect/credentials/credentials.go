@@ -1,12 +1,15 @@
 package credentials
 
 import (
-	"github.com/sirupsen/logrus"
-
 	"github.com/SUSE/connect-ng/pkg/connection"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 
 	"github.com/pkg/errors"
 )
+
+func credsContextLogger() log.StructuredLogger {
+	return log.NewLog().WithField("subcomponent", "suse-connect-creds")
+}
 
 type CredentialType int
 
@@ -106,7 +109,7 @@ func (c *SccCredentials) SetLogin(newLogin string, newPassword string) error {
 			}
 			errorMessage += "newPassword is empty"
 		}
-		logrus.Warnf("updating systemLogin to empty value(s); %v", errorMessage)
+		credsContextLogger().Warnf("updating systemLogin to empty value(s); %v", errorMessage)
 	}
 
 	c.systemLogin = newLogin
