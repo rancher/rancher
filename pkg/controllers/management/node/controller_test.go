@@ -2,20 +2,28 @@ package node
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAliasMaps(t *testing.T) {
 	assert := assert.New(t)
-	assert.Len(SchemaToDriverFields, len(nodedriver.DriverToSchemaFields), "Alias maps are not equal")
-	for driver, fields := range SchemaToDriverFields {
+	schemaToDriverFields := map[string]map[string]string{}
+	for driver, fields := range management.DriverData {
+		if fields.FileToFieldAliases != nil {
+			schemaToDriverFields[driver] = fields.FileToFieldAliases
+		}
+	}
+	assert.Len(schemaToDriverFields, len(nodedriver.DriverToSchemaFields), "Alias maps are not equal")
+	for driver, fields := range schemaToDriverFields {
+		fmt.Println("driver", driver, "fields", fields)
 		assert.Contains(nodedriver.DriverToSchemaFields, driver)
 		nodeAliases := nodedriver.DriverToSchemaFields[driver]
 		for k, v := range fields {
@@ -29,50 +37,59 @@ func TestAliasMaps(t *testing.T) {
 }
 
 func TestAliasToPath(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-	os.Setenv("CATTLE_DEV_MODE", "true")
+	assertT := assert.New(t)
+	requireT := require.New(t)
+	err := os.Setenv("CATTLE_DEV_MODE", "true")
+	assertT.NoError(err)
 	defer os.Unsetenv("CATTLE_DEV_MODE")
 
-	for driver, fields := range SchemaToDriverFields {
-		testData, _ := createFakeConfig(fields)
+	for driver, fields := range management.DriverData {
+		testConfig, annotations := createFakeConfigAnnotations(fields.FileToFieldAliases)
+		err = aliasToPath(annotations, testConfig, "fakeNamespace")
+		assertT.NoError(err)
 
-		err := aliasToPath(driver, testData, "fake")
-		assert.Nil(err)
 		for alias := range nodedriver.DriverToSchemaFields[driver] {
-			assert.Contains(testData, alias)
+			assertT.Contains(testConfig, alias)
 		}
-		tempdir := os.TempDir()
 
-		for _, v := range testData {
+		tempDir := os.TempDir()
+
+		for _, v := range testConfig {
 			filePath := v.(string)
-			// validate the temp dir is in the path for the field
-			assert.Contains(filePath, tempdir)
-			// valide the file exists on disk
+			// validate that the temp directory in the path for the field
+			assertT.Contains(filePath, tempDir)
+			// validate that the file exists on disk
 			_, err = os.Stat(filePath)
-			require.Nil(err)
+			requireT.NoError(err)
 
-			// assert the file contents starts with our expected string
-			b, err := ioutil.ReadFile(filePath)
-			require.Nil(err)
-			assert.Contains(string(b), "fakecontent")
+			// validate that the fileContents start with expected string
+			b, err := os.ReadFile(filePath)
+			requireT.NoError(err)
+			assertT.Contains(string(b), "fakecontent")
 			os.Remove(filePath)
 		}
 	}
 }
 
-func createFakeConfig(fields map[string]string) (map[string]interface{}, []string) {
+func createFakeConfigAnnotations(fields map[string]string) (map[string]interface{}, map[string]string) {
 	fakeContents := []string{}
 	testData := make(map[string]interface{})
+	annotations := map[string]string{}
 
 	base := "fakecontent"
 	i := 0
-	for k := range fields {
+	for k, v := range fields {
 		content := base + strconv.Itoa(i)
-		fakeContents = append(fakeContents, content)
+		fakeContents = append(fakeContents, fmt.Sprintf("%s:%s", k, v))
 		testData[k] = content
 		i++
 	}
-	return testData, fakeContents
 
+	if len(fakeContents) > 0 {
+		annotations = map[string]string{
+			"fileToFieldAliases": strings.Join(fakeContents, ","),
+		}
+	}
+
+	return testData, annotations
 }

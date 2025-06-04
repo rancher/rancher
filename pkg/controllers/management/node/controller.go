@@ -51,22 +51,6 @@ const (
 	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
 )
 
-// SchemaToDriverFields maps Schema field => driver field
-// The opposite of this lives in pkg/controllers/management/drivers/nodedriver/machine_driver.go
-var SchemaToDriverFields = map[string]map[string]string{
-	"aliyunecs":     {"sshKeyContents": "sshKeypath"},
-	"amazonec2":     {"sshKeyContents": "sshKeypath", "userdata": "userdata"},
-	"azure":         {"customData": "customData"},
-	"digitalocean":  {"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
-	"exoscale":      {"sshKey": "sshKey", "userdata": "userdata"},
-	"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-	"otc":           {"privateKeyFile": "privateKeyFile"},
-	"packet":        {"userdata": "userdata"},
-	"pod":           {"userdata": "userdata"},
-	"vmwarevsphere": {"cloudConfig": "cloud-config"},
-	"google":        {"authEncodedJson": "authEncodedJson", "userdata": "userdata"},
-}
-
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
