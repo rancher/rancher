@@ -22,8 +22,8 @@ jobs:
     strategy:
       matrix:
         os: [windows]
-        version: [2019]
-    runs-on: ${{ matrix.os }}-${{ matrix.version }}
+        version: [2019, 2022]
+    runs-on: ${{ matrix.os }}-2022
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
