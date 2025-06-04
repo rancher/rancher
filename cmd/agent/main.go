@@ -32,7 +32,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
-	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -44,6 +43,7 @@ var (
 
 const (
 	Token          = "X-API-Tunnel-Token"
+	Params         = "X-API-Tunnel-Params"
 	caFileLocation = "/etc/kubernetes/ssl/certs/serverca"
 )
 
@@ -206,8 +206,8 @@ func run(ctx context.Context) error {
 	}
 
 	headers := http.Header{
-		Token:                      {token},
-		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
+		Token:  {token},
+		Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
 
 	serverURL, err := url.Parse(server)
