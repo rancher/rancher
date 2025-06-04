@@ -6,7 +6,6 @@ on:
       - "release/v*"
 env:
   COMMIT: ${{ github.sha }}
-  DOCKERIO_REGISTRY: "docker.io"
   AWS_DEFAULT_REGION: "us-east-1"
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
