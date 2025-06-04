@@ -20,6 +20,7 @@ var (
 		"podsecurityadmissionconfigurationtemplates": true,
 		"projects":                                   true,
 		"projectroletemplatebindings":                true,
+		"oidcclients":                                true,
 	}
 	allowPost = map[string]bool{
 		"settings": true,
