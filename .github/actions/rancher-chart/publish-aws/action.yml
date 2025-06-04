@@ -8,7 +8,6 @@ runs:
       env:
         AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CHARTS }}
         AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CHARTS }}
-        CHARTS_BUCKET_NAME: charts.optimus.rancher.io
       run: |
         aws s3 cp --recursive ./bin/chart s3://${{ env.CHARTS_BUCKET_NAME }}/server-charts
     - name: Invalidate Cloudfront cache
