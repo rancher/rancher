@@ -44,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 )
@@ -987,16 +988,22 @@ func (s *Store) Watch(
 		return nil, apierrors.NewInternalError(err)
 	}
 
+	if !features.FeatureGates().Enabled(features.WatchListClient) {
+		listOptions.SendInitialEvents = nil
+		listOptions.ResourceVersionMatch = ""
+	}
+
+	configMapWatch, err := s.configMapClient.Watch(Namespace, *listOptions)
+	if err != nil {
+		logrus.Errorf("kubeconfig: watch: error starting watch: %s", err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("kubeconfig: watch: error starting watch: %w", err))
+	}
+
 	kubeconfigWatch := &watcher{
 		ch: make(chan watch.Event, 100),
 	}
 
 	go func() {
-		configMapWatch, err := s.configMapClient.Watch(Namespace, *listOptions)
-		if err != nil {
-			logrus.Errorf("kubeconfig: watch: error starting watch: %s", err)
-			return
-		}
 		defer configMapWatch.Stop()
 
 		for {
