@@ -199,6 +199,7 @@ func Setup(
 	go initOperator.waitForSystemReady(func() {
 		controllers.Register(
 			ctx,
+			wContext.Apply,
 			initOperator.sccResourceFactory.Scc().V1().Registration(),
 			initOperator.secrets,
 			initOperator.systemInfoExporter,

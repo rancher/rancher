@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/SUSE/connect-ng/pkg/registration"
 	"github.com/google/uuid"
+	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/wrangler"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -12,6 +13,27 @@ type InfoExporter struct {
 	InfoProvider *InfoProvider
 	wContext     *wrangler.Context
 }
+
+type RancherSCCInfo struct {
+	UUID       uuid.UUID `json:"uuid"`
+	RancherUrl string    `json:"server_url"`
+	Nodes      int       `json:"nodes"`
+	Sockets    int       `json:"sockets"`
+	Clusters   int       `json:"clusters"`
+	Version    string    `json:"version"`
+}
+
+type RancherOfflineRequest struct {
+	UUID       uuid.UUID `json:"uuid"`
+	RancherUrl string    `json:"server_url"`
+	Nodes      int       `json:"nodes"`
+	Sockets    int       `json:"sockets"`
+	VCPUs      int       `json:vcpus`
+	Clusters   int       `json:"clusters"`
+	Version    string    `json:"version"`
+}
+
+type RancherOfflineRequestEncoded []byte
 
 func NewInfoExporter(infoProvider *InfoProvider, wContext *wrangler.Context) *InfoExporter {
 	return &InfoExporter{
@@ -24,17 +46,7 @@ func (e *InfoExporter) Provider() *InfoProvider {
 	return e.InfoProvider
 }
 
-func (e *InfoExporter) preparedForSCC() ([]byte, error) {
-	type RancherSCCInfo struct {
-		UUID     uuid.UUID `json:"uuid"`
-		Url      string    `json:"server_url"`
-		Nodes    int       `json:"nodes"`
-		Sockets  int       `json:"sockets"`
-		Vcpus    int       `json:"vcpus"`
-		Clusters int       `json:"clusters"`
-		Version  string    `json:"version"`
-	}
-
+func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	// Fetch current node count
 	nodeCount := 0
 	socketsCount := 1 // TODO: i don't think rancher exposes this...because k8s doesnt
@@ -59,26 +71,25 @@ func (e *InfoExporter) preparedForSCC() ([]byte, error) {
 
 	// TODO: collect and organize downstream counts
 
-	sccInfo := &RancherSCCInfo{
-		UUID:     e.InfoProvider.RancherUuid,
-		Url:      ServerHostname(),
-		Version:  e.InfoProvider.GetVersion(),
-		Nodes:    nodeCount,
-		Sockets:  socketsCount,
-		Vcpus:    vcpusCount,
-		Clusters: clusterCount,
+	return RancherSCCInfo{
+		UUID:       e.InfoProvider.RancherUuid,
+		RancherUrl: ServerHostname(),
+		Version:    e.InfoProvider.GetVersion(),
+		Nodes:      nodeCount,
+		Sockets:    socketsCount,
+		Clusters:   clusterCount,
 	}
-
-	return json.Marshal(sccInfo)
 }
 
 func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) {
-	systemInfoMap := make(registration.SystemInformation)
-	jsonInfo, err := e.preparedForSCC()
-	if err != nil {
-		return nil, err
+	sccPreparedInfo := e.preparedForSCC()
+	sccJson, jsonErr := json.Marshal(sccPreparedInfo)
+	if jsonErr != nil {
+		return nil, jsonErr
 	}
-	err = json.Unmarshal(jsonInfo, &systemInfoMap)
+
+	systemInfoMap := make(registration.SystemInformation)
+	err := json.Unmarshal(sccJson, &systemInfoMap)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +97,26 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 	return systemInfoMap, nil
 }
 
-func (e *InfoExporter) PreparedForSCCOffline() ([]byte, error) {
-	return e.preparedForSCC()
+// PreparedForSCCOffline returns a RancherOfflineRequestEncoded just to delineate between other []byte types,
+// and to show connection to the original data structure it came from
+func (e *InfoExporter) PreparedForSCCOffline() (RancherOfflineRequestEncoded, error) {
+	sccPreparedInfo := e.preparedForSCC()
+
+	offlinePrepared := RancherOfflineRequest{
+		UUID:       sccPreparedInfo.UUID,
+		RancherUrl: sccPreparedInfo.RancherUrl,
+		Nodes:      sccPreparedInfo.Nodes,
+		// TODO: unsure what to do here for offline since we don't have metrics on both sockets and vCPU
+		Sockets:  sccPreparedInfo.Sockets,
+		VCPUs:    sccPreparedInfo.Sockets,
+		Clusters: sccPreparedInfo.Clusters,
+		Version:  sccPreparedInfo.Version,
+	}
+
+	offlineJson, jsonErr := json.Marshal(offlinePrepared)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	return util.JSONToBase64(offlineJson)
 }
