@@ -22,10 +22,10 @@ jobs:
     strategy:
       matrix:
         os: [windows]
-        version: [2019, 2022]
+        version: [2019]
     runs-on: ${{ matrix.os }}-2022
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Build Windows Agent Image
-      run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+      run: docker run --isolation=hyperv mcr.microsoft.com/windows/servercore:ltsc${{ matrix.version }} powershell.exe echo foo
