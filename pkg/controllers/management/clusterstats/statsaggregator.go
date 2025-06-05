@@ -89,7 +89,7 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object,
 func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
 	if v, ok := s.lastReconcile.Load(key); ok {
 		lastReconcile := v.(time.Time)
-		return time.Since(lastReconcile) - quietPeriod
+		return quietPeriod - time.Since(lastReconcile)
 	}
 	return 0
 }
