@@ -10,13 +10,18 @@ import (
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
 	"github.com/rancher/rancher/pkg/scc/util/log"
+	"github.com/rancher/wrangler/v3/pkg/apply"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 	"time"
 )
 
 const (
+	controllerID   = "prime-registration"
 	prodMinCheckin = time.Hour * 20
 	devMinCheckin  = time.Minute * 30
 )
@@ -25,14 +30,15 @@ type SCCHandler interface {
 	NeedsRegistration(*v1.Registration) bool
 	RegisterSystem(*v1.Registration) (*v1.Registration, error) // Equal to first time registration w/ SCC, or Offline Request creation
 	NeedsActivation(*v1.Registration) bool
-	Activate(*v1.Registration) (*v1.Registration, error)  // Equal to activating with SCC, or verifying offline Request
+	Activate(*v1.Registration) error                      // Equal to activating with SCC, or verifying offline Request
 	Keepalive(*v1.Registration) (*v1.Registration, error) // Provides a heartbeat to SCC and validates status
 	Deregister() error
 }
 
 type handler struct {
-	log                log.StructuredLogger
+	apply              apply.Apply
 	ctx                context.Context
+	log                *logrus.Entry
 	registrations      registrationControllers.RegistrationController
 	registrationCache  registrationControllers.RegistrationCache
 	secrets            v1core.SecretController
@@ -42,11 +48,16 @@ type handler struct {
 
 func Register(
 	ctx context.Context,
+	wApply apply.Apply,
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
 	systemInfoExporter *systeminfo.InfoExporter,
 ) {
 	controller := &handler{
+		apply: wApply.
+			WithCacheTypes(registrations).
+			WithSetID(controllerID).
+			WithSetOwnerReference(true, false),
 		log:                log.NewControllerLogger("registration-controller"),
 		ctx:                ctx,
 		registrations:      registrations,
@@ -56,8 +67,14 @@ func Register(
 		systemInfoExporter: systemInfoExporter,
 	}
 
-	registrations.OnChange(ctx, "registration-controller", controller.OnRegistrationChange)
-	registrations.OnRemove(ctx, "registration-controller", controller.OnRegistrationRemove)
+	registrations.OnChange(ctx, controllerID, controller.OnRegistrationChange)
+	registrations.OnRemove(ctx, controllerID, controller.OnRegistrationRemove)
+	relatedresource.Watch(ctx, controllerID+"-secrets",
+		relatedresource.
+			OwnerResolver(true, v1.SchemeGroupVersion.String(), v1.RegistrationResourceName),
+		secrets,
+		registrations,
+	)
 
 	// Configure jitter based daily revalidation trigger
 	jitterbugConfig := jitterbug.Config{
@@ -118,7 +135,11 @@ func Register(
 func (h *handler) prepareHandler(mode v1.RegistrationMode) SCCHandler {
 	if mode == v1.RegistrationModeOffline {
 		return sccOfflineMode{
-			log: h.log.WithField("handler", "offline"),
+			apply:              h.apply,
+			log:                h.log.WithField("handler", "offline"),
+			registrations:      h.registrations,
+			systemInfoExporter: h.systemInfoExporter,
+			secrets:            h.secrets,
 		}
 	}
 	return sccOnlineMode{
@@ -144,11 +165,11 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, errors.New("registration has failed status; create a new one to retry")
 	}
 
+	// Skip keepalive for anything activated within the last 20 hours
 	registrationHandler := h.prepareHandler(registrationObj.Spec.Mode)
 	if !registrationHandler.NeedsRegistration(registrationObj) &&
 		!registrationHandler.NeedsActivation(registrationObj) &&
 		registrationObj.Spec.CheckNow == nil {
-		// Skip keepalive for anything activated within the last 20 hours
 		recheckTime := time.Now().Add(-prodMinCheckin)
 		if util.VersionIsDevBuild() {
 			recheckTime = time.Now().Add(-devMinCheckin)
@@ -158,13 +179,45 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		}
 	}
 
+	var updateErr error
+
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	if registrationHandler.NeedsRegistration(registrationObj) {
+		// Set object to progressing
+		progressingObj := registrationObj.DeepCopy()
+		updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var err error
+			v1.ResourceConditionProgressing.True(progressingObj)
+			progressingObj, err = h.registrations.UpdateStatus(progressingObj)
+			return err
+		})
+		if updateErr != nil {
+			return registrationObj, updateErr
+		}
+
 		announced, err := registrationHandler.RegisterSystem(registrationObj)
 		if err != nil {
 			// reconcile state
 			return nil, err
+		}
+
+		// Prepare the Registration for Activation phase
+		updatingObj := registrationObj.DeepCopy()
+		updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var err error
+
+			updatingObj.Status.RegistrationProcessedTS = &metav1.Time{
+				Time: time.Now(),
+			}
+			v1.ResourceConditionFailure.SetStatusBool(updatingObj, false)
+			v1.ResourceConditionReady.SetStatusBool(updatingObj, true)
+			updatingObj, err = h.registrations.UpdateStatus(updatingObj)
+
+			return err
+		})
+		if updateErr != nil {
+			return registrationObj, updateErr
 		}
 
 		// Upon successful registration the processed TS should be set, so when it is enqueue for activation
@@ -176,13 +229,37 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	if registrationHandler.NeedsActivation(registrationObj) {
-		activated, err := registrationHandler.Activate(registrationObj)
+		err := registrationHandler.Activate(registrationObj)
 		if err != nil {
 			// reconcile state
 			return nil, err
 		}
 
-		return activated, nil
+		updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var retryErr error
+			registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+			if retryErr != nil {
+				return retryErr
+			}
+
+			updated := registrationObj.DeepCopy()
+			v1.RegistrationConditionSccUrlReady.True(updated)
+			v1.RegistrationConditionActivated.True(updated)
+			v1.ResourceConditionProgressing.False(updated)
+			v1.ResourceConditionReady.True(updated)
+			v1.ResourceConditionDone.True(updated)
+			updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
+				Time: time.Now(),
+			}
+			updated.Status.ActivationStatus.Activated = true
+			registrationObj, err = h.registrations.UpdateStatus(updated)
+			return err
+		})
+		if updateErr != nil {
+			return registrationObj, updateErr
+		}
+
+		return registrationObj, nil
 	}
 
 	// Handle what to do when CheckNow is used...

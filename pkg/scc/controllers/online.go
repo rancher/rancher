@@ -25,86 +25,28 @@ type sccOnlineMode struct {
 	secrets            v1core.SecretController
 }
 
-func (s sccOnlineMode) NeedsRegistration(obj *v1.Registration) bool {
-	return obj.Status.RegistrationProcessedTS.IsZero() ||
-		!obj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
-		!obj.HasCondition(v1.RegistrationConditionAnnounced)
+func (s sccOnlineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
+	return registrationObj.Status.RegistrationProcessedTS.IsZero() ||
+		!registrationObj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
+		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced)
 }
 
 func (s sccOnlineMode) RegisterSystem(registrationObj *v1.Registration) (*v1.Registration, error) {
-	if v1.ResourceConditionDone.IsTrue(registrationObj) ||
-		v1.RegistrationConditionAnnounced.IsTrue(registrationObj) {
-		s.log.Debugf("registration already complete, nothing to process for %s", registrationObj.Name)
-		return registrationObj, nil
-	}
-
 	credRefreshErr := s.sccCredentials.Refresh() // We must always refresh the sccCredentials - this ensures they are current from the secrets
 	if credRefreshErr != nil {
 		return registrationObj, fmt.Errorf("cannot refresh credentials: %w", credRefreshErr)
 	}
 
-	progressingObj := registrationObj.DeepCopy()
-	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
-		v1.ResourceConditionProgressing.True(progressingObj)
-		progressingObj, err = s.registrations.UpdateStatus(progressingObj)
-		return err
-	})
-	if updateErr != nil {
-		return registrationObj, updateErr
-	}
-
-	// Set to global default, or user configured value from the Registration resource
-	regCodeSecretRef := &corev1.SecretReference{
-		Namespace: "cattle-system",
-		Name:      util.RegCodeSecretName,
-	}
-	if progressingObj.Spec.RegistrationRequest.RegistrationCodeSecretRef != nil {
-		regObjRegCodeSecretRef := progressingObj.Spec.RegistrationRequest.RegistrationCodeSecretRef
-		if regObjRegCodeSecretRef.Name != "" && regObjRegCodeSecretRef.Namespace != "" {
-			regCodeSecretRef = regObjRegCodeSecretRef
-		} else {
-			s.log.Warn("registration code secret reference was set but cannot be used")
-		}
-	}
+	// Fetch the SCC registration code; for 80% of users this should be a real code
+	// The other cases are either:
+	//	a. an error and should have had a code, OR
+	//	b. BAYG/RMT/etc based Registration and will not use a code
+	registrationCode := s.fetchRegCode(registrationObj)
 
 	// Initiate connection to SCC & verify reg code is for Rancher
 	sccConnection := suseconnect.DefaultRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter)
 
 	// RegisterSystem this Rancher cluster to SCC
-	announcedReg, announceErr := s.announceSystem(progressingObj, &sccConnection, regCodeSecretRef)
-	if announceErr != nil {
-		return progressingObj, announceErr
-	}
-
-	// Prepare the Registration for Activation phase next
-	updatingObj := announcedReg.DeepCopy()
-	updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
-
-		updatingObj.Status.RegistrationProcessedTS = &metav1.Time{
-			Time: time.Now(),
-		}
-		v1.ResourceConditionFailure.SetStatusBool(updatingObj, false)
-		v1.ResourceConditionReady.SetStatusBool(updatingObj, true)
-		updatingObj, err = s.registrations.UpdateStatus(updatingObj)
-
-		return err
-	})
-	if updateErr != nil {
-		return registrationObj, updateErr
-	}
-
-	return updatingObj, nil
-}
-
-func (s sccOnlineMode) announceSystem(registrationObj *v1.Registration, sccConnection *suseconnect.SccWrapper, regCodeSecretRef *corev1.SecretReference) (*v1.Registration, error) {
-	// Fetch the SCC registration code; for 80% of users this should be a real code
-	// The other cases are either:
-	//	a. an error and should have had a code, OR
-	//	b. BAYG/RMT/etc based Registration and will not use a code
-	registrationCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, regCodeSecretRef)
-
 	id, regErr := sccConnection.RegisterOrKeepAlive(registrationCode)
 	if regErr != nil {
 		// TODO(scc) do we error different based on ID type?
@@ -116,6 +58,7 @@ func (s sccOnlineMode) announceSystem(registrationObj *v1.Registration, sccConne
 		return registrationObj, nil
 	}
 
+	// TODO maybe move to controller?
 	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", id)
 	s.log.Debugf("system announced, check %s", sccSystemUrl)
 
@@ -143,23 +86,41 @@ func (s sccOnlineMode) announceSystem(registrationObj *v1.Registration, sccConne
 	return newRegObj, nil
 }
 
+func (s sccOnlineMode) fetchRegCode(registrationObj *v1.Registration) string {
+	// Set to global default, or user configured value from the Registration resource
+	regCodeSecretRef := &corev1.SecretReference{
+		Namespace: "cattle-system",
+		Name:      util.RegCodeSecretName,
+	}
+	if registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef != nil {
+		regObjRegCodeSecretRef := registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef
+		if regObjRegCodeSecretRef.Name != "" && regObjRegCodeSecretRef.Namespace != "" {
+			regCodeSecretRef = regObjRegCodeSecretRef
+		} else {
+			s.log.Warn("registration code secret reference was set but cannot be used")
+		}
+	}
+
+	return suseconnect.FetchSccRegistrationCodeFrom(s.secrets, regCodeSecretRef)
+}
+
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
 	return !registrationObj.Status.ActivationStatus.Activated ||
 		registrationObj.Status.ActivationStatus.LastValidatedTS == nil
 }
 
-func (s sccOnlineMode) Activate(registrationObj *v1.Registration) (*v1.Registration, error) {
+func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	if v1.RegistrationConditionAnnounced.IsFalse(registrationObj) {
 		// reconcile to set failed status if not set
-		return registrationObj, errors.New("cannot activate system that hasn't been announced to SCC")
+		return errors.New("cannot activate system that hasn't been announced to SCC")
 	}
 
-	s.log.Infof("Received registration ready for activations %q", registrationObj.Name)
-	s.log.Info("registration ", registrationObj)
+	s.log.Debugf("received registration ready for activations %q", registrationObj.Name)
+	s.log.Debug("registration ", registrationObj)
 
 	credRefreshErr := s.sccCredentials.Refresh() // We must always refresh the sccCredentials - this ensures they are current from the secrets
 	if credRefreshErr != nil {
-		return registrationObj, fmt.Errorf("cannot refresh credentials: %w", credRefreshErr)
+		return fmt.Errorf("cannot refresh credentials: %w", credRefreshErr)
 	}
 
 	regCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
@@ -168,7 +129,7 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) (*v1.Registrat
 	identifier, version, arch := s.systemInfoExporter.Provider().GetProductIdentifier()
 	metaData, product, err := sccConnection.Activate(identifier, version, arch, regCode)
 	if err != nil {
-		return registrationObj, err
+		return err
 	}
 	s.log.Info(metaData)
 	s.log.Info(product)
@@ -176,32 +137,12 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) (*v1.Registrat
 	// If no error, then system is still registered with valid activation status...
 	keepAliveErr := sccConnection.KeepAlive()
 	if keepAliveErr != nil {
-		return registrationObj, keepAliveErr
+		return keepAliveErr
 	}
 
 	s.log.Info("Successfully registered activation")
-	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
-		registrationObj, err = s.registrations.Get(registrationObj.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
 
-		updated := registrationObj.DeepCopy()
-		v1.RegistrationConditionSccUrlReady.True(updated)
-		v1.ResourceConditionProgressing.False(updated)
-		v1.ResourceConditionReady.True(updated)
-		v1.ResourceConditionDone.True(updated)
-		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
-			Time: time.Now(),
-		}
-		// TODO: make sure we set Activated condition and add "ValidUntilTS" to that status
-		updated.Status.ActivationStatus.Activated = true
-		registrationObj, err = s.registrations.UpdateStatus(updated)
-		return err
-	})
-
-	return registrationObj, updateErr
+	return nil
 }
 
 func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) (*v1.Registration, error) {

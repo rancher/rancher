@@ -17,7 +17,7 @@ func sccContextLogger() log.StructuredLogger {
 type SccWrapper struct {
 	credentials connection.Credentials
 	conn        *connection.ApiConnection
-	registered  bool
+	registered  *bool // only used by online mode
 	systemInfo  *systeminfo.InfoExporter
 }
 
@@ -43,8 +43,14 @@ func DefaultRancherConnection(credentials connection.Credentials, systemInfo *sy
 	return SccWrapper{
 		credentials: credentials,
 		conn:        connection.New(options, credentials),
-		registered:  registered,
+		registered:  &registered,
 		systemInfo:  systemInfo,
+	}
+}
+
+func OfflineRancherRegistration(systemInfo *systeminfo.InfoExporter) SccWrapper {
+	return SccWrapper{
+		systemInfo: systemInfo,
 	}
 }
 
@@ -90,7 +96,7 @@ func (sw *SccWrapper) KeepAlive() error {
 }
 
 func (sw *SccWrapper) RegisterOrKeepAlive(regCode string) (RegistrationSystemId, error) {
-	if sw.registered {
+	if *sw.registered {
 		return KeepAliveRegistrationSystemId, sw.KeepAlive()
 	}
 
