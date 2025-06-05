@@ -1,6 +1,8 @@
 package util
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -82,4 +84,26 @@ func VersionIsDevBuild() bool {
 
 	matches := semverRegex.FindStringSubmatch(rancherVersion)
 	return matches[4] != "" || matches[3] == ""
+}
+
+func JSONToBase64(data interface{}) ([]byte, error) {
+	var jsonData []byte
+	var err error
+
+	if b, ok := data.([]byte); ok {
+		jsonData = b
+	} else {
+		jsonData, err = json.Marshal(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal JSON data: %w", err)
+		}
+	}
+
+	encodedLen := base64.StdEncoding.EncodedLen(len(jsonData))
+	output := make([]byte, encodedLen)
+
+	// Base64 encode the JSON byte slice
+	base64.StdEncoding.Encode(output, jsonData)
+
+	return output, nil
 }
