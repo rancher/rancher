@@ -67,6 +67,8 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 	return obj, err
 }
 
+// syncRT ensures that all the Roles and RoleBindings needed for PRTBs and CRTBs to give RoleTemplate access exist.
+// For PRTBs there is special handling to provide access to global resources, which are referred to as Promoted Rules.
 func (c *rtSync) syncRT(template *v3.RoleTemplate, prtbs []any, crtbs []any) error {
 	roleTemplates := map[string]*v3.RoleTemplate{}
 	if err := c.m.gatherRoles(template, roleTemplates, 0); err != nil {
