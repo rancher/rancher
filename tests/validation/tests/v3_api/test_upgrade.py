@@ -128,6 +128,7 @@ def test_validate_existing_wl_with_secret():
 @skip_test_hardened
 @if_post_upgrade
 @pytest.mark.run(order=2)
+@pytest.mark.skip(reason="catalog removed")
 def test_validate_existing_catalog_app():
     validate_catalog_app(app_validate_name, pre_upgrade_externalId)
 
@@ -172,6 +173,7 @@ def test_modify_workload_validate_secret():
 @skip_test_hardened
 @if_post_upgrade
 @pytest.mark.run(order=3)
+@pytest.mark.skip(reason="catalog removed")
 def test_modify_catalog_app():
     modify_catalog_app()
 
@@ -220,6 +222,7 @@ def test_create_and_validate_ingress_io_wl():
 @skip_test_hardened
 @skip_test_windows_os
 @pytest.mark.run(order=5)
+@pytest.mark.skip(reason="catalog removed")
 def test_create_and_validate_catalog_app():
     create_and_validate_catalog_app()
 
@@ -501,7 +504,7 @@ def create_validate_wokloads_with_secret():
     secret_wl_name_create1 = create_prefix + "-testwl1withsec"
     secret_wl_name_create2 = create_prefix + "-testwl2withsec"
 
-    secret = create_secret(keyvaluepair, p_client=p_client, name=secret_name)
+    secret = create_secret(keyvaluepair, p_client=p_client, name=secret_name, singlenamespace=True, ns=ns)
     create_and_validate_workload_with_secret_as_volume(
         p_client, secret, ns, keyvaluepair, name=secret_wl_name_create1)
     create_and_validate_workload_with_secret_as_env_variable(
@@ -517,15 +520,7 @@ def create_project_client(request):
     cluster = clusters[0]
     create_kubeconfig(cluster)
     namespace["cluster"] = cluster
-    if len(admin_client.list_catalog(name="test-catalog")) == 0:
-        catalog = admin_client.create_catalog(
-            name="test-catalog",
-            baseType="catalog",
-            branch=catalogBranch,
-            kind="helm",
-            url=catalogUrl)
-        catalog = wait_for_catalog_active(admin_client, catalog)
-
+   
 
 def create_project_resources():
     cluster = namespace["cluster"]
