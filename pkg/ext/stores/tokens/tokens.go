@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/features"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -910,17 +911,22 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		return consumer, nil
 	}
 
+	if !features.FeatureGates().Enabled(features.WatchListClient) {
+		localOptions.SendInitialEvents = nil
+		localOptions.ResourceVersionMatch = ""
+	}
+
+	producer, err := t.secretClient.Watch(TokenNamespace, localOptions)
+	if err != nil {
+		logrus.Errorf("tokens: watch: error starting watch: %s", err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("tokens: watch: error starting watch: %w", err))
+	}
+
 	sessionID := t.auth.SessionID(ctx)
 
 	// watch the backend secrets for changes and transform their events into
 	// the appropriate token events.
 	go func() {
-		producer, err := t.secretClient.Watch(TokenNamespace, localOptions)
-		if err != nil {
-			logrus.Errorf("tokens: watch: error starting watch: %s", err)
-			return
-		}
-
 		defer producer.Stop()
 		for {
 			select {
