@@ -21,6 +21,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -169,10 +170,19 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	if features.ImperativeApiExtension.Enabled() {
 		logrus.Info("creating imperative extension apiserver resources")
 
-		sniProvider, err := NewSNIProviderForCname(
+		// Only need to listen on localhost because that port will be reached
+		// from a remotedialer tunnel on localhost
+		tcpLn, err := net.Listen("tcp", fmt.Sprintf(":%d", Port))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
+		}
+
+		sniProvider, err := newCertProvider(
+			ctx,
+			*wranglerContext,
+			tcpLn,
 			"imperative-api-sni-provider",
-			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
-			wranglerContext.Core.Secret(),
+			fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
@@ -180,24 +190,19 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
 
-		go func() {
-			// sniProvider.Run uses a Watch that could be aborted due to external reasons, make sure we retry unless the context was already canceled
-			for {
-				if err := sniProvider.Run(ctx.Done()); err != nil {
-					logrus.Errorf("sni provider failed: %s", err)
-					if ctx.Err() != nil {
-						return
-					}
-				}
-				time.Sleep(10 * time.Second)
-			}
-		}()
-
-		// Only need to listen on localhost because that port will be reached
-		// from a remotedialer tunnel on localhost
-		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
+		ln, _, err = getListener(ctx, wranglerContext.Core.Secret(), sniProvider, tcpLn)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
+			return nil, fmt.Errorf("failed to create dynamiclistener: %w", err)
+		}
+
+		timeoutCtx, _ := context.WithTimeout(ctx, time.Second*30)
+		err = wait.PollUntilContextCancel(timeoutCtx, time.Second*2, false, wait.ConditionWithContextFunc(func(context.Context) (bool, error) {
+			logrus.Info("checking for initial imperative api cert data...")
+			ca, key := sniProvider.CurrentCertKeyContent()
+			return len(ca) > 0 && len(key) > 0, nil
+		}))
+		if err != nil {
+			return nil, fmt.Errorf("failed to wait for initial cert data: %w", err)
 		}
 
 		additionalSniProviders = append(additionalSniProviders, sniProvider)
