@@ -493,7 +493,7 @@ func TestAreClusterRolesSame(t *testing.T) {
 						},
 						Labels: map[string]string{
 							"otherlabel":     "foobar",
-							aggregationLabel: "aggregationlabel",
+							AggregationLabel: "AggregationLabel",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -505,7 +505,7 @@ func TestAreClusterRolesSame(t *testing.T) {
 				modified: &rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{clusterRoleOwnerAnnotation: "owner"},
-						Labels:      map[string]string{aggregationLabel: "aggregationlabel"},
+						Labels:      map[string]string{AggregationLabel: "AggregationLabel"},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
 						ClusterRoleSelectors: []metav1.LabelSelector{
@@ -578,7 +578,7 @@ func TestAreClusterRolesSame(t *testing.T) {
 				modified: &rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{clusterRoleOwnerAnnotation: "owner"},
-						Labels:      map[string]string{aggregationLabel: "aggregationlabel"},
+						Labels:      map[string]string{AggregationLabel: "AggregationLabel"},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
 						ClusterRoleSelectors: []metav1.LabelSelector{
@@ -595,7 +595,7 @@ func TestAreClusterRolesSame(t *testing.T) {
 						clusterRoleOwnerAnnotation: "owner",
 					},
 					Labels: map[string]string{
-						aggregationLabel: "aggregationlabel",
+						AggregationLabel: "AggregationLabel",
 					},
 				},
 				AggregationRule: &rbacv1.AggregationRule{

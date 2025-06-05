@@ -82,7 +82,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 
 	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {
-		roletemplates.Register(ctx, management)
+		roletemplates.Register(ctx, management, clusterManager)
 	} else {
 		management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
 		management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)

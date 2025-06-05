@@ -41,7 +41,7 @@ const (
 	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
 	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
 	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
-	aggregationLabel                  = "management.cattle.io/aggregates"
+	AggregationLabel                  = "management.cattle.io/aggregates"
 	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
 	promotedSuffix                    = "promoted"
@@ -421,9 +421,9 @@ func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1
 		same = false
 		metav1.SetMetaDataAnnotation(&currentCR.ObjectMeta, clusterRoleOwnerAnnotation, want)
 	}
-	if got, want := currentCR.Labels[aggregationLabel], wantedCR.Labels[aggregationLabel]; got != want {
+	if got, want := currentCR.Labels[AggregationLabel], wantedCR.Labels[AggregationLabel]; got != want {
 		same = false
-		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, aggregationLabel, want)
+		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, AggregationLabel, want)
 	}
 	return same, currentCR
 }
@@ -446,7 +446,7 @@ func BuildClusterRole(name, ownerName string, rules []rbacv1.PolicyRule) *rbacv1
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
-			Labels:      map[string]string{aggregationLabel: name},
+			Labels:      map[string]string{AggregationLabel: name},
 			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},
 		},
 		Rules: rules,
@@ -461,12 +461,12 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	ownerName := rt.Name
 
 	// aggregate our own cluster role
-	roleTemplateLabels := []metav1.LabelSelector{{MatchLabels: map[string]string{aggregationLabel: crName}}}
+	roleTemplateLabels := []metav1.LabelSelector{{MatchLabels: map[string]string{AggregationLabel: crName}}}
 
 	// aggregate every inherited role template
 	for _, roleTemplateName := range rt.RoleTemplateNames {
 		labelSelector := metav1.LabelSelector{
-			MatchLabels: map[string]string{aggregationLabel: AggregatedClusterRoleNameFor(nameTransformer(roleTemplateName))},
+			MatchLabels: map[string]string{AggregationLabel: AggregatedClusterRoleNameFor(nameTransformer(roleTemplateName))},
 		}
 		roleTemplateLabels = append(roleTemplateLabels, labelSelector)
 	}
@@ -477,7 +477,7 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 			Name: aggregatingCRName,
 			// Label so other cluster roles can aggregate this one
 			Labels: map[string]string{
-				aggregationLabel: aggregatingCRName,
+				AggregationLabel: aggregatingCRName,
 			},
 			// Annotation to identify which role template owns the cluster role
 			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},
