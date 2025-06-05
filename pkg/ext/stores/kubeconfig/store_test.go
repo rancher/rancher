@@ -515,7 +515,7 @@ func TestStoreCreate(t *testing.T) {
 		require.Len(t, userManager.clusterTokens, 1)
 		assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
 
-		assert.Equal(t, downstream1, config.CurrentContext)
+		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
 	t.Run("no cluster specified", func(t *testing.T) {
 		var configMap *corev1.ConfigMap
@@ -576,7 +576,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
 		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
-		assert.NotEmpty(t, kubeconfig.Spec.CurrentContext)
+		assert.Empty(t, kubeconfig.Spec.CurrentContext)
 		assert.Len(t, created.Spec.Clusters, 0)
 
 		require.NotNil(t, configMap)

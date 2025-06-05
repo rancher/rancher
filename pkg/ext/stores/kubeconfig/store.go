@@ -298,8 +298,10 @@ func (s *Store) Create(
 	}
 
 	var (
-		conditions []metav1.Condition
-		tokenIDs   []string
+		conditions    []metav1.Condition
+		tokenIDs      []string
+		clusters      []*apiv3.Cluster
+		isAllClusters bool // User requested the kubeconfig for all clusters with "*".
 	)
 
 	localCluster, err := s.clusterCache.Get("local")
@@ -307,9 +309,8 @@ func (s *Store) Create(
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting local cluster: %w", err))
 	}
 
-	var clusters []*apiv3.Cluster
 	if len(kubeconfig.Spec.Clusters) > 0 {
-		if kubeconfig.Spec.Clusters[0] == "*" {
+		if isAllClusters = kubeconfig.Spec.Clusters[0] == "*"; isAllClusters {
 			// The first id in the spec.clusters "*" means all clusters.
 			clusters, err = s.clusterCache.List(labels.Everything())
 			if err != nil {
@@ -336,36 +337,43 @@ func (s *Store) Create(
 		}
 	}
 
-	var foundCurrentContext bool
-	if kubeconfig.Spec.CurrentContext == "" {
-		kubeconfig.Spec.CurrentContext = defaultClusterName
-		foundCurrentContext = true
-	}
+	var currentContext string
 
 	// Check if the user has access to requested clusters before generating tokens.
-	for _, cluster := range clusters {
+	// If the user requested all clusters, figure out which clusters they have access to and adjust the list.
+	for i := 0; i < len(clusters); i++ {
 		decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 			User:            userInfo,
 			Verb:            "get",
 			APIGroup:        mgmt.GroupName,
 			Resource:        apiv3.ClusterResourceName,
 			ResourceRequest: true,
-			Name:            cluster.Name,
+			Name:            clusters[i].Name,
 		})
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error authorizing user %s to access cluster %s: %w", userInfo.GetName(), cluster.Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error checking if user %s has access to cluster %s: %w", userInfo.GetName(), clusters[i].Name, err))
+		}
+
+		// Check if the requested current context is valid early.
+		if currentContext == "" && kubeconfig.Spec.CurrentContext == clusters[i].Name {
+			currentContext = clusters[i].Name
 		}
 
 		if decision != authorizer.DecisionAllow {
-			return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), cluster.Name))
-		}
-
-		if !foundCurrentContext && kubeconfig.Spec.CurrentContext == cluster.Name {
-			foundCurrentContext = true
+			if isAllClusters {
+				// Delete the cluster from the list in-place.
+				copy(clusters[i:], clusters[i+1:])
+				clusters[len(clusters)-1] = nil
+				clusters = clusters[:len(clusters)-1]
+				i--
+			} else {
+				return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), clusters[i].Name))
+			}
 		}
 	}
 
-	if !foundCurrentContext {
+	// The current context was requested but wasn't found.
+	if currentContext == "" && kubeconfig.Spec.CurrentContext != "" {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid currentContext %s", kubeconfig.Spec.CurrentContext))
 	}
 
@@ -389,7 +397,6 @@ func (s *Store) Create(
 	configMap.GenerateName = namePrefix
 
 	var kubeConfigID string
-
 	if dryRun {
 		kubeConfigID = names.SimpleNameGenerator.GenerateName(namePrefix)
 		configMap.Name = kubeConfigID
@@ -435,10 +442,10 @@ func (s *Store) Create(
 			CreationTimestamp: configMap.CreationTimestamp.Format(time.RFC3339),
 			TTL:               strconv.FormatInt(kubeconfig.Spec.TTL, 10),
 		},
-		CurrentContext: kubeconfig.Spec.CurrentContext,
+		CurrentContext: defaultClusterName,
 	}
 
-	err = func() error {
+	err = func() error { // Deliberately use an anonymous function to capture the status and error conditions.
 		// Generate a shared token for the default and non-ACE clusters.
 		if !dryRun && generateToken {
 			input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
@@ -508,6 +515,14 @@ func (s *Store) Create(
 				Cert:   caCert,
 			})
 
+			if currentContext == "" {
+				currentContext = cluster.Name // Set the first cluster as the current context.
+			}
+			if currentContext == cluster.Name {
+				data.CurrentContext = clusterName // Use the display name as the context name.
+				kubeconfigToStore.Spec.CurrentContext = currentContext
+			}
+
 			if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 				data.Contexts = append(data.Contexts, kconfig.Context{
 					Name:    clusterName,
@@ -574,7 +589,7 @@ func (s *Store) Create(
 					User:    clusterName,
 				})
 
-				if kubeconfig.Spec.CurrentContext == cluster.Name {
+				if currentContext == cluster.Name {
 					data.CurrentContext = fqdnName
 				}
 
@@ -601,9 +616,6 @@ func (s *Store) Create(
 				if !node.Spec.ControlPlane {
 					continue
 				}
-				if !isCurrentContextSet {
-					isCurrentContextSet = true
-				}
 
 				nodeName := clusterName + "-" + strings.TrimPrefix(node.Spec.RequestedHostname, clusterName+"-")
 				data.Clusters = append(data.Clusters, kconfig.Cluster{
@@ -617,8 +629,8 @@ func (s *Store) Create(
 					User:    clusterName,
 				})
 
-				if kubeconfig.Spec.CurrentContext == cluster.Name && !isCurrentContextSet {
-					data.CurrentContext = nodeName
+				if !isCurrentContextSet && currentContext == cluster.Name {
+					data.CurrentContext = nodeName // Set the current context to the first control plane node.
 					isCurrentContextSet = true
 				}
 			}
