@@ -555,6 +555,36 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			clusterRolesMockUpdateErr: errors.New("something bad happened"),
 			wantErr:                   true,
 		},
+		{
+			name: "baserule with resourcenames and no newverbs does not update clusterrole",
+			args: args{
+				rtName:   "myrole",
+				resource: "clusters",
+				newVerbs: sets.New[string](),
+				baseRule: rbacv1.PolicyRule{
+					APIGroups:     []string{"management.cattle.io"},
+					ResourceNames: []string{"local"},
+				},
+			},
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{"storage.k8s.io"},
+						Resources: []string{"storageclasses"},
+						Verbs:     []string{"*"},
+					},
+					{
+						APIGroups: []string{"", "core"},
+						Resources: []string{"persistentvolumes"},
+						Verbs:     []string{"*"},
+					},
+				},
+			},
+			want: "myrole-promoted",
+		},
 	}
 
 	for _, tc := range tests {
