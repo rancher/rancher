@@ -32,7 +32,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
-	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -1549,22 +1548,6 @@ func canUpgrade(nodes []*apimgmtv3.Node, upgradeStrategy *rketypes.NodeUpgradeSt
 		} else {
 			workerOnlyNotReady++
 		}
-	}
-	maxUnavailableControl, err := rkeworkerupgrader.CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableControlplane, controlReady+controlNotReady)
-	if err != nil {
-		return err
-	}
-	if controlNotReady >= maxUnavailableControl {
-		return fmt.Errorf("not enough control plane nodes ready to upgrade, maxUnavailable: %v, notReady: %v, ready: %v",
-			maxUnavailableControl, controlNotReady, controlReady)
-	}
-	maxUnavailableWorker, err := rkeworkerupgrader.CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableWorker, workerOnlyReady+workerOnlyNotReady)
-	if err != nil {
-		return err
-	}
-	if workerOnlyNotReady >= maxUnavailableWorker {
-		return fmt.Errorf("not enough worker nodes ready to upgrade, maxUnavailable: %v, notReady: %v, ready: %v",
-			maxUnavailableWorker, workerOnlyNotReady, workerOnlyReady)
 	}
 	return nil
 }
