@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
@@ -36,6 +37,9 @@ const (
 type Options struct {
 	// AppSelector is the expected value for the "app" label on the rancher service.
 	AppSelector string
+
+	// KubeAggregatorReadyChan is the channel to close once the extension server receives a request from the kube API.
+	KubeAggregatorReadyChan chan struct{}
 }
 
 func DefaultOptions() Options {
@@ -226,6 +230,8 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	authenticator := steveext.NewUnionAuthenticator(authenticators...)
 
+	var once sync.Once
+
 	aslAuthorizer := steveext.NewAccessSetAuthorizer(wranglerContext.ASL)
 	codecs := serializer.NewCodecFactory(scheme)
 	extOpts := steveext.ExtensionAPIServerOptions{
@@ -243,6 +249,12 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		},
 		Authenticator: authenticator,
 		Authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			if a.GetUser().GetName() == "system:aggregator" || a.GetUser().GetName() == "system:kube-aggregator" {
+				once.Do(func() {
+					close(opts.KubeAggregatorReadyChan)
+				})
+			}
+
 			if a.IsResourceRequest() {
 				return aslAuthorizer.Authorize(ctx, a)
 			}
