@@ -219,14 +219,10 @@ jobs:
     strategy:
       matrix:
         os: [windows]
-        version:
-        - version: 2019
-          go_tag: 1.23.9-windowsservercore-1809
-        - version: 2022
-          go_tag: '1.23'
-    runs-on: ${{ matrix.os }}-${{ matrix.version.version }}
+        version: [2019, 2022]
+    runs-on: ${{ matrix.os }}-${{ matrix.version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Build Windows Agent Image
-      run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version.version }} --build-arg GO_TAG=${{ matrix.version.go_tag }} -f package/windows/Dockerfile.agent .
+      run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
