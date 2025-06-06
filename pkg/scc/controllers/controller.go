@@ -3,8 +3,10 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util"
@@ -21,17 +23,25 @@ import (
 )
 
 const (
-	controllerID   = "prime-registration"
-	prodMinCheckin = time.Hour * 20
-	devMinCheckin  = time.Minute * 30
+	controllerID    = "prime-registration"
+	prodBaseCheckin = time.Hour * 20
+	prodMinCheckin  = prodBaseCheckin - (3 * time.Hour)
+	devBaseCheckin  = time.Minute * 30
+	devMinCheckin   = devBaseCheckin - (10 * time.Minute)
 )
 
+// TODO: these that return `*v1.Registration` probably need to return a object set to use with apply
+// That way we can use apply to update Registrations and Secrets related to them together.
 type SCCHandler interface {
 	NeedsRegistration(*v1.Registration) bool
-	RegisterSystem(*v1.Registration) (*v1.Registration, error) // Equal to first time registration w/ SCC, or Offline Request creation
+	RegisterSystem(*v1.Registration) (suseconnect.RegistrationSystemId, error) // Equal to first time registration w/ SCC, or Offline Request creation
+	ReconcileRegisterSystemError(*v1.Registration, error) *v1.Registration
+	PrepareRegisteredSystem(*v1.Registration) *v1.Registration
 	NeedsActivation(*v1.Registration) bool
-	Activate(*v1.Registration) error                      // Equal to activating with SCC, or verifying offline Request
-	Keepalive(*v1.Registration) (*v1.Registration, error) // Provides a heartbeat to SCC and validates status
+	Activate(*v1.Registration) error // Equal to activating with SCC, or verifying offline Request
+	ReconcileActivateError(*v1.Registration, error) *v1.Registration
+	Keepalive(registrationObj *v1.Registration) error // Provides a heartbeat to SCC and validates status
+	ReconcileKeepaliveError(*v1.Registration, error) *v1.Registration
 	Deregister() error
 }
 
@@ -78,14 +88,14 @@ func Register(
 
 	// Configure jitter based daily revalidation trigger
 	jitterbugConfig := jitterbug.Config{
-		BaseInterval:    prodMinCheckin,
+		BaseInterval:    prodBaseCheckin,
 		JitterMax:       3,
 		JitterMaxScale:  time.Hour,
 		PollingInterval: 9 * time.Minute,
 	}
 	if util.VersionIsDevBuild() {
 		jitterbugConfig = jitterbug.Config{
-			BaseInterval:    devMinCheckin,
+			BaseInterval:    devBaseCheckin,
 			JitterMax:       10,
 			JitterMaxScale:  time.Minute,
 			PollingInterval: 9 * time.Second,
@@ -135,20 +145,25 @@ func Register(
 func (h *handler) prepareHandler(mode v1.RegistrationMode) SCCHandler {
 	if mode == v1.RegistrationModeOffline {
 		return sccOfflineMode{
-			apply:              h.apply,
 			log:                h.log.WithField("handler", "offline"),
-			registrations:      h.registrations,
 			systemInfoExporter: h.systemInfoExporter,
 			secrets:            h.secrets,
 		}
 	}
 	return sccOnlineMode{
 		log:                h.log.WithField("handler", "online"),
-		registrations:      h.registrations,
 		sccCredentials:     h.sccCredentials,
 		systemInfoExporter: h.systemInfoExporter,
 		secrets:            h.secrets,
 	}
+}
+
+func minResyncInterval() time.Time {
+	now := time.Now()
+	if util.VersionIsDevBuild() {
+		return now.Add(-devMinCheckin)
+	}
+	return now.Add(-prodMinCheckin)
 }
 
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
@@ -165,63 +180,87 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, errors.New("registration has failed status; create a new one to retry")
 	}
 
-	// Skip keepalive for anything activated within the last 20 hours
 	registrationHandler := h.prepareHandler(registrationObj.Spec.Mode)
+
+	// Skip keepalive for anything activated within the last 20 hours
 	if !registrationHandler.NeedsRegistration(registrationObj) &&
 		!registrationHandler.NeedsActivation(registrationObj) &&
 		registrationObj.Spec.CheckNow == nil {
-		recheckTime := time.Now().Add(-prodMinCheckin)
-		if util.VersionIsDevBuild() {
-			recheckTime = time.Now().Add(-devMinCheckin)
-		}
-		if registrationObj.Status.ActivationStatus.LastValidatedTS.Time.After(recheckTime) {
+		if registrationObj.Status.ActivationStatus.LastValidatedTS.Time.After(minResyncInterval()) {
 			return registrationObj, nil
 		}
 	}
-
-	var updateErr error
 
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	if registrationHandler.NeedsRegistration(registrationObj) {
 		// Set object to progressing
 		progressingObj := registrationObj.DeepCopy()
-		updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		progressingUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var err error
 			v1.ResourceConditionProgressing.True(progressingObj)
 			progressingObj, err = h.registrations.UpdateStatus(progressingObj)
 			return err
 		})
-		if updateErr != nil {
-			return registrationObj, updateErr
+		if progressingUpdateErr != nil {
+			return registrationObj, progressingUpdateErr
 		}
 
-		announced, err := registrationHandler.RegisterSystem(registrationObj)
-		if err != nil {
+		announcedSystemId, registerErr := registrationHandler.RegisterSystem(registrationObj)
+		if registerErr != nil {
 			// reconcile state
-			return nil, err
+			var reconciledReg *v1.Registration
+			reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				var retryErr, reconcileUpdateErr error
+				registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+				if retryErr != nil {
+					return retryErr
+				}
+				reconciledObj := registrationHandler.ReconcileRegisterSystemError(registrationObj, registerErr)
+
+				reconciledReg, reconcileUpdateErr = h.registrations.Update(reconciledObj)
+				return reconcileUpdateErr
+			})
+
+			err := fmt.Errorf("registration failed: %w", registerErr)
+			if reconcileErr != nil {
+				err = fmt.Errorf("registration failed with additional errors: %w, %w", err, reconcileErr)
+			}
+
+			return reconciledReg, err
+		}
+
+		switch announcedSystemId {
+		case suseconnect.KeepAliveRegistrationSystemId:
+			announcedSystemId = suseconnect.RegistrationSystemId(registrationObj.Status.SCCSystemId)
+		default:
+			h.log.Debugf("Annoucned System ID: %v", announcedSystemId)
 		}
 
 		// Prepare the Registration for Activation phase
-		updatingObj := registrationObj.DeepCopy()
-		updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var announced *v1.Registration
+		registerUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var err error
+			registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
 
+			updatingObj := registrationHandler.PrepareRegisteredSystem(registrationObj)
 			updatingObj.Status.RegistrationProcessedTS = &metav1.Time{
 				Time: time.Now(),
 			}
-			v1.ResourceConditionFailure.SetStatusBool(updatingObj, false)
-			v1.ResourceConditionReady.SetStatusBool(updatingObj, true)
-			updatingObj, err = h.registrations.UpdateStatus(updatingObj)
+
+			announced, err = h.registrations.UpdateStatus(updatingObj)
 
 			return err
 		})
-		if updateErr != nil {
-			return registrationObj, updateErr
+		if registerUpdateErr != nil {
+			return registrationObj, registerUpdateErr
 		}
 
 		// Upon successful registration the processed TS should be set, so when it is enqueue for activation
-		if registrationObj.Status.RegistrationProcessedTS != nil {
+		if announced.Status.RegistrationProcessedTS != nil {
 			h.registrations.Enqueue(registrationObj.Name)
 		}
 
@@ -229,37 +268,56 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	if registrationHandler.NeedsActivation(registrationObj) {
-		err := registrationHandler.Activate(registrationObj)
-		if err != nil {
-			// reconcile state
-			return nil, err
+		activationErr := registrationHandler.Activate(registrationObj)
+		// reconcile error state - must be able to handle Auth errors (or other SCC sourced errors)
+		if activationErr != nil {
+			var reconciledReg *v1.Registration
+			reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				var retryErr, reconcileUpdateErr error
+				registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+				if retryErr != nil {
+					return retryErr
+				}
+				preparedObj := registrationHandler.ReconcileActivateError(registrationObj, activationErr)
+
+				reconciledReg, reconcileUpdateErr = h.registrations.Update(preparedObj)
+				return reconcileUpdateErr
+			})
+
+			err := fmt.Errorf("activation failed: %w", activationErr)
+			if reconcileErr != nil {
+				err = fmt.Errorf("activation failed with additional errors: %w, %w", err, reconcileErr)
+			}
+
+			return reconciledReg, err
 		}
 
-		updateErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			var retryErr error
+		var activatedObj *v1.Registration
+		activatedUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var retryErr, updateErr error
 			registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
 			if retryErr != nil {
 				return retryErr
 			}
 
-			updated := registrationObj.DeepCopy()
-			v1.RegistrationConditionSccUrlReady.True(updated)
-			v1.RegistrationConditionActivated.True(updated)
-			v1.ResourceConditionProgressing.False(updated)
-			v1.ResourceConditionReady.True(updated)
-			v1.ResourceConditionDone.True(updated)
-			updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
+			activated := registrationObj.DeepCopy()
+			v1.RegistrationConditionSccUrlReady.True(activated)
+			v1.RegistrationConditionActivated.True(activated)
+			v1.ResourceConditionProgressing.False(activated)
+			v1.ResourceConditionReady.True(activated)
+			v1.ResourceConditionDone.True(activated)
+			activated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
 				Time: time.Now(),
 			}
-			updated.Status.ActivationStatus.Activated = true
-			registrationObj, err = h.registrations.UpdateStatus(updated)
-			return err
+			activated.Status.ActivationStatus.Activated = true
+			activatedObj, updateErr = h.registrations.UpdateStatus(activated)
+			return updateErr
 		})
-		if updateErr != nil {
-			return registrationObj, updateErr
+		if activatedUpdateErr != nil {
+			return registrationObj, activatedUpdateErr
 		}
 
-		return registrationObj, nil
+		return activatedObj, nil
 	}
 
 	// Handle what to do when CheckNow is used...
@@ -288,13 +346,38 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		}
 	}
 
-	heartbeat, err := registrationHandler.Keepalive(registrationObj)
+	err := registrationHandler.Keepalive(registrationObj)
 	if err != nil {
 		// reconcile state
 		return nil, err
 	}
 
-	return heartbeat, nil
+	var heartbeatUpdated *v1.Registration
+	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		updated := registrationObj.DeepCopy()
+		v1.RegistrationConditionSccUrlReady.True(updated)
+		v1.ResourceConditionProgressing.False(updated)
+		v1.ResourceConditionReady.True(updated)
+		v1.ResourceConditionDone.True(updated)
+		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
+			Time: time.Now(),
+		}
+		// TODO: make sure we set Activated condition and add "ValidUntilTS" to that status
+		updated.Status.ActivationStatus.Activated = true
+		heartbeatUpdated, err = h.registrations.UpdateStatus(updated)
+		return err
+	})
+	if updateErr != nil {
+		return nil, updateErr
+	}
+
+	return heartbeatUpdated, nil
 }
 
 func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {

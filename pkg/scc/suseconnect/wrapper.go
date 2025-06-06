@@ -61,6 +61,7 @@ const (
 	EmptyRegistrationSystemId     RegistrationSystemId = 0  // Used if an error happened before registration
 	ErrorRegistrationSystemId     RegistrationSystemId = -1 // Used when error is related to registration
 	KeepAliveRegistrationSystemId RegistrationSystemId = -2 // Indicates the Registration was handled via keepalive instead
+	OfflineRegistrationSystemId   RegistrationSystemId = -3
 )
 
 func (sw *SccWrapper) SystemRegistration(regCode string) (RegistrationSystemId, error) {
