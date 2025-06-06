@@ -462,7 +462,7 @@ func TestStoreCreate(t *testing.T) {
 
 		require.NotNil(t, configMap)
 		assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
-		assert.Equal(t, Namespace, configMap.Namespace)
+		assert.Equal(t, namespace, configMap.Namespace)
 		require.NotNil(t, configMap.Labels)
 		assert.Equal(t, userID, configMap.Labels[UserIDLabel])
 		assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
@@ -592,7 +592,7 @@ func TestStoreCreate(t *testing.T) {
 
 		require.NotNil(t, configMap)
 		assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
-		assert.Equal(t, Namespace, configMap.Namespace)
+		assert.Equal(t, namespace, configMap.Namespace)
 		require.NotNil(t, configMap.Labels)
 		assert.Equal(t, userID, configMap.Labels[UserIDLabel])
 		assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
@@ -793,7 +793,7 @@ func TestStoreCreate(t *testing.T) {
 
 		require.NotNil(t, configMap)
 		assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
-		assert.Equal(t, Namespace, configMap.Namespace)
+		assert.Equal(t, namespace, configMap.Namespace)
 		require.NotNil(t, configMap.Labels)
 		assert.Equal(t, userID, configMap.Labels[UserIDLabel])
 		assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
@@ -1028,7 +1028,7 @@ func TestWatcherAdd(t *testing.T) {
 			Object: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "obj1",
-					Namespace: Namespace,
+					Namespace: namespace,
 				},
 			},
 		})
@@ -1042,7 +1042,7 @@ func TestWatcherAdd(t *testing.T) {
 			Object: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "obj2",
-					Namespace: Namespace,
+					Namespace: namespace,
 				},
 			},
 		})
@@ -1090,7 +1090,7 @@ func TestStoreGet(t *testing.T) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeconfigID,
-			Namespace: Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				UserIDLabel: userID,
 				KindLabel:   KindLabelValue,
@@ -1117,7 +1117,7 @@ func TestStoreGet(t *testing.T) {
 	}
 
 	configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
-	configMapCache.EXPECT().Get(Namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
+	configMapCache.EXPECT().Get(namespace, gomock.Any()).DoAndReturn(func(namespace, name string) (*corev1.ConfigMap, error) {
 		switch name {
 		case kubeconfigID:
 			return configMap, nil
@@ -1214,7 +1214,7 @@ func TestStoreGet(t *testing.T) {
 
 	t.Run("configmap client is used if options are set", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			assert.Equal(t, "1", options.ResourceVersion)
 			return configMap, nil
 		}).AnyTimes()
@@ -1281,7 +1281,7 @@ func TestStoreList(t *testing.T) {
 	configMap1 := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeconfigID1,
-			Namespace: Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				UserIDLabel: userID1,
 				KindLabel:   KindLabelValue,
@@ -1309,7 +1309,7 @@ func TestStoreList(t *testing.T) {
 	configMap2 := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeconfigID2,
-			Namespace: Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				UserIDLabel: userID2,
 				KindLabel:   KindLabelValue,
@@ -1335,7 +1335,7 @@ func TestStoreList(t *testing.T) {
 	}
 
 	configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-	configMapClient.EXPECT().List(Namespace, gomock.Any()).DoAndReturn(func(namespace string, opts metav1.ListOptions) (*corev1.ConfigMapList, error) {
+	configMapClient.EXPECT().List(namespace, gomock.Any()).DoAndReturn(func(namespace string, opts metav1.ListOptions) (*corev1.ConfigMapList, error) {
 		labelSet, err := labels.ConvertSelectorToLabelsMap(opts.LabelSelector)
 		require.NoError(t, err)
 
@@ -1434,7 +1434,7 @@ func TestStoreWatch(t *testing.T) {
 	configMap1 := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeconfigID,
-			Namespace: Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				UserIDLabel: userID,
 				KindLabel:   KindLabelValue,
@@ -1469,7 +1469,7 @@ func TestStoreWatch(t *testing.T) {
 		defer configMapWatcher.Stop()
 
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Watch(Namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
+		configMapClient.EXPECT().Watch(namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
 			labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
 			require.NoError(t, err)
 			assert.Equal(t, KindLabelValue, labelSet[KindLabel])
@@ -1570,7 +1570,7 @@ func TestStoreWatch(t *testing.T) {
 		defer configMapWatcher.Stop()
 
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Watch(Namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
+		configMapClient.EXPECT().Watch(namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
 			labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
 			require.NoError(t, err)
 			assert.Equal(t, KindLabelValue, labelSet[KindLabel])
@@ -1642,7 +1642,7 @@ func TestStoreUpdate(t *testing.T) {
 	oldConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeconfigID,
-			Namespace: Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				UserIDLabel: userID,
 				KindLabel:   KindLabelValue,
@@ -1671,7 +1671,7 @@ func TestStoreUpdate(t *testing.T) {
 
 	t.Run("admin updates a kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return oldConfigMap.DeepCopy(), nil
 		})
 		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1739,7 +1739,7 @@ func TestStoreUpdate(t *testing.T) {
 	})
 	t.Run("user updates their kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return oldConfigMap.DeepCopy(), nil
 		})
 		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1808,7 +1808,7 @@ func TestStoreUpdate(t *testing.T) {
 
 	t.Run("user can't update other user's kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return oldConfigMap.DeepCopy(), nil
 		})
 
@@ -1841,7 +1841,7 @@ func TestStoreUpdate(t *testing.T) {
 		oldConfigMap := oldConfigMap.DeepCopy()
 		oldConfigMap.Labels[KindLabel] = "not-a-kubeconfig"
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return oldConfigMap.DeepCopy(), nil
 		})
 
@@ -1872,7 +1872,7 @@ func TestStoreUpdate(t *testing.T) {
 	})
 	t.Run("configMap doen't exist", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
 		})
 
@@ -1903,7 +1903,7 @@ func TestStoreUpdate(t *testing.T) {
 	})
 	t.Run("immutable fields", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return oldConfigMap.DeepCopy(), nil
 		}).AnyTimes()
 
@@ -1961,7 +1961,7 @@ func TestStoreUpdate(t *testing.T) {
 	})
 	t.Run("dryRun", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return oldConfigMap.DeepCopy(), nil
 		})
 		configMapClient.EXPECT().Update(gomock.Any()).Times(0)
@@ -2035,7 +2035,7 @@ func TestStoreDelete(t *testing.T) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeconfigID,
-			Namespace: Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				UserIDLabel: userID,
 				KindLabel:   KindLabelValue,
@@ -2073,10 +2073,10 @@ func TestStoreDelete(t *testing.T) {
 		}
 
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return configMap.DeepCopy(), nil
 		}).Times(1)
-		configMapClient.EXPECT().Delete(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
 			assert.Equal(t, deleteOptions, options)
 			return nil
 		}).Times(1)
@@ -2131,7 +2131,7 @@ func TestStoreDelete(t *testing.T) {
 	})
 	t.Run("user can't delete other user's kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().Get(Namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 			return configMap.DeepCopy(), nil
 		}).Times(1)
 
@@ -2180,7 +2180,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeconfigID,
-			Namespace: Namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				UserIDLabel: userID,
 				KindLabel:   KindLabelValue,
@@ -2224,7 +2224,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 		}
 
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
-		configMapClient.EXPECT().List(Namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (*corev1.ConfigMapList, error) {
+		configMapClient.EXPECT().List(namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (*corev1.ConfigMapList, error) {
 			labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
 			require.NoError(t, err)
 			assert.Equal(t, KindLabelValue, labelSet[KindLabel])
@@ -2238,7 +2238,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 				Items: []corev1.ConfigMap{*configMap.DeepCopy()},
 			}, nil
 		}).Times(1)
-		configMapClient.EXPECT().Delete(Namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
 			assert.Equal(t, deleteOptions, options)
 			return nil
 		}).Times(1)

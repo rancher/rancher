@@ -52,11 +52,11 @@ import (
 const (
 	Kind               = "Kubeconfig"
 	Singular           = "kubeconfig"
-	Namespace          = exttokens.TokenNamespace
 	UserIDLabel        = "cattle.io/user-id"
 	KindLabel          = "cattle.io/kind"
 	KindLabelValue     = "kubeconfig"
 	UIDAnnotation      = "cattle.io/uid"
+	namespace          = exttokens.TokenNamespace
 	unknownValue       = "<unknown>"
 	defaultClusterName = "rancher"
 	namePrefix         = Singular + "-"
@@ -145,22 +145,22 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, us
 
 // EnsureNamespace ensures that the namespace for storing kubeconfig configMaps exists.
 func (s *Store) EnsureNamespace() error {
-	_, err := s.nsCache.Get(Namespace)
+	_, err := s.nsCache.Get(namespace)
 	if err == nil {
 		return nil
 	}
 
 	if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("error getting namespace %s: %w", Namespace, err)
+		return fmt.Errorf("error getting namespace %s: %w", namespace, err)
 	}
 
 	_, err = s.nsClient.Create(&corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: Namespace,
+			Name: namespace,
 		},
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("error creating namespace %s: %w", Namespace, err)
+		return fmt.Errorf("error creating namespace %s: %w", namespace, err)
 	}
 
 	return nil
@@ -703,7 +703,7 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 		ObjectMeta: *kubeconfig.ObjectMeta.DeepCopy(),
 		Data:       make(map[string]string),
 	}
-	configMap.Namespace = Namespace
+	configMap.Namespace = namespace
 	configMap.UID = ""
 
 	if configMap.Annotations == nil {
@@ -851,9 +851,9 @@ func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache b
 	)
 
 	if useCache {
-		configMap, err = s.configMapCache.Get(Namespace, name)
+		configMap, err = s.configMapCache.Get(namespace, name)
 	} else {
-		configMap, err = s.configMapClient.Get(Namespace, name, *options)
+		configMap, err = s.configMapClient.Get(namespace, name, *options)
 	}
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -946,7 +946,7 @@ func (s *Store) List(
 		return nil, apierrors.NewInternalError(err)
 	}
 
-	configMapList, err := s.configMapClient.List(Namespace, *listOptions)
+	configMapList, err := s.configMapClient.List(namespace, *listOptions)
 	if err != nil {
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
 			return nil, apierrors.NewResourceExpired(err.Error())
@@ -994,7 +994,7 @@ func (s *Store) Watch(
 		listOptions.ResourceVersionMatch = ""
 	}
 
-	configMapWatch, err := s.configMapClient.Watch(Namespace, *listOptions)
+	configMapWatch, err := s.configMapClient.Watch(namespace, *listOptions)
 	if err != nil {
 		logrus.Errorf("kubeconfig: watch: error starting watch: %s", err)
 		return nil, apierrors.NewInternalError(fmt.Errorf("kubeconfig: watch: error starting watch: %w", err))
@@ -1201,7 +1201,7 @@ func (s *Store) DeleteCollection(
 		return nil, apierrors.NewInternalError(err)
 	}
 
-	configMapList, err := s.configMapClient.List(Namespace, *lOptions)
+	configMapList, err := s.configMapClient.List(namespace, *lOptions)
 	if err != nil {
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
 			return nil, apierrors.NewResourceExpired(err.Error())
@@ -1311,7 +1311,7 @@ func (s *Store) delete(
 		}
 	}
 
-	err = s.configMapClient.Delete(Namespace, configMap.Name, options)
+	err = s.configMapClient.Delete(namespace, configMap.Name, options)
 	switch {
 	case err == nil:
 	case apierrors.IsNotFound(err):
