@@ -16,7 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -29,10 +28,6 @@ const (
 func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wrangler.Context) error {
 	if features.MCMAgent.Enabled() {
 		return nil
-	}
-
-	if !features.ImperativeApiExtension.Enabled() || !RDPEnabled() {
-		return DeleteRDPConnectSecret(wranglerContext.Core.Secret())
 	}
 
 	portForwarder, err := forward.New(
@@ -112,9 +107,4 @@ func GetOrCreateRDPConnectSecret(secretController corecontrollers.SecretControll
 	}
 
 	return secretValue, nil
-}
-
-func DeleteRDPConnectSecret(secretController corecontrollers.SecretController) error {
-	err := secretController.Delete(namespace.System, apiExtSecretName, &v1.DeleteOptions{})
-	return client.IgnoreNotFound(err)
 }
