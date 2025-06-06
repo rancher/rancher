@@ -60,10 +60,10 @@ type RegistrationSpec struct {
 	// +optional
 	RegistrationRequest                     *RegistrationRequest    `json:"registrationRequest,omitempty"`
 	OfflineRegistrationCertificateSecretRef *corev1.SecretReference `json:"offlineRegistrationCertificateSecretRef,omitempty"`
-	CheckNow                                *bool                   `json:"checkNow,omitempty"`
+	SyncNow                                 *bool                   `json:"syncNow,omitempty"`
 }
 
-func (rs *RegistrationSpec) WithoutCheckNow() *RegistrationSpec {
+func (rs *RegistrationSpec) WithoutSyncNow() *RegistrationSpec {
 	return &RegistrationSpec{
 		Mode:                                    rs.Mode,
 		RegistrationRequest:                     rs.RegistrationRequest,

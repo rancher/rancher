@@ -45,8 +45,6 @@ spec:
           spec:
             description: RegistrationSpec is a description of a registration config
             properties:
-              checkNow:
-                type: boolean
               mode:
                 default: online
                 description: RegistrationMode enforces the valid registration modes
@@ -104,6 +102,8 @@ spec:
                   severUrl:
                     type: string
                 type: object
+              syncNow:
+                type: boolean
             required:
             - mode
             type: object

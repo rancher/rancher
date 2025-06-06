@@ -185,7 +185,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	// Skip keepalive for anything activated within the last 20 hours
 	if !registrationHandler.NeedsRegistration(registrationObj) &&
 		!registrationHandler.NeedsActivation(registrationObj) &&
-		registrationObj.Spec.CheckNow == nil {
+		registrationObj.Spec.SyncNow == nil {
 		if registrationObj.Status.ActivationStatus.LastValidatedTS.Time.After(minResyncInterval()) {
 			return registrationObj, nil
 		}
@@ -321,16 +321,15 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	// Handle what to do when CheckNow is used...
-	if registrationObj.Spec.CheckNow != nil && *registrationObj.Spec.CheckNow {
+	if registrationObj.Spec.SyncNow != nil && *registrationObj.Spec.SyncNow {
 		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 			updated := registrationObj.DeepCopy()
-			// TODO(o&b): Also update the status to warn RegistrationModeOffline users that `CheckNow` does nothing
-			// Better alternative, webhook prevent updates if mode=offline
-			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
+			// TODO(o&b): When offline calls this it should immediately sync the OfflineRegistrationRequest secret content
+			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 			return h.registrations.Update(updated)
 		} else {
 			updated := registrationObj.DeepCopy()
-			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
+			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 			updated.Status.ActivationStatus.Activated = false
 			updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{}
 			v1.ResourceConditionProgressing.True(updated)
@@ -340,7 +339,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			var err error
 			updated, err = h.registrations.UpdateStatus(updated)
 
-			updated.Spec = *registrationObj.Spec.WithoutCheckNow()
+			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 			updated, err = h.registrations.Update(updated)
 			return updated, err
 		}
