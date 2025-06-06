@@ -21,9 +21,9 @@ func TestAliasMaps(t *testing.T) {
 			schemaToDriverFields[driver] = fields.FileToFieldAliases
 		}
 	}
+
 	assert.Len(schemaToDriverFields, len(nodedriver.DriverToSchemaFields), "Alias maps are not equal")
 	for driver, fields := range schemaToDriverFields {
-		fmt.Println("driver", driver, "fields", fields)
 		assert.Contains(nodedriver.DriverToSchemaFields, driver)
 		nodeAliases := nodedriver.DriverToSchemaFields[driver]
 		for k, v := range fields {
@@ -43,12 +43,13 @@ func TestAliasToPath(t *testing.T) {
 	assertT.NoError(err)
 	defer os.Unsetenv("CATTLE_DEV_MODE")
 
-	for driver, fields := range management.DriverData {
+	for _, fields := range management.DriverData {
 		testConfig, annotations := createFakeConfigAnnotations(fields.FileToFieldAliases)
 		err = aliasToPath(annotations, testConfig, "fakeNamespace")
 		assertT.NoError(err)
 
-		for alias := range nodedriver.DriverToSchemaFields[driver] {
+		driverToSchemaFields := reverseAnnotations(annotations["fileToFieldAliases"])
+		for alias := range driverToSchemaFields {
 			assertT.Contains(testConfig, alias)
 		}
 
@@ -92,4 +93,17 @@ func createFakeConfigAnnotations(fields map[string]string) (map[string]interface
 	}
 
 	return testData, annotations
+}
+
+// reverseAnnotations reverse the key-value pairing and splits the string of key-value pair into
+func reverseAnnotations(annotations string) map[string]string {
+	result := map[string]string{}
+	pairs := strings.Split(annotations, ",")
+	for _, pair := range pairs {
+		keyVal := strings.SplitN(pair, ":", 2)
+		if len(keyVal) == 2 {
+			result[strings.TrimSpace(keyVal[1])] = strings.TrimSpace(keyVal[0])
+		}
+	}
+	return result
 }

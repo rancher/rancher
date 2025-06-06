@@ -219,7 +219,7 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node)
 		logrus.Fatalf("failed to list the node driver to fetch field annotations: %v", err)
 	}
 	if nodeDriver != nil {
-		logrus.Infof("fetching the fileToField aliases for nodeDriver: %v, nodeDriverName: %s", nodeDriver, obj.Status.NodeTemplateSpec.Driver)
+		logrus.Debugf("[node-controller] fetching the fileToField aliases for nodeDriver: %v", nodeDriver.Name)
 		err = aliasToPath(nodeDriver.Annotations, configRawMap, obj.Namespace)
 		if err != nil {
 			return obj, fmt.Errorf("error from aliasToPath: %w", err)
@@ -271,15 +271,7 @@ func aliasToPath(annotations map[string]string, config map[string]interface{}, n
 
 	// Check if the required driver has aliased fields
 	if aliasedFields, exists := annotations["fileToFieldAliases"]; exists {
-		fileToFieldAliasList := strings.Split(aliasedFields, ",")
-		fileToFieldAliasMap := make(map[string]string)
-
-		for _, pairs := range fileToFieldAliasList {
-			kv := strings.SplitN(pairs, ":", 2)
-			if len(kv) == 2 {
-				fileToFieldAliasMap[kv[0]] = kv[1]
-			}
-		}
+		fileToFieldAliasMap := nodedriver.ParseKeyValueString(aliasedFields)
 
 		hasher := sha256.New()
 		for schemaField, driverField := range fileToFieldAliasMap {
