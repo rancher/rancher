@@ -16,6 +16,5 @@ runs:
       run: |
         gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$LINUX_AMD64_FILE" --clobber
         gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$LINUX_ARM64_FILE" --clobber
-        gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2019_FILE" --clobber
         gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_2022_FILE" --clobber
         gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
