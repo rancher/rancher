@@ -337,6 +337,8 @@ func (s *Store) Create(
 		}
 	}
 
+	// The name of the cluster to use as the current context.
+	// Note that the actual context is set later to the display name of the cluster.
 	var currentContext string
 
 	// Check if the user has access to requested clusters before generating tokens.
@@ -354,14 +356,14 @@ func (s *Store) Create(
 			return nil, apierrors.NewInternalError(fmt.Errorf("error checking if user %s has access to cluster %s: %w", userInfo.GetName(), clusters[i].Name, err))
 		}
 
-		// Check if the requested current context is valid early.
+		// Check early if the requested current context is valid.
 		if currentContext == "" && kubeconfig.Spec.CurrentContext == clusters[i].Name {
 			currentContext = clusters[i].Name
 		}
 
 		if decision != authorizer.DecisionAllow {
 			if isAllClusters {
-				// Delete the cluster from the list in-place.
+				// Delete the cluster the user doesn't have access to from the list in-place.
 				copy(clusters[i:], clusters[i+1:])
 				clusters[len(clusters)-1] = nil
 				clusters = clusters[:len(clusters)-1]
@@ -381,13 +383,13 @@ func (s *Store) Create(
 	generateToken := s.shouldGenerateToken()
 
 	kubeconfigToStore := kubeconfig.DeepCopy()
-	kubeconfigToStore.Name = ""
-	kubeconfigToStore.GenerateName = ""
+	kubeconfigToStore.Name = ""         // We generate the kubeconfig's name automatically.
+	kubeconfigToStore.GenerateName = "" // We generate the kubeconfig's name automatically.
 	if kubeconfigToStore.Labels == nil {
 		kubeconfigToStore.Labels = make(map[string]string)
 	}
 	kubeconfigToStore.Labels[UserIDLabel] = userInfo.GetName()
-	kubeconfigToStore.UID = uuid.NewUUID()
+	kubeconfigToStore.UID = uuid.NewUUID() // Generate a UID for the kubeconfig, which is then stored as an annotation in the corresponding ConfigMap.
 	kubeconfigToStore.Status.Summary = StatusSummaryPending
 
 	configMap, err := s.toConfigMap(kubeconfigToStore)
