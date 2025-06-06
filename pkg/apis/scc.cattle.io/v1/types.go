@@ -53,14 +53,6 @@ type Registration struct {
 	Status RegistrationStatus `json:"status,omitempty"`
 }
 
-type RegistrationRequest struct {
-	RegistrationCodeSecretRef *corev1.SecretReference `json:"registrationCodeSecretRef,omitempty"`
-	// +optional
-	SeverUrl string `json:"severUrl,omitempty"`
-	// +optional
-	ServerCertificateSecretRef *corev1.SecretReference `json:"serverCertficateSecretRef,omitempty"`
-}
-
 // RegistrationSpec is a description of a registration config
 type RegistrationSpec struct {
 	// +default:value="online"
@@ -77,6 +69,14 @@ func (rs *RegistrationSpec) WithoutCheckNow() *RegistrationSpec {
 		RegistrationRequest:                     rs.RegistrationRequest,
 		OfflineRegistrationCertificateSecretRef: rs.OfflineRegistrationCertificateSecretRef,
 	}
+}
+
+type RegistrationRequest struct {
+	RegistrationCodeSecretRef *corev1.SecretReference `json:"registrationCodeSecretRef,omitempty"`
+	// +optional
+	SeverUrl string `json:"severUrl,omitempty"`
+	// +optional
+	ServerCertificateSecretRef *corev1.SecretReference `json:"serverCertficateSecretRef,omitempty"`
 }
 
 type RegistrationStatus struct {
