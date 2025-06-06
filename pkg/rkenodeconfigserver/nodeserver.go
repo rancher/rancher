@@ -19,7 +19,6 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
-	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
@@ -383,27 +382,4 @@ func AppendTaintsToKubeletArgs(processes map[string]rketypes.Process, nodeConfig
 		processes["kubelet"] = kubelet
 	}
 	return processes
-}
-
-func (n *RKENodeConfigServer) getServiceOptions(k8sVersion string, osType string) (map[string]interface{}, error) {
-	data := map[string]interface{}{}
-	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Linux)
-	if err != nil {
-		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
-		return data, err
-	}
-	if svcOptions != nil {
-		data["k8s-service-options"] = svcOptions
-	}
-	if osType == "windows" {
-		svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Windows)
-		if err != nil {
-			logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
-			return data, err
-		}
-		if svcOptionsWindows != nil {
-			data["k8s-windows-service-options"] = svcOptionsWindows
-		}
-	}
-	return data, nil
 }
