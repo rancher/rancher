@@ -808,15 +808,7 @@ func constructFilesSecret(annotations map[string]string, config map[string]inter
 	secretData := make(map[string][]byte)
 	// Check if the required driver has aliased fields
 	if aliasedFields, exists := annotations["fileToFieldAliases"]; exists {
-		fileToFieldAliasList := strings.Split(aliasedFields, ",")
-		fileToFieldAliasMap := make(map[string]string)
-
-		for _, pairs := range fileToFieldAliasList {
-			kv := strings.SplitN(pairs, ":", 2)
-			if len(kv) == 2 {
-				fileToFieldAliasMap[kv[0]] = kv[1]
-			}
-		}
+		fileToFieldAliasMap := nodedriver.ParseKeyValueString(aliasedFields)
 
 		for schemaField, driverField := range fileToFieldAliasMap {
 			if fileContents, ok := config[schemaField].(string); ok {
