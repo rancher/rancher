@@ -22,7 +22,7 @@ func TestIsCalico(t *testing.T) {
 				Spec: rkev1.RKEControlPlaneSpec{
 					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
 						MachineGlobalConfig: rkev1.GenericMap{
-							Data: map[string]any{
+							Data: map[string]interface{}{
 								"cni": "calico",
 							},
 						},
@@ -38,7 +38,7 @@ func TestIsCalico(t *testing.T) {
 				Spec: rkev1.RKEControlPlaneSpec{
 					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
 						MachineGlobalConfig: rkev1.GenericMap{
-							Data: map[string]any{
+							Data: map[string]interface{}{
 								"cni": "calico+multus",
 							},
 						},
@@ -54,7 +54,7 @@ func TestIsCalico(t *testing.T) {
 				Spec: rkev1.RKEControlPlaneSpec{
 					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
 						MachineGlobalConfig: rkev1.GenericMap{
-							Data: map[string]any{
+							Data: map[string]interface{}{
 								"cni": "calicoo",
 							},
 						},
@@ -70,7 +70,7 @@ func TestIsCalico(t *testing.T) {
 				Spec: rkev1.RKEControlPlaneSpec{
 					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
 						MachineGlobalConfig: rkev1.GenericMap{
-							Data: map[string]any{
+							Data: map[string]interface{}{
 								"cni": "calico",
 							},
 						},
