@@ -57,7 +57,6 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		namespace                         string
 		token                             string
 		url                               string
-		isWindowsCluster                  bool
 		isPreBootstrap                    bool
 		features                          map[string]bool
 		taints                            []corev1.Taint
@@ -299,7 +298,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			if tt.cluster.Spec.ImportedConfig != nil && tt.cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
 				tt.agentImage = image.ResolveWithCluster(tt.agentImage, tt.cluster)
 			}
-			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isWindowsCluster, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister, tt.pcExists)
+			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister, tt.pcExists)
 
 			assert.Nil(t, err)
 			decoder := scheme.Codecs.UniversalDeserializer()
