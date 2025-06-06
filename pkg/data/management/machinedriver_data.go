@@ -222,7 +222,7 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, cre
 	}
 
 	logrus.Infof("Creating node driver %v", name)
-	_, err = cli.Create(&v3.NodeDriver{
+	d := &v3.NodeDriver{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
@@ -237,7 +237,8 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, cre
 			Checksum:           checksum,
 			WhitelistDomains:   whitelist,
 		},
-	})
+	}
+	_, err = cli.Create(d)
 
 	return err
 }
