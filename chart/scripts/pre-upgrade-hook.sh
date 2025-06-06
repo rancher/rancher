@@ -103,7 +103,10 @@ print_summary() {
   echo "Total resources detected: $total"
 
   if [ "$RESOURCES_FOUND" = true ]; then
-    echo "Error: Rancher v2.12 does not support RKE1. RKE-related resources were found. Please delete the mentioned resources to continue."
+    echo "Error: Rancher v2.12+ does not support RKE1.
+Detected RKE1-related resources (listed above).
+Please migrate these clusters to RKE2 or K3s, or delete the related resources.
+More info: https://www.suse.com/c/rke-end-of-life-by-july-2025-replatform-to-rke2-or-k3s"
     exit 1
   else
     echo "No RKE related resources found."
