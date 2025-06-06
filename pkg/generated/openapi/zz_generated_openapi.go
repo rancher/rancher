@@ -914,7 +914,7 @@ func schema_pkg_apis_scccattleio_v1_RegistrationSpec(ref common.ReferenceCallbac
 							Ref: ref("k8s.io/api/core/v1.SecretReference"),
 						},
 					},
-					"checkNow": {
+					"syncNow": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"boolean"},
 							Format: "",

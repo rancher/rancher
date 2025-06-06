@@ -127,8 +127,8 @@ func (in *RegistrationSpec) DeepCopyInto(out *RegistrationSpec) {
 		*out = new(corev1.SecretReference)
 		**out = **in
 	}
-	if in.CheckNow != nil {
-		in, out := &in.CheckNow, &out.CheckNow
+	if in.SyncNow != nil {
+		in, out := &in.SyncNow, &out.SyncNow
 		*out = new(bool)
 		**out = **in
 	}
