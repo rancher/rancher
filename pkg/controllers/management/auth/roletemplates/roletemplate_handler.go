@@ -1,7 +1,11 @@
 package roletemplates
 
 import (
+	"errors"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
+	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/wrangler"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -30,12 +34,16 @@ var (
 )
 
 type roleTemplateHandler struct {
-	crClient crbacv1.ClusterRoleController
+	crController      crbacv1.ClusterRoleController
+	clusterController mgmtcontroller.ClusterController
+	clusterManager    *clustermanager.Manager
 }
 
-func newRoleTemplateHandler(w *wrangler.Context) *roleTemplateHandler {
+func newRoleTemplateHandler(w *wrangler.Context, clusterManager *clustermanager.Manager) *roleTemplateHandler {
 	return &roleTemplateHandler{
-		crClient: w.RBAC.ClusterRole(),
+		crController:      w.RBAC.ClusterRole(),
+		clusterController: w.Mgmt.Cluster(),
+		clusterManager:    clusterManager,
 	}
 }
 
@@ -65,7 +73,7 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 
 	for _, cr := range clusterRoles {
 		cr.OwnerReferences = ownerReferences
-		if err := rbac.CreateOrUpdateResource(cr, r.crClient, rbac.AreClusterRolesSame); err != nil {
+		if err := rbac.CreateOrUpdateResource(cr, r.crController, rbac.AreClusterRolesSame); err != nil {
 			return nil, err
 		}
 	}
@@ -123,7 +131,7 @@ func (r *roleTemplateHandler) getManagementClusterRoles(rt *v3.RoleTemplate, rul
 // any management plane rules.
 func (r *roleTemplateHandler) areThereInheritedManagementPlaneRules(inheritedRoleTemplates []string, crNameTransformer func(string) string) (bool, error) {
 	for _, rt := range inheritedRoleTemplates {
-		_, err := r.crClient.Get(rbac.AggregatedClusterRoleNameFor(crNameTransformer(rt)), metav1.GetOptions{})
+		_, err := r.crController.Get(rbac.AggregatedClusterRoleNameFor(crNameTransformer(rt)), metav1.GetOptions{})
 		if err == nil {
 			return true, nil
 		} else if !apierrors.IsNotFound(err) {
@@ -164,7 +172,7 @@ func (r *roleTemplateHandler) gatherRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyR
 		if rt.ExternalRules != nil {
 			return rt.ExternalRules, nil
 		}
-		cr, err := r.crClient.Get(rt.Name, metav1.GetOptions{})
+		cr, err := r.crController.Get(rt.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -172,4 +180,74 @@ func (r *roleTemplateHandler) gatherRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyR
 	} else {
 		return rt.Rules, nil
 	}
+}
+
+// OnRemove deletes all the ClusterRoles created in each cluster for the RoleTemplate
+func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+	clusters, err := r.clusterController.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var returnedErrors error
+	for _, cluster := range clusters.Items {
+		userContext, err := r.clusterManager.UserContext(cluster.Name)
+		if err != nil {
+			// ClusterUnavailable error indicates the record can't talk to the downstream cluster
+			if !clustermanager.IsClusterUnavailableErr(err) {
+				returnedErrors = errors.Join(returnedErrors, err)
+			}
+			continue
+		}
+		crController := userContext.RBACw.ClusterRole()
+
+		crName := rbac.ClusterRoleNameFor(rt.Name)
+		acrName := rbac.AggregatedClusterRoleNameFor(crName)
+
+		returnedErrors = removeLabelFromExternalRole(rt, crController)
+
+		// if the cluster role is external don't delete the external cluster role
+		if !rt.External {
+			returnedErrors = errors.Join(returnedErrors, rbac.DeleteResource(crName, crController))
+		}
+
+		returnedErrors = errors.Join(returnedErrors, rbac.DeleteResource(acrName, crController))
+
+		if rt.Context == projectContext {
+			promotedCRName := rbac.PromotedClusterRoleNameFor(crName)
+			promotedACRName := rbac.AggregatedClusterRoleNameFor(promotedCRName)
+			returnedErrors = errors.Join(returnedErrors,
+				rbac.DeleteResource(promotedCRName, crController),
+				rbac.DeleteResource(promotedACRName, crController),
+			)
+		}
+	}
+
+	return nil, returnedErrors
+}
+
+// removeLabelFromExternalRole removes the aggregation label from the external role.
+// It is a no-op if the RoleTemplate does not have an external role.
+func removeLabelFromExternalRole(rt *v3.RoleTemplate, crController crbacv1.ClusterRoleController) error {
+	if !rt.External {
+		return nil
+	}
+
+	externalRole, err := crController.Get(rt.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if externalRole.Labels == nil {
+		return nil
+	}
+
+	if _, ok := externalRole.Labels[rbac.AggregationLabel]; ok {
+		delete(externalRole.Labels, rbac.AggregationLabel)
+		if _, err := crController.Update(externalRole); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

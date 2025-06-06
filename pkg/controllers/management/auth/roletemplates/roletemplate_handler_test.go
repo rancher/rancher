@@ -1,11 +1,13 @@
 package roletemplates
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -530,12 +532,12 @@ func Test_OnChange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			crClient := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.setupClusterRoleController != nil {
-				tt.setupClusterRoleController(crClient)
+				tt.setupClusterRoleController(crController)
 			}
 			r := &roleTemplateHandler{
-				crClient: crClient,
+				crController: crController,
 			}
 
 			_, err := r.OnChange("", tt.rt)
@@ -807,12 +809,12 @@ func Test_gatherRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			crClient := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.getFunc != nil {
-				crClient.EXPECT().Get(tt.rt.Name, metav1.GetOptions{}).Return(tt.getFunc())
+				crController.EXPECT().Get(tt.rt.Name, metav1.GetOptions{}).Return(tt.getFunc())
 			}
 			r := &roleTemplateHandler{
-				crClient: crClient,
+				crController: crController,
 			}
 			got, err := r.gatherRules(tt.rt)
 			if (err != nil) != tt.wantErr {
@@ -821,6 +823,121 @@ func Test_gatherRules(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("roleTemplateHandler.gatherRules() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+var (
+	externalRoleTemplate = v3.RoleTemplate{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
+		External:   true,
+	}
+	clusterRoleWithAggregationLabel = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				rbac.AggregationLabel: "test-rt",
+			},
+		},
+	}
+	clusterRoleWithNoAggregationLabel = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{},
+		},
+	}
+)
+
+func Test_removeLabelFromExternalRole(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		rt         *v3.RoleTemplate
+		getFunc    func() (*rbacv1.ClusterRole, error)
+		updateFunc func() (*rbacv1.ClusterRole, error)
+		updatedCR  *rbacv1.ClusterRole
+		wantErr    bool
+	}{
+		{
+			name: "no op if there is no external role",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
+				External:   false,
+			},
+		},
+		{
+			name:    "error getting external role",
+			rt:      externalRoleTemplate.DeepCopy(),
+			getFunc: func() (*rbacv1.ClusterRole, error) { return nil, fmt.Errorf("error") },
+			wantErr: true,
+		},
+		{
+			name: "external role has no label",
+			rt:   externalRoleTemplate.DeepCopy(),
+			getFunc: func() (*rbacv1.ClusterRole, error) {
+				return clusterRoleWithNoAggregationLabel.DeepCopy(), nil
+			},
+		},
+		{
+			name: "external role has nil label map",
+			rt:   externalRoleTemplate.DeepCopy(),
+			getFunc: func() (*rbacv1.ClusterRole, error) {
+				return &rbacv1.ClusterRole{}, nil
+			},
+		},
+		{
+			name: "external role has label removed",
+			rt:   externalRoleTemplate.DeepCopy(),
+			getFunc: func() (*rbacv1.ClusterRole, error) {
+				return clusterRoleWithAggregationLabel.DeepCopy(), nil
+			},
+			updateFunc: func() (*rbacv1.ClusterRole, error) { return nil, nil },
+			updatedCR:  clusterRoleWithNoAggregationLabel.DeepCopy(),
+		},
+		{
+			name: "external role has label removed but keeps other labels",
+			rt:   externalRoleTemplate.DeepCopy(),
+			getFunc: func() (*rbacv1.ClusterRole, error) {
+				return &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							rbac.AggregationLabel: "test-rt",
+							"other-label":         "value",
+						},
+					},
+				}, nil
+			},
+			updateFunc: func() (*rbacv1.ClusterRole, error) { return nil, nil },
+			updatedCR: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"other-label": "value"},
+				},
+			},
+		},
+		{
+			name: "error updating cluster role",
+			rt:   externalRoleTemplate.DeepCopy(),
+			getFunc: func() (*rbacv1.ClusterRole, error) {
+				return clusterRoleWithAggregationLabel.DeepCopy(), nil
+			},
+			updateFunc: func() (*rbacv1.ClusterRole, error) { return nil, fmt.Errorf("error") },
+			updatedCR:  clusterRoleWithNoAggregationLabel.DeepCopy(),
+			wantErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			if tt.getFunc != nil {
+				crController.EXPECT().Get(tt.rt.Name, gomock.Any()).Return(tt.getFunc())
+			}
+			if tt.updateFunc != nil {
+				crController.EXPECT().Update(tt.updatedCR).Return(tt.updateFunc())
+			}
+
+			if err := removeLabelFromExternalRole(tt.rt, crController); (err != nil) != tt.wantErr {
+				t.Errorf("roleTemplateHandler.removeLabelFromExternalRole() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

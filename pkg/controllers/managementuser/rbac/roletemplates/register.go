@@ -23,7 +23,6 @@ const (
 	prtbByUsernameIndex = "auth.management.cattle.io/prtb-by-username"
 
 	roleTemplateChangeHandler = "cluster-roletemplate-change-handler"
-	roleTemplateRemoveHandler = "cluster-roletemplate-remove-handler"
 )
 
 func RegisterIndexers(wranglerContext *wrangler.Context) {
@@ -44,7 +43,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	rth := newRoleTemplateHandler(workload)
 	management.Wrangler.Mgmt.RoleTemplate().OnChange(ctx, roleTemplateChangeHandler, rth.OnChange)
-	management.Wrangler.Mgmt.RoleTemplate().OnRemove(ctx, roleTemplateRemoveHandler, rth.OnRemove)
 }
 
 // TODO(wrangler/v4): revert to use OnRemove when it supports options (https://github.com/rancher/wrangler/pull/472).
