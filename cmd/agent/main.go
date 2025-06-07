@@ -32,7 +32,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
-	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -44,6 +43,7 @@ var (
 
 const (
 	Token          = "X-API-Tunnel-Token"
+	Params         = "X-API-Tunnel-Params"
 	caFileLocation = "/etc/kubernetes/ssl/certs/serverca"
 )
 
@@ -206,8 +206,8 @@ func run(ctx context.Context) error {
 	}
 
 	headers := http.Header{
-		Token:                      {token},
-		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
+		Token:  {token},
+		Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
 
 	serverURL, err := url.Parse(server)
@@ -339,16 +339,12 @@ func run(ctx context.Context) error {
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
-		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
+
 		httpClient := http.Client{
 			Timeout: 300 * time.Second,
 		}
 		if transport != nil {
 			httpClient.Transport = transport
-		}
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-		if err != nil {
-			return err
 		}
 
 		if writeCertsOnly {
@@ -366,25 +362,6 @@ func run(ctx context.Context) error {
 		if err := cleanup(context.Background()); err != nil {
 			logrus.Warnf("Unable to perform docker cleanup: %v", err)
 		}
-
-		go func() {
-			logrus.Infof("Starting plan monitor, checking every %v seconds", interval)
-			tt := time.Duration(interval) * time.Second
-			for {
-				select {
-				case <-time.After(tt):
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-					if err != nil {
-						logrus.Errorf("failed to check plan: %v", err)
-					} else if receivedInterval != 0 && receivedInterval != interval {
-						tt = time.Duration(receivedInterval) * time.Second
-						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
 
 		return nil
 	}
