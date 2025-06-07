@@ -79,7 +79,7 @@ spec:
                       type: string
                     requestURI:
                       description: |-
-                        RequestURI is a regular expression used to match against the url of the log request. For exapmle, the Filter:
+                        RequestURI is a regular expression used to match against the url of the log request. For example, the Filter:
 
                         Filter {
                             Action: Allow.
