@@ -20,7 +20,7 @@ type Filter struct {
 	// Action defines what happens
 	Action FilterAction `json:"action,omitempty"`
 
-	// RequestURI is a regular expression used to match against the url of the log request. For exapmle, the Filter:
+	// RequestURI is a regular expression used to match against the url of the log request. For example, the Filter:
 	//
 	// Filter {
 	//     Action: Allow.
@@ -44,7 +44,7 @@ type Verbosity struct {
 type Level int
 
 const (
-	// LevelNull indicates that no Request or Resopnse data beyond what is included in the audit log metadata. A
+	// LevelNull indicates that no Request or Response data beyond what is included in the audit log metadata. A
 	// LogVerbosity with LevelNull is the same as the zero value for LogVerbosity or LogVerbosity{}.
 	LevelNull Level = iota
 
@@ -92,7 +92,7 @@ const (
 	LevelRequestResponse
 )
 
-// LogVerbosity defines what is included in an audit log. Log metadata (includeing RequestURI, user info, etc) is always present.
+// LogVerbosity defines what is included in an audit log. Log metadata (including RequestURI, user info, etc) is always present.
 type LogVerbosity struct {
 	// Level is carried over from the previous implementation of audit logging, and provides a shorthand for defining
 	// LogVerbosities. When Level is not LevelNull, Request and Reponse are ignored.
