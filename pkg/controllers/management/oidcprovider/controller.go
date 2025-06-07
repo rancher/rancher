@@ -147,6 +147,9 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		if err != nil {
 			return nil, fmt.Errorf("failed to find next secret key: %w", err)
 		}
+		if k8sSecret.Data == nil {
+			k8sSecret.Data = map[string][]byte{}
+		}
 		k8sSecret.Data[clientSecretName] = []byte(clientSecret)
 		if k8sSecret.Annotations == nil {
 			k8sSecret.Annotations = map[string]string{}
@@ -164,7 +167,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 	}
 
-	// regenerate client secret if the cattle.io/oidc-client-secret-create annotation is present.
+	// regenerate client secret if the cattle.io/oidc-client-secret-regenerate annotation is present.
 	// client secrets ids are comma separated
 	if clientSecretIDs, ok := oidcClient.Annotations[regenerateClientSecretAnn]; ok {
 		csids := strings.Split(clientSecretIDs, ",")
@@ -190,7 +193,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 	}
 
-	// remove client secret if the cattle.io/oidc-client-secret-create annotation is present.
+	// remove client secret if the cattle.io/oidc-client-secret-remove annotation is present.
 	// client secrets ids are comma separated
 	if clientSecretIDs, ok := oidcClient.Annotations[removeClientSecretAnn]; ok {
 		csids := strings.Split(clientSecretIDs, ",")
@@ -237,14 +240,18 @@ func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, s
 	}
 
 	if !reflect.DeepEqual(oidcClient.Status, observedStatus) {
-		patchData := map[string]interface{}{
-			"status": observedStatus,
+		patchOp := []map[string]interface{}{
+			{
+				"op":    "add",
+				"path":  "/status",
+				"value": observedStatus,
+			},
 		}
-		patchBytes, err := json.Marshal(patchData)
+		patchBytes, err := json.Marshal(patchOp)
 		if err != nil {
 			return fmt.Errorf("failed to create status patch: %w", err)
 		}
-		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.MergePatchType, patchBytes, "status")
+		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.JSONPatchType, patchBytes, "status")
 		if err != nil {
 			return fmt.Errorf("failed to apply status patch: %w", err)
 		}
