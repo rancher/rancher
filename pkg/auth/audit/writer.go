@@ -110,7 +110,9 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 func (w *Writer) Write(log *log) error {
 	redactors := []Redactor{}
 	if !w.DisableDefaultPolicies {
+		defaultMu.Lock()
 		redactors = append(redactors, defaultRedactors...)
+		defaultMu.Unlock()
 	}
 
 	verbosity := verbosityForLevel(w.DefaultPolicyLevel)
