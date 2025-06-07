@@ -619,6 +619,7 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, c.ReleaseName)
 	}
 	if len(c.Chart) > 0 {
+
 		args = append(args, filepath.Join(runPath, c.ChartFile))
 	}
 
