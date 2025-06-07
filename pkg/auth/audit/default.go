@@ -3,6 +3,7 @@ package audit
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
@@ -25,7 +26,9 @@ var (
 )
 
 var (
-	defaultRegex     = ".*([pP]assword|[Kk]ube[Cc]onfig|[Tt]oken).*"
+	defaultRegex = ".*([pP]assword|[Kk]ube[Cc]onfig|[Tt]oken).*"
+
+	defaultMu        sync.Mutex
 	defaultRedactors []Redactor
 )
 
@@ -45,12 +48,14 @@ func init() {
 		panic(fmt.Sprintf("failed to create regex redactor: %v", err))
 	}
 
+	defaultMu.Lock()
 	defaultRedactors = []Redactor{
 		RedactFunc(redactSecret),
 		RedactFunc(redactConfigMap),
 		RedactFunc(redactImportUrl),
 		r,
 	}
+	defaultMu.Unlock()
 }
 
 // DefaultPolicy is the policy deployed by default by rancher and cannot currently be disabled once it is installed.
