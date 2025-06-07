@@ -3,9 +3,11 @@ package planner
 import (
 	"context"
 	"errors"
-	"github.com/rancher/wrangler/v3/pkg/condition"
 	"strings"
 	"time"
+
+	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
+	"github.com/rancher/wrangler/v3/pkg/condition"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
@@ -116,6 +118,22 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 		capiScalingDownCondition.False(&status)
 		capiRollingOutCondition.False(&status)
 		return status, nil
+	}
+
+	// The SystemAgentUpgraded status does not exist on newly-created clusters
+	if capr.SystemAgentUpgraded.GetLastUpdated(&status) != "" {
+		// New plans may rely on features available only in newer versions of system-agent
+		// Make sure system-agent is upgraded before generating new plans
+		if !capr.SystemAgentUpgraded.IsTrue(&status) {
+			logrus.Debugf("[planner] rkecluster %s/%s: waiting for system-agent to be ready (reason: %s)", cp.Namespace, cp.Name, capr.SystemAgentUpgraded.GetReason(&status))
+			return status, nil
+		}
+
+		version := managesystemagent.SystemAgentUpgraderVersion()
+		if capr.SystemAgentUpgraded.GetMessage(&status) != version {
+			logrus.Debugf("[planner] rkecluster %s/%s: waiting for system-agent to be upgraded to %s", cp.Namespace, cp.Name, strings.TrimSuffix(version, "-suc"))
+			return status, nil
+		}
 	}
 
 	status.ObservedGeneration = cp.Generation

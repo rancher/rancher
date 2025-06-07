@@ -156,7 +156,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -175,7 +176,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -194,6 +196,7 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
+					chart.SystemUpgradeControllerChartName,
 					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
@@ -236,7 +239,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -255,7 +259,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -299,7 +304,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -318,7 +324,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -364,7 +371,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -383,7 +391,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -403,6 +412,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -421,7 +431,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -463,7 +474,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -482,7 +494,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -501,7 +514,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -548,7 +562,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -567,7 +582,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -586,7 +602,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -632,7 +649,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -651,7 +669,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -702,7 +721,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -721,7 +741,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -765,7 +786,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -783,7 +805,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -802,6 +825,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -819,7 +843,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -863,7 +888,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.1",
 					expectedValues,
@@ -884,7 +910,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.1",
 					expectedProvCAPIValues,
@@ -912,6 +939,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.1",
 					expectedSUCValues,
@@ -932,7 +960,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.1",
 					expectedRDPValues,
@@ -973,7 +1002,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -992,7 +1022,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -1012,6 +1043,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -1030,7 +1062,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.1",
 					expectedRDPValues,
