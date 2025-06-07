@@ -111,6 +111,19 @@ func main() {
 					capi.Cluster{},
 				},
 			},
+			"scc.cattle.io": {
+				PackageName: "scc.cattle.io",
+				Types: []interface{}{
+					// All structs with an embedded ObjectMeta field will be picked up
+					"./pkg/apis/scc.cattle.io/v1",
+				},
+				GenerateTypes:   true,
+				GenerateClients: true,
+				GenerateOpenAPI: true,
+				OpenAPIDependencies: []string{
+					"k8s.io/apimachinery/pkg/apis/meta/v1",
+				},
+			},
 			// This package is not a CRD but types from the extension API server.
 			"ext.cattle.io": {
 				PackageName: "ext.cattle.io",
