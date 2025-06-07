@@ -10,12 +10,6 @@ type selector interface {
 	Select(path Path) (int, bool)
 }
 
-type SelectorFunc func(Path) (int, bool)
-
-func (f SelectorFunc) Select(p Path) (int, bool) {
-	return f(p)
-}
-
 type selectRootElement struct{}
 
 func (s selectRootElement) Select(p Path) (int, bool) {
