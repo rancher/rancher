@@ -79,5 +79,5 @@ func TestMiddleware(t *testing.T) {
 
 	req.WithContext(context.Background())
 
-	assert.Len(t, requests, 1)
+	assert.Len(t, requests, 1, "handler did not forward request to next handler as expected")
 }
