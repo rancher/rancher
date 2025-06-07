@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -218,17 +219,17 @@ func (f *fakeUserManager) GetUser(apiContext *types.APIContext) string {
 	}
 	return contextUser
 }
-func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, error) {
+func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
 	if input.UserName == errUserName {
-		return "", fmt.Errorf("can't generate token for err user")
+		return "", nil, fmt.Errorf("can't generate token for err user")
 	}
-	return input.TokenName + ":" + "tokenvalue", nil
+	return input.TokenName + ":" + "tokenvalue", nil, nil
 }
-func (f *fakeUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, error) {
+func (f *fakeUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
 	if input.UserName == errUserName {
-		return "", fmt.Errorf("can't generate token for err user")
+		return "", nil, fmt.Errorf("can't generate token for err user")
 	}
-	return input.TokenName + ":" + "tokenvalue", nil
+	return input.TokenName + ":" + "tokenvalue", nil, nil
 }
 
 // Remaining functions are only implemented to satisfy the interface
