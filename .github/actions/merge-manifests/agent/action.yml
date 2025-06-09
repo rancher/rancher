@@ -16,27 +16,15 @@ runs:
     - name: Create manifest list and push
       shell: bash
       run: |
-        # docker manifest is used with windows images to maintain os.version in the manifest
-        docker manifest create ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }} \
-          ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-2019 \
-          ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-2022
-
-        docker manifest push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}
-
         # docker buildx imagetools create pushes to the registry by default, which is not the same behavior as docker manifest create
         docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }} \
-          --append ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-amd64 \
-          --append ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-arm64 
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-amd64 \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-arm64
 
         if [[ "${{ github.ref_name }}" == release/v* ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
-          docker manifest create ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.HEAD_TAG }} \
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-2019 \
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-windows-2022
-          docker manifest push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.HEAD_TAG }}
-
           docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.HEAD_TAG }} \
-            --append ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-amd64 \
-            --append ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-arm64 
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-amd64 \
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-arm64
         fi
 
 
