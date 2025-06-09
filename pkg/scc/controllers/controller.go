@@ -32,17 +32,28 @@ const (
 )
 
 // TODO: these that return `*v1.Registration` probably need to return a object set to use with apply
-// That way we can use apply to update Registrations and Secrets related to them together.
+// TODO: That way we can use apply to update Registrations and Secrets related to them together.
+// IMPORTANT: All the `Reconcile*` methods modifies the object in memory but does NOT save it. The caller is responsible for saving the state.
 type SCCHandler interface {
+	// NeedsRegistration determines if the system requires initial SCC registration.
 	NeedsRegistration(*v1.Registration) bool
-	RegisterSystem(*v1.Registration) (suseconnect.RegistrationSystemId, error) // Equal to first time registration w/ SCC, or Offline Request creation
+	// RegisterSystem performs the initial system registration with SCC or creates an offline request.
+	RegisterSystem(*v1.Registration) (suseconnect.RegistrationSystemId, error)
+	// ReconcileRegisterSystemError prepares the Registration object for error reconciliation after RegisterSystem fails.
 	ReconcileRegisterSystemError(*v1.Registration, error) *v1.Registration
+	// PrepareRegisteredSystem prepares the Registration object after successful registration.
 	PrepareRegisteredSystem(*v1.Registration) *v1.Registration
+	// NeedsActivation checks if the system requires activation with SCC.
 	NeedsActivation(*v1.Registration) bool
-	Activate(*v1.Registration) error // Equal to activating with SCC, or verifying offline Request
+	// Activate activates the system with SCC or verifies an offline request.
+	Activate(*v1.Registration) error
+	// ReconcileActivateError prepares the Registration object for error reconciliation after Activate fails.
 	ReconcileActivateError(*v1.Registration, error) *v1.Registration
-	Keepalive(registrationObj *v1.Registration) error // Provides a heartbeat to SCC and validates status
+	// Keepalive provides a heartbeat to SCC and validates the system's status.
+	Keepalive(registrationObj *v1.Registration) error
+	// ReconcileKeepaliveError prepares the Registration object for error reconciliation after Keepalive fails.
 	ReconcileKeepaliveError(*v1.Registration, error) *v1.Registration
+	// Deregister initiates the system's deregistration from SCC.
 	Deregister() error
 }
 
@@ -196,9 +207,9 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	if registrationHandler.NeedsRegistration(registrationObj) {
 		// Set object to progressing
-		progressingObj := registrationObj.DeepCopy()
 		progressingUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var err error
+			progressingObj := registrationObj.DeepCopy()
 			v1.ResourceConditionProgressing.True(progressingObj)
 			progressingObj, err = h.registrations.UpdateStatus(progressingObj)
 			return err

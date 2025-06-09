@@ -54,8 +54,56 @@ func (s sccOnlineMode) RegisterSystem(registrationObj *v1.Registration) (susecon
 	return id, nil
 }
 
-func (s sccOnlineMode) ReconcileRegisterSystemError(registration *v1.Registration, registerErr error) *v1.Registration {
+func isNonRecoverableHttpError(err error) bool {
+	var sccApiError connection.ApiError
+
+	if errors.As(err, &sccApiError) {
+		httpCode := sccApiError.Code
+
+		// Client errors (except 429 Too Many Requests) are non-recoverable; a few server errors are also non-recoverable
+		if (httpCode >= 400 && httpCode < 500 && httpCode != http.StatusTooManyRequests) ||
+			httpCode == http.StatusNotImplemented ||
+			httpCode == http.StatusHTTPVersionNotSupported ||
+			httpCode == http.StatusNotExtended {
+			return true
+		}
+	}
+	return false
+}
+
+func getHttpErrorCode(err error) *int {
+	var sccApiError connection.ApiError
+
+	if errors.As(err, &sccApiError) {
+		httpCode := sccApiError.Code
+		return &httpCode
+	}
+	return nil
+}
+
+func (s sccOnlineMode) reconcileNonRecoverableHttpError(registration *v1.Registration, registerErr error) *v1.Registration {
+	httpCode := *getHttpErrorCode(registerErr)
+	nowTime := metav1.Now()
+	// Cannot recover from this error so must set failure
+	registration.Status.ActivationStatus.Activated = false
+	registration.Status.ActivationStatus.LastValidatedTS = &nowTime
+	v1.ResourceConditionFailure.True(registration)
+	v1.ResourceConditionFailure.Message(registration, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then create a new registration.")
+	v1.ResourceConditionProgressing.False(registration)
+	v1.ResourceConditionReady.False(registration)
+	preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(httpCode), httpCode)
+	v1.RegistrationConditionActivated.SetError(registration, preparedErrorReasonCondition, registerErr)
+
 	return registration
+}
+
+func (s sccOnlineMode) ReconcileRegisterSystemError(registration *v1.Registration, registerErr error) *v1.Registration {
+	prepared := registration.DeepCopy()
+	if isNonRecoverableHttpError(registerErr) {
+		return s.reconcileNonRecoverableHttpError(prepared, registerErr)
+	}
+	// Do other reconcile prep steps
+	return prepared
 }
 
 func (s sccOnlineMode) PrepareRegisteredSystem(registration *v1.Registration) *v1.Registration {
@@ -141,23 +189,20 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
 	preparedForReconcile := registration.DeepCopy()
 
-	var myErr connection.ApiError
-	if errors.As(activationErr, &myErr) {
-		httpCode := myErr.Code
-		// if 401 code assume system creds are outdated and invalidate the registration
-		if httpCode == http.StatusUnauthorized {
-			nowTime := metav1.Now()
-			// Cannot recover from this error so must set failure
-			preparedForReconcile.Status.ActivationStatus.Activated = false
-			preparedForReconcile.Status.ActivationStatus.LastValidatedTS = &nowTime
-			v1.ResourceConditionFailure.True(preparedForReconcile)
-			v1.ResourceConditionFailure.Message(preparedForReconcile, "Non-recoverable error encountered; to reregister Rancher create a new registration.")
-			v1.ResourceConditionProgressing.False(preparedForReconcile)
-			v1.ResourceConditionReady.False(preparedForReconcile)
-			v1.RegistrationConditionActivated.SetError(preparedForReconcile, "Error: SCC sync returned Unauthorized (401) status", activationErr)
+	if isNonRecoverableHttpError(activationErr) {
+		httpCode := *getHttpErrorCode(activationErr)
+		nowTime := metav1.Now()
+		// Cannot recover from this error so must set failure
+		preparedForReconcile.Status.ActivationStatus.Activated = false
+		preparedForReconcile.Status.ActivationStatus.LastValidatedTS = &nowTime
+		v1.ResourceConditionFailure.True(preparedForReconcile)
+		v1.ResourceConditionFailure.Message(preparedForReconcile, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then create a new registration.")
+		v1.ResourceConditionProgressing.False(preparedForReconcile)
+		v1.ResourceConditionReady.False(preparedForReconcile)
+		preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(httpCode), httpCode)
+		v1.RegistrationConditionActivated.SetError(preparedForReconcile, preparedErrorReasonCondition, activationErr)
 
-			return preparedForReconcile
-		}
+		return preparedForReconcile
 	}
 
 	// Return the unmodified version
