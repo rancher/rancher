@@ -149,7 +149,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	}
 
 	exportConfig.OsType = img.Windows
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage(), winsAgentUpdateImage}, windowsInfo.RKESystemImages)
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{winsAgentUpdateImage}, windowsInfo.RKESystemImages)
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}
@@ -353,18 +353,6 @@ func writeSliceToFile(filename string, versions []string) error {
 	}
 
 	return nil
-}
-
-func getWindowsAgentImage() string {
-	tag, ok := os.LookupEnv("TAG")
-	if !ok {
-		return ""
-	}
-	repo, ok := os.LookupEnv("REPO")
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/rancher-agent:%s", repo, tag)
 }
 
 func getScript(arch, fileType string) string {
