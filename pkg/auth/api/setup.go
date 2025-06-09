@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -36,6 +37,9 @@ func User(ctx context.Context, schemas *types.Schemas, management *config.Scaled
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
 		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
 		ExtTokenStore:            extTokenStore,
+		SecretLister:             management.Wrangler.Core.Secret().Cache(),
+		SecretClient:             management.Wrangler.Core.Secret(),
+		PwdChanger:               pbkdf2.New(management.Wrangler.Core.Secret().Cache(), management.Wrangler.Core.Secret()),
 	}
 
 	schema.Formatter = handler.UserFormatter

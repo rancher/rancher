@@ -1,13 +1,18 @@
 package management
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/auth/api/user"
+	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/wrangler"
+	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -77,7 +82,12 @@ func ensureDefaultAdmin() {
 			}
 
 		} else {
-			err = createNewAdmin(client, length)
+			wranglerContext, err := wrangler.NewContext(context.TODO(), nil, conf)
+			if err != nil {
+				return err
+			}
+
+			err = createNewAdmin(client, length, wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret(), wranglerContext.Mgmt.User().Cache())
 			if err != nil {
 				return errors.Errorf("Couldn't create a new admin. %v", err)
 			}
@@ -93,12 +103,8 @@ func ensureDefaultAdmin() {
 	}
 }
 
-func createNewAdmin(client v3.Interface, length int) error {
+func createNewAdmin(client v3.Interface, length int, secretLister wranglerv1.SecretCache, secretClient wranglerv1.SecretClient, userLister mgmtcontrollers.UserCache) error {
 	pass := generatePassword(length)
-	hashedPass, err := user.HashPasswordString(string(pass))
-	if err != nil {
-		return err
-	}
 
 	admin, err := client.Users("").Create(&v3.User{
 		ObjectMeta: v1.ObjectMeta{
@@ -107,12 +113,16 @@ func createNewAdmin(client v3.Interface, length int) error {
 		},
 		DisplayName:        "Default Admin",
 		Username:           "admin",
-		Password:           string(hashedPass),
 		MustChangePassword: false,
 	})
 
 	if err != nil {
 		return err
+	}
+
+	pwdCreator := pbkdf2.New(secretLister, secretClient)
+	if err := pwdCreator.CreatePassword(admin, string(pass)); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
 	addAdminRoleToUser(client, *admin)

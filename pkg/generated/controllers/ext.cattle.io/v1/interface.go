@@ -32,8 +32,11 @@ func init() {
 
 type Interface interface {
 	Kubeconfig() KubeconfigController
+	PasswordChangeRequest() PasswordChangeRequestController
+	SelfUser() SelfUserController
 	Token() TokenController
 	UserActivity() UserActivityController
+	UserRefreshRequest() UserRefreshRequestController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -50,10 +53,22 @@ func (v *version) Kubeconfig() KubeconfigController {
 	return generic.NewNonNamespacedController[*v1.Kubeconfig, *v1.KubeconfigList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Kubeconfig"}, "kubeconfigs", v.controllerFactory)
 }
 
+func (v *version) PasswordChangeRequest() PasswordChangeRequestController {
+	return generic.NewController[*v1.PasswordChangeRequest, *v1.PasswordChangeRequestList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "PasswordChangeRequest"}, "passwordchangerequests", true, v.controllerFactory)
+}
+
+func (v *version) SelfUser() SelfUserController {
+	return generic.NewController[*v1.SelfUser, *v1.SelfUserList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "SelfUser"}, "selfusers", true, v.controllerFactory)
+}
+
 func (v *version) Token() TokenController {
 	return generic.NewNonNamespacedController[*v1.Token, *v1.TokenList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "Token"}, "tokens", v.controllerFactory)
 }
 
 func (v *version) UserActivity() UserActivityController {
 	return generic.NewNonNamespacedController[*v1.UserActivity, *v1.UserActivityList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "UserActivity"}, "useractivities", v.controllerFactory)
+}
+
+func (v *version) UserRefreshRequest() UserRefreshRequestController {
+	return generic.NewController[*v1.UserRefreshRequest, *v1.UserRefreshRequestList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "UserRefreshRequest"}, "userrefreshrequests", true, v.controllerFactory)
 }

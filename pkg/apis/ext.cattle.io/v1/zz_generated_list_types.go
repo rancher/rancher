@@ -44,6 +44,40 @@ func NewKubeconfig(namespace, name string, obj Kubeconfig) *Kubeconfig {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PasswordChangeRequestList is a list of PasswordChangeRequest resources
+type PasswordChangeRequestList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []PasswordChangeRequest `json:"items"`
+}
+
+func NewPasswordChangeRequest(namespace, name string, obj PasswordChangeRequest) *PasswordChangeRequest {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PasswordChangeRequest").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SelfUserList is a list of SelfUser resources
+type SelfUserList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []SelfUser `json:"items"`
+}
+
+func NewSelfUser(namespace, name string, obj SelfUser) *SelfUser {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SelfUser").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // TokenList is a list of Token resources
 type TokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -71,6 +105,23 @@ type UserActivityList struct {
 
 func NewUserActivity(namespace, name string, obj UserActivity) *UserActivity {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("UserActivity").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UserRefreshRequestList is a list of UserRefreshRequest resources
+type UserRefreshRequestList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []UserRefreshRequest `json:"items"`
+}
+
+func NewUserRefreshRequest(namespace, name string, obj UserRefreshRequest) *UserRefreshRequest {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("UserRefreshRequest").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
