@@ -53,27 +53,6 @@ jobs:
     with:
       parent_run_id: ${{ github.run_id }}
     uses: ./.github/workflows/integration-tests.yml
-  build-agent-windows:
-    strategy:
-      matrix:
-        os: [windows]
-        version: [2019, 2022]
-    runs-on: ${{ matrix.os }}-${{ matrix.version }}
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
-      - name: build
-        uses: ./.github/actions/build-images/agent-windows
   push-images:
     needs: [unit-tests, integration-tests]
     strategy:
@@ -152,7 +131,7 @@ jobs:
       - name: merge
         uses: ./.github/actions/merge-manifests/server
   merge-agent-manifest:
-    needs: [push-images, build-agent-windows]
+    needs: [push-images]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
