@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	apiregv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -137,18 +136,6 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector
 	return nil
 }
 
-func CleanupExtensionAPIServer(wranglerContext *wrangler.Context) error {
-	if err := wranglerContext.Core.Service().Delete(Namespace, TargetServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-		return fmt.Errorf("failed to delete service: %w", err)
-	}
-
-	if err := wranglerContext.API.APIService().Delete(APIServiceName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-		return fmt.Errorf("failed to delete APIService: %w", err)
-	}
-
-	return nil
-}
-
 func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Context, opts Options) (steveserver.ExtensionAPIServer, error) {
 	// Only the local cluster runs an extension API server
 	if features.MCMAgent.Enabled() {
@@ -170,61 +157,51 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	var additionalSniProviders []dynamiccertificates.SNICertKeyContentProvider
 	var ln net.Listener
 
-	if features.ImperativeApiExtension.Enabled() {
-		logrus.Info("creating imperative extension apiserver resources")
+	logrus.Info("creating imperative extension apiserver resources")
 
-		sniProvider, err := NewSNIProviderForCname(
-			"imperative-api-sni-provider",
-			[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
-			wranglerContext.Core.Secret(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
-		}
-
-		sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
-
-		go func() {
-			// sniProvider.Run uses a Watch that could be aborted due to external reasons, make sure we retry unless the context was already canceled
-			for {
-				if err := sniProvider.Run(ctx.Done()); err != nil {
-					logrus.Errorf("sni provider failed: %s", err)
-					if ctx.Err() != nil {
-						return
-					}
-				}
-				time.Sleep(10 * time.Second)
-			}
-		}()
-
-		// Only need to listen on localhost because that port will be reached
-		// from a remotedialer tunnel on localhost
-		ln, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
-		}
-
-		additionalSniProviders = append(additionalSniProviders, sniProvider)
-
-		if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
-			return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-		}
-
-		defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
-		}
-
-		authenticators = append(authenticators, defaultAuthenticator)
-	} else {
-		logrus.Info("deleting imperative extension apiserver resources")
-
-		ln = NewBlockingListener()
-
-		if err := CleanupExtensionAPIServer(wranglerContext); err != nil {
-			return nil, fmt.Errorf("failed to clean up extension api resources: %w", err)
-		}
+	sniProvider, err := NewSNIProviderForCname(
+		"imperative-api-sni-provider",
+		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
+		wranglerContext.Core.Secret(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate cert for target service: %w", err)
 	}
+
+	sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
+
+	go func() {
+		// sniProvider.Run uses a Watch that could be aborted due to external reasons, make sure we retry unless the context was already canceled
+		for {
+			if err := sniProvider.Run(ctx.Done()); err != nil {
+				logrus.Errorf("sni provider failed: %s", err)
+				if ctx.Err() != nil {
+					return
+				}
+			}
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
+	// Only need to listen on localhost because that port will be reached
+	// from a remotedialer tunnel on localhost
+	ln, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
+	}
+
+	additionalSniProviders = append(additionalSniProviders, sniProvider)
+
+	if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
+		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
+	}
+
+	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create extension server authenticator: %w", err)
+	}
+
+	authenticators = append(authenticators, defaultAuthenticator)
 
 	scheme := wrangler.Scheme
 

@@ -192,9 +192,8 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					return false
 				}
 
-				return features.ImperativeApiExtension.Enabled() && ext.RDPEnabled()
+				return ext.RDPEnabled()
 			},
-			Uninstall:       !features.ImperativeApiExtension.Enabled(),
 			RemoveNamespace: false,
 		},
 		{
