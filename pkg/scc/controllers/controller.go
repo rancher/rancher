@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
@@ -19,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
-	"time"
 )
 
 const (
@@ -78,7 +79,7 @@ func Register(
 	}
 
 	registrations.OnChange(ctx, controllerID, controller.OnRegistrationChange)
-	registrations.OnRemove(ctx, controllerID, controller.OnRegistrationRemove)
+	registrations.OnRemove(ctx, controllerID+"remove", controller.OnRegistrationRemove)
 	relatedresource.Watch(ctx, controllerID+"-secrets",
 		relatedresource.
 			OwnerResolver(true, v1.SchemeGroupVersion.String(), v1.RegistrationResourceName),

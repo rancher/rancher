@@ -1,11 +1,12 @@
 package systeminfo
 
 import (
-	"github.com/google/uuid"
+	"net/url"
+
+	"github.com/pborman/uuid"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/settings"
 	coreVersion "github.com/rancher/rancher/pkg/version"
-	"net/url"
 )
 
 const (

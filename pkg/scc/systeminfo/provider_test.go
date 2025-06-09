@@ -1,10 +1,11 @@
 package systeminfo
 
 import (
-	"github.com/rancher/rancher/pkg/scc/util"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/rancher/rancher/pkg/scc/util"
+
+	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/rancher/rancher/pkg/settings"
@@ -12,8 +13,8 @@ import (
 )
 
 func TestNewInfoProvider(t *testing.T) {
-	rancherUuid := uuid.New()
-	clusterUuid := uuid.New()
+	rancherUuid := uuid.Parse(uuid.New())
+	clusterUuid := uuid.Parse(uuid.New())
 
 	// Test with dev build
 	infoProvider := NewInfoProvider(rancherUuid, clusterUuid)
@@ -31,8 +32,8 @@ func TestNewInfoProvider(t *testing.T) {
 }
 
 func TestGetProductIdentifier(t *testing.T) {
-	rancherUuid := uuid.New()
-	clusterUuid := uuid.New()
+	rancherUuid := uuid.Parse(uuid.New())
+	clusterUuid := uuid.Parse(uuid.New())
 
 	infoProvider := NewInfoProvider(rancherUuid, clusterUuid)
 	product, version, architecture := infoProvider.GetProductIdentifier()

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc/util/log"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rancher/rancher/pkg/scc/util/log"
+
+	"github.com/pborman/uuid"
 	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +56,8 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 			return nil
 		},
 	)
+
+	// TODO(dan) : below we need to be more careful about where we logrus.Fatal. This calls os.Exit(1)
 	if kubeNsErr != nil {
 		// fatal log here, because we need the kube-system ns UID while creating any backup file
 		logger.Fatalf("Error getting namespace kube-system: %v", kubeNsErr)
@@ -72,10 +75,17 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 		logger.Fatalf("Error getting scc resources: %v", err)
 		return nil, err
 	}
+	// Validate that the UUID is in correct format
+	parsedRancherUUID := uuid.Parse(rancherUuid)
+	parsedkubeSystemNSUID := uuid.Parse(string(kubeSystemNS.UID))
 
+	if parsedRancherUUID == nil || parsedkubeSystemNSUID == nil {
+		// TODO (dan) : handle error case as you feel is appropriate
+		return nil, fmt.Errorf("invalid UUID format: rancherUuid=%s, kubeSystemNS.UID=%s", rancherUuid, string(kubeSystemNS.UID))
+	}
 	infoProvider := systeminfo.NewInfoProvider(
-		uuid.MustParse(rancherUuid),
-		uuid.MustParse(string(kubeSystemNS.UID)),
+		parsedRancherUUID,
+		parsedkubeSystemNSUID,
 	)
 
 	// TODO(o&b): also get Node, Sockets, v-cpus, Clusters and watch those
