@@ -104,40 +104,6 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: publish
         uses: ./.github/actions/rancher-chart/publish-gcp
-  merge-server-manifest:
-    needs: [push-images]
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
-      - name: merge
-        uses: ./.github/actions/merge-manifests/server
-  merge-agent-manifest:
-    needs: [push-images]
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
-      - name: merge
-        uses: ./.github/actions/merge-manifests/agent
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -161,8 +127,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
         uses: ./.github/actions/build-images/installer
-  merge-installer-manifest:
-    needs: [build-installer]
+  merge-server-agent-installer-manifests:
+    needs: [push-images, build-installer]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -176,8 +142,18 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
-      - name: merge
-        uses: ./.github/actions/merge-manifests/installer
+      - name: merge server manifests
+        with:
+          image: "${{ env.IMAGE }}"
+        uses: ./.github/actions/merge-manifests
+      - name: merge agent manifests
+        with:
+          image: "${{ env.IMAGE_AGENT }}"
+        uses: ./.github/actions/merge-manifests
+      - name: merge installer manifests
+        with:
+          image: "${{ env.IMAGE_INSTALLER }}"
+        uses: ./.github/actions/merge-manifests
   create-images-files:
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:

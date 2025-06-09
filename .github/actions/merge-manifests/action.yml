@@ -1,0 +1,39 @@
+name: "Merge images manifests"
+description: "Merge docker amd64 and arm64 images manifest into a single multi-arch manifest"
+inputs:
+  image:
+    description: "repository and image name e.g: rancher/rancher"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Environment Variables
+      uses: ./.github/actions/setup-tag-env
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Login to Docker Registry
+      uses: docker/login-action@v3
+      with:
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_PASSWORD }}
+        registry: ${{ env.REGISTRY }}
+    - name: Create manifest list and push
+      shell: bash
+      run: |
+        docker buildx imagetools create \
+          --tag ${{ env.REGISTRY}}/${{ inputs.image }}:${{ env.TAG }} \
+          ${{ env.REGISTRY}}/${{ inputs.image }}:${{ env.TAG }}-amd64 \
+          ${{ env.REGISTRY}}/${{ inputs.image }}:${{ env.TAG }}-arm64
+    - name: Create head manifest list and push
+      shell: bash
+      run: |
+        if [[ "${{ github.ref_name }}" == release/v* ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY}}/${{ inputs.image }}:${{ env.HEAD_TAG }} \
+            ${{ env.REGISTRY}}/${{ inputs.image }}:${{ env.TAG }}-amd64 \
+            ${{ env.REGISTRY}}/${{ inputs.image }}:${{ env.TAG }}-arm64
+        fi
+    - name: Inspect image
+      shell: bash
+      run: |
+        docker buildx imagetools inspect ${{ env.REGISTRY}}/${{ inputs.image }}:${{ env.TAG }}
