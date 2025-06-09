@@ -240,8 +240,10 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 			// Set the field to ensure backward compatibility in the case of node-driver RKE2/K3s cluster
 			if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
 				(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
-				return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
-					capr.SafeConcatName(48, cluster.Spec.DisplayName, "managed", "system-upgrade-controller"))
+				if cluster.Spec.DisplayName != "" {
+					return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
+						capr.SafeConcatName(48, cluster.Spec.DisplayName, "managed", "system-upgrade-controller"))
+				}
 			}
 			return ""
 		}(),
