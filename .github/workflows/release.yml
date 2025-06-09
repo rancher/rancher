@@ -187,7 +187,7 @@ jobs:
   docker-image-digests:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:latest
-    needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
+    needs: [create-images-files, merge-server-agent-installer-manifests]
     permissions:
       contents: write
       id-token: write
@@ -219,7 +219,7 @@ jobs:
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:latest
-    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests, merge-installer-manifest]
+    needs: [merge-server-agent-installer-manifests, docker-image-digests]
     permissions:
       contents: read
       id-token: write
