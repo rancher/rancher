@@ -238,6 +238,7 @@ var OriginMap = map[string]string{
 	"prom-prometheus":                                         "https://github.com/prometheus/prometheus",
 	"prometheus-auth":                                         "https://github.com/rancher/prometheus-auth",
 	"prometheus-federator":                                    "https://github.com/rancher/prometheus-federator",
+	"pushprox":                                                "https://github.com/rancher/PushProx",
 	"pushprox-client":                                         "https://github.com/rancher/PushProx",
 	"pushprox-proxy":                                          "https://github.com/rancher/PushProx",
 	"rancher":                                                 "https://github.com/rancher/rancher",
