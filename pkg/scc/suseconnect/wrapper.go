@@ -2,6 +2,7 @@ package suseconnect
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util/log"

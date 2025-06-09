@@ -17,6 +17,7 @@ const (
 )
 
 type CredentialSecretsAdapter struct {
+	// TODO (dan) : let's make sure the lookups are handled via a secret cache
 	secrets     v1core.SecretController
 	credentials SccCredentials
 	// TODO: implement secret reconcile logic

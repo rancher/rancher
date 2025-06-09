@@ -2,8 +2,9 @@ package systeminfo
 
 import (
 	"encoding/json"
+
 	"github.com/SUSE/connect-ng/pkg/registration"
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/wrangler"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ type RancherOfflineRequest struct {
 	RancherUrl string    `json:"server_url"`
 	Nodes      int       `json:"nodes"`
 	Sockets    int       `json:"sockets"`
-	VCPUs      int       `json:vcpus`
+	VCPUs      int       `json:"vcpus"`
 	Clusters   int       `json:"clusters"`
 	Version    string    `json:"version"`
 }
