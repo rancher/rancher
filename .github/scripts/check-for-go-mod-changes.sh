@@ -1,12 +1,5 @@
 #!/bin/sh
-set -uex
-
-git log -n 5
-
-git status
-
-git branch
-
+set -ue
 
 for DIRECTORY in . ./pkg/apis ./pkg/client; do
     cd "$DIRECTORY"
@@ -20,9 +13,6 @@ if [ -n "$(git status --porcelain)" ]; then
     echo
     echo "The following go files did differ after tidying them:"
     git status --porcelain
-    git status
-    git diff
-    go version
     exit 1
 fi
 
