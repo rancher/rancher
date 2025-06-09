@@ -57,6 +57,7 @@ import (
 	"github.com/urfave/cli"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -72,6 +73,7 @@ import (
 const (
 	encryptionConfigUpdate        = "provisioner.cattle.io/encrypt-migrated"
 	defaultSQLCacheMaxEventsCount = 1000
+	localUserPasswordsNamespace = "cattle-local-user-passwords"
 )
 
 type Options struct {
@@ -327,6 +329,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: localUserPasswordsNamespace},
+	}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
