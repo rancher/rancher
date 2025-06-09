@@ -8,3 +8,6 @@ controller-gen crd:generateEmbeddedObjectMeta=true,allowDangerousTypes=false pat
 
 # remove empty CRD that is generated from our use of // +kubebuilder:skipversion
 rm -f ./pkg/crds/yaml/generated/_.yaml
+
+# Generate the sample CRD used for documenting dynamic objects in rke-machine.cattle.io (machines and machinetemplates).
+controller-gen crd paths=./pkg/controllers/capr/dynamicschema/sample output:crd:dir=./pkg/controllers/capr/dynamicschema/sample
