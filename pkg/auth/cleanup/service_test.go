@@ -11,6 +11,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -21,8 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestRunCleanup(t *testing.T) {
@@ -276,8 +279,16 @@ func newMockCleanupService(t *testing.T,
 		return &lst, nil
 	}).AnyTimes()
 
+	// Setup SecretsCache mock client
+	secretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secretsCache.EXPECT().Get(pbkdf2.LocalUserPasswordsNamespace, gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{
+		Group:    v1.SchemeGroupVersion.Group,
+		Resource: "secrets",
+	}, "")).AnyTimes()
+
 	return Service{
 		secretsInterface:                  getSecretControllerMock(ctrl, secretStore),
+		secretsCache:                      secretsCache,
 		globalRoleBindingsCache:           grbCache,
 		globalRoleBindingsClient:          grbClient,
 		projectRoleTemplateBindingsCache:  prtbCache,

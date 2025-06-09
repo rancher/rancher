@@ -12,6 +12,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -37,6 +38,10 @@ const (
 
 var invalidHash, _ = bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
 
+type PasswordVerifier interface {
+	VerifyPassword(user *v3.User, password string) error
+}
+
 type Provider struct {
 	userLister   v3.UserLister
 	groupLister  v3.GroupLister
@@ -44,6 +49,7 @@ type Provider struct {
 	gmIndexer    cache.Indexer
 	groupIndexer cache.Indexer
 	tokenMGR     *tokens.Manager
+	pwdVerifier  PasswordVerifier
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -66,6 +72,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 		groupIndexer: gInformer.GetIndexer(),
 		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
 		tokenMGR:     tokenMGR,
+		pwdVerifier:  pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
 	}
 	return l
 }
@@ -130,7 +137,7 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 		return v3.Principal{}, nil, "", authFailedError
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(pwd)); err != nil {
+	if err := l.pwdVerifier.VerifyPassword(user, pwd); err != nil {
 		logrus.Debugf("Authentication failed for User [%s]: %v", username, err)
 		return v3.Principal{}, nil, "", authFailedError
 	}

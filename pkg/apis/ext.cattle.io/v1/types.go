@@ -249,3 +249,79 @@ type KubeconfigStatus struct {
 	// Value contains the generated content of the kubeconfig.
 	Value string `json:"value,omitempty"`
 }
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UserRefreshRequest is used to initiate a user refresh action.
+type UserRefreshRequest struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec is the desired state of the UserRefreshRequestSpec.
+	// +optional
+	Spec UserRefreshRequestSpec `json:"spec,omitempty"`
+	// Status is the most recently observed status of the UserRefreshRequestSpec.
+	// +optional
+	Status UserRefreshRequestStatus `json:"status,omitempty"`
+}
+
+// UserRefreshRequestSpec contains the data about the user refresh request.
+type UserRefreshRequestSpec struct {
+	UserID string `json:"userID,omitempty"`
+	All    bool   `json:"all,omitempty"`
+}
+
+// UserRefreshRequestStatus defines the most recently observed status of the UserRefreshRequest.
+type UserRefreshRequestStatus struct {
+	Conditions []metav1.Condition `json:"conditions"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PasswordChangeRequest is used to change the password for a local user.
+type PasswordChangeRequest struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec is the desired state of the PasswordChangeRequest.
+	// +optional
+	Spec PasswordChangeRequestSpec `json:"spec,omitempty"`
+	// Status is the most recently observed status of the PasswordChangeRequest.
+	// +optional
+	Status PasswordChangeRequestStatus `json:"status,omitempty"`
+}
+
+// PasswordChangeRequestSpec contains the data about the password change request.
+type PasswordChangeRequestSpec struct {
+	UserID          string `json:"userID,omitempty"`
+	CurrentPassword string `json:"currentPassword,omitempty"`
+	NewPassword     string `json:"newPassword,omitempty"`
+}
+
+// PasswordChangeRequestStatus defines the most recently observed status of the PasswordChangeRequest.
+type PasswordChangeRequestStatus struct {
+	Conditions []metav1.Condition `json:"conditions"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SelfUser is used to retrieve the current user information.
+type SelfUser struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec is the desired state of the PasswordChangeRequest.
+	// +optional
+	Status SelfUserStatus `json:"status,omitempty"`
+}
+
+// SelfUserStatus defines the most recently observed status of the SelfUser
+type SelfUserStatus struct {
+	UserID string `json:"userID,omitempty"`
+}
