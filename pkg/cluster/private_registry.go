@@ -45,6 +45,10 @@ func GetPrivateRegistry(cluster *v3.Cluster) *rketypes.PrivateRegistry {
 // GetPrivateClusterLevelRegistry returns the cluster-level registry for the given clusters.management.cattle.io/v3
 // object (or nil if one is not found).
 func GetPrivateClusterLevelRegistry(cluster *v3.Cluster) *rketypes.PrivateRegistry {
+	if cluster != nil && cluster.Spec.RancherKubernetesEngineConfig != nil && len(cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
+		config := cluster.Spec.RancherKubernetesEngineConfig
+		return &config.PrivateRegistries[0]
+	}
 	if cluster != nil && cluster.Spec.ImportedConfig != nil && cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
 		return &rketypes.PrivateRegistry{
 			URL: cluster.Spec.ImportedConfig.PrivateRegistryURL,

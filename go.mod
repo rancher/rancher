@@ -112,7 +112,6 @@ require (
 	github.com/microsoft/kiota-abstractions-go v1.7.0
 	github.com/microsoftgraph/msgraph-sdk-go v1.51.0
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1
-	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/locker v1.0.1
 	github.com/opencontainers/go-digest v1.0.0
@@ -233,7 +232,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/kubereboot/kured v1.13.1 // indirect
 	github.com/microsoft/kiota-authentication-azure-go v1.1.0 // indirect
 	github.com/microsoft/kiota-http-go v1.4.4 // indirect
@@ -348,7 +346,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
-	github.com/klauspost/cpuid v1.3.1 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -361,8 +358,6 @@ require (
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
-	github.com/minio/md5-simd v1.1.0 // indirect
-	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
@@ -384,7 +379,6 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
-	github.com/rs/xid v1.2.1 // indirect
 	github.com/rubenv/sql-migrate v1.7.1 // indirect
 	github.com/russellhaering/goxmldsig v1.4.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -421,7 +415,6 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.67.0 // indirect
 	k8s.io/cluster-bootstrap v0.31.3 // indirect
 	k8s.io/code-generator v0.32.2 // indirect
 	k8s.io/component-base v0.32.2 // indirect

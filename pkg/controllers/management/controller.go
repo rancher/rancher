@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clustertemplate"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/kontainerdriver"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
@@ -48,7 +47,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	cloudcredential.Register(ctx, management, wrangler)
 	node.Register(ctx, management, manager)
 
-	etcdbackup.Register(ctx, management)
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)
 	secretmigrator.Register(ctx, management)
