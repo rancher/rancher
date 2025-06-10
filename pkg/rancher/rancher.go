@@ -45,6 +45,7 @@ import (
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
+	"github.com/rancher/steve/pkg/sqlcache/informer/factory"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/k8scheck"
 	"github.com/rancher/wrangler/v3/pkg/unstructured"
@@ -64,7 +65,10 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-const encryptionConfigUpdate = "provisioner.cattle.io/encrypt-migrated"
+const (
+	encryptionConfigUpdate        = "provisioner.cattle.io/encrypt-migrated"
+	defaultSQLCacheMaxEventsCount = 1000
+)
 
 type Options struct {
 	ACMEDomains       cli.StringSlice
@@ -213,13 +217,16 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
-		ServerVersion:      settings.ServerVersion.Get(),
-		Controllers:        steveControllers,
-		AccessSetLookup:    wranglerContext.ASL,
-		AuthMiddleware:     steveauth.ExistingContext,
-		Next:               ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
-		ClusterRegistry:    opts.ClusterRegistry,
-		SQLCache:           features.UISQLCache.Enabled(),
+		ServerVersion:   settings.ServerVersion.Get(),
+		Controllers:     steveControllers,
+		AccessSetLookup: wranglerContext.ASL,
+		AuthMiddleware:  steveauth.ExistingContext,
+		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
+		ClusterRegistry: opts.ClusterRegistry,
+		SQLCache:        features.UISQLCache.Enabled(),
+		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
+			DefaultMaximumEventsCount: defaultSQLCacheMaxEventsCount,
+		},
 		ExtensionAPIServer: extensionAPIServer,
 	})
 	if err != nil {
