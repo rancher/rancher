@@ -96,6 +96,11 @@ func (in *RegistrationRequest) DeepCopyInto(out *RegistrationRequest) {
 		*out = new(corev1.SecretReference)
 		**out = **in
 	}
+	if in.SeverUrl != nil {
+		in, out := &in.SeverUrl, &out.SeverUrl
+		*out = new(string)
+		**out = **in
+	}
 	if in.ServerCertificateSecretRef != nil {
 		in, out := &in.ServerCertificateSecretRef, &out.ServerCertificateSecretRef
 		*out = new(corev1.SecretReference)
@@ -157,6 +162,11 @@ func (in *RegistrationStatus) DeepCopyInto(out *RegistrationStatus) {
 		in, out := &in.RegistrationProcessedTS, &out.RegistrationProcessedTS
 		*out = (*in).DeepCopy()
 	}
+	if in.SCCSystemId != nil {
+		in, out := &in.SCCSystemId, &out.SCCSystemId
+		*out = new(int)
+		**out = **in
+	}
 	in.ActivationStatus.DeepCopyInto(&out.ActivationStatus)
 	if in.SystemCredentialsSecretRef != nil {
 		in, out := &in.SystemCredentialsSecretRef, &out.SystemCredentialsSecretRef
@@ -187,6 +197,16 @@ func (in *SystemActivationState) DeepCopyInto(out *SystemActivationState) {
 	if in.LastValidatedTS != nil {
 		in, out := &in.LastValidatedTS, &out.LastValidatedTS
 		*out = (*in).DeepCopy()
+	}
+	if in.Certificate != nil {
+		in, out := &in.Certificate, &out.Certificate
+		*out = new(string)
+		**out = **in
+	}
+	if in.SystemUrl != nil {
+		in, out := &in.SystemUrl, &out.SystemUrl
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
