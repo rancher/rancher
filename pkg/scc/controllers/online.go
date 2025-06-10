@@ -107,23 +107,25 @@ func (s sccOnlineMode) ReconcileRegisterSystemError(registration *v1.Registratio
 }
 
 func (s sccOnlineMode) PrepareRegisteredSystem(registration *v1.Registration) *v1.Registration {
-	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", registration.Status.SCCSystemId)
+	if registration.Status.SCCSystemId == nil {
+		return registration
+	}
+	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
 	s.log.Debugf("system announced, check %s", sccSystemUrl)
 
-	prepared := registration.DeepCopy()
-	prepared.Status.ActivationStatus.SystemUrl = sccSystemUrl
-	v1.RegistrationConditionSccUrlReady.SetStatusBool(prepared, false) // This must be false until successful activation too.
-	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(prepared, fmt.Sprintf("system announced, check %s", sccSystemUrl))
-	v1.RegistrationConditionAnnounced.SetStatusBool(prepared, true)
-	v1.ResourceConditionFailure.SetStatusBool(prepared, false)
-	v1.ResourceConditionReady.SetStatusBool(prepared, true)
+	registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
+	v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
+	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+	v1.RegistrationConditionAnnounced.SetStatusBool(registration, true)
+	v1.ResourceConditionFailure.SetStatusBool(registration, false)
+	v1.ResourceConditionReady.SetStatusBool(registration, true)
 
-	prepared.Status.SystemCredentialsSecretRef = &corev1.SecretReference{
+	registration.Status.SystemCredentialsSecretRef = &corev1.SecretReference{
 		Namespace: credentials.Namespace,
 		Name:      credentials.SecretName,
 	}
 
-	return prepared
+	return registration
 }
 
 func (s sccOnlineMode) fetchRegCode(registrationObj *v1.Registration) string {
