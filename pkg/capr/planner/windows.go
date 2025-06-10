@@ -169,6 +169,10 @@ $restrictedPaths = @(
 		Directory = $false
 	}
 	[PSCustomObject]@{
+		Path = "c:\etc\rancher\rke2\config.yaml.d\25-join-server.yaml"
+		Directory = $false
+	}
+	[PSCustomObject]@{
 		Path = "c:\usr\local\bin\rke2.exe"
 		Directory = $false
 	}

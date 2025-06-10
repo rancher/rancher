@@ -62,8 +62,9 @@ const (
 	TLSCertFileArgument                           = "tls-cert-file"
 	DeleteFileAction                              = "delete"
 
-	authnWebhookFileName = "kube-api-authn-webhook.yaml"
-	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
+	authnWebhookFileName   = "kube-api-authn-webhook.yaml"
+	ConfigYamlFileName     = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
+	JoinServerYamlFileName = "/etc/rancher/%s/config.yaml.d/25-join-server.yaml"
 
 	bootstrapTier    = "bootstrap"
 	etcdTier         = "etcd"
