@@ -775,8 +775,8 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 	}
 	kubeconfig.Spec.TTL = ttl
 
-	if seriliazed := configMap.Data[ClustersField]; seriliazed != "" {
-		err = json.Unmarshal([]byte(configMap.Data[ClustersField]), &kubeconfig.Spec.Clusters)
+	if serialized := configMap.Data[ClustersField]; serialized != "" {
+		err = json.Unmarshal([]byte(serialized), &kubeconfig.Spec.Clusters)
 		if err != nil {
 			return nil, fmt.Errorf("error unmarshaling spec.clusters for %s: %w", configMap.Name, err)
 		}
