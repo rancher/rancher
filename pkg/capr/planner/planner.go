@@ -64,6 +64,7 @@ const (
 
 	authnWebhookFileName = "kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
+	ConfigYamlFileName2  = "/etc/rancher/%s/config.yaml.d/51-rancher.yaml"
 
 	bootstrapTier    = "bootstrap"
 	etcdTier         = "etcd"
