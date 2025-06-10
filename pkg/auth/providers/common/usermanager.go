@@ -265,19 +265,14 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		return "", nil, errors.New("failed to generate token key")
 	}
 
-	labels := map[string]string{
-		tokens.UserIDLabel:    input.UserName,
-		tokens.TokenKindLabel: input.Kind,
-	}
+	labels := map[string]string{}
 	if input.Labels != nil {
 		for k, v := range input.Labels {
-			if k == tokens.UserIDLabel || k == tokens.TokenKindLabel {
-				// Don't allow overriding user id and kind labels.
-				continue
-			}
 			labels[k] = v
 		}
 	}
+	labels[tokens.UserIDLabel] = input.UserName
+	labels[tokens.TokenKindLabel] = input.Kind
 
 	token = &v3.Token{
 		ObjectMeta: v1.ObjectMeta{
