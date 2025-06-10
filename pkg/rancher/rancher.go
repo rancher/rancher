@@ -711,6 +711,8 @@ func getMaximumEventsCount() (int, map[schema.GroupVersionKind]int) {
 	if defaultMaxStr != "" {
 		if converted, err := strconv.Atoi(defaultMaxStr); err == nil {
 			defaultMax = converted
+		} else {
+			logrus.Infof("Invalid SQLCACHE_MAX_EVENTS env var, defaulting to %d", defaultMax)
 		}
 	}
 
@@ -726,6 +728,7 @@ func getMaximumEventsCount() (int, map[schema.GroupVersionKind]int) {
 		maxStr := fields[1]
 		converted, err := strconv.Atoi(maxStr)
 		if err != nil {
+			logrus.Infof("Invalid value for %q in SQLCACHE_GVK_MAX_EVENTS env var, skipping", gvkStr)
 			continue
 		}
 
