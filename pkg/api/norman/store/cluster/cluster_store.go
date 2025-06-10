@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
@@ -29,7 +28,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
-	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -257,9 +255,6 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err = setInitialConditions(data); err != nil {
 		return nil, err
 	}
-	if err = validateS3Credentials(apiContext.Request.Context(), data, nil); err != nil {
-		return nil, err
-	}
 	if err = validateKeyRotation(data); err != nil {
 		return nil, err
 	}
@@ -473,13 +468,6 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	cleanPrivateRegistry(data)
-	dialer, err := r.DialerFactory.ClusterDialer(id, true)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting dialer")
-	}
-	if err := validateUpdatedS3Credentials(apiContext.Request.Context(), existingCluster, data, dialer); err != nil {
-		return nil, err
-	}
 	if err := validateKeyRotation(data); err != nil {
 		return nil, err
 	}
@@ -814,69 +802,6 @@ func enableCRIDockerd(data map[string]interface{}) {
 	}
 }
 
-func validateUpdatedS3Credentials(ctx context.Context, oldData, newData map[string]interface{}, dialer dialer.Dialer) error {
-	newConfig := convert.ToMapInterface(values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
-	if newConfig == nil {
-		return nil
-	}
-
-	oldConfig := convert.ToMapInterface(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
-	if oldConfig == nil {
-		return validateS3Credentials(ctx, newData, dialer)
-	}
-	// remove "type" since it's added to the object by API, and it's not present in newConfig yet.
-	delete(oldConfig, "type")
-	if !reflect.DeepEqual(newConfig, oldConfig) {
-		return validateS3Credentials(ctx, newData, dialer)
-	}
-	return nil
-}
-
-func validateS3Credentials(ctx context.Context, data map[string]interface{}, dialer dialer.Dialer) error {
-	s3BackupConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
-	if s3BackupConfig == nil {
-		return nil
-	}
-	configMap := convert.ToMapInterface(s3BackupConfig)
-	sbc := &rketypes.S3BackupConfig{
-		AccessKey: convert.ToString(configMap["accessKey"]),
-		SecretKey: convert.ToString(configMap["secretKey"]),
-		Endpoint:  convert.ToString(configMap["endpoint"]),
-		Region:    convert.ToString(configMap["region"]),
-		CustomCA:  convert.ToString(configMap["customCa"]),
-	}
-	// skip if we don't have credentials defined.
-	if sbc.AccessKey == "" && sbc.SecretKey == "" {
-		return nil
-	}
-	bucket := convert.ToString(configMap["bucketName"])
-	if bucket == "" {
-		return fmt.Errorf("Empty bucket name")
-	}
-	s3Client, err := etcdbackup.GetS3Client(sbc, s3TransportTimeout, dialer)
-	if err != nil {
-		return err
-	}
-
-	timeout, err := time.ParseDuration(settings.S3BucketCheckTimeout.Get())
-	if err != nil {
-		timeout = 30 * time.Second
-		logrus.Errorf("cluster store: could not parse S3 bucket check timeout, using 30s: %v", err)
-	}
-
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	exists, err := s3Client.BucketExists(timeoutCtx, bucket)
-	if err != nil {
-		return fmt.Errorf("Unable to validate S3 backup target configuration: %v", err)
-	}
-	if !exists {
-		return fmt.Errorf("Unable to validate S3 backup target configuration: bucket [%v] not found", bucket)
-	}
-	return nil
-}
-
 func cleanPrivateRegistry(data map[string]interface{}) {
 	registries, ok := values.GetSlice(data, "rancherKubernetesEngineConfig", "privateRegistries")
 	if !ok || registries == nil {
@@ -895,22 +820,6 @@ func cleanPrivateRegistry(data map[string]interface{}) {
 		updatedRegistries = append(updatedRegistries, registry)
 	}
 	values.PutValue(data, updatedRegistries, "rancherKubernetesEngineConfig", "privateRegistries")
-}
-
-func getRkeConfig(data map[string]interface{}) (*rketypes.RancherKubernetesEngineConfig, error) {
-	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
-	if rkeConfig == nil {
-		return nil, nil
-	}
-	config, err := json.Marshal(rkeConfig)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error marshaling rkeConfig")
-	}
-	var spec *rketypes.RancherKubernetesEngineConfig
-	if err = json.Unmarshal(config, &spec); err != nil {
-		return nil, errors.Wrapf(err, "error reading rkeConfig")
-	}
-	return spec, nil
 }
 
 func validateKeyRotation(data map[string]interface{}) error {

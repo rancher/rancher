@@ -76,16 +76,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.ImportYamlHandler(actionName, action, apiContext)
 	case v32.ClusterActionExportYaml:
 		return a.ExportYamlHandler(actionName, action, apiContext)
-	case v32.ClusterActionBackupEtcd:
-		if !canBackupEtcd(apiContext, apiContext.ID) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not backup etcd")
-		}
-		return a.BackupEtcdHandler(actionName, action, apiContext)
-	case v32.ClusterActionRestoreFromEtcdBackup:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not restore etcd backup")
-		}
-		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
 	case v32.ClusterActionRotateCertificates:
 		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")

@@ -229,10 +229,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions[v3.ClusterActionExportYaml] = types.Action{
 				Output: "exportOutput",
 			}
-			schema.ResourceActions[v3.ClusterActionBackupEtcd] = types.Action{}
-			schema.ResourceActions[v3.ClusterActionRestoreFromEtcdBackup] = types.Action{
-				Input: "restoreFromEtcdBackupInput",
-			}
 			schema.ResourceActions[v3.ClusterActionRotateCertificates] = types.Action{
 				Input:  "rotateCertificateInput",
 				Output: "rotateCertificateOutput",
