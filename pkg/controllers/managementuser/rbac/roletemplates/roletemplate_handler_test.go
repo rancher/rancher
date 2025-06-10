@@ -104,7 +104,7 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
 					}
 				}
-				if got, want := len(roles[2].Rules), 1; got != want {
+				if got, want := len(roles[2].Rules), 2; got != want {
 					t.Errorf("expected role to have %d rules but got %d", want, got)
 				}
 				if got := roles[3].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
