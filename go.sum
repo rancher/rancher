@@ -743,8 +743,8 @@ github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0leargg
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/rancher/aks-operator v1.11.0 h1:4bDrQ+7jO4nNCLciVM2WQNPKreRKOh1ieu8QxRzGLUs=
 github.com/rancher/aks-operator v1.11.0/go.mod h1:iipTP7sdC7XgmwMgTa+dkmzNFwabkrlAwbC0rIsbmH4=
-github.com/rancher/apiserver v0.6.1 h1:f52oitL3rkl3Iw1Cm/jEFdH9dHapzXbkdqzS2LGZtow=
-github.com/rancher/apiserver v0.6.1/go.mod h1:Tc4+kkh5mO7M1sZYaqlunx4S/YVcz9AapvbScS3hQRg=
+github.com/rancher/apiserver v0.6.2 h1:b+viUWxOLBiSTTvYyTvqY9fRpg9qmJNMIrwms4r0TI0=
+github.com/rancher/apiserver v0.6.2/go.mod h1:Tc4+kkh5mO7M1sZYaqlunx4S/YVcz9AapvbScS3hQRg=
 github.com/rancher/channelserver v0.7.0 h1:ZN5o8aD4mD31uhjEEW2e9yQXa3eOb+4Cp6DcWm7W/Lc=
 github.com/rancher/channelserver v0.7.0/go.mod h1:Mwd7hlMSu9X4FnZKj+0mA5ak8nTyJZtZsVX33G62Gzc=
 github.com/rancher/dynamiclistener v0.6.2 h1:F0SEJhvO2aFe0eTvKGlQoy5x7HtwK8oJbyITVfBSb90=
@@ -775,8 +775,8 @@ github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHR
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20250411212007-f3f2fd268849 h1:hxa/Y0LRTx8BzMPxirT9Yg3IZg2YXus7+smLLn5n9tw=
 github.com/rancher/shepherd v0.0.0-20250411212007-f3f2fd268849/go.mod h1:IVVaLrIQ1/1Fk7KTrkhpKFlgaqhh3uv27CokmEhXHJc=
-github.com/rancher/steve v0.6.8 h1:vizrFjjF6TLg2IbFZ1k8K7ZK/0wXqgPZKSUMva/MRZE=
-github.com/rancher/steve v0.6.8/go.mod h1:urSxeFtfn5Ont+lAyjSh1Z0/T7R9cMhksp4eiGXjwY0=
+github.com/rancher/steve v0.6.9 h1:3kgIvXYUc5hWh1U/VgpBopjTRp9uEuv+g736GBztWn0=
+github.com/rancher/steve v0.6.9/go.mod h1:JsWOGS/SF5yzqMXMLsNJghCQ7F0gzIimk6ZR3MzsUks=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab h1:Ttxt14bAImsWyFrtQZ314GW2DeExrYRNoAb+u9V3RiA=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab/go.mod h1:9gzmXntv/s0sEDBERi/fS58PRt5HFUfZr7niDGsDbAA=
 github.com/rancher/tests/actions v0.0.0-20250505204226-5b136337f7c5 h1:iatxRcqkupXLGISfU5zRA37po3YO7Pqq/Ao7bIqFsu4=
