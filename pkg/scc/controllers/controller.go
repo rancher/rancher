@@ -43,7 +43,7 @@ type SCCHandler interface {
 	// ReconcileRegisterSystemError prepares the Registration object for error reconciliation after RegisterSystem fails.
 	ReconcileRegisterSystemError(*v1.Registration, error) *v1.Registration
 	// PrepareRegisteredSystem prepares the Registration object after successful registration.
-	PrepareRegisteredSystem(*v1.Registration) *v1.Registration
+	PrepareRegisteredSystem(*v1.Registration) (*v1.Registration, error)
 	// NeedsActivation checks if the system requires activation with SCC.
 	NeedsActivation(*v1.Registration) bool
 	// Activate activates the system with SCC or verifies an offline request.
@@ -257,8 +257,12 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			regForAnnounce.Status.SCCSystemId = announcedSystemId.Ptr()
 		}
 
+		var prepareError error
 		// Prepare the Registration for Activation phase
-		regForAnnounce = registrationHandler.PrepareRegisteredSystem(regForAnnounce)
+		regForAnnounce, prepareError = registrationHandler.PrepareRegisteredSystem(regForAnnounce)
+		if prepareError != nil {
+			return registrationObj, prepareError
+		}
 		regForAnnounce.Status.RegistrationProcessedTS = &metav1.Time{
 			Time: time.Now(),
 		}

@@ -24,14 +24,17 @@ type RancherSCCInfo struct {
 	Version    string    `json:"version"`
 }
 
+type ProductTriplet struct {
+	Identifier string `json:"identifier"`
+	Version    string `json:"version"`
+	Arch       string `json:"arch"`
+}
+
 type RancherOfflineRequest struct {
+	Product ProductTriplet `json:"product"`
+
 	UUID       uuid.UUID `json:"uuid"`
 	RancherUrl string    `json:"server_url"`
-	Nodes      int       `json:"nodes"`
-	Sockets    int       `json:"sockets"`
-	VCPUs      int       `json:"vcpus"`
-	Clusters   int       `json:"clusters"`
-	Version    string    `json:"version"`
 }
 
 type RancherOfflineRequestEncoded []byte
@@ -74,7 +77,7 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 
 	return RancherSCCInfo{
 		UUID:       e.InfoProvider.RancherUuid,
-		RancherUrl: ServerHostname(),
+		RancherUrl: ServerUrl(),
 		Version:    e.InfoProvider.GetVersion(),
 		Nodes:      nodeCount,
 		Sockets:    socketsCount,
@@ -103,15 +106,16 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 func (e *InfoExporter) PreparedForSCCOffline() (RancherOfflineRequestEncoded, error) {
 	sccPreparedInfo := e.preparedForSCC()
 
+	identifier, version, arch := e.InfoProvider.GetProductIdentifier()
+
 	offlinePrepared := RancherOfflineRequest{
 		UUID:       sccPreparedInfo.UUID,
 		RancherUrl: sccPreparedInfo.RancherUrl,
-		Nodes:      sccPreparedInfo.Nodes,
-		// TODO: unsure what to do here for offline since we don't have metrics on both sockets and vCPU
-		Sockets:  sccPreparedInfo.Sockets,
-		VCPUs:    sccPreparedInfo.Sockets,
-		Clusters: sccPreparedInfo.Clusters,
-		Version:  sccPreparedInfo.Version,
+		Product: ProductTriplet{
+			Identifier: identifier,
+			Version:    version,
+			Arch:       arch,
+		},
 	}
 
 	offlineJson, jsonErr := json.Marshal(offlinePrepared)

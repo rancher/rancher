@@ -31,22 +31,14 @@ func CreateSccOfflineRegistrationRequestSecret(offlineBlob []byte) *corev1.Secre
 			Name:      util.RancherSCCOfflineRequestSecretName,
 			Namespace: "cattle-system",
 		},
-		StringData: map[string]string{
-			util.RegCertSecretKey: string(offlineBlob),
+		Data: map[string][]byte{
+			util.RegCertSecretKey: offlineBlob,
 		},
 	}
 }
 
 func StoreSccOfflineRegistration(secrets controllerv1.SecretController, offlineBlob []byte) (*corev1.Secret, error) {
-	newSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      util.RancherSCCOfflineRequestSecretName,
-			Namespace: "cattle-system",
-		},
-		StringData: map[string]string{
-			util.RegCertSecretKey: string(offlineBlob),
-		},
-	}
+	newSecret := CreateSccOfflineRegistrationRequestSecret(offlineBlob)
 	created, err := secrets.Create(newSecret)
 	if err != nil {
 		return nil, err

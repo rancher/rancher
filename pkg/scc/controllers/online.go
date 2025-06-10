@@ -106,9 +106,9 @@ func (s sccOnlineMode) ReconcileRegisterSystemError(registration *v1.Registratio
 	return prepared
 }
 
-func (s sccOnlineMode) PrepareRegisteredSystem(registration *v1.Registration) *v1.Registration {
+func (s sccOnlineMode) PrepareRegisteredSystem(registration *v1.Registration) (*v1.Registration, error) {
 	if registration.Status.SCCSystemId == nil {
-		return registration
+		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
 	}
 	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
 	s.log.Debugf("system announced, check %s", sccSystemUrl)
@@ -125,7 +125,7 @@ func (s sccOnlineMode) PrepareRegisteredSystem(registration *v1.Registration) *v
 		Name:      credentials.SecretName,
 	}
 
-	return registration
+	return registration, nil
 }
 
 func (s sccOnlineMode) fetchRegCode(registrationObj *v1.Registration) string {

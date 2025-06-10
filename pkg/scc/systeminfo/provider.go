@@ -48,6 +48,11 @@ func (i *InfoProvider) GetProductIdentifier() (string, string, string) {
 	return RancherProductIdentifier, i.GetVersion(), RancherCPUArch
 }
 
+// ServerUrl returns the Rancher server URL
+func ServerUrl() string {
+	return settings.ServerURL.Get()
+}
+
 // ServerHostname returns the hostname of the Rancher server URL
 func ServerHostname() string {
 	serverUrl := settings.ServerURL.Get()
