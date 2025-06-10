@@ -202,6 +202,7 @@ func (t *Token) GetCreationTime() metav1.Time {
 type Kubeconfig struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// Note: Name and GenerateName are not respected. A name is always generated with a predefined prefix.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Spec is the desired state of the Kubeconfig.
