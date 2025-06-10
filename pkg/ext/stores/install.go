@@ -30,7 +30,7 @@ func InstallStores(
 	if err != nil {
 		return fmt.Errorf("unable to install useractivity store: %w", err)
 	}
-	logrus.Infof("Successfully installed useractivity token store")
+	logrus.Infof("Successfully installed useractivity store")
 
 	err = server.Install(
 		tokens.PluralName,
