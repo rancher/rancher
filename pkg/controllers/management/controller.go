@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
-	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/management/settings"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
@@ -52,7 +51,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	etcdbackup.Register(ctx, management)
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)
-	rkeworkerupgrader.Register(ctx, management, manager.ScaledContext)
 	secretmigrator.Register(ctx, management)
 	settings.Register(ctx, management)
 	managementlegacy.Register(ctx, management, manager)

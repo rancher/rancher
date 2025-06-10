@@ -38,7 +38,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
-	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,7 +93,6 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
 	}
 
-	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
 	nodeClient.AddHandler(ctx, "node-controller-sync", nodeLifecycle.sync)
 }
 
@@ -215,92 +213,6 @@ func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*apimgmtv3.NodeTem
 	ns, n := ref.Parse(nodeTemplateName)
 	logrus.Debugf("[node-controller] getNodeTemplate parsed [%s] to ns: [%s] and n: [%s]", nodeTemplateName, ns, n)
 	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
-}
-
-func (m *Lifecycle) getNodePool(nodePoolName string) (*apimgmtv3.NodePool, error) {
-	ns, p := ref.Parse(nodePoolName)
-	return m.nodePoolLister.Get(ns, p)
-}
-
-func (m *Lifecycle) Remove(machine *apimgmtv3.Node) (obj runtime.Object, err error) {
-	machine = m.userNodeRemoveCleanup(machine)
-
-	if machine.Status.NodeTemplateSpec == nil {
-		if err = m.cleanRKENode(machine); err != nil {
-			return machine, err
-		}
-
-		return m.deleteV1Node(machine)
-	}
-
-	obj, err = apimgmtv3.NodeConditionRemoved.DoUntilTrue(machine, func() (runtime.Object, error) {
-		found, err := m.isNodeInAppliedSpec(machine)
-		if err != nil {
-			return machine, err
-		}
-		if found {
-			return machine, errors.New("waiting for node to be removed from cluster")
-		}
-
-		if !m.devMode {
-			err = jailer.CreateJail(machine.Namespace)
-			if err != nil {
-				return nil, errors.WithMessage(err, "node remove jail error")
-			}
-		}
-
-		config, err := nodeconfig.NewNodeConfig(m.secretStore, machine)
-		if err != nil {
-			return machine, err
-		}
-
-		if err = config.Restore(); err != nil {
-			return machine, err
-		}
-
-		defer config.Remove()
-
-		err = m.refreshNodeConfig(config, machine)
-		if err != nil {
-			return nil, errors.WithMessagef(err, "unable to refresh config for node %v", machine.Name)
-		}
-
-		exists, err := nodeExists(config.Dir(), machine)
-		if err != nil {
-			return machine, err
-		}
-
-		if exists {
-			logrus.Infof("[node-controller] Removing node %s", machine.Spec.RequestedHostname)
-			if err = m.drainNode(machine); err != nil {
-				return machine, err
-			}
-
-			driverConfig, err := config.DriverConfig()
-			if err != nil {
-				return nil, err
-			}
-
-			configRawMap := map[string]any{}
-			if err := json.Unmarshal([]byte(driverConfig), &configRawMap); err != nil {
-				return obj, errors.Wrap(err, "failed to unmarshal node config")
-			}
-
-			if err = deleteNode(config.Dir(), machine, configRawMap); err != nil {
-				return machine, err
-			}
-			logrus.Infof("[node-controller] Removing node %s done", machine.Spec.RequestedHostname)
-		}
-
-		return machine, nil
-	})
-
-	machine = obj.(*apimgmtv3.Node)
-	if err != nil {
-		return machine, err
-	}
-
-	return m.deleteV1Node(machine)
 }
 
 func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node) (*apimgmtv3.Node, error) {
@@ -529,13 +441,6 @@ outer:
 		}
 	}
 
-	newObj, saveError := apimgmtv3.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
-		return m.saveConfig(config, config.FullDir(), obj)
-	})
-	obj = newObj.(*apimgmtv3.Node)
-	if err == nil {
-		return obj, saveError
-	}
 	return obj, err
 }
 
@@ -549,112 +454,6 @@ func (m *Lifecycle) sync(_ string, machine *apimgmtv3.Node) (runtime.Object, err
 	}
 
 	return m.nodeClient.Update(machine)
-}
-
-func (m *Lifecycle) Updated(obj *apimgmtv3.Node) (runtime.Object, error) {
-	newObj, err := apimgmtv3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
-		if obj.Status.NodeTemplateSpec == nil {
-			m.setWaiting(obj)
-			return obj, nil
-		}
-
-		if !m.devMode {
-			logrus.Infof("Creating jail for %v", obj.Namespace)
-			err := jailer.CreateJail(obj.Namespace)
-			if err != nil {
-				return nil, errors.WithMessage(err, "node update jail error")
-			}
-		}
-
-		obj, err := m.ready(obj)
-		if err == nil {
-			m.setWaiting(obj)
-		}
-
-		return obj, err
-	})
-	return newObj.(*apimgmtv3.Node), err
-}
-
-func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *apimgmtv3.Node) (*apimgmtv3.Node, error) {
-	logrus.Infof("[node-controller] Generating and uploading node config %s", obj.Spec.RequestedHostname)
-	if err := config.Save(); err != nil {
-		return obj, err
-	}
-
-	ip, err := config.IP()
-	if err != nil {
-		return obj, err
-	}
-
-	internalAddress, err := config.InternalIP()
-	if err != nil {
-		return obj, err
-	}
-
-	keyPath, err := config.SSHKeyPath()
-	if err != nil {
-		return obj, err
-	}
-
-	_, err = getSSHKey(nodeDir, keyPath, obj)
-	if err != nil {
-		return obj, err
-	}
-
-	sshUser, err := config.SSHUser()
-	if err != nil {
-		return obj, err
-	}
-
-	if err = config.Save(); err != nil {
-		return obj, err
-	}
-
-	template, err := m.getNodeTemplate(obj.Spec.NodeTemplateName)
-	if err != nil {
-		return obj, err
-	}
-
-	pool, err := m.getNodePool(obj.Spec.NodePoolName)
-	if err != nil {
-		return obj, err
-	}
-
-	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
-		NodeName:         obj.Namespace + ":" + obj.Name,
-		Address:          ip,
-		InternalAddress:  internalAddress,
-		User:             sshUser,
-		Role:             roles(obj),
-		HostnameOverride: obj.Spec.RequestedHostname,
-		Labels:           template.Labels,
-	}
-	obj.Status.InternalNodeStatus.Addresses = []v1.NodeAddress{
-		{
-			Type:    v1.NodeInternalIP,
-			Address: obj.Status.NodeConfig.Address,
-		},
-	}
-
-	if len(obj.Status.NodeConfig.Role) == 0 {
-		obj.Status.NodeConfig.Role = []string{"worker"}
-	}
-
-	templateSet := taints.GetKeyEffectTaintSet(template.Spec.NodeTaints)
-	nodeSet := taints.GetKeyEffectTaintSet(pool.Spec.NodeTaints)
-	expectTaints := pool.Spec.NodeTaints
-
-	for key, ti := range templateSet {
-		// the expected taints are based on the node pool. so we don't need to set taints with same key and effect by template because
-		// the taints from node pool should override the taints from template.
-		if _, ok := nodeSet[key]; !ok {
-			expectTaints = append(expectTaints, template.Spec.NodeTaints[ti])
-		}
-	}
-	obj.Status.NodeConfig.Taints = taints.GetRKETaintsFromTaints(expectTaints)
-
-	return obj, nil
 }
 
 func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *apimgmtv3.Node) error {
@@ -713,41 +512,6 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *apimgmtv3.
 	}
 
 	return nil
-}
-
-func (m *Lifecycle) isNodeInAppliedSpec(node *apimgmtv3.Node) (bool, error) {
-	// worker/controlplane nodes can just be immediately deleted
-	if !node.Spec.Etcd {
-		return false, nil
-	}
-
-	cluster, err := m.clusterLister.Get("", node.Namespace)
-	if err != nil {
-		if kerror.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	if cluster == nil {
-		return false, nil
-	}
-	if cluster.DeletionTimestamp != nil {
-		return false, nil
-	}
-	if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
-		return false, nil
-	}
-
-	for _, rkeNode := range cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Nodes {
-		nodeName := rkeNode.NodeName
-		if len(nodeName) == 0 {
-			continue
-		}
-		if nodeName == fmt.Sprintf("%s:%s", node.Namespace, node.Name) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func validateCustomHost(obj *apimgmtv3.Node) error {
