@@ -6,7 +6,6 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
@@ -23,10 +22,6 @@ func (p *Provisioner) driverCreate(cluster *apimgmtv3.Cluster, spec apimgmtv3.Cl
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
-	spec, err = assemblers.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
-	if err != nil {
-		return "", "", "", err
-	}
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster
@@ -89,11 +84,6 @@ func (p *Provisioner) driverUpdate(
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot = &_false
 	}
 
-	spec, err = assemblers.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
-	if err != nil {
-		return "", "", "", false, err
-	}
-
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster
 	}
@@ -138,10 +128,6 @@ func (p *Provisioner) driverRestore(cluster *apimgmtv3.Cluster, spec apimgmtv3.C
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
-	spec, err := assemblers.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
-	if err != nil {
-		return "", "", "", err
-	}
 
 	newCluster, err := p.Clusters.Update(cluster)
 	if err == nil {
