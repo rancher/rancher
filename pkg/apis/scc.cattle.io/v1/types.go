@@ -74,7 +74,7 @@ func (rs *RegistrationSpec) WithoutSyncNow() *RegistrationSpec {
 type RegistrationRequest struct {
 	RegistrationCodeSecretRef *corev1.SecretReference `json:"registrationCodeSecretRef,omitempty"`
 	// +optional
-	SeverUrl string `json:"severUrl,omitempty"`
+	SeverUrl *string `json:"severUrl,omitempty"`
 	// +optional
 	ServerCertificateSecretRef *corev1.SecretReference `json:"serverCertficateSecretRef,omitempty"`
 }
@@ -90,7 +90,7 @@ type RegistrationStatus struct {
 	// +optional
 	RegistrationProcessedTS *metav1.Time `json:"registrationProcessedTS,omitempty"`
 	// +optional
-	SCCSystemId int `json:"sccSystemId,omitempty"`
+	SCCSystemId *int `json:"sccSystemId,omitempty"`
 
 	// +optional
 	ActivationStatus SystemActivationState `json:"activationStatus,omitempty"`
@@ -105,8 +105,10 @@ type SystemActivationState struct {
 	Activated bool `json:"activated"`
 	// +optional
 	LastValidatedTS *metav1.Time `json:"lastValidatedTS"`
-	Certificate     string       `json:"certificate,omitempty"`
-	SystemUrl       string       `json:"systemUrl,omitempty"`
+	// +optional
+	Certificate *string `json:"certificate,omitempty"`
+	// +optional
+	SystemUrl *string `json:"systemUrl,omitempty"`
 }
 
 func (r *Registration) HasCondition(matchCond condition.Cond) bool {
