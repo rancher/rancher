@@ -8,7 +8,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -493,7 +493,7 @@ func validateEKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster
 		return nil
 	}
 
-	if aws.StringValue(clusterVersion) == "" {
+	if aws.ToString(clusterVersion) == "" {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
 	}
 
@@ -521,7 +521,7 @@ func validateEKSNodegroups(spec *v32.ClusterSpec) error {
 	var errors []string
 
 	for _, ng := range nodegroups {
-		name := aws.StringValue(ng.NodegroupName)
+		name := aws.ToString(ng.NodegroupName)
 		if name == "" {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodegroupName cannot be an empty")
 		}
@@ -530,7 +530,7 @@ func validateEKSNodegroups(spec *v32.ClusterSpec) error {
 		if version == nil {
 			continue
 		}
-		if aws.StringValue(version) == "" {
+		if aws.ToString(version) == "" {
 			errors = append(errors, fmt.Sprintf("nodegroup [%s] version cannot be empty string", name))
 			continue
 		}
