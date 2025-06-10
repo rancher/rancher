@@ -65,6 +65,10 @@ const (
 	authnWebhookFileName = "kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 
+	// ServerBootstrapYamlFileName is the file the "server" arg (and "cluster-init" arg) will be rendered to.
+	// This file is dynamic so that changes to the "server" arg do not result in an unnecessary drain loop on a machine rollout.
+	ServerBootstrapYamlFileName = "/etc/rancher/%s/config.yaml.d/25-server-bootstrap.yaml"
+
 	bootstrapTier    = "bootstrap"
 	etcdTier         = "etcd"
 	controlPlaneTier = "control plane"
