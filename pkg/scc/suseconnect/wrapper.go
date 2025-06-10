@@ -57,6 +57,15 @@ func OfflineRancherRegistration(systemInfo *systeminfo.InfoExporter) SccWrapper 
 
 type RegistrationSystemId int
 
+func (id RegistrationSystemId) Int() int {
+	return int(id)
+}
+
+func (id RegistrationSystemId) Ptr() *int {
+	i := int(id)
+	return &i
+}
+
 // Define constant values for empty and error
 const (
 	EmptyRegistrationSystemId     RegistrationSystemId = 0  // Used if an error happened before registration

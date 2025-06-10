@@ -31,9 +31,10 @@ const (
 	devMinCheckin   = devBaseCheckin - (10 * time.Minute)
 )
 
+// SCCHandler Defines a common interface for online and offline operations
+// IMPORTANT: All the `Reconcile*` methods modifies the object in memory but does NOT save it. The caller is responsible for saving the state.
 // TODO: these that return `*v1.Registration` probably need to return a object set to use with apply
 // TODO: That way we can use apply to update Registrations and Secrets related to them together.
-// IMPORTANT: All the `Reconcile*` methods modifies the object in memory but does NOT save it. The caller is responsible for saving the state.
 type SCCHandler interface {
 	// NeedsRegistration determines if the system requires initial SCC registration.
 	NeedsRegistration(*v1.Registration) bool
@@ -206,19 +207,22 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	if registrationHandler.NeedsRegistration(registrationObj) {
-		// Set object to progressing
-		progressingUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			var err error
-			progressingObj := registrationObj.DeepCopy()
-			v1.ResourceConditionProgressing.True(progressingObj)
-			progressingObj, err = h.registrations.UpdateStatus(progressingObj)
-			return err
-		})
-		if progressingUpdateErr != nil {
-			return registrationObj, progressingUpdateErr
+		progressingObj := registrationObj.DeepCopy()
+		if !v1.ResourceConditionProgressing.IsTrue(registrationObj) {
+			// Set object to progressing
+			progressingUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				var err error
+				v1.ResourceConditionProgressing.True(progressingObj)
+				progressingObj, err = h.registrations.UpdateStatus(progressingObj)
+				return err
+			})
+			if progressingUpdateErr != nil {
+				return registrationObj, progressingUpdateErr
+			}
 		}
 
-		announcedSystemId, registerErr := registrationHandler.RegisterSystem(registrationObj)
+		regForAnnounce := progressingObj.DeepCopy()
+		announcedSystemId, registerErr := registrationHandler.RegisterSystem(regForAnnounce)
 		if registerErr != nil {
 			// reconcile state
 			var reconciledReg *v1.Registration
@@ -243,37 +247,25 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		}
 
 		switch announcedSystemId {
+		case suseconnect.OfflineRegistrationSystemId:
+			h.log.Debugf("SCC system ID cannot be known for offline until activation")
 		case suseconnect.KeepAliveRegistrationSystemId:
-			announcedSystemId = suseconnect.RegistrationSystemId(registrationObj.Status.SCCSystemId)
+			h.log.Debugf("register system handled via keepalive")
+			announcedSystemId = suseconnect.RegistrationSystemId(*registrationObj.Status.SCCSystemId)
 		default:
 			h.log.Debugf("Annoucned System ID: %v", announcedSystemId)
+			regForAnnounce.Status.SCCSystemId = announcedSystemId.Ptr()
 		}
 
 		// Prepare the Registration for Activation phase
-		var announced *v1.Registration
-		registerUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			var err error
-			registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			updatingObj := registrationHandler.PrepareRegisteredSystem(registrationObj)
-			updatingObj.Status.RegistrationProcessedTS = &metav1.Time{
-				Time: time.Now(),
-			}
-
-			announced, err = h.registrations.UpdateStatus(updatingObj)
-
-			return err
-		})
-		if registerUpdateErr != nil {
-			return registrationObj, registerUpdateErr
+		regForAnnounce = registrationHandler.PrepareRegisteredSystem(regForAnnounce)
+		regForAnnounce.Status.RegistrationProcessedTS = &metav1.Time{
+			Time: time.Now(),
 		}
 
-		// Upon successful registration the processed TS should be set, so when it is enqueue for activation
-		if announced.Status.RegistrationProcessedTS != nil {
-			h.registrations.Enqueue(registrationObj.Name)
+		announced, registerUpdateErr := h.registrations.UpdateStatus(regForAnnounce)
+		if registerUpdateErr != nil {
+			return registrationObj, registerUpdateErr
 		}
 
 		return announced, nil
