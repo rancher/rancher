@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -46,7 +45,6 @@ import (
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/steve/pkg/sqlcache/informer/factory"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/k8scheck"
 	"github.com/rancher/wrangler/v3/pkg/unstructured"
@@ -56,7 +54,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -215,19 +212,14 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, fmt.Errorf("extension api server: %w", err)
 	}
 
-	defaultMaxEventsCount, perGVKMaxEventsCount := getMaximumEventsCount()
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
-		ServerVersion:   settings.ServerVersion.Get(),
-		Controllers:     steveControllers,
-		AccessSetLookup: wranglerContext.ASL,
-		AuthMiddleware:  steveauth.ExistingContext,
-		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
-		ClusterRegistry: opts.ClusterRegistry,
-		SQLCache:        features.UISQLCache.Enabled(),
-		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
-			DefaultMaximumEventsCount: defaultMaxEventsCount,
-			PerGVKMaximumEventsCount:  perGVKMaxEventsCount,
-		},
+		ServerVersion:      settings.ServerVersion.Get(),
+		Controllers:        steveControllers,
+		AccessSetLookup:    wranglerContext.ASL,
+		AuthMiddleware:     steveauth.ExistingContext,
+		Next:               ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
+		ClusterRegistry:    opts.ClusterRegistry,
+		SQLCache:           features.UISQLCache.Enabled(),
 		ExtensionAPIServer: extensionAPIServer,
 	})
 	if err != nil {
@@ -693,50 +685,4 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	}
 
 	return found, nil
-}
-
-// getMaximumEventsCount will get the maximum events we want to keep in the SQL cache
-// based on environment variables.
-//
-// To set the default (for all GVKs):
-//
-//	SQLCACHE_MAX_EVENTS=2000
-//
-// To set per GVK values:
-//
-//	SQLCACHE_GVK_MAX_EVENTS=ConfigMap_v1_:2000,User_v3_management.cattle.io:3000
-func getMaximumEventsCount() (int, map[schema.GroupVersionKind]int) {
-	defaultMax := 1000
-	defaultMaxStr := os.Getenv("SQLCACHE_MAX_EVENTS")
-	if defaultMaxStr != "" {
-		if converted, err := strconv.Atoi(defaultMaxStr); err == nil {
-			defaultMax = converted
-		}
-	}
-
-	gvkMaxEventsCount := make(map[schema.GroupVersionKind]int)
-	gvksMax := strings.Split(os.Getenv("SQLCACHE_GVK_MAX_EVENTS"), ",")
-	for _, gvkMax := range gvksMax {
-		fields := strings.SplitN(gvkMax, ":", 2)
-		if len(fields) != 2 {
-			continue
-		}
-
-		gvkStr := fields[0]
-		maxStr := fields[1]
-		converted, err := strconv.Atoi(maxStr)
-		if err != nil {
-			continue
-		}
-
-		gvkFields := strings.SplitN(gvkStr, "_", 3)
-		gvk := schema.GroupVersionKind{
-			Group:   gvkFields[2],
-			Version: gvkFields[1],
-			Kind:    gvkFields[0],
-		}
-		gvkMaxEventsCount[gvk] = converted
-	}
-
-	return defaultMax, gvkMaxEventsCount
 }
