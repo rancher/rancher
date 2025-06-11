@@ -46,6 +46,8 @@ type SCCHandler interface {
 	PrepareRegisteredSystem(*v1.Registration) (*v1.Registration, error)
 	// NeedsActivation checks if the system requires activation with SCC.
 	NeedsActivation(*v1.Registration) bool
+	// ReadyForActivation checks if the system is ready for activation.
+	ReadyForActivation(*v1.Registration) bool
 	// Activate activates the system with SCC or verifies an offline request.
 	Activate(*v1.Registration) error
 	// ReconcileActivateError prepares the Registration object for error reconciliation after Activate fails.
@@ -277,6 +279,10 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	if registrationHandler.NeedsActivation(registrationObj) {
+		if !registrationHandler.ReadyForActivation(registrationObj) {
+			h.log.Debugf("registration needs to be activated, but not yet ready; %v", registrationObj)
+			return registrationObj, nil
+		}
 		activationErr := registrationHandler.Activate(registrationObj)
 		// reconcile error state - must be able to handle Auth errors (or other SCC sourced errors)
 		if activationErr != nil {
@@ -310,7 +316,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			}
 
 			activated := registrationObj.DeepCopy()
-			v1.RegistrationConditionSccUrlReady.True(activated)
+			v1.RegistrationConditionSccUrlReady.True(activated) // TODO: online only?
 			v1.RegistrationConditionActivated.True(activated)
 			v1.ResourceConditionProgressing.False(activated)
 			v1.ResourceConditionReady.True(activated)

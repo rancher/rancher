@@ -151,12 +151,11 @@ func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
 		registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero()
 }
 
-func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
-	if v1.RegistrationConditionAnnounced.IsFalse(registrationObj) {
-		// reconcile to set failed status if not set
-		return errors.New("cannot activate system that hasn't been announced to SCC")
-	}
+func (s sccOnlineMode) ReadyForActivation(registrationObj *v1.Registration) bool {
+	return v1.RegistrationConditionAnnounced.IsTrue(registrationObj)
+}
 
+func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	s.log.Debugf("received registration ready for activations %q", registrationObj.Name)
 	s.log.Debug("registration ", registrationObj)
 

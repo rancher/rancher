@@ -31,18 +31,6 @@ func (s sccOfflineMode) RegisterSystem(registrationObj *v1.Registration) (suseco
 		return suseconnect.EmptyRegistrationSystemId, nil
 	}
 
-	// TODO: this generation and secret maybe should be updated regularly like Online mode phone home?
-	generatedRegistrationRequest, err := s.systemInfoExporter.PreparedForSCCOffline()
-	if err != nil {
-		return suseconnect.EmptyRegistrationSystemId, err
-	}
-
-	// TODO: actually save the secret via apply in the controller
-	_, secretErr := suseconnect.StoreSccOfflineRegistration(s.secrets, generatedRegistrationRequest)
-	if secretErr != nil {
-		return suseconnect.EmptyRegistrationSystemId, secretErr
-	}
-
 	return suseconnect.OfflineRegistrationSystemId, nil
 }
 
@@ -67,18 +55,27 @@ func (s sccOfflineMode) PrepareRegisteredSystem(registration *v1.Registration) (
 		Name:      requestSecret.Name,
 	}
 
+	v1.RegistrationConditionOfflineRequestReady.True(registration)
+
 	return registration, nil
 }
 
 func (s sccOfflineMode) NeedsActivation(registrationObj *v1.Registration) bool {
-	return registrationObj.Spec.OfflineRegistrationCertificateSecretRef != nil &&
+	return registrationObj.Status.OfflineRegistrationRequest != nil &&
 		(!registrationObj.Status.ActivationStatus.Activated ||
 			registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero())
 }
 
+func (s sccOfflineMode) ReadyForActivation(registrationObj *v1.Registration) bool {
+	return registrationObj.Status.OfflineRegistrationRequest != nil &&
+		registrationObj.Spec.OfflineRegistrationCertificateSecretRef != nil
+}
+
 func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
+	// fetch secret contents (needs io.Reader)
+	// registration.OfflineCertificateFrom()
 	//TODO implement me
-	panic("implement me")
+	panic("implement me to activate offline certs")
 }
 
 func (s sccOfflineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
@@ -88,6 +85,7 @@ func (s sccOfflineMode) ReconcileActivateError(registration *v1.Registration, ac
 
 func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
 	s.log.Debugf("For now offline keepalive is an intentional noop")
+	// TODO: eventually keepalive for offline should mimic `PrepareRegisteredSystem` creation of ORR (to update metrics for next offline registration)
 	return nil
 }
 
@@ -97,8 +95,9 @@ func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, e
 }
 
 func (s sccOfflineMode) Deregister() error {
-	//TODO implement me
-	panic("implement me")
+	// TODO implement me; for now this is no-op
+	// TODO eventually this should clean up secrets downstream of this offline reg
+	return nil
 }
 
 var _ SCCHandler = &sccOfflineMode{}
