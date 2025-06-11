@@ -103,6 +103,8 @@ type Rancher struct {
 	auditLog   *audit.LogWriter
 	authServer *auth.Server
 	opts       *Options
+
+	kubeAggregationReadyChan <-chan struct{}
 }
 
 func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options) (*Rancher, error) {
@@ -234,9 +236,16 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext, ext.DefaultOptions())
+	extensionOpts := ext.DefaultOptions()
+
+	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext, extensionOpts)
 	if err != nil {
 		return nil, fmt.Errorf("extension api server: %w", err)
+	}
+
+	var kubeAggregationReadyChan <-chan struct{}
+	if extensionAPIServer != nil {
+		kubeAggregationReadyChan = extensionAPIServer.Registered()
 	}
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
@@ -305,11 +314,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			additionalAPI,
 			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
 		}.Handler(steve),
-		Wrangler:   wranglerContext,
-		Steve:      steve,
-		auditLog:   auditLogWriter,
-		authServer: authServer,
-		opts:       opts,
+		Wrangler:                 wranglerContext,
+		Steve:                    steve,
+		auditLog:                 auditLogWriter,
+		authServer:               authServer,
+		opts:                     opts,
+		kubeAggregationReadyChan: kubeAggregationReadyChan,
 	}, nil
 }
 
@@ -367,6 +377,20 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
+
+	if features.MCMAgent.Enabled() && r.kubeAggregationReadyChan != nil {
+		go func() {
+			logrus.Info("Waiting for imperative API to be ready")
+
+			select {
+			case <-r.kubeAggregationReadyChan:
+				logrus.Info("kube-apiserver connected to imperative api")
+			case <-time.After(time.Minute * 2):
+				logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
+			}
+		}()
+	}
+
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
