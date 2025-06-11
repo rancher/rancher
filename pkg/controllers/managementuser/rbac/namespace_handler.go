@@ -498,6 +498,22 @@ func addManageNSPermission(clusterRole *rbacv1.ClusterRole, projectName string) 
 	return clusterRole
 }
 
+func addUpdatepsaClusterRole(projectName string) *rbacv1.ClusterRole {
+	clusterRole := &rbacv1.ClusterRole{}
+	crName := "%s-namespaces-psa"
+	clusterRole.Name = fmt.Sprintf(crName, projectName)
+	clusterRole.Rules = append(clusterRole.Rules, rbacv1.PolicyRule{
+		APIGroups:     []string{management.GroupName},
+		Verbs:         []string{"updatepsa"},
+		Resources:     []string{apisV3.ProjectResourceName},
+		ResourceNames: []string{projectName},
+	})
+	if clusterRole.Annotations == nil {
+		clusterRole.Annotations = map[string]string{}
+	}
+	return clusterRole
+}
+
 func crByNS(obj interface{}) ([]string, error) {
 	cr, ok := obj.(*rbacv1.ClusterRole)
 	if !ok {
