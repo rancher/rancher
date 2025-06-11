@@ -43,9 +43,9 @@ type tokenHandler struct {
 	clusterSecretLister        corev1.SecretLister
 }
 
-// ExtCreate is called when a given ext token is created, and is responsible for
+// extCreate is called when a given ext token is created, and is responsible for
 // updating/creating the ClusterAuthToken in a downstream cluster.
-func (h *tokenHandler) ExtCreate(token *extv1.Token) (*extv1.Token, error) {
+func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.ExtUpdated(token)
@@ -75,7 +75,7 @@ func (h *tokenHandler) ExtCreate(token *extv1.Token) (*extv1.Token, error) {
 func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
-		return h.ExtCreate(token)
+		return h.extCreate(token)
 	}
 	if err != nil {
 		return nil, err
