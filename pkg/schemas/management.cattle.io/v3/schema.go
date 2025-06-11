@@ -226,20 +226,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Input:  "importClusterYamlInput",
 				Output: "importYamlOutput",
 			}
-			schema.ResourceActions[v3.ClusterActionExportYaml] = types.Action{
-				Output: "exportOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionRotateCertificates] = types.Action{
-				Input:  "rotateCertificateInput",
-				Output: "rotateCertificateOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionRotateEncryptionKey] = types.Action{
-				Output: "rotateEncryptionKeyOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionSaveAsTemplate] = types.Action{
-				Input:  "saveAsTemplateInput",
-				Output: "saveAsTemplateOutput",
-			}
 		})
 }
 
