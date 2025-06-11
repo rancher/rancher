@@ -49,8 +49,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"oraclecontainerengine",
-		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.8.3/kontainer-engine-driver-oke-linux",
-		"7bfde567e6d478f1da8d36531f765d348bff1cd3abe83c70ddf7766f46112170",
+		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.8.6/kontainer-engine-driver-oke-linux",
+		"f5a092b7fe367fb322ac4e286d474a0b82c9484c3d6b93ce62253b3ce7a353b0",
 		"",
 		false,
 		"*.oraclecloud.com",
