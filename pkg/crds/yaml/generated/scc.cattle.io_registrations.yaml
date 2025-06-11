@@ -15,9 +15,15 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.mode
+      name: Mode
+      type: string
     - jsonPath: .status.activationStatus.activated
       name: Registration Active
       type: boolean
+    - jsonPath: .status.sccSystemId
+      name: System ID
+      type: integer
     - jsonPath: .status.activationStatus.lastValidatedTS
       name: Last Sync
       type: date
