@@ -115,7 +115,12 @@ func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.AP
 		return "", err
 	}
 
-	return a.UserMgr.EnsureClusterToken(clusterID, input)
+	tokenKey, _, err := a.UserMgr.EnsureClusterToken(clusterID, input)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenKey, nil
 }
 
 // ensureToken will create a new kubeconfig token for the user in the provided context with the default TTL.
@@ -125,7 +130,12 @@ func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error)
 		return "", err
 	}
 
-	return a.UserMgr.EnsureToken(input)
+	tokenKey, _, err := a.UserMgr.EnsureToken(input)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenKey, nil
 }
 
 // createTokenInput will create the input for a new kubeconfig token with the default TTL.

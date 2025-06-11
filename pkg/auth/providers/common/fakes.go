@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
+	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -14,9 +15,11 @@ type FakeUserManager struct {
 func (m FakeUserManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
 	panic("unimplemented")
 }
-func (m FakeUserManager) GetUser(apiContext *types.APIContext) string       { panic("unimplemented") }
-func (m FakeUserManager) EnsureToken(input user.TokenInput) (string, error) { panic("unimplemented") }
-func (m FakeUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, error) {
+func (m FakeUserManager) GetUser(apiContext *types.APIContext) string { panic("unimplemented") }
+func (m FakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
+	panic("unimplemented")
+}
+func (m FakeUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
 	panic("unimplemented")
 }
 func (m FakeUserManager) DeleteToken(tokenName string) error { panic("unimplemented") }

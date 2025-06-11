@@ -8,7 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/user"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -24,7 +24,7 @@ type reducedCondition struct {
 
 func Test_crtbHandler_reconcileSubject(t *testing.T) {
 	type controllers struct {
-		userMGR        *user.MockManager
+		userMGR        *userMocks.MockManager
 		userController *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]
 	}
 	tests := []struct {
@@ -179,7 +179,7 @@ func Test_crtbHandler_reconcileSubject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controllers := controllers{
-				userMGR:        user.NewMockManager(ctrl),
+				userMGR:        userMocks.NewMockManager(ctrl),
 				userController: fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl),
 			}
 
