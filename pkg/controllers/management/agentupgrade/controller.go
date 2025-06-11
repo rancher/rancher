@@ -20,7 +20,6 @@ const (
 var (
 	names = map[string]bool{
 		"cattle-cluster-agent": true,
-		"cattle-node-agent":    true,
 	}
 	imageRegexp = regexp.MustCompile("v2\\.[0-4]\\.")
 )

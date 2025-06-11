@@ -57,7 +57,6 @@ var (
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
-	AgentRolloutWait    = NewSetting("agent-rollout-wait", "true")
 	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
 	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeStrict).WithDefaultOnUpgrade(AgentTLSModeSystemStore)
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
