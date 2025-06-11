@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,6 +70,9 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object,
 }
 
 func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
+	startTime := time.Now()
+	defer zed.Log(startTime, "StatsAggregator.aggregate()")
+
 	allMachines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return err

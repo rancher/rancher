@@ -3,9 +3,11 @@ package restrictedadminrbac
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -16,6 +18,9 @@ import (
 
 // clusterOwnerSync ensures that the given enqueued GRB has a cluster-owner CRTB in all downstream clusters iff the role is GlobalRestrictedAdmin.
 func (r *rbaccontroller) clusterOwnerSync(_ string, grb *v3.GlobalRoleBinding) (runtime.Object, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "rbaccontroller.clusterOwnerSync()")
+
 	if grb == nil || grb.DeletionTimestamp != nil || grb.GlobalRoleName != rbac.GlobalRestrictedAdmin {
 		return nil, nil
 	}
