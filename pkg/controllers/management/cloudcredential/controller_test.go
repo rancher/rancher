@@ -2,7 +2,12 @@ package cloudcredential
 
 import (
 	"errors"
+	"testing"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	fapply "github.com/rancher/wrangler/v3/pkg/apply/fake"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -10,11 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
-	"testing"
-	"time"
-
-	fapply "github.com/rancher/wrangler/v3/pkg/apply/fake"
-	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 )
 
 func TestSyncHarvesterToken(t *testing.T) {

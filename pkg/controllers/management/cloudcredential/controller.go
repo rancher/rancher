@@ -87,76 +87,75 @@ func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secr
 	}
 
 	objs := make([]runtime.Object, 0)
-	if secret.DeletionTimestamp == nil {
-		if !slices.Contains(secret.Finalizers, harvesterCloudCredentialFinalizer) {
-			secret = secret.DeepCopy()
-			secret.Finalizers = append(secret.Finalizers, harvesterCloudCredentialFinalizer)
 
-			// remove now defunct expiration annotation if present
-			if secret.Annotations[harvesterCloudCredentialExpirationAnnotation] != "" {
-				delete(secret.Annotations, harvesterCloudCredentialExpirationAnnotation)
-			}
-
-			secret, err = c.secretClient.Update(secret)
-			if err != nil {
-				return nil, fmt.Errorf("unable to update harvester cloud credential secret %s: %w", key, err)
-			}
-		}
-
-		// in practice a kubeconfig will only ever have one token, but we need to handle the case where users may be
-		// modifying the secret directly and properly extend/delete tokens as necessary.
-		tokenNames := make(cred.Set[string])
-		err := cred.TokenNamesFromContent(secret.Data["harvestercredentialConfig-kubeconfigContent"], tokenNames)
+	if secret.DeletionTimestamp != nil {
+		err = c.apply.WithOwner(secret).ApplyObjects(objs...)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to remove tokens for harvester cloud credential secret %s: %w", key, err)
 		}
 
-		for tokenName := range tokenNames {
-			token, err := c.tokenClient.Get(tokenName, metav1.GetOptions{})
-			if err != nil {
-				return nil, fmt.Errorf("unable to get token %s for harvester cloud credential secret %s: %w", tokenName, key, err)
-			}
-
-			token = token.DeepCopy()
-			token.TTLMillis = 0
-			// although the token is updated here, the resource version must be empty because apply expects to create the token
-			token.ResourceVersion = ""
-			objs = append(objs, token)
+		secret = secret.DeepCopy()
+		secret.Finalizers = slices.DeleteFunc(secret.Finalizers, func(s string) bool {
+			return s == harvesterCloudCredentialFinalizer
+		})
+		secret, err = c.secretClient.Update(secret)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update harvester cloud credential secret %s: %w", key, err)
 		}
+
+		return secret, nil
+	}
+
+	if !slices.Contains(secret.Finalizers, harvesterCloudCredentialFinalizer) {
+		secret = secret.DeepCopy()
+		secret.Finalizers = append(secret.Finalizers, harvesterCloudCredentialFinalizer)
+
+		// remove now defunct expiration annotation if present
+		if secret.Annotations[harvesterCloudCredentialExpirationAnnotation] != "" {
+			delete(secret.Annotations, harvesterCloudCredentialExpirationAnnotation)
+		}
+
+		secret, err = c.secretClient.Update(secret)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update harvester cloud credential secret %s: %w", key, err)
+		}
+	}
+
+	// in practice a kubeconfig will only ever have one token, but we need to handle the case where users may be
+	// modifying the secret directly and properly extend/delete tokens as necessary.
+	tokenNames := make(cred.Set[string])
+	err = cred.TokenNamesFromContent(secret.Data["harvestercredentialConfig-kubeconfigContent"], tokenNames)
+	if err != nil {
+		return nil, err
+	}
+
+	for tokenName := range tokenNames {
+		token, err := c.tokenClient.Get(tokenName, metav1.GetOptions{})
+		if err != nil {
+			// If we can't own all tokens associated with the kubeconfig, exit early to prevent extending the lifecycle of any.
+			return nil, fmt.Errorf("unable to get token %s for harvester cloud credential secret %s: %w", tokenName, key, err)
+		}
+
+		token = token.DeepCopy()
+		token.TTLMillis = 0
+		// although the token is updated here, the resource version must be empty because apply expects to create the token
+		token.ResourceVersion = ""
+		objs = append(objs, token)
 	}
 
 	err = c.apply.WithOwner(secret).ApplyObjects(objs...)
 	if err != nil {
+		return nil, fmt.Errorf("unable to update tokens for harvester cloud credential secret %s: %w", key, err)
+	}
+
+	secret = secret.DeepCopy()
+	secret.Annotations[harvesterCloudCredentialTokenChecksumAnnotation] = checksum
+	secret, err = c.secretClient.Update(secret)
+	if err != nil {
 		return nil, fmt.Errorf("unable to update harvester cloud credential secret %s: %w", key, err)
 	}
 
-	if secret.DeletionTimestamp == nil {
-		secret = secret.DeepCopy()
-		secret.Annotations[harvesterCloudCredentialTokenChecksumAnnotation] = checksum
-		secret, err = c.secretClient.Update(secret)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update harvester cloud credential secret %s: %w", key, err)
-		}
-	} else {
-		secret = secret.DeepCopy()
-		secret.Finalizers = removeFromSlice(secret.Finalizers, harvesterCloudCredentialFinalizer)
-		secret, err = c.secretClient.Update(secret)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update harvester cloud credential secret %s: %w", key, err)
-		}
-	}
 	return secret, nil
-}
-
-// removeFromSlice removes the first element from the slice that is equal to e.
-// If the slice does not contain e, the slice is returned unchanged.
-// This function is written in the styles of the generic functions from slices.go
-func removeFromSlice[S ~[]E, E comparable](s S, e E) S {
-	i := slices.Index(s, e)
-	if i == -1 {
-		return s
-	}
-	return append(s[:i], s[i+1:]...)
 }
 
 func (c *Controller) ccSync(_ string, cloudCredential *v1.Secret) (runtime.Object, error) {
