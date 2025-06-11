@@ -356,11 +356,6 @@ func (s *Store) Create(
 			return nil, apierrors.NewInternalError(fmt.Errorf("error checking if user %s has access to cluster %s: %w", userInfo.GetName(), clusters[i].Name, err))
 		}
 
-		// Check early if the requested current context is valid.
-		if currentContext == "" && kubeconfig.Spec.CurrentContext == clusters[i].Name {
-			currentContext = clusters[i].Name
-		}
-
 		if decision != authorizer.DecisionAllow {
 			if isAllClusters {
 				// Delete the cluster the user doesn't have access to from the list in-place.
@@ -368,9 +363,14 @@ func (s *Store) Create(
 				clusters[len(clusters)-1] = nil
 				clusters = clusters[:len(clusters)-1]
 				i--
+				continue
 			} else {
 				return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), clusters[i].Name))
 			}
+		}
+
+		if currentContext == "" && kubeconfig.Spec.CurrentContext == clusters[i].Name {
+			currentContext = clusters[i].Name
 		}
 	}
 
