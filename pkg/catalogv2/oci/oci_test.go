@@ -2,6 +2,8 @@ package oci
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -243,4 +245,112 @@ func TestGenerateIndex(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerateIndexExactAndSubMatch(t *testing.T) {
+	base := "forgejo-helm/forgejo"
+	catalog := []string{
+		"forgejo-helm/forgejo",          // exact match
+		"forgejo-helm/forgejo/subchart", // sub-repo match
+		"other-repo/chart",
+	}
+
+	// HTTP handler to serve catalog and tag-list
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/_catalog":
+			// Return the catalog entries
+			fmt.Fprintf(w, `{"repositories": ["%s", "%s", "%s"]}`,
+				catalog[0], catalog[1], catalog[2])
+
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, fmt.Sprintf("/v2/%s/tags/list", base)):
+			// Return an empty tag list to avoid further branches
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"tags": []}`))
+
+		default:
+			// Any other endpoints return 404
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	// Construct an OCI URL pointing at our test server and base path
+	trimmedURL := strings.TrimPrefix(srv.URL, "http://")
+	ociURL := fmt.Sprintf("oci://%s/%s", trimmedURL, base)
+
+	// Create a client using insecure HTTP
+	client, err := NewClient(ociURL,
+		v1.RepoSpec{InsecurePlainHTTP: true, InsecureSkipTLSverify: true},
+		(*corev1.Secret)(nil),
+	)
+	assert.NoError(t, err, "failed to create OCI client")
+
+	indexFile := repo.NewIndexFile()
+
+	// Ensure GenerateIndex neither panics nor returns an unexpected panic
+	assert.NotPanics(t, func() {
+		_, _ = GenerateIndex(
+			client,
+			ociURL,
+			nil,
+			v1.RepoSpec{InsecurePlainHTTP: true, InsecureSkipTLSverify: true},
+			v1.RepoStatus{},
+			indexFile,
+		)
+	}, "GenerateIndex should not panic on exact+sub-repo catalog entries")
+}
+
+func TestGenerateIndexEmptyRepoExactAndSubMatch(t *testing.T) {
+	base := ""
+	catalog := []string{
+		"forgejo-helm/forgejo",          // exact match
+		"forgejo-helm/forgejo/subchart", // sub-repo match
+		"other-repo/chart",
+	}
+
+	// HTTP handler to serve catalog and tag-list
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/_catalog":
+			// Return the catalog entries
+			fmt.Fprintf(w, `{"repositories": ["%s", "%s", "%s"]}`,
+				catalog[0], catalog[1], catalog[2])
+
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, fmt.Sprintf("/v2/%s/tags/list", base)):
+			// Return an empty tag list to avoid further branches
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"tags": []}`))
+
+		default:
+			// Any other endpoints return 404
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	// Construct an OCI URL pointing at our test server and base path
+	trimmedURL := strings.TrimPrefix(srv.URL, "http://")
+	ociURL := fmt.Sprintf("oci://%s/%s", trimmedURL, base)
+
+	// Create a client using insecure HTTP
+	client, err := NewClient(ociURL,
+		v1.RepoSpec{InsecurePlainHTTP: true, InsecureSkipTLSverify: true},
+		(*corev1.Secret)(nil),
+	)
+	assert.NoError(t, err, "failed to create OCI client")
+
+	indexFile := repo.NewIndexFile()
+
+	// Ensure the same behaviour when base is empty
+	assert.NotPanics(t, func() {
+		_, _ = GenerateIndex(
+			client,
+			ociURL,
+			nil,
+			v1.RepoSpec{InsecurePlainHTTP: true, InsecureSkipTLSverify: true},
+			v1.RepoStatus{},
+			indexFile,
+		)
+	}, "GenerateIndex should not panic on exact+sub-repo catalog entries when the base is empty")
 }
