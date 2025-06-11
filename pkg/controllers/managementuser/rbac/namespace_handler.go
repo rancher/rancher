@@ -498,6 +498,8 @@ func addManageNSPermission(clusterRole *rbacv1.ClusterRole, projectName string) 
 	return clusterRole
 }
 
+// addUpdatepsaClusterRole returns a ClusterRole with the updatepsa verb enabled.
+// The name of the ClusterRole has the following format: <project_name>-namespaces-psa
 func addUpdatepsaClusterRole(projectName string) *rbacv1.ClusterRole {
 	clusterRole := &rbacv1.ClusterRole{}
 	crName := "%s-namespaces-psa"
