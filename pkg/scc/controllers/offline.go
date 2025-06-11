@@ -11,6 +11,7 @@ import (
 )
 
 type sccOfflineMode struct {
+	registration       *v1.Registration
 	log                log.StructuredLogger
 	systemInfoExporter *systeminfo.InfoExporter
 	secrets            v1core.SecretController
@@ -23,8 +24,13 @@ func (s sccOfflineMode) NeedsRegistration(registrationObj *v1.Registration) bool
 			v1.RegistrationConditionOfflineRequestReady.IsFalse(registrationObj))
 }
 
-func (s sccOfflineMode) RegisterSystem(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
-	// TODO: for offline it probably makes more sense to just return offline system ID const and do this prep in PrepareRegisteredSystem
+func (s sccOfflineMode) PrepareForRegister(registration *v1.Registration) (*v1.Registration, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s sccOfflineMode) Register(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
+	// TODO: for offline it probably makes more sense to just return offline system ID const and do this prep in PrepareRegisteredForActivation
 	if v1.ResourceConditionDone.IsTrue(registrationObj) ||
 		v1.RegistrationConditionAnnounced.IsTrue(registrationObj) {
 		logrus.Debugf("[scc.registration-controller]: registration already complete, nothing to process for %s", registrationObj.Name)
@@ -34,11 +40,11 @@ func (s sccOfflineMode) RegisterSystem(registrationObj *v1.Registration) (suseco
 	return suseconnect.OfflineRegistrationSystemId, nil
 }
 
-func (s sccOfflineMode) ReconcileRegisterSystemError(registration *v1.Registration, registerErr error) *v1.Registration {
+func (s sccOfflineMode) ReconcileRegisterError(registration *v1.Registration, registerErr error) *v1.Registration {
 	return registration
 }
 
-func (s sccOfflineMode) PrepareRegisteredSystem(registration *v1.Registration) (*v1.Registration, error) {
+func (s sccOfflineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
 	// TODO: this generation and secret maybe should be updated regularly like Online mode phone home?
 	generatedRegistrationRequest, err := s.systemInfoExporter.PreparedForSCCOffline()
 	if err != nil {
@@ -85,7 +91,7 @@ func (s sccOfflineMode) ReconcileActivateError(registration *v1.Registration, ac
 
 func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
 	s.log.Debugf("For now offline keepalive is an intentional noop")
-	// TODO: eventually keepalive for offline should mimic `PrepareRegisteredSystem` creation of ORR (to update metrics for next offline registration)
+	// TODO: eventually keepalive for offline should mimic `PrepareRegisteredForActivation` creation of ORR (to update metrics for next offline registration)
 	return nil
 }
 

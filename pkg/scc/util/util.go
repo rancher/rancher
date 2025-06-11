@@ -29,6 +29,7 @@ func utilContextLogger() log.StructuredLogger {
 	return log.NewLog().WithField("subcomponent", "util")
 }
 
+// ValidateInitializingConfigMap TODO: repurpose for validate secret?
 func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*corev1.SecretReference, *v1.RegistrationMode, error) {
 	secretReference := &corev1.SecretReference{}
 	// Verify the expected fields are on the config map
