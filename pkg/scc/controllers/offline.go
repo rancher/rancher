@@ -73,7 +73,7 @@ func (s sccOfflineMode) PrepareRegisteredSystem(registration *v1.Registration) (
 func (s sccOfflineMode) NeedsActivation(registrationObj *v1.Registration) bool {
 	return registrationObj.Spec.OfflineRegistrationCertificateSecretRef != nil &&
 		(!registrationObj.Status.ActivationStatus.Activated ||
-			registrationObj.Status.ActivationStatus.LastValidatedTS == nil)
+			registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero())
 }
 
 func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {

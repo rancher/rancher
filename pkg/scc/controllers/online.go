@@ -148,7 +148,7 @@ func (s sccOnlineMode) fetchRegCode(registrationObj *v1.Registration) string {
 
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
 	return !registrationObj.Status.ActivationStatus.Activated ||
-		registrationObj.Status.ActivationStatus.LastValidatedTS == nil
+		registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero()
 }
 
 func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {

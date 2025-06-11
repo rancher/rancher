@@ -199,7 +199,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	if !registrationHandler.NeedsRegistration(registrationObj) &&
 		!registrationHandler.NeedsActivation(registrationObj) &&
 		registrationObj.Spec.SyncNow == nil {
-		if registrationObj.Status.ActivationStatus.LastValidatedTS.Time.After(minResyncInterval()) {
+		if !registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero() &&
+			registrationObj.Status.ActivationStatus.LastValidatedTS.Time.After(minResyncInterval()) {
 			return registrationObj, nil
 		}
 	}
