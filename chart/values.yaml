@@ -258,11 +258,6 @@ extraObjects: []
 registration:
   enabled: false
   regCode: ""
-  # Optionally, specify the namespace+name of a secret that contains the registration code.
-  # This is preferred if you pre-create the secret before using helm to install Rancher.
-  # regCodeRef:
-  #   secretName: ""
-  #   secretNamespace: ""
   ## Alternative Registration Endpoint
   # For users with a local RMT server you can use an alternative registration endpoint to register your cluster.
   # This will cause the registration process to sync with your RMT server instead of with the SCC.
@@ -272,6 +267,8 @@ registration:
   # To complete the offline registration via helm is a multi-step process - or you can complete it via the Rancher UI.
   # Step 1. Enable registration (above) and then uncomment the next line to set mode to offline; then complete the initial helm install.
   # mode: offline
+  
+  # TODO: UPDATE THESE DOCS FOR OFFLINE
   # Step 2. Fetch the offline registration Request needed for the SCC
   # Step 2.a. Using kubectl fetch the offline registration request and save to local file, OR
   #     cmd: kubectl get secrets -n cattle-system rancher-scc-offline-registration-request -o yaml|yq '.data.certificate' > offline-request.json.base64
