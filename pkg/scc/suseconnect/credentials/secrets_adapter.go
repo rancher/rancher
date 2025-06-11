@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"github.com/SUSE/connect-ng/pkg/connection"
+	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -9,38 +10,35 @@ import (
 )
 
 const (
-	SecretName  = "rancher-scc-system-credentials"
-	Namespace   = "cattle-system"
 	UsernameKey = "systemLogin"
 	PasswordKey = "password"
 	TokenKey    = "systemToken"
 )
 
 type CredentialSecretsAdapter struct {
+	secretNamespace string
+	secretName      string
 	// TODO (dan) : let's make sure the lookups are handled via a secret cache
 	secrets     v1core.SecretController
+	secretCache v1core.SecretCache
 	credentials SccCredentials
-	// TODO: implement secret reconcile logic
-	currentSHA string
 }
 
-func New(secrets v1core.SecretController) *CredentialSecretsAdapter {
-	newAdapterCreds := NewCredentials()
-
-	// Load initial creds from secret
-	sccCreds, err := secrets.Get(Namespace, SecretName, metav1.GetOptions{})
-	if err == nil && sccCreds != nil && len(sccCreds.Data) != 0 {
-		username, _ := sccCreds.Data[UsernameKey]
-		password, _ := sccCreds.Data[PasswordKey]
-		token, _ := sccCreds.Data[TokenKey]
-		_ = newAdapterCreds.SetLogin(string(username), string(password))
-		_ = newAdapterCreds.UpdateToken(string(token))
-	}
-
+func New(
+	name, namespace string,
+	secrets v1core.SecretController,
+	secretCache v1core.SecretCache,
+) *CredentialSecretsAdapter {
 	return &CredentialSecretsAdapter{
-		secrets:     secrets,
-		credentials: *newAdapterCreds,
+		secretName:      name,
+		secretNamespace: namespace,
+		secrets:         secrets,
+		secretCache:     secretCache,
 	}
+}
+
+func (c *CredentialSecretsAdapter) InitSecret() error {
+	return c.saveCredentials()
 }
 
 func (c *CredentialSecretsAdapter) Refresh() error {
@@ -49,7 +47,7 @@ func (c *CredentialSecretsAdapter) Refresh() error {
 
 func (c *CredentialSecretsAdapter) loadCredentials() error {
 	// TODO gather errors
-	sccCreds, err := c.secrets.Get(Namespace, SecretName, metav1.GetOptions{})
+	sccCreds, err := c.secretCache.Get(c.secretNamespace, c.secretName)
 	if err == nil && sccCreds != nil && len(sccCreds.Data) != 0 {
 		username, _ := sccCreds.Data[UsernameKey]
 		password, _ := sccCreds.Data[PasswordKey]
@@ -58,13 +56,13 @@ func (c *CredentialSecretsAdapter) loadCredentials() error {
 		_ = c.credentials.UpdateToken(string(token))
 	}
 
-	return nil
+	return err
 }
 
 func (c *CredentialSecretsAdapter) saveCredentials() error {
 	create := false
 	// TODO gather errors
-	sccCreds, err := c.secrets.Get(Namespace, SecretName, metav1.GetOptions{})
+	sccCreds, err := c.secrets.Get(c.secretNamespace, c.secretName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -73,8 +71,8 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 		create = true
 		sccCreds = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      SecretName,
-				Namespace: Namespace,
+				Name:      c.secretName,
+				Namespace: c.secretNamespace,
 			},
 			Data: map[string][]byte{},
 		}
@@ -106,7 +104,7 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 }
 
 func (c *CredentialSecretsAdapter) Remove() error {
-	return c.secrets.Delete(Namespace, SecretName, &metav1.DeleteOptions{})
+	return c.secrets.Delete(c.secretNamespace, c.secretName, &metav1.DeleteOptions{})
 }
 
 func (c *CredentialSecretsAdapter) HasAuthentication() bool {
@@ -148,4 +146,12 @@ func (c *CredentialSecretsAdapter) SetLogin(newUser string, newPass string) erro
 
 func (c *CredentialSecretsAdapter) SccCredentials() connection.Credentials {
 	return c
+}
+
+func (c *CredentialSecretsAdapter) SetRegistrationCredentialsSecretRef(registrationObj *v1.Registration) *v1.Registration {
+	registrationObj.Status.SystemCredentialsSecretRef = &corev1.SecretReference{
+		Namespace: c.secretNamespace,
+		Name:      c.secretName,
+	}
+	return registrationObj
 }

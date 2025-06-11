@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -12,14 +13,12 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util"
-	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -38,41 +37,48 @@ const (
 type SCCHandler interface {
 	// NeedsRegistration determines if the system requires initial SCC registration.
 	NeedsRegistration(*v1.Registration) bool
-	// RegisterSystem performs the initial system registration with SCC or creates an offline request.
-	RegisterSystem(*v1.Registration) (suseconnect.RegistrationSystemId, error)
-	// ReconcileRegisterSystemError prepares the Registration object for error reconciliation after RegisterSystem fails.
-	ReconcileRegisterSystemError(*v1.Registration, error) *v1.Registration
-	// PrepareRegisteredSystem prepares the Registration object after successful registration.
-	PrepareRegisteredSystem(*v1.Registration) (*v1.Registration, error)
 	// NeedsActivation checks if the system requires activation with SCC.
 	NeedsActivation(*v1.Registration) bool
 	// ReadyForActivation checks if the system is ready for activation.
 	ReadyForActivation(*v1.Registration) bool
+
+	// PrepareForRegister preforms pre-registration steps
+	PrepareForRegister(*v1.Registration) (*v1.Registration, error)
+	// Register performs the initial system registration with SCC or creates an offline request.
+	Register(*v1.Registration) (suseconnect.RegistrationSystemId, error)
+	// PrepareRegisteredForActivation prepares the Registration object after successful registration.
+	PrepareRegisteredForActivation(*v1.Registration) (*v1.Registration, error)
 	// Activate activates the system with SCC or verifies an offline request.
 	Activate(*v1.Registration) error
-	// ReconcileActivateError prepares the Registration object for error reconciliation after Activate fails.
-	ReconcileActivateError(*v1.Registration, error) *v1.Registration
 	// Keepalive provides a heartbeat to SCC and validates the system's status.
 	Keepalive(registrationObj *v1.Registration) error
-	// ReconcileKeepaliveError prepares the Registration object for error reconciliation after Keepalive fails.
-	ReconcileKeepaliveError(*v1.Registration, error) *v1.Registration
 	// Deregister initiates the system's deregistration from SCC.
 	Deregister() error
+
+	// ReconcileRegisterError prepares the Registration object for error reconciliation after RegisterSystem fails.
+	ReconcileRegisterError(*v1.Registration, error) *v1.Registration
+	// ReconcileKeepaliveError prepares the Registration object for error reconciliation after Keepalive fails.
+	ReconcileKeepaliveError(*v1.Registration, error) *v1.Registration
+	// ReconcileActivateError prepares the Registration object for error reconciliation after Activate fails.
+	ReconcileActivateError(*v1.Registration, error) *v1.Registration
 }
 
 type handler struct {
-	apply              apply.Apply
-	ctx                context.Context
-	log                *logrus.Entry
-	registrations      registrationControllers.RegistrationController
-	registrationCache  registrationControllers.RegistrationCache
-	secrets            v1core.SecretController
-	sccCredentials     *credentials.CredentialSecretsAdapter
-	systemInfoExporter *systeminfo.InfoExporter
+	apply                 apply.Apply
+	entrypointSecretApply apply.Apply
+	ctx                   context.Context
+	log                   *logrus.Entry
+	registrations         registrationControllers.RegistrationController
+	registrationCache     registrationControllers.RegistrationCache
+	secrets               v1core.SecretController
+	secretCache           v1core.SecretCache
+	systemInfoExporter    *systeminfo.InfoExporter
+	systemNamespace       string
 }
 
 func Register(
 	ctx context.Context,
+	systemNamespace string,
 	wApply apply.Apply,
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
@@ -80,96 +86,61 @@ func Register(
 ) {
 	controller := &handler{
 		apply: wApply.
-			WithCacheTypes(registrations).
-			WithSetID(controllerID).
-			WithSetOwnerReference(true, false),
+			WithCacheTypes(registrations, secrets),
+		//WithSetID(controllerID).
+		//WithSetOwnerReference(true, false),
 		log:                log.NewControllerLogger("registration-controller"),
 		ctx:                ctx,
 		registrations:      registrations,
 		registrationCache:  registrations.Cache(),
 		secrets:            secrets,
-		sccCredentials:     credentials.New(secrets),
+		secretCache:        secrets.Cache(),
 		systemInfoExporter: systemInfoExporter,
+		systemNamespace:    systemNamespace,
 	}
+
+	controller.initIndexers()
+	controller.initResolvers(ctx)
+	secrets.OnChange(ctx, controllerID+"-secrets", controller.OnSecretChange)
+	secrets.OnRemove(ctx, controllerID+"-secrets-remove", controller.OnSecretRemove)
 
 	registrations.OnChange(ctx, controllerID, controller.OnRegistrationChange)
-	registrations.OnRemove(ctx, controllerID+"remove", controller.OnRegistrationRemove)
-	relatedresource.Watch(ctx, controllerID+"-secrets",
-		relatedresource.
-			OwnerResolver(true, v1.SchemeGroupVersion.String(), v1.RegistrationResourceName),
-		secrets,
-		registrations,
-	)
-
-	// Configure jitter based daily revalidation trigger
-	jitterbugConfig := jitterbug.Config{
-		BaseInterval:    prodBaseCheckin,
-		JitterMax:       3,
-		JitterMaxScale:  time.Hour,
-		PollingInterval: 9 * time.Minute,
-	}
-	if util.VersionIsDevBuild() {
-		jitterbugConfig = jitterbug.Config{
-			BaseInterval:    devBaseCheckin,
-			JitterMax:       10,
-			JitterMaxScale:  time.Minute,
-			PollingInterval: 9 * time.Second,
-		}
-	}
-	jitterCheckin := jitterbug.NewJitterChecker(
-		&jitterbugConfig,
-		func(nextTrigger, strictDeadline time.Duration) (bool, error) {
-			registrationsCacheList, err := controller.registrationCache.List(labels.Everything())
-			if err != nil {
-				controller.log.Errorf("Failed to list registrations: %v", err)
-				return false, err
-			}
-
-			checkInWasTriggered := false
-			for _, registrationObj := range registrationsCacheList {
-				registrationHandler := controller.prepareHandler(registrationObj.Spec.Mode)
-
-				// Always skip offline mode registrations, or Registrations that haven't progressed to activation
-				if registrationObj.Spec.Mode == v1.RegistrationModeOffline ||
-					registrationHandler.NeedsRegistration(registrationObj) ||
-					registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero() {
-					continue
-				}
-
-				lastValidated := registrationObj.Status.ActivationStatus.LastValidatedTS
-
-				timeSinceLastValidation := time.Since(lastValidated.Time)
-				// If the time since last validation is after the daily trigger (which includes jitter), we revalidate.
-				// Also, ensure that when a registration is over the strictDeadline it is checked.
-				if timeSinceLastValidation >= nextTrigger || timeSinceLastValidation >= strictDeadline {
-					checkInWasTriggered = true
-					// TODO (o&b): 95% sure that enqueue alone won't be good enough based on other controller logic.
-					// Either we need to adjust that controller logic so enqueue alone is enough, or use `CheckNow`.
-					// Seems check now is most simple as it reuses controller logic
-					registrations.Enqueue(registrationObj.Name)
-				}
-			}
-
-			return checkInWasTriggered, nil
-		},
-	)
-	jitterCheckin.Start()
-	go jitterCheckin.Run()
+	registrations.OnRemove(ctx, controllerID+"-remove", controller.OnRegistrationRemove)
+	//relatedresource.Watch(ctx, controllerID+"-secrets",
+	//	relatedresource.
+	//		OwnerResolver(true, v1.SchemeGroupVersion.String(), v1.RegistrationResourceName),
+	//	secrets,
+	//	registrations,
+	//)
+	cfg := setupCfg()
+	go controller.RunDispatcher(cfg)
 }
 
-func (h *handler) prepareHandler(mode v1.RegistrationMode) SCCHandler {
-	if mode == v1.RegistrationModeOffline {
+func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
+
+	if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 		return sccOfflineMode{
+			registration:       registrationObj,
 			log:                h.log.WithField("handler", "offline"),
 			systemInfoExporter: h.systemInfoExporter,
 			secrets:            h.secrets,
 		}
 	}
+
+	var credsName string
+	if labelVal, ok := registrationObj.Labels[LabelSccManagedBy]; ok && labelVal == ManagedBySecretBroker {
+		credsName = consts.SCCCredentialsSecretName(labelVal)
+	} else {
+		credsName = consts.SCCCredentialsSecretName(registrationObj.Name)
+	}
+
 	return sccOnlineMode{
+		registration:       registrationObj,
 		log:                h.log.WithField("handler", "online"),
-		sccCredentials:     h.sccCredentials,
+		sccCredentials:     credentials.New(credsName, h.systemNamespace, h.secrets, h.secretCache),
 		systemInfoExporter: h.systemInfoExporter,
 		secrets:            h.secrets,
+		systemNamespace:    h.systemNamespace,
 	}
 }
 
@@ -179,6 +150,101 @@ func minResyncInterval() time.Time {
 		return now.Add(-devMinCheckin)
 	}
 	return now.Add(-prodMinCheckin)
+}
+
+func registrationBrokerSetId(hash string) string {
+	return controllerID + "-entrypoint-" + hash
+}
+
+func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*corev1.Secret, error) {
+	if incomingObj == nil || incomingObj.DeletionTimestamp != nil {
+		return incomingObj, nil
+	}
+	logrus.Warn("SCC : secret handling")
+
+	if h.isRancherEntrypointSecret(incomingObj) {
+		incomingHash := incomingObj.GetLabels()[LabelSccHash]
+		params, err := extraRegistrationParamsFromSecret(incomingObj)
+		if err != nil {
+			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
+		}
+
+		// update secret with useful annotations & labels
+		newSecret := incomingObj.DeepCopy()
+		if newSecret.Annotations == nil {
+			newSecret.Annotations = map[string]string{}
+		}
+		newSecret.Annotations[LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
+		newSecret.Labels = params.Labels()
+
+		if _, updateErr := h.secrets.Update(newSecret); updateErr != nil {
+			h.log.Error("error applying metadata updates to default SCC registration secret")
+			return nil, updateErr
+		}
+
+		// construct associated registration CRs
+		registration, err := registrationFromSecretEntrypoint(params)
+		if err != nil {
+			return incomingObj, fmt.Errorf("failed to create registration from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
+		}
+
+		applier := h.apply.WithSetID(
+			registrationBrokerSetId(params.hash),
+		).WithOwner(incomingObj)
+
+		if err := applier.ApplyObjects(
+			registration,
+		); err != nil {
+			h.log.Error("error applying global default SCC registration")
+			return incomingObj,
+				fmt.Errorf(
+					"failed to apply matching registration and secret updates %s/%s: %w",
+					incomingObj.Namespace,
+					incomingObj.Name,
+					err,
+				)
+		}
+
+		// If secret hash has changed make sure that we submit objects that correspond to that hash
+		// are cleaned up
+		if incomingHash != "" && incomingHash != params.hash {
+			oldApplier := h.apply.WithSetID(registrationBrokerSetId(incomingHash))
+			if err := oldApplier.ApplyObjects(); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if h.isRancherSccSecret(incomingObj) {
+		// TODO(dan): credentials rework
+		h.log.Debug("Do something with SCC creds secret?")
+		h.log.Debug(incomingObj)
+	}
+	return incomingObj, nil
+}
+
+func (h *handler) OnSecretRemove(name string, secretObj *corev1.Secret) (*corev1.Secret, error) {
+	if secretObj == nil {
+		return nil, nil
+	}
+	// TODO : this clears registrations? Do we want this
+	hash, ok := secretObj.Labels[LabelSccHash]
+	if !ok {
+		return secretObj, nil
+	}
+
+	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, reg := range regs {
+		if err := h.registrations.Delete(reg.Name, &metav1.DeleteOptions{}); err != nil {
+			return nil, err
+		}
+	}
+
+	return secretObj, nil
 }
 
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
@@ -195,7 +261,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, errors.New("registration has failed status; create a new one to retry")
 	}
 
-	registrationHandler := h.prepareHandler(registrationObj.Spec.Mode)
+	registrationHandler := h.prepareHandler(registrationObj)
 
 	// Skip keepalive for anything activated within the last 20 hours
 	if !registrationHandler.NeedsRegistration(registrationObj) &&
@@ -225,7 +291,17 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		}
 
 		regForAnnounce := progressingObj.DeepCopy()
-		announcedSystemId, registerErr := registrationHandler.RegisterSystem(regForAnnounce)
+		preparedForRegister, prepareErr := registrationHandler.PrepareForRegister(regForAnnounce)
+		if prepareErr != nil {
+			return progressingObj, prepareErr
+		}
+		// Maybe we don't update until after successful registration?
+		regForAnnounce, updateErr := h.registrations.UpdateStatus(preparedForRegister)
+		if updateErr != nil {
+			return progressingObj, prepareErr
+		}
+
+		announcedSystemId, registerErr := registrationHandler.Register(regForAnnounce)
 		if registerErr != nil {
 			// reconcile state
 			var reconciledReg *v1.Registration
@@ -235,7 +311,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 				if retryErr != nil {
 					return retryErr
 				}
-				reconciledObj := registrationHandler.ReconcileRegisterSystemError(registrationObj, registerErr)
+				reconciledObj := registrationHandler.ReconcileRegisterError(registrationObj, registerErr)
 
 				reconciledReg, reconcileUpdateErr = h.registrations.Update(reconciledObj)
 				return reconcileUpdateErr
@@ -262,7 +338,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 		var prepareError error
 		// Prepare the Registration for Activation phase
-		regForAnnounce, prepareError = registrationHandler.PrepareRegisteredSystem(regForAnnounce)
+		regForAnnounce, prepareError = registrationHandler.PrepareRegisteredForActivation(regForAnnounce)
 		if prepareError != nil {
 			return registrationObj, prepareError
 		}
@@ -394,12 +470,13 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	return heartbeatUpdated, nil
 }
 
+// do we want a finalizer for preventing deregister from failing then deleting object?
 func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	if registrationObj == nil {
 		return nil, nil
 	}
 
-	regHandler := h.prepareHandler(registrationObj.Spec.Mode)
+	regHandler := h.prepareHandler(registrationObj)
 	deRegErr := regHandler.Deregister()
 	if deRegErr != nil {
 		h.log.Warn(deRegErr)

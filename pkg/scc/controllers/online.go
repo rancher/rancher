@@ -17,10 +17,12 @@ import (
 )
 
 type sccOnlineMode struct {
+	registration       *v1.Registration
 	log                log.StructuredLogger
 	sccCredentials     *credentials.CredentialSecretsAdapter
 	systemInfoExporter *systeminfo.InfoExporter
 	secrets            v1core.SecretController
+	systemNamespace    string
 }
 
 func (s sccOnlineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
@@ -29,10 +31,26 @@ func (s sccOnlineMode) NeedsRegistration(registrationObj *v1.Registration) bool 
 		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced)
 }
 
-func (s sccOnlineMode) RegisterSystem(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
-	credRefreshErr := s.sccCredentials.Refresh() // We must always refresh the sccCredentials - this ensures they are current from the secrets
-	if credRefreshErr != nil {
-		return suseconnect.EmptyRegistrationSystemId, fmt.Errorf("cannot refresh credentials: %w", credRefreshErr)
+// PrepareForRegister creates the necessary SCC creds secret and secret reference
+func (s sccOnlineMode) PrepareForRegister(registration *v1.Registration) (*v1.Registration, error) {
+	if registration.Status.SystemCredentialsSecretRef == nil {
+		err := s.sccCredentials.InitSecret()
+		if err != nil {
+			return registration, err
+		}
+		s.sccCredentials.SetRegistrationCredentialsSecretRef(registration)
+	}
+
+	return registration, nil
+}
+
+func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
+	// We must always refresh the sccCredentials - this ensures they are current from the secrets
+	credentialsErr := s.sccCredentials.Refresh()
+	if credentialsErr == nil {
+		// Counter-intuitively, on register we expect Refresh call will trigger an error because the secret should not exist yet
+		// So when it does we will send a warning that unexpected results may be found ahead
+		s.log.Warnf("scc credential secret %s already exists; normaly it should not exist at this point yet, this may result in unexpected outcomes")
 	}
 
 	// Fetch the SCC registration code; for 80% of users this should be a real code
@@ -44,7 +62,7 @@ func (s sccOnlineMode) RegisterSystem(registrationObj *v1.Registration) (susecon
 	// Initiate connection to SCC & verify reg code is for Rancher
 	sccConnection := suseconnect.DefaultRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter)
 
-	// RegisterSystem this Rancher cluster to SCC
+	// Register this Rancher cluster to SCC
 	id, regErr := sccConnection.RegisterOrKeepAlive(registrationCode)
 	if regErr != nil {
 		// TODO(scc) do we error different based on ID type?
@@ -55,7 +73,7 @@ func (s sccOnlineMode) RegisterSystem(registrationObj *v1.Registration) (susecon
 }
 
 func isNonRecoverableHttpError(err error) bool {
-	var sccApiError connection.ApiError
+	var sccApiError *connection.ApiError
 
 	if errors.As(err, &sccApiError) {
 		httpCode := sccApiError.Code
@@ -72,7 +90,7 @@ func isNonRecoverableHttpError(err error) bool {
 }
 
 func getHttpErrorCode(err error) *int {
-	var sccApiError connection.ApiError
+	var sccApiError *connection.ApiError
 
 	if errors.As(err, &sccApiError) {
 		httpCode := sccApiError.Code
@@ -97,7 +115,7 @@ func (s sccOnlineMode) reconcileNonRecoverableHttpError(registration *v1.Registr
 	return registration
 }
 
-func (s sccOnlineMode) ReconcileRegisterSystemError(registration *v1.Registration, registerErr error) *v1.Registration {
+func (s sccOnlineMode) ReconcileRegisterError(registration *v1.Registration, registerErr error) *v1.Registration {
 	prepared := registration.DeepCopy()
 	if isNonRecoverableHttpError(registerErr) {
 		return s.reconcileNonRecoverableHttpError(prepared, registerErr)
@@ -106,7 +124,7 @@ func (s sccOnlineMode) ReconcileRegisterSystemError(registration *v1.Registratio
 	return prepared
 }
 
-func (s sccOnlineMode) PrepareRegisteredSystem(registration *v1.Registration) (*v1.Registration, error) {
+func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
 	if registration.Status.SCCSystemId == nil {
 		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
 	}
@@ -120,18 +138,13 @@ func (s sccOnlineMode) PrepareRegisteredSystem(registration *v1.Registration) (*
 	v1.ResourceConditionFailure.SetStatusBool(registration, false)
 	v1.ResourceConditionReady.SetStatusBool(registration, true)
 
-	registration.Status.SystemCredentialsSecretRef = &corev1.SecretReference{
-		Namespace: credentials.Namespace,
-		Name:      credentials.SecretName,
-	}
-
 	return registration, nil
 }
 
 func (s sccOnlineMode) fetchRegCode(registrationObj *v1.Registration) string {
 	// Set to global default, or user configured value from the Registration resource
 	regCodeSecretRef := &corev1.SecretReference{
-		Namespace: "cattle-system",
+		Namespace: s.systemNamespace,
 		Name:      util.RegCodeSecretName,
 	}
 	if registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef != nil {
@@ -159,9 +172,9 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	s.log.Debugf("received registration ready for activations %q", registrationObj.Name)
 	s.log.Debug("registration ", registrationObj)
 
-	credRefreshErr := s.sccCredentials.Refresh() // We must always refresh the sccCredentials - this ensures they are current from the secrets
-	if credRefreshErr != nil {
-		return fmt.Errorf("cannot refresh credentials: %w", credRefreshErr)
+	credentialsErr := s.sccCredentials.Refresh()
+	if credentialsErr != nil {
+		return fmt.Errorf("cannot load scc credentials: %w", credentialsErr)
 	}
 
 	registrationCode := s.fetchRegCode(registrationObj)

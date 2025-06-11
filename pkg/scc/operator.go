@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"time"
 
 	"github.com/rancher/rancher/pkg/scc/util/log"
@@ -16,11 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
-	sccv1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
 	"github.com/rancher/rancher/pkg/scc/controllers"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
-	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -104,6 +102,7 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 	// Currently we only wait for ServerUrl not being empty, this is a good start as without the URL we cannot start.
 	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
 	// TODO: expand wait to include verifying at least local cluster is ready too - this prevents issues with offline clusters
+	defer onSystemReady()
 	if systeminfo.IsServerUrlReady() {
 		close(so.systemRegistrationReady)
 		return
@@ -118,63 +117,6 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 			so.log.Info("cannot start controllers yet; server URL is not ready.")
 		}
 	}, 15*time.Second, so.systemRegistrationReady)
-	onSystemReady()
-}
-
-// maybeFirstInit will check if the initial `Registration` seeding values exist
-// and if they need to be processed into a new `Registration` (used during first boot ever)
-func (so *sccOperator) maybeFirstInit() (*sccv1.Registration, error) {
-	so.log.Debug("Running maybeFirstInit")
-	if strings.EqualFold(settings.SCCFirstStart.Get(), "false") {
-		so.log.Warn("Skipping the SCC controller first start; first start already completed previously.")
-		return nil, nil
-	}
-
-	// Check if the `cattle-system:initial-scc-registration` ConfigMap exists
-	// If it does not exist, then we skip initialization via ConfigMap and proceed to set SCCFirstStart to false
-	configMap, err := so.configMaps.Get("cattle-system", "initial-scc-registration", metav1.GetOptions{})
-	var newRegistration *sccv1.Registration
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			so.log.Errorf("Error getting cattle-system initial-scc-registration: %v", err)
-			return nil, err
-		}
-		so.log.Warn("Cannot find initial-scc-registration configmap; it will be skipped")
-	} else {
-		secretRef, mode, err := util.ValidateInitializingConfigMap(configMap)
-		if err != nil {
-			so.log.Warn("Cannot validate initial-scc-registration configmap; it will be skipped")
-		} else {
-			newRegistration = &sccv1.Registration{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "rancher-",
-				},
-				Spec: sccv1.RegistrationSpec{
-					RegistrationRequest: &sccv1.RegistrationRequest{},
-				},
-			}
-			newRegistration.Spec.Mode = *mode
-			if *mode == sccv1.RegistrationModeOnline {
-				newRegistration.Spec.RegistrationRequest.RegistrationCodeSecretRef = secretRef
-			}
-
-			_, err = so.sccResourceFactory.Scc().V1().Registration().Create(newRegistration)
-			if err != nil {
-				so.log.Errorf("Cannot create registration request; %s", err)
-				return nil, err
-			}
-			_ = so.configMaps.Delete(configMap.Namespace, configMap.Name, &metav1.DeleteOptions{})
-		}
-	}
-
-	// At very end, we will set it to false so this doesn't run again
-	if !strings.EqualFold(settings.SCCFirstStart.Get(), "false") {
-		if err := settings.SCCFirstStart.Set("false"); err != nil {
-			return newRegistration, err
-		}
-	}
-
-	return newRegistration, nil
 }
 
 // Setup initializes the SCC Operator and configures it to start when Rancher is in appropriate state.
@@ -190,25 +132,13 @@ func Setup(
 		return fmt.Errorf("error setting up scc operator: %s", err.Error())
 	}
 
-	// Start goroutine to wait for systemRegistrationReady to complete; currently based on server-url only
-	go func() {
-		initOperator.log.Debug("waiting to run first init until after system ready signal")
-		<-initOperator.systemRegistrationReady
-
-		_, err = initOperator.maybeFirstInit()
-		if err != nil {
-			initOperator.log.Errorf("error creating first-start `Registration`: %s", err.Error())
-		}
-
-		return
-	}()
-
 	// Because the controller `Register` call will start activation refresh timers,
 	// we need to wait for the system to be ready before starting the controller.
 	// Doing it this way is more simple than tying the controller starting those timers to `systemRegistrationReady`
 	go initOperator.waitForSystemReady(func() {
 		controllers.Register(
 			ctx,
+			consts.DefaultSCCNamespace,
 			wContext.Apply,
 			initOperator.sccResourceFactory.Scc().V1().Registration(),
 			initOperator.secrets,
