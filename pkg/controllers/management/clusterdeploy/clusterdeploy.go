@@ -50,7 +50,6 @@ var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes
 var (
 	agentImagesMutex sync.RWMutex
 	agentImages      = map[string]map[string]string{
-		nodeImage:    {},
 		clusterImage: {},
 	}
 	controlPlaneTaintsMutex sync.RWMutex
@@ -627,35 +626,7 @@ func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
 	return "", nil
 }
 
-func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContextNoControllers(name)
-	if err != nil {
-		return "", err
-	}
-
-	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return "", err
-		}
-		return "", nil
-	}
-
-	for _, c := range ds.Spec.Template.Spec.Containers {
-		if c.Name == "agent" {
-			return c.Image, nil
-		}
-	}
-
-	return "", nil
-}
-
 func (cd *clusterDeploy) cacheAgentImages(name string) error {
-	na, err := cd.getNodeAgentImage(name)
-	if err != nil {
-		return err
-	}
-
 	ca, err := cd.getClusterAgentImage(name)
 	if err != nil {
 		return err
@@ -663,7 +634,6 @@ func (cd *clusterDeploy) cacheAgentImages(name string) error {
 
 	agentImagesMutex.Lock()
 	defer agentImagesMutex.Unlock()
-	agentImages[nodeImage][name] = na
 	agentImages[clusterImage][name] = ca
 	return nil
 }
@@ -685,7 +655,7 @@ func controlPlaneTaintsCached(name string) bool {
 func getAgentImages(name string) (string, string) {
 	agentImagesMutex.RLock()
 	defer agentImagesMutex.RUnlock()
-	return agentImages[nodeImage][name], agentImages[clusterImage][name]
+	return "", agentImages[clusterImage][name]
 }
 
 func getCachedControlPlaneTaints(name string) []corev1.Taint {
@@ -701,7 +671,6 @@ func clearAgentImages(name string) {
 	logrus.Tracef("clusterDeploy: clearAgentImages called for [%s]", name)
 	agentImagesMutex.Lock()
 	defer agentImagesMutex.Unlock()
-	delete(agentImages[nodeImage], name)
 	delete(agentImages[clusterImage], name)
 }
 
