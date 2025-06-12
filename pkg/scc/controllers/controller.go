@@ -519,6 +519,8 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 		h.log.Warn(deRegErr)
 	}
 
+	// TODO: owner finalizers handled here
+	// (alex) :  I don't think this is neded
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
 		return registrationObj, err
