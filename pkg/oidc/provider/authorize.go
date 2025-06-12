@@ -86,6 +86,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		q.Set("redirect_uri", params.redirectURI)
 		q.Set("scope", strings.Join(params.scopes, " "))
 		q.Set("code_challenge", params.codeChallenge)
+		q.Set("code_challenge_method", params.codeChallengeMethod)
 		if params.state != "" {
 			q.Set("state", params.state)
 		}
