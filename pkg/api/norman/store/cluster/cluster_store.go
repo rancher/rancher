@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
@@ -32,13 +31,11 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
-	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
-	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -46,7 +43,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkedefaults "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/k8s"
-	rkeservices "github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -782,9 +778,6 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateKeyRotation(data); err != nil {
 		return nil, err
 	}
-	if err := r.validateUnavailableNodes(data, existingCluster, id); err != nil {
-		return nil, err
-	}
 
 	// When any rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter has been removed, updating cluster using k8s dynamic client to properly
 	// replace cluster spec. This is required due to r.Store.Update is merging this data instead of replacing it, https://github.com/rancher/rancher/issues/27306
@@ -1479,35 +1472,6 @@ func cleanPrivateRegistry(data map[string]interface{}) {
 	values.PutValue(data, updatedRegistries, "rancherKubernetesEngineConfig", "privateRegistries")
 }
 
-func (r *Store) validateUnavailableNodes(data, existingData map[string]interface{}, id string) error {
-	cluster, err := r.ClusterLister.Get("", id)
-	if err != nil {
-		return fmt.Errorf("error getting cluster, try again %v", err)
-	}
-	// no need to validate if cluster's already provisioning or upgrading
-	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) ||
-		!apimgmtv3.ClusterConditionUpdated.IsTrue(cluster) ||
-		apimgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
-		return nil
-	}
-	spec, err := getRkeConfig(data)
-	if err != nil || spec == nil {
-		return err
-	}
-	status, err := getRkeConfig(existingData)
-	if err != nil || status == nil {
-		return err
-	}
-	if reflect.DeepEqual(status, spec) {
-		return nil
-	}
-	nodes, err := r.NodeLister.List(id, labels.Everything())
-	if err != nil {
-		return fmt.Errorf("error fetching nodes, try again %v", err)
-	}
-	return canUpgrade(nodes, spec.UpgradeStrategy)
-}
-
 func getRkeConfig(data map[string]interface{}) (*rketypes.RancherKubernetesEngineConfig, error) {
 	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
 	if rkeConfig == nil {
@@ -1522,51 +1486,6 @@ func getRkeConfig(data map[string]interface{}) (*rketypes.RancherKubernetesEngin
 		return nil, errors.Wrapf(err, "error reading rkeConfig")
 	}
 	return spec, nil
-}
-
-func canUpgrade(nodes []*apimgmtv3.Node, upgradeStrategy *rketypes.NodeUpgradeStrategy) error {
-	var (
-		controlReady, controlNotReady, workerOnlyReady, workerOnlyNotReady int
-	)
-	for _, node := range nodes {
-		if node.Status.NodeConfig == nil {
-			continue
-		}
-		if slice.ContainsString(node.Status.NodeConfig.Role, rkeservices.ControlRole) {
-			// any node having control role
-			if nodehelper.IsMachineReady(node) {
-				controlReady++
-			} else {
-				controlNotReady++
-			}
-			continue
-		}
-		if slice.ContainsString(node.Status.NodeConfig.Role, rkeservices.ETCDRole) {
-			continue
-		}
-		if nodehelper.IsMachineReady(node) {
-			workerOnlyReady++
-		} else {
-			workerOnlyNotReady++
-		}
-	}
-	maxUnavailableControl, err := rkeworkerupgrader.CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableControlplane, controlReady+controlNotReady)
-	if err != nil {
-		return err
-	}
-	if controlNotReady >= maxUnavailableControl {
-		return fmt.Errorf("not enough control plane nodes ready to upgrade, maxUnavailable: %v, notReady: %v, ready: %v",
-			maxUnavailableControl, controlNotReady, controlReady)
-	}
-	maxUnavailableWorker, err := rkeworkerupgrader.CalculateMaxUnavailable(upgradeStrategy.MaxUnavailableWorker, workerOnlyReady+workerOnlyNotReady)
-	if err != nil {
-		return err
-	}
-	if workerOnlyNotReady >= maxUnavailableWorker {
-		return fmt.Errorf("not enough worker nodes ready to upgrade, maxUnavailable: %v, notReady: %v, ready: %v",
-			maxUnavailableWorker, workerOnlyNotReady, workerOnlyReady)
-	}
-	return nil
 }
 
 func validateKeyRotation(data map[string]interface{}) error {

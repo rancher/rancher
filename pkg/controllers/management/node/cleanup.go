@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,13 +10,10 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/dialer"
-	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/kubectl"
-	nodehelper "github.com/rancher/rancher/pkg/node"
+
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/types/config"
-	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,10 +31,6 @@ const (
 
 func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 	logrus.Debugf("[node-cleanup] Deleting v1.node for [%v] node", node.Status.NodeName)
-	if nodehelper.IgnoreNode(node.Status.NodeName, node.Status.NodeLabels) {
-		logrus.Debugf("[node-cleanup] Skipping v1.node removal for [%v] node", node.Status.NodeName)
-		return node, nil
-	}
 
 	if node.Status.NodeName == "" {
 		logrus.Debugf("[node-cleanup] Skipping v1.node removal for machine [%v] without node name", node.Name)
@@ -74,111 +66,6 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 	}
 
 	return node, nil
-}
-
-func (m *Lifecycle) drainNode(node *v3.Node) error {
-	nodeCopy := node.DeepCopy() // copy for cache protection as we do no updating but need things set for the drain
-	cluster, err := m.clusterLister.Get("", nodeCopy.Namespace)
-	if err != nil {
-		if kerror.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	nodePool, err := m.getNodePool(node.Spec.NodePoolName)
-	if err != nil && !kerror.IsNotFound(err) {
-		return err
-	}
-
-	if !nodehelper.DrainBeforeDelete(nodeCopy, cluster, nodePool) {
-		return nil
-	}
-
-	logrus.Infof("[node-cleanup] node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
-	kubeConfig, _, err := m.getKubeConfig(cluster)
-	if err != nil {
-		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
-	}
-
-	if nodeCopy.Spec.NodeDrainInput == nil {
-		logrus.Debugf("[node-cleanup] node [%s] has no NodeDrainInput, creating one with 60s timeout",
-			nodeCopy.Spec.RequestedHostname)
-		nodeCopy.Spec.NodeDrainInput = &rketypes.NodeDrainInput{
-			Force:           true,
-			DeleteLocalData: true,
-			GracePeriod:     60,
-			Timeout:         60,
-		}
-	}
-
-	backoff := wait.Backoff{
-		Duration: 2 * time.Second,
-		Factor:   1,
-		Jitter:   0,
-		Steps:    3,
-	}
-
-	logrus.Infof("[node-cleanup] node [%s] attempting to drain, retrying up to 3 times", nodeCopy.Spec.RequestedHostname)
-	// purposefully ignoring kubectl.drain error. However, if the node fails to drain after 3 attempts
-	// wait.ExponentialBackoff will still return a wait.ErrWaitTimeout error, which must also be ignored.
-	// Otherwise, the node will not actually delete and resources will be orphaned in the provider.
-	_ = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(m.ctx, time.Duration(nodeCopy.Spec.NodeDrainInput.Timeout)*time.Second)
-		defer cancel()
-
-		_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeCopy.Status.NodeName, nodehelper.GetDrainFlags(nodeCopy))
-		if ctx.Err() != nil {
-			logrus.Errorf("[node-cleanup] node [%s] kubectl drain failed, retrying: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
-			return false, nil
-		}
-		if err != nil {
-			logrus.Errorf("[node-cleanup] node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
-			return false, nil
-		}
-
-		logrus.Infof("[node-cleanup] node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
-		return true, nil
-	})
-	return nil // always return nil so the node is deleted regardless of drain outcome
-}
-
-func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
-	if !features.RKE1CustomNodeCleanup.Enabled() {
-		return nil
-	}
-
-	cluster, err := m.clusterLister.Get("", node.Namespace)
-	if err != nil {
-		if kerror.IsNotFound(err) {
-			return nil // no cluster, we'll never figure out if this is an RKE1 cluster
-		}
-		return err
-	}
-
-	if cluster.Status.Driver != v3.ClusterDriverRKE {
-		return nil // not an rke node, bail out
-	}
-
-	userContext, err := m.clusterManager.UserContextFromCluster(cluster)
-	if err != nil {
-		return err
-	}
-	if userContext == nil {
-		logrus.Debugf("[node-cleanup] cluster is already deleted, cannot clean RKE node")
-		return nil
-	}
-
-	job, err := m.createCleanupJob(userContext, cluster, node)
-	if err != nil {
-		return err
-	}
-
-	if err = m.waitUntilJobCompletes(userContext, job); err != nil && !errors.Is(err, wait.ErrWaitTimeout) {
-		return err
-	}
-
-	return m.waitUntilJobDeletes(userContext, node.Name, job)
 }
 
 func (m *Lifecycle) waitForJobCondition(userContext *config.UserContext, job *batchv1.Job, condition func(*batchv1.Job, error) bool, logMessage string) error {
