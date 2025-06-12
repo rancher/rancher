@@ -153,6 +153,10 @@ spec:
           value: "true"
         - name: IMPERATIVE_API_APP_SELECTOR
           value: {{ template "rancher.fullname" . }}
+{{- if .Values.aggregationRegistrationTimeout }}
+        - name: AGGREGATION_REGISTRATION_TIMEOUT
+          value: {{ .Values.aggregationRegistrationTimeout }}
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}

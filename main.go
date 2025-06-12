@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
@@ -152,6 +153,13 @@ func main() {
 			Value:       "",
 			Usage:       "Declare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
 			Destination: &config.Features,
+		},
+		cli.DurationFlag{
+			Name:        "aggregation-registration-timeout",
+			EnvVar:      "AGGREGATION_REGISTRATION_TIMEOUT",
+			Value:       time.Minute * 2,
+			Usage:       "Declare a different timeout duration when waiting to registration requests from the aggregation layer",
+			Destination: &config.AggregationRegistrationTimeout,
 		},
 	}
 
