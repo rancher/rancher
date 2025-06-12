@@ -157,7 +157,7 @@ func main() {
 		cli.DurationFlag{
 			Name:        "aggregation-registration-timeout",
 			EnvVar:      "AGGREGATION_REGISTRATION_TIMEOUT",
-			Value:       time.Minute * 2,
+			Value:       time.Minute * 5,
 			Usage:       "Declare a different timeout duration when waiting to registration requests from the aggregation layer",
 			Destination: &config.AggregationRegistrationTimeout,
 		},
