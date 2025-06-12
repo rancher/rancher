@@ -150,7 +150,7 @@ func (s *Store) EnsureNamespace() error {
 		Duration: 100 * time.Millisecond,
 		Factor:   2,
 		Jitter:   .2,
-		Steps:    7,
+		Steps:    8, // Up to ~13 seconds.
 	}
 
 	return wait.ExponentialBackoff(backoff, func() (bool, error) {
