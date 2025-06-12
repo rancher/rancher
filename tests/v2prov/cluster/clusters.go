@@ -37,7 +37,7 @@ import (
 )
 
 const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to update the secret: Operation cannot be fulfilled on secrets.*: the object has been modified; please apply your changes to the latest version and try again`
-const SaneConflictMessageThreshold = 3
+const SaneConflictMessageThreshold = 10
 
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
 	cluster = cluster.DeepCopy()
