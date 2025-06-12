@@ -129,7 +129,6 @@ main() {
     "NAMESPACE" "NAME" "DISPLAY NAME"
 
   print_summary
-  exit 1
 }
 
 main
