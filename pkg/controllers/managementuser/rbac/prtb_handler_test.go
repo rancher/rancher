@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	typesrbacv1fakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -633,18 +632,10 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 }
 
 func Test_ensurePSAPermissions(t *testing.T) {
-	type fields struct {
-		crbClient typesrbacv1.ClusterRoleBindingInterface
-		crClient  typesrbacv1.ClusterRoleInterface
-		crLister  typesrbacv1.ClusterRoleLister
-	}
 	type args struct {
 		binding *v3.ProjectRoleTemplateBinding
 		roles   map[string]*v3.RoleTemplate
 	}
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	p := &prtbLifecycle{}
 
