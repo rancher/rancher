@@ -1,11 +1,12 @@
 package controllers
 
 import (
+	"time"
+
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
 	"k8s.io/apimachinery/pkg/labels"
-	"time"
 )
 
 func setupCfg() *jitterbug.Config {
@@ -27,7 +28,7 @@ func setupCfg() *jitterbug.Config {
 	return &jitterbugConfig
 }
 
-func (h *handler) RunDispatcher(
+func (h *handler) RunLifecycleManager(
 	cfg *jitterbug.Config,
 ) {
 	// min jitter 20 hours
