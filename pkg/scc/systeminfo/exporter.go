@@ -5,14 +5,19 @@ import (
 
 	"github.com/SUSE/connect-ng/pkg/registration"
 	"github.com/pborman/uuid"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/wrangler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type InfoExporter struct {
 	InfoProvider *InfoProvider
-	wContext     *wrangler.Context
+
+	clusterCache   v3.ClusterCache
+	nodeCache      v3.NodeCache
+	namespaceCache v1core.NamespaceCache
 }
 
 type RancherSCCInfo struct {
@@ -39,10 +44,15 @@ type RancherOfflineRequest struct {
 
 type RancherOfflineRequestEncoded []byte
 
-func NewInfoExporter(infoProvider *InfoProvider, wContext *wrangler.Context) *InfoExporter {
+func NewInfoExporter(
+	infoProvider *InfoProvider,
+	wContext *wrangler.Context,
+) *InfoExporter {
 	return &InfoExporter{
-		InfoProvider: infoProvider,
-		wContext:     wContext,
+		InfoProvider:   infoProvider,
+		clusterCache:   wContext.Mgmt.Cluster().Cache(),
+		nodeCache:      wContext.Mgmt.Node().Cache(),
+		namespaceCache: wContext.Core.Namespace().Cache(),
 	}
 }
 
@@ -53,12 +63,23 @@ func (e *InfoExporter) Provider() *InfoProvider {
 func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	// Fetch current node count
 	nodeCount := 0
-	socketsCount := 1 // TODO: i don't think rancher exposes this...because k8s doesnt
 	vcpusCount := 0
-	mgmtNodes, nodesErr := e.wContext.Mgmt.Node().List("local", metav1.ListOptions{})
-	if nodesErr == nil {
-		nodeCount = len(mgmtNodes.Items)
-		for _, node := range mgmtNodes.Items {
+	// TODO: i don't think rancher exposes this...because k8s doesnt
+	socketsCount := 1
+
+	namespaces, err := e.namespaceCache.List(labels.Everything())
+	if err != nil {
+		panic(err)
+	}
+
+	for _, ns := range namespaces {
+		nodes, err := e.nodeCache.List(ns.Name, labels.Everything())
+		if err != nil {
+			panic(err)
+		}
+
+		nodeCount = len(nodes)
+		for _, node := range nodes {
 			cpuCores := node.Status.InternalNodeStatus.Capacity.Cpu()
 			if cpuCores != nil {
 				vcpusCount += cpuCores.Size()
@@ -68,10 +89,11 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 
 	// Fetch current cluster count
 	clusterCount := 0
-	clusterList, clusterErr := e.wContext.Mgmt.Cluster().List(metav1.ListOptions{})
-	if clusterErr == nil {
-		clusterCount = len(clusterList.Items)
+	clusterList, err := e.clusterCache.List(labels.Everything())
+	if err != nil {
+		panic(err)
 	}
+	clusterCount = len(clusterList)
 
 	// TODO: collect and organize downstream counts
 
