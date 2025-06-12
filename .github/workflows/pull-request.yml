@@ -67,3 +67,24 @@ jobs:
   provisioning-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
+  generate-public-api-docs:
+    needs: [build-server]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      ARTIFACTS_BASE_DIR: "bin"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: generate
+        uses: ./.github/actions/public-api-docs/generate
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: "openapi.json"
+          path: "${{ env.ARTIFACTS_BASE_DIR }}/openapi.json"
+          if-no-files-found: error
+          retention-days: 4
+          overwrite: false

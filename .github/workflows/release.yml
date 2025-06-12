@@ -163,6 +163,27 @@ jobs:
         with:
           image: "${{ env.IMAGE_INSTALLER }}"
         uses: ./.github/actions/merge-manifests
+  generate-public-api-docs:
+    needs: [build-server]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      ARTIFACTS_BASE_DIR: "bin"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: generate
+        uses: ./.github/actions/public-api-docs/generate
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
+      - name: publish to gh
+        uses: ./.github/actions/public-api-docs/publish-gh
   create-images-files:
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:

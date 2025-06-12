@@ -1,0 +1,18 @@
+name: "Publish Public API docs to GitHub"
+description: "Upload public API docs to a GitHub release"
+runs:
+  using: "composite"
+  steps:
+    - name: Create App Token
+      uses: actions/create-github-app-token@v1
+      id: app-token
+      with:
+        app-id: ${{ env.APP_ID }}
+        private-key: ${{ env.PRIVATE_KEY }}
+    - name: Upload artifacts
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      shell: bash
+      run: |
+        set -ex
+        gh release upload -R ${{ github.repository_owner }}/rancher ${{ env.TAG }} "./$ARTIFACTS_BASE_DIR/openapi.json" --clobber

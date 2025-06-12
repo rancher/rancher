@@ -1,0 +1,50 @@
+name: "Generate Public API OpenAPI docs"
+description: "Generate Rancher Public API OpenAPI docs"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Environment Variables
+      uses: ./.github/actions/setup-tag-env
+    - id: env
+      name: Setup Dependencies Env Variables
+      uses: ./.github/actions/setup-build-env
+    - name: Update dependencies
+      shell: bash
+      run: sudo apt-get update
+    - name: Configure Docker for cgroupfs
+      shell: bash
+      run: |
+        echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
+        sudo systemctl restart docker
+      #TODO: Wait for image server ready
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '${{ steps.env.outputs.GO_VERSION }}'
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: "${{ env.GOLANG_VERSION }}"
+    - name: Download Docker images artifact
+      uses: actions/download-artifact@v4
+      with:
+        path: "/tmp"
+        merge-multiple: true
+    - name: Load server image
+      shell: bash
+      id: load
+      run: |
+        image_server_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        if [ -z "$image_server_id" ]; then
+          echo "Error: Failed to load image from tarball!"
+          exit 1
+        fi
+        echo "image_server_id=$image_server_id" >> $GITHUB_OUTPUT
+    - name: Install crd-swagger
+      shell: bash
+      run: |
+        # TODO: Switch to official rancher repository
+        go install github.com/tomleb/rancher-crd-swagger@236ff9f29c511116cff4736f11aa81cd12941f73
+    - name: Generate Rancher Public API docs
+      shell: bash
+      run: |
+        rancher-crd-swagger -i "${{ steps.load.outputs.image_server_id }}" -f ./public-api.txt -p 9998 -t 9999 -o bin/openapi.json
