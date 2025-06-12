@@ -3,6 +3,8 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/SUSE/connect-ng/pkg/connection"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
@@ -13,7 +15,6 @@ import (
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
 )
 
 type sccOnlineMode struct {
@@ -50,7 +51,7 @@ func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.R
 	if credentialsErr == nil {
 		// Counter-intuitively, on register we expect Refresh call will trigger an error because the secret should not exist yet
 		// So when it does we will send a warning that unexpected results may be found ahead
-		s.log.Warnf("scc credential secret %s already exists; normaly it should not exist at this point yet, this may result in unexpected outcomes")
+		s.log.Warn("scc credential secret already exists; normaly it should not exist at this point yet, this may result in unexpected outcomes")
 	}
 
 	// Fetch the SCC registration code; for 80% of users this should be a real code

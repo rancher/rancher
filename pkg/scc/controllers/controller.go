@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc/consts"
 	"time"
+
+	"github.com/rancher/rancher/pkg/scc/consts"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
@@ -18,6 +19,7 @@ import (
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
@@ -64,16 +66,14 @@ type SCCHandler interface {
 }
 
 type handler struct {
-	apply                 apply.Apply
-	entrypointSecretApply apply.Apply
-	ctx                   context.Context
-	log                   *logrus.Entry
-	registrations         registrationControllers.RegistrationController
-	registrationCache     registrationControllers.RegistrationCache
-	secrets               v1core.SecretController
-	secretCache           v1core.SecretCache
-	systemInfoExporter    *systeminfo.InfoExporter
-	systemNamespace       string
+	ctx                context.Context
+	log                *logrus.Entry
+	registrations      registrationControllers.RegistrationController
+	registrationCache  registrationControllers.RegistrationCache
+	secrets            v1core.SecretController
+	secretCache        v1core.SecretCache
+	systemInfoExporter *systeminfo.InfoExporter
+	systemNamespace    string
 }
 
 func Register(
@@ -85,8 +85,6 @@ func Register(
 	systemInfoExporter *systeminfo.InfoExporter,
 ) {
 	controller := &handler{
-		apply: wApply.
-			WithCacheTypes(registrations, secrets),
 		//WithSetID(controllerID).
 		//WithSetOwnerReference(true, false),
 		log:                log.NewControllerLogger("registration-controller"),
@@ -106,14 +104,9 @@ func Register(
 
 	registrations.OnChange(ctx, controllerID, controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, controllerID+"-remove", controller.OnRegistrationRemove)
-	//relatedresource.Watch(ctx, controllerID+"-secrets",
-	//	relatedresource.
-	//		OwnerResolver(true, v1.SchemeGroupVersion.String(), v1.RegistrationResourceName),
-	//	secrets,
-	//	registrations,
-	//)
+
 	cfg := setupCfg()
-	go controller.RunDispatcher(cfg)
+	go controller.RunLifecycleManager(cfg)
 }
 
 func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
@@ -152,21 +145,23 @@ func minResyncInterval() time.Time {
 	return now.Add(-prodMinCheckin)
 }
 
-func registrationBrokerSetId(hash string) string {
-	return controllerID + "-entrypoint-" + hash
-}
-
 func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*corev1.Secret, error) {
 	if incomingObj == nil || incomingObj.DeletionTimestamp != nil {
 		return incomingObj, nil
 	}
-	logrus.Warn("SCC : secret handling")
-
 	if h.isRancherEntrypointSecret(incomingObj) {
 		incomingHash := incomingObj.GetLabels()[LabelSccHash]
 		params, err := extraRegistrationParamsFromSecret(incomingObj)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
+		}
+
+		// If secret hash has changed make sure that we submit objects that correspond to that hash
+		// are cleaned up
+		if incomingHash != "" && incomingHash != params.hash {
+			if err := h.cleanupRegistrationByHash(incomingHash); err != nil {
+				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingHash, err)
+			}
 		}
 
 		// update secret with useful annotations & labels
@@ -188,60 +183,56 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			return incomingObj, fmt.Errorf("failed to create registration from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 
-		applier := h.apply.WithSetID(
-			registrationBrokerSetId(params.hash),
-		).WithOwner(incomingObj)
-
-		if err := applier.ApplyObjects(
-			registration,
-		); err != nil {
-			h.log.Error("error applying global default SCC registration")
-			return incomingObj,
-				fmt.Errorf(
-					"failed to apply matching registration and secret updates %s/%s: %w",
-					incomingObj.Namespace,
-					incomingObj.Name,
-					err,
-				)
+		if err := h.createOrUpdate(registration); err != nil {
+			h.log.Errorf("failed to create or update registration %s: %v", registration.Name, err)
+			return incomingObj, fmt.Errorf("failed to create or update registration %s: %w", registration.Name, err)
 		}
-
-		// If secret hash has changed make sure that we submit objects that correspond to that hash
-		// are cleaned up
-		if incomingHash != "" && incomingHash != params.hash {
-			oldApplier := h.apply.WithSetID(registrationBrokerSetId(incomingHash))
-			if err := oldApplier.ApplyObjects(); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	if h.isRancherSccSecret(incomingObj) {
-		// TODO(dan): credentials rework
-		h.log.Debug("Do something with SCC creds secret?")
-		h.log.Debug(incomingObj)
 	}
 	return incomingObj, nil
+}
+
+func (h *handler) createOrUpdate(reg *v1.Registration) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err := h.registrations.Create(reg)
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		_, updateErr := h.registrations.Update(reg)
+		return updateErr
+	})
+}
+
+func (h *handler) cleanupRegistrationByHash(hash string) error {
+	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, hash)
+	if err != nil {
+		return err
+	}
+
+	for _, reg := range regs {
+		err := h.registrations.Delete(reg.Name, &metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			h.log.Debugf("Registration %s already deleted", reg.Name)
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("failed to delete registration %s: %w", reg.Name, err)
+		}
+	}
+	return nil
 }
 
 func (h *handler) OnSecretRemove(name string, secretObj *corev1.Secret) (*corev1.Secret, error) {
 	if secretObj == nil {
 		return nil, nil
 	}
-	// TODO : this clears registrations? Do we want this
 	hash, ok := secretObj.Labels[LabelSccHash]
 	if !ok {
 		return secretObj, nil
 	}
 
-	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, hash)
-	if err != nil {
+	if err := h.cleanupRegistrationByHash(hash); err != nil {
+		h.log.Errorf("failed to cleanup registrations for hash %s: %v", hash, err)
 		return nil, err
-	}
-
-	for _, reg := range regs {
-		if err := h.registrations.Delete(reg.Name, &metav1.DeleteOptions{}); err != nil {
-			return nil, err
-		}
 	}
 
 	return secretObj, nil
