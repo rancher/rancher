@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"slices"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -26,7 +27,8 @@ const (
 )
 
 const (
-	FinalizerSccCredentials = "scc.cattle.io/managed-credentials"
+	FinalizerSccCredentials  = "scc.cattle.io/managed-credentials"
+	FinalizerSccRegistration = "scc.cattle.io/managed-registration"
 )
 
 const (
@@ -84,6 +86,7 @@ func (r RegistrationParams) Labels() map[string]string {
 }
 
 func (h *handler) registrationFromSecretEntrypoint(
+	ownerRef metav1.OwnerReference,
 	params RegistrationParams,
 ) (*v1.Registration, error) {
 	if params.regType != v1.RegistrationModeOnline && params.regType != v1.RegistrationModeOffline {
@@ -95,23 +98,29 @@ func (h *handler) registrationFromSecretEntrypoint(
 		)
 	}
 
+	// FIXME: lets figure how to generate better unique names
 	genName := fmt.Sprintf("scc-registration-%s", params.hash)
+	var reg *v1.Registration
+	var err error
 
-	reg, err := h.registrationCache.Get(genName)
+	reg, err = h.registrationCache.Get(genName)
 	if err != nil && apierrors.IsNotFound(err) {
-		return &v1.Registration{
+		reg = &v1.Registration{
 			ObjectMeta: metav1.ObjectMeta{
-				// FIXME: lets figure how to generate better unique names
-				Name:   genName,
-				Labels: params.Labels(),
+				Name: genName,
 			},
-			Spec: paramsToReg(params),
-		}, nil
+		}
 	}
 
 	reg.Labels = params.Labels()
 	reg.Spec = paramsToReg(params)
-
+	if !slices.Contains(reg.Finalizers, FinalizerSccRegistration) {
+		if reg.Finalizers == nil {
+			reg.Finalizers = []string{}
+		}
+		reg.Finalizers = append(reg.Finalizers, FinalizerSccRegistration)
+	}
+	reg.OwnerReferences = []metav1.OwnerReference{ownerRef}
 	return reg, nil
 }
 

@@ -121,7 +121,12 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 	}
 
 	credsName := consts.SCCCredentialsSecretName(registrationObj.Name)
-	ref := metav1.NewControllerRef(registrationObj, registrationObj.GetObjectKind().GroupVersionKind())
+	ref := &metav1.OwnerReference{
+		APIVersion: registrationObj.TypeMeta.APIVersion,
+		Kind:       registrationObj.TypeMeta.Kind,
+		UID:        registrationObj.GetUID(),
+		Name:       registrationObj.GetName(),
+	}
 	return sccOnlineMode{
 		registration: registrationObj,
 		log:          h.log.WithField("handler", "online"),
@@ -178,9 +183,13 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			h.log.Error("error applying metadata updates to default SCC registration secret")
 			return nil, updateErr
 		}
-
 		// construct associated registration CRs
-		registration, err := h.registrationFromSecretEntrypoint(params)
+		registration, err := h.registrationFromSecretEntrypoint(metav1.OwnerReference{
+			Name:       newSecret.GetName(),
+			UID:        newSecret.GetUID(),
+			Kind:       newSecret.TypeMeta.Kind,
+			APIVersion: newSecret.TypeMeta.APIVersion,
+		}, params)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to create registration from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
@@ -213,6 +222,21 @@ func (h *handler) cleanupRegistrationByHash(hash string) error {
 	}
 
 	for _, reg := range regs {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			remainingFin := []string{}
+			for _, finalizer := range reg.Finalizers {
+				if finalizer != FinalizerSccRegistration {
+					remainingFin = append(remainingFin, finalizer)
+				}
+			}
+			reg.Finalizers = remainingFin
+
+			_, err := h.registrations.Update(reg)
+			return err
+		}); err != nil {
+			return err
+		}
+
 		err := h.registrations.Delete(reg.Name, &metav1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			h.log.Debugf("Registration %s already deleted", reg.Name)
