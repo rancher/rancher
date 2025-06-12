@@ -102,15 +102,8 @@ func initFeatures() {
 	features.InitializeFeatures(nil, os.Getenv("CATTLE_FEATURES"))
 }
 
-func isCluster() bool {
-	return os.Getenv("CATTLE_CLUSTER") == "true"
-}
-
 func getParams() (map[string]interface{}, error) {
-	if isCluster() {
-		return cluster.Params()
-	}
-	return node.Params(), nil
+	return cluster.Params()
 }
 
 func getTokenAndURL() (string, string, error) {
@@ -137,50 +130,6 @@ func connected() {
 	if err != nil {
 		f.Close()
 	}
-}
-
-func cleanup(ctx context.Context) error {
-	if os.Getenv("CATTLE_K8S_MANAGED") != "true" {
-		return nil
-	}
-
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	args := filters.NewArgs()
-	args.Add("label", "io.cattle.agent=true")
-
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		return err
-	}
-
-	for _, container := range containers {
-		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
-			continue
-		}
-
-		if strings.Contains(container.Names[0], "share-mnt") {
-			continue
-		}
-
-		container := container
-		go func() {
-			time.Sleep(15 * time.Second)
-			logrus.Infof("Removing unmanaged agent %s(%s)", container.Names[0], container.ID)
-			c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
-				Force: true,
-			})
-		}()
-	}
-
-	return nil
 }
 
 func run(ctx context.Context) error {
@@ -313,26 +262,17 @@ func run(ctx context.Context) error {
 			exitCertWriter(ctx)
 		}
 
-		if isCluster() {
-			err = rancher.Run(topContext)
-			if err != nil {
-				logrus.Fatal(err)
-			}
-			return nil
-		}
-
-		if err := cleanup(context.Background()); err != nil {
-			logrus.Warnf("Unable to perform docker cleanup: %v", err)
+		err = rancher.Run(topContext)
+		if err != nil {
+			logrus.Fatal(err)
 		}
 
 		return nil
 	}
 
-	if isCluster() {
-		go func() {
-			log.Println(http.ListenAndServe("localhost:6060", nil))
-		}()
-	}
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	for {
 		wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
