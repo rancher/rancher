@@ -120,17 +120,19 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 		}
 	}
 
-	var credsName string
-	if labelVal, ok := registrationObj.Labels[LabelSccManagedBy]; ok && labelVal == ManagedBySecretBroker {
-		credsName = consts.SCCCredentialsSecretName(labelVal)
-	} else {
-		credsName = consts.SCCCredentialsSecretName(registrationObj.Name)
-	}
-
+	credsName := consts.SCCCredentialsSecretName(registrationObj.Name)
+	ref := metav1.NewControllerRef(registrationObj, registrationObj.GetObjectKind().GroupVersionKind())
 	return sccOnlineMode{
-		registration:       registrationObj,
-		log:                h.log.WithField("handler", "online"),
-		sccCredentials:     credentials.New(credsName, h.systemNamespace, h.secrets, h.secretCache),
+		registration: registrationObj,
+		log:          h.log.WithField("handler", "online"),
+		sccCredentials: credentials.New(
+			credsName,
+			h.systemNamespace,
+			FinalizerSccCredentials,
+			ref,
+			h.secrets,
+			h.secretCache,
+		),
 		systemInfoExporter: h.systemInfoExporter,
 		secrets:            h.secrets,
 		systemNamespace:    h.systemNamespace,
@@ -178,7 +180,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		}
 
 		// construct associated registration CRs
-		registration, err := registrationFromSecretEntrypoint(params)
+		registration, err := h.registrationFromSecretEntrypoint(params)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to create registration from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
@@ -192,11 +194,13 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 }
 
 func (h *handler) createOrUpdate(reg *v1.Registration) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err := h.registrations.Create(reg)
-		if !apierrors.IsAlreadyExists(err) {
+	if _, err := h.registrationCache.Get(reg.Name); err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err := h.registrations.Create(reg)
 			return err
 		}
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, updateErr := h.registrations.Update(reg)
 		return updateErr
 	})
@@ -221,21 +225,63 @@ func (h *handler) cleanupRegistrationByHash(hash string) error {
 	return nil
 }
 
-func (h *handler) OnSecretRemove(name string, secretObj *corev1.Secret) (*corev1.Secret, error) {
-	if secretObj == nil {
+func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*corev1.Secret, error) {
+	if incomingObj == nil {
 		return nil, nil
 	}
-	hash, ok := secretObj.Labels[LabelSccHash]
-	if !ok {
-		return secretObj, nil
+	if incomingObj.Namespace != h.systemNamespace {
+		h.log.Debugf("Secret %s/%s is not in SCC system namespace %s, skipping cleanup", incomingObj.Namespace, incomingObj.Name, h.systemNamespace)
+		return incomingObj, nil
 	}
 
-	if err := h.cleanupRegistrationByHash(hash); err != nil {
-		h.log.Errorf("failed to cleanup registrations for hash %s: %v", hash, err)
-		return nil, err
+	if h.isRancherEntrypointSecret(incomingObj) {
+		hash, ok := incomingObj.Labels[LabelSccHash]
+		if !ok {
+			return incomingObj, nil
+		}
+
+		if err := h.cleanupRegistrationByHash(hash); err != nil {
+			h.log.Errorf("failed to cleanup registrations for hash %s: %v", hash, err)
+			return nil, err
+		}
+
+		return incomingObj, nil
+	}
+	finalizers := incomingObj.GetFinalizers()
+	for i, finalizer := range finalizers {
+		// check if we are ready to remove the finalizer
+		if finalizer == FinalizerSccCredentials {
+			refs := incomingObj.GetOwnerReferences()
+			danglingRefs := 0
+			for _, ref := range refs {
+				if ref.APIVersion == v1.SchemeGroupVersion.String() &&
+					ref.Kind == "Registration" {
+					_, err := h.registrations.Get(ref.Name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						continue
+					} else {
+						danglingRefs++
+					}
+				}
+			}
+			if danglingRefs > 0 {
+				h.log.Errorf("cannot remove finalizer %s from secret %s/%s, dangling references to Registration found", finalizer, incomingObj.Namespace, incomingObj.Name)
+				return nil, fmt.Errorf("cannot remove finalizer %s from secret %s/%s, dangling references to Registration found", finalizer, incomingObj.Namespace, incomingObj.Name)
+			}
+			newSecret := incomingObj.DeepCopy()
+			newSecret.SetFinalizers(append(finalizers[:i], finalizers[i+1:]...))
+			logrus.Info("Removing finalizer from secret", newSecret.Name, "in namespace", newSecret.Namespace)
+			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				_, err := h.secrets.Update(newSecret)
+				return err
+			}); err != nil {
+				h.log.Errorf("failed to remove finalizer %s from secret %s/%s: %v", finalizer, incomingObj.Namespace, incomingObj.Name, err)
+				return nil, fmt.Errorf("failed to remove finalizer %s from secret %s/%s: %w", finalizer, incomingObj.Namespace, incomingObj.Name, err)
+			}
+		}
 	}
 
-	return secretObj, nil
+	return incomingObj, nil
 }
 
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {

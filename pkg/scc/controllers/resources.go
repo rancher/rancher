@@ -4,11 +4,11 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/scc/consts"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 const (
@@ -26,18 +26,15 @@ const (
 )
 
 const (
+	FinalizerSccCredentials = "scc.cattle.io/managed-credentials"
+)
+
+const (
 	ResourceSCCEntrypointSecretName = "scc-registration"
 )
 
 func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
 	if secretObj.Name != ResourceSCCEntrypointSecretName || secretObj.Namespace != h.systemNamespace {
-		return false
-	}
-	return true
-}
-
-func (h *handler) isRancherSccSecret(secretObj *corev1.Secret) bool {
-	if !strings.HasPrefix(secretObj.Name, consts.SCCSystemCredentialsSecretNamePrefix) || secretObj.Namespace != h.systemNamespace {
 		return false
 	}
 	return true
@@ -82,11 +79,11 @@ type RegistrationParams struct {
 func (r RegistrationParams) Labels() map[string]string {
 	return map[string]string{
 		LabelSccHash:      r.hash,
-		LabelSccManagedBy: "",
+		LabelSccManagedBy: ManagedBySecretBroker,
 	}
 }
 
-func registrationFromSecretEntrypoint(
+func (h *handler) registrationFromSecretEntrypoint(
 	params RegistrationParams,
 ) (*v1.Registration, error) {
 	if params.regType != v1.RegistrationModeOnline && params.regType != v1.RegistrationModeOffline {
@@ -98,20 +95,31 @@ func registrationFromSecretEntrypoint(
 		)
 	}
 
-	registration := &v1.Registration{
-		ObjectMeta: metav1.ObjectMeta{
-			// FIXME: lets figure how to generate better unique names
-			Name:   fmt.Sprintf("scc-registration-%s", params.hash),
-			Labels: params.Labels(),
-		},
-		Spec: v1.RegistrationSpec{
-			Mode: params.regType,
-			RegistrationRequest: &v1.RegistrationRequest{
-				RegistrationCodeSecretRef: params.secretRef,
-				// TODO: set fields for non-SCC based RMT regs too
+	genName := fmt.Sprintf("scc-registration-%s", params.hash)
+
+	reg, err := h.registrationCache.Get(genName)
+	if err != nil && apierrors.IsNotFound(err) {
+		return &v1.Registration{
+			ObjectMeta: metav1.ObjectMeta{
+				// FIXME: lets figure how to generate better unique names
+				Name:   genName,
+				Labels: params.Labels(),
 			},
-		},
+			Spec: paramsToReg(params),
+		}, nil
 	}
 
-	return registration, nil
+	reg.Labels = params.Labels()
+	reg.Spec = paramsToReg(params)
+
+	return reg, nil
+}
+
+func paramsToReg(params RegistrationParams) v1.RegistrationSpec {
+	return v1.RegistrationSpec{
+		Mode: params.regType,
+		RegistrationRequest: &v1.RegistrationRequest{
+			RegistrationCodeSecretRef: params.secretRef,
+		},
+	}
 }

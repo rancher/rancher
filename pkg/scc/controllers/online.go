@@ -260,6 +260,11 @@ func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, er
 func (s sccOnlineMode) Deregister() error {
 	_ = s.sccCredentials.Refresh()
 	sccConnection := suseconnect.DefaultRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter)
+	// TODO : this causes deletion to fail if the credentials are invalid. I think we
+	// need to do a best effort check to see if it was ever registered before
+	// we want to fail to delete if deregister fails, but the system is registered in SCC
+
+	// Finalizers on the credential secret have helped this case, but it's still invalid if users edit the secret manually for some reason.
 	err := sccConnection.Deregister()
 	if err != nil {
 		return err
