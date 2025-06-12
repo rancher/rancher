@@ -203,7 +203,7 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 		if apierrors.IsNotFound(err) {
 			// create ClusterRole if it doesn't exist
 			psaCR, err = p.crClient.Create(psaCRWanted)
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
 		} else {
@@ -235,7 +235,7 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	psaCRB.Subjects = []rbacv1.Subject{subject}
 
 	_, err = p.crbClient.Create(psaCRB)
-	if err != nil && apierrors.IsNotFound(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
