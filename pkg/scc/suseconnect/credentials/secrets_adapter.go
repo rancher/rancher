@@ -1,6 +1,8 @@
 package credentials
 
 import (
+	"slices"
+
 	"github.com/SUSE/connect-ng/pkg/connection"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -102,14 +104,13 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 		if sccCreds.Finalizers == nil {
 			sccCreds.Finalizers = []string{}
 		}
-		sccCreds.Finalizers = append(sccCreds.Finalizers, c.finalizer)
+		if !slices.Contains(sccCreds.Finalizers, c.finalizer) {
+			sccCreds.Finalizers = append(sccCreds.Finalizers, c.finalizer)
+		}
 	}
 
 	if c.ownerRef != nil {
-		if sccCreds.OwnerReferences == nil {
-			sccCreds.OwnerReferences = []metav1.OwnerReference{}
-		}
-		sccCreds.OwnerReferences = append(sccCreds.OwnerReferences, *c.ownerRef)
+		sccCreds.OwnerReferences = []metav1.OwnerReference{*c.ownerRef}
 	}
 
 	var createOrUpdateErr error
