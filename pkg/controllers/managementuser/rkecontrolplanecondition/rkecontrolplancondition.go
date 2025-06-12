@@ -63,7 +63,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	}
 	// Skip if the cluster is undergoing an upgrade, provisioning, or not in the ready state
 	if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
-		logrus.Infof("[syncSystemUpgradeControllerCondition] cluster %s/%s: cluster is not ready", cluster.Namespace, cluster.Name)
+		logrus.Infof("[syncSystemUpgradeControllerCondition] cluster %s/%s: cluster is not ready, skip syncing condition", cluster.Namespace, cluster.Name)
 		return status, nil
 	}
 
@@ -127,7 +127,7 @@ func (h *handler) syncSystemAgentUpgraderCondition(obj *rkev1.RKEControlPlane, s
 	}
 	// Skip if the cluster is undergoing an upgrade, provisioning, or not in the ready state
 	if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
-		logrus.Infof("[syncSystemAgentUpgraderCondition] cluster %s/%s: cluster is not ready", cluster.Namespace, cluster.Name)
+		logrus.Infof("[syncSystemAgentUpgraderCondition] cluster %s/%s: cluster is not ready, skip syncing condition", cluster.Namespace, cluster.Name)
 		return status, nil
 	}
 

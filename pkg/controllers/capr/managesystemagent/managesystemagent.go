@@ -123,7 +123,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 
 	if capr.SystemUpgradeControllerReady.GetStatus(cp) == "" {
 		// todo: change back to debug level
-		logrus.Infof("[managesystemagent] cluster %s/%s: waiting for SystemUpgradeControllerReady condition to be initilized", cluster.Namespace, cluster.Name)
+		logrus.Infof("[managesystemagent] cluster %s/%s: SystemUpgradeControllerReady condition is not found, skip installing system-agent-upgrader", cluster.Namespace, cluster.Name)
 		return cluster, nil
 	}
 	// Skip if the system-upgrade-controller app is not ready or the target version has not been installed,
