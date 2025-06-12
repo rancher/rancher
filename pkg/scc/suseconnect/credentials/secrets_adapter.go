@@ -18,14 +18,17 @@ const (
 type CredentialSecretsAdapter struct {
 	secretNamespace string
 	secretName      string
-	// TODO (dan) : let's make sure the lookups are handled via a secret cache
-	secrets     v1core.SecretController
-	secretCache v1core.SecretCache
-	credentials SccCredentials
+	finalizer       string
+	ownerRef        *metav1.OwnerReference
+	secrets         v1core.SecretController
+	secretCache     v1core.SecretCache
+	credentials     SccCredentials
 }
 
 func New(
 	name, namespace string,
+	finalizer string,
+	ownerRef *metav1.OwnerReference,
 	secrets v1core.SecretController,
 	secretCache v1core.SecretCache,
 ) *CredentialSecretsAdapter {
@@ -34,6 +37,8 @@ func New(
 		secretNamespace: namespace,
 		secrets:         secrets,
 		secretCache:     secretCache,
+		finalizer:       finalizer,
+		ownerRef:        ownerRef,
 	}
 }
 
@@ -91,6 +96,20 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 	token, err := c.credentials.Token()
 	if err == nil {
 		sccCreds.Data[TokenKey] = []byte(token)
+	}
+
+	if c.finalizer != "" {
+		if sccCreds.Finalizers == nil {
+			sccCreds.Finalizers = []string{}
+		}
+		sccCreds.Finalizers = append(sccCreds.Finalizers, c.finalizer)
+	}
+
+	if c.ownerRef != nil {
+		if sccCreds.OwnerReferences == nil {
+			sccCreds.OwnerReferences = []metav1.OwnerReference{}
+		}
+		sccCreds.OwnerReferences = append(sccCreds.OwnerReferences, *c.ownerRef)
 	}
 
 	var createOrUpdateErr error
