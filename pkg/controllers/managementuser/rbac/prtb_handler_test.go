@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	rancherv3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	typesrbacv1fakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -788,6 +789,153 @@ func Test_ensurePSAPermissions(t *testing.T) {
 			tt.mockSetup()
 			if err := p.ensurePSAPermissions(tt.args.binding, tt.args.roles); (err != nil) != tt.wantErr {
 				t.Errorf("prtbLifecycle.ensurePSAPermissions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_ensurePSAPermissionsDelete(t *testing.T) {
+	type args struct {
+		binding *v3.ProjectRoleTemplateBinding
+	}
+
+	p := &prtbLifecycle{}
+
+	tests := []struct {
+		name      string
+		mockSetup func()
+		args      args
+		wantErr   bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "clean up psa rbac resources",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unable to delete CRB",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unable to delete CR",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unable to get RT",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return nil, fmt.Errorf("error")
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+			if err := p.ensurePSAPermissionsDelete(tt.args.binding); (err != nil) != tt.wantErr {
+				t.Errorf("prtbLifecycle.ensurePRTBDelete() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
