@@ -62,10 +62,10 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		return status, err
 	}
 	// Skip if the cluster is undergoing an upgrade, provisioning, or not in the ready state
-	if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
-		logrus.Infof("[syncSystemUpgradeControllerCondition] cluster %s/%s: cluster is not ready, skip syncing condition", cluster.Namespace, cluster.Name)
-		return status, nil
-	}
+	// if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
+	// 	logrus.Infof("[syncSystemUpgradeControllerCondition] cluster %s/%s: cluster is not ready, skip syncing condition", cluster.Namespace, cluster.Name)
+	// 	return status, nil
+	// }
 
 	name := appName(obj.Spec.ClusterName)
 	app, err := h.downstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
@@ -121,15 +121,15 @@ func (h *handler) syncSystemAgentUpgraderCondition(obj *rkev1.RKEControlPlane, s
 		return status, nil
 	}
 
-	cluster, err := h.getCluster()
-	if err != nil {
-		return status, err
-	}
+	// cluster, err := h.getCluster()
+	// if err != nil {
+	// 	return status, err
+	// }
 	// Skip if the cluster is undergoing an upgrade, provisioning, or not in the ready state
-	if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
-		logrus.Infof("[syncSystemAgentUpgraderCondition] cluster %s/%s: cluster is not ready, skip syncing condition", cluster.Namespace, cluster.Name)
-		return status, nil
-	}
+	// if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
+	// 	logrus.Infof("[syncSystemAgentUpgraderCondition] cluster %s/%s: cluster is not ready, skip syncing condition", cluster.Namespace, cluster.Name)
+	// 	return status, nil
+	// }
 
 	plan, err := h.downstreamPlanClient.Get(namespace.System, managesystemagent.SystemAgentUpgrader, metav1.GetOptions{})
 	if errors.IsNotFound(err) {

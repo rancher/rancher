@@ -108,9 +108,10 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 		return cluster, nil
 	}
 	// Skip if the cluster is undergoing an upgrade or not in the ready state
-	if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
-		return cluster, nil
-	}
+	// if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
+	// 	return cluster, nil
+	// }
+
 	// Skip if the cluster's kubeconfig is not populated
 	if cluster.Status.ClientSecretName == "" {
 		return cluster, nil
@@ -523,8 +524,14 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 	if cluster.Status.FleetWorkspaceName == "" {
 		return cluster, nil
 	}
+
 	// Skip if the cluster is undergoing an upgrade or not in the ready state
-	if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
+	// if !(capr.Updated.IsTrue(cluster) && capr.Provisioned.IsTrue(cluster) && capr.Ready.IsTrue(cluster)) {
+	// 	return cluster, nil
+	// }
+
+	// Skip if the cluster's kubeconfig is not populated
+	if cluster.Status.ClientSecretName == "" {
 		return cluster, nil
 	}
 
