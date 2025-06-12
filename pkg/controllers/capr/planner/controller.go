@@ -134,6 +134,8 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 			logrus.Debugf("[planner] rkecluster %s/%s: waiting for system-agent to be upgraded to %s", cp.Namespace, cp.Name, strings.TrimSuffix(version, "-suc"))
 			return status, nil
 		}
+	} else {
+		logrus.Debugf("[planner] rkecluster %s/%s: SystemAgentUpgraded condition is not found", cp.Namespace, cp.Name)
 	}
 
 	status.ObservedGeneration = cp.Generation

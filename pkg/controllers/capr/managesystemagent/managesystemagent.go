@@ -99,7 +99,12 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
-	if cluster.Spec.RKEConfig == nil || settings.SystemAgentUpgradeImage.Get() == "" {
+	if cluster.Spec.RKEConfig == nil {
+		return cluster, nil
+	}
+	if settings.SystemAgentUpgradeImage.Get() == "" {
+		logrus.Warnf("[managesystemagent] cluster %s/%s: skip installing system-agent-upgrader, "+
+			"the SystemAgentUpgradeImage setting is empty", cluster.Namespace, cluster.Name)
 		return cluster, nil
 	}
 	// Skip if the cluster is undergoing an upgrade or not in the ready state
@@ -115,6 +120,11 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	if err != nil {
 		return cluster, err
 	}
+
+	if capr.SystemUpgradeControllerReady.GetStatus(cp) == "" {
+		logrus.Debugf("[managesystemagent] cluster %s/%s: waiting for SystemUpgradeControllerReady condition to be initilized", cluster.Namespace, cluster.Name)
+		return cluster, nil
+	}
 	// Skip if the system-upgrade-controller app is not ready or the target version has not been installed,
 	// because new Plans may depend on functionality of a new version of the system-upgrade-controller app
 	if !capr.SystemUpgradeControllerReady.IsTrue(cp) {
@@ -122,9 +132,13 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 			cluster.Namespace, cluster.Name, capr.SystemUpgradeControllerReady.GetReason(cp))
 		return cluster, nil
 	}
-	if capr.SystemUpgradeControllerReady.GetMessage(cp) != settings.SystemUpgradeControllerChartVersion.Get() {
+	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
+	if targetVersion == "" {
+		logrus.Warnf("[managesystemagent] cluster %s/%s: SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
+	}
+	if targetVersion != "" && targetVersion != capr.SystemUpgradeControllerReady.GetMessage(cp) {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: waiting for system-upgrade-controller to be upgraded to %s",
-			cluster.Namespace, cluster.Name, settings.SystemUpgradeControllerChartVersion.Get())
+			cluster.Namespace, cluster.Name, targetVersion)
 		return cluster, nil
 	}
 

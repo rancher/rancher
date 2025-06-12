@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -84,6 +85,9 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	}
 
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
+	if targetVersion == "" {
+		logrus.Warnf("[rkecontrolplanecondition] cluster %s/%s: SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
+	}
 	version := app.Spec.Chart.Metadata.Version
 	if version != targetVersion && targetVersion != "" {
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be updated to %s", app.Name, targetVersion))
