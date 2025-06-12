@@ -4,4 +4,3 @@ RoleTemplate.management.cattle.io
 ProjectRoleTemplateBinding.management.cattle.io
 ClusterRoleTemplateBinding.management.cattle.io
 Project.management.cattle.io
-Tokens.ext.cattle.io
