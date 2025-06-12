@@ -346,10 +346,18 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret1",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret2",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 					},
 				}, nil)
@@ -382,10 +390,18 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret1",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret2",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 					},
 				}, nil)
@@ -402,10 +418,18 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret1",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret2",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 					},
 				}, nil)
@@ -425,10 +449,18 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret1",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "ns1"},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:        "secret2",
+								Namespace:   "ns1",
+								Annotations: map[string]string{pssCopyAnnotation: "true"},
+							},
 						},
 					},
 				}, nil)
