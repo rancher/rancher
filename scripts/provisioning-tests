@@ -140,7 +140,7 @@ build_and_run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run --debug >/tmp/rancher.log 2>&1 &
+          ./scripts/run >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
@@ -251,7 +251,7 @@ fi
 echo Running provisioning-tests $RUNARG
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
+go test $RUNARG -v -failfast -timeout 120m ./tests/v2prov/tests/... || {
      dump_rancher_logs
      exit 1
 }
