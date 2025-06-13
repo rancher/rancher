@@ -913,7 +913,7 @@ func Test_ensurePSAPermissionsDelete(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "unable to delete CR (locked by other CRB)",
+			name: "delete only CRB (CR locked by other CRBs)",
 			mockSetup: func() {
 				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
 					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
