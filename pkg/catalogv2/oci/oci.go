@@ -177,7 +177,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 
 			// Work on all repositories if the user has not provided any repository or
 			// work on the oci repositories that match with the userProvidedRepository
-			if after, found := strings.CutPrefix(repository, ociClient.repository); found && (ociClient.repository == "" || len(after) > 0 && after[0] == '/') {
+			if after, found := strings.CutPrefix(repository, ociClient.repository); found && (ociClient.repository == "" || after == "" || strings.HasPrefix(after, "/")) {
 				ociClient.repository = repository
 				orasRepository, err := ociClient.GetOrasRepository()
 				if err != nil {
