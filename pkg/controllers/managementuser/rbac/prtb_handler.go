@@ -306,12 +306,12 @@ func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTempla
 		// delete CR and CRB for the given project
 		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
 		err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("error deleting clusterrole %v: %w", psaCRName, err)
 		}
 		psaCRBName := fmt.Sprintf("%s-updatepsa", projectName)
 		err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
 		}
 	}
