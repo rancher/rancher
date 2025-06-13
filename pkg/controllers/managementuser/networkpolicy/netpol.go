@@ -120,7 +120,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 
 		// add an allow all network policy to system project namespaces
 		// this is the same as having no network policy, i.e. it allows all ingress and egress traffic to/from the namespace
-		// this is needed to ensure CIS Scans pass. See: https://github.com/rancher/rancher/issues/30211 for more info
+		// this is needed to ensure Compliance Scans pass. See: https://github.com/rancher/rancher/issues/30211 for more info
 		// we also guard against overriding existing network policies, the default network policy for a namespace in the system project
 		// will only be added if there are no other network policies in the namespace (network policies are additive)
 		if systemNamespaces[aNS.Name] {

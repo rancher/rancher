@@ -511,7 +511,7 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	w.Require().NoError(err)
 	w.Assert().Equal("bundled", systemCatalogUpdated.Value)
 
-	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark")
+	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-compliance")
 	w.Require().NoError(err)
 	w.Assert().Greater(imgLength, 0)
 
