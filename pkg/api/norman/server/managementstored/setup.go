@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/feature"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
-	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
 	"github.com/rancher/rancher/pkg/api/norman/customization/nodepool"
@@ -49,7 +48,6 @@ import (
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
-	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -125,7 +123,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	GlobalRole(schemas, apiContext)
 	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
-	KontainerDriver(schemas, apiContext)
 	ClusterTemplates(schemas, apiContext)
 	SystemImages(schemas, apiContext)
 	EtcdBackups(schemas, apiContext)
@@ -405,35 +402,7 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Store = rtStore.Wrap(schema.Store, management.Management.RoleTemplates("").Controller().Lister())
 }
 
-func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
-	metadataHandler := md.MetadataController{
-		SystemImagesController:   management.Wrangler.Mgmt.RkeK8sSystemImage(),
-		ServiceOptionsController: management.Wrangler.Mgmt.RkeK8sServiceOption(),
-		Addons:                   management.Wrangler.Mgmt.RkeAddon(),
-		Settings:                 management.Wrangler.Mgmt.Setting(),
-	}
 
-	handler := kontainerdriver.ActionHandler{
-		KontainerDrivers:      management.Management.KontainerDrivers(""),
-		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
-		MetadataHandler:       metadataHandler,
-	}
-	lh := kontainerdriver.ListHandler{
-		SysImageLister:  management.Management.RkeK8sSystemImages("").Controller().Lister(),
-		SysImages:       management.Management.RkeK8sSystemImages(""),
-		ConfigMapLister: management.Core.ConfigMaps("").Controller().Lister(),
-	}
-	schema.ActionHandler = handler.ActionHandler
-	schema.CollectionFormatter = kontainerdriver.CollectionFormatter
-	schema.Formatter = kontainerdriver.NewFormatter(management)
-	schema.Store = kontainerdriver.NewStore(management, schema.Store)
-	schema.ListHandler = lh.ListHandler
-	kontainerDriverValidator := kontainerdriver.Validator{
-		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
-	}
-	schema.Validator = kontainerDriverValidator.Validator
-}
 
 func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	wrapper := clustertemplate.Wrapper{
