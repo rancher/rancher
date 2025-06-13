@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -145,25 +146,34 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, us
 
 // EnsureNamespace ensures that the namespace for storing kubeconfig configMaps exists.
 func (s *Store) EnsureNamespace() error {
-	_, err := s.nsCache.Get(namespace)
-	if err == nil {
-		return nil
+	var backoff = wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   2,
+		Jitter:   .2,
+		Steps:    10, // Up to ~51 seconds.
 	}
 
-	if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("error getting namespace %s: %w", namespace, err)
-	}
+	return wait.ExponentialBackoff(backoff, func() (bool, error) {
+		_, err := s.nsCache.Get(namespace)
+		if err == nil {
+			return true, nil
+		}
 
-	_, err = s.nsClient.Create(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
+		if !apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("error getting namespace %s: %w", namespace, err)
+		}
+
+		_, err = s.nsClient.Create(&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return false, fmt.Errorf("error creating namespace %s: %w", namespace, err)
+		}
+
+		return true, nil
 	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("error creating namespace %s: %w", namespace, err)
-	}
-
-	return nil
 }
 
 // isUnique returns true if the given slice of strings contains unique values.
