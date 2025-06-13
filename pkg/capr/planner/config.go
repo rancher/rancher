@@ -105,9 +105,7 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	return nil
 }
 
-// addRoleConfig adds the role config to the passed in map, and returns the join server that the config was rendered for.
-// It will return "-" as the join server if the entry is an init node (the init node should not join a server)
-func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, joinServer string) string {
+func addServer(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, joinServer string) string {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if isInitNode(entry) {
 		// If this node is the init node, it should not be joined to anything. Clear the joinServer URL.
@@ -131,6 +129,12 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["server"] = joinServer
 	}
 
+	return joinServer
+}
+
+// addRoleConfig adds the role config to the passed in map, and returns the join server that the config was rendered for.
+// It will return "-" as the join server if the entry is an init node (the init node should not join a server)
+func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
 	if IsOnlyEtcd(entry) {
 		config["disable-scheduler"] = true
 		config["disable-apiserver"] = true
@@ -146,6 +150,8 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	// If this is a control-plane node, then we need to set arguments/(and for RKE2, volume mounts) to allow probes
 	// to run.
 	if isControlPlane(entry) {
+		runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+
 		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-controller-manager")
 		certDirArg, certDirMount := renderArgAndMount(config[KubeControllerManagerArg], config[KubeControllerManagerExtraMount], controlPlane, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
 		config[KubeControllerManagerArg] = certDirArg
@@ -164,7 +170,6 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	if nodeName := entry.Metadata.Labels[capr.NodeNameLabel]; nodeName != "" {
 		config["node-name"] = nodeName
 	}
-	return joinServer
 }
 
 func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
@@ -570,7 +575,7 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 // NOTE: the joined server can be "-" if the config file is being added for the init node.
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, tokensSecret plan.Secret,
 	joinServer string, reg registries, renderS3 bool) (plan.NodePlan, map[string]interface{}, string, error) {
-	config := map[string]interface{}{}
+	config := map[string]any{}
 
 	addDefaults(config, controlPlane)
 
@@ -585,10 +590,14 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
 
-	joinedServer := addRoleConfig(config, controlPlane, entry, joinServer)
+	config2 := map[string]any{}
+
+	joinedServer := addServer(config2, controlPlane, entry, joinServer)
 	if joinedServer == capr.JoinServerImplausible {
 		return nodePlan, config, "", fmt.Errorf("implausible joined server for entry")
 	}
+
+	addRoleConfig(config, controlPlane, entry)
 
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
@@ -669,6 +678,17 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
 		Path:    fmt.Sprintf(ConfigYamlFileName, capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+	})
+
+	configData2, err := json.MarshalIndent(config2, "", "  ")
+	if err != nil {
+		return nodePlan, config, joinedServer, err
+	}
+
+	nodePlan.Files = append(nodePlan.Files, plan.File{
+		Dynamic: true,
+		Content: base64.StdEncoding.EncodeToString(configData2),
+		Path:    fmt.Sprintf(ConfigYamlFileName2, capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, config, joinedServer, nil
