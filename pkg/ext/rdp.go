@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -15,7 +16,9 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -24,6 +27,13 @@ const (
 	certSecretName   = "api-extension-ca-name"
 	certServerName   = "api-extension-tls-name"
 )
+
+var rdpSecretBackoff = wait.Backoff{
+	Steps:    7,
+	Duration: 15 * time.Second,
+	Factor:   2.0,
+	Jitter:   0.1,
+}
 
 func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wrangler.Context) error {
 	if features.MCMAgent.Enabled() {
@@ -41,9 +51,22 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 		return err
 	}
 
-	connectSecret, err := GetOrCreateRDPConnectSecret(wranglerContext.Core.Secret())
-	if err != nil {
-		return err
+	var connectSecret string
+	var retryErr error
+	retryCount := 0
+
+	// Retry to get or create the connect secret for approx 15 minutes
+	retry.OnError(rdpSecretBackoff, func(err error) bool {
+		retryCount++
+		logrus.Errorf("RDPClient: error getting connect secret (retry #%d), will retry: %s", retryCount, err.Error())
+		return true
+	}, func() error {
+		connectSecret, retryErr = GetOrCreateRDPConnectSecret(wranglerContext.Core.Secret())
+		return retryErr
+	})
+
+	if retryErr != nil {
+		return retryErr
 	}
 
 	remoteDialerProxyClient, err := proxyclient.New(
