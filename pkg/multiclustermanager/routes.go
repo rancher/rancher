@@ -29,7 +29,6 @@ import (
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/version"
@@ -38,10 +37,9 @@ import (
 
 func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
-		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
-		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
-		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
-		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
+		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
+		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
+		clusterImport  = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 	)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
@@ -72,7 +70,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.UseEncodedPath()
 
 	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
-	unauthed.Handle("/v3/connect/config", connectConfigHandler)
 	unauthed.Handle("/v3/connect", connectHandler)
 	unauthed.Handle("/v3/connect/register", connectHandler)
 	unauthed.Handle("/v3/import/{token}_{clusterId}.yaml", http.HandlerFunc(clusterImport.ClusterImportHandler))
