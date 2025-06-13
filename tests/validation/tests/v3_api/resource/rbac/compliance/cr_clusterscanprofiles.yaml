@@ -1,0 +1,6 @@
+apiVersion: compliance.cattle.io/v1
+kind: ClusterScanProfile
+metadata:
+  name: profile-sample
+spec:
+  benchmarkVersion: k3s-ssb-1.0

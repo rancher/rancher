@@ -8,7 +8,7 @@ from .common import wait_until_app_v2_deployed
 from .common import check_v2_app_and_uninstall
 
 CIS_CHART_VERSION = os.environ.get('RANCHER_CIS_CHART_VERSION', "1.0.100")
-SCAN_PROFILE = os.environ.get('RANCHER_SCAN_PROFILE', "rke-profile-permissive")
+SCAN_PROFILE = os.environ.get('RANCHER_SCAN_PROFILE', "k3s-ssb-1.0")
 
 cluster_detail = {"cluster": None}
 cis_annotations = \
@@ -22,7 +22,7 @@ cis_charts = {
     "version": CIS_CHART_VERSION,
     "projectId": None
 }
-CHART_NAME = "rancher-cis-benchmark"
+CHART_NAME = "rancher-compliance"
 
 def test_install_v2_cis_benchmark():
     """
@@ -43,16 +43,16 @@ def test_install_v2_cis_benchmark():
     cluster_name = cluster_detail["cluster"]["name"]
     rancher_repo = rancherrepo["data"][0]
 
-    # check if CIS is already installed and uninstall the app
+    # check if Compliance is already installed and uninstall the app
     check_v2_app_and_uninstall(client, CHART_NAME)
     check_v2_app_and_uninstall(client, CHART_NAME + "-crd")
 
     # create namespace
-    ns = "cis-operator-system"
+    ns = "rancher-compliance-system"
     command = "create namespace " + ns
     execute_kubectl_cmd(command, False)
 
-    # install CIS v2
+    # install Compliance
     cis_charts["annotations"] = cis_annotations
     cis_charts["values"]["global"]["cattle"]["clusterId"] = cluster_id
     cis_charts["values"]["global"]["cattle"]["clusterName"] = cluster_name

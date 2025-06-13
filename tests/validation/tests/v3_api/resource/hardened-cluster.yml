@@ -55,7 +55,7 @@ services:
                - cattle-ui-plugin-system
                - cattle-windows-gmsa-system
                - cert-manager
-               - cis-operator-system
+               - rancher-compliance-system
                - fleet-default
                - ingress-nginx
                - istio-system
