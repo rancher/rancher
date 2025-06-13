@@ -231,7 +231,7 @@ var MigratedResources = map[string]bool{
 	"managedcharts.management.cattle.io":                              false,
 	"monitormetrics.management.cattle.io":                             false,
 	"navlinks.ui.cattle.io":                                           false,
-	"nodedrivers.management.cattle.io":                                false,
+	"nodedrivers.management.cattle.io":                                true,
 	"nodepools.management.cattle.io":                                  false,
 	"nodes.management.cattle.io":                                      false,
 	"nodetemplates.management.cattle.io":                              false,
