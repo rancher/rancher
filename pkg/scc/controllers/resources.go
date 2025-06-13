@@ -26,15 +26,20 @@ func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
 }
 
 func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
-	regCode, ok := secret.Data[dataRegCode]
-	if !ok || len(regCode) == 0 {
-		return RegistrationParams{}, fmt.Errorf("secret does not have data %s", dataRegCode)
-	}
-
 	regType, ok := secret.Data[dataRegistrationType]
 	if !ok || len(regType) == 0 {
 		return RegistrationParams{}, fmt.Errorf("secret does not have label %s", dataRegistrationType)
 	}
+	regMode := v1.RegistrationMode(regType)
+	if !regMode.Valid() {
+		return RegistrationParams{}, fmt.Errorf("invalid registration mode %s", string(regMode))
+	}
+
+	regCode, ok := secret.Data[dataRegCode]
+	if regMode == v1.RegistrationModeOnline && (!ok || len(regCode) == 0) {
+		return RegistrationParams{}, fmt.Errorf("secret does not have data %s; this is required in online mode", dataRegCode)
+	}
+
 	hasher := md5.New()
 	data := append(regCode, regType...)
 	if _, err := hasher.Write(data); err != nil {

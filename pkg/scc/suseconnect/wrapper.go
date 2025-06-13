@@ -90,6 +90,19 @@ func (sw *SccWrapper) SystemRegistration(regCode string) (RegistrationSystemId, 
 	return RegistrationSystemId(id), nil
 }
 
+func (sw *SccWrapper) PrepareOfflineRegistrationRequest() (*registration.OfflineRequest, error) {
+	identifier, version, arch := sw.systemInfo.GetProductIdentifier()
+	rancherUuid := sw.systemInfo.RancherUuid()
+
+	// 1 collect system info
+	preparedSystemInfo, err := sw.systemInfo.PreparedForSCC()
+	if err != nil {
+		return nil, err
+	}
+
+	return registration.BuildOfflineRequest(identifier, version, arch, rancherUuid.String(), preparedSystemInfo), nil
+}
+
 func (sw *SccWrapper) KeepAlive() error {
 	// 1 collect system info
 	systemInfo := sw.systemInfo
@@ -114,7 +127,8 @@ func (sw *SccWrapper) RegisterOrKeepAlive(regCode string) (RegistrationSystemId,
 	return sw.SystemRegistration(regCode)
 }
 
-func (sw *SccWrapper) Activate(identifier string, version string, arch string, regCode string) (*registration.Metadata, *registration.Product, error) {
+func (sw *SccWrapper) Activate(regCode string) (*registration.Metadata, *registration.Product, error) {
+	identifier, version, arch := sw.systemInfo.GetProductIdentifier()
 	metaData, product, err := registration.Activate(sw.conn, identifier, version, arch, regCode)
 	if err != nil {
 		return nil, nil, err

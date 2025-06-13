@@ -13,7 +13,7 @@ import (
 )
 
 type InfoExporter struct {
-	InfoProvider *InfoProvider
+	infoProvider *InfoProvider
 
 	clusterCache   v3.ClusterCache
 	nodeCache      v3.NodeCache
@@ -49,15 +49,24 @@ func NewInfoExporter(
 	wContext *wrangler.Context,
 ) *InfoExporter {
 	return &InfoExporter{
-		InfoProvider:   infoProvider,
+		infoProvider:   infoProvider,
 		clusterCache:   wContext.Mgmt.Cluster().Cache(),
 		nodeCache:      wContext.Mgmt.Node().Cache(),
 		namespaceCache: wContext.Core.Namespace().Cache(),
 	}
 }
 
-func (e *InfoExporter) Provider() *InfoProvider {
-	return e.InfoProvider
+// GetProductIdentifier returns a triple of product ID, version and CPU architecture
+func (e *InfoExporter) GetProductIdentifier() (string, string, string) {
+	return e.infoProvider.GetProductIdentifier()
+}
+
+func (e *InfoExporter) RancherUuid() uuid.UUID {
+	return e.infoProvider.RancherUuid
+}
+
+func (e *InfoExporter) ClusterUuid() uuid.UUID {
+	return e.infoProvider.ClusterUuid
 }
 
 func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
@@ -98,9 +107,9 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	// TODO: collect and organize downstream counts
 
 	return RancherSCCInfo{
-		UUID:       e.InfoProvider.RancherUuid,
+		UUID:       e.infoProvider.RancherUuid,
 		RancherUrl: ServerUrl(),
-		Version:    e.InfoProvider.GetVersion(),
+		Version:    e.infoProvider.GetVersion(),
 		Nodes:      nodeCount,
 		Sockets:    socketsCount,
 		Clusters:   clusterCount,
@@ -123,12 +132,12 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 	return systemInfoMap, nil
 }
 
-// PreparedForSCCOffline returns a RancherOfflineRequestEncoded just to delineate between other []byte types,
+// PrepareOfflineRegistrationRequest returns a RancherOfflineRequestEncoded just to delineate between other []byte types,
 // and to show connection to the original data structure it came from
-func (e *InfoExporter) PreparedForSCCOffline() (RancherOfflineRequestEncoded, error) {
+func (e *InfoExporter) PrepareOfflineRegistrationRequest() (RancherOfflineRequestEncoded, error) {
 	sccPreparedInfo := e.preparedForSCC()
 
-	identifier, version, arch := e.InfoProvider.GetProductIdentifier()
+	identifier, version, arch := e.infoProvider.GetProductIdentifier()
 
 	offlinePrepared := RancherOfflineRequest{
 		UUID:       sccPreparedInfo.UUID,

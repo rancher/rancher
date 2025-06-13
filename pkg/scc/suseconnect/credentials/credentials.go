@@ -125,3 +125,5 @@ func (c *SccCredentials) SccCredentials() connection.Credentials {
 func NewCredentials() *SccCredentials {
 	return &SccCredentials{}
 }
+
+var _ connection.Credentials = &SccCredentials{}

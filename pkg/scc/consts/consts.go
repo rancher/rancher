@@ -3,17 +3,22 @@ package consts
 import "fmt"
 
 const (
-	DefaultSCCNamespace                  = "cattle-scc-system"
+	DefaultSCCNamespace = "cattle-scc-system"
+)
+
+const (
+	ResourceSCCEntrypointSecretName      = "scc-registration"
 	SCCSystemCredentialsSecretNamePrefix = "scc-system-credentials-"
+	OfflineRequestSecretNamePrefix       = "offline-request-"
 )
 
 func SCCCredentialsSecretName(namePartIn string) string {
 	return fmt.Sprintf("%s%s", SCCSystemCredentialsSecretNamePrefix, namePartIn)
 }
 
-const (
-	ResourceSCCEntrypointSecretName = "scc-registration"
-)
+func OfflineRequestSecretName(namePartIn string) string {
+	return fmt.Sprintf("%s%s", OfflineRequestSecretNamePrefix, namePartIn)
+}
 
 const (
 	ManagedBySecretBroker = "secret-broker"
@@ -25,7 +30,8 @@ const (
 )
 
 const (
-	LabelSccLastProcessed = "scc.cattle.io/last-processsed"
 	LabelSccHash          = "scc.cattle.io/scc-hash"
+	LabelSccLastProcessed = "scc.cattle.io/last-processsed"
 	LabelSccManagedBy     = "scc.cattle.io/managed-by"
+	LabelSccSecretRole    = "scc.cattle.io/secret-role"
 )
