@@ -828,6 +828,9 @@ func Test_ensurePSAPermissionsDelete(t *testing.T) {
 					},
 				}
 				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					ListFunc: func(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error) {
+						return &v1.ClusterRoleBindingList{}, nil
+					},
 					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
 						return nil
 					},
@@ -863,6 +866,9 @@ func Test_ensurePSAPermissionsDelete(t *testing.T) {
 					},
 				}
 				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					ListFunc: func(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error) {
+						return &v1.ClusterRoleBindingList{}, nil
+					},
 					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
 						return fmt.Errorf("error")
 					},
@@ -905,6 +911,48 @@ func Test_ensurePSAPermissionsDelete(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "unable to delete CR (locked by other CRB)",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					ListFunc: func(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error) {
+						return &v1.ClusterRoleBindingList{
+							Items: []v1.ClusterRoleBinding{
+								v1.ClusterRoleBinding{
+									RoleRef: v1.RoleRef{
+										Kind: "ClusterRole",
+										Name: "p-example-namespaces-psa",
+									},
+								},
+							},
+						}, nil
+					},
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name: "unable to get RT",
