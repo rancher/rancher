@@ -646,7 +646,6 @@ func Test_ensurePSAPermissions(t *testing.T) {
 		args      args
 		wantErr   bool
 	}{
-		// TODO: Add test cases.
 		{
 			name: "create psa rbac resources without errors",
 			mockSetup: func() {
@@ -807,7 +806,6 @@ func Test_ensurePSAPermissionsDelete(t *testing.T) {
 		args      args
 		wantErr   bool
 	}{
-		// TODO: Add test cases.
 		{
 			name: "clean up psa rbac resources",
 			mockSetup: func() {
