@@ -1,29 +1,59 @@
 package credentials
 
 import (
-	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 
-	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 )
+
+const (
+	Namespace = consts.DefaultSCCNamespace
+	Finalizer = consts.FinalizerSccCredentials
+)
+
+var SecretName = consts.SCCCredentialsSecretName("testing-credentials")
+
+func mockRegistration() v1.Registration {
+	return v1.Registration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "registration-testing",
+		},
+		Spec: v1.RegistrationSpec{
+			Mode: v1.RegistrationModeOnline,
+		},
+	}
+}
 
 func TestBasicNewSecretsAdapter(t *testing.T) {
 	gomockCtrl := gomock.NewController(t)
-	mockSecretsController := fake.NewMockControllerInterface[*v1.Secret, *v1.SecretList](gomockCtrl)
+	mockSecretsController := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](gomockCtrl)
+	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](gomockCtrl)
 
 	// Define expected calls to our mock controller using gomock.
 	mockSecretsController.EXPECT().Get(Namespace, SecretName, metav1.GetOptions{}).MaxTimes(1)
 
-	secretsBackedCredentials := New(mockSecretsController)
+	testReg := mockRegistration()
+	testOwnerRef := testReg.ToOwnerRef()
+
+	secretsBackedCredentials := New(Namespace, SecretName, Finalizer, testOwnerRef, mockSecretsController, mockSecretsCache)
 	assert.Equal(t, &CredentialSecretsAdapter{
-		secrets: mockSecretsController,
+		secretNamespace: Namespace,
+		secretName:      SecretName,
+		secrets:         mockSecretsController,
+		secretCache:     mockSecretsCache,
+		finalizer:       Finalizer,
+		ownerRef:        testOwnerRef,
 	}, secretsBackedCredentials)
 }
 
-func testSecret(name string, namespace string, dataOverride *map[string]string) v1.Secret {
+func testSecret(name string, namespace string, dataOverride *map[string]string) corev1.Secret {
 	if name == "" {
 		name = SecretName
 	}
@@ -53,7 +83,7 @@ func testSecret(name string, namespace string, dataOverride *map[string]string) 
 		}
 	}
 
-	return v1.Secret{
+	return corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -62,9 +92,17 @@ func testSecret(name string, namespace string, dataOverride *map[string]string) 
 	}
 }
 
-func preparedSecretsMock(t *testing.T) *fake.MockControllerInterface[*v1.Secret, *v1.SecretList] {
+func testSecretForUpdate(inSecret *corev1.Secret, inReg *v1.Registration) *corev1.Secret {
+	inSecret.ObjectMeta.Finalizers = append(inSecret.ObjectMeta.Finalizers, Finalizer)
+	inSecret.OwnerReferences = []metav1.OwnerReference{
+		*inReg.ToOwnerRef(),
+	}
+	return inSecret
+}
+
+func preparedSecretsMocks(t *testing.T) (*fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList], *fake.MockCacheInterface[*corev1.Secret]) {
 	gomockCtrl := gomock.NewController(t)
-	mockSecretsController := fake.NewMockControllerInterface[*v1.Secret, *v1.SecretList](gomockCtrl)
+	mockSecretsController := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](gomockCtrl)
 
 	defaultTestSecret := testSecret("", "", nil)
 
@@ -72,15 +110,27 @@ func preparedSecretsMock(t *testing.T) *fake.MockControllerInterface[*v1.Secret,
 	mockSecretsController.EXPECT().Get(Namespace, SecretName, metav1.GetOptions{}).Return(&defaultTestSecret, nil).AnyTimes()
 	mockSecretsController.EXPECT().Create(defaultTestSecret).Return(&defaultTestSecret, nil).AnyTimes()
 
-	return mockSecretsController
+	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](gomockCtrl)
+	mockSecretsCache.EXPECT().Get(Namespace, SecretName).Return(&defaultTestSecret, nil).AnyTimes()
+
+	return mockSecretsController, mockSecretsCache
 }
 
 func TestNewSecretsAdapter(t *testing.T) {
-	mockSecretsController := preparedSecretsMock(t)
+	mockSecretsController, mockSecretsCache := preparedSecretsMocks(t)
 
-	secretsBackedCredentials := New(mockSecretsController)
+	testReg := mockRegistration()
+	testOwnerRef := testReg.ToOwnerRef()
+	secretsBackedCredentials := New(Namespace, SecretName, Finalizer, testOwnerRef, mockSecretsController, mockSecretsCache)
+	_ = secretsBackedCredentials.Refresh()
+
 	assert.Equal(t, &CredentialSecretsAdapter{
-		secrets: mockSecretsController,
+		secretNamespace: Namespace,
+		secretName:      SecretName,
+		finalizer:       Finalizer,
+		ownerRef:        testOwnerRef,
+		secrets:         mockSecretsController,
+		secretCache:     mockSecretsCache,
 		credentials: SccCredentials{
 			systemLogin: "system_testLoginUser",
 			password:    "system_testLoginPassword",
@@ -102,11 +152,20 @@ func TestNewSecretsAdapter(t *testing.T) {
 }
 
 func TestSecretsAdapterCredentials_Basic(t *testing.T) {
-	mockSecretsController := preparedSecretsMock(t)
+	mockSecretsController, mockSecretsCache := preparedSecretsMocks(t)
 
-	secretsBackedCredentials := New(mockSecretsController)
+	testReg := mockRegistration()
+	testOwnerRef := testReg.ToOwnerRef()
+	secretsBackedCredentials := New(Namespace, SecretName, Finalizer, testOwnerRef, mockSecretsController, mockSecretsCache)
+	_ = secretsBackedCredentials.Refresh()
+
 	assert.Equal(t, &CredentialSecretsAdapter{
-		secrets: mockSecretsController,
+		secretNamespace: Namespace,
+		secretName:      SecretName,
+		finalizer:       Finalizer,
+		ownerRef:        testOwnerRef,
+		secrets:         mockSecretsController,
+		secretCache:     mockSecretsCache,
 		credentials: SccCredentials{
 			systemLogin: "system_testLoginUser",
 			password:    "system_testLoginPassword",
@@ -117,7 +176,8 @@ func TestSecretsAdapterCredentials_Basic(t *testing.T) {
 	modifiedSecret := testSecret("", "", &map[string]string{
 		TokenKey: "Hello-WORLD",
 	})
-	mockSecretsController.EXPECT().Update(&modifiedSecret).Return(&modifiedSecret, nil).AnyTimes()
+	prepared := testSecretForUpdate(modifiedSecret.DeepCopy(), &testReg)
+	mockSecretsController.EXPECT().Update(prepared).Return(prepared, nil).MaxTimes(1)
 
 	// Update token
 	updateErr := secretsBackedCredentials.UpdateToken("Hello-WORLD")
@@ -130,7 +190,8 @@ func TestSecretsAdapterCredentials_Basic(t *testing.T) {
 	modifiedSecret = testSecret("", "", &map[string]string{
 		TokenKey: "",
 	})
-	mockSecretsController.EXPECT().Update(&modifiedSecret).Return(&modifiedSecret, nil).AnyTimes()
+	prepared = testSecretForUpdate(modifiedSecret.DeepCopy(), &testReg)
+	mockSecretsController.EXPECT().Update(prepared).Return(prepared, nil).MaxTimes(1)
 
 	// Update token ERROR
 	updateErr = secretsBackedCredentials.UpdateToken("")
@@ -145,7 +206,8 @@ func TestSecretsAdapterCredentials_Basic(t *testing.T) {
 		PasswordKey: "freds-system-PW",
 		TokenKey:    "",
 	})
-	mockSecretsController.EXPECT().Update(&modifiedSecret).Return(&modifiedSecret, nil).AnyTimes()
+	prepared = testSecretForUpdate(modifiedSecret.DeepCopy(), &testReg)
+	mockSecretsController.EXPECT().Update(prepared).Return(prepared, nil).MaxTimes(1)
 
 	// Update login
 	updateErr = secretsBackedCredentials.SetLogin("fred", "freds-system-PW")
@@ -158,11 +220,20 @@ func TestSecretsAdapterCredentials_Basic(t *testing.T) {
 }
 
 func TestSecretsAdapterSccCredentials(t *testing.T) {
-	mockSecretsController := preparedSecretsMock(t)
+	mockSecretsController, mockSecretsCache := preparedSecretsMocks(t)
 
-	secretsBackedCredentials := New(mockSecretsController)
+	testReg := mockRegistration()
+	testOwnerRef := testReg.ToOwnerRef()
+	secretsBackedCredentials := New(Namespace, SecretName, Finalizer, testOwnerRef, mockSecretsController, mockSecretsCache)
+	_ = secretsBackedCredentials.Refresh()
+
 	assert.Equal(t, &CredentialSecretsAdapter{
-		secrets: mockSecretsController,
+		secretNamespace: Namespace,
+		secretName:      SecretName,
+		finalizer:       Finalizer,
+		ownerRef:        testOwnerRef,
+		secrets:         mockSecretsController,
+		secretCache:     mockSecretsCache,
 		credentials: SccCredentials{
 			systemLogin: "system_testLoginUser",
 			password:    "system_testLoginPassword",
@@ -176,11 +247,20 @@ func TestSecretsAdapterSccCredentials(t *testing.T) {
 }
 
 func TestSecretEmptyTokenUpdate(t *testing.T) {
-	mockSecretsController := preparedSecretsMock(t)
+	mockSecretsController, mockSecretsCache := preparedSecretsMocks(t)
 
-	secretsBackedCredentials := New(mockSecretsController)
+	testReg := mockRegistration()
+	testOwnerRef := testReg.ToOwnerRef()
+	secretsBackedCredentials := New(Namespace, SecretName, Finalizer, testOwnerRef, mockSecretsController, mockSecretsCache)
+	_ = secretsBackedCredentials.Refresh()
+
 	assert.Equal(t, &CredentialSecretsAdapter{
-		secrets: mockSecretsController,
+		secretNamespace: Namespace,
+		secretName:      SecretName,
+		finalizer:       Finalizer,
+		ownerRef:        testOwnerRef,
+		secrets:         mockSecretsController,
+		secretCache:     mockSecretsCache,
 		credentials: SccCredentials{
 			systemLogin: "system_testLoginUser",
 			password:    "system_testLoginPassword",
@@ -191,7 +271,8 @@ func TestSecretEmptyTokenUpdate(t *testing.T) {
 	modifiedSecret := testSecret("", "", &map[string]string{
 		TokenKey: "",
 	})
-	mockSecretsController.EXPECT().Update(&modifiedSecret).Return(&modifiedSecret, nil).AnyTimes()
+	prepared := testSecretForUpdate(modifiedSecret.DeepCopy(), &testReg)
+	mockSecretsController.EXPECT().Update(prepared).Return(prepared, nil).MaxTimes(1)
 
 	updateErr := secretsBackedCredentials.UpdateToken("")
 	assert.NoError(t, updateErr)

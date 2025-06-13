@@ -123,3 +123,12 @@ func (r *Registration) HasCondition(matchCond condition.Cond) bool {
 
 	return false
 }
+
+func (r *Registration) ToOwnerRef() *metav1.OwnerReference {
+	return &metav1.OwnerReference{
+		APIVersion: r.TypeMeta.APIVersion,
+		Kind:       r.TypeMeta.Kind,
+		UID:        r.GetUID(),
+		Name:       r.GetName(),
+	}
+}

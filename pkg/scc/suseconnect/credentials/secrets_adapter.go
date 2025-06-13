@@ -28,15 +28,15 @@ type CredentialSecretsAdapter struct {
 }
 
 func New(
-	name, namespace string,
+	namespace, name string,
 	finalizer string,
 	ownerRef *metav1.OwnerReference,
 	secrets v1core.SecretController,
 	secretCache v1core.SecretCache,
 ) *CredentialSecretsAdapter {
 	return &CredentialSecretsAdapter{
-		secretName:      name,
 		secretNamespace: namespace,
+		secretName:      name,
 		secrets:         secrets,
 		secretCache:     secretCache,
 		finalizer:       finalizer,
