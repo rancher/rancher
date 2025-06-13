@@ -232,107 +232,7 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
-{{ if .IsRKE }}
-
----
-
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-    name: cattle-node-agent
-    namespace: cattle-system
-spec:
-  selector:
-    matchLabels:
-      app: cattle-agent
-  template:
-    metadata:
-      labels:
-        app: cattle-agent
-    spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                - key: beta.kubernetes.io/os
-                  operator: NotIn
-                  values:
-                    - windows
-      hostNetwork: true
-      serviceAccountName: cattle
-      tolerations:
-      - operator: Exists
-      containers:
-      - name: agent
-        image: {{.AgentImage}}
-        imagePullPolicy: IfNotPresent
-        env:
-        - name: CATTLE_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: CATTLE_SERVER
-          value: "{{.URLPlain}}"
-        - name: CATTLE_CA_CHECKSUM
-          value: "{{.CAChecksum}}"
-        - name: CATTLE_CLUSTER
-          value: "false"
-        - name: CATTLE_K8S_MANAGED
-          value: "true"
-        - name: CATTLE_AGENT_CONNECT
-          value: "true"
-      {{- if .AgentEnvVars}}
-{{ .AgentEnvVars | indent 8 }}
-      {{- end }}
-        volumeMounts:
-        - name: cattle-credentials
-          mountPath: /cattle-credentials
-          readOnly: true
-        - name: k8s-ssl
-          mountPath: /etc/kubernetes
-        - name: var-run
-          mountPath: /var/run
-          mountPropagation: HostToContainer
-        - name: run
-          mountPath: /run
-          mountPropagation: HostToContainer
-        - name: docker-certs
-          mountPath: /etc/docker/certs.d
-        securityContext:
-          privileged: true
-      {{- if .PrivateRegistryConfig}}
-      imagePullSecrets:
-      - name: cattle-private-registry
-      {{- end }}
-      volumes:
-      - name: k8s-ssl
-        hostPath:
-          path: /etc/kubernetes
-          type: DirectoryOrCreate
-      - name: var-run
-        hostPath:
-          path: /var/run
-          type: DirectoryOrCreate
-      - name: run
-        hostPath:
-          path: /run
-          type: DirectoryOrCreate
-      - name: cattle-credentials
-        secret:
-          secretName: cattle-credentials-{{.TokenKey}}
-          defaultMode: 320
-      - hostPath:
-          path: /etc/docker/certs.d
-          type: DirectoryOrCreate
-        name: docker-certs
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 50%
-
-{{- end }}
-
+      
 {{- if .AuthImage}}
 
 ---
@@ -435,13 +335,6 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: kube-api-auth
-    namespace: cattle-system
-`
-	NodeAgentDaemonSet = `
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-    name: cattle-node-agent
     namespace: cattle-system
 `
 
