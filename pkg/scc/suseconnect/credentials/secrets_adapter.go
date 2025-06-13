@@ -58,8 +58,8 @@ func (c *CredentialSecretsAdapter) loadCredentials() error {
 	if err == nil && sccCreds != nil && len(sccCreds.Data) != 0 {
 		username, _ := sccCreds.Data[UsernameKey]
 		password, _ := sccCreds.Data[PasswordKey]
-		token, _ := sccCreds.Data[TokenKey]
 		_ = c.credentials.SetLogin(string(username), string(password))
+		token, _ := sccCreds.Data[TokenKey]
 		_ = c.credentials.UpdateToken(string(token))
 	}
 
@@ -81,7 +81,11 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 				Name:      c.secretName,
 				Namespace: c.secretNamespace,
 			},
-			Data: map[string][]byte{},
+			Data: map[string][]byte{
+				UsernameKey: make([]byte, 0),
+				PasswordKey: make([]byte, 0),
+				TokenKey:    make([]byte, 0),
+			},
 		}
 	}
 
