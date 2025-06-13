@@ -13,6 +13,15 @@ ARG TERRAFORM_VERSION=0.12.10
 ARG EXTERNAL_ENCODED_VPN
 ARG VPN_ENCODED_LOGIN
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    curl \
+    unzip \
+    tar \
+    gzip \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY [".", "$WORKSPACE"]
 
@@ -31,8 +40,6 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     mv linux-amd64/helm /bin/helm_v3 && \
     chmod +x /bin/helm_v3 && \
     wget https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
-    apt-get update && \
-    apt-get install unzip && \
     unzip terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
     chmod u+x terraform && \
     mv terraform /usr/local/bin && \
@@ -50,4 +57,3 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
 
 # necessary to run if statements using [[ ]]
 SHELL ["/bin/bash", "-c"] 
-
