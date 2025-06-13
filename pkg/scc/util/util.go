@@ -75,7 +75,8 @@ func ValidateInitializingConfigMap(sccInitializerConfig *corev1.ConfigMap) (*cor
 	return secretReference, &mode, nil
 }
 
-var semverRegex = regexp.MustCompile(`(?m)^v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+// semverRegex matches on regular SemVer as well as Rancher's dev versions
+var semverRegex = regexp.MustCompile(`(?m)^v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)(?:\.(?P<patch>0|[1-9]\d*))?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
 
 func VersionIsDevBuild() bool {
 	rancherVersion := version.Version
@@ -84,7 +85,9 @@ func VersionIsDevBuild() bool {
 	}
 
 	matches := semverRegex.FindStringSubmatch(rancherVersion)
-	return matches[4] != "" || matches[3] == ""
+	return matches == nil || // When version is not SemVer it is dev
+		matches[3] == "" || // When the version is just Major.Minor assume dev
+		matches[4] != "" // When the version includes pre-release assume dev
 }
 
 func JSONToBase64(data interface{}) ([]byte, error) {
