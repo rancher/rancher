@@ -39,18 +39,17 @@ func NewAuditLogMiddleware(auditWriter *LogWriter) (func(http.Handler) http.Hand
 func constructKeyRedactRegex() (*regexp.Regexp, error) {
 	s := strings.Builder{}
 	s.WriteRune('(')
-	for _, v := range management.DriverData {
-		for key, value := range v {
-			if strings.HasPrefix(key, "public") || strings.HasPrefix(key, "optional") {
-				continue
-			}
-			for _, item := range value {
-				s.WriteString(item + "|")
-			}
+
+	for _, fields := range management.DriverData {
+		for _, item := range fields.PrivateCredentialFields {
+			s.WriteString(item + "|")
+		}
+		for _, item := range fields.PasswordFields {
+			s.WriteString(item + "|")
 		}
 	}
-	s.WriteString(`[pP]assword|[tT]oken|[kK]ube[cC]onfig)`)
 
+	s.WriteString(`[pP]assword|[tT]oken|[kK]ube[cC]onfig)`)
 	return regexp.Compile(s.String())
 }
 

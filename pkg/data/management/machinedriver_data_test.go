@@ -97,3 +97,94 @@ func Test_removeMachineDriverByURLPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAnnotations(t *testing.T) {
+	testCases := []struct {
+		name                string
+		inputDriver         *v3.NodeDriver
+		driverName          string
+		expectedAnnotations map[string]string
+	}{
+		{
+			name:        "known drivers when nodeDriver object is nil",
+			inputDriver: nil,
+			driverName:  Amazonec2driver,
+			expectedAnnotations: map[string]string{
+				"fileToFieldAliases":      "sshKeyContents:sshKeypath,userdata:userdata",
+				"privateCredentialFields": "secretKey",
+				"publicCredentialFields":  "accessKey",
+			},
+		},
+		{
+			name: "known drivers with additional annotations",
+			inputDriver: &v3.NodeDriver{
+				ObjectMeta: v1.ObjectMeta{
+					Name: DigitalOceandriver,
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec: v3.NodeDriverSpec{},
+			},
+			driverName: DigitalOceandriver,
+			expectedAnnotations: map[string]string{
+				"foo":                     "bar",
+				"fileToFieldAliases":      "sshKeyContents:sshKeyPath,userdata:userdata",
+				"privateCredentialFields": "accessToken",
+			},
+		},
+		{
+			name: "conflicting annotations overwritten by DriverData",
+			inputDriver: &v3.NodeDriver{
+				ObjectMeta: v1.ObjectMeta{
+					Name: GoogleDriver,
+					Annotations: map[string]string{
+						"fileToFieldAliases": "foo:bar",
+					},
+				},
+			},
+			driverName: GoogleDriver,
+			expectedAnnotations: map[string]string{
+				"fileToFieldAliases":      "authEncodedJson:authEncodedJson,userdata:userdata",
+				"privateCredentialFields": "authEncodedJson",
+			},
+		},
+		{
+			name: "custom node driver with annotations",
+			inputDriver: &v3.NodeDriver{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{
+						"foo":                    "bar",
+						"baz":                    "baz",
+						"fileToFieldAliases":     "userdata:userdata",
+						"publicCredentialFields": "publicKey",
+					},
+				},
+				Spec: v3.NodeDriverSpec{},
+			},
+			driverName: "testDriver",
+			expectedAnnotations: map[string]string{
+				"foo":                    "bar",
+				"baz":                    "baz",
+				"fileToFieldAliases":     "userdata:userdata",
+				"publicCredentialFields": "publicKey",
+			},
+		},
+		{
+			name: "custom driver with no annotations",
+			inputDriver: &v3.NodeDriver{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "testDriver",
+				},
+			},
+			driverName:          "testDriver",
+			expectedAnnotations: map[string]string{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			annotations := getAnnotations(tc.inputDriver, tc.driverName)
+			assert.Equal(t, tc.expectedAnnotations, annotations)
+		})
+	}
+}

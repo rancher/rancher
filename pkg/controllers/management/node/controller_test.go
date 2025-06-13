@@ -2,77 +2,84 @@ package node
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestAliasMaps(t *testing.T) {
-	assert := assert.New(t)
-	assert.Len(SchemaToDriverFields, len(nodedriver.DriverToSchemaFields), "Alias maps are not equal")
-	for driver, fields := range SchemaToDriverFields {
-		assert.Contains(nodedriver.DriverToSchemaFields, driver)
-		nodeAliases := nodedriver.DriverToSchemaFields[driver]
-		for k, v := range fields {
-			// check that the value from the first map is the key to the 2nd map
-			val, ok := nodeAliases[v]
-			require.True(t, ok, fmt.Sprintf("Alias %v not found", v))
-			// check that the value from the 2nd map is equal to the key from the first
-			assert.Equal(k, val)
-		}
-	}
-}
-
 func TestAliasToPath(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-	os.Setenv("CATTLE_DEV_MODE", "true")
+	assertT := assert.New(t)
+	requireT := require.New(t)
+	err := os.Setenv("CATTLE_DEV_MODE", "true")
+	assertT.NoError(err)
 	defer os.Unsetenv("CATTLE_DEV_MODE")
 
-	for driver, fields := range SchemaToDriverFields {
-		testData, _ := createFakeConfig(fields)
+	for _, fields := range management.DriverData {
+		testConfig, annotations := createFakeConfigAnnotations(fields.FileToFieldAliases)
+		err = aliasToPath(annotations, testConfig, "fakeNamespace")
+		assertT.NoError(err)
 
-		err := aliasToPath(driver, testData, "fake")
-		assert.Nil(err)
-		for alias := range nodedriver.DriverToSchemaFields[driver] {
-			assert.Contains(testData, alias)
+		driverToSchemaFields := reverseAnnotations(annotations["fileToFieldAliases"])
+		for alias := range driverToSchemaFields {
+			assertT.Contains(testConfig, alias)
 		}
-		tempdir := os.TempDir()
 
-		for _, v := range testData {
+		tempDir := os.TempDir()
+
+		for _, v := range testConfig {
 			filePath := v.(string)
-			// validate the temp dir is in the path for the field
-			assert.Contains(filePath, tempdir)
-			// valide the file exists on disk
+			// validate that the temp directory in the path for the field
+			assertT.Contains(filePath, tempDir)
+			// validate that the file exists on disk
 			_, err = os.Stat(filePath)
-			require.Nil(err)
+			requireT.NoError(err)
 
-			// assert the file contents starts with our expected string
-			b, err := ioutil.ReadFile(filePath)
-			require.Nil(err)
-			assert.Contains(string(b), "fakecontent")
+			// validate that the fileContents start with expected string
+			b, err := os.ReadFile(filePath)
+			requireT.NoError(err)
+			assertT.Contains(string(b), "fakecontent")
 			os.Remove(filePath)
 		}
 	}
 }
 
-func createFakeConfig(fields map[string]string) (map[string]interface{}, []string) {
+func createFakeConfigAnnotations(fields map[string]string) (map[string]interface{}, map[string]string) {
 	fakeContents := []string{}
 	testData := make(map[string]interface{})
+	annotations := map[string]string{}
 
 	base := "fakecontent"
 	i := 0
-	for k := range fields {
+	for k, v := range fields {
 		content := base + strconv.Itoa(i)
-		fakeContents = append(fakeContents, content)
+		fakeContents = append(fakeContents, fmt.Sprintf("%s:%s", k, v))
 		testData[k] = content
 		i++
 	}
-	return testData, fakeContents
 
+	if len(fakeContents) > 0 {
+		annotations = map[string]string{
+			"fileToFieldAliases": strings.Join(fakeContents, ","),
+		}
+	}
+
+	return testData, annotations
+}
+
+// reverseAnnotations reverse the key-value pairing and splits the string of key-value pair into
+func reverseAnnotations(annotations string) map[string]string {
+	result := map[string]string{}
+	pairs := strings.Split(annotations, ",")
+	for _, pair := range pairs {
+		keyVal := strings.SplitN(pair, ":", 2)
+		if len(keyVal) == 2 {
+			result[strings.TrimSpace(keyVal[1])] = strings.TrimSpace(keyVal[0])
+		}
+	}
+	return result
 }

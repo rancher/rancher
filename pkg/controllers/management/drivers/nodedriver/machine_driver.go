@@ -25,23 +25,8 @@ import (
 )
 
 var (
-	SchemaLock = sync.Mutex{}
-	driverLock = sync.Mutex{}
-	// DriverToSchemaFields maps Driver field => schema field
-	// The opposite of this lives in pkg/controllers/management/node/controller.go
-	DriverToSchemaFields = map[string]map[string]string{
-		"aliyunecs":     {"sshKeypath": "sshKeyContents"},
-		"amazonec2":     {"sshKeypath": "sshKeyContents", "userdata": "userdata"},
-		"azure":         {"customData": "customData"},
-		"digitalocean":  {"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
-		"exoscale":      {"sshKey": "sshKey", "userdata": "userdata"},
-		"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-		"otc":           {"privateKeyFile": "privateKeyFile"},
-		"packet":        {"userdata": "userdata"},
-		"pod":           {"userdata": "userdata"},
-		"vmwarevsphere": {"cloud-config": "cloudConfig"},
-		"google":        {"authEncodedJson": "authEncodedJson", "userdata": "userdata"},
-	}
+	SchemaLock   = sync.Mutex{}
+	driverLock   = sync.Mutex{}
 	SSHKeyFields = map[string]bool{
 		"sshKeyContents": true,
 		"sshKey":         true,
@@ -52,6 +37,7 @@ var (
 const (
 	driverNameLabel  = "io.cattle.node_driver.name"
 	uiFieldHintsAnno = "io.cattle.nodedriver/ui-field-hints"
+	aliasedAnno      = "fileToFieldAliases"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -85,10 +71,12 @@ type Lifecycle struct {
 }
 
 func (m *Lifecycle) Create(obj *v32.NodeDriver) (runtime.Object, error) {
+	fmt.Println("inside create for machine_driver")
 	return m.download(obj)
 }
 
 func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
+	fmt.Println("inside download for machine_driver")
 	driverLock.Lock()
 	defer driverLock.Unlock()
 	if !obj.Spec.Active && !obj.Spec.AddCloudCredential {
@@ -96,6 +84,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	}
 
 	forceUpdate := m.checkDriverVersion(obj)
+	fmt.Println("check driver version returns: ", forceUpdate)
 	if v32.NodeDriverConditionDownloaded.GetStatus(obj) == "" || v32.NodeDriverConditionInstalled.GetStatus(obj) == "" {
 		forceUpdate = true
 	}
@@ -193,11 +182,13 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		if err != nil {
 			return nil, err
 		}
-		if aliases, ok := DriverToSchemaFields[driverName]; ok {
-			// convert path fields to their alias to take file contents
-			if alias, ok := aliases[name]; ok {
-				name = alias
-				field.Description = fmt.Sprintf("File contents for %v", alias)
+		if fileToFieldAliases, exists := obj.Annotations[aliasedAnno]; exists && strings.Contains(fileToFieldAliases, name) {
+			fields := ParseKeyValueString(fileToFieldAliases)
+			for schemaField, driverField := range fields {
+				if driverField == name {
+					name = schemaField
+					field.Description = fmt.Sprintf("File contents for %v", schemaField)
+				}
 			}
 		}
 
@@ -303,9 +294,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 		return true
 	}
 
-	driverName := strings.TrimPrefix(obj.Spec.DisplayName, drivers.DockerMachineDriverPrefix)
-
-	if _, ok := DriverToSchemaFields[driverName]; ok {
+	if _, ok := obj.Annotations[aliasedAnno]; ok {
 		if val, ok := obj.Annotations[uiFieldHintsAnno]; !ok || val == "" {
 			return true
 		}
@@ -337,11 +326,11 @@ func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) *v32.NodeDriver {
 }
 
 func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v32.NodeDriver) (*v32.NodeDriver, error) {
-	if aliases, ok := DriverToSchemaFields[driverName]; ok {
+	if aliasedField, ok := obj.Annotations[aliasedAnno]; ok {
 		anno := make(map[string]map[string]string)
-
-		for _, aliased := range aliases {
-			anno[aliased] = map[string]string{
+		aliases := ParseKeyValueString(aliasedField)
+		for field, _ := range aliases {
+			anno[field] = map[string]string{
 				"type": "multiline",
 			}
 		}
@@ -492,20 +481,10 @@ func getCredFields(annotations map[string]string) (map[string]bool, map[string]b
 		}
 		return data
 	}
-	getDefaults := func(fields string) map[string]string {
-		data := map[string]string{}
-		for _, pattern := range strings.Split(fields, ",") {
-			split := strings.SplitN(pattern, ":", 2)
-			if len(split) == 2 {
-				data[split[0]] = split[1]
-			}
-		}
-		return data
-	}
 	return getMap(annotations["publicCredentialFields"]),
 		getMap(annotations["privateCredentialFields"]),
 		getMap(annotations["passwordFields"]),
-		getDefaults(annotations["defaults"]),
+		ParseKeyValueString(annotations["defaults"]),
 		getMap(annotations["optionalCredentialFields"])
 }
 
