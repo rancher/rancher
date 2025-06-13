@@ -121,19 +121,14 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 	}
 
 	credsName := consts.SCCCredentialsSecretName(registrationObj.Name)
-	ref := &metav1.OwnerReference{
-		APIVersion: registrationObj.TypeMeta.APIVersion,
-		Kind:       registrationObj.TypeMeta.Kind,
-		UID:        registrationObj.GetUID(),
-		Name:       registrationObj.GetName(),
-	}
+	ref := registrationObj.ToOwnerRef()
 	return sccOnlineMode{
 		registration: registrationObj,
 		log:          h.log.WithField("handler", "online"),
 		sccCredentials: credentials.New(
-			credsName,
 			h.systemNamespace,
-			FinalizerSccCredentials,
+			credsName,
+			consts.FinalizerSccCredentials,
 			ref,
 			h.secrets,
 			h.secretCache,
@@ -157,7 +152,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		return incomingObj, nil
 	}
 	if h.isRancherEntrypointSecret(incomingObj) {
-		incomingHash := incomingObj.GetLabels()[LabelSccHash]
+		incomingHash := incomingObj.GetLabels()[consts.LabelSccHash]
 		params, err := extraRegistrationParamsFromSecret(incomingObj)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
@@ -176,7 +171,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		if newSecret.Annotations == nil {
 			newSecret.Annotations = map[string]string{}
 		}
-		newSecret.Annotations[LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
+		newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
 		newSecret.Labels = params.Labels()
 
 		if _, updateErr := h.secrets.Update(newSecret); updateErr != nil {
@@ -225,7 +220,7 @@ func (h *handler) cleanupRegistrationByHash(hash string) error {
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			remainingFin := []string{}
 			for _, finalizer := range reg.Finalizers {
-				if finalizer != FinalizerSccRegistration {
+				if finalizer != consts.FinalizerSccRegistration {
 					remainingFin = append(remainingFin, finalizer)
 				}
 			}
@@ -259,7 +254,7 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 	}
 
 	if h.isRancherEntrypointSecret(incomingObj) {
-		hash, ok := incomingObj.Labels[LabelSccHash]
+		hash, ok := incomingObj.Labels[consts.LabelSccHash]
 		if !ok {
 			return incomingObj, nil
 		}
@@ -274,7 +269,7 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 	finalizers := incomingObj.GetFinalizers()
 	for i, finalizer := range finalizers {
 		// check if we are ready to remove the finalizer
-		if finalizer == FinalizerSccCredentials {
+		if finalizer == consts.FinalizerSccCredentials {
 			refs := incomingObj.GetOwnerReferences()
 			danglingRefs := 0
 			for _, ref := range refs {

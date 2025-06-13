@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"slices"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -16,27 +17,9 @@ const (
 	dataRegCode          = "regCode"
 	dataRegistrationType = "registrationType"
 )
-const (
-	LabelSccLastProcessed = "scc.cattle.io/last-processsed"
-	LabelSccHash          = "scc.cattle.io/scc-hash"
-	LabelSccManagedBy     = "scc.cattle.io/managed-by"
-)
-
-const (
-	ManagedBySecretBroker = "secret-broker"
-)
-
-const (
-	FinalizerSccCredentials  = "scc.cattle.io/managed-credentials"
-	FinalizerSccRegistration = "scc.cattle.io/managed-registration"
-)
-
-const (
-	ResourceSCCEntrypointSecretName = "scc-registration"
-)
 
 func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
-	if secretObj.Name != ResourceSCCEntrypointSecretName || secretObj.Namespace != h.systemNamespace {
+	if secretObj.Name != consts.ResourceSCCEntrypointSecretName || secretObj.Namespace != h.systemNamespace {
 		return false
 	}
 	return true
@@ -65,7 +48,7 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 		regCode: string(regCode),
 		regType: v1.RegistrationMode(regType),
 		secretRef: &corev1.SecretReference{
-			Name:      ResourceSCCEntrypointSecretName,
+			Name:      consts.ResourceSCCEntrypointSecretName,
 			Namespace: secret.Namespace,
 		},
 	}, nil
@@ -80,8 +63,8 @@ type RegistrationParams struct {
 
 func (r RegistrationParams) Labels() map[string]string {
 	return map[string]string{
-		LabelSccHash:      r.hash,
-		LabelSccManagedBy: ManagedBySecretBroker,
+		consts.LabelSccHash:      r.hash,
+		consts.LabelSccManagedBy: consts.ManagedBySecretBroker,
 	}
 }
 
@@ -114,11 +97,11 @@ func (h *handler) registrationFromSecretEntrypoint(
 
 	reg.Labels = params.Labels()
 	reg.Spec = paramsToReg(params)
-	if !slices.Contains(reg.Finalizers, FinalizerSccRegistration) {
+	if !slices.Contains(reg.Finalizers, consts.FinalizerSccRegistration) {
 		if reg.Finalizers == nil {
 			reg.Finalizers = []string{}
 		}
-		reg.Finalizers = append(reg.Finalizers, FinalizerSccRegistration)
+		reg.Finalizers = append(reg.Finalizers, consts.FinalizerSccRegistration)
 	}
 	reg.OwnerReferences = []metav1.OwnerReference{ownerRef}
 	return reg, nil

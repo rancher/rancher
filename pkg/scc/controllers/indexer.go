@@ -2,6 +2,7 @@ package controllers
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/consts"
 )
 
 const (
@@ -22,7 +23,7 @@ func (h *handler) registrationToHash(reg *v1.Registration) ([]string, error) {
 		return nil, nil
 	}
 
-	hash, ok := reg.Labels[LabelSccHash]
+	hash, ok := reg.Labels[consts.LabelSccHash]
 	if !ok {
 		return nil, nil
 	}

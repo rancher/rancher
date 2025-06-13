@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,7 +25,7 @@ func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Ob
 	if namespace != h.systemNamespace {
 		return nil, nil
 	}
-	if name != ResourceSCCEntrypointSecretName {
+	if name != consts.ResourceSCCEntrypointSecretName {
 		return nil, nil
 	}
 
@@ -33,7 +34,7 @@ func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Ob
 		return nil, nil
 	}
 
-	curHash, ok := secret.GetLabels()[LabelSccHash]
+	curHash, ok := secret.GetLabels()[consts.LabelSccHash]
 	if !ok {
 		return nil, fmt.Errorf("expected an SCC processed hash")
 	}
