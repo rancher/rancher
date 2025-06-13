@@ -118,7 +118,11 @@ func (s sccOnlineMode) ReconcileRegisterError(registration *v1.Registration, reg
 	if isNonRecoverableHttpError(registerErr) {
 		return s.reconcileNonRecoverableHttpError(registration, registerErr)
 	}
-	// Do other reconcile prep steps
+	// TODO: Do other reconcile prep steps
+
+	v1.ResourceConditionReady.False(registration)
+	v1.ResourceConditionProgressing.False(registration)
+	v1.ResourceConditionFailure.SetError(registration, "could not complete registration", registerErr)
 	return registration
 }
 

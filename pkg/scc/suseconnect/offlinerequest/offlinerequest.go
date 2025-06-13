@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"maps"
 	"slices"
 )
 
@@ -24,6 +25,7 @@ type OfflineRegistrationSecrets struct {
 	secrets         v1core.SecretController
 	secretCache     v1core.SecretCache
 	offlineRequest  []byte
+	labels          map[string]string
 }
 
 func New(
@@ -32,6 +34,7 @@ func New(
 	ownerRef *metav1.OwnerReference,
 	secrets v1core.SecretController,
 	secretCache v1core.SecretCache,
+	labels map[string]string,
 ) *OfflineRegistrationSecrets {
 	return &OfflineRegistrationSecrets{
 		secretNamespace: namespace,
@@ -40,6 +43,7 @@ func New(
 		secretCache:     secretCache,
 		finalizer:       finalizer,
 		ownerRef:        ownerRef,
+		labels:          labels,
 	}
 }
 
@@ -75,14 +79,14 @@ func (o *OfflineRegistrationSecrets) InitSecret() error {
 func (o *OfflineRegistrationSecrets) saveSecret() error {
 	create := false
 	// TODO gather errors
-	sccCreds, err := o.secretCache.Get(o.secretNamespace, o.secretName)
+	offlineRequest, err := o.secretCache.Get(o.secretNamespace, o.secretName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
 	if apierrors.IsNotFound(err) {
 		create = true
-		sccCreds = &corev1.Secret{
+		offlineRequest = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      o.secretName,
 				Namespace: o.secretNamespace,
@@ -90,44 +94,50 @@ func (o *OfflineRegistrationSecrets) saveSecret() error {
 		}
 	}
 
-	if sccCreds.Data == nil {
-		sccCreds.Data = map[string][]byte{
+	if offlineRequest.Data == nil {
+		offlineRequest.Data = map[string][]byte{
 			RequestKey: make([]byte, 0),
 		}
 	}
 
 	if len(o.offlineRequest) != 0 {
-		sccCreds.Data[RequestKey] = o.offlineRequest
+		offlineRequest.Data[RequestKey] = o.offlineRequest
 	}
 
 	if o.finalizer != "" {
-		if sccCreds.Finalizers == nil {
-			sccCreds.Finalizers = []string{}
+		if offlineRequest.Finalizers == nil {
+			offlineRequest.Finalizers = []string{}
 		}
-		if !slices.Contains(sccCreds.Finalizers, o.finalizer) {
-			sccCreds.Finalizers = append(sccCreds.Finalizers, o.finalizer)
+		if !slices.Contains(offlineRequest.Finalizers, o.finalizer) {
+			offlineRequest.Finalizers = append(offlineRequest.Finalizers, o.finalizer)
 		}
 	}
 
+	if offlineRequest.Labels == nil {
+		offlineRequest.Labels = o.labels
+	} else {
+		maps.Copy(offlineRequest.Labels, o.labels)
+	}
+
 	if o.ownerRef != nil {
-		sccCreds.OwnerReferences = []metav1.OwnerReference{*o.ownerRef}
+		offlineRequest.OwnerReferences = []metav1.OwnerReference{*o.ownerRef}
 	}
 
 	var createOrUpdateErr error
 	if create {
-		_, createOrUpdateErr = o.secrets.Create(sccCreds)
+		_, createOrUpdateErr = o.secrets.Create(offlineRequest)
 	} else {
 		// TODO(alex): this was a hack that makes it work...which makes me think secretCache is root of issue?
-		curSccCreds, err := o.secrets.Get(o.secretNamespace, o.secretName, metav1.GetOptions{})
+		curOfflineRequest, err := o.secrets.Get(o.secretNamespace, o.secretName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		prepared := curSccCreds.DeepCopy()
-		prepared.Data = sccCreds.Data
-		prepared.OwnerReferences = sccCreds.OwnerReferences
-		prepared.Finalizers = sccCreds.Finalizers
-		prepared.Labels = sccCreds.Labels
+		prepared := curOfflineRequest.DeepCopy()
+		prepared.Data = offlineRequest.Data
+		prepared.OwnerReferences = offlineRequest.OwnerReferences
+		prepared.Finalizers = offlineRequest.Finalizers
+		prepared.Labels = offlineRequest.Labels
 
 		_, createOrUpdateErr = o.secrets.Update(prepared)
 	}

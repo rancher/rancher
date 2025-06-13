@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/offlinerequest"
+	"maps"
 	"time"
 
 	"github.com/rancher/rancher/pkg/scc/consts"
@@ -108,9 +109,16 @@ func Register(
 
 func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 	ref := registrationObj.ToOwnerRef()
+	nameSuffixHash := registrationObj.Labels[consts.LabelNameSuffix]
+
+	defaultLabels := map[string]string{
+		consts.LabelSccHash:      registrationObj.Labels[consts.LabelSccHash],
+		consts.LabelNameSuffix:   nameSuffixHash,
+		consts.LabelSccManagedBy: controllerID,
+	}
 
 	if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
-		offlineRequestSecretName := consts.OfflineRequestSecretName(registrationObj.Name)
+		offlineRequestSecretName := consts.OfflineRequestSecretName(nameSuffixHash)
 		return sccOfflineMode{
 			registration:       registrationObj,
 			log:                h.log.WithField("handler", "offline"),
@@ -122,11 +130,12 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 				ref,
 				h.secrets,
 				h.secretCache,
+				defaultLabels,
 			),
 		}
 	}
 
-	credsSecretName := consts.SCCCredentialsSecretName(registrationObj.Name)
+	credsSecretName := consts.SCCCredentialsSecretName(nameSuffixHash)
 	return sccOnlineMode{
 		registration: registrationObj,
 		log:          h.log.WithField("handler", "online"),
@@ -137,6 +146,7 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 			ref,
 			h.secrets,
 			h.secretCache,
+			defaultLabels,
 		),
 		systemInfoExporter: h.systemInfoExporter,
 		secrets:            h.secrets,
@@ -157,8 +167,13 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		return incomingObj, nil
 	}
 	if h.isRancherEntrypointSecret(incomingObj) {
+		if _, saltOk := incomingObj.GetLabels()[consts.LabelObjectSalt]; !saltOk {
+			return h.prepareSecretSalt(incomingObj)
+		}
+
+		/** incomingSalt := incomingObj.GetLabels()[consts.LabelObjectSalt] */
 		incomingHash := incomingObj.GetLabels()[consts.LabelSccHash]
-		params, err := extraRegistrationParamsFromSecret(incomingObj)
+		params, err := h.extraRegistrationParamsFromSecret(incomingObj)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
@@ -183,7 +198,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 
 		// If secret hash has changed make sure that we submit objects that correspond to that hash
 		// are cleaned up
-		if incomingHash != params.hash {
+		if incomingHash != params.contentHash {
 			if cleanUpErr := h.cleanupRegistrationByHash(incomingHash); cleanUpErr != nil {
 				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingHash, cleanUpErr)
 			}
@@ -195,6 +210,10 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			newSecret.Annotations = map[string]string{}
 		}
 		newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
+
+		labels := incomingObj.Labels
+		maps.Copy(labels, params.Labels())
+		newSecret.Labels = labels
 
 		_, updateErr := h.secrets.Update(newSecret)
 		if updateErr != nil {
@@ -365,7 +384,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	if registrationHandler.NeedsRegistration(registrationObj) {
 		progressingObj := registrationObj.DeepCopy()
-		if !v1.ResourceConditionProgressing.IsTrue(registrationObj) {
+		if !registrationObj.HasCondition(v1.ResourceConditionProgressing) || v1.ResourceConditionProgressing.IsFalse(registrationObj) {
 			// Set object to progressing
 			progressingUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				var err error
@@ -413,6 +432,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			return reconciledReg, err
 		}
 
+		setSystemId := false
 		switch announcedSystemId {
 		case suseconnect.OfflineRegistrationSystemId:
 			h.log.Debugf("SCC system ID cannot be known for offline until activation")
@@ -421,11 +441,14 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			announcedSystemId = suseconnect.RegistrationSystemId(*registrationObj.Status.SCCSystemId)
 		default:
 			h.log.Debugf("Annoucned System ID: %v", announcedSystemId)
-			regForAnnounce.Status.SCCSystemId = announcedSystemId.Ptr()
+			setSystemId = true
 		}
 
 		var prepareError error
 		// Prepare the Registration for Activation phase
+		if setSystemId {
+			regForAnnounce.Status.SCCSystemId = announcedSystemId.Ptr()
+		}
 		regForAnnounce, prepareError = registrationHandler.PrepareRegisteredForActivation(regForAnnounce)
 		if prepareError != nil {
 			return registrationObj, prepareError
@@ -525,10 +548,22 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		}
 	}
 
-	err := registrationHandler.Keepalive(registrationObj)
-	if err != nil {
-		// reconcile state
-		return nil, err
+	keepaliveErr := registrationHandler.Keepalive(registrationObj)
+	if keepaliveErr != nil {
+		var reconciledReg *v1.Registration
+		reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var retryErr, reconcileUpdateErr error
+			registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+			if retryErr != nil {
+				return retryErr
+			}
+			preparedObj := registrationHandler.ReconcileKeepaliveError(registrationObj, keepaliveErr)
+
+			reconciledReg, reconcileUpdateErr = h.registrations.Update(preparedObj)
+			return reconcileUpdateErr
+		})
+
+		return reconciledReg, reconcileErr
 	}
 
 	var heartbeatUpdated *v1.Registration

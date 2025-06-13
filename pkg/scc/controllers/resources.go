@@ -3,8 +3,10 @@ package controllers
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/scc/util"
 	"slices"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -16,6 +18,7 @@ import (
 const (
 	dataRegCode          = "regCode"
 	dataRegistrationType = "registrationType"
+	dataCertificate      = "certificate"
 )
 
 func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
@@ -25,33 +28,77 @@ func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
 	return true
 }
 
-func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
+func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, error) {
+	preparedSecret := secret.DeepCopy()
+	generatedSalt := util.NewSaltGen(nil, nil).GenerateSalt()
+
+	existingLabels := make(map[string]string)
+	if objLabels := secret.GetLabels(); objLabels != nil {
+		existingLabels = objLabels
+	}
+	existingLabels[consts.LabelObjectSalt] = generatedSalt
+	preparedSecret.SetLabels(existingLabels)
+
+	updatedSecret, updateErr := h.secrets.Update(preparedSecret)
+	if updateErr != nil {
+		h.log.Error("error applying metadata updates to default SCC registration secret; cannot initialize secret salt value")
+		return nil, updateErr
+	}
+
+	return updatedSecret, nil
+}
+
+func (h *handler) extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
+	incomingSalt := []byte(secret.GetLabels()[consts.LabelObjectSalt])
+
 	regMode := v1.RegistrationModeOnline
 	regType, ok := secret.Data[dataRegistrationType]
-	if ok && len(regType) > 0 {
+	if !ok || len(regType) == 0 {
+		h.log.Warnf("secret does not have the `%s` field, defaulting to %s", dataRegistrationType, regMode)
+	} else {
 		regMode = v1.RegistrationMode(regType)
 		if !regMode.Valid() {
-			return RegistrationParams{}, fmt.Errorf("invalid registration mode %s", string(regType))
+			return RegistrationParams{}, fmt.Errorf("invalid registration mode %s", string(regMode))
 		}
 	}
 
 	regCode, ok := secret.Data[dataRegCode]
-	if regMode == v1.RegistrationModeOnline && (!ok || len(regCode) == 0) {
-		return RegistrationParams{}, fmt.Errorf("secret does not have data %s", dataRegCode)
+	if !ok || len(regCode) == 0 {
+		warnOrErrText := fmt.Sprintf("secret does not have data %s; this is required in online mode", dataRegCode)
+		if regMode == v1.RegistrationModeOnline {
+			return RegistrationParams{}, errors.New(warnOrErrText)
+		} else {
+			h.log.Warnf(warnOrErrText)
+		}
 	}
+
+	offlineRegCert, certOk := secret.Data[dataCertificate]
+	// TODO: do we care to validate this; online shouldn't have this at all, offline has it eventually
+	// So it cannot be required for offline mode like RegCode is above, we could error online mode with it?
 
 	hasher := md5.New()
-	data := append([]byte(regMode), regCode...)
-	if _, err := hasher.Write(data); err != nil {
-		return RegistrationParams{}, err
-	}
+	nameData := append(incomingSalt, regType...)
+	data := append(nameData, regCode...)
+	data = append(data, offlineRegCert...)
 
-	id := hex.EncodeToString(hasher.Sum(nil))
+	// Generate a has for the name data
+	if _, err := hasher.Write(nameData); err != nil {
+		return RegistrationParams{}, fmt.Errorf("failed to hash name data: %v", err)
+	}
+	nameId := hex.EncodeToString(hasher.Sum(nil))
+
+	// Generate hash for the content data
+	if _, err := hasher.Write(data); err != nil {
+		return RegistrationParams{}, fmt.Errorf("failed to hash data: %v", err)
+	}
+	contentsId := hex.EncodeToString(hasher.Sum(nil))
 
 	return RegistrationParams{
-		hash:    id,
-		regCode: string(regCode),
-		regType: regMode,
+		regType:            regMode,
+		nameId:             nameId,
+		contentHash:        contentsId,
+		regCode:            string(regCode),
+		hasOfflineCertData: certOk && len(offlineRegCert) > 0,
 		secretRef: &corev1.SecretReference{
 			Name:      consts.ResourceSCCEntrypointSecretName,
 			Namespace: secret.Namespace,
@@ -60,15 +107,18 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 }
 
 type RegistrationParams struct {
-	hash      string
-	regCode   string
-	regType   v1.RegistrationMode
-	secretRef *corev1.SecretReference
+	regType            v1.RegistrationMode
+	nameId             string
+	contentHash        string
+	regCode            string
+	hasOfflineCertData bool
+	secretRef          *corev1.SecretReference
 }
 
 func (r RegistrationParams) Labels() map[string]string {
 	return map[string]string{
-		consts.LabelSccHash:      r.hash,
+		consts.LabelNameSuffix:   r.nameId,
+		consts.LabelSccHash:      r.contentHash,
 		consts.LabelSccManagedBy: consts.ManagedBySecretBroker,
 	}
 }
@@ -76,7 +126,7 @@ func (r RegistrationParams) Labels() map[string]string {
 func (h *handler) registrationFromSecretEntrypoint(
 	params RegistrationParams,
 ) (*v1.Registration, error) {
-	if params.regType != v1.RegistrationModeOnline && params.regType != v1.RegistrationModeOffline {
+	if !params.regType.Valid() {
 		return nil, fmt.Errorf(
 			"invalid registration type %s, must be one of %s or %s",
 			params.regType,
@@ -86,7 +136,7 @@ func (h *handler) registrationFromSecretEntrypoint(
 	}
 
 	// FIXME: lets figure how to generate better unique names
-	genName := fmt.Sprintf("scc-registration-%s", params.hash)
+	genName := fmt.Sprintf("scc-registration-%s", params.nameId)
 	var reg *v1.Registration
 	var err error
 
@@ -100,7 +150,7 @@ func (h *handler) registrationFromSecretEntrypoint(
 	}
 
 	reg.Labels = params.Labels()
-	reg.Spec = paramsToReg(params)
+	reg.Spec = paramsToRegSpec(params)
 	if !slices.Contains(reg.Finalizers, consts.FinalizerSccRegistration) {
 		if reg.Finalizers == nil {
 			reg.Finalizers = []string{}
@@ -110,11 +160,18 @@ func (h *handler) registrationFromSecretEntrypoint(
 	return reg, nil
 }
 
-func paramsToReg(params RegistrationParams) v1.RegistrationSpec {
-	return v1.RegistrationSpec{
+func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
+	regSpec := v1.RegistrationSpec{
 		Mode: params.regType,
-		RegistrationRequest: &v1.RegistrationRequest{
-			RegistrationCodeSecretRef: params.secretRef,
-		},
 	}
+
+	if params.regType == v1.RegistrationModeOnline {
+		regSpec.RegistrationRequest = &v1.RegistrationRequest{
+			RegistrationCodeSecretRef: params.secretRef,
+		}
+	} else if params.regType == v1.RegistrationModeOffline && params.hasOfflineCertData {
+		regSpec.OfflineRegistrationCertificateSecretRef = params.secretRef
+	}
+
+	return regSpec
 }

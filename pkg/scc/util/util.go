@@ -9,7 +9,9 @@ import (
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	"github.com/rancher/rancher/pkg/version"
 	corev1 "k8s.io/api/core/v1"
+	"math/rand"
 	"regexp"
+	"time"
 )
 
 const (
@@ -110,4 +112,41 @@ func JSONToBase64(data interface{}) ([]byte, error) {
 	base64.StdEncoding.Encode(output, jsonData)
 
 	return output, nil
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+type SaltGen struct {
+	randSrc     *rand.Rand
+	saltCharset string
+	charsetLen  int
+}
+
+func NewSaltGen(timeIn *time.Time, charsetIn *string) *SaltGen {
+	if timeIn == nil {
+		now := time.Now()
+		timeIn = &now
+	}
+	randSrc := rand.New(rand.NewSource(timeIn.UnixNano()))
+
+	setCharset := charset
+	if charsetIn != nil {
+		setCharset = *charsetIn
+	}
+
+	return &SaltGen{randSrc: randSrc, saltCharset: setCharset, charsetLen: len(setCharset)}
+}
+
+func (s *SaltGen) GenerateCharacter() uint8 {
+	randIndex := s.randSrc.Intn(s.charsetLen)
+	return s.saltCharset[randIndex]
+}
+
+func (s *SaltGen) GenerateSalt() string {
+	salt := make([]byte, 8)
+	for i := range salt {
+		salt[i] = s.GenerateCharacter()
+	}
+
+	return string(salt)
 }

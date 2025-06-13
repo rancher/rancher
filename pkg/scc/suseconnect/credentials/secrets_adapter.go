@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/SUSE/connect-ng/pkg/connection"
@@ -27,6 +28,7 @@ type CredentialSecretsAdapter struct {
 	secrets     v1core.SecretController
 	secretCache v1core.SecretCache
 	credentials SccCredentials
+	labels      map[string]string
 }
 
 func New(
@@ -35,6 +37,7 @@ func New(
 	ownerRef *metav1.OwnerReference,
 	secrets v1core.SecretController,
 	secretCache v1core.SecretCache,
+	labels map[string]string,
 ) *CredentialSecretsAdapter {
 	return &CredentialSecretsAdapter{
 		secretNamespace: namespace,
@@ -43,6 +46,7 @@ func New(
 		ownerRef:        ownerRef,
 		secrets:         secrets,
 		secretCache:     secretCache,
+		labels:          labels,
 	}
 }
 
@@ -114,7 +118,12 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 		}
 	}
 
-	// TODO: see if we can set labels on secrets too?
+	if sccCreds.Labels == nil {
+		sccCreds.Labels = c.labels
+	} else {
+		maps.Copy(sccCreds.Labels, c.labels)
+	}
+
 	if c.ownerRef != nil {
 		sccCreds.OwnerReferences = []metav1.OwnerReference{*c.ownerRef}
 	}

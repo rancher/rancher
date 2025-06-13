@@ -30,6 +30,8 @@ const (
 )
 
 const (
+	LabelObjectSalt       = "scc.cattle.io/instance-salt"
+	LabelNameSuffix       = "scc.cattle.io/related-name-suffix"
 	LabelSccHash          = "scc.cattle.io/scc-hash"
 	LabelSccLastProcessed = "scc.cattle.io/last-processsed"
 	LabelSccManagedBy     = "scc.cattle.io/managed-by"
