@@ -1,4 +1,4 @@
-apiVersion: cis.cattle.io/v1
+apiVersion: compliance.cattle.io/v1
 kind: ClusterScan
 metadata:
   name: scan

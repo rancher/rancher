@@ -1,0 +1,7 @@
+apiVersion: compliance.cattle.io/v1
+kind: ClusterScanBenchmark
+metadata:
+  name: benchmark-sample
+spec:
+  clusterProvider: k3s
+  minKubernetesVersion: 1.30.0
