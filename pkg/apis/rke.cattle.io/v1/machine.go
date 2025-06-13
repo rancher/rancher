@@ -8,9 +8,14 @@ import (
 )
 
 type RKECommonNodeConfig struct {
-	Labels                    map[string]string `json:"labels,omitempty"`
-	Taints                    []corev1.Taint    `json:"taints,omitempty"`
-	CloudCredentialSecretName string            `json:"cloudCredentialSecretName,omitempty"`
+	// Labels for the nodes in this pool.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Taints for the nodes in this pool.
+	// +optional
+	Taints                    []corev1.Taint `json:"taints,omitempty"`
+	CloudCredentialSecretName string         `json:"cloudCredentialSecretName,omitempty"`
 }
 
 type RKEMachineStatus struct {
