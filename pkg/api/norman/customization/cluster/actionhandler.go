@@ -74,36 +74,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.GenerateKubeconfigActionHandler(actionName, action, apiContext)
 	case v32.ClusterActionImportYaml:
 		return a.ImportYamlHandler(actionName, action, apiContext)
-	case v32.ClusterActionExportYaml:
-		return a.ExportYamlHandler(actionName, action, apiContext)
-	case v32.ClusterActionBackupEtcd:
-		if !canBackupEtcd(apiContext, apiContext.ID) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not backup etcd")
-		}
-		return a.BackupEtcdHandler(actionName, action, apiContext)
-	case v32.ClusterActionRestoreFromEtcdBackup:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not restore etcd backup")
-		}
-		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
-	case v32.ClusterActionRotateCertificates:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")
-		}
-		return a.RotateCertificates(actionName, action, apiContext)
-	case v32.ClusterActionRotateEncryptionKey:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate encryption key")
-		}
-		return a.RotateEncryptionKey(actionName, action, apiContext)
-	case v32.ClusterActionSaveAsTemplate:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")
-		}
-		if !canCreateClusterTemplate(a.SubjectAccessReviewClient, apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")
-		}
-		return a.saveAsTemplate(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }

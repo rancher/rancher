@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
@@ -72,7 +72,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			secrets: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: assemblers.SecretNamespace,
+						Namespace: secretmigrator.SecretNamespace,
 						Name:      "test-secret",
 					},
 					Data: map[string][]byte{

@@ -3,8 +3,8 @@ package cluster
 import (
 	"encoding/base64"
 	"encoding/json"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -78,15 +78,6 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 		return "", "", nil
 	}
 
-	cluster = cluster.DeepCopy()
-	// Only assemble ECR credential, for RKE1 private registries, the credential is stored in the correct format, and
-	// v2prov secrets won't be assembled because they are in the fleet workspace namespace of the cluster (currently this
-	// is always the "fleet-default" namespace)
-	cluster.Spec, err = assemblers.AssemblePrivateRegistryECRCredential(cluster.Spec.ClusterSecrets.PrivateRegistryECRSecret, assemblers.ClusterType, cluster.Name, cluster.Spec, secretLister)
-	if err != nil {
-		return "", "", err
-	}
-
 	// The PrivateRegistrySecret have the same name both for v1 or v2 provisioning clusters despite having different structures
 	registrySecretName := cluster.GetSecret(v3.ClusterPrivateRegistrySecret)
 
@@ -124,7 +115,7 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 				return rkeClusterRegistryOrGlobalSystemDefault.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
 			}
 			// If it doesn't exist (secret not found error) we need to check for a v2prov cluster.
-			if err != nil && !apierrors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				return rkeClusterRegistryOrGlobalSystemDefault.URL, "", err
 			}
 		}

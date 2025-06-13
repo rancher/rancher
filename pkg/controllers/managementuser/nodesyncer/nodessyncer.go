@@ -13,7 +13,6 @@ import (
 	cond "github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -22,7 +21,6 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -128,7 +126,6 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 
 	cluster.Core.Nodes("").Controller().AddHandler(ctx, "nodesSyncer", n.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machinesSyncer", m.sync)
-	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machinesLabelSyncer", m.syncLabels)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "cordonFieldsSyncer", m.syncCordonFields)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "drainNodeSyncer", d.drainNode)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machineTaintSyncer", m.syncTaints)
@@ -332,30 +329,6 @@ func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *apimgmtv3.Node, 
 	return m.updateNodeAndNode(node, obj)
 }
 
-func (m *nodesSyncer) syncLabels(_ string, obj *apimgmtv3.Node) (runtime.Object, error) {
-	if obj == nil {
-		return nil, nil
-	}
-
-	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
-	if err != nil || node == nil {
-		return nil, err
-	}
-
-	nodePlan, err := m.getNodePlan(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	node, obj, err = m.updateLabels(node, obj, nodePlan)
-	if err != nil {
-		return obj, err
-	}
-
-	_, obj, err = m.updateAnnotations(node, obj, nodePlan)
-	return obj, err
-}
-
 func onlyKubeLabels(key string) bool {
 	return strings.Contains(key, "kubernetes.io")
 }
@@ -399,51 +372,6 @@ func computeDelta(currentState map[string]string, planValues map[string]string, 
 	}
 
 	return result, changed
-}
-
-func (m *nodesSyncer) getNodePlan(node *apimgmtv3.Node) (rketypes.RKEConfigNodePlan, error) {
-	cluster, err := m.clusterLister.Get("", node.Namespace)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
-		return rketypes.RKEConfigNodePlan{}, nil
-	}
-
-	if node.Status.NodeConfig == nil {
-		return rketypes.RKEConfigNodePlan{}, nil
-	}
-
-	dockerInfo, err := librke.GetDockerInfo(node)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	hostAddress := node.Status.NodeConfig.Address
-	hostDockerInfo := dockerInfo[hostAddress]
-
-	svcOptions, err := m.getServiceOptions(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version, hostDockerInfo.OSType)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, *cluster.Status.AppliedSpec.DeepCopy(), m.secretLister)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-	plan, err := librke.New().GeneratePlan(context.Background(), appliedSpec.RancherKubernetesEngineConfig, dockerInfo, svcOptions)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	for _, nodePlan := range plan.Nodes {
-		if nodePlan.Address == node.Status.NodeConfig.Address {
-			return nodePlan, nil
-		}
-	}
-
-	return rketypes.RKEConfigNodePlan{}, nil
 }
 
 func (m *nodesSyncer) getServiceOptions(k8sVersion string, osType string) (map[string]interface{}, error) {

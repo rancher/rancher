@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -346,10 +345,6 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *apimgmtv3.Node) error {
 
 	// make a deep copy of the cluster, so we are not modifying the original cluster object
 	clusterCopy := cluster.DeepCopy()
-	clusterCopy.Spec, err = assemblers.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.secretLister)
-	if err != nil {
-		return err
-	}
 	err = m.authenticateRegistry(nodeDir, obj, clusterCopy)
 	if err != nil {
 		return err
