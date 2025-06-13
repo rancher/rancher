@@ -8,7 +8,6 @@ import (
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/audit/jsonpath"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -109,54 +108,6 @@ func redactData(secret map[string]any) bool {
 	}
 
 	return isRedacted
-}
-
-func redactSecretsFromBody(log *log, body map[string]any) error {
-	var err error
-
-	if body == nil {
-		return nil
-	}
-
-	isK8sProxyList := strings.HasPrefix(log.RequestURI, "/k8s/") && (body["kind"] != nil && body["kind"] == "SecretList")
-	isRegularList := body["type"] != nil && body["type"] == "collection"
-
-	if !(isK8sProxyList || isRegularList) {
-		redactData(body)
-
-		return nil
-	}
-
-	secretListItemsKey := "data"
-	if isK8sProxyList {
-		secretListItemsKey = "items"
-	}
-
-	if _, ok := body[secretListItemsKey]; !ok {
-		logrus.Debugf("auditLog: skipping data redaction of secret bodies in secret list: no key [%s] present, no data to redact", secretListItemsKey)
-		return nil
-	}
-
-	list, ok := body[secretListItemsKey].([]any)
-	if !ok {
-		logrus.Debugf("auditlog: redacting entire value for key [%s] in resopnse to URI [%s], unable to assert body is of type []any", secretListItemsKey, log.RequestURI)
-		body[secretListItemsKey] = redacted
-		return nil
-	}
-
-	for i, s := range list {
-		secret, ok := s.(map[string]any)
-		if !ok {
-			logrus.Debugf("auditlog: redacting entire value for key [%s] in response to URI [%s], unable to assert body is of type map[string]any", secretListItemsKey, log.RequestURI)
-			list[i] = redacted
-			continue
-		}
-
-		redactData(secret)
-		list[i] = secret
-	}
-
-	return err
 }
 
 func redactDataFromBody(log *log, body map[string]any, listKind string) bool {
