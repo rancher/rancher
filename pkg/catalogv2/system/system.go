@@ -43,7 +43,8 @@ var (
 
 type desiredKey struct {
 	namespace            string
-	name                 string
+	chartName            string
+	releaseName          string
 	minVersion           string
 	exactVersion         string
 	installImageOverride string
@@ -193,12 +194,12 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, ta
 
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
-				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
+			if err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.chartName, err)
 				time.Sleep(5 * time.Second)
 				continue
 			} else if err != nil {
-				logrus.Errorf("Failed to install system chart %s: %v", key.name, err)
+				logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
 				errs = append(errs, err)
 			}
 			break
@@ -235,12 +236,13 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
-func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
+func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
 				namespace:            namespace,
-				name:                 name,
+				chartName:            chartName,
+				releaseName:          releaseName,
 				minVersion:           minVersion,
 				exactVersion:         exactVersion,
 				installImageOverride: installImageOverride,
@@ -252,9 +254,9 @@ func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, value
 	return nil
 }
 
-func (m *Manager) Remove(namespace, name string) {
+func (m *Manager) Remove(namespace, releaseName string) {
 	for k := range m.desiredCharts {
-		if k.namespace == namespace && k.name == name {
+		if k.namespace == namespace && k.releaseName == releaseName {
 			delete(m.desiredCharts, k)
 		}
 	}
@@ -268,10 +270,14 @@ func (m *Manager) Remove(namespace, name string) {
 // If no version is provided, it will try to install the latest version available.
 // If a release with the version to be installed is already installed, or is pending install, upgrade or rollback, this
 // does nothing.
-func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
+func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", "", true)
 	if err != nil {
 		return err
+	}
+
+	if releaseName == "" {
+		releaseName = chartName
 	}
 
 	const latestVersionMatcher = ">=0-a" // latest - special syntax to match everything including pre-release builds
@@ -290,7 +296,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 
 	// This method from the Helm fork doesn't return an error when given a non-existent version, unfortunately.
 	// It instead returns the latest version in the index.
-	chart, err := index.Get(name, v)
+	chart, err := index.Get(chartName, v)
 	if err != nil {
 		// The helm library is using github.com/pkg/errors which is deprecated
 		return errors.New(err.Error())
@@ -301,7 +307,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	}
 
 	// If the chart version is already installed, we do nothing
-	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, minVersion, chart.Version, isExact, values)
+	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, releaseName, minVersion, chart.Version, isExact, values)
 	if err != nil {
 		return err
 	} else if installed {
@@ -310,7 +316,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 
 	// If the release is pending install, upgrade or rollback, we do nothing.
 	// If it's not, we proceed to create an operation
-	if ok, err := m.hasStatus(namespace, name, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback); err != nil {
+	if ok, err := m.hasStatus(namespace, releaseName, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback); err != nil {
 		return err
 	} else if ok {
 		return nil
@@ -345,9 +351,9 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		AutomaticCPTolerations: true,
 		Charts: []types.ChartUpgrade{
 			{
-				ChartName:   name,
+				ChartName:   chartName,
 				Version:     desiredVersion,
-				ReleaseName: name,
+				ReleaseName: releaseName,
 				Values:      desiredValue,
 				ResetValues: true,
 			},

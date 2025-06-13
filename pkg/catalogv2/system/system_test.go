@@ -409,7 +409,8 @@ func TestInstall(t *testing.T) {
 	asserts := assert.New(t)
 	type testInput struct {
 		namespace            string
-		name                 string
+		chartName            string
+		releaseName          string
 		minVersion           string
 		exactVersion         string
 		values               map[string]interface{}
@@ -451,7 +452,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should return error if the exact version of the chart does not exists",
 			input: testInput{
-				name:         "test-chart",
+				chartName:    "test-chart",
+				releaseName:  "test-chart",
 				exactVersion: "100.1.0+up0.6.1",
 			},
 			mocks: testMocks{
@@ -462,8 +464,9 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should do nothing if the chart is already installed",
 			input: testInput{
-				namespace: "test",
-				name:      "test-chart",
+				namespace:   "test",
+				chartName:   "test-chart",
+				releaseName: "test-chart",
 			},
 			mocks: testMocks{
 				indexOutput: mockIndex,
@@ -477,7 +480,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should return error if not able list helm releases",
 			input: testInput{
-				name: "test-chart",
+				chartName:   "test-chart",
+				releaseName: "test-chart",
 			},
 			mocks: testMocks{
 				indexOutput:              mockIndex,
@@ -488,9 +492,10 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should return error if the available chart version is lower than the min version",
 			input: testInput{
-				namespace:  "test",
-				name:       "test-chart",
-				minVersion: "102.0.0+up1.0.0",
+				namespace:   "test",
+				chartName:   "test-chart",
+				releaseName: "test-chart",
+				minVersion:  "102.0.0+up1.0.0",
 			},
 			mocks: testMocks{
 				indexOutput: &repo.IndexFile{
@@ -508,7 +513,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should do nothing if chart is pending upgrade, pending install or pending rollback",
 			input: testInput{
-				name: "test-chart",
+				chartName:   "test-chart",
+				releaseName: "test-chart",
 			},
 			mocks: testMocks{
 				indexOutput: mockIndex,
@@ -521,7 +527,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should return an error if it fails to create an upgrade operation",
 			input: testInput{
-				name: "test-chart",
+				chartName:   "test-chart",
+				releaseName: "test-chart",
 			},
 			mocks: testMocks{
 				indexOutput:  mockIndex,
@@ -532,7 +539,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should return nil after the operation pod finishes successfully",
 			input: testInput{
-				name: "test-chart",
+				chartName:   "test-chart",
+				releaseName: "test-chart",
 			},
 			mocks: testMocks{
 				indexOutput: mockIndex,
@@ -554,7 +562,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should return nil after the operation pod finishes successfully with exact version install",
 			input: testInput{
-				name:         "test-chart",
+				chartName:    "test-chart",
+				releaseName:  "test-chart",
 				exactVersion: "102.0.0+up1.0.0",
 			},
 			mocks: testMocks{
@@ -584,7 +593,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should add cp tolerations to values",
 			input: testInput{
-				name:          "test-chart",
+				chartName:     "test-chart",
+				releaseName:   "test-chart",
 				exactVersion:  "102.0.0+up1.0.0",
 				cpTolerations: []v1.Toleration{{Key: "foo", Value: "bar"}},
 			},
@@ -615,7 +625,8 @@ func TestInstall(t *testing.T) {
 		{
 			name: "Should not add cp tolerations to values if tolerations array is present in the provided values",
 			input: testInput{
-				name:         "test-chart",
+				chartName:    "test-chart",
+				releaseName:  "test-chart",
 				exactVersion: "102.0.0+up1.0.0",
 				values: map[string]interface{}{
 					"tolerations": []v1.Toleration{{Key: "foo2", Value: "bar2"}},
@@ -668,15 +679,15 @@ func TestInstall(t *testing.T) {
 			&mocks.ContentClient{}, &mocks.OperationClient{}, &mocks.PodClient{}, &mocks.SettingController{}, &mocks.HelmClient{}, &mocks.ClusterRepoController{}
 
 		contentMock.On("Index", "", "rancher-charts", "", true).Return(test.mocks.indexOutput, test.mocks.indexError)
-		helmMock.On("ListReleases", test.input.namespace, test.input.name, action.ListDeployed).Return(test.mocks.isInstalledReleasesOutput, test.mocks.isInstalledReleasesError)
-		helmMock.On("ListReleases", test.input.namespace, test.input.name, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback).Return(test.mocks.hasStatusOutput, test.mocks.hasStatusError)
+		helmMock.On("ListReleases", test.input.namespace, test.input.releaseName, action.ListDeployed).Return(test.mocks.isInstalledReleasesOutput, test.mocks.isInstalledReleasesError)
+		helmMock.On("ListReleases", test.input.namespace, test.input.releaseName, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback).Return(test.mocks.hasStatusOutput, test.mocks.hasStatusError)
 		opsMock.On("Upgrade", context.TODO(), installUser, "", "rancher-charts", UpgradeActionMatcher, test.input.installImageOverride).Return(test.mocks.upgradeOutput, test.mocks.upgradeError)
 		opsMock.On("AddCpTaintsToTolerations", []v1.Toleration(nil)).Return(test.input.cpTolerations, nil)
 		if test.mocks.podGetOutput != nil || test.mocks.podGetError != nil {
 			podsMock.On("Get", test.mocks.upgradeOutput.Status.PodNamespace, test.mocks.upgradeOutput.Status.PodName, metav1.GetOptions{}).Return(test.mocks.podGetOutput, test.mocks.podGetError)
 		}
 		manager, _ := NewManager(context.TODO(), contentMock, opsMock, podsMock, settingsMock, clusterRepoMock, helmMock)
-		err := manager.install(test.input.namespace, test.input.name, test.input.minVersion, test.input.exactVersion, test.input.values, test.input.takeOwnership, test.input.installImageOverride)
+		err := manager.install(test.input.namespace, test.input.chartName, test.input.releaseName, test.input.minVersion, test.input.exactVersion, test.input.values, test.input.takeOwnership, test.input.installImageOverride)
 		if test.expected == nil {
 			asserts.Nil(err, test.name)
 		} else {

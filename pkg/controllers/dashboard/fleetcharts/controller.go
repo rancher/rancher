@@ -22,14 +22,17 @@ const priorityClassKey = "priorityClassName"
 var (
 	fleetCRDChart = chart.Definition{
 		ReleaseNamespace: fleetconst.ReleaseNamespace,
+		ReleaseName:      fleetconst.CRDChartName,
 		ChartName:        fleetconst.CRDChartName,
 	}
 	fleetChart = chart.Definition{
 		ReleaseNamespace: fleetconst.ReleaseNamespace,
+		ReleaseName:      fleetconst.ChartName,
 		ChartName:        fleetconst.ChartName,
 	}
 	fleetUninstallChart = chart.Definition{
 		ReleaseNamespace: fleetconst.ReleaseLegacyNamespace,
+		ReleaseName:      fleetconst.ChartName,
 		ChartName:        fleetconst.ChartName,
 	}
 
@@ -78,7 +81,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 
 	h.Lock()
-	if err := h.manager.Uninstall(fleetUninstallChart.ReleaseNamespace, fleetUninstallChart.ChartName); err != nil {
+	if err := h.manager.Uninstall(fleetUninstallChart.ReleaseNamespace, fleetUninstallChart.ReleaseName); err != nil {
 		h.Unlock()
 		return nil, err
 	}
@@ -93,6 +96,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	err := h.manager.Ensure(
 		fleetCRDChart.ReleaseNamespace,
 		fleetCRDChart.ChartName,
+		fleetCRDChart.ReleaseName,
 		fleetVersion,
 		"",
 		nil,
@@ -149,6 +153,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		h.manager.Ensure(
 			fleetChart.ReleaseNamespace,
 			fleetChart.ChartName,
+			fleetChart.ReleaseName,
 			fleetVersion,
 			"",
 			fleetChartValues,
