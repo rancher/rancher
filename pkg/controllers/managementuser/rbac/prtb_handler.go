@@ -304,20 +304,43 @@ func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTempla
 	}
 
 	if rbac.RulesAllow(psaRec, prtbRoleTemplate.Rules...) {
-		// delete CR and CRB for the given project
-		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
-		err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("error deleting clusterrole %v: %w", psaCRName, err)
-		}
+		// delete the ClusterRoleBinding first
+		// if ClusterRole is not used by other ClusterRoleBindings:
+		// then delete the ClusterRole
+		// skip the deletion otherwhise
 		psaCRBName := fmt.Sprintf("%s-updatepsa", projectName)
 		err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
 		}
+		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
+		isUsed := p.isClusterRoleUsed(psaCRName)
+		if !isUsed {
+			err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("error deleting clusterrole %v: %w", psaCRName, err)
+			}
+		}
 	}
 
 	return nil
+}
+
+// IsClusterRoleUsed checks if a ClusterRole is referenced by any ClusterRoleBinding
+func (p *prtbLifecycle) isClusterRoleUsed(clusterRoleName string) bool {
+	bindings, err := p.crbClient.List(metav1.ListOptions{})
+	if err != nil {
+		return false
+	}
+
+	var usingBindings []string
+	for _, binding := range bindings.Items {
+		if binding.RoleRef.Kind == "ClusterRole" && binding.RoleRef.Name == clusterRoleName {
+			usingBindings = append(usingBindings, binding.Name)
+		}
+	}
+
+	return len(usingBindings) > 0
 }
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
