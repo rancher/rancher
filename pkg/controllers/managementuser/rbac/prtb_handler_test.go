@@ -15,7 +15,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type prtbTestState struct {
@@ -96,192 +95,22 @@ func setupPRTBTest(t *testing.T) prtbTestState {
 	return state
 }
 
-func Test_manager_checkForGlobalResourceRules(t *testing.T) {
-	type tests struct {
-		name     string
-		role     *v3.RoleTemplate
-		resource string
-		baseRule rbacv1.PolicyRule
-		want     sets.Set[string]
+var (
+	defaultRule = rbacv1.PolicyRule{
+		Resources:     []string{"myresource"},
+		Verbs:         []string{"list", "delete"},
+		APIGroups:     []string{"management.cattle.io"},
+		ResourceNames: []string{"local"},
 	}
-
-	testCases := []tests{
-		{
-			name: "valid_api_group_persistentvolumes",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"put"},
-						APIGroups: []string{""},
-						Resources: []string{"persistentvolumes"},
-					},
-				},
-			},
-			resource: "persistentvolumes",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New("put"),
-		},
-		{
-			name: "invalid_api_group_persistentvolumes",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"put"},
-						APIGroups: []string{"foo"},
-						Resources: []string{"persistentvolumes"},
-					},
-				},
-			},
-			resource: "persistentvolumes",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New[string](),
-		},
-		{
-			name: "valid_api_group_storageclasses",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"put"},
-						APIGroups: []string{"storage.k8s.io"},
-						Resources: []string{"storageclasses"},
-					},
-				},
-			},
-			resource: "storageclasses",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New("put"),
-		},
-		{
-			name: "invalid_api_group_storageclasses",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"put"},
-						APIGroups: []string{"foo"},
-						Resources: []string{"storageclasses"},
-					},
-				},
-			},
-			resource: "storageclasses",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New[string](),
-		},
-		{
-			name: "valid_api_group_start",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"put"},
-						APIGroups: []string{""},
-						Resources: []string{"*"},
-					},
-				},
-			},
-			resource: "persistentvolumes",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New("put"),
-		},
-		{
-			name: "invalid_api_group_star",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"put"},
-						APIGroups: []string{"foo"},
-						Resources: []string{"*"},
-					},
-				},
-			},
-			resource: "persistentvolumes",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New[string](),
-		},
-		{
-			name: "cluster_rule_match",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"get"},
-						APIGroups: []string{"management.cattle.io"},
-						Resources: []string{"clusters"},
-					},
-				},
-			},
-			resource: "clusters",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New("get"),
-		},
-		{
-			name: "cluster_rule_resource_names_match",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:         []string{"get"},
-						APIGroups:     []string{"management.cattle.io"},
-						Resources:     []string{"clusters"},
-						ResourceNames: []string{"local"},
-					},
-				},
-			},
-			resource: "clusters",
-			baseRule: rbacv1.PolicyRule{
-				ResourceNames: []string{"local"},
-			},
-			want: sets.New("get"),
-		},
-		{
-			name: "cluster_rule_baserule_resource_names_no_match",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"get"},
-						APIGroups: []string{"management.cattle.io"},
-						Resources: []string{"clusters"},
-					},
-				},
-			},
-			resource: "clusters",
-			baseRule: rbacv1.PolicyRule{
-				ResourceNames: []string{"local"},
-			},
-			want: sets.New[string](),
-		},
-		{
-			name: "cluster_rule_roletemplate_resource_names_no_match",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:         []string{"get"},
-						APIGroups:     []string{"management.cattle.io"},
-						Resources:     []string{"clusters"},
-						ResourceNames: []string{"local"},
-					},
-				},
-			},
-			resource: "clusters",
-			baseRule: rbacv1.PolicyRule{},
-			want:     sets.New[string](),
-		},
-	}
-
-	m := &manager{}
-
-	for _, test := range testCases {
-		got, err := m.checkForGlobalResourceRules(test.role, test.resource, test.baseRule)
-		assert.Nil(t, err)
-		assert.Equal(t, test.want, got, fmt.Sprintf("test %v failed", test.name))
-	}
-}
+)
 
 func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 	// discard logs to avoid cluttering
 	logrus.SetOutput(io.Discard)
 
 	type args struct {
-		resource string
-		rtName   string
-		newVerbs sets.Set[string]
-		baseRule rbacv1.PolicyRule
+		rtName        string
+		promotedRules []rbacv1.PolicyRule
 	}
 
 	tests := []struct {
@@ -292,6 +121,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 		clusterRolesMockCreateErr    error
 		clusterRolesMockUpdateResult *v1.ClusterRole
 		clusterRolesMockUpdateErr    error
+		clusterRolesMockDeleteErr    error
 		args                         args
 		want                         string
 		wantErr                      bool
@@ -306,8 +136,8 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 		{
 			name: "failing create will return an error",
 			args: args{
-				rtName:   "myrole",
-				newVerbs: sets.New("get", "list"),
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetErr:        errNotFound,
 			clusterRolesMockCreateErr: errors.New("something bad happened"),
@@ -316,8 +146,8 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 		{
 			name: "reconciling non existing ClusterRole with no verbs is no-op",
 			args: args{
-				rtName:   "myrole",
-				newVerbs: sets.New[string](),
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{},
 			},
 			crListerMockGetErr: errNotFound,
 			want:               "",
@@ -325,64 +155,37 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 		{
 			name: "existing ClusterRole will not update if no need to reconcile",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New("list", "delete"),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetResult: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "myrole-promoted",
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						ResourceNames: []string{"local"},
-						Resources:     []string{"myresource"},
-						Verbs:         []string{"list", "delete"},
-					},
-				},
+				Rules: []rbacv1.PolicyRule{defaultRule},
 			},
 			want: "myrole-promoted",
 		},
 		{
 			name: "non existing ClusterRole will create a new promoted ClusterRole",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New("get", "list"),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetErr: errNotFound,
 			clusterRolesMockCreateResult: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "myrole-promoted",
 				},
-				Rules: []rbacv1.PolicyRule{{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-					Resources:     []string{"myresource"},
-					Verbs:         []string{"get", "list"},
-				}},
+				Rules: []rbacv1.PolicyRule{defaultRule},
 			},
 			want: "myrole-promoted",
 		},
 		{
-			name: "existing ClusterRole will update it adding missing rules",
+			name: "existing ClusterRole will update if adding missing rules",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New("list", "delete"),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetResult: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -401,33 +204,15 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "myrole-promoted",
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						ResourceNames: []string{"local"},
-						Resources:     []string{"another"},
-						Verbs:         []string{"get", "list"},
-					},
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						ResourceNames: []string{"local"},
-						Resources:     []string{"myresource"},
-						Verbs:         []string{"delete", "list"},
-					},
-				},
+				Rules: []rbacv1.PolicyRule{defaultRule},
 			},
 			want: "myrole-promoted",
 		},
 		{
-			name: "existing ClusterRole will update it",
+			name: "clusterRole with extra rules will remove them",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New("list", "delete"),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetResult: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -452,33 +237,15 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "myrole-promoted",
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"another.cattle.io"},
-						ResourceNames: []string{"foobar"},
-						Resources:     []string{"nodes"},
-						Verbs:         []string{"create"},
-					},
-					{
-						APIGroups:     []string{"management.cattle.io"},
-						ResourceNames: []string{"local"},
-						Resources:     []string{"myresource"},
-						Verbs:         []string{"delete", "list"},
-					},
-				},
+				Rules: []rbacv1.PolicyRule{defaultRule},
 			},
 			want: "myrole-promoted",
 		},
 		{
 			name: "removing verbs from policy will remove the rule",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New[string](),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetResult: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -503,27 +270,15 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "myrole-promoted",
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups:     []string{"another.cattle.io"},
-						ResourceNames: []string{"foobar"},
-						Resources:     []string{"nodes"},
-						Verbs:         []string{"create"},
-					},
-				},
+				Rules: []rbacv1.PolicyRule{defaultRule},
 			},
 			want: "myrole-promoted",
 		},
 		{
 			name: "get fail will return an error",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New("get", "list"),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetErr: errors.New("get failed"),
 			wantErr:            true,
@@ -531,13 +286,8 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 		{
 			name: "update fail will return an error",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New("list", "delete"),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{defaultRule},
 			},
 			crListerMockGetResult: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -556,34 +306,15 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			wantErr:                   true,
 		},
 		{
-			name: "baserule with resourcenames and no newverbs does not update clusterrole",
+			name: "promoted clusterrole exists, but no promotedrules. delete clusterrole",
 			args: args{
-				rtName:   "myrole",
-				resource: "clusters",
-				newVerbs: sets.New[string](),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName:        "myrole",
+				promotedRules: []rbacv1.PolicyRule{},
 			},
-			crListerMockGetResult: &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "myrole-promoted",
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{"storage.k8s.io"},
-						Resources: []string{"storageclasses"},
-						Verbs:     []string{"*"},
-					},
-					{
-						APIGroups: []string{"", "core"},
-						Resources: []string{"persistentvolumes"},
-						Verbs:     []string{"*"},
-					},
-				},
-			},
-			want: "myrole-promoted",
+			crListerMockGetErr:        errNotFound,
+			clusterRolesMockDeleteErr: nil,
+			wantErr:                   false,
+			want:                      "",
 		},
 	}
 
@@ -605,6 +336,9 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
 					return in1, tc.clusterRolesMockUpdateErr
 				},
+				DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+					return tc.clusterRolesMockDeleteErr
+				},
 			}
 
 			manager := manager{
@@ -612,7 +346,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				clusterRoles: clusterRolesMock,
 			}
 
-			got, err := manager.reconcileRoleForProjectAccessToGlobalResource(tc.args.resource, tc.args.rtName, tc.args.newVerbs, tc.args.baseRule)
+			got, err := manager.reconcileRoleForProjectAccessToGlobalResource(tc.args.rtName, tc.args.promotedRules)
 			assert.Equal(t, tc.want, got)
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -652,6 +386,15 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				if tc.clusterRolesMockUpdateErr == nil {
 					assert.Equal(t, tc.clusterRolesMockUpdateResult, results[0].In1)
 				}
+			}
+
+			// if nil the method should have not been called
+			if tc.clusterRolesMockDeleteErr == nil {
+				assert.Empty(t, clusterRolesMock.DeleteCalls())
+			} else {
+				// otherwise only one call to Delete is expected
+				results := clusterRolesMock.DeleteCalls()
+				assert.Len(t, results, 1)
 			}
 		})
 	}

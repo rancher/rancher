@@ -2,16 +2,15 @@ package roletemplates
 
 import (
 	"errors"
+	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/slice"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -68,7 +67,7 @@ func (rth *roleTemplateHandler) clusterRolesForRoleTemplate(rt *v3.RoleTemplate)
 		// ClusterRoles for promoted rules
 		var promotedClusterRoles []*rbacv1.ClusterRole
 		var err error
-		promotedClusterRoles, rt.Rules, err = rth.buildPromotedClusterRoles(rt)
+		promotedClusterRoles, err = rth.buildPromotedClusterRoles(rt)
 		if err != nil {
 			return nil, err
 		}
@@ -115,19 +114,19 @@ func (rth *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.Rol
 
 // buildPromotedClusterRoles looks for promoted rules in a project role template and creates required promoted cluster roles.
 // It also returns the role template rules with the promoted rules removed.
-func (rth *roleTemplateHandler) buildPromotedClusterRoles(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, []rbacv1.PolicyRule, error) {
+func (rth *roleTemplateHandler) buildPromotedClusterRoles(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, error) {
 	clusterRoles := []*rbacv1.ClusterRole{}
 
-	promotedRules, rules := extractPromotedRules(rt.Rules)
+	promotedRules := ExtractPromotedRules(rt.Rules)
 
 	inheritedPromotedRules, err := rth.areThereInheritedPromotedRules(rt.RoleTemplateNames)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// If there are no promoted rules and no inherited RoleTemplates with promoted rules, no need for additional cluster roles
 	if len(promotedRules) == 0 && !inheritedPromotedRules {
-		return clusterRoles, rules, nil
+		return clusterRoles, nil
 	}
 
 	if len(promotedRules) != 0 {
@@ -138,7 +137,7 @@ func (rth *roleTemplateHandler) buildPromotedClusterRoles(rt *v3.RoleTemplate) (
 	// If there are promoted rules or inherited promoted rules, an aggregating cluster role will be what PRTBs bind to.
 	clusterRoles = append(clusterRoles, rbac.BuildAggregatingClusterRole(rt, rbac.PromotedClusterRoleNameFor))
 
-	return clusterRoles, rules, nil
+	return clusterRoles, nil
 }
 
 // areThereInheritedPromotedRules checks if any of the inherited RoleTemplates contain promoted rules. If none do, return false.
@@ -164,35 +163,38 @@ var promotedRulesForProjects = map[string]string{
 	"clusters":          "management.cattle.io",
 }
 
-// extractPromotedRules filters a list of PolicyRules for promoted rules for projects and returns the list of promoted rules
-// and the original rules without promoted rules.
-func extractPromotedRules(rules []rbacv1.PolicyRule) ([]rbacv1.PolicyRule, []rbacv1.PolicyRule) {
+// ExtractPromotedRules filters a list of PolicyRules for promoted rules for projects and returns the list of promoted rules.
+func ExtractPromotedRules(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
 	promotedRules := []rbacv1.PolicyRule{}
-	nonPromotedRules := []rbacv1.PolicyRule{}
-	for _, r := range rules {
-		rulePromoted := false
+	for _, rule := range rules {
 		for resource, apigroup := range promotedRulesForProjects {
-			ruleCopy := r
-			if slice.ContainsString(r.Resources, resource) || slice.ContainsString(r.Resources, rbacv1.ResourceAll) {
-				ruleCopy.Resources = []string{resource}
-				if slice.ContainsString(r.APIGroups, apigroup) || slice.ContainsString(r.APIGroups, rbacv1.APIGroupAll) {
-					ruleCopy.APIGroups = []string{apigroup}
-					// the only cluster that can be provided is the local cluster
-					if resource == "clusters" {
-						ruleCopy.ResourceNames = []string{"local"}
-					}
-					rulePromoted = true
-					promotedRules = append(promotedRules, ruleCopy)
-					continue
+			// Check if the rule contains the resource and apigroup of a global resource
+			resourceMatch := slices.Contains(rule.Resources, resource) || slices.Contains(rule.Resources, rbacv1.ResourceAll)
+			apiGroupMatch := slices.Contains(rule.APIGroups, apigroup) || slices.Contains(rule.APIGroups, rbacv1.APIGroupAll)
+
+			if resourceMatch && apiGroupMatch {
+				// Create our promoted rule for the specific global resource
+				promotedRule := rbacv1.PolicyRule{
+					Resources:     []string{resource},
+					APIGroups:     []string{apigroup},
+					Verbs:         rule.Verbs,
+					ResourceNames: rule.ResourceNames,
 				}
+
+				// the only cluster that can be provided is the local cluster
+				if resource == "clusters" {
+					// we only care about the ResourceName "local"
+					if len(rule.ResourceNames) != 0 && !slices.Contains(rule.ResourceNames, "local") {
+						continue
+					}
+					promotedRule.ResourceNames = []string{"local"}
+				}
+				promotedRules = append(promotedRules, promotedRule)
+				continue
 			}
 		}
-		// If the rule is not a promoted rule, or contains * as Resource or APIGroup, return it as the rest of the rules
-		if !rulePromoted || slice.ContainsString(r.Resources, rbacv1.ResourceAll) || slice.ContainsString(r.APIGroups, rbacv1.APIGroupAll) {
-			nonPromotedRules = append(nonPromotedRules, r)
-		}
 	}
-	return promotedRules, nonPromotedRules
+	return promotedRules
 }
 
 // addLabelToExternalRole ensures the external role has the right aggregation label.
@@ -202,7 +204,7 @@ func (rth *roleTemplateHandler) addLabelToExternalRole(rt *v3.RoleTemplate) erro
 		return nil
 	}
 
-	externalRole, err := rth.crController.Get(rt.Name, v1.GetOptions{})
+	externalRole, err := rth.crController.Get(rt.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -231,7 +233,7 @@ func (rth *roleTemplateHandler) removeLabelFromExternalRole(rt *v3.RoleTemplate)
 		return nil
 	}
 
-	externalRole, err := rth.crController.Get(rt.Name, v1.GetOptions{})
+	externalRole, err := rth.crController.Get(rt.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
