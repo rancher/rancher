@@ -213,7 +213,8 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 
 	// verify existing ClusterRole has the correct updatepsa rules
 	if !reflect.DeepEqual(psaCR.Rules, psaCRWanted.Rules) {
-		return fmt.Errorf("%s rules do not grant required updatepsa permissions", psaCRName)
+		// if the CR have been modified, restore it
+		psaCR = addUpdatepsaClusterRole(projectName)
 	}
 
 	// create ClusterRoleBinding to bind the ClusterRole to the user/group
