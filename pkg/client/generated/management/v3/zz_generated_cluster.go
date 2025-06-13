@@ -185,9 +185,21 @@ type ClusterOperations interface {
 	ByID(id string) (*Cluster, error)
 	Delete(container *Cluster) error
 
+	ActionBackupEtcd(resource *Cluster) error
+
+	ActionExportYaml(resource *Cluster) (*ExportOutput, error)
+
 	ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error)
 
 	ActionImportYaml(resource *Cluster, input *ImportClusterYamlInput) (*ImportYamlOutput, error)
+
+	ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error
+
+	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
+
+	ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error)
+
+	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
 }
 
 func newClusterClient(apiClient *Client) *ClusterClient {
@@ -259,6 +271,17 @@ func (c *ClusterClient) Delete(container *Cluster) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterType, &container.Resource)
 }
 
+func (c *ClusterClient) ActionBackupEtcd(resource *Cluster) error {
+	err := c.apiClient.Ops.DoAction(ClusterType, "backupEtcd", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ClusterClient) ActionExportYaml(resource *Cluster) (*ExportOutput, error) {
+	resp := &ExportOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "exportYaml", &resource.Resource, nil, resp)
+	return resp, err
+}
+
 func (c *ClusterClient) ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error) {
 	resp := &GenerateKubeConfigOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "generateKubeconfig", &resource.Resource, nil, resp)
@@ -268,5 +291,28 @@ func (c *ClusterClient) ActionGenerateKubeconfig(resource *Cluster) (*GenerateKu
 func (c *ClusterClient) ActionImportYaml(resource *Cluster, input *ImportClusterYamlInput) (*ImportYamlOutput, error) {
 	resp := &ImportYamlOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "importYaml", &resource.Resource, input, resp)
+	return resp, err
+}
+
+func (c *ClusterClient) ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error {
+	err := c.apiClient.Ops.DoAction(ClusterType, "restoreFromEtcdBackup", &resource.Resource, input, nil)
+	return err
+}
+
+func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error) {
+	resp := &RotateCertificateOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, resp)
+	return resp, err
+}
+
+func (c *ClusterClient) ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error) {
+	resp := &RotateEncryptionKeyOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "rotateEncryptionKey", &resource.Resource, nil, resp)
+	return resp, err
+}
+
+func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error) {
+	resp := &SaveAsTemplateOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "saveAsTemplate", &resource.Resource, input, resp)
 	return resp, err
 }
