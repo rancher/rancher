@@ -75,10 +75,11 @@ func (rf RedactFunc) Redact(log *log) error {
 }
 
 var (
-	secretBaseType = regexp.MustCompile("^[A-Za-z]*[S|s]ecret$")
+	secretBaseType    = regexp.MustCompile("^[A-Za-z]*[S|s]ecret$")
+	configmapBaseType = regexp.MustCompile("^[A-Za-z]*[C|c]onfig[M|m]ap$")
 )
 
-func redactSingleSecret(secret map[string]any) {
+func redactData(secret map[string]any) bool {
 	var isRedacted bool
 
 	if secret["data"] != nil {
@@ -92,7 +93,7 @@ func redactSingleSecret(secret map[string]any) {
 	}
 
 	if isRedacted {
-		return
+		return isRedacted
 	}
 
 	for key := range secret {
@@ -106,6 +107,8 @@ func redactSingleSecret(secret map[string]any) {
 
 		secret[key] = redacted
 	}
+
+	return isRedacted
 }
 
 func redactSecretsFromBody(log *log, body map[string]any) error {
@@ -119,7 +122,7 @@ func redactSecretsFromBody(log *log, body map[string]any) error {
 	isRegularList := body["type"] != nil && body["type"] == "collection"
 
 	if !(isK8sProxyList || isRegularList) {
-		redactSingleSecret(body)
+		redactData(body)
 
 		return nil
 	}
@@ -149,35 +152,84 @@ func redactSecretsFromBody(log *log, body map[string]any) error {
 			continue
 		}
 
-		redactSingleSecret(secret)
+		redactData(secret)
 		list[i] = secret
 	}
 
 	return err
 }
 
-func checkForSecretBasetype(k string, v any) bool {
-	s, ok := v.(string)
-	if !ok {
+func redactDataFromBody(log *log, body map[string]any, listKind string) bool {
+	var changed bool
+
+	isK8sProxyList := strings.HasPrefix(log.RequestURI, "/k8s") && (body["kind"] != nil && body["kind"] == listKind)
+	isRegularList := body["type"] != nil && body["type"] == "collection"
+
+	if !(isK8sProxyList || isRegularList) {
+		redactData(body)
 		return false
 	}
 
-	return k == "baseType" && secretBaseType.MatchString(s)
+	var itemsKey string
+	if isRegularList {
+		itemsKey = "data"
+	} else {
+		itemsKey = "items"
+	}
+
+	itemsList, ok := body[itemsKey].([]any)
+	if !ok {
+		body[itemsKey] = redacted
+		return true
+	}
+
+	for i, item := range itemsList {
+		m, ok := item.(map[string]any)
+		if !ok {
+			itemsList[i] = redacted
+		}
+
+		changed = redactData(m) || changed
+		itemsList[i] = m
+	}
+
+	if changed {
+		body[itemsKey] = itemsList
+	}
+
+	return changed
+}
+
+func checkForBasetype(pattern *regexp.Regexp) func(string, any) bool {
+	return func(k string, v any) bool {
+		s, ok := v.(string)
+		if !ok {
+			return false
+		}
+
+		return k == "baseType" && pattern.MatchString(s)
+	}
 }
 
 func redactSecret(log *log) error {
-	var err error
-
-	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.RequestBody, checkForSecretBasetype) {
-		if err = redactSecretsFromBody(log, log.RequestBody); err != nil {
-			return err
-		}
+	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.RequestBody, checkForBasetype(secretBaseType)) {
+		redactDataFromBody(log, log.RequestBody, "SecretList")
 	}
 
-	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.RequestBody, checkForSecretBasetype) {
-		if err = redactSecretsFromBody(log, log.ResponseBody); err != nil {
-			return err
-		}
+	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.ResponseBody, checkForBasetype(secretBaseType)) {
+		redactDataFromBody(log, log.RequestBody, "SecretList")
+	}
+
+	return nil
+}
+
+func redactConfigMap(log *log) error {
+	if strings.Contains(log.RequestURI, "configmaps") || pairMatches(log.RequestBody, checkForBasetype(configmapBaseType)) {
+		redactDataFromBody(log, log.RequestBody, "ConfigMapList")
+	}
+
+	if strings.Contains(log.RequestURI, "configmaps") || pairMatches(log.ResponseBody, checkForBasetype(configmapBaseType)) {
+		redactDataFromBody(log, log.ResponseBody, "ConfigMapList")
 	}
 
 	return nil
@@ -226,4 +278,12 @@ func regexRedactor(patterns []string) (Redactor, error) {
 		redactMap(regexes, log.ResponseBody)
 		return nil
 	}), nil
+}
+
+func redactImportUrl(l *log) error {
+	if strings.HasPrefix(l.RequestURI, "/v3/import") {
+		l.RequestURI = "/v3/import/" + redacted
+	}
+
+	return nil
 }
