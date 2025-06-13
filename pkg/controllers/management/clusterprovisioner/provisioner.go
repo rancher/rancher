@@ -2,7 +2,6 @@ package clusterprovisioner
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
@@ -17,7 +16,6 @@ import (
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
@@ -26,7 +24,6 @@ import (
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/kontainerdriver"
-	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
@@ -104,13 +101,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	rkeDriver.DockerDialer = docker.Build
 	rkeDriver.LocalDialer = local.Build
 	rkeDriver.WrapTransportFactory = docker.WrapTransport
-	mgmt := management.Management
-	rkeDriver.DataStore = NewDataStore(mgmt.RkeAddons("").Controller().Lister(),
-		mgmt.RkeAddons(""),
-		mgmt.RkeK8sServiceOptions("").Controller().Lister(),
-		mgmt.RkeK8sServiceOptions(""),
-		mgmt.RkeK8sSystemImages("").Controller().Lister(),
-		mgmt.RkeK8sSystemImages(""))
 }
 
 func skipOperatorCluster(action string, cluster *apimgmtv3.Cluster) bool {
@@ -807,12 +797,6 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, d
 			spec.RancherKubernetesEngineConfig.Nodes = nodes
 		}
 
-		systemImages, err := p.getSystemImages(spec)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		spec.RancherKubernetesEngineConfig.SystemImages = *systemImages
 		data, _ := convert.EncodeToMap(spec)
 		v, _ = data[RKEDriverKey]
 	}
@@ -852,45 +836,6 @@ func (p *Provisioner) validateDriver(cluster *apimgmtv3.Cluster) (string, error)
 	}
 
 	return newDriver, nil
-}
-
-func (p *Provisioner) getSystemImages(spec apimgmtv3.ClusterSpec) (*rketypes.RKESystemImages, error) {
-	version := spec.RancherKubernetesEngineConfig.Version
-	if version == "" {
-		return nil, fmt.Errorf("kubernetes version (spec.rancherKubernetesEngineConfig.kubernetesVersion) is unset")
-	}
-	// fetch system images from settings
-	systemImages, err := kd.GetRKESystemImages(version, p.RKESystemImagesLister, p.RKESystemImages)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find system images for version %s: %v", version, err)
-	}
-
-	privateRegistry := util.GetPrivateRegistryURL(&apimgmtv3.Cluster{Spec: spec})
-	if privateRegistry == "" {
-		return &systemImages, nil
-	}
-
-	// prepend private repo
-	imagesMap, err := convert.EncodeToMap(systemImages)
-	if err != nil {
-		return nil, err
-	}
-	updatedMap := make(map[string]interface{})
-	for key, value := range imagesMap {
-		newValue := fmt.Sprintf("%s/%s", privateRegistry, value)
-		updatedMap[key] = newValue
-	}
-	// Decoding updateMap to systemImages using json marshal/unmarshal to honor field names
-	updatedByte, err := json.Marshal(updatedMap)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(updatedByte, &systemImages)
-	if err != nil {
-		return nil, err
-	}
-	logrus.Debugf("Updated system images to use private registry [%s]: %#v", privateRegistry, systemImages)
-	return &systemImages, nil
 }
 
 // getSpec computes the spec from the given cluster. Returns an error if the spec could not be computed. Otherwise,

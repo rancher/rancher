@@ -30,7 +30,7 @@ xargs -n1 docker pull <<< "${AIRGAP_IMAGES}"
 xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
 
 # download kontainer driver metadata
-curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json > ./data.json
+curl -sLf https://raw.githubusercontent.com/krunalhinguu/kontainer-driver-metadata/refs/heads/rke-eol-support/data/data.json > ./data.json
 
 if [ -z $TARGET ] || [ $TARGET = "server" ]; then
   # start the builds
