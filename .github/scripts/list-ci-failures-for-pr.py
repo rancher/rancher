@@ -100,6 +100,7 @@ def extract_failure_lines(log_content, max_lines=10):
     log_lines = log_content.splitlines()
 
     for line in reversed(log_lines):
+        # Remove ANSI color code
         cleaned = re.sub(r'\x1b\[[0-9;]*m', '', line).strip()
         if not is_matching_line(cleaned):
             continue
