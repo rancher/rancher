@@ -147,9 +147,6 @@ spec:
       - effect: NoSchedule
         key: "node-role.kubernetes.io/control-plane"
         operator: "Exists"
-      - effect: NoSchedule
-        key: "node-role.kubernetes.io/master"
-        operator: "Exists"
       - effect: NoExecute
         key: "node-role.kubernetes.io/etcd"
         operator: "Exists"
@@ -166,9 +163,6 @@ spec:
         value: "true"
       - effect: NoSchedule
         key: "node-role.kubernetes.io/control-plane"
-        operator: "Exists"
-      - effect: NoSchedule
-        key: "node-role.kubernetes.io/master"
         operator: "Exists"
       {{- end }}
       {{- if .AppendTolerations }}
@@ -255,7 +249,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - windows
@@ -356,7 +350,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - windows
@@ -365,20 +359,11 @@ spec:
                   values:
                     - "true"
               - matchExpressions:
-                - key: beta.kubernetes.io/os
+                - key: kubernetes.io/os
                   operator: NotIn
                   values:
                     - windows
                 - key: node-role.kubernetes.io/control-plane
-                  operator: In
-                  values:
-                    - "true"
-              - matchExpressions:
-                - key: beta.kubernetes.io/os
-                  operator: NotIn
-                  values:
-                    - windows
-                - key: node-role.kubernetes.io/master
                   operator: In
                   values:
                     - "true"

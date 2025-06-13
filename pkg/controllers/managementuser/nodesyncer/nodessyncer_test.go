@@ -19,10 +19,10 @@ func TestDetermineNodeRole(t *testing.T) {
 				Spec: v3.NodeSpec{},
 				Status: v3.NodeStatus{
 					NodeLabels: map[string]string{
-						"node-role.kubernetes.io/etcd":         "true",
-						"node-role.kubernetes.io/controlplane": "true",
-						"node-role.kubernetes.io/master":       "true",
-						"node-role.kubernetes.io/worker":       "true"},
+						"node-role.kubernetes.io/etcd":          "true",
+						"node-role.kubernetes.io/controlplane":  "true",
+						"node-role.kubernetes.io/control-plane": "true",
+						"node-role.kubernetes.io/worker":        "true"},
 				},
 			},
 			expectedNode: &v3.Node{
@@ -33,10 +33,10 @@ func TestDetermineNodeRole(t *testing.T) {
 				},
 				Status: v3.NodeStatus{
 					NodeLabels: map[string]string{
-						"node-role.kubernetes.io/etcd":         "true",
-						"node-role.kubernetes.io/controlplane": "true",
-						"node-role.kubernetes.io/master":       "true",
-						"node-role.kubernetes.io/worker":       "true"},
+						"node-role.kubernetes.io/etcd":          "true",
+						"node-role.kubernetes.io/controlplane":  "true",
+						"node-role.kubernetes.io/control-plane": "true",
+						"node-role.kubernetes.io/worker":        "true"},
 				},
 			},
 		},
@@ -80,7 +80,7 @@ func TestDetermineNodeRole(t *testing.T) {
 			name: "master node label",
 			node: &v3.Node{
 				Status: v3.NodeStatus{
-					NodeLabels: map[string]string{"node-role.kubernetes.io/master": "true"},
+					NodeLabels: map[string]string{"node-role.kubernetes.io/control-plane": "true"},
 				},
 			},
 			expectedNode: &v3.Node{
@@ -90,7 +90,7 @@ func TestDetermineNodeRole(t *testing.T) {
 					Worker:       false,
 				},
 				Status: v3.NodeStatus{
-					NodeLabels: map[string]string{"node-role.kubernetes.io/master": "true"},
+					NodeLabels: map[string]string{"node-role.kubernetes.io/control-plane": "true"},
 				},
 			},
 		},

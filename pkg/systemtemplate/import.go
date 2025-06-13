@@ -132,9 +132,8 @@ func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isPreBootstrap bool,
-	cluster *apimgmtv3.Cluster, agentFeatures map[string]bool, taints []corev1.Taint,
-	secretLister v1.SecretLister, pcExists bool) error {
+func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isPreBootstrap bool, cluster *apimgmtv3.Cluster,
+	agentFeatures map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister, pcExists bool) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := sha256.Sum256([]byte(fmt.Sprintf("%s.%s.%s", url, token, namespace)))
 	tokenKey := hex.EncodeToString(d[:])[:10]
@@ -267,7 +266,8 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster), GetDesiredAuthImage(cluster),
-		cluster.Name, token, settings.ServerURL.Get(), capr.PreBootstrap(cluster), cluster, GetDesiredFeatures(cluster), taints, secretLister, pcExists)
+		cluster.Name, token, settings.ServerURL.Get(), capr.PreBootstrap(cluster), cluster,
+		GetDesiredFeatures(cluster), taints, secretLister, pcExists)
 	return buf.Bytes(), err
 }
 
