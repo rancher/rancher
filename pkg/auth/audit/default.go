@@ -18,7 +18,10 @@ var (
 		"Cookie", "Set-Cookie", "X-Api-Set-Cookie-Header",
 	}
 
-	sensitiveBodyFields = []string{"credentials", "applicationSecret", "oauthCredential", "serviceAccountCredential", "spKey", "spCert", "certificate", "privateKey"}
+	sensitiveBodyFields = []string{
+		"credentials", "applicationSecret", "oauthCredential", "serviceAccountCredential", "spKey", "spCert", "certificate", "privateKey", "secretsEncryptionConfig", "manifestUrl",
+		"insecureWindowsNodeCommand", "insecureNodeCommand", "insecureCommand", "command", "nodeCommand", "windowsNodeCommand", "clientRandom",
+	}
 )
 
 var (
@@ -44,6 +47,8 @@ func init() {
 
 	defaultRedactors = []Redactor{
 		RedactFunc(redactSecret),
+		RedactFunc(redactConfigMap),
+		RedactFunc(redactImportUrl),
 		r,
 	}
 }
@@ -79,6 +84,26 @@ func DefaultPolicies() []auditlogv1.AuditPolicy {
 					{
 						Paths: []string{
 							"$..config",
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "redact-last-applied-configuration",
+			},
+			Spec: auditlogv1.AuditPolicySpec{
+				Filters: []auditlogv1.Filter{
+					{
+						Action:     auditlogv1.FilterActionAllow,
+						RequestURI: ".*secrets.*",
+					},
+				},
+				AdditionalRedactions: []auditlogv1.Redaction{
+					{
+						Paths: []string{
+							"$.metadata.annotations['kubectl.kubernetes.io/last-applied-configuration']",
 						},
 					},
 				},
