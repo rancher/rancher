@@ -178,8 +178,7 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	registrationCode := s.fetchRegCode(registrationObj)
 	sccConnection := suseconnect.DefaultRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter)
 
-	identifier, version, arch := s.systemInfoExporter.Provider().GetProductIdentifier()
-	metaData, product, err := sccConnection.Activate(identifier, version, arch, registrationCode)
+	metaData, product, err := sccConnection.Activate(registrationCode)
 	if err != nil {
 		return err
 	}
@@ -222,8 +221,7 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) error {
 	regCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
 	sccConnection := suseconnect.DefaultRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter)
 
-	identifier, version, arch := s.systemInfoExporter.Provider().GetProductIdentifier()
-	metaData, product, err := sccConnection.Activate(identifier, version, arch, regCode)
+	metaData, product, err := sccConnection.Activate(regCode)
 	if err != nil {
 		return err
 	}

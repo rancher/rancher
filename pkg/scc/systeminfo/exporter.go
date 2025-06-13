@@ -59,6 +59,19 @@ func (e *InfoExporter) Provider() *InfoProvider {
 	return e.infoProvider
 }
 
+// GetProductIdentifier returns a triple of product ID, version and CPU architecture
+func (e *InfoExporter) GetProductIdentifier() (string, string, string) {
+	return e.infoProvider.GetProductIdentifier()
+}
+
+func (e *InfoExporter) RancherUuid() uuid.UUID {
+	return e.infoProvider.RancherUuid
+}
+
+func (e *InfoExporter) ClusterUuid() uuid.UUID {
+	return e.infoProvider.ClusterUuid
+}
+
 func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	// Fetch current node count
 	totalNodeCount := 0
@@ -133,9 +146,9 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 	return systemInfoMap, nil
 }
 
-// PreparedForSCCOffline returns a RancherOfflineRequestEncoded just to delineate between other []byte types,
+// PrepareOfflineRegistrationRequest returns a RancherOfflineRequestEncoded just to delineate between other []byte types,
 // and to show connection to the original data structure it came from
-func (e *InfoExporter) PreparedForSCCOffline() (RancherOfflineRequestEncoded, error) {
+func (e *InfoExporter) PrepareOfflineRegistrationRequest() (RancherOfflineRequestEncoded, error) {
 	sccPreparedInfo := e.preparedForSCC()
 
 	identifier, version, arch := e.infoProvider.GetProductIdentifier()

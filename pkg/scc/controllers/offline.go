@@ -3,18 +3,16 @@ package controllers
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
+	"github.com/rancher/rancher/pkg/scc/suseconnect/offlinerequest"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util/log"
-	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type sccOfflineMode struct {
 	registration       *v1.Registration
 	log                log.StructuredLogger
 	systemInfoExporter *systeminfo.InfoExporter
-	secrets            v1core.SecretController
+	offlineSecrets     *offlinerequest.OfflineRegistrationSecrets
 }
 
 func (s sccOfflineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
@@ -24,46 +22,42 @@ func (s sccOfflineMode) NeedsRegistration(registrationObj *v1.Registration) bool
 			v1.RegistrationConditionOfflineRequestReady.IsFalse(registrationObj))
 }
 
-func (s sccOfflineMode) PrepareForRegister(registration *v1.Registration) (*v1.Registration, error) {
-	//TODO implement me
-	panic("implement me")
+func (s sccOfflineMode) PrepareForRegister(registrationObj *v1.Registration) (*v1.Registration, error) {
+	if registrationObj.Status.OfflineRegistrationRequest == nil {
+		err := s.offlineSecrets.InitSecret()
+		if err != nil {
+			return registrationObj, err
+		}
+		s.offlineSecrets.SetRegistrationOfflineRegistrationRequestSecretRef(registrationObj)
+	}
+
+	return registrationObj, nil
 }
 
 func (s sccOfflineMode) Register(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
-	// TODO: for offline it probably makes more sense to just return offline system ID const and do this prep in PrepareRegisteredForActivation
-	if v1.ResourceConditionDone.IsTrue(registrationObj) ||
-		v1.RegistrationConditionAnnounced.IsTrue(registrationObj) {
-		logrus.Debugf("[scc.registration-controller]: registration already complete, nothing to process for %s", registrationObj.Name)
-		return suseconnect.EmptyRegistrationSystemId, nil
+	sccWrapper := suseconnect.OfflineRancherRegistration(s.systemInfoExporter)
+
+	generatedOfflineRegistrationRequest, err := sccWrapper.PrepareOfflineRegistrationRequest()
+	if err != nil {
+		return suseconnect.EmptyRegistrationSystemId, err
+	}
+	updateErr := s.offlineSecrets.UpdateOfflineRequest(generatedOfflineRegistrationRequest)
+	if updateErr != nil {
+		return suseconnect.EmptyRegistrationSystemId, updateErr
 	}
 
 	return suseconnect.OfflineRegistrationSystemId, nil
 }
 
-func (s sccOfflineMode) ReconcileRegisterError(registration *v1.Registration, registerErr error) *v1.Registration {
-	return registration
+func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error) *v1.Registration {
+	return registrationObj
 }
 
-func (s sccOfflineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
-	// TODO: this generation and secret maybe should be updated regularly like Online mode phone home?
-	generatedRegistrationRequest, err := s.systemInfoExporter.PreparedForSCCOffline()
-	if err != nil {
-		return registration, err
-	}
+func (s sccOfflineMode) PrepareRegisteredForActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
 
-	// TODO: actually save the secret via apply in the controller (instead of saving using util helper)
-	requestSecret, secretErr := suseconnect.StoreSccOfflineRegistration(s.secrets, generatedRegistrationRequest)
-	if secretErr != nil {
-		return registration, secretErr
-	}
-	registration.Status.OfflineRegistrationRequest = &corev1.SecretReference{
-		Namespace: requestSecret.Namespace,
-		Name:      requestSecret.Name,
-	}
+	v1.RegistrationConditionOfflineRequestReady.True(registrationObj)
 
-	v1.RegistrationConditionOfflineRequestReady.True(registration)
-
-	return registration, nil
+	return registrationObj, nil
 }
 
 func (s sccOfflineMode) NeedsActivation(registrationObj *v1.Registration) bool {

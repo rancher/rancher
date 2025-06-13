@@ -36,10 +36,8 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 	}
 
 	regCode, ok := secret.Data[dataRegCode]
-	if regMode == v1.RegistrationModeOnline {
-		if !ok || len(regCode) == 0 {
-			return RegistrationParams{}, fmt.Errorf("secret does not have data %s", dataRegCode)
-		}
+	if regMode == v1.RegistrationModeOnline && (!ok || len(regCode) == 0) {
+		return RegistrationParams{}, fmt.Errorf("secret does not have data %s", dataRegCode)
 	}
 
 	hasher := md5.New()

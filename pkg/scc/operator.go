@@ -141,7 +141,6 @@ func Setup(
 		controllers.Register(
 			ctx,
 			consts.DefaultSCCNamespace,
-			wContext.Apply,
 			initOperator.sccResourceFactory.Scc().V1().Registration(),
 			initOperator.secrets,
 			initOperator.systemInfoExporter,

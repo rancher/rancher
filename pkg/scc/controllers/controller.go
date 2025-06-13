@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/suseconnect/offlinerequest"
 	"time"
 
 	"github.com/rancher/rancher/pkg/scc/consts"
@@ -15,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/log"
-	"github.com/rancher/wrangler/v3/pkg/apply"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -79,7 +79,6 @@ type handler struct {
 func Register(
 	ctx context.Context,
 	systemNamespace string,
-	wApply apply.Apply,
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
 	systemInfoExporter *systeminfo.InfoExporter,
@@ -111,21 +110,29 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 	ref := registrationObj.ToOwnerRef()
 
 	if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
+		offlineRequestSecretName := consts.OfflineRequestSecretName(registrationObj.Name)
 		return sccOfflineMode{
 			registration:       registrationObj,
 			log:                h.log.WithField("handler", "offline"),
 			systemInfoExporter: h.systemInfoExporter,
-			secrets:            h.secrets,
+			offlineSecrets: offlinerequest.New(
+				h.systemNamespace,
+				offlineRequestSecretName,
+				consts.FinalizerSccCredentials,
+				ref,
+				h.secrets,
+				h.secretCache,
+			),
 		}
 	}
 
-	credsName := consts.SCCCredentialsSecretName(registrationObj.Name)
+	credsSecretName := consts.SCCCredentialsSecretName(registrationObj.Name)
 	return sccOnlineMode{
 		registration: registrationObj,
 		log:          h.log.WithField("handler", "online"),
 		sccCredentials: credentials.New(
 			h.systemNamespace,
-			credsName,
+			credsSecretName,
 			consts.FinalizerSccCredentials,
 			ref,
 			h.secrets,
@@ -376,7 +383,6 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		if prepareErr != nil {
 			return progressingObj, prepareErr
 		}
-		// Maybe we don't update until after successful registration?
 		regForAnnounce, updateErr := h.registrations.UpdateStatus(preparedForRegister)
 		if updateErr != nil {
 			return progressingObj, prepareErr

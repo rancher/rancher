@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/SUSE/connect-ng/pkg/connection"
@@ -56,7 +57,10 @@ func (c *CredentialSecretsAdapter) Refresh() error {
 func (c *CredentialSecretsAdapter) loadCredentials() error {
 	// TODO gather errors
 	sccCreds, err := c.secretCache.Get(c.secretNamespace, c.secretName)
-	if err == nil && sccCreds != nil && len(sccCreds.Data) != 0 {
+	if err == nil && sccCreds != nil {
+		if len(sccCreds.Data) == 0 {
+			return fmt.Errorf("secret %s/%s has no data fields; but should always have them", c.secretNamespace, c.secretName)
+		}
 		username, _ := sccCreds.Data[UsernameKey]
 		password, _ := sccCreds.Data[PasswordKey]
 		token, _ := sccCreds.Data[TokenKey]
@@ -110,6 +114,7 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 		}
 	}
 
+	// TODO: see if we can set labels on secrets too?
 	if c.ownerRef != nil {
 		sccCreds.OwnerReferences = []metav1.OwnerReference{*c.ownerRef}
 	}
@@ -176,3 +181,5 @@ func (c *CredentialSecretsAdapter) SetRegistrationCredentialsSecretRef(registrat
 	}
 	return registrationObj
 }
+
+var _ connection.Credentials = &CredentialSecretsAdapter{}
