@@ -21,7 +21,7 @@ const (
 
 type userKey string
 
-var userKeyValue userKey = "user"
+var userKeyValue userKey = "audit_user"
 
 func NewAuditLogMiddleware(writer *Writer) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
