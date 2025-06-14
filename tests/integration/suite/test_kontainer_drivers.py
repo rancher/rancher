@@ -24,31 +24,6 @@ DRIVER_ARM64_URL = "https://github.com/jianghang8421/" \
                    + sys.platform + "-arm64"
 
 
-def test_builtin_drivers_are_present(admin_mc):
-    """Test if builtin kd are present and cannot be deleted via API or UI"""
-    admin_mc.client.reload_schema()
-    types = admin_mc.client.schema.types
-
-    for name in ['azureKubernetesService',
-                 'googleKubernetesEngine',
-                 'amazonElasticContainerService']:
-        kd = admin_mc.client.list_kontainerDriver(
-            name=name,
-        ).data[0]
-        wait_for_condition('Active', "True", admin_mc.client, kd, timeout=90)
-        # check in schema
-        assert name + "Config" in types
-
-        # verify has no delete link because its built in
-        kd = admin_mc.client.by_id_kontainer_driver(name.lower())
-        assert not hasattr(kd.links, 'remove')
-        # assert cannot delete it via API
-        with pytest.raises(ApiError) as e:
-            admin_mc.client.delete(kd)
-
-        assert e.value.error.status == 405
-
-
 @pytest.mark.skip
 @pytest.mark.nonparallel
 def test_kontainer_driver_lifecycle(admin_mc, list_remove_resource):

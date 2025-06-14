@@ -148,11 +148,20 @@ func (l *Lifecycle) createDynamicSchema(obj *v3.KontainerDriver) error {
 func (l *Lifecycle) createOrUpdateDynamicSchema(obj *v3.KontainerDriver) error {
 	dynamicSchema, err := l.dynamicSchemasLister.Get("", strings.ToLower(getDynamicTypeName(obj)))
 	if errors.IsNotFound(err) {
-		return l.createDynamicSchema(obj)
+		if !obj.Spec.BuiltIn {
+			return l.createDynamicSchema(obj)
+		}
+		return nil
 	}
 	if err != nil {
 		return err
+	}
 
+	if obj.Spec.BuiltIn {
+		// Delete the dynamicSchema for builtins since AKS, GKE and EKS provisioning no longer
+		// use KontainerEngine or dynamicSchema.
+		err = l.dynamicSchemas.Delete(dynamicSchema.Name, &v13.DeleteOptions{})
+		return err
 	}
 
 	return l.updateDynamicSchema(dynamicSchema, obj)
