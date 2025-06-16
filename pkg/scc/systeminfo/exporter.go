@@ -4,28 +4,26 @@ import (
 	"encoding/json"
 	"github.com/SUSE/connect-ng/pkg/registration"
 	"github.com/pborman/uuid"
-	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/scc/util"
-	"github.com/rancher/rancher/pkg/wrangler"
-	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"github.com/rancher/rancher/pkg/telemetry"
+	"k8s.io/client-go/util/retry"
 )
 
 type InfoExporter struct {
 	infoProvider *InfoProvider
-
-	clusterCache   v3.ClusterCache
-	namespaceCache v1core.NamespaceCache
-	isLocalReady   bool
+	tel          telemetry.TelemetryGatherer
+	isLocalReady bool
 }
 
 type RancherSCCInfo struct {
-	UUID       uuid.UUID `json:"uuid"`
-	RancherUrl string    `json:"server_url"`
-	Nodes      int       `json:"nodes"`
-	Sockets    int       `json:"sockets"`
-	Clusters   int       `json:"clusters"`
-	Version    string    `json:"version"`
+	UUID             uuid.UUID `json:"uuid"`
+	RancherUrl       string    `json:"server_url"`
+	Nodes            int       `json:"nodes"`
+	Sockets          int       `json:"sockets"`
+	Clusters         int       `json:"clusters"`
+	Version          string    `json:"version"`
+	CpuCores         int64     `json:"vcpus"`
+	MemoryBytesTotal int64     `json:"mem_total"`
 }
 
 type ProductTriplet struct {
@@ -45,13 +43,12 @@ type RancherOfflineRequestEncoded []byte
 
 func NewInfoExporter(
 	infoProvider *InfoProvider,
-	wContext *wrangler.Context,
+	rancherTelemetry telemetry.TelemetryGatherer,
 ) *InfoExporter {
 	return &InfoExporter{
-		infoProvider:   infoProvider,
-		clusterCache:   wContext.Mgmt.Cluster().Cache(),
-		namespaceCache: wContext.Core.Namespace().Cache(),
-		isLocalReady:   false,
+		infoProvider: infoProvider,
+		tel:          rancherTelemetry,
+		isLocalReady: false,
 	}
 }
 
@@ -73,60 +70,59 @@ func (e *InfoExporter) ClusterUuid() uuid.UUID {
 }
 
 func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
-	// Fetch current node count
-	totalNodeCount := 0
-	localNodeCount := 0
-	vcpusCount := 0
-	// TODO: i don't think rancher exposes this...because k8s doesnt
-	socketsCount := 1
-
-	localNodes, nodesErr := e.infoProvider.nodeCache.List("local", labels.Everything())
-	if nodesErr != nil {
-		localNodeCount += len(localNodes)
-	}
-
-	totalNodeCount += localNodeCount
-
-	namespaces, err := e.namespaceCache.List(labels.Everything())
-	if err != nil {
-		panic(err)
-	}
-
-	for _, ns := range namespaces {
-		if ns.Name == "local" {
-			continue
-		}
-		nodes, err := e.infoProvider.nodeCache.List(ns.Name, labels.Everything())
+	var exporter telemetry.RancherManagerTelemetry
+	// TODO(dan): this logic might need some tweaking
+	if err := retry.OnError(retry.DefaultRetry, func(_ error) bool {
+		return true
+	}, func() error {
+		exp, err := e.tel.GetClusterTelemetry()
 		if err != nil {
-			panic(err)
+			return err
 		}
-
-		totalNodeCount += len(nodes)
-		for _, node := range nodes {
-			cpuCores := node.Status.InternalNodeStatus.Capacity.Cpu()
-			if cpuCores != nil {
-				vcpusCount += cpuCores.Size()
-			}
-		}
+		exporter = exp
+		return nil
+	}); err != nil {
+		// TODO(dan) : should probably surface an error here and handle it
+		return RancherSCCInfo{}
 	}
 
-	// Fetch current cluster count
-	clusterCount := 0
-	clusterList, err := e.clusterCache.List(labels.Everything())
-	if err != nil {
-		panic(err)
-	}
-	clusterCount = len(clusterList)
+	nodeCount := 0
+	totalCpuCores := int64(0)
+	// note: this will only correctly report up to ~9 exabytes of memory,
+	// which should be fine
+	totalMemBytes := int64(0)
+	clusterCount := exporter.ManagedClusterCount()
 
-	// TODO: collect and organize downstream counts
+	// local cluster metrics
+	localClT := exporter.LocalClusterTelemetry()
+	localCores, _ := localClT.CpuCores()
+	localMem, _ := localClT.MemoryCapacityBytes()
+	totalCpuCores += localCores
+	totalMemBytes += localMem
+	for _, _ = range localClT.PerNodeTelemetry() {
+		nodeCount++
+	}
+
+	// managed cluster metrics
+	for _, clT := range exporter.PerManagedClusterTelemetry() {
+		cores, _ := clT.CpuCores()
+		totalCpuCores += cores
+		memBytes, _ := clT.MemoryCapacityBytes()
+		totalMemBytes += memBytes
+		for _, _ = range clT.PerNodeTelemetry() {
+			nodeCount++
+		}
+	}
 
 	return RancherSCCInfo{
-		UUID:       e.infoProvider.RancherUuid,
-		RancherUrl: ServerUrl(),
-		Version:    e.infoProvider.GetVersion(),
-		Nodes:      totalNodeCount,
-		Sockets:    socketsCount,
-		Clusters:   clusterCount,
+		UUID:             e.infoProvider.RancherUuid,
+		RancherUrl:       ServerUrl(),
+		Version:          exporter.RancherVersion(),
+		Nodes:            nodeCount,
+		Sockets:          0,
+		Clusters:         clusterCount,
+		CpuCores:         totalCpuCores,
+		MemoryBytesTotal: totalMemBytes,
 	}
 }
 

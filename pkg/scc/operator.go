@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc/consts"
 	"time"
+
+	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/telemetry"
 
 	"github.com/rancher/rancher/pkg/scc/util/log"
 
@@ -87,14 +89,15 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 		wContext.Mgmt.Node().Cache(),
 	)
 
-	// TODO(o&b): also get Node, Sockets, v-cpus, Clusters and watch those
+	rancherVersion := systeminfo.GetVersion()
+	rancherTelemetry := telemetry.NewTelemetryGatherer(rancherVersion, wContext.Mgmt.Cluster().Cache(), wContext.Mgmt.Node().Cache())
 	return &sccOperator{
 		log:                     logger,
 		configMaps:              wContext.Core.ConfigMap(),
 		sccResourceFactory:      sccResources,
 		secrets:                 wContext.Core.Secret(),
 		systemInfoProvider:      infoProvider,
-		systemInfoExporter:      systeminfo.NewInfoExporter(infoProvider, wContext),
+		systemInfoExporter:      systeminfo.NewInfoExporter(infoProvider, rancherTelemetry),
 		systemRegistrationReady: make(chan struct{}),
 	}, nil
 }

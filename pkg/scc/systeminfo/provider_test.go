@@ -13,22 +13,22 @@ import (
 )
 
 func TestNewInfoProvider(t *testing.T) {
-	rancherUuid := uuid.Parse(uuid.New())
-	clusterUuid := uuid.Parse(uuid.New())
+	// rancherUuid := uuid.Parse(uuid.New())
+	// clusterUuid := uuid.Parse(uuid.New())
 
 	// Test with dev build
-	infoProvider := NewInfoProvider(rancherUuid, clusterUuid, nil)
-	assert.Equal(t, "2.10.3", infoProvider.GetVersion())
+	// infoProvider := NewInfoProvider(rancherUuid, clusterUuid)
+	assert.Equal(t, "2.10.3", GetVersion())
 
 	// Test with non-dev build
 	coreVersion.Version = "1.9.0"
 	defer func() { coreVersion.Version = "dev" }()
-	infoProvider = NewInfoProvider(rancherUuid, clusterUuid, nil)
-	assert.Equal(t, "1.9.0", infoProvider.GetVersion())
+	// infoProvider = NewInfoProvider(rancherUuid, clusterUuid)
+	assert.Equal(t, "1.9.0", GetVersion())
 
 	// Test with no mock version
-	infoProvider = NewInfoProvider(rancherUuid, clusterUuid, nil)
-	assert.Equal(t, coreVersion.Version, infoProvider.GetVersion())
+	// infoProvider = NewInfoProvider(rancherUuid, clusterUuid)
+	assert.Equal(t, coreVersion.Version, GetVersion())
 }
 
 func TestGetProductIdentifier(t *testing.T) {
@@ -45,7 +45,7 @@ func TestGetProductIdentifier(t *testing.T) {
 	} else {
 		assert.Equal(t, coreVersion.Version, version)
 	}
-	assert.Equal(t, infoProvider.GetVersion(), version)
+	assert.Equal(t, GetVersion(), version)
 	assert.Equal(t, "unknown", architecture)
 }
 
