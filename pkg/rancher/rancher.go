@@ -13,7 +13,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	normanStoreProxy "github.com/rancher/norman/store/proxy"
-	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
@@ -168,7 +167,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
-	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
 
 	if features.ProvisioningV2.Enabled() {

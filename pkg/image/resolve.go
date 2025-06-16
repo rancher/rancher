@@ -30,13 +30,6 @@ const (
 	Windows
 )
 
-const imageListDelimiter = "\n"
-
-var osTypeImageListName = map[OSType]string{
-	Windows: "windows-rancher-images",
-	Linux:   "rancher-images",
-}
-
 // Resolve calls ResolveWithCluster passing nil into the cluster argument.
 // returns the image concatenated with the URL of the system default registry.
 // if there is no system default registry it will return the image

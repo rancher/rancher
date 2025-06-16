@@ -52,16 +52,16 @@ type nodeSyncer struct {
 }
 
 type nodesSyncer struct {
-	machines             v3.NodeInterface
-	machineLister        v3.NodeLister
-	nodeLister           v1.NodeLister
-	nodeClient           v1.NodeInterface
-	clusterNamespace     string
-	clusterLister        v3.ClusterLister
-	serviceOptionsLister v3.RkeK8sServiceOptionLister
-	serviceOptions       v3.RkeK8sServiceOptionInterface
-	sysImagesLister      v3.RkeK8sSystemImageLister
-	sysImages            v3.RkeK8sSystemImageInterface
+	machines         v3.NodeInterface
+	machineLister    v3.NodeLister
+	nodeLister       v1.NodeLister
+	nodeClient       v1.NodeInterface
+	clusterNamespace string
+	clusterLister    v3.ClusterLister
+	// serviceOptionsLister v3.RkeK8sServiceOptionLister
+	// serviceOptions       v3.RkeK8sServiceOptionInterface
+	// sysImagesLister      v3.RkeK8sSystemImageLister
+	// sysImages            v3.RkeK8sSystemImageInterface
 	secretLister         v1.SecretLister
 	provClusterCache     provcontrollers.ClusterCache
 	capiClusterCache     capicontrollers.ClusterCache
@@ -92,10 +92,6 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		nodeLister:           cluster.Core.Nodes("").Controller().Lister(),
 		nodeClient:           cluster.Core.Nodes(""),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
-		serviceOptionsLister: cluster.Management.Management.RkeK8sServiceOptions("").Controller().Lister(),
-		serviceOptions:       cluster.Management.Management.RkeK8sServiceOptions(""),
-		sysImagesLister:      cluster.Management.Management.RkeK8sSystemImages("").Controller().Lister(),
-		sysImages:            cluster.Management.Management.RkeK8sSystemImages(""),
 		secretLister:         cluster.Management.Core.Secrets("").Controller().Lister(),
 		provClusterCache:     cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
 		capiClusterCache:     cluster.Management.Wrangler.CAPI.Cluster().Cache(),

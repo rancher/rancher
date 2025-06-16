@@ -419,20 +419,8 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		MetadataHandler:       metadataHandler,
 	}
-	lh := kontainerdriver.ListHandler{
-		SysImageLister:  management.Management.RkeK8sSystemImages("").Controller().Lister(),
-		SysImages:       management.Management.RkeK8sSystemImages(""),
-		ConfigMapLister: management.Core.ConfigMaps("").Controller().Lister(),
-	}
+
 	schema.ActionHandler = handler.ActionHandler
-	schema.CollectionFormatter = kontainerdriver.CollectionFormatter
-	schema.Formatter = kontainerdriver.NewFormatter(management)
-	schema.Store = kontainerdriver.NewStore(management, schema.Store)
-	schema.ListHandler = lh.ListHandler
-	kontainerDriverValidator := kontainerdriver.Validator{
-		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
-	}
-	schema.Validator = kontainerDriverValidator.Validator
 }
 
 func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) {
