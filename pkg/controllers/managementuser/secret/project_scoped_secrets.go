@@ -30,6 +30,7 @@ const (
 	namespaceEnqueuerName    = "project-scoped-secret-namespace-enqueuer"
 	projectIDLabel           = "field.cattle.io/projectId"
 	projectScopedSecretLabel = "management.cattle.io/project-scoped-secret"
+	pssCopyAnnotation        = "management.cattle.io/project-scoped-secret-copy"
 )
 
 type namespaceHandler struct {
@@ -120,7 +121,10 @@ func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1
 
 	allSecrets := sets.New[types.NamespacedName]()
 	for _, secret := range downstreamProjectScopedSecrets.Items {
-		allSecrets.Insert(client.ObjectKeyFromObject(&secret))
+		// only remove secrets that are copies
+		if secret.Annotations[pssCopyAnnotation] == "true" {
+			allSecrets.Insert(client.ObjectKeyFromObject(&secret))
+		}
 	}
 
 	secretsToDelete := allSecrets.Difference(desiredSecrets)
@@ -201,9 +205,12 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 	maps.Copy(namespacedSecret.Annotations, obj.Annotations)
 	maps.Copy(namespacedSecret.Labels, obj.Labels)
 	namespacedSecret.Annotations[userSecretAnnotation] = "true"
+	namespacedSecret.Annotations[pssCopyAnnotation] = "true"
 	return namespacedSecret
 }
 
 func areSecretsSame(s1, s2 *corev1.Secret) (bool, *corev1.Secret) {
-	return reflect.DeepEqual(s1.Data, s2.Data) && s1.Annotations[projectScopedSecretLabel] == s2.Annotations[projectScopedSecretLabel], s2
+	return reflect.DeepEqual(s1.Data, s2.Data) &&
+		s1.Annotations[projectScopedSecretLabel] == s2.Annotations[projectScopedSecretLabel] &&
+		s1.Annotations[pssCopyAnnotation] == s2.Annotations[pssCopyAnnotation], s2
 }
