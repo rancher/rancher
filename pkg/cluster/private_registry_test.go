@@ -6,9 +6,8 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
-	rketypes "github.com/rancher/rke/types"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -33,12 +32,13 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		expectedUrl    string
-		expectedConfig string
-		expectedError  string
-		cluster        *v3.Cluster
-		secrets        []*corev1.Secret
+		name                        string
+		expectedUrl                 string
+		expectedConfig              string
+		expectedError               string
+		cluster                     *v3.Cluster
+		secrets                     []*corev1.Secret
+		globalSystemDefaultRegistry string
 	}{
 		{
 			name:           "nil",
@@ -46,40 +46,6 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			expectedConfig: "",
 			expectedError:  "",
 			cluster:        nil,
-		},
-		{
-			name:           "rke1 private registry",
-			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-			expectedConfig: base64.StdEncoding.EncodeToString([]byte("testConfig")), // should be directly copied from RKE1 secret
-			expectedError:  "",
-			cluster: &v3.Cluster{
-				Spec: v3.ClusterSpec{
-					ClusterSpecBase: v3.ClusterSpecBase{
-						ClusterSecrets: v3.ClusterSecrets{
-							PrivateRegistrySecret: "test-secret",
-						},
-						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
-							PrivateRegistries: []rketypes.PrivateRegistry{
-								{
-									URL:  "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-									User: "testuser",
-								},
-							},
-						},
-					},
-				},
-			},
-			secrets: []*corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: secretmigrator.SecretNamespace,
-						Name:      "test-secret",
-					},
-					Data: map[string][]byte{
-						corev1.DockerConfigJsonKey: []byte("testConfig"),
-					},
-				},
-			},
 		},
 		{
 			name:           "v2prov private registry",
@@ -118,11 +84,6 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase: v3.ClusterSpecBase{
-						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
-							PrivateRegistries: []rketypes.PrivateRegistry{{
-								URL: "upstream-registry.com",
-							}},
-						},
 						ClusterSecrets: v3.ClusterSecrets{
 							PrivateRegistrySecret: "test-secret",
 							PrivateRegistryURL:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
@@ -152,11 +113,6 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase: v3.ClusterSpecBase{
-						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
-							PrivateRegistries: []rketypes.PrivateRegistry{{
-								URL: "upstream-registry.com",
-							}},
-						},
 						ClusterSecrets: v3.ClusterSecrets{
 							PrivateRegistryURL: "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
 						},
@@ -166,19 +122,13 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "global system default registry and no cluster default registry",
-			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-			expectedConfig: "",
-			expectedError:  "",
+			name:                        "global system default registry and no cluster default registry",
+			expectedUrl:                 "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+			expectedConfig:              "",
+			expectedError:               "",
+			globalSystemDefaultRegistry: "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
-					ClusterSpecBase: v3.ClusterSpecBase{
-						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
-							PrivateRegistries: []rketypes.PrivateRegistry{{
-								URL: "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-							}},
-						},
-					},
 					FleetWorkspaceName: "fleet-default",
 				},
 			},
@@ -191,6 +141,12 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			for _, s := range tt.secrets {
 				mockSecrets[fmt.Sprintf("%s:%s", s.Namespace, s.Name)] = s
 			}
+
+			if tt.globalSystemDefaultRegistry != "" {
+				err := settings.SystemDefaultRegistry.Set(tt.globalSystemDefaultRegistry)
+				assert.Nil(t, err)
+			}
+
 			url, cfg, err := GeneratePrivateRegistryEncodedDockerConfig(tt.cluster, secretLister)
 			assert.Equal(t, tt.expectedUrl, url)
 			assert.Equal(t, tt.expectedConfig, cfg)
