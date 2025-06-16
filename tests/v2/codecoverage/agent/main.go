@@ -25,7 +25,6 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
-	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/agent/rancher"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
@@ -60,10 +59,6 @@ func runAgent(ctx context.Context) {
 	if len(os.Args) > 1 {
 		err = runArgs(ctx)
 	} else {
-		if _, err = reconcileKubelet(ctx); err != nil {
-			logrus.Warnf("failed to reconcile kubelet, error: %v", err)
-		}
-
 		logrus.SetOutput(colorable.NewColorableStdout())
 		logserver.StartServerWithDefaults()
 		if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
@@ -107,14 +102,7 @@ func getParams() (map[string]interface{}, error) {
 }
 
 func getTokenAndURL() (string, string, error) {
-	token, url, err := node.TokenAndURL()
-	if err != nil {
-		return "", "", err
-	}
-	if token == "" {
-		return cluster.TokenAndURL()
-	}
-	return token, url, nil
+	return cluster.TokenAndURL()
 }
 
 func isConnect() bool {
@@ -358,45 +346,4 @@ func certinfo(cert *x509.Certificate) {
 	logrus.Infof("NotAfter: %+v", cert.NotAfter)
 	logrus.Infof("SignatureAlgorithm: %+v", cert.SignatureAlgorithm)
 	logrus.Infof("PublicKeyAlgorithm: %+v", cert.PublicKeyAlgorithm)
-}
-
-// reconcileKubelet restarts kubelet in unmanaged agents
-func reconcileKubelet(ctx context.Context) (bool, error) {
-	if os.Getenv("CATTLE_K8S_MANAGED") == "true" {
-		return true, nil
-	}
-
-	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
-	if writeCertsOnly {
-		return true, nil
-	}
-
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
-	if err != nil {
-		return false, err
-	}
-	defer c.Close()
-
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=kubelet")
-
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	for _, container := range containers {
-		if len(container.Names) > 0 && strings.Contains(container.Names[0], "kubelet") {
-			nodeName := os.Getenv("CATTLE_NODE_NAME")
-			logrus.Infof("node %v is not registered, restarting kubelet now", nodeName)
-			if err := c.ContainerRestart(ctx, container.ID, nil); err != nil {
-				return false, err
-			}
-			break
-		}
-	}
-	return false, nil
 }
