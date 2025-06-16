@@ -50,7 +50,6 @@ var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes
 var (
 	agentImagesMutex sync.RWMutex
 	agentImages      = map[string]map[string]string{
-		nodeImage:    {},
 		clusterImage: {},
 	}
 	controlPlaneTaintsMutex sync.RWMutex
@@ -518,33 +517,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
-		if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE {
-			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
-				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
-				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
-				dsNotFoundError := "daemonsets.apps \"cattle-node-agent\" not found"
-				if !strings.Contains(string(output), dsNotFoundError) {
-					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
-				}
-				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
-			}
-		} else if strings.ToLower(settings.AgentRolloutWait.Get()) == "true" {
-			// Check for agent daemonset rollout if parameter is set and driverv32.ClusterDriverRKE
-			timeout := settings.AgentRolloutTimeout.Get()
-			_, err = time.ParseDuration(timeout)
-			if err != nil {
-				logrus.Warnf("[deployAgent] agent-rollout-timeout setting must be in Duration format. Using default: 300s")
-				timeout = "300s"
-			}
-			logrus.Debugf("clusterDeploy: deployAgent: waiting rollout agent daemonset for cluster [%s]", cluster.Name)
-			output, err := kubectl.RolloutStatusWithNamespace("cattle-system", "ds/cattle-node-agent", timeout, kubeConfig)
-			if err != nil {
-				logrus.Debugf("clusterDeploy: deployAgent: timeout waiting rollout agent daemonset for cluster [%s]: %v", cluster.Name, err)
-				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Timeout waiting rollout agent daemonset")
-			}
-			logrus.Debugf("clusterDeploy: deployAgent: successfully rollout agent daemonset for cluster [%s]", cluster.Name)
-			apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
-		}
 		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
@@ -654,35 +626,7 @@ func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
 	return "", nil
 }
 
-func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContextNoControllers(name)
-	if err != nil {
-		return "", err
-	}
-
-	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return "", err
-		}
-		return "", nil
-	}
-
-	for _, c := range ds.Spec.Template.Spec.Containers {
-		if c.Name == "agent" {
-			return c.Image, nil
-		}
-	}
-
-	return "", nil
-}
-
 func (cd *clusterDeploy) cacheAgentImages(name string) error {
-	na, err := cd.getNodeAgentImage(name)
-	if err != nil {
-		return err
-	}
-
 	ca, err := cd.getClusterAgentImage(name)
 	if err != nil {
 		return err
@@ -690,7 +634,6 @@ func (cd *clusterDeploy) cacheAgentImages(name string) error {
 
 	agentImagesMutex.Lock()
 	defer agentImagesMutex.Unlock()
-	agentImages[nodeImage][name] = na
 	agentImages[clusterImage][name] = ca
 	return nil
 }
@@ -712,7 +655,7 @@ func controlPlaneTaintsCached(name string) bool {
 func getAgentImages(name string) (string, string) {
 	agentImagesMutex.RLock()
 	defer agentImagesMutex.RUnlock()
-	return agentImages[nodeImage][name], agentImages[clusterImage][name]
+	return "", agentImages[clusterImage][name]
 }
 
 func getCachedControlPlaneTaints(name string) []corev1.Taint {
@@ -728,7 +671,6 @@ func clearAgentImages(name string) {
 	logrus.Tracef("clusterDeploy: clearAgentImages called for [%s]", name)
 	agentImagesMutex.Lock()
 	defer agentImagesMutex.Unlock()
-	delete(agentImages[nodeImage], name)
 	delete(agentImages[clusterImage], name)
 }
 
