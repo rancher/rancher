@@ -6,7 +6,7 @@ jobs:
     container: registry.suse.com/bci/python:3.11
     env:
       GOLANG_CI_LINT_VERSION: v1.54.2
-      GOLANG_VERSION: '1.23'
+      GOLANG_VERSION: '1.24'
     steps:
       - name: Install dependencies
         shell: bash
