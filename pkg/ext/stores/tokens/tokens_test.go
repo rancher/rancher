@@ -214,6 +214,41 @@ func Test_ttlGreater(t *testing.T) {
 	}
 }
 
+func Test_Store_New(t *testing.T) {
+	t.Parallel()
+
+	store := &Store{}
+	obj := store.New()
+	require.NotNil(t, obj)
+	assert.IsType(t, &ext.Token{}, obj)
+}
+
+func Test_Store_NewList(t *testing.T) {
+	store := &Store{}
+	obj := store.NewList()
+	require.NotNil(t, obj)
+	require.IsType(t, &ext.TokenList{}, obj)
+
+	list := obj.(*ext.TokenList)
+	assert.Nil(t, list.Items)
+}
+
+func Test_Store_GetSingularName(t *testing.T) {
+	store := &Store{}
+	assert.Equal(t, SingularName, store.GetSingularName())
+}
+
+func Test_Store_NamespaceScoped(t *testing.T) {
+	store := &Store{}
+	assert.False(t, store.NamespaceScoped())
+}
+
+func Test_Store_GroupVersionKind(t *testing.T) {
+	store := &Store{}
+	assert.Equal(t, GVK, store.GroupVersionKind(ext.SchemeGroupVersion))
+}
+
+
 func Test_Store_Delete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
