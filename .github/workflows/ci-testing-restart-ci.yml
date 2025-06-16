@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write # Vault access
 
 jobs:
   restart-ci:
@@ -17,6 +18,26 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: "Read some Secrets"
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/pr-actions-write-app/credentials appId | APP_ID;
+            secret/data/github/repo/${{ github.repository }}/github/pr-actions-write-app/credentials privateKey | PRIVATE_KEY
+
+      - name: "Create temporary token"
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
+          permission-actions: write
+
+      - name: Clear sensitive variables
+        run: |
+          echo "PRIVATE_KEY=" >> $GITHUB_ENV
+          echo "APP_ID=" >> $GITHUB_ENV
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -86,7 +107,7 @@ jobs:
         if: steps.find-pr.outputs.pr_number && steps.current-attempt.outputs.reached_limit != 'true'
         env:
           # Needs write permissions to Actions
-          GH_TOKEN: ${{ secrets.CI_TESTING_PAT }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "Restart workflow '${{ steps.find-pr.outputs.workflow_name }}'"
           gh api --method POST "repos/${{ github.repository }}/actions/runs/${{ steps.find-pr.outputs.run_id }}/rerun"
