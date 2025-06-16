@@ -215,6 +215,10 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	if !reflect.DeepEqual(psaCR.Rules, psaCRWanted.Rules) {
 		// if the CR have been modified, restore it
 		psaCR = addUpdatepsaClusterRole(projectName)
+		_, err = p.crClient.Update(psaCR)
+		if err != nil {
+			return err
+		}
 	}
 
 	// create ClusterRoleBinding to bind the ClusterRole to the user/group
@@ -333,14 +337,13 @@ func (p *prtbLifecycle) isClusterRoleUsed(clusterRoleName string) bool {
 		return false
 	}
 
-	var usingBindings []string
 	for _, binding := range bindings.Items {
 		if binding.RoleRef.Kind == "ClusterRole" && binding.RoleRef.Name == clusterRoleName {
-			usingBindings = append(usingBindings, binding.Name)
+			return true
 		}
 	}
 
-	return len(usingBindings) > 0
+	return false
 }
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {

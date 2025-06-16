@@ -782,6 +782,57 @@ func Test_ensurePSAPermissions(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "unable to update CR",
+			mockSetup: func() {
+				p.crLister = &typesrbacv1fakes.ClusterRoleListerMock{
+					GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+						return &v1.ClusterRole{
+							Rules: []rbacv1.PolicyRule{
+								{
+									APIGroups:     []string{management.GroupName},
+									Verbs:         []string{"updatepsa"},
+									Resources:     []string{apisV3.ProjectResourceName},
+									ResourceNames: []string{"p-example"},
+								},
+								{
+									APIGroups:     []string{management.GroupName},
+									Verbs:         []string{"get"},
+									Resources:     []string{apisV3.ProjectResourceName},
+									ResourceNames: []string{"p-example"},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+						return &v1.ClusterRole{}, fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "prtb-example",
+					},
+					UserName:    "u-test1",
+					ProjectName: "c-abc:p-example",
+				},
+				roles: map[string]*v3.RoleTemplate{
+					"role_template_0": &apisV3.RoleTemplate{
+						Rules: []v1.PolicyRule{
+							{
+								APIGroups: []string{management.GroupName},
+								Verbs:     []string{"updatepsa"},
+								Resources: []string{apisV3.ProjectResourceName},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
