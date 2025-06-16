@@ -403,7 +403,9 @@ func TestStoreCreate(t *testing.T) {
 			require.Equal(t, namePrefix, obj.GenerateName)
 
 			configMap = obj.DeepCopy()
-			configMap.CreationTimestamp = metav1.Now()
+			loc, err := time.LoadLocation("Europe/London") // This is to ensure we don't use html encoding e.g. "+01:00" -> "&#43;01:00"
+			require.NoError(t, err)
+			configMap.CreationTimestamp = metav1.NewTime(time.Now().In(loc))
 			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
 			return configMap, nil
 		}).Times(1)
