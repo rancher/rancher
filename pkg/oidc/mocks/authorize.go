@@ -80,15 +80,15 @@ func (m *MocksessionAdder) EXPECT() *MocksessionAdderMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MocksessionAdder) Add(code string, session session.Session) error {
+func (m *MocksessionAdder) Add(code string, arg1 session.Session) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", code, session)
+	ret := m.ctrl.Call(m, "Add", code, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MocksessionAdderMockRecorder) Add(code, session any) *gomock.Call {
+func (mr *MocksessionAdderMockRecorder) Add(code, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MocksessionAdder)(nil).Add), code, session)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MocksessionAdder)(nil).Add), code, arg1)
 }
