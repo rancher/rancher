@@ -831,7 +831,7 @@ func Test_ensurePSAPermissions(t *testing.T) {
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
