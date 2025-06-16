@@ -5,3 +5,9 @@ pkg/apis/catalog.cattle.io @rancher/observation-backup
 pkg/controllers/dashboard/helm @rancher/observation-backup
 pkg/controllers/dashboard/plugin @rancher/observation-backup
 tests/v2/integration/catalogv2 @rancher/observation-backup
+
+# Release workflows
+.github/workflows @rancher/release-team
+.github/actions @rancher/release-team
+package/Dockerfile @rancher/release-team
+package/Dockerfile.installer @rancher/release-team
