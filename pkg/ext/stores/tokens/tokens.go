@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -109,8 +110,8 @@ type Store struct {
 // words, it generally has access to all the tokens, in all ways.
 type SystemStore struct {
 	authorizer      authorizer.Authorizer
-	initialized     bool                // flag. set when this store ensured presence of the backing namespace
 	namespaceClient v1.NamespaceClient  // access to namespaces.
+	namespaceCache  v1.NamespaceCache   // quick access to namespaces.
 	secretClient    v1.SecretClient     // direct access to the backing secrets
 	secretCache     v1.SecretCache      // cached access to the backing secrets
 	userClient      v3.UserCache        // cached access to the v3.Users
@@ -127,6 +128,7 @@ func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Au
 	return New(
 		authorizer,
 		wranglerContext.Core.Namespace(),
+		wranglerContext.Core.Namespace().Cache(),
 		wranglerContext.Core.Secret(),
 		wranglerContext.Mgmt.User(),
 		wranglerContext.Mgmt.Token().Cache(),
@@ -143,6 +145,7 @@ func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Au
 func New(
 	authorizer authorizer.Authorizer,
 	namespaceClient v1.NamespaceClient,
+	namespaceCache v1.NamespaceCache,
 	secretClient v1.SecretController,
 	userClient v3.UserController,
 	tokenClient v3.TokenCache,
@@ -154,6 +157,7 @@ func New(
 		SystemStore: SystemStore{
 			authorizer:      authorizer,
 			namespaceClient: namespaceClient,
+			namespaceCache:  namespaceCache,
 			secretClient:    secretClient,
 			secretCache:     secretClient.Cache(),
 			userClient:      userClient.Cache(),
@@ -174,6 +178,7 @@ func New(
 func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 	return NewSystem(
 		wranglerContext.Core.Namespace(),
+		wranglerContext.Core.Namespace().Cache(),
 		wranglerContext.Core.Secret(),
 		wranglerContext.Mgmt.User(),
 		wranglerContext.Mgmt.Token().Cache(),
@@ -189,6 +194,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 // convenience function instead.
 func NewSystem(
 	namespaceClient v1.NamespaceClient,
+	namespaceCache v1.NamespaceCache,
 	secretClient v1.SecretController,
 	userClient v3.UserController,
 	tokenClient v3.TokenCache,
@@ -198,6 +204,7 @@ func NewSystem(
 ) *SystemStore {
 	tokenStore := SystemStore{
 		namespaceClient: namespaceClient,
+		namespaceCache:  namespaceCache,
 		secretClient:    secretClient,
 		secretCache:     secretClient.Cache(),
 		userClient:      userClient.Cache(),
@@ -233,6 +240,38 @@ func (t *Store) New() runtime.Object {
 
 // Destroy implements [rest.Storage], a required interface.
 func (t *Store) Destroy() {
+}
+
+// EnsureNamespace ensures that the namespace for storing token secrets exists.
+func (t *Store) EnsureNamespace() error {
+	var backoff = wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   2,
+		Jitter:   .2,
+		Steps:    10, // Up to ~51 seconds.
+	}
+
+	return wait.ExponentialBackoff(backoff, func() (bool, error) {
+		_, err := t.namespaceCache.Get(TokenNamespace)
+		if err == nil {
+			return true, nil
+		}
+
+		if !apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("error getting namespace %s: %w", TokenNamespace, err)
+		}
+
+		_, err = t.namespaceClient.Create(&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: TokenNamespace,
+			},
+		})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return false, fmt.Errorf("error creating namespace %s: %w", TokenNamespace, err)
+		}
+
+		return true, nil
+	})
 }
 
 // Create implements [rest.Creator], the interface to support the `create`
@@ -473,19 +512,6 @@ func (t *Store) create(ctx context.Context, token *ext.Token, options *metav1.Cr
 func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, token *ext.Token, options *metav1.CreateOptions) (*ext.Token, error) {
 	// check if the user does not wish to actually change anything
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
-
-	// ensure existence of the namespace holding our secrets. run once per store.
-	if !dryRun && !t.initialized {
-		_, err := t.namespaceClient.Create(&corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: TokenNamespace,
-			},
-		})
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return nil, err
-		}
-		t.initialized = true
-	}
 
 	user, err := t.userClient.Get(token.Spec.UserID)
 	if err != nil {
