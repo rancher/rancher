@@ -40,9 +40,7 @@ func (p *Provisioner) getKontainerDriver(spec apimgmtv3.ClusterSpec) (*apimgmtv3
 	return nil, fmt.Errorf("no kontainer driver for cluster %v", spec.DisplayName)
 }
 
-// driverUpdate updates the given cluster with the new config from `spec` using its driver. If `forceUpdate` is true,
-// the update will be performed regardless of whether the spec has changed at all. Otherwise, the update will only
-// occur if the spec has changed.
+// driverUpdate updates the given cluster with the new config from `spec` using its driver
 func (p *Provisioner) driverUpdate(
 	cluster *apimgmtv3.Cluster,
 	spec apimgmtv3.ClusterSpec,

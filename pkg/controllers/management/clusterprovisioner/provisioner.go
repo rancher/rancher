@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
@@ -31,7 +30,6 @@ import (
 
 const (
 	KontainerEngineUpdate = "provisioner.cattle.io/ke-driver-update"
-	RKEForceUpdate        = "rke.cattle.io/force-update"
 )
 
 type Provisioner struct {
@@ -394,8 +392,6 @@ func (p *Provisioner) backoffFailure(cluster *apimgmtv3.Cluster, spec *apimgmtv3
 	return false, 0
 }
 
-var errKeyRotationFailed = errors.New("encryption key rotation failed, please restore your cluster from backup")
-
 func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) (*apimgmtv3.Cluster, error) {
 	if skipLocalK3sImported(cluster) {
 		reconcileACE(cluster)
@@ -460,9 +456,6 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
 			apiEndpoint, serviceAccountToken, caCert, _, err = p.driverUpdate(cluster, *spec)
 		}
-	} else if strings.Contains(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), errKeyRotationFailed.Error()) {
-		logrus.Infof("Key rotation failed, cluster needs to be restored. Skipping driver updates.")
-		return cluster, nil // prevent driver updates if the cluster needs to be restored
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
 
@@ -519,9 +512,6 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		cluster.Status.ServiceAccountTokenSecret = secret.Name
 		cluster.Status.ServiceAccountToken = ""
 		cluster.Status.CACert = caCert
-
-		// Remove the force reconcile annotation from the cluster since it has been reconciled successfully.
-		delete(cluster.Annotations, RKEForceUpdate)
 
 		if cluster, err = p.Clusters.Update(cluster); err == nil {
 			saved = true

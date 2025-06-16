@@ -20,7 +20,6 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -372,29 +371,6 @@ func computeDelta(currentState map[string]string, planValues map[string]string, 
 	}
 
 	return result, changed
-}
-
-func (m *nodesSyncer) getServiceOptions(k8sVersion string, osType string) (map[string]interface{}, error) {
-	data := map[string]interface{}{}
-	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, m.serviceOptionsLister, m.serviceOptions, m.sysImagesLister, m.sysImages, kd.Linux)
-	if err != nil {
-		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
-		return data, err
-	}
-	if svcOptions != nil {
-		data["k8s-service-options"] = svcOptions
-	}
-	if osType == "windows" {
-		svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, m.serviceOptionsLister, m.serviceOptions, m.sysImagesLister, m.sysImages, kd.Windows)
-		if err != nil {
-			logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
-			return data, err
-		}
-		if svcOptionsWindows != nil {
-			data["k8s-windows-service-options"] = svcOptionsWindows
-		}
-	}
-	return data, nil
 }
 
 func (m *nodesSyncer) reconcileAll() error {

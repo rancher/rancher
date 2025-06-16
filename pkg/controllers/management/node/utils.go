@@ -1,13 +1,9 @@
 package node
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -15,12 +11,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -38,42 +31,6 @@ const (
 	nodeCmd           = "rancher-machine"
 	ec2TagFlag        = "tags"
 )
-
-func buildAgentCommand(node *v3.Node, dockerRun string) []string {
-	drun := strings.Fields(dockerRun)
-	cmd := []string{"ssh", node.Spec.RequestedHostname}
-	cmd = append(cmd, drun...)
-	cmd = append(cmd, "-r", "-n", node.Name)
-	return cmd
-}
-
-func buildLoginCommand(node *v3.Node, login string) []string {
-	cmd := []string{"ssh", node.Spec.RequestedHostname}
-	cmd = append(cmd, strings.Fields(login)...)
-	return cmd
-}
-
-func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []string {
-	sDriver := strings.ToLower(node.Status.NodeTemplateSpec.Driver)
-	cmd := []string{"create", "-d", sDriver}
-
-	cmd = append(cmd, buildEngineOpts("--engine-install-url", []string{node.Status.NodeTemplateSpec.EngineInstallURL})...)
-	cmd = append(cmd, buildEngineOpts("--engine-opt", mapToSlice(node.Status.NodeTemplateSpec.EngineOpt))...)
-	cmd = append(cmd, buildEngineOpts("--engine-opt", storageOptMapToSlice(node.Status.NodeTemplateSpec.StorageOpt))...)
-	cmd = append(cmd, buildEngineOpts("--engine-opt", logOptMapToSlice(node.Status.NodeTemplateSpec.LogOpt))...)
-	cmd = append(cmd, buildEngineOpts("--engine-env", mapToSlice(node.Status.NodeTemplateSpec.EngineEnv))...)
-	cmd = append(cmd, buildEngineOpts("--engine-insecure-registry", node.Status.NodeTemplateSpec.EngineInsecureRegistry)...)
-	cmd = append(cmd, buildEngineOpts("--engine-label", mapToSlice(node.Status.NodeTemplateSpec.EngineLabel))...)
-	cmd = append(cmd, buildEngineOpts("--engine-registry-mirror", node.Status.NodeTemplateSpec.EngineRegistryMirror)...)
-	cmd = append(cmd, buildEngineOpts("--engine-storage-driver", []string{node.Status.NodeTemplateSpec.EngineStorageDriver})...)
-
-	// Append driver-specific flags to the command.
-	cmd = append(cmd, buildDriverFlags(sDriver, configMap)...)
-
-	// Add the hostname to the command.
-	cmd = append(cmd, node.Spec.RequestedHostname)
-	return cmd
-}
 
 // buildDriverFlags extracts driver-specific configuration from the given configmap and turns it into CLI flags.
 func buildDriverFlags(driverName string, configMap map[string]any) []string {
@@ -143,31 +100,6 @@ func logOptMapToSlice(m map[string]string) []string {
 	return ret
 }
 
-func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, error) {
-	// only in trace because machine has sensitive details and we can't control who debugs what in there easily
-	if logrus.GetLevel() >= logrus.TraceLevel {
-		// prepend --debug to pass directly to machine
-		cmdArgs = append([]string{"--debug"}, cmdArgs...)
-	}
-
-	// In dev_mode, don't need jail or reference to jail in command
-	if os.Getenv("CATTLE_DEV_MODE") != "" {
-		env := initEnviron(nodeDir)
-		command := exec.Command(nodeCmd, cmdArgs...)
-		command.Env = env
-		logrus.Tracef("buildCommand args: %v", command.Args)
-		return command, nil
-	}
-
-	command := exec.Command(nodeCmd, cmdArgs...)
-	command.Env = []string{
-		nodeDirEnvKey + nodeDir,
-		"PATH=/usr/bin:/var/lib/rancher/management-state/bin",
-	}
-	logrus.Tracef("buildCommand args: %v", command.Args)
-	return jailer.JailCommand(command, path.Join(jailer.BaseJailPath, node.Namespace))
-}
-
 func initEnviron(nodeDir string) []string {
 	env := os.Environ()
 	found := false
@@ -189,26 +121,6 @@ func initEnviron(nodeDir string) []string {
 	return env
 }
 
-func startReturnOutput(command *exec.Cmd) (io.ReadCloser, io.ReadCloser, error) {
-	readerStdout, err := command.StdoutPipe()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	readerStderr, err := command.StderrPipe()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if err := command.Start(); err != nil {
-		readerStdout.Close()
-		readerStderr.Close()
-		return nil, nil, err
-	}
-
-	return readerStdout, readerStderr, nil
-}
-
 func getSSHKey(nodeDir, keyPath string, obj *v3.Node) (string, error) {
 	keyName := filepath.Base(keyPath)
 	if keyName == "" || keyName == "." || keyName == string(filepath.Separator) {
@@ -221,42 +133,6 @@ func getSSHKey(nodeDir, keyPath string, obj *v3.Node) (string, error) {
 	return getSSHPrivateKey(nodeDir, keyName, obj)
 }
 
-func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, node *v3.Node) (*v3.Node, error) {
-	scanner := bufio.NewScanner(stdoutReader)
-	debugPrefix := fmt.Sprintf("(%s) DBG | ", node.Spec.RequestedHostname)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		if strings.Contains(msg, "To see how to connect") {
-			continue
-		}
-		_, err := filterDockerMessage(msg, node)
-		if err != nil {
-			return node, err
-		}
-		if strings.HasPrefix(msg, debugPrefix) {
-			// calls in machine with log.Debug are all prefixed and spammy so only log
-			// under trace and don't add to the v3.NodeConditionProvisioned.Message
-			logrus.Tracef("[node-controller] [cluster-id: %s] %v", node.ObjClusterName(), msg)
-		} else {
-			logrus.Infof("[node-controller] [cluster-id: %s] %v", node.ObjClusterName(), msg)
-			v32.NodeConditionProvisioned.Message(node, msg)
-		}
-
-		// ignore update errors
-		if newObj, err := m.nodeClient.Update(node); err == nil {
-			node = newObj
-		} else {
-			node, _ = m.nodeClient.Get(node.Name, metav1.GetOptions{})
-		}
-	}
-	scanner = bufio.NewScanner(stderrReader)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		return node, errors.New(msg)
-	}
-	return node, nil
-}
-
 func filterDockerMessage(msg string, node *v3.Node) (string, error) {
 	if strings.Contains(msg, errorCreatingNode) {
 		return "", errors.New(msg)
@@ -265,75 +141,6 @@ func filterDockerMessage(msg string, node *v3.Node) (string, error) {
 		return "", nil
 	}
 	return msg, nil
-}
-
-func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
-	command, err := buildCommand(nodeDir, node, []string{"ls", "-q"})
-	if err != nil {
-		return false, err
-	}
-
-	r, err := command.StdoutPipe()
-	if err != nil {
-		return false, err
-	}
-
-	if err = command.Start(); err != nil {
-		return false, err
-	}
-	defer command.Wait()
-
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		foundName := scanner.Text()
-		if foundName == node.Spec.RequestedHostname {
-			return true, nil
-		}
-	}
-	if err = scanner.Err(); err != nil {
-		return false, err
-	}
-
-	if err := command.Wait(); err != nil {
-		return false, err
-	}
-
-	return false, nil
-}
-
-func deleteNode(nodeDir string, node *v3.Node, configMap map[string]any) error {
-	// We're passing the `--update-config` flag here along with driver-specific flags to tell Rancher Machine
-	// to reload the driver-specific flags we pass via CLI flags. They need to be reloaded to account for cases
-	// were configuration used by Rancher machine (namely cloud credentials) change while the machine is still running.
-	// If we didn't do this, a user could create a machine and change the cloud credential it uses, leaving Rancher
-	// unable to remove the machine afterward because Rancher machine will always use the old credential it stored on
-	// machine creation.
-	driverName := strings.ToLower(node.Status.NodeTemplateSpec.Driver)
-	args := append([]string{"rm", "-f", "--update-config"}, buildDriverFlags(driverName, configMap)...)
-
-	args = append(args, node.Spec.RequestedHostname)
-	command, err := buildCommand(nodeDir, node, args)
-	if err != nil {
-		return err
-	}
-	stdoutReader, stderrReader, err := startReturnOutput(command)
-	if err != nil {
-		return err
-	}
-	defer stdoutReader.Close()
-	defer stderrReader.Close()
-	scanner := bufio.NewScanner(stdoutReader)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		logrus.Infof("[node-controller] %v", msg)
-	}
-	scanner = bufio.NewScanner(stderrReader)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		logrus.Warnf("[node-controller] %v", msg)
-	}
-
-	return command.Wait()
 }
 
 func getSSHPrivateKey(nodeDir, keyName string, node *v3.Node) (string, error) {
