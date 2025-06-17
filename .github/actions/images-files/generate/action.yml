@@ -28,6 +28,8 @@ runs:
         touch $HOME/bin/rancher-rke-k8s-versions.txt
     - name: Create components and images files
       shell: bash
+      env:
+        REGISTRY: ""
       run: ./scripts/create-components-images-files.sh
     - name: Move rke-k8s version file
       shell: bash
