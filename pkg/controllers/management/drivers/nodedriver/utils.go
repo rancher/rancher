@@ -146,3 +146,16 @@ func getCreateFlagsForDriver(driver string) ([]cli.Flag, error) {
 
 	return flags, nil
 }
+
+// ParseKeyValueString parses a comma-separated list of "key:value" pairs into a map[string]string
+func ParseKeyValueString(input string) map[string]string {
+	result := map[string]string{}
+	pairs := strings.Split(input, ",")
+	for _, pair := range pairs {
+		keyVal := strings.SplitN(pair, ":", 2)
+		if len(keyVal) == 2 {
+			result[strings.TrimSpace(keyVal[0])] = strings.TrimSpace(keyVal[1])
+		}
+	}
+	return result
+}

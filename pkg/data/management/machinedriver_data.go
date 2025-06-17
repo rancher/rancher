@@ -39,6 +39,9 @@ const (
 	OutscaleDriver     = "outscale"
 )
 
+// DriverDataConfig contains driver‑specific metadata that is parsed as
+// annotations on the corresponding NodeDriver object.
+// FileToFieldAliases field maps `Schema field => driver field`
 type DriverDataConfig struct {
 	FileToFieldAliases       map[string]string
 	PublicCredentialFields   []string
@@ -48,8 +51,6 @@ type DriverDataConfig struct {
 	Defaults                 map[string]string
 }
 
-// DriverData[fileToFieldAliases] maps Schema field => driver field
-// This mapping is inverse of DriverToSchemaFields in pkg/controllers/management/drivers/nodedriver/machine_driver.go
 var DriverData = map[string]DriverDataConfig{
 	AlibabaDriver: {
 		FileToFieldAliases: map[string]string{"sshKeyContents": "sshKeypath"},
@@ -314,7 +315,7 @@ func getAnnotations(nodeDriver *v3.NodeDriver, driverName string) map[string]str
 		return annotations
 	}
 
-	// Helper: formats map[string]string to key=value comma-separated string
+	// Helper: formats map[string]string to key:value comma-separated string
 	formatMap := func(mp map[string]string) string {
 		pairs := make([]string, 0, len(mp))
 		for k, v := range mp {
