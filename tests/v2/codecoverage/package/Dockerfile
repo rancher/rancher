@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/bci-micro:15.6 AS final
+FROM registry.suse.com/bci/bci-micro:15.7 AS final
 
 # Temporary build stage image
 FROM registry.suse.com/bci/bci-base:15.7 AS builder
