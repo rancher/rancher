@@ -6,15 +6,14 @@ WORKDIR $WORKSPACE
 ENV PYTHONPATH /src/rancher-validation
 ARG RKE_VERSION=v1.0.2
 ARG CLI_VERSION=v2.3.2
-ARG RANCHER_HELM_VERSION=v3.9.0
 ARG SONOBUOY_VERSION=0.18.2
 ARG TERRAFORM_VERSION=0.12.10
 
 ARG EXTERNAL_ENCODED_VPN
 ARG VPN_ENCODED_LOGIN
 
-
 COPY [".", "$WORKSPACE"]
+COPY bin/helm-v3.18.3-linux-amd64.tar.gz /tmp/helm-v3.18.3-linux-amd64.tar.gz
 
 RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
     mv kubectl /bin/kubectl && \
@@ -26,10 +25,11 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     tar -x -f rancher-linux-amd64-$CLI_VERSION.tar.gz && \
     mv rancher-$CLI_VERSION/rancher /bin/rancherctl && \
     chmod +x /bin/rancherctl && \
-    wget https://get.helm.sh/helm-$RANCHER_HELM_VERSION-linux-amd64.tar.gz && \
-    tar -x -f helm-$RANCHER_HELM_VERSION-linux-amd64.tar.gz && \
-    mv linux-amd64/helm /bin/helm_v3 && \
-    chmod +x /bin/helm_v3 && \
+    tar -zxvf /tmp/helm-v3.18.3-linux-amd64.tar.gz -C /tmp && \
+    mv /tmp/linux-amd64/helm /usr/local/bin/helm_v3 && \
+    chmod +x /usr/local/bin/helm_v3 && \
+    rm /tmp/helm-v3.18.3-linux-amd64.tar.gz && \
+    rm -rf /tmp/linux-amd64 && \
     wget https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
     apt-get update && \
     apt-get install unzip && \
@@ -50,4 +50,3 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
 
 # necessary to run if statements using [[ ]]
 SHELL ["/bin/bash", "-c"] 
-
