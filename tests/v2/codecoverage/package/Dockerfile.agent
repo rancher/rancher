@@ -31,7 +31,7 @@ FROM ${RANCHER_IMAGE} AS rancher
 
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
-FROM registry.suse.com/bci/bci-base:15.6 AS zypper
+FROM registry.suse.com/bci/bci-base:15.7 AS zypper
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/

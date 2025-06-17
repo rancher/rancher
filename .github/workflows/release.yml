@@ -77,7 +77,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: registry.suse.com/bci/bci-base:15.7
     permissions:
       contents: read
       id-token: write
@@ -186,7 +186,7 @@ jobs:
         uses: ./.github/actions/images-files/publish-gh
   docker-image-digests:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: registry.suse.com/bci/bci-base:15.7
     needs: [create-images-files, merge-server-agent-installer-manifests]
     permissions:
       contents: write
@@ -218,7 +218,7 @@ jobs:
         uses: ./.github/actions/images-digests/publish-gh
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: registry.suse.com/bci/bci-base:15.7
     needs: [merge-server-agent-installer-manifests, docker-image-digests]
     permissions:
       contents: read

@@ -75,7 +75,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: registry.suse.com/bci/bci-base:15.7
     permissions:
       contents: read
       id-token: write
