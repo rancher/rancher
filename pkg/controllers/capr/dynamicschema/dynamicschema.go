@@ -2,6 +2,7 @@ package dynamicschema
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -76,6 +77,7 @@ func addConfigSchema(name string, specSchema *schemas.Schema, allSchemas *schema
 	return id, allSchemas.AddSchema(schemas.Schema{
 		ID:             id,
 		ResourceFields: nodeConfigFields,
+		Description:    fmt.Sprintf("%s is the configuration for the rancher %s node driver flags for machines in a machine pool.", convert.Capitalize(id), name),
 	})
 }
 
@@ -85,12 +87,14 @@ func addMachineSchema(name string, specSchema, statusSchema *schemas.Schema, all
 		ID: id,
 		ResourceFields: map[string]schemas.Field{
 			"spec": {
-				Type: specSchema.ID,
+				Type:        specSchema.ID,
+				Description: "Desired state of the machine, generated from the pool configuration.",
 			},
 			"status": {
 				Type: statusSchema.ID,
 			},
 		},
+		Description: fmt.Sprintf("%s is a CAPI infrastructure machine for the rancher %s infrastructure provider.", convert.Capitalize(id), name),
 	})
 }
 
@@ -100,7 +104,8 @@ func addMachineTemplateSchema(name string, specSchema *schemas.Schema, allSchema
 		ID: templateTemplateSpecSchemaID,
 		ResourceFields: map[string]schemas.Field{
 			"spec": {
-				Type: specSchema.ID,
+				Type:        specSchema.ID,
+				Description: "Specification of the template object.",
 			},
 		},
 	})
@@ -113,10 +118,12 @@ func addMachineTemplateSchema(name string, specSchema *schemas.Schema, allSchema
 		ID: templateSpecSchemaID,
 		ResourceFields: map[string]schemas.Field{
 			"template": {
-				Type: templateTemplateSpecSchemaID,
+				Type:        templateTemplateSpecSchemaID,
+				Description: "Template for creating new machines.",
 			},
 			"clusterName": {
-				Type: "string",
+				Type:        "string",
+				Description: "Name of the cluster (provisioning.cattle.io) that generated this template.",
 			},
 		},
 	})
@@ -129,9 +136,11 @@ func addMachineTemplateSchema(name string, specSchema *schemas.Schema, allSchema
 		ID: id,
 		ResourceFields: map[string]schemas.Field{
 			"spec": {
-				Type: templateSpecSchemaID,
+				Type:        templateSpecSchemaID,
+				Description: "Specification of the machines in the template, generated from the pool configuration.",
 			},
 		},
+		Description: fmt.Sprintf("%s is a CAPI infrastructure machine template for the rancher %s infrastructure provider.", convert.Capitalize(id), name),
 	})
 }
 
@@ -272,7 +281,8 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 	}
 
 	specSchema.ResourceFields["providerID"] = schemas.Field{
-		Type: "string",
+		Type:        "string",
+		Description: "Identifier for the machine, corresponds to the node object providerID.",
 	}
 
 	for name, field := range specSchema.ResourceFields {

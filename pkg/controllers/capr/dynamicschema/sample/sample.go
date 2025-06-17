@@ -19,10 +19,12 @@ type Sample struct {
 
 	Spec SampleSpec `json:"spec"`
 
+	// Observed status of the Machine.
 	Status rkev1.RKEMachineStatus `json:"status"`
 }
 
 type SampleSpec struct {
+	// Machine configuration not specific to the infrastructure provider.
 	Common rkev1.RKECommonNodeConfig `json:"common"`
 }
 
