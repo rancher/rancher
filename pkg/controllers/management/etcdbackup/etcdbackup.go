@@ -22,9 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
-	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkecluster "github.com/rancher/rke/cluster"
@@ -65,21 +63,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		secretLister:          management.Core.Secrets("").Controller().Lister(),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
-
-	local := &rkedialerfactory.RKEDialerFactory{
-		Factory: management.Dialer,
-		Ctx:     ctx,
-	}
-	docker := &rkedialerfactory.RKEDialerFactory{
-		Factory: management.Dialer,
-		Docker:  true,
-		Ctx:     ctx,
-	}
-	driver := service.Drivers[service.RancherKubernetesEngineDriverName]
-	rkeDriver := driver.(*rke.Driver)
-	rkeDriver.DockerDialer = docker.Build
-	rkeDriver.LocalDialer = local.Build
-	rkeDriver.WrapTransportFactory = docker.WrapTransport
 
 	c.backupClient.AddLifecycle(ctx, "etcdbackup-controller", c)
 	go c.clusterBackupSync(ctx, clusterBackupCheckInterval)

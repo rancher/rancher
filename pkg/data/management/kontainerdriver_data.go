@@ -31,10 +31,6 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := creator.add("rancherKubernetesEngine"); err != nil {
-		return err
-	}
-
 	if err := creator.add("googleKubernetesEngine"); err != nil {
 		return err
 	}
@@ -79,6 +75,7 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		return err
 	}
 
+	creator.deleteRKEKontainerDriver()
 	creator.deleteKontainerDriver("baiducloudcontainerengine", "https://drivers.rancher.cn")
 	creator.deleteKontainerDriver("aliyunkubernetescontainerservice", "https://drivers.rancher.cn")
 	creator.deleteKontainerDriver("tencentkubernetesengine", "https://drivers.rancher.cn")
@@ -195,5 +192,11 @@ func (c *driverCreator) deleteKontainerDriver(name, urlPrefix string) {
 	logrus.Infof("Deleting kontainer driver %s", name)
 	if err := c.drivers.Delete(name, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		logrus.Warnf("Error deleting node driver %s: %v", name, err)
+	}
+}
+
+func (c *driverCreator) deleteRKEKontainerDriver() {
+	if err := c.drivers.Delete("rancherKubernetesEngine", &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		logrus.Warnf("Error deleting rke kontainer driver : %s", err.Error())
 	}
 }

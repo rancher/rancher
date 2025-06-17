@@ -23,12 +23,10 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/kontainerdriver"
 	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rke/services"
@@ -89,28 +87,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
 	management.Management.Nodes("").AddHandler(ctx, "cluster-provisioner-controller", p.machineChanged)
 
-	local := &rkedialerfactory.RKEDialerFactory{
-		Factory: management.Dialer,
-		Ctx:     ctx,
-	}
-	docker := &rkedialerfactory.RKEDialerFactory{
-		Factory: management.Dialer,
-		Docker:  true,
-		Ctx:     ctx,
-	}
-
-	driver := service.Drivers[service.RancherKubernetesEngineDriverName]
-	rkeDriver := driver.(*rke.Driver)
-	rkeDriver.DockerDialer = docker.Build
-	rkeDriver.LocalDialer = local.Build
-	rkeDriver.WrapTransportFactory = docker.WrapTransport
-	mgmt := management.Management
-	rkeDriver.DataStore = NewDataStore(mgmt.RkeAddons("").Controller().Lister(),
-		mgmt.RkeAddons(""),
-		mgmt.RkeK8sServiceOptions("").Controller().Lister(),
-		mgmt.RkeK8sServiceOptions(""),
-		mgmt.RkeK8sSystemImages("").Controller().Lister(),
-		mgmt.RkeK8sSystemImages(""))
 }
 
 func skipOperatorCluster(action string, cluster *apimgmtv3.Cluster) bool {
