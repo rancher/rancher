@@ -1,6 +1,8 @@
 package systeminfo
 
 import (
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"k8s.io/apimachinery/pkg/labels"
 	"net/url"
 
 	"github.com/pborman/uuid"
@@ -17,13 +19,15 @@ const (
 type InfoProvider struct {
 	RancherUuid uuid.UUID
 	ClusterUuid uuid.UUID
+	nodeCache   v3.NodeCache
 }
 
-func NewInfoProvider(rancherUuid uuid.UUID, clusterUuid uuid.UUID) *InfoProvider {
+func NewInfoProvider(rancherUuid uuid.UUID, clusterUuid uuid.UUID, nodeCache v3.NodeCache) *InfoProvider {
 
 	return &InfoProvider{
 		RancherUuid: rancherUuid,
 		ClusterUuid: clusterUuid,
+		nodeCache:   nodeCache,
 	}
 }
 
@@ -46,6 +50,15 @@ func (i *InfoProvider) GetProductIdentifier() (string, string, string) {
 	// It is unlikely SCC should add these as that would require customers purchasing different RegCodes to run Rancher on arm64 and amd64.
 	// In turn, that would lead to complications like "should Arm run Ranchers allow x86 downstream clusters?"
 	return RancherProductIdentifier, i.GetVersion(), RancherCPUArch
+}
+
+func (i *InfoProvider) IsLocalReady() bool {
+	localNodes, nodesErr := i.nodeCache.List("local", labels.Everything())
+	if nodesErr != nil && len(localNodes) > 0 {
+		return true
+	}
+
+	return false
 }
 
 // ServerUrl returns the Rancher server URL

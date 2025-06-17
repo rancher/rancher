@@ -84,6 +84,7 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 	infoProvider := systeminfo.NewInfoProvider(
 		parsedRancherUUID,
 		parsedkubeSystemNSUID,
+		wContext.Mgmt.Node().Cache(),
 	)
 
 	// TODO(o&b): also get Node, Sockets, v-cpus, Clusters and watch those
@@ -103,11 +104,12 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
 	// TODO: expand wait to include verifying at least local cluster is ready too - this prevents issues with offline clusters
 	defer onSystemReady()
-	if systeminfo.IsServerUrlReady() {
+	if systeminfo.IsServerUrlReady() &&
+		(so.systemInfoProvider != nil && so.systemInfoProvider.IsLocalReady()) {
 		close(so.systemRegistrationReady)
 		return
 	}
-	so.log.Info("Waiting for server-url to be ready")
+	so.log.Info("Waiting for server-url and/or local cluster to be ready")
 	wait.Until(func() {
 		// Todo: also wait for local cluster ready
 		if systeminfo.IsServerUrlReady() {

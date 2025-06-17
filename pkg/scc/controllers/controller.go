@@ -85,8 +85,6 @@ func Register(
 	systemInfoExporter *systeminfo.InfoExporter,
 ) {
 	controller := &handler{
-		//WithSetID(controllerID).
-		//WithSetOwnerReference(true, false),
 		log:                log.NewControllerLogger("registration-controller"),
 		ctx:                ctx,
 		registrations:      registrations,
@@ -110,6 +108,7 @@ func Register(
 }
 
 func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
+	ref := registrationObj.ToOwnerRef()
 
 	if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 		return sccOfflineMode{
@@ -121,7 +120,6 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 	}
 
 	credsName := consts.SCCCredentialsSecretName(registrationObj.Name)
-	ref := registrationObj.ToOwnerRef()
 	return sccOnlineMode{
 		registration: registrationObj,
 		log:          h.log.WithField("handler", "online"),
@@ -158,11 +156,29 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 
+		if incomingHash == "" {
+			// update secret with useful annotations & labels
+			newSecret := incomingObj.DeepCopy()
+			if newSecret.Annotations == nil {
+				newSecret.Annotations = map[string]string{}
+			}
+			newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
+			newSecret.Labels = params.Labels()
+
+			savedSecret, updateErr := h.secrets.Update(newSecret)
+			if updateErr != nil {
+				h.log.Error("error applying metadata updates to default SCC registration secret")
+				return nil, updateErr
+			}
+
+			return savedSecret, nil
+		}
+
 		// If secret hash has changed make sure that we submit objects that correspond to that hash
 		// are cleaned up
-		if incomingHash != "" && incomingHash != params.hash {
-			if err := h.cleanupRegistrationByHash(incomingHash); err != nil {
-				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingHash, err)
+		if incomingHash != params.hash {
+			if cleanUpErr := h.cleanupRegistrationByHash(incomingHash); cleanUpErr != nil {
+				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingHash, cleanUpErr)
 			}
 		}
 
@@ -172,40 +188,49 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			newSecret.Annotations = map[string]string{}
 		}
 		newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
-		newSecret.Labels = params.Labels()
 
-		if _, updateErr := h.secrets.Update(newSecret); updateErr != nil {
+		_, updateErr := h.secrets.Update(newSecret)
+		if updateErr != nil {
 			h.log.Error("error applying metadata updates to default SCC registration secret")
 			return nil, updateErr
 		}
+
 		// construct associated registration CRs
-		registration, err := h.registrationFromSecretEntrypoint(metav1.OwnerReference{
-			Name:       newSecret.GetName(),
-			UID:        newSecret.GetUID(),
-			Kind:       newSecret.TypeMeta.Kind,
-			APIVersion: newSecret.TypeMeta.APIVersion,
-		}, params)
+		registration, err := h.registrationFromSecretEntrypoint(params)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to create registration from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 
-		if err := h.createOrUpdate(registration); err != nil {
-			h.log.Errorf("failed to create or update registration %s: %v", registration.Name, err)
-			return incomingObj, fmt.Errorf("failed to create or update registration %s: %w", registration.Name, err)
+		if createOrUpdateErr := h.createOrUpdate(registration); createOrUpdateErr != nil {
+			h.log.Errorf("failed to create or update registration %s: %v", registration.Name, createOrUpdateErr)
+			return incomingObj, fmt.Errorf("failed to create or update registration %s: %w", registration.Name, createOrUpdateErr)
 		}
 	}
+
 	return incomingObj, nil
 }
 
 func (h *handler) createOrUpdate(reg *v1.Registration) error {
-	if _, err := h.registrationCache.Get(reg.Name); err != nil {
+	if _, err := h.registrations.Get(reg.Name, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			_, err := h.registrations.Create(reg)
-			return err
+			_, createErr := h.registrations.Create(reg)
+			return createErr
 		}
 	}
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, updateErr := h.registrations.Update(reg)
+		currentReg, err := h.registrations.Get(reg.Name, metav1.GetOptions{})
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+		preparedReg := currentReg.DeepCopy()
+		preparedReg.Labels = reg.Labels
+		preparedReg.Annotations = reg.Annotations
+		preparedReg.Finalizers = reg.Finalizers
+		preparedReg.Spec = reg.Spec
+
+		_, updateErr := h.registrations.Update(preparedReg)
 		return updateErr
 	})
 }
@@ -217,8 +242,8 @@ func (h *handler) cleanupRegistrationByHash(hash string) error {
 	}
 
 	for _, reg := range regs {
-		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			remainingFin := []string{}
+		if retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var remainingFin []string
 			for _, finalizer := range reg.Finalizers {
 				if finalizer != consts.FinalizerSccRegistration {
 					remainingFin = append(remainingFin, finalizer)
@@ -226,18 +251,18 @@ func (h *handler) cleanupRegistrationByHash(hash string) error {
 			}
 			reg.Finalizers = remainingFin
 
-			_, err := h.registrations.Update(reg)
-			return err
-		}); err != nil {
-			return err
+			_, updateErr := h.registrations.Update(reg)
+			return updateErr
+		}); retryErr != nil {
+			return retryErr
 		}
 
-		err := h.registrations.Delete(reg.Name, &metav1.DeleteOptions{})
-		if apierrors.IsNotFound(err) {
+		deleteErr := h.registrations.Delete(reg.Name, &metav1.DeleteOptions{})
+		if apierrors.IsNotFound(deleteErr) {
 			h.log.Debugf("Registration %s already deleted", reg.Name)
 			continue
 		}
-		if err != nil {
+		if deleteErr != nil {
 			return fmt.Errorf("failed to delete registration %s: %w", reg.Name, err)
 		}
 	}
@@ -367,9 +392,10 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 				if retryErr != nil {
 					return retryErr
 				}
-				reconciledObj := registrationHandler.ReconcileRegisterError(registrationObj, registerErr)
+				prepareObj := registrationObj.DeepCopy()
+				prepareObj = registrationHandler.ReconcileRegisterError(prepareObj, registerErr)
 
-				reconciledReg, reconcileUpdateErr = h.registrations.Update(reconciledObj)
+				reconciledReg, reconcileUpdateErr = h.registrations.Update(prepareObj)
 				return reconcileUpdateErr
 			})
 
@@ -425,9 +451,10 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 				if retryErr != nil {
 					return retryErr
 				}
-				preparedObj := registrationHandler.ReconcileActivateError(registrationObj, activationErr)
+				prepareObj := registrationObj.DeepCopy()
+				prepareObj = registrationHandler.ReconcileActivateError(prepareObj, activationErr)
 
-				reconciledReg, reconcileUpdateErr = h.registrations.Update(preparedObj)
+				reconciledReg, reconcileUpdateErr = h.registrations.Update(prepareObj)
 				return reconcileUpdateErr
 			})
 

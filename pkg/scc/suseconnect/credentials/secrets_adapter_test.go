@@ -48,7 +48,7 @@ func TestBasicNewSecretsAdapter(t *testing.T) {
 		secretName:      SecretName,
 		secrets:         mockSecretsController,
 		secretCache:     mockSecretsCache,
-		finalizer:       Finalizer,
+		finalizerName:   Finalizer,
 		ownerRef:        testOwnerRef,
 	}, secretsBackedCredentials)
 }
@@ -127,7 +127,7 @@ func TestNewSecretsAdapter(t *testing.T) {
 	assert.Equal(t, &CredentialSecretsAdapter{
 		secretNamespace: Namespace,
 		secretName:      SecretName,
-		finalizer:       Finalizer,
+		finalizerName:   Finalizer,
 		ownerRef:        testOwnerRef,
 		secrets:         mockSecretsController,
 		secretCache:     mockSecretsCache,
@@ -162,7 +162,7 @@ func TestSecretsAdapterCredentials_Basic(t *testing.T) {
 	assert.Equal(t, &CredentialSecretsAdapter{
 		secretNamespace: Namespace,
 		secretName:      SecretName,
-		finalizer:       Finalizer,
+		finalizerName:   Finalizer,
 		ownerRef:        testOwnerRef,
 		secrets:         mockSecretsController,
 		secretCache:     mockSecretsCache,
@@ -230,7 +230,7 @@ func TestSecretsAdapterSccCredentials(t *testing.T) {
 	assert.Equal(t, &CredentialSecretsAdapter{
 		secretNamespace: Namespace,
 		secretName:      SecretName,
-		finalizer:       Finalizer,
+		finalizerName:   Finalizer,
 		ownerRef:        testOwnerRef,
 		secrets:         mockSecretsController,
 		secretCache:     mockSecretsCache,
@@ -257,7 +257,7 @@ func TestSecretEmptyTokenUpdate(t *testing.T) {
 	assert.Equal(t, &CredentialSecretsAdapter{
 		secretNamespace: Namespace,
 		secretName:      SecretName,
-		finalizer:       Finalizer,
+		finalizerName:   Finalizer,
 		ownerRef:        testOwnerRef,
 		secrets:         mockSecretsController,
 		secretCache:     mockSecretsCache,

@@ -20,11 +20,12 @@ const (
 type CredentialSecretsAdapter struct {
 	secretNamespace string
 	secretName      string
-	finalizer       string
+	finalizerName   string
 	ownerRef        *metav1.OwnerReference
-	secrets         v1core.SecretController
-	secretCache     v1core.SecretCache
-	credentials     SccCredentials
+	// TODO (dan) : let's make sure the lookups are handled via a secret cache
+	secrets     v1core.SecretController
+	secretCache v1core.SecretCache
+	credentials SccCredentials
 }
 
 func New(
@@ -37,10 +38,10 @@ func New(
 	return &CredentialSecretsAdapter{
 		secretNamespace: namespace,
 		secretName:      name,
+		finalizerName:   finalizer,
+		ownerRef:        ownerRef,
 		secrets:         secrets,
 		secretCache:     secretCache,
-		finalizer:       finalizer,
-		ownerRef:        ownerRef,
 	}
 }
 
@@ -100,12 +101,12 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 		sccCreds.Data[TokenKey] = []byte(token)
 	}
 
-	if c.finalizer != "" {
+	if c.finalizerName != "" {
 		if sccCreds.Finalizers == nil {
 			sccCreds.Finalizers = []string{}
 		}
-		if !slices.Contains(sccCreds.Finalizers, c.finalizer) {
-			sccCreds.Finalizers = append(sccCreds.Finalizers, c.finalizer)
+		if !slices.Contains(sccCreds.Finalizers, c.finalizerName) {
+			sccCreds.Finalizers = append(sccCreds.Finalizers, c.finalizerName)
 		}
 	}
 

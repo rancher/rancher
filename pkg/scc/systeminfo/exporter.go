@@ -2,7 +2,6 @@ package systeminfo
 
 import (
 	"encoding/json"
-
 	"github.com/SUSE/connect-ng/pkg/registration"
 	"github.com/pborman/uuid"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -13,11 +12,11 @@ import (
 )
 
 type InfoExporter struct {
-	InfoProvider *InfoProvider
+	infoProvider *InfoProvider
 
 	clusterCache   v3.ClusterCache
-	nodeCache      v3.NodeCache
 	namespaceCache v1core.NamespaceCache
+	isLocalReady   bool
 }
 
 type RancherSCCInfo struct {
@@ -49,23 +48,31 @@ func NewInfoExporter(
 	wContext *wrangler.Context,
 ) *InfoExporter {
 	return &InfoExporter{
-		InfoProvider:   infoProvider,
+		infoProvider:   infoProvider,
 		clusterCache:   wContext.Mgmt.Cluster().Cache(),
-		nodeCache:      wContext.Mgmt.Node().Cache(),
 		namespaceCache: wContext.Core.Namespace().Cache(),
+		isLocalReady:   false,
 	}
 }
 
 func (e *InfoExporter) Provider() *InfoProvider {
-	return e.InfoProvider
+	return e.infoProvider
 }
 
 func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	// Fetch current node count
-	nodeCount := 0
+	totalNodeCount := 0
+	localNodeCount := 0
 	vcpusCount := 0
 	// TODO: i don't think rancher exposes this...because k8s doesnt
 	socketsCount := 1
+
+	localNodes, nodesErr := e.infoProvider.nodeCache.List("local", labels.Everything())
+	if nodesErr != nil {
+		localNodeCount += len(localNodes)
+	}
+
+	totalNodeCount += localNodeCount
 
 	namespaces, err := e.namespaceCache.List(labels.Everything())
 	if err != nil {
@@ -73,12 +80,15 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	}
 
 	for _, ns := range namespaces {
-		nodes, err := e.nodeCache.List(ns.Name, labels.Everything())
+		if ns.Name == "local" {
+			continue
+		}
+		nodes, err := e.infoProvider.nodeCache.List(ns.Name, labels.Everything())
 		if err != nil {
 			panic(err)
 		}
 
-		nodeCount = len(nodes)
+		totalNodeCount += len(nodes)
 		for _, node := range nodes {
 			cpuCores := node.Status.InternalNodeStatus.Capacity.Cpu()
 			if cpuCores != nil {
@@ -98,10 +108,10 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	// TODO: collect and organize downstream counts
 
 	return RancherSCCInfo{
-		UUID:       e.InfoProvider.RancherUuid,
+		UUID:       e.infoProvider.RancherUuid,
 		RancherUrl: ServerUrl(),
-		Version:    e.InfoProvider.GetVersion(),
-		Nodes:      nodeCount,
+		Version:    e.infoProvider.GetVersion(),
+		Nodes:      totalNodeCount,
 		Sockets:    socketsCount,
 		Clusters:   clusterCount,
 	}
@@ -128,7 +138,7 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 func (e *InfoExporter) PreparedForSCCOffline() (RancherOfflineRequestEncoded, error) {
 	sccPreparedInfo := e.preparedForSCC()
 
-	identifier, version, arch := e.InfoProvider.GetProductIdentifier()
+	identifier, version, arch := e.infoProvider.GetProductIdentifier()
 
 	offlinePrepared := RancherOfflineRequest{
 		UUID:       sccPreparedInfo.UUID,

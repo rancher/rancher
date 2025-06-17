@@ -26,17 +26,24 @@ func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
 }
 
 func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
-	regCode, ok := secret.Data[dataRegCode]
-	if !ok || len(regCode) == 0 {
-		return RegistrationParams{}, fmt.Errorf("secret does not have data %s", dataRegCode)
+	regMode := v1.RegistrationModeOnline
+	regType, ok := secret.Data[dataRegistrationType]
+	if ok && len(regType) > 0 {
+		regMode = v1.RegistrationMode(regType)
+		if !regMode.Valid() {
+			return RegistrationParams{}, fmt.Errorf("invalid registration mode %s", string(regType))
+		}
 	}
 
-	regType, ok := secret.Data[dataRegistrationType]
-	if !ok || len(regType) == 0 {
-		return RegistrationParams{}, fmt.Errorf("secret does not have label %s", dataRegistrationType)
+	regCode, ok := secret.Data[dataRegCode]
+	if regMode == v1.RegistrationModeOnline {
+		if !ok || len(regCode) == 0 {
+			return RegistrationParams{}, fmt.Errorf("secret does not have data %s", dataRegCode)
+		}
 	}
+
 	hasher := md5.New()
-	data := append(regCode, regType...)
+	data := append([]byte(regMode), regCode...)
 	if _, err := hasher.Write(data); err != nil {
 		return RegistrationParams{}, err
 	}
@@ -46,7 +53,7 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 	return RegistrationParams{
 		hash:    id,
 		regCode: string(regCode),
-		regType: v1.RegistrationMode(regType),
+		regType: regMode,
 		secretRef: &corev1.SecretReference{
 			Name:      consts.ResourceSCCEntrypointSecretName,
 			Namespace: secret.Namespace,
@@ -69,7 +76,6 @@ func (r RegistrationParams) Labels() map[string]string {
 }
 
 func (h *handler) registrationFromSecretEntrypoint(
-	ownerRef metav1.OwnerReference,
 	params RegistrationParams,
 ) (*v1.Registration, error) {
 	if params.regType != v1.RegistrationModeOnline && params.regType != v1.RegistrationModeOffline {
@@ -103,7 +109,6 @@ func (h *handler) registrationFromSecretEntrypoint(
 		}
 		reg.Finalizers = append(reg.Finalizers, consts.FinalizerSccRegistration)
 	}
-	reg.OwnerReferences = []metav1.OwnerReference{ownerRef}
 	return reg, nil
 }
 

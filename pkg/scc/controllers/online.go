@@ -48,10 +48,8 @@ func (s sccOnlineMode) PrepareForRegister(registration *v1.Registration) (*v1.Re
 func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
 	// We must always refresh the sccCredentials - this ensures they are current from the secrets
 	credentialsErr := s.sccCredentials.Refresh()
-	if credentialsErr == nil {
-		// Counter-intuitively, on register we expect Refresh call will trigger an error because the secret should not exist yet
-		// So when it does we will send a warning that unexpected results may be found ahead
-		s.log.Warn("scc credential secret already exists; normaly it should not exist at this point yet, this may result in unexpected outcomes")
+	if credentialsErr != nil {
+		return suseconnect.EmptyRegistrationSystemId, credentialsErr
 	}
 
 	// Fetch the SCC registration code; for 80% of users this should be a real code
@@ -117,12 +115,11 @@ func (s sccOnlineMode) reconcileNonRecoverableHttpError(registration *v1.Registr
 }
 
 func (s sccOnlineMode) ReconcileRegisterError(registration *v1.Registration, registerErr error) *v1.Registration {
-	prepared := registration.DeepCopy()
 	if isNonRecoverableHttpError(registerErr) {
-		return s.reconcileNonRecoverableHttpError(prepared, registerErr)
+		return s.reconcileNonRecoverableHttpError(registration, registerErr)
 	}
 	// Do other reconcile prep steps
-	return prepared
+	return registration
 }
 
 func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
@@ -189,12 +186,6 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	s.log.Info(metaData)
 	s.log.Info(product)
 
-	// If no error, then system is still registered with valid activation status...
-	keepAliveErr := sccConnection.KeepAlive()
-	if keepAliveErr != nil {
-		return keepAliveErr
-	}
-
 	s.log.Info("Successfully registered activation")
 
 	return nil
@@ -202,22 +193,20 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 
 // ReconcileActivateError will first verify if an error is recoverable and then reconcile the error as needed
 func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
-	preparedForReconcile := registration.DeepCopy()
-
 	if isNonRecoverableHttpError(activationErr) {
 		httpCode := *getHttpErrorCode(activationErr)
 		nowTime := metav1.Now()
 		// Cannot recover from this error so must set failure
-		preparedForReconcile.Status.ActivationStatus.Activated = false
-		preparedForReconcile.Status.ActivationStatus.LastValidatedTS = &nowTime
-		v1.ResourceConditionFailure.True(preparedForReconcile)
-		v1.ResourceConditionFailure.Message(preparedForReconcile, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then create a new registration.")
-		v1.ResourceConditionProgressing.False(preparedForReconcile)
-		v1.ResourceConditionReady.False(preparedForReconcile)
+		registration.Status.ActivationStatus.Activated = false
+		registration.Status.ActivationStatus.LastValidatedTS = &nowTime
+		v1.ResourceConditionFailure.True(registration)
+		v1.ResourceConditionFailure.Message(registration, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then create a new registration.")
+		v1.ResourceConditionProgressing.False(registration)
+		v1.ResourceConditionReady.False(registration)
 		preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(httpCode), httpCode)
-		v1.RegistrationConditionActivated.SetError(preparedForReconcile, preparedErrorReasonCondition, activationErr)
+		v1.RegistrationConditionActivated.SetError(registration, preparedErrorReasonCondition, activationErr)
 
-		return preparedForReconcile
+		return registration
 	}
 
 	// Return the unmodified version

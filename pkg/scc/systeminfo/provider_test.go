@@ -17,17 +17,17 @@ func TestNewInfoProvider(t *testing.T) {
 	clusterUuid := uuid.Parse(uuid.New())
 
 	// Test with dev build
-	infoProvider := NewInfoProvider(rancherUuid, clusterUuid)
+	infoProvider := NewInfoProvider(rancherUuid, clusterUuid, nil)
 	assert.Equal(t, "2.10.3", infoProvider.GetVersion())
 
 	// Test with non-dev build
 	coreVersion.Version = "1.9.0"
 	defer func() { coreVersion.Version = "dev" }()
-	infoProvider = NewInfoProvider(rancherUuid, clusterUuid)
+	infoProvider = NewInfoProvider(rancherUuid, clusterUuid, nil)
 	assert.Equal(t, "1.9.0", infoProvider.GetVersion())
 
 	// Test with no mock version
-	infoProvider = NewInfoProvider(rancherUuid, clusterUuid)
+	infoProvider = NewInfoProvider(rancherUuid, clusterUuid, nil)
 	assert.Equal(t, coreVersion.Version, infoProvider.GetVersion())
 }
 
@@ -35,7 +35,7 @@ func TestGetProductIdentifier(t *testing.T) {
 	rancherUuid := uuid.Parse(uuid.New())
 	clusterUuid := uuid.Parse(uuid.New())
 
-	infoProvider := NewInfoProvider(rancherUuid, clusterUuid)
+	infoProvider := NewInfoProvider(rancherUuid, clusterUuid, nil)
 	product, version, architecture := infoProvider.GetProductIdentifier()
 	assert.Equal(t, "rancher", product)
 	// When in dev mode, the info provider has to "lie" in order to connect with SCC

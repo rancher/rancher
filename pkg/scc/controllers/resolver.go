@@ -2,8 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
@@ -21,7 +19,7 @@ func (h *handler) initResolvers(ctx context.Context) {
 }
 
 func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	ret := []relatedresource.Key{}
+	var ret []relatedresource.Key
 	if namespace != h.systemNamespace {
 		return nil, nil
 	}
@@ -36,7 +34,8 @@ func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Ob
 
 	curHash, ok := secret.GetLabels()[consts.LabelSccHash]
 	if !ok {
-		return nil, fmt.Errorf("expected an SCC processed hash")
+		h.log.Warnf("failed to find hash for secret %s/%s", namespace, name)
+		return nil, nil
 	}
 	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, curHash)
 	if err != nil {
