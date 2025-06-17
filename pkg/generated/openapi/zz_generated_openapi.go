@@ -969,6 +969,17 @@ func schema_pkg_apis_scccattleio_v1_RegistrationStatus(ref common.ReferenceCallb
 							Format: "int32",
 						},
 					},
+					"registeredProduct": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"registrationExpiresAt": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 					"activationStatus": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},

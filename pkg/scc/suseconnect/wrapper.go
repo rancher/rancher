@@ -137,6 +137,11 @@ func (sw *SccWrapper) Activate(regCode string) (*registration.Metadata, *registr
 	return metaData, product, err
 }
 
+func (sw *SccWrapper) ProductInfo() (*registration.Product, error) {
+	identifier, version, arch := sw.systemInfo.GetProductIdentifier()
+	return registration.FetchProductInfo(sw.conn, identifier, version, arch)
+}
+
 func (sw *SccWrapper) Deregister() error {
 	return registration.Deregister(sw.conn)
 }

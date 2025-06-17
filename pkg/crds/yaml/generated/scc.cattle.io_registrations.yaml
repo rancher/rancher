@@ -176,6 +176,11 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              registeredProduct:
+                type: string
+              registrationExpiresAt:
+                format: date-time
+                type: string
               registrationProcessedTS:
                 format: date-time
                 type: string

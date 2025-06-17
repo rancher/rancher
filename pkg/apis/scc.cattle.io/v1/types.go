@@ -95,6 +95,10 @@ type RegistrationStatus struct {
 	RegistrationProcessedTS *metav1.Time `json:"registrationProcessedTS,omitempty"`
 	// +optional
 	SCCSystemId *int `json:"sccSystemId,omitempty"`
+	// +optional
+	RegisteredProduct *string `json:"registeredProduct"`
+	// +optional
+	RegistrationExpiresAt *metav1.Time `json:"registrationExpiresAt,omitempty"`
 
 	// +optional
 	ActivationStatus SystemActivationState `json:"activationStatus,omitempty"`

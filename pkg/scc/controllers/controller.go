@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/offlinerequest"
 	"maps"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
-	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -53,8 +53,12 @@ type SCCHandler interface {
 	PrepareRegisteredForActivation(*v1.Registration) (*v1.Registration, error)
 	// Activate activates the system with SCC or verifies an offline request.
 	Activate(*v1.Registration) error
+	// PrepareActivatedForKeepalive prepares an Activated Registration for future keepalive
+	PrepareActivatedForKeepalive(*v1.Registration) (*v1.Registration, error)
 	// Keepalive provides a heartbeat to SCC and validates the system's status.
 	Keepalive(registrationObj *v1.Registration) error
+	// PrepareKeepaliveSucceeded completes any necessary steps after successful keepalive
+	PrepareKeepaliveSucceeded(*v1.Registration) (*v1.Registration, error)
 	// Deregister initiates the system's deregistration from SCC.
 	Deregister() error
 
@@ -152,14 +156,6 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 		secrets:            h.secrets,
 		systemNamespace:    h.systemNamespace,
 	}
-}
-
-func minResyncInterval() time.Time {
-	now := time.Now()
-	if util.VersionIsDevBuild() {
-		return now.Add(-devMinCheckin)
-	}
-	return now.Add(-prodMinCheckin)
 }
 
 func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*corev1.Secret, error) {
@@ -352,7 +348,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, errors.New("no server url found in the system info")
 	}
 
-	if v1.ResourceConditionFailure.IsTrue(registrationObj) {
+	if shared.RegistrationIsFailed(registrationObj) {
 		return registrationObj, errors.New("registration has failed status; create a new one to retry")
 	}
 
@@ -482,7 +478,6 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			return registrationObj, err
 		}
 
-		// TODO: maybe this should be in a PrepareActivatedForKeepalive
 		activatedUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var retryErr, updateErr error
 			registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
@@ -491,16 +486,12 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			}
 
 			activated := registrationObj.DeepCopy()
-			v1.RegistrationConditionSccUrlReady.True(activated) // TODO: online only?
-			v1.RegistrationConditionActivated.True(activated)
-			v1.ResourceConditionProgressing.False(activated)
-			v1.ResourceConditionReady.True(activated)
-			v1.ResourceConditionDone.True(activated)
-			activated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
-				Time: time.Now(),
+			activated = shared.PrepareSuccessfulActivation(activated)
+			prepared, err := registrationHandler.PrepareActivatedForKeepalive(activated)
+			if err != nil {
+				return err
 			}
-			activated.Status.ActivationStatus.Activated = true
-			_, updateErr = h.registrations.UpdateStatus(activated)
+			_, updateErr = h.registrations.UpdateStatus(prepared)
 			return updateErr
 		})
 		if activatedUpdateErr != nil {
@@ -511,13 +502,14 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	// Handle what to do when CheckNow is used...
-	if registrationObj.Spec.SyncNow != nil && *registrationObj.Spec.SyncNow {
+	if shared.RegistrationNeedsSyncNow(registrationObj) {
 		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 			updated := registrationObj.DeepCopy()
 			// TODO(o&b): When offline calls this it should immediately sync the OfflineRegistrationRequest secret content
 			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 			return h.registrations.Update(updated)
 		} else {
+			// Todo: online/offline  handler should have a sync now
 			updated := registrationObj.DeepCopy()
 			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 			updated.Status.ActivationStatus.Activated = false

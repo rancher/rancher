@@ -78,6 +78,11 @@ func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
 	panic("implement me to activate offline certs")
 }
 
+func (s sccOfflineMode) PrepareActivatedForKeepalive(registration *v1.Registration) (*v1.Registration, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (s sccOfflineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
 	//TODO implement me
 	panic("implement me")
@@ -87,6 +92,11 @@ func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
 	s.log.Debugf("For now offline keepalive is an intentional noop")
 	// TODO: eventually keepalive for offline should mimic `PrepareRegisteredForActivation` creation of ORR (to update metrics for next offline registration)
 	return nil
+}
+
+func (s sccOfflineMode) PrepareKeepaliveSucceeded(registration *v1.Registration) (*v1.Registration, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, err error) *v1.Registration {

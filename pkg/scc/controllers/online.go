@@ -230,6 +230,25 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	return nil
 }
 
+func (s sccOnlineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registration) (*v1.Registration, error) {
+	now := metav1.Now()
+	registrationObj.Status.RegistrationExpiresAt = &now
+	v1.RegistrationConditionSccUrlReady.True(registrationObj)
+
+	credentialsErr := s.sccCredentials.Refresh()
+	if credentialsErr != nil {
+		return nil, fmt.Errorf("cannot load scc credentials: %w", credentialsErr)
+	}
+	sccConnection := suseconnect.DefaultRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter)
+	productInfo, err := sccConnection.ProductInfo()
+	if err != nil {
+		return nil, fmt.Errorf("cannot load product info from scc: %w", err)
+	}
+
+	registrationObj.Status.RegisteredProduct = &productInfo.FriendlyName
+	return registrationObj, nil
+}
+
 // ReconcileActivateError will first verify if an error is recoverable and then reconcile the error as needed
 func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
 	if isNonRecoverableHttpError(activationErr) {
@@ -279,6 +298,12 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) error {
 	s.log.Info("Successfully checked in with SCC")
 
 	return nil
+}
+
+func (s sccOnlineMode) PrepareKeepaliveSucceeded(registration *v1.Registration) (*v1.Registration, error) {
+	// TODO take any post keepalive success steps
+	s.log.Debug("preparing keepalive succeeded")
+	return registration, nil
 }
 
 func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, keepaliveErr error) *v1.Registration {

@@ -167,6 +167,15 @@ func (in *RegistrationStatus) DeepCopyInto(out *RegistrationStatus) {
 		*out = new(int)
 		**out = **in
 	}
+	if in.RegisteredProduct != nil {
+		in, out := &in.RegisteredProduct, &out.RegisteredProduct
+		*out = new(string)
+		**out = **in
+	}
+	if in.RegistrationExpiresAt != nil {
+		in, out := &in.RegistrationExpiresAt, &out.RegistrationExpiresAt
+		*out = (*in).DeepCopy()
+	}
 	in.ActivationStatus.DeepCopyInto(&out.ActivationStatus)
 	if in.SystemCredentialsSecretRef != nil {
 		in, out := &in.SystemCredentialsSecretRef, &out.SystemCredentialsSecretRef
