@@ -70,7 +70,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
       - name: push
         uses: ./.github/actions/push-images
   build-publish-chart:
@@ -117,7 +117,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
       - name: merge
         uses: ./.github/actions/merge-manifests/server
   merge-agent-manifest:
@@ -134,7 +134,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
       - name: merge
         uses: ./.github/actions/merge-manifests/agent
   build-installer:
@@ -157,7 +157,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
       - name: build
         uses: ./.github/actions/build-images/installer
   merge-installer-manifest:
@@ -174,7 +174,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
       - name: merge
         uses: ./.github/actions/merge-manifests/installer
   create-images-files:
@@ -195,10 +195,10 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials accessKeyId | AWS_ACCESS_KEY_ID ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials primeArtifactsBucketName | ARTIFACTS_BUCKET_NAME;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY ;
+            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials primeArtifactsBucketName | ARTIFACTS_BUCKET_NAME ;
       - name: publish to gh
         uses: ./.github/actions/images-files/publish-gh
       - name: publish to aws
@@ -232,7 +232,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
+            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
       - name: publish to gh
         uses: ./.github/actions/images-digests/publish-gh
   notify-release:
@@ -254,6 +254,6 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL
+            secret/data/github/repo/${{ github.repository }}/slack/webhook webhook_url | WEBHOOK_URL ;
       - name: notify
         uses: ./.github/actions/notify-release
