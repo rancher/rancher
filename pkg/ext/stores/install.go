@@ -33,19 +33,23 @@ func InstallStores(
 	}
 	logrus.Infof("Successfully installed useractivity store")
 
-	tokenStore := tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer())
-	if err := tokenStore.EnsureNamespace(); err != nil {
-		return fmt.Errorf("error ensuring token namespace: %w", err)
-	}
+	if features.ExtTokens.Enabled() {
+		tokenStore := tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer())
+		if err := tokenStore.EnsureNamespace(); err != nil {
+			return fmt.Errorf("error ensuring token namespace: %w", err)
+		}
 
-	if err := server.Install(
-		tokens.PluralName,
-		tokens.GVK,
-		tokenStore,
-	); err != nil {
-		return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
+		if err := server.Install(
+			tokens.PluralName,
+			tokens.GVK,
+			tokenStore,
+		); err != nil {
+			return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
+		}
+		logrus.Infof("Successfully installed token store")
+	} else {
+		logrus.Infof("Feature ext-tokens is disabled")
 	}
-	logrus.Infof("Successfully installed token store")
 
 	if features.ExtKubeconfigs.Enabled() {
 		userManager, err := common.NewUserManagerNoBindings(wranglerContext)
