@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/ext/stores/kubeconfig"
 	"github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/ext/stores/useractivity"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	"github.com/sirupsen/logrus"
@@ -42,24 +43,28 @@ func InstallStores(
 	}
 	logrus.Infof("Successfully installed token store")
 
-	userManager, err := common.NewUserManagerNoBindings(wranglerContext)
-	if err != nil {
-		return fmt.Errorf("error getting user manager: %w", err)
-	}
+	if features.ExtKubeconfigs.Enabled() {
+		userManager, err := common.NewUserManagerNoBindings(wranglerContext)
+		if err != nil {
+			return fmt.Errorf("error getting user manager: %w", err)
+		}
 
-	kubeconfigStore := kubeconfig.New(wranglerContext, server.GetAuthorizer(), userManager)
-	if err = kubeconfigStore.EnsureNamespace(); err != nil {
-		return fmt.Errorf("error ensuring kubeconfig namespace: %w", err)
-	}
+		kubeconfigStore := kubeconfig.New(wranglerContext, server.GetAuthorizer(), userManager)
+		if err = kubeconfigStore.EnsureNamespace(); err != nil {
+			return fmt.Errorf("error ensuring kubeconfig namespace: %w", err)
+		}
 
-	if err := server.Install(
-		extv1.KubeconfigResourceName,
-		extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
-		kubeconfigStore,
-	); err != nil {
-		return fmt.Errorf("unable to install kubeconfig store: %w", err)
+		if err := server.Install(
+			extv1.KubeconfigResourceName,
+			extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
+			kubeconfigStore,
+		); err != nil {
+			return fmt.Errorf("unable to install kubeconfig store: %w", err)
+		}
+		logrus.Infof("Successfully installed kubeconfig store")
+	} else {
+		logrus.Infof("Feature ext-kubeconfigs is disabled")
 	}
-	logrus.Infof("Successfully installed kubeconfig store")
 
 	return nil
 }

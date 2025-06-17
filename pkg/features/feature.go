@@ -176,6 +176,12 @@ var (
 		isPrime(),
 		false,
 		true)
+	ExtKubeconfigs = newFeature(
+		"ext-kubeconfigs",
+		"Enable Imperative API resource kubeconfigs.ext.cattle.io.",
+		true,
+		false,
+		true)
 )
 
 type Feature struct {
