@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	zed "github.com/rancher/rancher/pkg/zdbg"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -452,6 +453,9 @@ func (m *MCAppManager) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp) (
 }
 
 func (m *MCAppManager) getAllApps(mcAppName string) ([]*pv3.App, error) {
+	startTime := time.Now()
+	defer zed.Log(startTime, "getAllApps()")
+
 	// to get all apps, get all clusters first, then get all apps in all projects of all clusters
 	allApps := []*pv3.App{}
 	set := labels.Set(map[string]string{MultiClusterAppIDSelector: mcAppName})
