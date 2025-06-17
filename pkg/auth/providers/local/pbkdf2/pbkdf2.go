@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	localUserPasswordsNamespace = "cattle-local-user-passwords"
+	LocalUserPasswordsNamespace = "cattle-local-user-passwords"
 	iterations                  = 210000
 	keyLength                   = 32
 	passwordHashAnnotation      = "cattle.io/password-hash"
@@ -58,7 +58,7 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 	_, err = p.secretClient.Create(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      user.Name,
-			Namespace: localUserPasswordsNamespace,
+			Namespace: LocalUserPasswordsNamespace,
 			Annotations: map[string]string{
 				passwordHashAnnotation: pbkdf2sha3512Hash,
 			},
@@ -83,9 +83,9 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 	return nil
 }
 
-// SetPassword hashes the provided password using PBKDF2 and updates the secret associated with the specified user
-func (p *Pbkdf2) SetPassword(userId string, newPassword string) error {
-	secret, err := p.secretLister.Get(localUserPasswordsNamespace, userId)
+// UpdatePassword hashes the provided password using PBKDF2 and updates the secret associated with the specified user
+func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
+	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, userId)
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
@@ -110,7 +110,7 @@ func (p *Pbkdf2) SetPassword(userId string, newPassword string) error {
 	if err != nil {
 		return err
 	}
-	_, err = p.secretClient.Patch(localUserPasswordsNamespace, secret.Name, types.JSONPatchType, patch)
+	_, err = p.secretClient.Patch(LocalUserPasswordsNamespace, secret.Name, types.JSONPatchType, patch)
 	if err != nil {
 		return fmt.Errorf("failed to patch secret: %w", err)
 	}
@@ -118,10 +118,10 @@ func (p *Pbkdf2) SetPassword(userId string, newPassword string) error {
 	return nil
 }
 
-// UpdatePassword hashes the provided password using PBKDF2 and updates the secret associated with the specified user
+// VerifyAndUpdatePassword hashes the provided password using PBKDF2 and updates the secret associated with the specified user
 // if the currentPassword matches the password stored.
-func (p *Pbkdf2) UpdatePassword(userId string, currentPassword, newPassword string) error {
-	secret, err := p.secretLister.Get(localUserPasswordsNamespace, userId)
+func (p *Pbkdf2) VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error {
+	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, userId)
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
@@ -131,13 +131,13 @@ func (p *Pbkdf2) UpdatePassword(userId string, currentPassword, newPassword stri
 		return fmt.Errorf("invalid current password")
 	}
 
-	return p.SetPassword(userId, newPassword)
+	return p.UpdatePassword(userId, newPassword)
 }
 
 // VerifyPassword verifies if the password stored is the same as the password provided.
 // if the password stored is usign the legacy hashing algorithm (bcrypt) it will be updated to PBKDF2.
 func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
-	secret, err := p.secretLister.Get(localUserPasswordsNamespace, user.Name)
+	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, user.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
@@ -196,7 +196,7 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 		if err != nil {
 			return err
 		}
-		_, err = p.secretClient.Patch(localUserPasswordsNamespace, secret.Name, types.JSONPatchType, patch)
+		_, err = p.secretClient.Patch(LocalUserPasswordsNamespace, secret.Name, types.JSONPatchType, patch)
 		if err != nil {
 			return fmt.Errorf("failed to patch secret: %w", err)
 		}

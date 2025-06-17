@@ -36,11 +36,6 @@ var GVK = schema.GroupVersionKind{
 	Version: GV.Version,
 	Kind:    "UserRefreshRequest",
 }
-var GVR = schema.GroupVersionResource{
-	Group:    GV.Group,
-	Version:  GV.Version,
-	Resource: "userrefreshrequests",
-}
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
@@ -116,6 +111,9 @@ func (s *Store) Create(
 		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T",
 			zeroT, obj))
 	}
+	if !objUserRefreshRequest.Spec.All && objUserRefreshRequest.Spec.UserID == "" {
+		return nil, apierrors.NewBadRequest("user ID or 'all' must be set")
+	}
 
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
@@ -143,8 +141,7 @@ func (s *Store) Create(
 
 	if objUserRefreshRequest.Spec.All {
 		s.userAuthRefresher.TriggerAllUserRefresh()
-	}
-	if objUserRefreshRequest.Spec.UserID != "" {
+	} else if objUserRefreshRequest.Spec.UserID != "" {
 		s.userAuthRefresher.TriggerUserRefresh(objUserRefreshRequest.Spec.UserID, true)
 	}
 

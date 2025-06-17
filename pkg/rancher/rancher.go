@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"net/http"
 	"os"
 	"strings"
@@ -73,7 +74,6 @@ import (
 const (
 	encryptionConfigUpdate        = "provisioner.cattle.io/encrypt-migrated"
 	defaultSQLCacheMaxEventsCount = 1000
-	localUserPasswordsNamespace = "cattle-local-user-passwords"
 )
 
 type Options struct {
@@ -330,7 +330,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 func (r *Rancher) Start(ctx context.Context) error {
 	if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: localUserPasswordsNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: pbkdf2.LocalUserPasswordsNamespace},
 	}); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}

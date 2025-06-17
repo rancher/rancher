@@ -3,6 +3,8 @@ package pbkdf2
 import (
 	"encoding/json"
 	"errors"
+	"testing"
+
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"testing"
 )
 
 func TestCreatePassword(t *testing.T) {
@@ -31,7 +32,7 @@ func TestCreatePassword(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		userID             string
+		user               *v3.User
 		password           string
 		mockHashKey        func(password string, salt []byte, iter, keyLength int) ([]byte, error)
 		mockSaltGenerator  func() ([]byte, error)
@@ -40,7 +41,7 @@ func TestCreatePassword(t *testing.T) {
 		expectErrorMessage string
 	}{
 		"a secret with the hashed password and salt is created": {
-			userID:   fakeUserID,
+			user:     fakeUser,
 			password: fakePassword,
 			mockHashKey: func(password string, salt []byte, iter, keyLength int) ([]byte, error) {
 				return []byte(fakePasswordHash), nil
@@ -59,7 +60,7 @@ func TestCreatePassword(t *testing.T) {
 				mock.EXPECT().Create(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
 							passwordHashAnnotation: pbkdf2sha3512Hash,
 						},
@@ -80,22 +81,8 @@ func TestCreatePassword(t *testing.T) {
 				return mock
 			},
 		},
-		"error when user can't be fetched": {
-			userID:   fakeUserID,
-			password: fakePassword,
-			mockUserCache: func() *fake.MockNonNamespacedCacheInterface[*v3.User] {
-				mock := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctlr)
-				mock.EXPECT().Get(fakeUserID).Return(nil, errors.New("unexpected error"))
-
-				return mock
-			},
-			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
-				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
-			},
-			expectErrorMessage: "failed to get user: unexpected error",
-		},
 		"error when salt can't be generated": {
-			userID:   fakeUserID,
+			user:     fakeUser,
 			password: fakePassword,
 			mockSaltGenerator: func() ([]byte, error) {
 				return nil, errors.New("unexpected error")
@@ -112,7 +99,7 @@ func TestCreatePassword(t *testing.T) {
 			expectErrorMessage: "failed to generate salt: unexpected error",
 		},
 		"error when creating a hash for a password": {
-			userID:   fakeUserID,
+			user:     fakeUser,
 			password: fakePassword,
 			mockHashKey: func(password string, salt []byte, iter, keyLength int) ([]byte, error) {
 				return nil, errors.New("unexpected error")
@@ -132,7 +119,7 @@ func TestCreatePassword(t *testing.T) {
 			expectErrorMessage: "failed to hash password: unexpected error",
 		},
 		"error when secret can't be created": {
-			userID:   fakeUserID,
+			user:     fakeUser,
 			password: fakePassword,
 			mockHashKey: func(password string, salt []byte, iter, keyLength int) ([]byte, error) {
 				return []byte(fakePasswordHash), nil
@@ -151,7 +138,7 @@ func TestCreatePassword(t *testing.T) {
 				mock.EXPECT().Create(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
 							passwordHashAnnotation: pbkdf2sha3512Hash,
 						},
@@ -180,11 +167,10 @@ func TestCreatePassword(t *testing.T) {
 			t.Parallel()
 			p := Pbkdf2{
 				secretClient:  test.mockSecretClient(),
-				userLister:    test.mockUserCache(),
 				hashKey:       test.mockHashKey,
 				saltGenerator: test.mockSaltGenerator,
 			}
-			err := p.CreatePassword(test.userID, test.password)
+			err := p.CreatePassword(test.user, test.password)
 			if test.expectErrorMessage == "" {
 				assert.NoError(t, err)
 			} else {
@@ -194,7 +180,7 @@ func TestCreatePassword(t *testing.T) {
 	}
 }
 
-func TestSetPassword(t *testing.T) {
+func TestUpdatePassword(t *testing.T) {
 	ctlr := gomock.NewController(t)
 	fakeUserID := "fake-user-id"
 	fakePassword := "fake-password"
@@ -217,10 +203,10 @@ func TestSetPassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -243,7 +229,7 @@ func TestSetPassword(t *testing.T) {
 						"salt":     []byte(fakePasswordSalt),
 					},
 				}})
-				mock.EXPECT().Patch(localUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
 
 				return mock
 			},
@@ -253,7 +239,7 @@ func TestSetPassword(t *testing.T) {
 			password: fakePassword,
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(nil, errors.New("unexpected error"))
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -270,10 +256,10 @@ func TestSetPassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -295,10 +281,10 @@ func TestSetPassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -321,7 +307,7 @@ func TestSetPassword(t *testing.T) {
 						"salt":     []byte(fakePasswordSalt),
 					},
 				}})
-				mock.EXPECT().Patch(localUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, errors.New("unexpected error"))
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -337,7 +323,7 @@ func TestSetPassword(t *testing.T) {
 				secretLister: test.mockSecretCache(),
 				hashKey:      test.mockHashKey,
 			}
-			err := p.SetPassword(test.userID, test.password)
+			err := p.UpdatePassword(test.userID, test.password)
 			if test.expectErrorMessage == "" {
 				assert.NoError(t, err)
 			} else {
@@ -347,7 +333,7 @@ func TestSetPassword(t *testing.T) {
 	}
 }
 
-func TestUpdatePassword(t *testing.T) {
+func TestVerifyAndUpdatePassword(t *testing.T) {
 	ctlr := gomock.NewController(t)
 	fakeUserID := "fake-user-id"
 	fakeNewPassword := "fake-new-password"
@@ -381,10 +367,10 @@ func TestUpdatePassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 					},
 					Data: map[string][]byte{
 						"salt":     []byte(fakePasswordSalt),
@@ -408,7 +394,7 @@ func TestUpdatePassword(t *testing.T) {
 						"salt":     []byte(fakePasswordSalt),
 					},
 				}})
-				mock.EXPECT().Patch(localUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
 				return mock
 			},
 		},
@@ -417,7 +403,7 @@ func TestUpdatePassword(t *testing.T) {
 			currentPassword: fakeNewPassword,
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(nil, errors.New("unexpected error"))
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -434,10 +420,10 @@ func TestUpdatePassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -467,10 +453,10 @@ func TestUpdatePassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 					},
 					Data: map[string][]byte{
 						"salt":     []byte(fakePasswordSalt),
@@ -494,7 +480,7 @@ func TestUpdatePassword(t *testing.T) {
 						"salt":     []byte(fakePasswordSalt),
 					},
 				}})
-				mock.EXPECT().Patch(localUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, errors.New("unexpected error"))
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -510,7 +496,7 @@ func TestUpdatePassword(t *testing.T) {
 				secretLister: test.mockSecretCache(),
 				hashKey:      test.mockHashKey,
 			}
-			err := p.UpdatePassword(test.userID, test.currentPassword, test.newPassword)
+			err := p.VerifyAndUpdatePassword(test.userID, test.currentPassword, test.newPassword)
 			if test.expectErrorMessage == "" {
 				assert.NoError(t, err)
 			} else {
@@ -553,10 +539,10 @@ func TestVerifyPassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
 							passwordHashAnnotation: pbkdf2sha3512Hash,
 						},
@@ -583,7 +569,7 @@ func TestVerifyPassword(t *testing.T) {
 			password: fakePassword,
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
 
 				return mock
 			},
@@ -609,10 +595,10 @@ func TestVerifyPassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
 							passwordHashAnnotation: bcryptHash,
 						},
@@ -645,7 +631,7 @@ func TestVerifyPassword(t *testing.T) {
 						Value: pbkdf2sha3512Hash,
 					},
 				})
-				mock.EXPECT().Patch(localUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
 
 				return mock
 			},
@@ -662,10 +648,10 @@ func TestVerifyPassword(t *testing.T) {
 			},
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
 							passwordHashAnnotation: pbkdf2sha3512Hash,
 						},
@@ -692,10 +678,10 @@ func TestVerifyPassword(t *testing.T) {
 			password: "another-password",
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
-						Namespace: localUserPasswordsNamespace,
+						Namespace: LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
 							passwordHashAnnotation: bcryptHash,
 						},
@@ -722,7 +708,7 @@ func TestVerifyPassword(t *testing.T) {
 			password: fakePassword,
 			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
 				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(localUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
 
 				return mock
 			},

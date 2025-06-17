@@ -18,9 +18,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type PasswordChanger interface {
-	UpdatePassword(userId string, currentPassword, newPassword string) error
-	SetPassword(userId string, newPassword string) error
+type PasswordUpdater interface {
+	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
+	UpdatePassword(userId string, newPassword string) error
 }
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -45,7 +45,7 @@ type Handler struct {
 	ExtTokenStore            *exttokenstore.SystemStore
 	SecretLister             wranglerv1.SecretCache
 	SecretClient             wranglerv1.SecretClient
-	PwdChanger               PasswordChanger
+	PwdChanger               PasswordUpdater
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -109,7 +109,7 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	if err := h.PwdChanger.UpdatePassword(user.Name, currentPass, newPass); err != nil {
+	if err := h.PwdChanger.VerifyAndUpdatePassword(user.Name, currentPass, newPass); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
@@ -159,7 +159,7 @@ func (h *Handler) setPassword(request *types.APIContext) error {
 	if !ok {
 		return errors.New("failed to get userId")
 	}
-	if err := h.PwdChanger.SetPassword(userId, newPass); err != nil {
+	if err := h.PwdChanger.UpdatePassword(userId, newPass); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 

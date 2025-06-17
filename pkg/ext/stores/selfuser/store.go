@@ -5,6 +5,7 @@ package selfuser
 import (
 	"context"
 	"fmt"
+
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,11 +29,6 @@ var GVK = schema.GroupVersionKind{
 	Group:   GV.Group,
 	Version: GV.Version,
 	Kind:    "SelfUser",
-}
-var GVR = schema.GroupVersionResource{
-	Group:    GV.Group,
-	Version:  GV.Version,
-	Resource: "SelfUsers",
 }
 
 // +k8s:openapi-gen=false

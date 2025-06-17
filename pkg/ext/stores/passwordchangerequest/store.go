@@ -10,11 +10,11 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
-	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -35,24 +35,18 @@ var GVK = schema.GroupVersionKind{
 	Version: GV.Version,
 	Kind:    "PasswordChangeRequest",
 }
-var GVR = schema.GroupVersionResource{
-	Group:    GV.Group,
-	Version:  GV.Version,
-	Resource: "passwordchangerequests",
-}
 
 type PasswordUpdater interface {
-	UpdatePassword(userId string, currentPassword, newPassword string) error
+	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
+	UpdatePassword(userId string, newPassword string) error
 }
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 
 type Store struct {
-	secretClient v1.SecretClient
-	secretCache  v1.SecretCache
-	authorizer   authorizer.Authorizer
-	pwdUpdater   PasswordUpdater
+	authorizer authorizer.Authorizer
+	pwdUpdater PasswordUpdater
 }
 
 // +k8s:openapi-gen=false
@@ -122,58 +116,76 @@ func (s *Store) Create(
 	if !ok {
 		return nil, apierrors.NewInternalError(fmt.Errorf("can't get user info from context"))
 	}
-	if userInfo.GetName() != objPasswordChangeRequest.Spec.UserID {
-		decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
-			User:            userInfo,
-			Verb:            "update",
-			APIGroup:        v3.GroupName,
-			APIVersion:      v3.Version,
-			Resource:        "users",
-			ResourceRequest: true,
-		})
-		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error checking permissions %w", err))
-		}
-		if decision != authorizer.DecisionAllow {
-			return nil, apierrors.NewUnauthorized("not authorized to update password")
-		}
-		decision, _, err = s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
-			User:            userInfo,
-			Verb:            "update",
-			Namespace:       "cattle-local-user-passwords", //TODO const
-			APIVersion:      "v1",
-			Resource:        "secrets",
-			ResourceRequest: true,
-		})
-		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error checking permissions %w", err))
-		}
-		if decision != authorizer.DecisionAllow {
-			return nil, apierrors.NewUnauthorized("not authorized to update password")
-		}
-	}
-
 	if dryRun {
 		return obj, nil
 	}
 
-	if err := s.pwdUpdater.UpdatePassword(objPasswordChangeRequest.Spec.UserID, objPasswordChangeRequest.Spec.CurrentPassword, objPasswordChangeRequest.Spec.NewPassword); err != nil {
+	canUpdateAnyPassword, err := s.canUpdateAnyPassword(ctx, userInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	// Checking the current password is only required if the user doesn't have permissions on update on users and update
+	// secrets in the cattle-local-user-passwords namespace.
+	if canUpdateAnyPassword {
+		err := s.pwdUpdater.UpdatePassword(objPasswordChangeRequest.Spec.UserID, objPasswordChangeRequest.Spec.NewPassword)
+		if err != nil {
+			return nil, apierrors.NewUnauthorized(fmt.Sprintf("error checking permissions %s", err.Error()))
+		}
+
 		c := metav1.Condition{
-			Type:    "PasswordUpdated",
-			Status:  "False",
-			Reason:  err.Error(),
-			Message: "Failed to update password",
+			Type:   "PasswordUpdated",
+			Status: "True",
 		}
 		objPasswordChangeRequest.Status.Conditions = append(objPasswordChangeRequest.Status.Conditions, c)
 
 		return objPasswordChangeRequest, nil
 	}
 
-	c := metav1.Condition{
-		Type:   "PasswordUpdated",
-		Status: "True",
-	}
-	objPasswordChangeRequest.Status.Conditions = append(objPasswordChangeRequest.Status.Conditions, c)
+	if userInfo.GetName() == objPasswordChangeRequest.Spec.UserID {
+		err := s.pwdUpdater.VerifyAndUpdatePassword(objPasswordChangeRequest.Spec.UserID, objPasswordChangeRequest.Spec.CurrentPassword, objPasswordChangeRequest.Spec.NewPassword)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error updating password: %w", err))
+		}
+		c := metav1.Condition{
+			Type:   "PasswordUpdated",
+			Status: "True",
+		}
+		objPasswordChangeRequest.Status.Conditions = append(objPasswordChangeRequest.Status.Conditions, c)
 
-	return objPasswordChangeRequest, nil
+		return objPasswordChangeRequest, nil
+	}
+
+	return objPasswordChangeRequest, apierrors.NewUnauthorized("not authorized to update password")
+}
+
+// canUpdateAnyPassword verifies the user can update users and secrets in the cattle-local-user-passwords namespace.
+func (s *Store) canUpdateAnyPassword(ctx context.Context, userInfo user.Info) (bool, error) {
+	decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
+		User:            userInfo,
+		Verb:            "update",
+		APIGroup:        v3.GroupName,
+		APIVersion:      v3.Version,
+		Resource:        "users",
+		ResourceRequest: true,
+	})
+	if err != nil {
+		return false, apierrors.NewInternalError(fmt.Errorf("error checking permissions %w", err))
+	}
+	if decision != authorizer.DecisionAllow {
+		return false, nil
+	}
+	decision, _, err = s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
+		User:            userInfo,
+		Verb:            "update",
+		Namespace:       pbkdf2.LocalUserPasswordsNamespace,
+		APIVersion:      "v1",
+		Resource:        "secrets",
+		ResourceRequest: true,
+	})
+	if err != nil {
+		return false, apierrors.NewInternalError(fmt.Errorf("error checking permissions %w", err))
+	}
+
+	return decision == authorizer.DecisionAllow, nil
 }
