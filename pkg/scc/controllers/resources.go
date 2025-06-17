@@ -38,13 +38,13 @@ func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, erro
 	existingLabels[consts.LabelObjectSalt] = generatedSalt
 	preparedSecret.SetLabels(existingLabels)
 
-	updatedSecret, updateErr := h.secrets.Update(preparedSecret)
+	_, updateErr := h.updateSecret(secret, preparedSecret)
 	if updateErr != nil {
 		h.log.Error("error applying metadata updates to default SCC registration secret; cannot initialize secret salt value")
 		return nil, updateErr
 	}
 
-	return updatedSecret, nil
+	return secret, nil
 }
 
 func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
@@ -74,8 +74,8 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 
 	hasher := md5.New()
 	nameData := append(incomingSalt, regType...)
-	data := append(nameData, regCode...)
-	data = append(data, offlineRegCert...)
+	nameData = append(nameData, regCode...)
+	data := append(nameData, offlineRegCert...)
 
 	// Generate a has for the name data
 	if _, err := hasher.Write(nameData); err != nil {
@@ -144,8 +144,7 @@ func (h *handler) registrationFromSecretEntrypoint(
 			},
 		}
 	}
-
-	reg.Labels = params.Labels()
+	reg.Labels = params.Labels() //TODO: maps.Copy here
 	reg.Spec = paramsToRegSpec(params)
 	if !slices.Contains(reg.Finalizers, consts.FinalizerSccRegistration) {
 		if reg.Finalizers == nil {

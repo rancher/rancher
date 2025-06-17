@@ -3,7 +3,10 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/sync/semaphore"
 	"net/http"
+	"sync"
+	"sync/atomic"
 
 	"github.com/SUSE/connect-ng/pkg/connection"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -16,6 +19,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var (
+	activiateMu sync.Mutex
+	activeSem   *semaphore.Weighted = semaphore.NewWeighted(1)
+)
+
+type TryMutex struct {
+	locked int32
+}
+
+func (m *TryMutex) TryLock() bool {
+	return atomic.CompareAndSwapInt32(&m.locked, 0, 1)
+}
+
+func (m *TryMutex) Unlock() {
+	atomic.StoreInt32(&m.locked, 0)
+}
 
 type sccOnlineMode struct {
 	registration       *v1.Registration
@@ -98,27 +118,43 @@ func getHttpErrorCode(err error) *int {
 	return nil
 }
 
-func (s sccOnlineMode) reconcileNonRecoverableHttpError(registration *v1.Registration, registerErr error) *v1.Registration {
+type registrationReconcilerApplier func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration
+
+func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Registration, registerErr error, additionalApplier registrationReconcilerApplier) *v1.Registration {
 	httpCode := *getHttpErrorCode(registerErr)
 	nowTime := metav1.Now()
-	// Cannot recover from this error so must set failure
-	registration.Status.ActivationStatus.Activated = false
-	registration.Status.ActivationStatus.LastValidatedTS = &nowTime
-	v1.ResourceConditionFailure.True(registration)
-	v1.ResourceConditionFailure.Message(registration, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then create a new registration.")
-	v1.ResourceConditionProgressing.False(registration)
-	v1.ResourceConditionReady.False(registration)
-	preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(httpCode), httpCode)
-	v1.RegistrationConditionActivated.SetError(registration, preparedErrorReasonCondition, registerErr)
+	registrationIn.Status.RegistrationProcessedTS = &nowTime
+	registrationIn.Status.ActivationStatus.LastValidatedTS = &nowTime
+	v1.ResourceConditionFailure.True(registrationIn)
+	v1.ResourceConditionFailure.Message(registrationIn, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then try again.")
+	v1.ResourceConditionProgressing.False(registrationIn)
+	v1.ResourceConditionReady.False(registrationIn)
 
-	return registration
+	if additionalApplier != nil {
+		return additionalApplier(registrationIn, &httpCode)
+	}
+
+	return registrationIn
 }
 
 func (s sccOnlineMode) ReconcileRegisterError(registration *v1.Registration, registerErr error) *v1.Registration {
 	if isNonRecoverableHttpError(registerErr) {
-		return s.reconcileNonRecoverableHttpError(registration, registerErr)
+		return s.reconcileNonRecoverableHttpError(
+			registration,
+			registerErr,
+			func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration {
+				preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(*httpCode), httpCode)
+				v1.RegistrationConditionAnnounced.SetError(regApplierIn, preparedErrorReasonCondition, registerErr)
+				v1.RegistrationConditionSccUrlReady.False(regApplierIn)
+				v1.RegistrationConditionActivated.False(regApplierIn)
+
+				// Cannot recover from this error so must set failure
+				regApplierIn.Status.ActivationStatus.Activated = false
+
+				return regApplierIn
+			},
+		)
 	}
-	// TODO: Do other reconcile prep steps
 
 	v1.ResourceConditionReady.False(registration)
 	v1.ResourceConditionProgressing.False(registration)
@@ -197,20 +233,22 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 // ReconcileActivateError will first verify if an error is recoverable and then reconcile the error as needed
 func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
 	if isNonRecoverableHttpError(activationErr) {
-		httpCode := *getHttpErrorCode(activationErr)
-		nowTime := metav1.Now()
-		// Cannot recover from this error so must set failure
-		registration.Status.ActivationStatus.Activated = false
-		registration.Status.ActivationStatus.LastValidatedTS = &nowTime
-		v1.ResourceConditionFailure.True(registration)
-		v1.ResourceConditionFailure.Message(registration, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then create a new registration.")
-		v1.ResourceConditionProgressing.False(registration)
-		v1.ResourceConditionReady.False(registration)
-		preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(httpCode), httpCode)
-		v1.RegistrationConditionActivated.SetError(registration, preparedErrorReasonCondition, activationErr)
+		return s.reconcileNonRecoverableHttpError(
+			registration,
+			activationErr,
+			func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration {
+				preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(*httpCode), httpCode)
+				v1.RegistrationConditionActivated.SetError(regApplierIn, preparedErrorReasonCondition, activationErr)
 
-		return registration
+				// Cannot recover from this error so must set failure
+				regApplierIn.Status.ActivationStatus.Activated = false
+
+				return regApplierIn
+			},
+		)
 	}
+
+	// TODO other error reconcile when non-http error based
 
 	// Return the unmodified version
 	return registration
@@ -243,9 +281,26 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) error {
 	return nil
 }
 
-func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, err error) *v1.Registration {
-	//TODO implement me
-	panic("implement me")
+func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, keepaliveErr error) *v1.Registration {
+	if isNonRecoverableHttpError(keepaliveErr) {
+		return s.reconcileNonRecoverableHttpError(
+			registration,
+			keepaliveErr,
+			func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration {
+				preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(*httpCode), httpCode)
+				v1.RegistrationConditionKeepalive.SetError(regApplierIn, preparedErrorReasonCondition, keepaliveErr)
+
+				// Cannot recover from this error so must set failure
+				regApplierIn.Status.ActivationStatus.Activated = false
+
+				return regApplierIn
+			},
+		)
+	}
+
+	// TODO other error reconcile when non-http error based
+
+	return registration
 }
 
 func (s sccOnlineMode) Deregister() error {

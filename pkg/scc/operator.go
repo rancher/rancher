@@ -57,10 +57,8 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 		},
 	)
 
-	// TODO(dan) : below we need to be more careful about where we logrus.Fatal. This calls os.Exit(1)
 	if kubeNsErr != nil {
-		// fatal log here, because we need the kube-system ns UID while creating any backup file
-		logger.Fatalf("Error getting namespace kube-system: %v", kubeNsErr)
+		return nil, fmt.Errorf("failed to get kube-system namespace: %v", kubeNsErr)
 	}
 
 	rancherUuid := settings.InstallUUID.Get()
@@ -80,7 +78,6 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 	parsedkubeSystemNSUID := uuid.Parse(string(kubeSystemNS.UID))
 
 	if parsedRancherUUID == nil || parsedkubeSystemNSUID == nil {
-		// TODO (dan) : handle error case as you feel is appropriate
 		return nil, fmt.Errorf("invalid UUID format: rancherUuid=%s, kubeSystemNS.UID=%s", rancherUuid, string(kubeSystemNS.UID))
 	}
 	infoProvider := systeminfo.NewInfoProvider(
@@ -116,10 +113,10 @@ func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
 	wait.Until(func() {
 		// Todo: also wait for local cluster ready
 		if systeminfo.IsServerUrlReady() {
-			so.log.Info("can now start controllers; server URL is now ready.")
+			so.log.Info("can now start controllers; server URL and local cluster are now ready.")
 			close(so.systemRegistrationReady)
 		} else {
-			so.log.Info("cannot start controllers yet; server URL is not ready.")
+			so.log.Info("cannot start controllers yet; server URL and/or local cluster are not ready.")
 		}
 	}, 15*time.Second, so.systemRegistrationReady)
 }
@@ -131,7 +128,7 @@ func Setup(
 ) error {
 	operatorLogger := log.NewLog()
 
-	operatorLogger.Debug("Starting SCC Operator")
+	operatorLogger.Debug("Setting up SCC Operator")
 	initOperator, err := setup(wContext, operatorLogger)
 	if err != nil {
 		return fmt.Errorf("error setting up scc operator: %s", err.Error())
@@ -155,7 +152,7 @@ func Setup(
 	})
 
 	if initOperator.systemRegistrationReady != nil {
-		initOperator.log.Info("Initial startup initiated; the setup will complete when Server URL is configured.")
+		initOperator.log.Info("SCC operator initialized; controllers waiting to start until system is ready")
 	}
 
 	return nil

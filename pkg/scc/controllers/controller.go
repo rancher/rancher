@@ -121,7 +121,7 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 		offlineRequestSecretName := consts.OfflineRequestSecretName(nameSuffixHash)
 		return sccOfflineMode{
 			registration:       registrationObj,
-			log:                h.log.WithField("handler", "offline"),
+			log:                h.log.WithField("regHandler", "offline"),
 			systemInfoExporter: h.systemInfoExporter,
 			offlineSecrets: offlinerequest.New(
 				h.systemNamespace,
@@ -138,7 +138,7 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 	credsSecretName := consts.SCCCredentialsSecretName(nameSuffixHash)
 	return sccOnlineMode{
 		registration: registrationObj,
-		log:          h.log.WithField("handler", "online"),
+		log:          h.log.WithField("regHandler", "online"),
 		sccCredentials: credentials.New(
 			h.systemNamespace,
 			credsSecretName,
@@ -179,30 +179,35 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		}
 
 		if incomingHash == "" {
+			h.log.Info("incoming hash empty, prepare it")
 			// update secret with useful annotations & labels
 			newSecret := incomingObj.DeepCopy()
 			if newSecret.Annotations == nil {
 				newSecret.Annotations = map[string]string{}
 			}
 			newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
-			newSecret.Labels = params.Labels()
+			maps.Copy(newSecret.Labels, params.Labels())
 
-			savedSecret, updateErr := h.secrets.Update(newSecret)
+			_, updateErr := h.updateSecret(incomingObj, newSecret)
 			if updateErr != nil {
 				h.log.Error("error applying metadata updates to default SCC registration secret")
 				return nil, updateErr
 			}
 
-			return savedSecret, nil
+			return incomingObj, nil
 		}
 
 		// If secret hash has changed make sure that we submit objects that correspond to that hash
 		// are cleaned up
 		if incomingHash != params.contentHash {
+			h.log.Info("must cleanup existing registration managed by secret")
 			if cleanUpErr := h.cleanupRegistrationByHash(incomingHash); cleanUpErr != nil {
 				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingHash, cleanUpErr)
+				return incomingObj, cleanUpErr
 			}
 		}
+
+		h.log.Info("create or update registration managed by secert")
 
 		// update secret with useful annotations & labels
 		newSecret := incomingObj.DeepCopy()
@@ -215,10 +220,15 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		maps.Copy(labels, params.Labels())
 		newSecret.Labels = labels
 
-		_, updateErr := h.secrets.Update(newSecret)
-		if updateErr != nil {
-			h.log.Error("error applying metadata updates to default SCC registration secret")
-			return nil, updateErr
+		//_, updateErr := h.secrets.Update(newSecret)
+		//if updateErr != nil {
+		//	h.log.Error("error applying metadata updates to default SCC registration secret")
+		//	return nil, updateErr
+		//}
+
+		// TODO(dan): make sure all update logic is handled via the new patch mechanism
+		if _, err := h.updateSecret(incomingObj, newSecret); err != nil {
+			return incomingObj, err
 		}
 
 		// construct associated registration CRs
@@ -227,7 +237,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			return incomingObj, fmt.Errorf("failed to create registration from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 
-		if createOrUpdateErr := h.createOrUpdate(registration); createOrUpdateErr != nil {
+		if createOrUpdateErr := h.createOrUpdateRegistration(registration); createOrUpdateErr != nil {
 			h.log.Errorf("failed to create or update registration %s: %v", registration.Name, createOrUpdateErr)
 			return incomingObj, fmt.Errorf("failed to create or update registration %s: %w", registration.Name, createOrUpdateErr)
 		}
@@ -236,33 +246,9 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 	return incomingObj, nil
 }
 
-func (h *handler) createOrUpdate(reg *v1.Registration) error {
-	if _, err := h.registrations.Get(reg.Name, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			_, createErr := h.registrations.Create(reg)
-			return createErr
-		}
-	}
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		currentReg, err := h.registrations.Get(reg.Name, metav1.GetOptions{})
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-		preparedReg := currentReg.DeepCopy()
-		preparedReg.Labels = reg.Labels
-		preparedReg.Annotations = reg.Annotations
-		preparedReg.Finalizers = reg.Finalizers
-		preparedReg.Spec = reg.Spec
-
-		_, updateErr := h.registrations.Update(preparedReg)
-		return updateErr
-	})
-}
-
 func (h *handler) cleanupRegistrationByHash(hash string) error {
 	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, hash)
+	h.log.Infof("found %d matching registrations to clean up", len(regs))
 	if err != nil {
 		return err
 	}
@@ -355,6 +341,8 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 }
 
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
+	activiateMu.Lock()
+	defer activiateMu.Unlock()
 	if registrationObj == nil {
 		return nil, nil
 	}
@@ -404,23 +392,22 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		}
 		regForAnnounce, updateErr := h.registrations.UpdateStatus(preparedForRegister)
 		if updateErr != nil {
-			return progressingObj, prepareErr
+			return registrationObj, prepareErr
 		}
 
 		announcedSystemId, registerErr := registrationHandler.Register(regForAnnounce)
 		if registerErr != nil {
 			// reconcile state
-			var reconciledReg *v1.Registration
+			//var reconciledReg *v1.Registration
 			reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				var retryErr, reconcileUpdateErr error
-				registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+				var reconcileUpdateErr error
+				curReg, retryErr := h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
 				if retryErr != nil {
 					return retryErr
 				}
-				prepareObj := registrationObj.DeepCopy()
+				prepareObj := curReg.DeepCopy()
 				prepareObj = registrationHandler.ReconcileRegisterError(prepareObj, registerErr)
-
-				reconciledReg, reconcileUpdateErr = h.registrations.Update(prepareObj)
+				_, reconcileUpdateErr = h.registrations.UpdateStatus(prepareObj)
 				return reconcileUpdateErr
 			})
 
@@ -429,7 +416,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 				err = fmt.Errorf("registration failed with additional errors: %w, %w", err, reconcileErr)
 			}
 
-			return reconciledReg, err
+			return registrationObj, err
 		}
 
 		setSystemId := false
@@ -457,12 +444,12 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			Time: time.Now(),
 		}
 
-		announced, registerUpdateErr := h.registrations.UpdateStatus(regForAnnounce)
+		_, registerUpdateErr := h.registrations.UpdateStatus(regForAnnounce)
 		if registerUpdateErr != nil {
 			return registrationObj, registerUpdateErr
 		}
 
-		return announced, nil
+		return registrationObj, nil
 	}
 
 	if registrationHandler.NeedsActivation(registrationObj) {
@@ -473,7 +460,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		activationErr := registrationHandler.Activate(registrationObj)
 		// reconcile error state - must be able to handle Auth errors (or other SCC sourced errors)
 		if activationErr != nil {
-			var reconciledReg *v1.Registration
+			//var reconciledReg *v1.Registration
 			reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				var retryErr, reconcileUpdateErr error
 				registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
@@ -483,7 +470,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 				prepareObj := registrationObj.DeepCopy()
 				prepareObj = registrationHandler.ReconcileActivateError(prepareObj, activationErr)
 
-				reconciledReg, reconcileUpdateErr = h.registrations.Update(prepareObj)
+				_, reconcileUpdateErr = h.registrations.Update(prepareObj)
 				return reconcileUpdateErr
 			})
 
@@ -492,10 +479,10 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 				err = fmt.Errorf("activation failed with additional errors: %w, %w", err, reconcileErr)
 			}
 
-			return reconciledReg, err
+			return registrationObj, err
 		}
 
-		var activatedObj *v1.Registration
+		// TODO: maybe this should be in a PrepareActivatedForKeepalive
 		activatedUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var retryErr, updateErr error
 			registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
@@ -513,14 +500,14 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 				Time: time.Now(),
 			}
 			activated.Status.ActivationStatus.Activated = true
-			activatedObj, updateErr = h.registrations.UpdateStatus(activated)
+			_, updateErr = h.registrations.UpdateStatus(activated)
 			return updateErr
 		})
 		if activatedUpdateErr != nil {
 			return registrationObj, activatedUpdateErr
 		}
 
-		return activatedObj, nil
+		return registrationObj, nil
 	}
 
 	// Handle what to do when CheckNow is used...
@@ -544,13 +531,13 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 			updated, err = h.registrations.Update(updated)
-			return updated, err
+			return registrationObj, err
 		}
 	}
 
 	keepaliveErr := registrationHandler.Keepalive(registrationObj)
 	if keepaliveErr != nil {
-		var reconciledReg *v1.Registration
+		//var reconciledReg *v1.Registration
 		reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var retryErr, reconcileUpdateErr error
 			registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
@@ -559,14 +546,14 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			}
 			preparedObj := registrationHandler.ReconcileKeepaliveError(registrationObj, keepaliveErr)
 
-			reconciledReg, reconcileUpdateErr = h.registrations.Update(preparedObj)
+			_, reconcileUpdateErr = h.registrations.Update(preparedObj)
 			return reconcileUpdateErr
 		})
 
-		return reconciledReg, reconcileErr
+		return registrationObj, reconcileErr
 	}
 
-	var heartbeatUpdated *v1.Registration
+	// TODO: maybe this should be in a PrepareKeepaliveSuccess
 	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
 		registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
@@ -582,19 +569,20 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
 			Time: time.Now(),
 		}
+		// TODO: set keepalive condition success
 		// TODO: make sure we set Activated condition and add "ValidUntilTS" to that status
 		updated.Status.ActivationStatus.Activated = true
-		heartbeatUpdated, err = h.registrations.UpdateStatus(updated)
+		_, err = h.registrations.UpdateStatus(updated)
 		return err
 	})
 	if updateErr != nil {
 		return nil, updateErr
 	}
 
-	return heartbeatUpdated, nil
+	return registrationObj, nil
 }
 
-// do we want a finalizer for preventing deregister from failing then deleting object?
+// TODO: do we want a finalizer for preventing deregister from failing then deleting object?
 func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	if registrationObj == nil {
 		return nil, nil
@@ -607,7 +595,7 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	}
 
 	// TODO: owner finalizers handled here
-	// (alex) :  I don't think this is neded
+	// (alex) :  I don't think this is needed
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
 		return registrationObj, err

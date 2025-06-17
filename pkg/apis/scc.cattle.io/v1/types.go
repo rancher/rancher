@@ -21,6 +21,7 @@ const (
 	RegistrationModeOffline RegistrationMode = "offline"
 )
 
+// resource conditions ordered by: general-use, offline specific, general registration
 const (
 	ResourceConditionDone        condition.Cond = "Done"
 	ResourceConditionFailure     condition.Cond = "Failure"
@@ -34,6 +35,7 @@ const (
 	RegistrationConditionAnnounced   condition.Cond = "RegistrationAnnounced"
 	RegistrationConditionSccUrlReady condition.Cond = "RegistrationSccUrlReady"
 	RegistrationConditionActivated   condition.Cond = "RegistrationActivated"
+	RegistrationConditionKeepalive   condition.Cond = "RegistrationKeepalive"
 )
 
 // +genclient

@@ -41,6 +41,7 @@ func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Ob
 	if err != nil {
 		return nil, err
 	}
+	h.log.Infof("resolved entrypoint secret to : %d registrations", len(regs))
 	for _, reg := range regs {
 		ret = append(ret, relatedresource.Key{
 			Name: reg.GetName(),
