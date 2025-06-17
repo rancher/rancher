@@ -4,29 +4,28 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
-	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewClusterAuthToken creates a new cluster auth token from a given token and it's hashed value.
-// Does not create the token in the remote cluster.
-func NewClusterAuthToken(token *managementv3.Token, hashedValue string) (*clusterv3.ClusterAuthToken, error) {
-	tokenEnabled := token.Enabled == nil || *token.Enabled
-	result := &clusterv3.ClusterAuthToken{
+// NewClusterAuthToken creates a new cluster auth token from a given token
+// accessor and it's hashed value. Does not create the token in the remote
+// cluster.
+func NewClusterAuthToken(token accessor.TokenAccessor, hashedValue string) (*clusterv3.ClusterAuthToken, error) {
+	return &clusterv3.ClusterAuthToken{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: token.ObjectMeta.Name,
+			Name: token.GetName(),
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ClusterAuthToken",
 		},
-		UserName:      token.UserID,
+		UserName:      token.GetUserID(),
 		SecretKeyHash: hashedValue,
-		ExpiresAt:     token.ExpiresAt,
-		Enabled:       tokenEnabled,
-	}
-	return result, nil
+		ExpiresAt:     token.GetExpiresAt(),
+		Enabled:       token.GetIsEnabled(),
+	}, nil
 }
 
 // VerifyClusterAuthToken verifies that a provided secret key is valid for the given clusterAuthToken.
