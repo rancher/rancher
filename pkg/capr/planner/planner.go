@@ -60,7 +60,6 @@ const (
 	SecurePortArgument                            = "secure-port"
 	CertDirArgument                               = "cert-dir"
 	TLSCertFileArgument                           = "tls-cert-file"
-	DeleteFileAction                              = "delete"
 
 	authnWebhookFileName = "kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
