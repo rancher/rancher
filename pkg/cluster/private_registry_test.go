@@ -17,6 +17,7 @@ import (
 
 // It is not currently possible to test ECR credentials, because they require valid credentials and communicate with
 // the ecr service to generate an auth config.
+// This test modifies SystemDefaultRegistry setting so it can't be run in parallel
 func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 	mockSecrets := map[string]*corev1.Secret{}
 
