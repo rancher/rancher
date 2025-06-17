@@ -74,8 +74,8 @@ type SystemTelemetry interface {
 }
 
 type ComputeTelmetry interface {
-	CpuCores() (int64, error)
-	MemoryCapacityBytes() (int64, error)
+	CpuCores() (int, error)
+	MemoryCapacityBytes() (int, error)
 }
 
 type nodeTelemetryImpl struct {
@@ -98,7 +98,7 @@ func (n *nodeTelemetryImpl) Role() NodeRole {
 	return NodeRoleUnknown
 }
 
-func (n *nodeTelemetryImpl) CpuCores() (int64, error) {
+func (n *nodeTelemetryImpl) CpuCores() (int, error) {
 	cpuQ := n.n.Status.InternalNodeStatus.Capacity.Cpu()
 	if cpuQ == nil {
 		return 0, ErrNoCPUReported
@@ -106,7 +106,7 @@ func (n *nodeTelemetryImpl) CpuCores() (int64, error) {
 	return handleCpuCores(*cpuQ)
 }
 
-func (n *nodeTelemetryImpl) MemoryCapacityBytes() (int64, error) {
+func (n *nodeTelemetryImpl) MemoryCapacityBytes() (int, error) {
 	memQ := n.n.Status.InternalNodeStatus.Capacity.Memory()
 	if memQ == nil {
 		return 0, ErrNoMemReported
@@ -189,7 +189,7 @@ type clusterTelemetryImpl struct {
 
 var _ ClusterTelemetry = (*clusterTelemetryImpl)(nil)
 
-func (c *clusterTelemetryImpl) CpuCores() (int64, error) {
+func (c *clusterTelemetryImpl) CpuCores() (int, error) {
 	cpuQ := c.Status.Capacity.Cpu()
 	if cpuQ == nil {
 		return 0, ErrNoCPUReported
@@ -197,7 +197,7 @@ func (c *clusterTelemetryImpl) CpuCores() (int64, error) {
 	return handleCpuCores(*cpuQ)
 }
 
-func (c *clusterTelemetryImpl) MemoryCapacityBytes() (int64, error) {
+func (c *clusterTelemetryImpl) MemoryCapacityBytes() (int, error) {
 	memQ := c.Status.Capacity.Memory()
 	if memQ == nil {
 		return 0, ErrNoMemReported
@@ -283,15 +283,15 @@ func newTelemetryImpl(
 	}
 }
 
-func handleCpuCores(cpuQ resource.Quantity) (int64, error) {
+func handleCpuCores(cpuQ resource.Quantity) (int, error) {
 	cores, ok := cpuQ.AsInt64()
 	if !ok {
 		return 0, ErrCpuCoresFormat
 	}
-	return cores, nil
+	return int(cores), nil
 }
 
-func handleMemBytes(memQ resource.Quantity) (int64, error) {
+func handleMemBytes(memQ resource.Quantity) (int, error) {
 	memDec := memQ.AsDec()
 	if memDec == nil {
 		return 0, ErrMemBytesFormat
@@ -300,5 +300,5 @@ func handleMemBytes(memQ resource.Quantity) (int64, error) {
 	if !ok {
 		return 0, ErrMemBytesFormat
 	}
-	return bytes, nil
+	return int(bytes), nil
 }

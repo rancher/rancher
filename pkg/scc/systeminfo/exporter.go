@@ -22,8 +22,8 @@ type RancherSCCInfo struct {
 	Sockets          int       `json:"sockets"`
 	Clusters         int       `json:"clusters"`
 	Version          string    `json:"version"`
-	CpuCores         int64     `json:"vcpus"`
-	MemoryBytesTotal int64     `json:"mem_total"`
+	CpuCores         int       `json:"vcpus"`
+	MemoryBytesTotal int       `json:"mem_total"`
 }
 
 type ProductTriplet struct {
@@ -87,10 +87,10 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	}
 
 	nodeCount := 0
-	totalCpuCores := int64(0)
+	totalCpuCores := int(0)
 	// note: this will only correctly report up to ~9 exabytes of memory,
 	// which should be fine
-	totalMemBytes := int64(0)
+	totalMemBytes := int(0)
 	clusterCount := exporter.ManagedClusterCount()
 
 	// local cluster metrics
@@ -122,7 +122,7 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 		Sockets:          0,
 		Clusters:         clusterCount,
 		CpuCores:         totalCpuCores,
-		MemoryBytesTotal: totalMemBytes,
+		MemoryBytesTotal: util.BytesToMiBRounded(totalMemBytes),
 	}
 }
 
