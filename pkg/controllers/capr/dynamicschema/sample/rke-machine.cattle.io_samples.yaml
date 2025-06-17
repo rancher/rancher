@@ -38,12 +38,16 @@ spec:
           spec:
             properties:
               common:
+                description: Machine configuration not specific to the infrastructure
+                  provider.
                 properties:
                   cloudCredentialSecretName:
+                    nullable: true
                     type: string
                   labels:
                     additionalProperties:
                       type: string
+                    nullable: true
                     type: object
                   taints:
                     items:
@@ -75,14 +79,18 @@ spec:
                       - effect
                       - key
                       type: object
+                    nullable: true
                     type: array
                 type: object
             required:
             - common
             type: object
           status:
+            description: Observed status of the Machine.
             properties:
               addresses:
+                description: Addresses are the machine network addresses. Assigned
+                  by the CAPI controller.
                 items:
                   description: MachineAddress contains information for the node's
                     address.
@@ -98,10 +106,16 @@ spec:
                   - address
                   - type
                   type: object
+                nullable: true
                 type: array
               cloudCredentialSecretName:
+                description: CloudCredentialSecretName is the secret name that was
+                  used as a credential to provision the machine.
+                nullable: true
                 type: string
               conditions:
+                description: Conditions is a representation of the machine's current
+                  state.
                 items:
                   properties:
                     lastTransitionTime:
@@ -128,18 +142,35 @@ spec:
                   - status
                   - type
                   type: object
+                nullable: true
                 type: array
               driverHash:
+                description: DriverHash is the expected hash of the node driver binary
+                  used for provisioning the machine.
+                nullable: true
                 type: string
               driverUrl:
+                description: DriverURL is the url used to download the node driver
+                  binary for provisioning the machine.
+                nullable: true
                 type: string
               failureMessage:
+                description: FailureMessage is the container termination message for
+                  a provisioning job that failed.
+                nullable: true
                 type: string
               failureReason:
+                description: FailureReason indicates whether the provisioning job
+                  failed on creation or on removal of the machine.
+                nullable: true
                 type: string
               jobName:
+                description: JobName is the name of the provisioning job of the machine.
+                nullable: true
                 type: string
               ready:
+                description: Ready indicates whether the provider ID has been set
+                  in this machine's spec.
                 type: boolean
             type: object
         required:
