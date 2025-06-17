@@ -30,16 +30,14 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 		return nil, nil
 	}
 
-	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
-
-	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, runtime, entry)
+	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, entry)
 	if err != nil {
 		return nil, err
 	}
 	result = append(result, clusterAgent)
 
 	// if we have a nil snapshotMetadata object, it's probably because the annotation didn't exist on the controlplane object. this is not breaking though so don't block.
-	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, runtime)
+	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if snapshotMetadata == nil {
 		logrus.Errorf("Error while generating etcd snapshot extra metadata manifest for cluster %s", controlPlane.Spec.ClusterName)
 	} else {
@@ -70,8 +68,8 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 }
 
 // getClusterAgentManifestFile returns a plan.File that contains the cluster agent manifest.
-func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, runtime string, entry *planEntry) (plan.File, error) {
-	data, err := p.generateClusterAgentManifest(controlPlane)
+func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.File, error) {
+	data, err := p.generateClusterAgentManifest(controlPlane, entry)
 	if err != nil {
 		return plan.File{}, err
 	}
