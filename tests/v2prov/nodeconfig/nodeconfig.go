@@ -2,6 +2,7 @@ package nodeconfig
 
 import (
 	"encoding/json"
+	"github.com/rancher/rancher/pkg/data/management"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -51,7 +52,8 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 
 	_, err = clients.Mgmt.NodeDriver().Create(&v3.NodeDriver{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod",
+			Name:        management.PodDriver,
+			Annotations: map[string]string{"fileToFieldAliases": "userdata:userdata"},
 		},
 		Spec: v3.NodeDriverSpec{
 			DisplayName: "pod",
