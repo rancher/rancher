@@ -13,7 +13,6 @@ import (
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/types/image"
 	"github.com/rancher/rke/types/kdm"
 )
 
@@ -239,7 +238,7 @@ func MirrorScript(arch string, targetImages []string) error {
 
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		srcImage, ok := image.Mirrors[targetImage]
+		srcImage, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -258,7 +257,7 @@ func MirrorScript(arch string, targetImages []string) error {
 func saveImages(targetImages []string) []string {
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -272,7 +271,7 @@ func saveImagesAndSources(imagesAndSources []string) []string {
 	var saveImagesAndSources []string
 	for _, imageAndSources := range imagesAndSources {
 		targetImage := strings.Split(imageAndSources, " ")[0]
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
