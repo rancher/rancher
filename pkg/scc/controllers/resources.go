@@ -3,7 +3,6 @@ package controllers
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/util"
@@ -48,13 +47,13 @@ func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, erro
 	return updatedSecret, nil
 }
 
-func (h *handler) extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
+func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
 	incomingSalt := []byte(secret.GetLabels()[consts.LabelObjectSalt])
 
 	regMode := v1.RegistrationModeOnline
 	regType, ok := secret.Data[dataRegistrationType]
 	if !ok || len(regType) == 0 {
-		h.log.Warnf("secret does not have the `%s` field, defaulting to %s", dataRegistrationType, regMode)
+		// h.log.Warnf("secret does not have the `%s` field, defaulting to %s", dataRegistrationType, regMode)
 	} else {
 		regMode = v1.RegistrationMode(regType)
 		if !regMode.Valid() {
@@ -64,11 +63,8 @@ func (h *handler) extraRegistrationParamsFromSecret(secret *corev1.Secret) (Regi
 
 	regCode, ok := secret.Data[dataRegCode]
 	if !ok || len(regCode) == 0 {
-		warnOrErrText := fmt.Sprintf("secret does not have data %s; this is required in online mode", dataRegCode)
 		if regMode == v1.RegistrationModeOnline {
-			return RegistrationParams{}, errors.New(warnOrErrText)
-		} else {
-			h.log.Warnf(warnOrErrText)
+			return RegistrationParams{}, fmt.Errorf("secret does not have data %s; this is required in online mode", dataRegCode)
 		}
 	}
 

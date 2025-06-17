@@ -21,26 +21,26 @@ func TestRegistrationFromSecret(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NotNil(t, params)
-	assert.NotNil(t, params.hash)
+	assert.NotNil(t, params.contentHash)
 	// valid hash
 
-	seenHash := params.hash
+	seenHash := params.contentHash
 	assert.Equal(t, len(seenHash), 32)
 
 	sec.Data[dataRegCode] = []byte("world")
 	params2, err := extraRegistrationParamsFromSecret(sec)
 	assert.NoError(t, err)
 	assert.NotNil(t, params2)
-	assert.NotNil(t, params2.hash)
-	assert.NotEqual(t, seenHash, params2.hash)
+	assert.NotNil(t, params2.contentHash)
+	assert.NotEqual(t, seenHash, params2.contentHash)
 
-	seenHash = params2.hash
+	seenHash = params2.contentHash
 	sec.Data[dataRegistrationType] = []byte(v1.RegistrationModeOffline)
 	params3, err := extraRegistrationParamsFromSecret(sec)
 	assert.NoError(t, err)
 	assert.NotNil(t, params3)
-	assert.NotNil(t, params3.hash)
-	assert.NotEqual(t, seenHash, params3.hash)
+	assert.NotNil(t, params3.contentHash)
+	assert.NotEqual(t, seenHash, params3.contentHash)
 
 	for _, label := range params.Labels() {
 		assert.Less(t, len(label), 63)

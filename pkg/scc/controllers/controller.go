@@ -173,7 +173,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 
 		/** incomingSalt := incomingObj.GetLabels()[consts.LabelObjectSalt] */
 		incomingHash := incomingObj.GetLabels()[consts.LabelSccHash]
-		params, err := h.extraRegistrationParamsFromSecret(incomingObj)
+		params, err := extraRegistrationParamsFromSecret(incomingObj)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
