@@ -22,7 +22,7 @@ jobs:
     uses: ./.github/workflows/unit-test.yml
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: registry.suse.com/bci/bci-base:15.7
     steps:
       - name: install dependencies
         shell: bash
