@@ -11,7 +11,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -189,11 +191,89 @@ func Test_namespaceHandler_getNamespacesFromSecret(t *testing.T) {
 
 func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 	tests := []struct {
+		name                 string
+		project              *v3.Project
+		setupManagementCache func(*fake.MockCacheInterface[*corev1.Secret])
+		wantSecrets          []*corev1.Secret
+		wantErr              bool
+	}{
+		{
+			name: "successfully retrieve project scoped secrets",
+			project: &v3.Project{
+				ObjectMeta: metav1.ObjectMeta{Name: "p-test"},
+				Status:     v3.ProjectStatus{BackingNamespace: "c-abc123-p-test"},
+			},
+			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
+				expectedSelector, _ := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{"p-test"})
+				f.EXPECT().List("c-abc123-p-test", labels.NewSelector().Add(*expectedSelector)).Return([]*corev1.Secret{
+					{ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "c-abc123-p-test"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "c-abc123-p-test"}},
+				}, nil)
+			},
+			wantSecrets: []*corev1.Secret{
+				{ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "c-abc123-p-test"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "c-abc123-p-test"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no secrets found",
+			project: &v3.Project{
+				ObjectMeta: metav1.ObjectMeta{Name: "p-test"},
+				Status:     v3.ProjectStatus{BackingNamespace: "c-abc123-p-test"},
+			},
+			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
+				expectedSelector, _ := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{"p-test"})
+				f.EXPECT().List("c-abc123-p-test", labels.NewSelector().Add(*expectedSelector)).Return([]*corev1.Secret{}, nil)
+			},
+			wantSecrets: []*corev1.Secret{},
+			wantErr:     false,
+		},
+		{
+			name: "error listing secrets from cache",
+			project: &v3.Project{
+				ObjectMeta: metav1.ObjectMeta{Name: "p-test"},
+				Status:     v3.ProjectStatus{BackingNamespace: "c-abc123-p-test"},
+			},
+			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
+				expectedSelector, _ := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{"p-test"})
+				f.EXPECT().List("c-abc123-p-test", labels.NewSelector().Add(*expectedSelector)).Return(nil, errDefault)
+			},
+			wantSecrets: nil,
+			wantErr:     true,
+		},
+	}
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			managementSecretCacheMock := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			if tt.setupManagementCache != nil {
+				tt.setupManagementCache(managementSecretCacheMock)
+			}
+
+			n := &namespaceHandler{
+				managementSecretCache: managementSecretCacheMock,
+			}
+
+			gotSecrets, err := n.getProjectScopedSecretsFromNamespace(tt.project)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("namespaceHandler.getProjectScopedSecretsFromNamespace() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotSecrets, tt.wantSecrets) {
+				t.Errorf("namespaceHandler.getProjectScopedSecretsFromNamespace() gotSecrets = %v, want %v", gotSecrets, tt.wantSecrets)
+			}
+		})
+	}
+}
+
+func Test_namespaceHandler_getProjectFromNamespace(t *testing.T) {
+	tests := []struct {
 		name              string
 		namespace         *corev1.Namespace
 		setupProjectCache func(*fake.MockCacheInterface[*v3.Project])
-		setupSecretCache  func(*fake.MockCacheInterface[*corev1.Secret])
-		want              []*corev1.Secret
+		want              *v3.Project
 		wantErr           bool
 	}{
 		{
@@ -234,7 +314,7 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "error listing secrets",
+			name: "get a project",
 			namespace: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -249,34 +329,11 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 					},
 				}, nil)
 			},
-			setupSecretCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
-				f.EXPECT().List("c-abc123-p-abc123", gomock.Any()).Return(nil, errDefault)
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "get list of secrets",
-			namespace: &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						projectIDLabel: "c-abc123:p-abc123",
-					},
+			want: &v3.Project{
+				Status: v3.ProjectStatus{
+					BackingNamespace: "c-abc123-p-abc123",
 				},
 			},
-			setupProjectCache: func(f *fake.MockCacheInterface[*v3.Project]) {
-				f.EXPECT().Get("c-abc123", "p-abc123").Return(&v3.Project{
-					Status: v3.ProjectStatus{
-						BackingNamespace: "c-abc123-p-abc123",
-					},
-				}, nil)
-			},
-			setupSecretCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
-				f.EXPECT().List("c-abc123-p-abc123", gomock.Any()).Return([]*corev1.Secret{
-					{ObjectMeta: metav1.ObjectMeta{Name: "secret"}},
-				}, nil)
-			},
-			want: []*corev1.Secret{{ObjectMeta: metav1.ObjectMeta{Name: "secret"}}},
 		},
 	}
 	ctrl := gomock.NewController(t)
@@ -286,15 +343,10 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 			if tt.setupProjectCache != nil {
 				tt.setupProjectCache(projectCache)
 			}
-			secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-			if tt.setupSecretCache != nil {
-				tt.setupSecretCache(secretCache)
-			}
 			n := &namespaceHandler{
-				managementSecretCache: secretCache,
-				projectCache:          projectCache,
+				projectCache: projectCache,
 			}
-			got, err := n.getProjectScopedSecretsFromNamespace(tt.namespace)
+			got, err := n.getProjectFromNamespace(tt.namespace)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("namespaceHandler.getProjectScopedSecretsFromNamespace() error = %v, wantErr %v", err, tt.wantErr)
 				return
