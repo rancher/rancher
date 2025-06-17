@@ -8,11 +8,11 @@ ARG CATTLE_KDM_BRANCH=dev-v2.11
 
 ARG VERSION=${VERSION}
 
-FROM registry.suse.com/bci/bci-micro:15.6 AS final
+FROM registry.suse.com/bci/bci-micro:15.7 AS final
 RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS chroot-builder
+FROM registry.suse.com/bci/bci-base:15.7 AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
