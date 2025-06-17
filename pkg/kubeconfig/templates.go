@@ -1,6 +1,6 @@
 package kubeconfig
 
-import "html/template"
+import "text/template"
 
 const (
 	tokenTemplateText = `apiVersion: v1
