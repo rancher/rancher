@@ -20,7 +20,7 @@ type testcase struct {
 
 var (
 	windowsNodeLabel = map[string]string{
-		"beta.kubernetes.io/os": "windows",
+		"kubernetes.io/os": "windows",
 	}
 )
 
