@@ -186,7 +186,7 @@ func TestGetImages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{}, map[string]rketypes.RKESystemImages{})
+			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{})
 			assertlib.NoError(t, err)
 
 			for _, expected := range tt.expected {

@@ -12,9 +12,7 @@ import (
 	"github.com/coreos/go-semver/semver"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
-	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/types/image"
 	"github.com/rancher/rke/types/kdm"
 )
 
@@ -83,23 +81,6 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		return ImageTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
 	}
 
-	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
-		rancherVersion,
-		data.K8sVersionRKESystemImages,
-		data.K8sVersionServiceOptions,
-		data.K8sVersionWindowsServiceOptions,
-		data.K8sVersionInfo,
-	)
-
-	var k8sVersions []string
-	for k := range linuxInfo.RKESystemImages {
-		k8sVersions = append(k8sVersions, k)
-	}
-	sort.Strings(k8sVersions)
-	if err := writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions); err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not write rancher-rke-k8s-versions.txt file", err)
-	}
-
 	k8sVersion1_21_0 := &semver.Version{
 		Major: 1,
 		Minor: 21,
@@ -141,13 +122,13 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		RancherVersion:  rancherVersion,
 		GithubEndpoints: img.ExtensionEndpoints,
 	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs)
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}
 
 	exportConfig.OsType = img.Windows
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{winsAgentUpdateImage}, windowsInfo.RKESystemImages)
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{winsAgentUpdateImage})
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}
@@ -257,7 +238,7 @@ func MirrorScript(arch string, targetImages []string) error {
 
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		srcImage, ok := image.Mirrors[targetImage]
+		srcImage, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -276,7 +257,7 @@ func MirrorScript(arch string, targetImages []string) error {
 func saveImages(targetImages []string) []string {
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -290,7 +271,7 @@ func saveImagesAndSources(imagesAndSources []string) []string {
 	var saveImagesAndSources []string
 	for _, imageAndSources := range imagesAndSources {
 		targetImage := strings.Split(imageAndSources, " ")[0]
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
