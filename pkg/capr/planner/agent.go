@@ -5,15 +5,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"sort"
-	"strings"
 	"text/template"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 )
-
-var t = template.Must(template.New("cam-apply").Parse(ClusterAgentInitialCreationManifest))
 
 const ClusterAgentInitialCreationManifest = `
 apiVersion: v1
@@ -96,6 +93,11 @@ spec:
 `
 
 const ApplyManifestIfNotExistsScript string = `#!/bin/sh
+
+if [ -z "$CATTLE_SERVER" ] || [ -z "$CATTLE_TOKEN" ]; then
+	exit 1
+fi
+
 # info logs the given argument at info log level.
 info() {
     echo "[INFO] " "$@"
@@ -116,10 +118,6 @@ fatal() {
     echo "[FATAL] " "$@" >&2
     exit 1
 }
-
-if [ -z "$CATTLE_SERVER" ] || [ -z "$CATTLE_TOKEN" ]; then
-	fatal "CATTLE_SERVER and CATTLE_TOKEN must not be empty"
-fi
 
 if kubectl get deployments -n cattle-system cattle-cluster-agent > /dev/null; then
 	info "cattle-cluster-agent already exists"
@@ -400,12 +398,11 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, err
 	}
 
+	t := template.Must(template.New("cam-apply").Parse(ClusterAgentInitialCreationManifest))
+
 	strictVerify := settings.AgentTLSMode.Get() == settings.AgentTLSModeStrict
 	for _, ev := range controlPlane.Spec.AgentEnvVars {
-		if strictVerify == true {
-			break
-		}
-		if ev.Name == "STRICT_VERIFY" && strings.ToLower(ev.Value) == "true" {
+		if ev.Name == "STRICT_VERIFY" {
 			strictVerify = true
 		}
 	}

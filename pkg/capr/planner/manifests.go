@@ -32,7 +32,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
-	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane)
+	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, runtime, entry)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 }
 
 // getClusterAgentManifestFile returns a plan.File that contains the cluster agent manifest.
-func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane) (plan.File, error) {
+func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, runtime string, entry *planEntry) (plan.File, error) {
 	data, err := p.generateClusterAgentManifest(controlPlane)
 	if err != nil {
 		return plan.File{}, err
