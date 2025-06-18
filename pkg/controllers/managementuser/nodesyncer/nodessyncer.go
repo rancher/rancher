@@ -52,16 +52,12 @@ type nodeSyncer struct {
 }
 
 type nodesSyncer struct {
-	machines         v3.NodeInterface
-	machineLister    v3.NodeLister
-	nodeLister       v1.NodeLister
-	nodeClient       v1.NodeInterface
-	clusterNamespace string
-	clusterLister    v3.ClusterLister
-	// serviceOptionsLister v3.RkeK8sServiceOptionLister
-	// serviceOptions       v3.RkeK8sServiceOptionInterface
-	// sysImagesLister      v3.RkeK8sSystemImageLister
-	// sysImages            v3.RkeK8sSystemImageInterface
+	machines             v3.NodeInterface
+	machineLister        v3.NodeLister
+	nodeLister           v1.NodeLister
+	nodeClient           v1.NodeInterface
+	clusterNamespace     string
+	clusterLister        v3.ClusterLister
 	secretLister         v1.SecretLister
 	provClusterCache     provcontrollers.ClusterCache
 	capiClusterCache     capicontrollers.ClusterCache
