@@ -11,17 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
-	"github.com/rancher/rke/k8s"
-	"github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/transport"
@@ -139,77 +135,6 @@ func HasOnlyPrivateAPIEndpoint(cluster *v3.Cluster) bool {
 	}
 }
 
-func (f *Factory) translateClusterAddress(cluster *v3.Cluster, clusterHostPort, address string) string {
-	if clusterHostPort != address {
-		logrus.Tracef("dialerFactory: apiEndpoint clusterHostPort [%s] is not equal to address [%s]", clusterHostPort, address)
-		return address
-	}
-
-	host, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return address
-	}
-
-	// Make sure that control plane node we are connecting to is not bad, also use internal address
-	nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
-	if err != nil {
-		logrus.Debugf("Error listing nodes while translating cluster address, returning address [%s], error: %v", address, err)
-		return address
-	}
-
-	clusterGood := v32.ClusterConditionReady.IsTrue(cluster)
-	logrus.Tracef("dialerFactory: ClusterConditionReady for cluster [%s] is [%t]", cluster.Spec.DisplayName, clusterGood)
-	lastGoodHost := ""
-	logrus.Trace("dialerFactory: finding a node to tunnel the cluster connection")
-	for _, node := range nodes {
-		var (
-			publicIP  = node.Status.NodeAnnotations[k8s.ExternalAddressAnnotation]
-			privateIP = node.Status.NodeAnnotations[k8s.InternalAddressAnnotation]
-		)
-
-		fakeNode := &v1.Node{
-			Status: node.Status.InternalNodeStatus,
-		}
-
-		nodeGood := v32.NodeConditionRegistered.IsTrue(node) && v32.NodeConditionProvisioned.IsTrue(node) &&
-			!v32.NodeConditionReady.IsUnknown(fakeNode) && node.DeletionTimestamp == nil
-
-		if !nodeGood {
-			logrus.Tracef("dialerFactory: Skipping node [%s] for tunneling the cluster connection because nodeConditions are not as expected", node.Spec.RequestedHostname)
-			logrus.Tracef("dialerFactory: Node conditions for node [%s]: %+v", node.Status.NodeName, node.Status.Conditions)
-			continue
-		}
-		if privateIP == "" {
-			logrus.Tracef("dialerFactory: Skipping node [%s] for tunneling the cluster connection because privateIP is empty", node.Status.NodeName)
-			continue
-		}
-
-		logrus.Tracef("dialerFactory: IP addresses for node [%s]: publicIP [%s], privateIP [%s]", node.Status.NodeName, publicIP, privateIP)
-
-		if publicIP == host {
-			logrus.Tracef("dialerFactory: publicIP [%s] for node [%s] matches apiEndpoint host [%s], checking if cluster condition Ready is True", publicIP, node.Status.NodeName, host)
-			if clusterGood {
-				logrus.Trace("dialerFactory: cluster condition Ready is True")
-				host = privateIP
-				logrus.Tracef("dialerFactory: Using privateIP [%s] of node [%s] as node to tunnel the cluster connection", privateIP, node.Status.NodeName)
-				return fmt.Sprintf("%s:%s", host, port)
-			}
-			logrus.Debug("dialerFactory: cluster condition Ready is False")
-		} else if node.Status.NodeConfig != nil && slice.ContainsString(node.Status.NodeConfig.Role, services.ControlRole) {
-			logrus.Tracef("dialerFactory: setting node [%s] with privateIP [%s] as option for the connection as it is a controlplane node", node.Status.NodeName, privateIP)
-			lastGoodHost = privateIP
-		}
-	}
-
-	if lastGoodHost != "" {
-		logrus.Tracef("dialerFactory: returning [%s:%s] as last good option to tunnel the cluster connection", lastGoodHost, port)
-		return fmt.Sprintf("%s:%s", lastGoodHost, port)
-	}
-
-	logrus.Tracef("dialerFactory: returning [%s], as no good option was found (no match with apiEndpoint or a controlplane node with correct conditions", address)
-	return address
-}
-
 var nativeDialer dialer.Dialer = (&net.Dialer{
 	Timeout:   30 * time.Second,
 	KeepAlive: 30 * time.Second,
@@ -237,9 +162,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 		logrus.Tracef("dialerFactory: tunnel session found for cluster [%s]", cluster.Name)
 		cd := f.TunnelServer.Dialer(cluster.Name)
 		return func(ctx context.Context, network, address string) (net.Conn, error) {
-			if cluster.Status.Driver == v32.ClusterDriverRKE {
-				address = f.translateClusterAddress(cluster, hostPort, address)
-			}
 			logrus.Tracef("dialerFactory: returning network [%s] and address [%s] as clusterDialer", network, address)
 			return cd(ctx, network, address)
 		}, nil
@@ -252,11 +174,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 		return nil, err
 	}
 
-	var localAPIEndpoint bool
-	if cluster.Status.Driver == v32.ClusterDriverRKE {
-		localAPIEndpoint = true
-	}
-
 	for _, node := range nodes {
 		if node.DeletionTimestamp == nil && v32.NodeConditionProvisioned.IsTrue(node) &&
 			(node.Spec.ControlPlane || v32.NodeConditionReady.IsTrue(node)) {
@@ -264,12 +181,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 				node.Labels["management.cattle.io/nodename"], node.Name)
 			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
 				return func(ctx context.Context, network, address string) (net.Conn, error) {
-					if address == hostPort && localAPIEndpoint {
-						logrus.Trace("dialerFactory: rewriting address/port to 127.0.0.1:6443 as node may not" +
-							" have direct kube-api access")
-						// The node dialer may not have direct access to kube-api so we hit localhost:6443 instead
-						address = "127.0.0.1:6443"
-					}
 					logrus.Tracef("dialerFactory: Returning network [%s] and address [%s] as nodeDialer", network, address)
 					return nodeDialer(ctx, network, address)
 				}, nil
@@ -288,9 +199,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 			logrus.Debugf("Cluster [%s] has reconnected, resuming", cluster.Name)
 			cd := f.TunnelServer.Dialer(cluster.Name)
 			return func(ctx context.Context, network, address string) (net.Conn, error) {
-				if cluster.Status.Driver == v32.ClusterDriverRKE {
-					address = f.translateClusterAddress(cluster, hostPort, address)
-				}
 				logrus.Tracef("dialerFactory: returning network [%s] and address [%s] as clusterDialer", network, address)
 				return cd(ctx, network, address)
 			}, nil
