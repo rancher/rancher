@@ -144,13 +144,13 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	exportConfig := image.ExportConfig{OsType: image.Linux}
 	switch apiContext.ID {
 	case linuxImages:
-		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{}, rkeSysImages)
+		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{})
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	case windowsImages:
 		exportConfig.OsType = image.Windows
-		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{}, rkeSysImages)
+		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{})
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
 		}

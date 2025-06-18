@@ -8,7 +8,6 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	rketypes "github.com/rancher/rke/types"
 	assertlib "github.com/stretchr/testify/assert"
 )
 
