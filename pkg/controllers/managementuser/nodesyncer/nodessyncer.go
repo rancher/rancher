@@ -24,7 +24,6 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
-	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -247,122 +246,6 @@ func (m *nodesSyncer) sync(key string, _ *apimgmtv3.Node) (runtime.Object, error
 		return nil, m.reconcileAll()
 	}
 	return nil, nil
-}
-
-func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *apimgmtv3.Node) (*corev1.Node, *apimgmtv3.Node, error) {
-	node, err := m.nodeClient.Update(node)
-	if err != nil {
-		// Return apimgmtv3.Node is nil because it hasn't been persisted and therefor out of sync with cache
-		// so we don't want to return it from the handler
-		return node, nil, err
-	}
-
-	obj, err = m.machines.Update(obj)
-	if err != nil {
-		// Same logic as above, but more so that we don't know the state of this object
-		return node, nil, err
-	}
-
-	return node, obj, nil
-}
-
-func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *apimgmtv3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *apimgmtv3.Node, error) {
-	finalMap, changed := computeDelta(node.Labels, nodePlan.Labels, obj.Spec.MetadataUpdate.Labels, onlyKubeLabels)
-	if !changed {
-		return node, obj, nil
-	}
-
-	node, obj = node.DeepCopy(), obj.DeepCopy()
-	if obj.Status.NodeConfig != nil {
-		planValues, changed := computePlanDelta(obj.Status.NodeConfig.Labels, obj.Spec.MetadataUpdate.Labels)
-		if changed {
-			obj.Status.NodeConfig.Labels = planValues
-		}
-	}
-
-	node.Labels = finalMap
-
-	obj.Spec.MetadataUpdate.Labels = apimgmtv3.MapDelta{}
-
-	return m.updateNodeAndNode(node, obj)
-}
-
-// For any key that already exist in the plan, we should update or delete. For others, do not touch the plan.
-func computePlanDelta(planValues map[string]string, delta apimgmtv3.MapDelta) (map[string]string, bool) {
-	update := false
-	for k, v := range delta.Add {
-		if planValues[k] != "" {
-			update = true
-			planValues[k] = v
-		}
-	}
-
-	for k := range delta.Delete {
-		if planValues[k] != "" {
-			update = true
-			delete(planValues, k)
-		}
-	}
-	return planValues, update
-
-}
-
-func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *apimgmtv3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *apimgmtv3.Node, error) {
-	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, allowAllPolicy)
-	if !changed {
-		return node, obj, nil
-	}
-
-	node, obj = node.DeepCopy(), obj.DeepCopy()
-	node.Annotations = finalMap
-	obj.Spec.MetadataUpdate.Annotations = apimgmtv3.MapDelta{}
-
-	return m.updateNodeAndNode(node, obj)
-}
-
-func onlyKubeLabels(key string) bool {
-	return strings.Contains(key, "kubernetes.io")
-}
-
-func allowAllPolicy(_ string) bool {
-	return true
-}
-
-// computeDelta will return the final updated map to apply and a boolean indicating whether there are changes to be applied.
-// If the boolean is false, the caller need not take any action as the data is already in sync.
-func computeDelta(currentState map[string]string, planValues map[string]string, delta apimgmtv3.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
-	result := map[string]string{}
-	changed := false
-
-	// copy map
-	for k, v := range currentState {
-		result[k] = v
-	}
-
-	for k, v := range planValues {
-		currentValue, ok := result[k]
-		// if the key is missing or the value is allowed to be changed
-		if !ok || (currentValue != v && canChangeValue(k)) {
-			result[k] = v
-			changed = true
-		}
-	}
-
-	for k, v := range delta.Add {
-		if result[k] != v {
-			changed = true
-			result[k] = v
-		}
-	}
-
-	for k := range delta.Delete {
-		if _, ok := result[k]; ok {
-			delete(result, k)
-			changed = true
-		}
-	}
-
-	return result, changed
 }
 
 func (m *nodesSyncer) reconcileAll() error {
