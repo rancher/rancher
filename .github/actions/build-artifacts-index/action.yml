@@ -16,7 +16,7 @@ runs:
         mkdir -p ${{ steps.vars.outputs.ARTIFACTS_INDEX }}
         # The generate artifacts-index command needs an aws key and secret to perform operations, but all other auth configs are not used
         # The config is generated using the config gen command to prevent future changes in the config format from breaking this command
-        ECM_AUTH_CONFIG=$(release config gen | jq '.auth | .aws_access_key_id |= "${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }}" | .aws_secret_access_key |= "${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }}" | .aws_session_token |= "" | .aws_default_region |= "${{ env.AWS_DEFAULT_REGION }}"')
+        ECM_AUTH_CONFIG=$(release config gen | jq '.auth | .aws_access_key_id |= "${{ env.AWS_ACCESS_KEY_ID }}" | .aws_secret_access_key |= "${{ env.AWS_SECRET_ACCESS_KEY }}" | .aws_session_token |= "" | .aws_default_region |= "${{ env.AWS_DEFAULT_REGION }}"')
         ECM_CONFIG="{\"auth\": $ECM_AUTH_CONFIG}"
         # ignore v2.6.4 because it isn't a prime version, but it needs to be in the bucket since it is used by a test
         release generate rancher artifacts-index --config "$ECM_CONFIG" --write-path ${{ steps.vars.outputs.ARTIFACTS_INDEX }} --ignore-versions v2.6.4
