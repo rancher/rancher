@@ -37,3 +37,9 @@ const (
 	LabelSccManagedBy     = "scc.cattle.io/managed-by"
 	LabelSccSecretRole    = "scc.cattle.io/secret-role"
 )
+
+const (
+	SecretKeyRegistrationCode  = "regCode"
+	SecretKeyOfflineRegRequest = "request"
+	SecretKeyOfflineRegCert    = "certificate"
+)

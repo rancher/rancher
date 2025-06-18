@@ -15,9 +15,7 @@ import (
 )
 
 const (
-	dataRegCode          = "regCode"
 	dataRegistrationType = "registrationType"
-	dataCertificate      = "certificate"
 )
 
 func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
@@ -61,14 +59,14 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 		}
 	}
 
-	regCode, ok := secret.Data[dataRegCode]
+	regCode, ok := secret.Data[consts.SecretKeyRegistrationCode]
 	if !ok || len(regCode) == 0 {
 		if regMode == v1.RegistrationModeOnline {
-			return RegistrationParams{}, fmt.Errorf("secret does not have data %s; this is required in online mode", dataRegCode)
+			return RegistrationParams{}, fmt.Errorf("secret does not have data %s; this is required in online mode", consts.SecretKeyRegistrationCode)
 		}
 	}
 
-	offlineRegCert, certOk := secret.Data[dataCertificate]
+	offlineRegCert, certOk := secret.Data[consts.SecretKeyOfflineRegCert]
 	// TODO: do we care to validate this; online shouldn't have this at all, offline has it eventually
 	// So it cannot be required for offline mode like RegCode is above, we could error online mode with it?
 

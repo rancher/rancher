@@ -2,19 +2,17 @@ package offlinerequest
 
 import (
 	"fmt"
+	"io"
+	"maps"
+	"slices"
+
 	"github.com/SUSE/connect-ng/pkg/registration"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"maps"
-	"slices"
-)
-
-const (
-	RequestKey = "request"
 )
 
 type OfflineRegistrationSecrets struct {
@@ -61,9 +59,9 @@ func (o *OfflineRegistrationSecrets) loadSecret() error {
 		if len(offlineRequest.Data) == 0 {
 			return fmt.Errorf("secret %s/%s has no data fields; but should always have them", o.secretNamespace, o.secretName)
 		}
-		currentOfflineRequest, ok := offlineRequest.Data[RequestKey]
+		currentOfflineRequest, ok := offlineRequest.Data[consts.SecretKeyOfflineRegRequest]
 		if !ok {
-			return fmt.Errorf("secret %s/%s has no data field for %s", o.secretNamespace, o.secretName, RequestKey)
+			return fmt.Errorf("secret %s/%s has no data field for %s", o.secretNamespace, o.secretName, consts.SecretKeyOfflineRegRequest)
 		}
 
 		o.offlineRequest = currentOfflineRequest
@@ -96,12 +94,12 @@ func (o *OfflineRegistrationSecrets) saveSecret() error {
 
 	if offlineRequest.Data == nil {
 		offlineRequest.Data = map[string][]byte{
-			RequestKey: make([]byte, 0),
+			consts.SecretKeyOfflineRegRequest: make([]byte, 0),
 		}
 	}
 
 	if len(o.offlineRequest) != 0 {
-		offlineRequest.Data[RequestKey] = o.offlineRequest
+		offlineRequest.Data[consts.SecretKeyOfflineRegRequest] = o.offlineRequest
 	}
 
 	if o.finalizer != "" {

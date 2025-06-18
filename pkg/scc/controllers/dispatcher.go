@@ -1,10 +1,10 @@
 package controllers
 
 import (
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/jitterbug"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -17,7 +17,7 @@ func setupCfg() *jitterbug.Config {
 		JitterMaxScale:  time.Hour,
 		PollingInterval: 9 * time.Minute,
 	}
-	if util.VersionIsDevBuild() {
+	if consts.IsDevMode() {
 		jitterbugConfig = jitterbug.Config{
 			BaseInterval:    devBaseCheckin,
 			JitterMax:       10,

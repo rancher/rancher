@@ -1,19 +1,21 @@
 package controllers
 
 import (
+	"testing"
+
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestRegistrationFromSecret(t *testing.T) {
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{},
 		Data: map[string][]byte{
-			dataRegCode:          []byte("hello"),
-			dataRegistrationType: []byte(v1.RegistrationModeOnline),
+			consts.SecretKeyRegistrationCode: []byte("hello"),
+			dataRegistrationType:             []byte(v1.RegistrationModeOnline),
 		},
 	}
 
@@ -27,7 +29,7 @@ func TestRegistrationFromSecret(t *testing.T) {
 	seenHash := params.contentHash
 	assert.Equal(t, len(seenHash), 32)
 
-	sec.Data[dataRegCode] = []byte("world")
+	sec.Data[consts.SecretKeyRegistrationCode] = []byte("world")
 	params2, err := extraRegistrationParamsFromSecret(sec)
 	assert.NoError(t, err)
 	assert.NotNil(t, params2)

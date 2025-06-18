@@ -3,8 +3,6 @@ package systeminfo
 import (
 	"testing"
 
-	"github.com/rancher/rancher/pkg/scc/util"
-
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -13,22 +11,19 @@ import (
 )
 
 func TestNewInfoProvider(t *testing.T) {
-	// rancherUuid := uuid.Parse(uuid.New())
-	// clusterUuid := uuid.Parse(uuid.New())
-
 	// Test with dev build
 	// infoProvider := NewInfoProvider(rancherUuid, clusterUuid)
-	assert.Equal(t, "2.10.3", GetVersion())
+	assert.Equal(t, "2.10.3", SCCSafeVersion())
 
 	// Test with non-dev build
 	coreVersion.Version = "1.9.0"
 	defer func() { coreVersion.Version = "dev" }()
 	// infoProvider = NewInfoProvider(rancherUuid, clusterUuid)
-	assert.Equal(t, "1.9.0", GetVersion())
+	assert.Equal(t, "1.9.0", SCCSafeVersion())
 
 	// Test with no mock version
 	// infoProvider = NewInfoProvider(rancherUuid, clusterUuid)
-	assert.Equal(t, coreVersion.Version, GetVersion())
+	assert.Equal(t, coreVersion.Version, SCCSafeVersion())
 }
 
 func TestGetProductIdentifier(t *testing.T) {
@@ -40,12 +35,12 @@ func TestGetProductIdentifier(t *testing.T) {
 	assert.Equal(t, "rancher", product)
 	// When in dev mode, the info provider has to "lie" in order to connect with SCC
 	// however, when not in dev mode, the info provider should return the correct version
-	if util.VersionIsDevBuild() {
+	if versionIsDevBuild() {
 		assert.NotEqual(t, coreVersion.Version, version)
 	} else {
 		assert.Equal(t, coreVersion.Version, version)
 	}
-	assert.Equal(t, GetVersion(), version)
+	assert.Equal(t, SCCSafeVersion(), version)
 	assert.Equal(t, "unknown", architecture)
 }
 

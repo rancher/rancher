@@ -1,4 +1,4 @@
-package util
+package systeminfo
 
 import (
 	"fmt"
@@ -43,7 +43,7 @@ func TestVersionIsDevBuild(t *testing.T) {
 		t.Run(name(tc), func(t *testing.T) {
 			// Test non-semVer versions used for dev builds
 			coreVersion.Version = tc.version
-			assert.Equal(t, tc.expectedIsDev, VersionIsDevBuild())
+			assert.Equal(t, tc.expectedIsDev, versionIsDevBuild())
 			coreVersion.Version = startVersion
 		})
 	}

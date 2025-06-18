@@ -28,8 +28,8 @@ import (
 )
 
 type sccOperator struct {
+	devMode                 bool
 	log                     log.StructuredLogger
-	configMaps              corev1.ConfigMapController
 	sccResourceFactory      *scc.Factory
 	secrets                 corev1.SecretController
 	systemInfoProvider      *systeminfo.InfoProvider
@@ -88,9 +88,16 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 
 	rancherVersion := systeminfo.GetVersion()
 	rancherTelemetry := telemetry.NewTelemetryGatherer(rancherVersion, wContext.Mgmt.Cluster().Cache(), wContext.Mgmt.Node().Cache())
+
+	devMode := false
+	if consts.IsDevMode() {
+		devMode = true
+		logger = logger.WithField("devMode", true)
+	}
+
 	return &sccOperator{
+		devMode:                 devMode,
 		log:                     logger,
-		configMaps:              wContext.Core.ConfigMap(),
 		sccResourceFactory:      sccResources,
 		secrets:                 wContext.Core.Secret(),
 		systemInfoProvider:      infoProvider,
