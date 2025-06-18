@@ -43,6 +43,7 @@ const (
 	migrateRKEClusterState                     = "migraterkeclusterstate"
 	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
 	migrateImportedClusterManagedFields        = "migrateimportedclustermanagedfields"
+	rkeCleanupMigration                        = "rkecleanupmigration"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
@@ -52,6 +53,7 @@ const (
 	rkeClustersAnnotatedForMigrationKey        = "rkeClustersAnnotatedForMigration"
 	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
 	importedClusterManagedFieldsMigratedKey    = "importedClusterManagedFieldsMigrated"
+	rkeCleanupCompletedKey                     = "rkecleanupcompleted"
 )
 
 var (
@@ -90,7 +92,11 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	return migrateImportedClusterFields(wranglerContext)
+	if err := migrateImportedClusterFields(wranglerContext); err != nil {
+		return err
+	}
+
+	return rkeResourcesCleanup(wranglerContext)
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -644,4 +650,51 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 	d.SetNested(conditions, "status", "conditions")
 
 	return true, nil
+}
+
+func rkeResourcesCleanup(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), rkeCleanupMigration)
+	if err != nil {
+		return fmt.Errorf("error getting configmap %s: %w", rkeCleanupMigration, err)
+	} else if cm == nil {
+		return nil
+	}
+
+	// Check if this migration has already run.
+	if cm.Data[rkeCleanupCompletedKey] == "true" {
+		return nil
+	}
+
+	err = w.Core.ConfigMap().Delete(cattleNamespace, migrateRKEClusterState, &metav1.DeleteOptions{})
+	if err != nil && !k8serror.IsNotFound(err) {
+		logrus.Error("Failed to delete rkeaddons.management.cattle.io crd")
+		return err
+	}
+
+	err = w.CRD.CustomResourceDefinition().Delete("rkeaddons.management.cattle.io", &metav1.DeleteOptions{})
+	if err != nil && !k8serror.IsNotFound(err) {
+		logrus.Error("Failed to delete rkeaddons.management.cattle.io crd")
+		return err
+	}
+
+	err = w.CRD.CustomResourceDefinition().Delete("rkek8sserviceoptions.management.cattle.io", &metav1.DeleteOptions{})
+	if err != nil && !k8serror.IsNotFound(err) {
+		logrus.Error("Failed to delete rkek8sserviceoptions.management.cattle.io crd")
+		return err
+	}
+
+	err = w.CRD.CustomResourceDefinition().Delete("rkek8ssystemimages.management.cattle.io", &metav1.DeleteOptions{})
+	if err != nil && !k8serror.IsNotFound(err) {
+		logrus.Error("Failed to delete rkeaddons.management.cattle.io crd")
+		return err
+	}
+
+	err = w.CRD.CustomResourceDefinition().Delete("etcdbackups.management.cattle.io", &metav1.DeleteOptions{})
+	if err != nil && !k8serror.IsNotFound(err) {
+		logrus.Error("Failed to delete etcdbackups.management.cattle.io crd")
+		return err
+	}
+
+	cm.Data[rkeCleanupCompletedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
