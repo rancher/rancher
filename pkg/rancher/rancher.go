@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"net/http"
 	"os"
 	"strings"
@@ -22,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
@@ -329,6 +329,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	// ensure namespace for storing local users password is created
 	if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: pbkdf2.LocalUserPasswordsNamespace},
 	}); err != nil && !apierrors.IsAlreadyExists(err) {

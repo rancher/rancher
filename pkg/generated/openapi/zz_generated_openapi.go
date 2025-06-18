@@ -333,7 +333,8 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequest(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "PasswordChangeRequest is used to change the password for a local user.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -431,7 +432,8 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequestSpec(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "PasswordChangeRequestSpec contains the data about the password change request.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"userID": {
 						SchemaProps: spec.SchemaProps{
@@ -461,7 +463,8 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequestStatus(ref common.Refer
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "PasswordChangeRequestStatus defines the most recently observed status of the PasswordChangeRequest.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"conditions": {
 						SchemaProps: spec.SchemaProps{
@@ -489,7 +492,8 @@ func schema_pkg_apis_extcattleio_v1_SelfUser(ref common.ReferenceCallback) commo
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "SelfUser is used to retrieve the current user information.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -580,7 +584,8 @@ func schema_pkg_apis_extcattleio_v1_SelfUserStatus(ref common.ReferenceCallback)
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "SelfUserStatus defines the most recently observed status of the SelfUser",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"userID": {
 						SchemaProps: spec.SchemaProps{
@@ -1039,7 +1044,8 @@ func schema_pkg_apis_extcattleio_v1_UserRefreshRequest(ref common.ReferenceCallb
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "UserRefreshRequest is used to initiate a user refresh action.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -1137,7 +1143,8 @@ func schema_pkg_apis_extcattleio_v1_UserRefreshRequestSpec(ref common.ReferenceC
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "UserRefreshRequestSpec contains the data about the user refresh request.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"userID": {
 						SchemaProps: spec.SchemaProps{
@@ -1161,7 +1168,8 @@ func schema_pkg_apis_extcattleio_v1_UserRefreshRequestStatus(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "UserRefreshRequestStatus defines the most recently observed status of the UserRefreshRequest.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"conditions": {
 						SchemaProps: spec.SchemaProps{
