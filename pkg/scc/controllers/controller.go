@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/controllers/shared"
-	"github.com/rancher/rancher/pkg/scc/suseconnect/offlinerequest"
+	"github.com/rancher/rancher/pkg/scc/suseconnect/offline"
 	"maps"
 	"time"
 
@@ -123,13 +123,15 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 
 	if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 		offlineRequestSecretName := consts.OfflineRequestSecretName(nameSuffixHash)
+		offlineCertSecretName := consts.OfflineCertificateSecretName(nameSuffixHash)
 		return sccOfflineMode{
 			registration:       registrationObj,
 			log:                h.log.WithField("regHandler", "offline"),
 			systemInfoExporter: h.systemInfoExporter,
-			offlineSecrets: offlinerequest.New(
+			offlineSecrets: offline.New(
 				h.systemNamespace,
 				offlineRequestSecretName,
+				offlineCertSecretName,
 				consts.FinalizerSccCredentials,
 				ref,
 				h.secrets,
@@ -168,9 +170,8 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			return h.prepareSecretSalt(incomingObj)
 		}
 
-		/** incomingSalt := incomingObj.GetLabels()[consts.LabelObjectSalt] */
 		incomingHash := incomingObj.GetLabels()[consts.LabelSccHash]
-		params, err := extraRegistrationParamsFromSecret(incomingObj)
+		params, err := extractRegistrationParamsFromSecret(incomingObj)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
