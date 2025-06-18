@@ -10,7 +10,7 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/rancher/rancher/pkg/image"
-	"github.com/rancher/rke/types/kdm"
+	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -103,7 +103,7 @@ func TestGetExternalImages(t *testing.T) {
 			if err != nil {
 				t.Errorf("failed to read response from url %v", tt.args.kdmUrl)
 			}
-			data, err := kdm.FromData(resp)
+			data, err := kontainerdrivermetadata.FromData(resp)
 			if err != nil {
 				t.Error(err)
 			}
