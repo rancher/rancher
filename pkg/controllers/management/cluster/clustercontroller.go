@@ -10,8 +10,6 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
-	rketypes "github.com/rancher/rke/types"
-
 	errorsutil "github.com/pkg/errors"
 	normantypes "github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -23,11 +21,8 @@ import (
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rke/cloudprovider/aws"
-	"github.com/rancher/rke/cloudprovider/azure"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -73,17 +68,7 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, 
 	}
 	capabilities := v32.Capabilities{}
 
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		capabilities.NodePortRange = DefaultNodePortRange
-		// taint support capability is set in provisioner and update cluster is called, so we should retain the capability here
-		if cluster.Status.Capabilities.TaintSupport != nil && *cluster.Status.Capabilities.TaintSupport {
-			supportsTaints := true
-			capabilities.TaintSupport = &supportsTaints
-		}
-		if capabilities, err = c.RKECapabilities(capabilities, *cluster.Spec.RancherKubernetesEngineConfig, cluster.Name); err != nil {
-			return nil, err
-		}
-	} else if cluster.Spec.GenericEngineConfig != nil {
+	if cluster.Spec.GenericEngineConfig != nil {
 		capabilities.NodePortRange = DefaultNodePortRange
 		driverName, ok := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
 		if !ok {
@@ -193,57 +178,6 @@ func (c *controller) parseResourceInterface(key string, annoValue string) (inter
 		}
 		return result, nil
 	}
-}
-
-func (c *controller) RKECapabilities(capabilities v32.Capabilities, rkeConfig rketypes.RancherKubernetesEngineConfig, clusterName string) (v32.Capabilities, error) {
-	switch rkeConfig.CloudProvider.Name {
-	case aws.AWSCloudProviderName:
-		capabilities.LoadBalancerCapabilities = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
-	case azure.AzureCloudProviderName:
-		capabilities.LoadBalancerCapabilities = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
-	}
-	// only if not custom, non custom clusters have nodepools set
-	nodes, err := c.nodeLister.List(clusterName, labels.Everything())
-	if err != nil {
-		return capabilities, err
-	}
-
-	if len(nodes) > 0 {
-		if nodes[0].Spec.NodePoolName != "" {
-			capabilities.NodePoolScalingSupported = true
-		}
-	}
-
-	ingressController := c.IngressCapability(true, rkeConfig.Ingress.Provider)
-	capabilities.IngressCapabilities = []v32.IngressCapabilities{ingressController}
-	if rkeConfig.Services.KubeAPI.ServiceNodePortRange != "" {
-		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ServiceNodePortRange
-	} else if rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"] != "" {
-		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"]
-	}
-
-	return capabilities, nil
-}
-
-func (c *controller) L4Capability(enabled bool, providerName string, protocols []string, healthCheck bool) v32.LoadBalancerCapabilities {
-	l4lb := v32.LoadBalancerCapabilities{
-		Enabled:              &enabled,
-		Provider:             providerName,
-		ProtocolsSupported:   protocols,
-		HealthCheckSupported: healthCheck,
-	}
-	return l4lb
-}
-
-func (c *controller) IngressCapability(httpLBEnabled bool, providerName string) v32.IngressCapabilities {
-	customDefaultBackendDisabled := false
-	ing := v32.IngressCapabilities{
-		IngressProvider: providerName,
-	}
-	if strings.EqualFold(providerName, NginxIngressProvider) {
-		ing.CustomDefaultBackend = &customDefaultBackendDisabled
-	}
-	return ing
 }
 
 func toCapabilities(k8sCapabilities *types.K8SCapabilities) v32.Capabilities {
