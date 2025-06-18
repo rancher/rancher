@@ -26,6 +26,8 @@ type Sample struct {
 type SampleSpec struct {
 	// Machine configuration not specific to the infrastructure provider.
 	Common rkev1.RKECommonNodeConfig `json:"common"`
+
+	Foo string `json:"common"`
 }
 
 func GetSampleProps() (*apiextv1.JSONSchemaProps, error) {
