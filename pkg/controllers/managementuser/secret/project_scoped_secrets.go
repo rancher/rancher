@@ -34,10 +34,12 @@ const (
 	projectScopedSecretLabel = "management.cattle.io/project-scoped-secret"
 	pssCopyAnnotation        = "management.cattle.io/project-scoped-secret-copy"
 )
+
+// previous controller label, annotations and finalizer
 const (
-	normanLabel      = "cattle.io/creator"
-	oldPSSAnnotation = "lifecycle.cattle.io/create.secretsController_"
-	oldPSSFinalizer  = "clusterscoped.controller.cattle.io/secretsController_"
+	normanCreatorLabel = "cattle.io/creator"
+	oldPSSAnnotation   = "lifecycle.cattle.io/create.secretsController_"
+	oldPSSFinalizer    = "clusterscoped.controller.cattle.io/secretsController_"
 )
 
 type namespaceHandler struct {
@@ -115,7 +117,7 @@ func (n *namespaceHandler) migrateExistingProjectScopedSecrets(project *v3.Proje
 	backingNamespace := project.GetProjectBackingNamespace()
 	clusterName := project.Spec.ClusterName
 
-	r, err := labels.NewRequirement(normanLabel, selection.Equals, []string{"norman"})
+	r, err := labels.NewRequirement(normanCreatorLabel, selection.Equals, []string{"norman"})
 	if err != nil {
 		return err
 	}
@@ -128,14 +130,15 @@ func (n *namespaceHandler) migrateExistingProjectScopedSecrets(project *v3.Proje
 	// The controllers handling those were removed in v2.12 https://github.com/rancher/rancher/pull/49995
 	var errs error
 	for _, s := range secrets {
-		delete(s.Labels, normanLabel)
-		delete(s.Annotations, oldPSSAnnotation+clusterName)
-		if i := slices.Index(s.Finalizers, oldPSSFinalizer+clusterName); i >= 0 {
-			s.Finalizers = slices.Delete(s.Finalizers, i, i+1)
+		secretCopy := s.DeepCopy()
+		delete(secretCopy.Labels, normanCreatorLabel)
+		delete(secretCopy.Annotations, oldPSSAnnotation+clusterName)
+		if i := slices.Index(secretCopy.Finalizers, oldPSSFinalizer+clusterName); i >= 0 {
+			secretCopy.Finalizers = slices.Delete(secretCopy.Finalizers, i, i+1)
 		}
-		s.Labels[projectScopedSecretLabel] = project.Name
-		_, err := n.managementSecretClient.Update(s)
-		errors.Join(errs, err)
+		secretCopy.Labels[projectScopedSecretLabel] = project.Name
+		_, err := n.managementSecretClient.Update(secretCopy)
+		errs = errors.Join(errs, err)
 	}
 
 	return errs
@@ -182,6 +185,7 @@ func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1
 }
 
 // getProjectFromNamespace returns the project that a namespace belongs to, if it belongs to one.
+// Returns nil if the namespace is not part of a project or if the projectID annotation is malformed.
 func (n *namespaceHandler) getProjectFromNamespace(namespace *corev1.Namespace) (*v3.Project, error) {
 	// check if namespace is part of a project
 	projectID, ok := namespace.Annotations[projectIDLabel]
