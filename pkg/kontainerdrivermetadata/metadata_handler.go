@@ -2,6 +2,7 @@ package kontainerdrivermetadata
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -39,6 +40,13 @@ type MetadataURL struct {
 	// latestHash, isGit set in parseURL
 	latestHash string
 	isGit      bool
+}
+
+type Data struct {
+	// K3S specific data, opaque and defined by the config file in kdm
+	K3S map[string]interface{} `json:"k3s,omitempty"`
+	// Rke2 specific data, defined by the config file in kdm
+	RKE2 map[string]interface{} `json:"rke2,omitempty"`
 }
 
 const (
@@ -149,4 +157,13 @@ func GetURLSettingValue() (*MetadataURL, error) {
 		return nil, fmt.Errorf("error parsing url %v %v", url, err)
 	}
 	return url, nil
+}
+
+func FromData(b []byte) (Data, error) {
+	d := &Data{}
+
+	if err := json.Unmarshal(b, d); err != nil {
+		return Data{}, err
+	}
+	return *d, nil
 }
