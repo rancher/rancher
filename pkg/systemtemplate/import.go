@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -20,9 +21,9 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/templates"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -149,7 +150,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	}
 
 	if taints != nil {
-		tolerations = templates.ToYAML(taints)
+		tolerations = toYAML(taints)
 	}
 
 	envVars := settings.DefaultAgentSettingsAsEnvVars()
@@ -178,10 +179,10 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		}
 	}
 
-	agentEnvVars = templates.ToYAML(envVars)
+	agentEnvVars = toYAML(envVars)
 
 	if appendTolerations := util.GetClusterAgentTolerations(cluster); appendTolerations != nil {
-		agentAppendTolerations = templates.ToYAML(appendTolerations)
+		agentAppendTolerations = toYAML(appendTolerations)
 		if agentAppendTolerations == "" {
 			return fmt.Errorf("error converting agent append tolerations to YAML")
 		}
@@ -191,13 +192,13 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	if err != nil {
 		return err
 	}
-	agentAffinity = templates.ToYAML(affinity)
+	agentAffinity = toYAML(affinity)
 	if agentAffinity == "" {
 		return fmt.Errorf("error converting agent affinity to YAML")
 	}
 
 	if resourceRequirements := util.GetClusterAgentResourceRequirements(cluster); resourceRequirements != nil {
-		agentResourceRequirements = templates.ToYAML(resourceRequirements)
+		agentResourceRequirements = toYAML(resourceRequirements)
 		if agentResourceRequirements == "" {
 			return fmt.Errorf("error converting agent resource requirements to YAML")
 		}
@@ -318,4 +319,20 @@ func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
 	return desiredAuth
+}
+
+func toYAML(v interface{}) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		// Swallow errors inside of a template so it doesn't affect remaining template lines
+		logrus.Errorf("[ToYAML] Error marshaling %v: %v", v, err)
+		return ""
+	}
+	yamlData, err := yaml.JSONToYAML(data)
+	if err != nil {
+		// Swallow errors inside of a template so it doesn't affect remaining template lines
+		logrus.Errorf("[ToYAML] Error converting json to yaml for %v: %v ", string(data), err)
+		return ""
+	}
+	return strings.TrimSuffix(string(yamlData), "\n")
 }
