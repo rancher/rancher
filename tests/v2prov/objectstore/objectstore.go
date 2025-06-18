@@ -8,8 +8,8 @@ import (
 
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
+	"github.com/rancher/rancher/tests/v2prov/utils"
 	"github.com/rancher/rancher/tests/v2prov/wait"
-	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	corev1 "k8s.io/api/core/v1"
@@ -62,7 +62,7 @@ func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQ
 		return nil, err
 	}
 
-	cert, key, err := cert.GenerateSelfSignedCertKey(serviceFQDN, []net.IP{net.ParseIP(serviceIP)}, nil)
+	cert, key, err := utils.GenerateSelfSignedCertKey(serviceFQDN, []net.IP{net.ParseIP(serviceIP)}, nil)
 	if err != nil {
 		return nil, err
 	}

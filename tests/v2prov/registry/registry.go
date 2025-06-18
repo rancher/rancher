@@ -6,8 +6,8 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/utils"
 	"github.com/rancher/rancher/tests/v2prov/wait"
-	"github.com/rancher/rke/pki/cert"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +71,7 @@ func createRegistrySecret(clients *clients.Clients, podName string) (*corev1.Sec
 		return nil, err
 	}
 
-	cert, key, err := cert.GenerateSelfSignedCertKey(newRegistryServiceName(podName), nil, nil)
+	cert, key, err := utils.GenerateSelfSignedCertKey(newRegistryServiceName(podName), nil, nil)
 	if err != nil {
 		return nil, err
 	}
