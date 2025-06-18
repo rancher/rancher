@@ -33,12 +33,16 @@ func InstallStores(
 	}
 	logrus.Infof("Successfully installed useractivity store")
 
-	err = server.Install(
+	tokenStore := tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer())
+	if err := tokenStore.EnsureNamespace(); err != nil {
+		return fmt.Errorf("error ensuring token namespace: %w", err)
+	}
+
+	if err := server.Install(
 		tokens.PluralName,
 		tokens.GVK,
-		tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer()),
-	)
-	if err != nil {
+		tokenStore,
+	); err != nil {
 		return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
 	}
 	logrus.Infof("Successfully installed token store")
