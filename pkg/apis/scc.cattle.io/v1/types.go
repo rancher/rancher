@@ -78,7 +78,7 @@ func (rs *RegistrationSpec) WithoutSyncNow() *RegistrationSpec {
 type RegistrationRequest struct {
 	RegistrationCodeSecretRef *corev1.SecretReference `json:"registrationCodeSecretRef,omitempty"`
 	// +optional
-	SeverUrl *string `json:"severUrl,omitempty"`
+	RegistrationUrl *string `json:"registrationUrl,omitempty"`
 	// +optional
 	ServerCertificateSecretRef *corev1.SecretReference `json:"serverCertficateSecretRef,omitempty"`
 }

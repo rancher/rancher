@@ -90,6 +90,8 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
+                  registrationUrl:
+                    type: string
                   serverCertficateSecretRef:
                     description: |-
                       SecretReference represents a Secret Reference. It has enough information to retrieve secret
@@ -105,8 +107,6 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
-                  severUrl:
-                    type: string
                 type: object
               syncNow:
                 type: boolean

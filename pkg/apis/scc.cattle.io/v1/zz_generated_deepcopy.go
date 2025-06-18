@@ -96,8 +96,8 @@ func (in *RegistrationRequest) DeepCopyInto(out *RegistrationRequest) {
 		*out = new(corev1.SecretReference)
 		**out = **in
 	}
-	if in.SeverUrl != nil {
-		in, out := &in.SeverUrl, &out.SeverUrl
+	if in.RegistrationUrl != nil {
+		in, out := &in.RegistrationUrl, &out.RegistrationUrl
 		*out = new(string)
 		**out = **in
 	}
