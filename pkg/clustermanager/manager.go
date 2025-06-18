@@ -24,10 +24,10 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
-	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
@@ -381,7 +381,7 @@ func nameIgnoringTLSDialer(dialer dialer.Dialer, caBytes []byte) (func(string, s
 func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
 	rootCAs := x509.NewCertPool()
 	if len(caCertsPEM) > 0 {
-		caCerts, err := cert.ParseCertsPEM(caCertsPEM)
+		caCerts, err := rkecerts.ParseCertsPEM(caCertsPEM)
 		if err != nil {
 			return nil, err
 		}
