@@ -4,6 +4,7 @@ package cleanup
 import (
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -173,8 +174,11 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 		providerName := getProviderNameFromPrincipalNames(u.PrincipalIDs...)
 		if providerName == config.Name {
 			// A fully external user (who was never local) has no password.
-			// TODO check secret for password!
-			if u.Password == "" {
+			_, err := s.secretsInterface.Cache().Get(pbkdf2.LocalUserPasswordsNamespace, u.Name)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to get user secret: %w", err)
+			}
+			if u.Password == "" && apierrors.IsNotFound(err) {
 				err := s.userClient.Delete(u.Name, &metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
