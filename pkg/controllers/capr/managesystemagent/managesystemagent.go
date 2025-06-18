@@ -89,7 +89,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}
 
 	clients.Provisioning.Cluster().OnChange(ctx, "uninstall-fleet-managed-suc-and-system-agent", h.UninstallFleetBasedApps)
-	clients.Provisioning.Cluster().OnChange(ctx, "install-system-agent", h.InstallSystemAgentUpgrader)
+	clients.Provisioning.Cluster().OnChange(ctx, "install-system-agent-upgrader", h.InstallSystemAgentUpgrader)
 
 }
 
@@ -100,6 +100,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
+	// Skip if it is not a node-driver or custom RKE2/k3s cluster
 	if cluster.Spec.RKEConfig == nil {
 		return cluster, nil
 	}
@@ -142,13 +143,6 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 			cluster.Namespace, cluster.Name, targetVersion)
 		return cluster, nil
 	}
-
-	// Limit the number of cluster to be processed simultaneously
-	if installCounter.Load() >= int32(settings.SystemAgentUpgraderInstallConcurrency.GetInt()) {
-		return cluster, nil
-	}
-	installCounter.Add(1)
-	defer installCounter.Add(-1)
 
 	var (
 		secretName = "stv-aggregation"
@@ -203,6 +197,13 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 			cluster.Namespace, cluster.Name, AppliedSystemAgentUpgraderHashAnnotation)
 		return cluster, nil
 	}
+
+	// Limit the number of cluster to be processed simultaneously
+	if installCounter.Load() >= int32(settings.SystemAgentUpgraderInstallConcurrency.GetInt()) {
+		return cluster, nil
+	}
+	installCounter.Add(1)
+	defer installCounter.Add(-1)
 
 	logrus.Infof("[managesystemagent] cluster %s/%s: applying system-agent-upgrader templates", cluster.Namespace, cluster.Name)
 	// Construct a Wrangler's Apply object
@@ -580,8 +581,6 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		} else if !errors.IsNotFound(err) {
 			return nil, err
 		}
-		// Uninstall one app each time, the cluster will be added back to the processing queen shortly
-		return cluster, nil
 	}
 
 	// step 2: uninstall the system-upgrade-controller managedChart( which is translated into a Fleet Bundle by another handler)

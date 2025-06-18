@@ -773,17 +773,30 @@ func resetRkeControlPlanes(w *wrangler.Context) error {
 		return err
 	}
 	for _, item := range rkeControlPlanes.Items {
-		obj := item.DeepCopy()
-		if obj.Annotations != nil {
-			if _, ok := obj.Annotations[managesystemagent.AppliedSystemAgentUpgraderHashAnnotation]; ok {
-				delete(obj.Annotations, managesystemagent.AppliedSystemAgentUpgraderHashAnnotation)
-				obj, err = w.RKE.RKEControlPlane().Update(obj)
-				if err != nil {
-					return err
-				}
+		needsUpdate := false
+		needsStatusUpdate := false
+
+		if item.Annotations != nil {
+			if _, ok := item.Annotations[managesystemagent.AppliedSystemAgentUpgraderHashAnnotation]; ok {
+				needsUpdate = true
 			}
 		}
-		if capr.SystemAgentUpgraded.IsTrue(obj) || capr.SystemUpgradeControllerReady.IsTrue(obj) {
+		if capr.SystemAgentUpgraded.IsTrue(&item) || capr.SystemUpgradeControllerReady.IsTrue(&item) {
+			needsStatusUpdate = true
+		}
+		if !needsUpdate && !needsStatusUpdate {
+			continue
+		}
+
+		obj := item.DeepCopy()
+
+		if needsUpdate {
+			delete(obj.Annotations, managesystemagent.AppliedSystemAgentUpgraderHashAnnotation)
+			if obj, err = w.RKE.RKEControlPlane().Update(obj); err != nil {
+				return err
+			}
+		}
+		if needsStatusUpdate {
 			capr.SystemAgentUpgraded.False(obj)
 			capr.SystemAgentUpgraded.Message(obj, "")
 			capr.SystemAgentUpgraded.Reason(obj, "waiting for initialization")
