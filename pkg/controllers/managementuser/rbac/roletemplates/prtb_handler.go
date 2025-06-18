@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -16,6 +18,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	rbacAuth "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 const (
@@ -23,6 +27,7 @@ const (
 	projectIDAnnotation = "field.cattle.io/projectId"
 	namespaceReadOnly   = "namespaces-readonly"
 	namespaceEdit       = "namespaces-edit"
+	namespacePSA        = "namespaces-psa"
 	namespacesCreate    = "create-ns"
 )
 
@@ -238,6 +243,14 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 		return nil, err
 	}
 
+	psaRec := authorizer.AttributesRecord{
+		Verb:            "updatepsa",
+		APIGroup:        management.GroupName,
+		Resource:        v32.ProjectResourceName,
+		Name:            prtb.ProjectName,
+		ResourceRequest: true,
+	}
+	neededCRBs := []*rbacv1.ClusterRoleBinding{}
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	for _, rule := range cr.Rules {
 		hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, rbacv1.ResourceAll)
@@ -253,9 +266,19 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 				if err != nil {
 					return nil, err
 				}
-				return []*rbacv1.ClusterRoleBinding{namespaceCreateCR, namespaceEditCR}, nil
+				neededCRBs = append(neededCRBs, namespaceCreateCR, namespaceEditCR)
 			}
 		}
+
+		// check if any of the aggregated CR grant updatepsa permission
+		if rbacAuth.RulesAllow(psaRec, cr.Rules...) {
+			namespacePSACR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, prtb.RoleTemplateName)
+			if err != nil {
+				return nil, err
+			}
+			neededCRBs = append(neededCRBs, namespacePSACR)
+		}
+		return neededCRBs, nil
 	}
 	// Didn't have edit access to namespaces, needs read access binding
 	namespaceCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceReadOnly)
