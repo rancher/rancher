@@ -98,10 +98,6 @@ func (rb *roleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilde
 	return n
 }
 
-func (r *ruleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilder {
-	return r.rb.addNamespacedRule(namespace)
-}
-
 func (rb *roleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	rb.roleTemplateNames = names
 	return rb
