@@ -2,6 +2,7 @@ package suseconnect
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/consts"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
@@ -23,22 +24,26 @@ type SccWrapper struct {
 }
 
 func DefaultConnectionOptions() connection.Options {
-	// TODO(scc): I believe this is creating the options for the API "app"
 	// So this doesn't necessarily mean these have to match Rancher on the cluster.
 	// Rather the details about the HTTP client talking to SCC
 	return connection.DefaultOptions("rancher-scc-integration", "0.0.1", "en_US")
 }
 
-func DefaultRancherConnection(credentials connection.Credentials, systemInfo *systeminfo.InfoExporter) SccWrapper {
+func OnlineRancherConnection(credentials connection.Credentials, systemInfo *systeminfo.InfoExporter, url string) SccWrapper {
 	if credentials == nil {
 		panic("credentials must be set")
 	}
-	options := DefaultConnectionOptions()
-	// TODO(scc): options in CLI tool set the base URL, shouldn't we do that too? (for SMT/RMT support)
 
 	registered := false
 	if credentials.HasAuthentication() {
 		registered = true
+	}
+
+	options := DefaultConnectionOptions()
+
+	// TODO: consider if dev mode should ever point to default Prod SCC connection
+	if consts.IsDevMode() {
+		options.URL = url
 	}
 
 	return SccWrapper{

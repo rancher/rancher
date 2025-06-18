@@ -19,7 +19,7 @@ func TestRegistrationFromSecret(t *testing.T) {
 		},
 	}
 
-	params, err := extraRegistrationParamsFromSecret(sec)
+	params, err := extractRegistrationParamsFromSecret(sec)
 	assert.NoError(t, err)
 
 	assert.NotNil(t, params)
@@ -30,7 +30,7 @@ func TestRegistrationFromSecret(t *testing.T) {
 	assert.Equal(t, len(seenHash), 32)
 
 	sec.Data[consts.SecretKeyRegistrationCode] = []byte("world")
-	params2, err := extraRegistrationParamsFromSecret(sec)
+	params2, err := extractRegistrationParamsFromSecret(sec)
 	assert.NoError(t, err)
 	assert.NotNil(t, params2)
 	assert.NotNil(t, params2.contentHash)
@@ -38,7 +38,7 @@ func TestRegistrationFromSecret(t *testing.T) {
 
 	seenHash = params2.contentHash
 	sec.Data[dataKeyRegistrationType] = []byte(v1.RegistrationModeOffline)
-	params3, err := extraRegistrationParamsFromSecret(sec)
+	params3, err := extractRegistrationParamsFromSecret(sec)
 	assert.NoError(t, err)
 	assert.NotNil(t, params3)
 	assert.NotNil(t, params3.contentHash)

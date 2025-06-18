@@ -47,7 +47,7 @@ func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, erro
 	return secret, nil
 }
 
-func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
+func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
 	incomingSalt := []byte(secret.GetLabels()[consts.LabelObjectSalt])
 
 	regMode := v1.RegistrationModeOnline
@@ -78,12 +78,25 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 		}
 	}
 
+	var regUrlBytes []byte
+	regUrlString := ""
+	if regMode == v1.RegistrationModeOnline {
+		regUrlBytes, ok = secret.Data[consts.RegistrationUrl]
+		if ok && len(regUrlBytes) != 0 {
+			regUrlString = string(regUrlBytes)
+		} else if consts.IsDevMode() {
+			regUrlBytes = []byte(consts.RegistrationUrl)
+			regUrlString = string(consts.StagingSCCUrl)
+		}
+	}
+
 	// TODO: do we care to validate this; online shouldn't have this at all, offline has it eventually
 	// So it cannot be required for offline mode like RegCode is above, we could error online mode with it?
 
 	hasher := md5.New()
 	nameData := append(incomingSalt, regType...)
 	nameData = append(nameData, regCode...)
+	nameData = append(nameData, regUrlBytes...)
 	data := append(nameData, offlineRegCertData...)
 
 	// Generate a has for the name data
@@ -109,6 +122,7 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 			Name:      consts.ResourceSCCEntrypointSecretName,
 			Namespace: secret.Namespace,
 		},
+		regUrl: regUrlString,
 	}, nil
 }
 
@@ -117,6 +131,7 @@ type RegistrationParams struct {
 	nameId             string
 	contentHash        string
 	regCode            string
+	regUrl             string
 	hasOfflineCertData bool
 	secretRef          *corev1.SecretReference
 	offlineCertData    *[]byte
@@ -183,11 +198,16 @@ func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
 		regSpec.OfflineRegistrationCertificateSecretRef = params.secretRef
 	}
 
+	// check if params has regUrl and use, otherwise check if devmode and when true use staging Scc url
+	if params.regUrl != "" {
+		regSpec.RegistrationRequest.RegistrationUrl = &params.regUrl
+	}
+
 	return regSpec
 }
 
 func (h *handler) offlineCertFromSecretEntrypoint(params RegistrationParams) (*corev1.Secret, error) {
-	secretName := consts.OfflineRequestSecretName(params.nameId)
+	secretName := consts.OfflineCertificateSecretName(params.nameId)
 
 	offlineCertSecret, err := h.secretCache.Get(h.systemNamespace, secretName)
 	if err != nil && apierrors.IsNotFound(err) {
