@@ -21,6 +21,7 @@ var errAuthConfigNil = errors.New("cannot get auth provider if its config is nil
 // Service performs cleanup of resources associated with an auth provider.
 type Service struct {
 	secretsInterface wcorev1.SecretController
+	secretsCache     wcorev1.SecretCache
 
 	userClient controllers.UserClient
 
@@ -41,6 +42,7 @@ type Service struct {
 func NewCleanupService(secretsInterface wcorev1.SecretController, c controllers.Interface) *Service {
 	return &Service{
 		secretsInterface: secretsInterface,
+		secretsCache:     secretsInterface.Cache(),
 
 		userClient: c.User(),
 
@@ -174,7 +176,7 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 		providerName := getProviderNameFromPrincipalNames(u.PrincipalIDs...)
 		if providerName == config.Name {
 			// A fully external user (who was never local) has no password.
-			_, err := s.secretsInterface.Cache().Get(pbkdf2.LocalUserPasswordsNamespace, u.Name)
+			_, err := s.secretsCache.Get(pbkdf2.LocalUserPasswordsNamespace, u.Name)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("failed to get user secret: %w", err)
 			}
