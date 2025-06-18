@@ -329,11 +329,9 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod do
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
 ARG VERSION
 ARG COMMIT
-ARG RKE_VERSION
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
-ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
 ARG TARGETOS
 ARG TARGETARCH
 COPY pkg/ pkg/
