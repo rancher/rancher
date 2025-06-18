@@ -71,8 +71,13 @@ spec:
                   This field must be in the format of "namespace:name".
                 type: string
               clusterAPIConfig:
+                description: ClusterAPIConfig is deprecated and will be removed in
+                  a future version.
                 properties:
                   clusterName:
+                    description: |-
+                      ClusterName is deprecated and will be removed in a future version.
+                      Deprecated:
                     type: string
                 type: object
               clusterAgentDeploymentCustomization:
@@ -1131,13 +1136,20 @@ spec:
                     type: object
                 type: object
               defaultClusterRoleForProjectMembers:
+                description: |-
+                  DefaultClusterRoleForProjectMembers
+                  Deprecated:
                 type: string
               defaultPodSecurityAdmissionConfigurationTemplateName:
+                description: |-
+                  DefaultPodSecurityAdmissionConfigurationTemplateName is the name of the default psact to use when generating a pod security admissions config file for the cluster.
+                  The rancher-webhook will generate a secret containing the rendered AdmissionConfiguration resource as yaml, and create a machineSelectorFile at
+                  /etc/rancher/k3s/config/rancher-psact.yaml and /etc/rancher/rke2/config/rancher-psact.yaml for K3s and RKE2 respectively.
                 type: string
               enableNetworkPolicy:
                 type: boolean
               fleetAgentDeploymentCustomization:
-                description: ClusterAgentDeploymentCustomization is the customization
+                description: FleetAgentDeploymentCustomization is the customization
                   configuration to apply to the fleet agent deployment.
                 properties:
                   appendTolerations:
@@ -2236,19 +2248,21 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   dataDirectories:
-                    description: DataDirectories contains the configuration for the
-                      data directories typically stored within /var/lib/rancher.
+                    description: |-
+                      DataDirectories contains the configuration for the data directories typically stored within /var/lib/rancher.
+                      The data directories must be configured via the provisioning cluster object and are immutable once set.
                     properties:
                       k8sDistro:
-                        description: Data directory for the k8s distro
+                        description: K8sDistro is the data directory for the k8s distro,
+                          i.e. the data-dir arg.
                         type: string
                       provisioning:
-                        description: Data directory for provisioning related files
-                          (idempotency)
+                        description: Provisioning is the data directory for provisioning
+                          related files (e.g. idempotency).
                         type: string
                       systemAgent:
-                        description: Data directory for the system-agent connection
-                          info and plans
+                        description: SystemAgent is the data directory for the system-agent
+                          connection info and plans.
                         type: string
                     type: object
                   etcd:
@@ -2328,8 +2342,6 @@ spec:
                           to initiate a snapshot restore.
                         type: integer
                       name:
-                        description: Name refers to the name of the associated etcdsnapshot
-                          object.
                         type: string
                       restoreRKEConfig:
                         description: Set to either none (or empty string), all, or
@@ -2659,7 +2671,7 @@ spec:
                       properties:
                         config:
                           description: Config is a map of distro arguments which will
-                            be copied to /etc/rancher/<rke2/k3s>/config.yaml.d/5o-rancher.yaml
+                            be copied to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml
                             if the machine matches the label selector.
                           type: object
                           x-kubernetes-preserve-unknown-fields: true
@@ -2745,6 +2757,7 @@ spec:
                                       - key
                                       - path
                                       type: object
+                                    minItems: 1
                                     type: array
                                   name:
                                     type: string
@@ -2772,6 +2785,7 @@ spec:
                                       - key
                                       - path
                                       type: object
+                                    minItems: 1
                                     type: array
                                   name:
                                     type: string
@@ -2781,8 +2795,8 @@ spec:
                             type: object
                           type: array
                         machineLabelSelector:
-                          description: MachineLabelSelector is a label selector that
-                            is used to match machines.
+                          description: MachineLabelSelector is a label selector used
+                            to match machines.
                           properties:
                             matchExpressions:
                               description: matchExpressions is a list of label selector
@@ -2850,7 +2864,7 @@ spec:
                       regardless of whether a reconciliation is required.
                     type: integer
                   registries:
-                    description: Registries defines the list of mirrors and configurations
+                    description: Registries is the list of mirrors and configurations
                       for the cluster's container registries.
                     properties:
                       configs:
@@ -2863,13 +2877,15 @@ spec:
                                 to the registry.
                               type: string
                             caBundle:
+                              description: CABundle
                               format: byte
                               type: string
                             insecureSkipVerify:
+                              description: InsecureSkipVerify
                               type: boolean
                             tlsSecretName:
                               description: |-
-                                TLS is a pair of Cert/Key which then are used when creating the transport
+                                TLSSecretName is a pair of Cert/Key which are used when creating the transport
                                 that communicates with the registry.
                               type: string
                           type: object
@@ -2937,8 +2953,8 @@ spec:
                     properties:
                       controlPlaneConcurrency:
                         description: |-
-                          How many controlplane nodes should be upgrade at time, defaults to 1, 0 is infinite. Percentages are
-                          accepted too.
+                          ControlPlaneConcurrency is the number of server nodes that should be upgraded at a time.
+                          The default value is 1, a 0 value is infinite. Percentages are also accepted.
                         type: string
                       controlPlaneDrainOptions:
                         description: DrainOptions contains the drain configuration
@@ -3022,7 +3038,9 @@ spec:
                         - timeout
                         type: object
                       workerConcurrency:
-                        description: How many workers should be upgraded at a time
+                        description: |-
+                          WorkerConcurrency is the number of worker nodes that should be upgraded at a time.
+                          The default value is 1, a 0 value is infinite. Percentages are also accepted.
                         type: string
                       workerDrainOptions:
                         description: DrainOptions contains the drain configuration
@@ -3161,6 +3179,8 @@ spec:
                 description: |-
                   FleetWorkspaceName is the name of the fleet workspace that the cluster belongs to.
                   Defaults to the namespace of the cluster object, which is usually "fleet-default".
+                  If the provisioningv2-fleet-workspace-back-population feature is enabled and the cluster has the
+                  "provisioning.cattle.io/fleet-workspace-name" annotation, this will be set to the value of the annotation.
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation for

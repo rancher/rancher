@@ -31,7 +31,7 @@ type ClusterSpec struct {
 
 	// LocalClusterAuthEndpoint is an optional field that can be used to configure the local cluster auth endpoint.
 	// +optional
-	LocalClusterAuthEndpoint rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
+	LocalClusterAuthEndpoint *rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 
 	// AgentEnvVars is a list of environment variables that will be set on the cluster agent deployment and system agent service.
 	// +optional
