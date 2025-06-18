@@ -182,6 +182,12 @@ var (
 		true,
 		false,
 		true)
+	ExtTokens = newFeature(
+		"ext-tokens",
+		"Enable Imperative API resource tokens.ext.cattle.io.",
+		true,
+		false,
+		true)
 )
 
 type Feature struct {
