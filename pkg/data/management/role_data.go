@@ -58,6 +58,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Manage Cluster Drivers", "kontainerdrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
 	rb.addRole("Manage Users", "users-manage").
+		addRule().apiGroups("ext.cattle.io").resources("userrefreshrequests").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").
@@ -89,6 +90,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		// Note: The ext token store applies additional restrictions.
 		// A user can see and manipulate only their own tokens.
 		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("get", "list", "watch", "create", "delete", "update", "patch").
+		addRule().apiGroups("ext.cattle.io").resources("selfusers").verbs("create").
+		addRule().apiGroups("ext.cattle.io").resources("passwordchangerequests").verbs("create").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
 
@@ -97,6 +100,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "create").
+		addRule().apiGroups("ext.cattle.io").resources("selfusers").verbs("create").
+		addRule().apiGroups("ext.cattle.io").resources("passwordchangerequests").verbs("create").
 		addRule().apiGroups("ext.cattle.io").resources("kubeconfigs").verbs("get", "list", "watch", "create", "delete", "update", "patch").
 		// standard permissions for regular users, on their tokens
 		// Note: The ext token store applies additional restrictions. A user can see and manipulate only their own tokens.

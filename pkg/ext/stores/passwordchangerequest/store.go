@@ -5,10 +5,12 @@ package passwordchangerequest
 import (
 	"context"
 	"fmt"
+	"unicode/utf8"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,6 +118,11 @@ func (s *Store) Create(
 	if !ok {
 		return nil, apierrors.NewInternalError(fmt.Errorf("can't get user info from context"))
 	}
+	err := validatePassword(objPasswordChangeRequest.Spec.NewPassword, settings.PasswordMinLength.GetInt())
+	if err != nil {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("error validating password: %s", err.Error()))
+	}
+
 	if dryRun {
 		return obj, nil
 	}
@@ -188,4 +195,13 @@ func (s *Store) canUpdateAnyPassword(ctx context.Context, userInfo user.Info) (b
 	}
 
 	return decision == authorizer.DecisionAllow, nil
+}
+
+// validatePassword will ensure a password is at least the minimum required length in runes,
+func validatePassword(password string, minPassLen int) error {
+	if utf8.RuneCountInString(password) < minPassLen {
+		return fmt.Errorf("password must be at least %v characters", minPassLen)
+	}
+
+	return nil
 }

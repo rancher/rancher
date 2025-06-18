@@ -15,12 +15,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-type passwordUpdaterFunc func(userId string, currentPassword, newPassword string) error
-
-func (p passwordUpdaterFunc) UpdatePassword(userId string, currentPassword, newPassword string) error {
-	return p(userId, currentPassword, newPassword)
-}
-
 func TestCreate(t *testing.T) {
 	ctlr := gomock.NewController(t)
 	fakeUserID := "fake-user-id"
@@ -120,6 +114,23 @@ func TestCreate(t *testing.T) {
 				return mocks.NewMockPasswordUpdater(ctlr)
 			},
 			wantErr: "not authorized to update password",
+		},
+		"password too short": {
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          fakeUserID,
+					CurrentPassword: fakeCurrentPassword,
+					NewPassword:     "short",
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				return mocks.NewMockPasswordUpdater(ctlr)
+			},
+			wantErr: "error validating password: password must be at least 12 characters",
 		},
 		"dry run": {
 			obj: &ext.PasswordChangeRequest{
