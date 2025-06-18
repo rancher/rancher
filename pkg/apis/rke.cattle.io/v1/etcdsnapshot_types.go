@@ -2,20 +2,6 @@ package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-type ETCDSnapshotPhase string
-
-const (
-	ETCDSnapshotPhaseStarted                ETCDSnapshotPhase = "Started"
-	ETCDSnapshotPhaseShutdown               ETCDSnapshotPhase = "Shutdown"
-	ETCDSnapshotPhaseRestore                ETCDSnapshotPhase = "Restore"
-	ETCDSnapshotPhasePostRestorePodCleanup  ETCDSnapshotPhase = "PostRestorePodCleanup"
-	ETCDSnapshotPhaseInitialRestartCluster  ETCDSnapshotPhase = "InitialRestartCluster"
-	ETCDSnapshotPhasePostRestoreNodeCleanup ETCDSnapshotPhase = "PostRestoreNodeCleanup"
-	ETCDSnapshotPhaseRestartCluster         ETCDSnapshotPhase = "RestartCluster"
-	ETCDSnapshotPhaseFinished               ETCDSnapshotPhase = "Finished"
-	ETCDSnapshotPhaseFailed                 ETCDSnapshotPhase = "Failed"
-)
-
 type ETCDSnapshotS3 struct {
 	// Endpoint is the S3 endpoint used for snapshot operations.
 	Endpoint string `json:"endpoint,omitempty"`
@@ -40,24 +26,6 @@ type ETCDSnapshotS3 struct {
 	CloudCredentialName string `json:"cloudCredentialName,omitempty"`
 	// Folder is the name of the S3 folder used for snapshot operations.
 	Folder string `json:"folder,omitempty"`
-}
-
-type ETCDSnapshotCreate struct {
-	// Changing the Generation is the only thing required to initiate a snapshot creation.
-	Generation int `json:"generation,omitempty"`
-}
-
-type ETCDSnapshotRestore struct {
-	// Name refers to the name of the associated etcdsnapshot object.
-	Name string `json:"name,omitempty"`
-
-	// Changing the Generation is the only thing required to initiate a snapshot restore.
-	// +optional
-	Generation int `json:"generation,omitempty"`
-	// Set to either none (or empty string), all, or kubernetesVersion
-	// +kubebuilder:validation:Enum=none;all;kubernetesVersion
-	// +optional
-	RestoreRKEConfig string `json:"restoreRKEConfig,omitempty"`
 }
 
 // +genclient
@@ -90,19 +58,4 @@ type ETCDSnapshotFile struct {
 
 type ETCDSnapshotStatus struct {
 	Missing bool `json:"missing"`
-}
-
-type ETCD struct {
-	// DisableSnapshots disables the creation of snapshots for the cluster.
-	// +optional
-	DisableSnapshots bool `json:"disableSnapshots,omitempty"`
-	// SnapshotScheduleCron is the cron schedule for the snapshot creation.
-	// +optional
-	SnapshotScheduleCron string `json:"snapshotScheduleCron,omitempty"`
-	// SnapshotRetention is the number of snapshots the downstream cluster should retain per snapshot generation.
-	// +optional
-	SnapshotRetention int `json:"snapshotRetention,omitempty"`
-	// S3 defines the S3 configuration for the cluster if enabled.
-	// +optional
-	S3 *ETCDSnapshotS3 `json:"s3,omitempty"`
 }

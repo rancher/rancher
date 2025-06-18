@@ -92,6 +92,10 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 			}
 		}
 
+		if cluster.Spec.RKEConfig.DataDirectories == nil {
+			cluster.Spec.RKEConfig.DataDirectories = &rkev1.DataDirectories{}
+		}
+
 		// If an override is specified for a data directory, and one is not explicitly set for the cluster, use it
 		if cluster.Spec.RKEConfig.DataDirectories.K8sDistro == "" {
 			cluster.Spec.RKEConfig.DataDirectories.K8sDistro = defaults.DistroDataDir
