@@ -230,7 +230,7 @@ var OriginMap = map[string]string{
 	"nginx-ingress-controller":                                "https://github.com/rancher/ingress-nginx",
 	"mirrored-skopeo-skopeo":                                  "https://github.com/containers/skopeo",
 	"supportability-review":                                   "https://github.com/rancher/supportability-review",
-	"supportability-review-app-frontend":                      "https://github.com/rancher/supportability-review",
+	"supportability-review-app-frontend":                      "https://github.com/rancher/supportability-review-operator",
 	"supportability-review-internal":                          "https://github.com/rancher/supportability-review",
 	"supportability-review-operator":                          "https://github.com/rancher/supportability-review-operator",
 	"openvswitch":                                             "https://github.com/servicefractal/ovs",
