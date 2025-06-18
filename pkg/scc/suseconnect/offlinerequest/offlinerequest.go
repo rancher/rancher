@@ -1,6 +1,7 @@
 package offlinerequest
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
@@ -34,6 +35,7 @@ func New(
 	secretCache v1core.SecretCache,
 	labels map[string]string,
 ) *OfflineRegistrationSecrets {
+	labels[consts.LabelSccSecretRole] = string(consts.OfflineRequestRole)
 	return &OfflineRegistrationSecrets{
 		secretNamespace: namespace,
 		secretName:      name,
@@ -77,7 +79,7 @@ func (o *OfflineRegistrationSecrets) InitSecret() error {
 func (o *OfflineRegistrationSecrets) saveSecret() error {
 	create := false
 	// TODO gather errors
-	offlineRequest, err := o.secretCache.Get(o.secretNamespace, o.secretName)
+	offlineRequest, err := o.secrets.Get(o.secretNamespace, o.secretName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -144,19 +146,13 @@ func (o *OfflineRegistrationSecrets) saveSecret() error {
 }
 
 func (o *OfflineRegistrationSecrets) UpdateOfflineRequest(inReq *registration.OfflineRequest) error {
-	base64StringReader, err := inReq.Base64Encoded()
-	if err != nil {
-		return err
-	}
-
-	var orrBytes []byte
-	orrBytes, err = io.ReadAll(base64StringReader)
+	jsonOfflineRequest, err := json.Marshal(inReq)
 	if err != nil {
 		return err
 	}
 
 	// TODO: get sha of request/secret data then compare to see if actually needs update?
-	o.offlineRequest = orrBytes
+	o.offlineRequest = jsonOfflineRequest
 
 	return o.saveSecret()
 }

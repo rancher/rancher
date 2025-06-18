@@ -32,6 +32,27 @@ func (h *handler) updateSecret(incoming, target *corev1.Secret) (*corev1.Secret,
 	return incoming, nil
 }
 
+func (h *handler) createOrUpdateSecret(secret *corev1.Secret) error {
+	if _, err := h.secretCache.Get(secret.Namespace, secret.Name); err != nil {
+		if apierrors.IsNotFound(err) {
+			_, createErr := h.secrets.Create(secret)
+			return createErr
+		}
+	}
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		currentSecret, err := h.secrets.Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+
+		_, updateErr := h.updateSecret(currentSecret, secret)
+		return updateErr
+	})
+}
+
 func (h *handler) updateRegistration(incoming, target *v1.Registration) (*v1.Registration, error) {
 	incomingJson, err := json.Marshal(incoming)
 	if err != nil {

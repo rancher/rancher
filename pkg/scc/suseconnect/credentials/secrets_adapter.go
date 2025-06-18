@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"maps"
 	"slices"
 
@@ -39,6 +40,7 @@ func New(
 	secretCache v1core.SecretCache,
 	labels map[string]string,
 ) *CredentialSecretsAdapter {
+	labels[consts.LabelSccSecretRole] = string(consts.SCCCredentialsRole)
 	return &CredentialSecretsAdapter{
 		secretNamespace: namespace,
 		secretName:      name,

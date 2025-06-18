@@ -272,8 +272,13 @@ registration:
   # Step 2. Fetch the offline registration Request needed for the SCC
   # Step 2.a. Using kubectl fetch the offline registration request and save to local file, OR
   #     cmd: kubectl get secrets -n cattle-system rancher-scc-offline-registration-request -o yaml|yq '.data.certificate' > offline-request.json.base64
+  # cmd: kubectl get secrets -n  cattle-scc-system -l \
+  #       scc.cattle.io/secret-role=offline-request,scc.cattle.io/scc-hash=$(kubectl get secrets \
+  #         -n cattle-scc-system scc-registration -o yaml|yq '.metadata.labels["scc.cattle.io/scc-hash"]') -o yaml|yq '.items[0].data.request' > offline.base64
   # Step 2.b. Using the Rancher UI download the offline registration request file.
   # Step 3. Upload that certificate file to the SCC to begin the offline registration process.
+  # cmd: kubectl patch secret -n cattle-scc-system scc-registration   --type='merge' \
+  #       -p "{\"data\": {\"certificate\": \"$(cat ./1749847840_19998357_offline_registration_certificate.cert )\"}}"
   # Step 4. Download the offline registration certificate file and save it to local file,
   # Step 5. Finally, upload the offline registration certificate to the Rancher
   # Step 5.a. Using either kubectl or helm, configure the certificate (or secret ref) value and then `helm upgrade` rancher, OR

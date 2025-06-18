@@ -9,19 +9,6 @@ import (
 	"time"
 )
 
-const (
-	RegCodeInitializerNameKey             = "regCodeSecretName"
-	RegCodeInitializerNamespaceKey        = "regCodeSecretNamespace"
-	RegCodeSecretName                     = "rancher-scc-registration-code"
-	RegCodeSecretKey                      = "regCode"
-	RegCertInitializerNameKey             = "certificateSecretName"
-	RegCertInitializerNamespaceKey        = "certificateSecretNamespace"
-	RegCertSecretName                     = "rancher-scc-registration-certificate"
-	RegCertSecretKey                      = "certificate"
-	RancherSCCSystemCredentialsSecretName = "rancher-scc-system-credentials"
-	RancherSCCOfflineRequestSecretName    = "rancher-scc-offline-registration-request"
-)
-
 func utilContextLogger() log.StructuredLogger {
 	return log.NewLog().WithField("subcomponent", "util")
 }

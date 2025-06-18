@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/util"
+	"maps"
 	"slices"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -15,7 +17,7 @@ import (
 )
 
 const (
-	dataRegistrationType = "registrationType"
+	dataKeyRegistrationType = "registrationType"
 )
 
 func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
@@ -49,9 +51,9 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 	incomingSalt := []byte(secret.GetLabels()[consts.LabelObjectSalt])
 
 	regMode := v1.RegistrationModeOnline
-	regType, ok := secret.Data[dataRegistrationType]
+	regType, ok := secret.Data[dataKeyRegistrationType]
 	if !ok || len(regType) == 0 {
-		// h.log.Warnf("secret does not have the `%s` field, defaulting to %s", dataRegistrationType, regMode)
+		// h.log.Warnf("secret does not have the `%s` field, defaulting to %s", dataKeyRegistrationType, regMode)
 	} else {
 		regMode = v1.RegistrationMode(regType)
 		if !regMode.Valid() {
@@ -66,14 +68,23 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 		}
 	}
 
-	offlineRegCert, certOk := secret.Data[consts.SecretKeyOfflineRegCert]
+	var offlineCertDecoded []byte
+	offlineRegCertData, certOk := secret.Data[consts.SecretKeyOfflineRegCert]
+	if regMode == v1.RegistrationModeOffline {
+		var err error
+		offlineCertDecoded, err = base64.StdEncoding.DecodeString(string(offlineRegCertData))
+		if err != nil {
+			return RegistrationParams{}, err
+		}
+	}
+
 	// TODO: do we care to validate this; online shouldn't have this at all, offline has it eventually
 	// So it cannot be required for offline mode like RegCode is above, we could error online mode with it?
 
 	hasher := md5.New()
 	nameData := append(incomingSalt, regType...)
 	nameData = append(nameData, regCode...)
-	data := append(nameData, offlineRegCert...)
+	data := append(nameData, offlineRegCertData...)
 
 	// Generate a has for the name data
 	if _, err := hasher.Write(nameData); err != nil {
@@ -92,7 +103,8 @@ func extraRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParam
 		nameId:             nameId,
 		contentHash:        contentsId,
 		regCode:            string(regCode),
-		hasOfflineCertData: certOk && len(offlineRegCert) > 0,
+		hasOfflineCertData: certOk && len(offlineRegCertData) > 0,
+		offlineCertData:    &offlineCertDecoded,
 		secretRef: &corev1.SecretReference{
 			Name:      consts.ResourceSCCEntrypointSecretName,
 			Namespace: secret.Namespace,
@@ -107,6 +119,7 @@ type RegistrationParams struct {
 	regCode            string
 	hasOfflineCertData bool
 	secretRef          *corev1.SecretReference
+	offlineCertData    *[]byte
 }
 
 func (r RegistrationParams) Labels() map[string]string {
@@ -142,7 +155,11 @@ func (h *handler) registrationFromSecretEntrypoint(
 			},
 		}
 	}
-	reg.Labels = params.Labels() //TODO: maps.Copy here
+	if reg.Labels == nil {
+		reg.Labels = map[string]string{}
+	}
+	maps.Copy(reg.Labels, params.Labels())
+
 	reg.Spec = paramsToRegSpec(params)
 	if !slices.Contains(reg.Finalizers, consts.FinalizerSccRegistration) {
 		if reg.Finalizers == nil {
@@ -167,4 +184,35 @@ func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
 	}
 
 	return regSpec
+}
+
+func (h *handler) offlineCertFromSecretEntrypoint(params RegistrationParams) (*corev1.Secret, error) {
+	secretName := consts.OfflineRequestSecretName(params.nameId)
+
+	offlineCertSecret, err := h.secretCache.Get(h.systemNamespace, secretName)
+	if err != nil && apierrors.IsNotFound(err) {
+		offlineCertSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: h.systemNamespace,
+				Name:      secretName,
+			},
+			Data: map[string][]byte{
+				consts.SecretKeyOfflineRegCert: *params.offlineCertData,
+			},
+		}
+	}
+
+	if offlineCertSecret.Labels == nil {
+		offlineCertSecret.Labels = map[string]string{}
+	}
+	maps.Copy(offlineCertSecret.Labels, params.Labels())
+
+	if !slices.Contains(offlineCertSecret.Finalizers, consts.FinalizerSccRegistration) {
+		if offlineCertSecret.Finalizers == nil {
+			offlineCertSecret.Finalizers = []string{}
+		}
+		offlineCertSecret.Finalizers = append(offlineCertSecret.Finalizers, consts.FinalizerSccRegistration)
+	}
+
+	return offlineCertSecret, nil
 }

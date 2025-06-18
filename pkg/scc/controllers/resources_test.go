@@ -15,7 +15,7 @@ func TestRegistrationFromSecret(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{},
 		Data: map[string][]byte{
 			consts.SecretKeyRegistrationCode: []byte("hello"),
-			dataRegistrationType:             []byte(v1.RegistrationModeOnline),
+			dataKeyRegistrationType:          []byte(v1.RegistrationModeOnline),
 		},
 	}
 
@@ -37,7 +37,7 @@ func TestRegistrationFromSecret(t *testing.T) {
 	assert.NotEqual(t, seenHash, params2.contentHash)
 
 	seenHash = params2.contentHash
-	sec.Data[dataRegistrationType] = []byte(v1.RegistrationModeOffline)
+	sec.Data[dataKeyRegistrationType] = []byte(v1.RegistrationModeOffline)
 	params3, err := extraRegistrationParamsFromSecret(sec)
 	assert.NoError(t, err)
 	assert.NotNil(t, params3)

@@ -13,6 +13,7 @@ type sccOfflineMode struct {
 	log                log.StructuredLogger
 	systemInfoExporter *systeminfo.InfoExporter
 	offlineSecrets     *offlinerequest.OfflineRegistrationSecrets
+	systemNamespace    string
 }
 
 func (s sccOfflineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
@@ -75,17 +76,20 @@ func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
 	// fetch secret contents (needs io.Reader)
 	// registration.OfflineCertificateFrom()
 	//TODO implement me
-	panic("implement me to activate offline certs")
+	s.log.Error("implement me to activate offline certs")
+	return nil
 }
 
 func (s sccOfflineMode) PrepareActivatedForKeepalive(registration *v1.Registration) (*v1.Registration, error) {
 	//TODO implement me
-	panic("implement me")
+	s.log.Error("implement me")
+	return registration, nil
 }
 
 func (s sccOfflineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
 	//TODO implement me
-	panic("implement me")
+	s.log.Error("implement me")
+	return registration
 }
 
 func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {

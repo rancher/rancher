@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"golang.org/x/sync/semaphore"
 	"net/http"
 	"sync"
@@ -13,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
-	"github.com/rancher/rancher/pkg/scc/util"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -183,7 +183,7 @@ func (s sccOnlineMode) fetchRegCode(registrationObj *v1.Registration) string {
 	// Set to global default, or user configured value from the Registration resource
 	regCodeSecretRef := &corev1.SecretReference{
 		Namespace: s.systemNamespace,
-		Name:      util.RegCodeSecretName,
+		Name:      consts.ResourceSCCEntrypointSecretName,
 	}
 	if registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef != nil {
 		regObjRegCodeSecretRef := registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef

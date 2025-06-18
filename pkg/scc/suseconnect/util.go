@@ -1,7 +1,7 @@
 package suseconnect
 
 import (
-	"github.com/rancher/rancher/pkg/scc/util"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	controllerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,9 +16,9 @@ func FetchSccRegistrationCodeFrom(secrets controllerv1.SecretController, referen
 	}
 	sccContextLogger().Debugf("Found secret %s/%s", reference.Namespace, reference.Name)
 
-	regCode, ok := regSecret.Data[util.RegCodeSecretKey]
+	regCode, ok := regSecret.Data[consts.SecretKeyRegistrationCode]
 	if !ok {
-		sccContextLogger().Warnf("registration secret `%v` does not contain expected data `%s`", reference, util.RegCodeSecretKey)
+		sccContextLogger().Warnf("registration secret `%v` does not contain expected data `%s`", reference, consts.SecretKeyRegistrationCode)
 		return ""
 	}
 

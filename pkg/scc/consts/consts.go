@@ -43,3 +43,11 @@ const (
 	SecretKeyOfflineRegRequest = "request"
 	SecretKeyOfflineRegCert    = "certificate"
 )
+
+type SecretRole string
+
+const (
+	SCCCredentialsRole SecretRole = "scc-credentials"
+	OfflineRequestRole SecretRole = "offline-request"
+	OfflineCertificate SecretRole = "offline-certificate"
+)

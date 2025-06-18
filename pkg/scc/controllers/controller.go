@@ -136,6 +136,7 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 				h.secretCache,
 				defaultLabels,
 			),
+			systemNamespace: h.systemNamespace,
 		}
 	}
 
@@ -216,15 +217,20 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		maps.Copy(labels, params.Labels())
 		newSecret.Labels = labels
 
-		//_, updateErr := h.secrets.Update(newSecret)
-		//if updateErr != nil {
-		//	h.log.Error("error applying metadata updates to default SCC registration secret")
-		//	return nil, updateErr
-		//}
-
 		// TODO(dan): make sure all update logic is handled via the new patch mechanism
 		if _, err := h.updateSecret(incomingObj, newSecret); err != nil {
 			return incomingObj, err
+		}
+
+		if params.regType == v1.RegistrationModeOffline && params.hasOfflineCertData {
+			offlineCertSecret, err := h.offlineCertFromSecretEntrypoint(params)
+			if err != nil {
+				return incomingObj, err
+			}
+
+			if err := h.createOrUpdateSecret(offlineCertSecret); err != nil {
+				return incomingObj, err
+			}
 		}
 
 		// construct associated registration CRs
