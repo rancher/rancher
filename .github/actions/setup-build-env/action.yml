@@ -4,7 +4,7 @@ inputs:
   rancher_path:
     description: "Path to the Rancher repository"
     required: true
-    default: ${{ github.workspace }}
+    default: "."
 outputs:
   CATTLE_KDM_BRANCH:
     description: "CATTLE_KDM_BRANCH from package/Dockerfile"
