@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -2784,34 +2785,31 @@ func (s *steveAPITestSuite) TestCRUD() {
 		assert.Nil(s.T(), readObj)
 	})
 }
+
 func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
 	assert.Equal(s.T(), len(expect), len(list))
-	for i, w := range expect {
-		if name, ok := w["name"]; ok {
-			assert.Equal(s.T(), name, list[i].Name)
-		}
-		if ns, ok := w["namespace"]; ok {
-			assert.Equal(s.T(), namespaceMap[ns], list[i].Namespace)
-		}
+
+	expectedKeys := make([]string, len(expect))
+	for _, v := range expect {
+		expectedKeys = append(expectedKeys, path.Join(v["namespace"], v["name"]))
 	}
+	listKeys := make([]string, len(list))
+	for _, obj := range list {
+		listKeys = append(listKeys, path.Join(obj.Namespace, obj.Name))
+	}
+	assert.Equal(s.T(), expectedKeys, listKeys, "list did not contain the same object keys")
 }
 
 func (s *steveAPITestSuite) assertListContains(expect []map[string]string, list []clientv1.SteveAPIObject) {
-	assert.GreaterOrEqual(s.T(), len(list), len(expect))
-	matches := true
-	for _, w := range expect {
-		found := false
-		for _, obj := range list {
-			if obj.Name == w["name"] && obj.Namespace == namespaceMap[w["namespace"]] {
-				found = true
-				break
-			}
-		}
-		if !found {
-			matches = false
-		}
+	expectedKeys := make([]string, len(expect))
+	for _, v := range expect {
+		expectedKeys = append(expectedKeys, path.Join(v["namespace"], v["name"]))
 	}
-	assert.True(s.T(), matches, "list did not contain expected results")
+	listKeys := make([]string, len(list))
+	for _, obj := range list {
+		listKeys = append(listKeys, path.Join(obj.Namespace, obj.Name))
+	}
+	assert.Subset(s.T(), listKeys, expectedKeys, "list did not contain expected results")
 }
 
 func (s *steveAPITestSuite) assertListExcludes(expect []map[string]string, list []clientv1.SteveAPIObject) {
