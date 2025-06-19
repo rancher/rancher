@@ -14,10 +14,6 @@ func GetTaintsString(taint v1.Taint) string {
 	return fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
 }
 
-func GetRKETaintsString(taint rketypes.RKETaint) string {
-	return fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
-}
-
 func GetKeyEffectString(taint v1.Taint) string {
 	return fmt.Sprintf("%s:%s", taint.Key, taint.Effect)
 }
@@ -85,27 +81,6 @@ func GetRKETaintsFromStrings(sources []string) []rketypes.RKETaint {
 			Value:     t.Value,
 			Effect:    t.Effect,
 			TimeAdded: t.TimeAdded,
-		}
-	}
-	return rtn
-}
-
-func GetStringsFromRKETaint(taints []rketypes.RKETaint) []string {
-	var rtn []string
-	for _, taint := range taints {
-		rtn = append(rtn, GetRKETaintsString(taint))
-	}
-	return rtn
-}
-
-func GetRKETaintsFromTaints(sources []v1.Taint) []rketypes.RKETaint {
-	rtn := make([]rketypes.RKETaint, len(sources))
-	for i, source := range sources {
-		rtn[i] = rketypes.RKETaint{
-			Key:       source.Key,
-			Effect:    source.Effect,
-			Value:     source.Value,
-			TimeAdded: source.TimeAdded,
 		}
 	}
 	return rtn
