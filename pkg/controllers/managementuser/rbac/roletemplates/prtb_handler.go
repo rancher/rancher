@@ -7,7 +7,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -246,7 +245,7 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 	psaRec := authorizer.AttributesRecord{
 		Verb:            "updatepsa",
 		APIGroup:        management.GroupName,
-		Resource:        v32.ProjectResourceName,
+		Resource:        v3.ProjectResourceName,
 		Name:            prtb.ProjectName,
 		ResourceRequest: true,
 	}
