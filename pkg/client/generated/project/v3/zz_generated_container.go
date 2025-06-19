@@ -36,6 +36,7 @@ const (
 	ContainerFieldState                    = "state"
 	ContainerFieldStdin                    = "stdin"
 	ContainerFieldStdinOnce                = "stdinOnce"
+	ContainerFieldStopSignal               = "stopSignal"
 	ContainerFieldTTY                      = "tty"
 	ContainerFieldTerminationMessagePath   = "terminationMessagePath"
 	ContainerFieldTerminationMessagePolicy = "terminationMessagePolicy"
@@ -83,6 +84,7 @@ type Container struct {
 	State                    string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Stdin                    bool                           `json:"stdin,omitempty" yaml:"stdin,omitempty"`
 	StdinOnce                bool                           `json:"stdinOnce,omitempty" yaml:"stdinOnce,omitempty"`
+	StopSignal               string                         `json:"stopSignal,omitempty" yaml:"stopSignal,omitempty"`
 	TTY                      bool                           `json:"tty,omitempty" yaml:"tty,omitempty"`
 	TerminationMessagePath   string                         `json:"terminationMessagePath,omitempty" yaml:"terminationMessagePath,omitempty"`
 	TerminationMessagePolicy string                         `json:"terminationMessagePolicy,omitempty" yaml:"terminationMessagePolicy,omitempty"`
