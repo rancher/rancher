@@ -23,13 +23,10 @@ import (
 )
 
 type MetadataController struct {
-	NamespacesController     v1.NamespaceController
-	SystemImagesController   mgmtcontrollers.RkeK8sSystemImageController
-	ServiceOptionsController mgmtcontrollers.RkeK8sServiceOptionController
-	Addons                   mgmtcontrollers.RkeAddonController
-	Settings                 mgmtcontrollers.SettingController
-	url                      *MetadataURL
-	wranglerContext          *wrangler.Context
+	NamespacesController v1.NamespaceController
+	Settings             mgmtcontrollers.SettingController
+	url                  *MetadataURL
+	wranglerContext      *wrangler.Context
 }
 
 type MetadataURL struct {
@@ -69,12 +66,9 @@ var (
 func Register(ctx context.Context, wCtx *wrangler.Context) {
 
 	m := &MetadataController{
-		SystemImagesController:   wCtx.Mgmt.RkeK8sSystemImage(),
-		ServiceOptionsController: wCtx.Mgmt.RkeK8sServiceOption(),
-		NamespacesController:     wCtx.Core.Namespace(),
-		Addons:                   wCtx.Mgmt.RkeAddon(),
-		Settings:                 wCtx.Mgmt.Setting(),
-		wranglerContext:          wCtx,
+		NamespacesController: wCtx.Core.Namespace(),
+		Settings:             wCtx.Mgmt.Setting(),
+		wranglerContext:      wCtx,
 	}
 
 	wCtx.Mgmt.Setting().OnChange(ctx, "rke-metadata-handler", m.sync)
