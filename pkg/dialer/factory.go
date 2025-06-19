@@ -93,7 +93,6 @@ func IsCloudDriver(cluster *v3.Cluster) bool {
 	return !cluster.Spec.Internal &&
 		cluster.Status.Driver != "" &&
 		cluster.Status.Driver != v32.ClusterDriverImported &&
-		cluster.Status.Driver != v32.ClusterDriverRKE &&
 		cluster.Status.Driver != v32.ClusterDriverK3s &&
 		cluster.Status.Driver != v32.ClusterDriverK3os &&
 		cluster.Status.Driver != v32.ClusterDriverRke2 &&
@@ -174,11 +173,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 		return nil, err
 	}
 
-	var localAPIEndpoint bool
-	if cluster.Status.Driver == v32.ClusterDriverRKE {
-		localAPIEndpoint = true
-	}
-
 	for _, node := range nodes {
 		if node.DeletionTimestamp == nil && v32.NodeConditionProvisioned.IsTrue(node) &&
 			(node.Spec.ControlPlane || v32.NodeConditionReady.IsTrue(node)) {
@@ -186,12 +180,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 				node.Labels["management.cattle.io/nodename"], node.Name)
 			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
 				return func(ctx context.Context, network, address string) (net.Conn, error) {
-					if address == hostPort && localAPIEndpoint {
-						logrus.Trace("dialerFactory: rewriting address/port to 127.0.0.1:6443 as node may not" +
-							" have direct kube-api access")
-						// The node dialer may not have direct access to kube-api so we hit localhost:6443 instead
-						address = "127.0.0.1:6443"
-					}
 					logrus.Tracef("dialerFactory: Returning network [%s] and address [%s] as nodeDialer", network, address)
 					return nodeDialer(ctx, network, address)
 				}, nil

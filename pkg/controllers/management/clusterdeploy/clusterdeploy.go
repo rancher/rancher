@@ -104,15 +104,6 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 	original := cluster
 	cluster = original.DeepCopy()
 
-	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
-		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
-		} else {
-			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509"
-		}
-		logrus.Tracef("clusterDeploy: sync: cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy set to [%s] for cluster [%s]", cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy, cluster.Name)
-	}
-
 	err = cd.doSync(cluster)
 	if cluster != nil && !reflect.DeepEqual(cluster, original) {
 		logrus.Tracef("clusterDeploy: sync: cluster changed, calling Update on cluster [%s]", cluster.Name)
@@ -185,7 +176,7 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
-	return cd.setNetworkPolicyAnn(cluster)
+	return nil
 }
 
 // agentFeaturesChanged will treat a missing key as false. This means we only detect changes
@@ -215,26 +206,10 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
-	repoChange := false
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
-			if len(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
-				desiredRepo := util.GetPrivateRegistry(cluster)
-				appliedRepo := &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
 
-				if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
-					repoChange = true
-				}
-				if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
-					repoChange = true
-				}
-			}
-		}
-	}
-
-	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
+	if forceDeploy || imageChange || agentFeaturesChanged {
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
-			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
+			" agent features changed=%v", cluster.Name, forceDeploy, imageChange,
 			agentFeaturesChanged)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s]", cluster.Status.AgentImage, desiredAgent)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s]", cluster.Status.AuthImage, desiredAuth)
@@ -242,11 +217,11 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
-	na, ca := getAgentImages(cluster.Name)
-	if (cluster.Status.AgentImage != na && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
+	_, ca := getAgentImages(cluster.Name)
+	if cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
-			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
+			cluster.Name, cluster.Status.AgentImage, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
 		clearAgentImages(cluster.Name)
 		return true
 	}
@@ -544,20 +519,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	util.UpdateAppliedAgentDeploymentCustomization(cluster)
 
-	return nil
-}
-
-func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *apimgmtv3.Cluster) error {
-	if cluster.Spec.EnableNetworkPolicy != nil {
-		return nil
-	}
-	// set current state for upgraded canal clusters
-	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
-		cluster.Spec.RancherKubernetesEngineConfig.Network.Plugin == "canal" {
-		enableNetworkPolicy := true
-		cluster.Spec.EnableNetworkPolicy = &enableNetworkPolicy
-		cluster.Annotations["networking.management.cattle.io/enable-network-policy"] = "true"
-	}
 	return nil
 }
 

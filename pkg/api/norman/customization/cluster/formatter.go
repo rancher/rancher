@@ -98,24 +98,6 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	}
 }
 
-// rotateEncryptionKeyEnabled returns true if the rotateEncryptionKey action should be enabled in the API view, otherwise, it returns false.
-func rotateEncryptionKeyEnabled(clusterLister v3.ClusterLister, clusterName string) bool {
-	cluster, err := clusterLister.Get("", clusterName)
-	if err != nil {
-		return false
-	}
-
-	// check that encryption is enabled on cluster
-	if cluster.Spec.RancherKubernetesEngineConfig == nil ||
-		cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig == nil ||
-		!cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.Enabled {
-		return false
-	}
-
-	// Cluster should not be in updating
-	return v32.ClusterConditionUpdated.IsTrue(cluster)
-}
-
 func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
 	if configMap[fieldName] == nil {
 		configMap[fieldName] = true

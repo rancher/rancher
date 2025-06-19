@@ -227,7 +227,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
 		IsPreBootstrap:        isPreBootstrap,
-		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
+		IsRKE:                 false,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
 		AppendTolerations:     agentAppendTolerations,

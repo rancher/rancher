@@ -6,17 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/agent/clean"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/dialer"
 
-	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -132,158 +127,6 @@ func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, nodeNam
 		return kerror.IsNotFound(err)
 	},
 		"delete")
-}
-
-func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v3.Cluster, node *v3.Node) (*batchv1.Job, error) {
-	nodeLabel := "cattle.io/node"
-
-	// find if someone else already kicked this job off
-	existingJob, err := userContext.K8sClient.BatchV1().Jobs("default").List(m.ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", nodeLabel, node.Name),
-	})
-	if err != nil && !kerror.IsNotFound(err) {
-		if strings.Contains(err.Error(), dialer.ErrAgentDisconnected.Error()) ||
-			strings.Contains(err.Error(), "connection refused") {
-			return nil, nil // can't connect, just continue on with deleting v3 node
-		}
-		return nil, err
-	}
-
-	if len(existingJob.Items) != 0 {
-		if existingJob.Items[0].DeletionTimestamp.IsZero() {
-			// found an existing job that isn't deleting, so assuming another run of the controller is working on it.
-			// Return an "already exists" error.
-			return nil, &kerror.StatusError{
-				ErrStatus: metav1.Status{
-					Reason:  metav1.StatusReasonAlreadyExists,
-					Message: fmt.Sprintf("job already exists for %s/%s", node.Namespace, node.Name),
-				},
-			}
-		}
-
-		return nil, m.waitUntilJobDeletes(userContext, node.Name, &existingJob.Items[0])
-	}
-
-	meta := metav1.ObjectMeta{
-		GenerateName: "cattle-node-cleanup-",
-		Namespace:    "default",
-		Labels: map[string]string{
-			"cattle.io/creator": "norman",
-			nodeLabel:           node.Name,
-		},
-	}
-
-	var tolerations []corev1.Toleration
-
-	for _, taint := range node.Spec.InternalNodeSpec.Taints {
-		tolerations = append(tolerations, corev1.Toleration{
-			Effect:   taint.Effect,
-			Key:      taint.Key,
-			Operator: "Exists",
-		})
-	}
-
-	var mounts []corev1.VolumeMount
-	var volumes []corev1.Volume
-
-	if os, ok := node.Status.NodeLabels["kubernetes.io/os"]; ok && os == "windows" {
-		t := corev1.HostPathType("")
-		volumes = append(volumes, corev1.Volume{
-			Name: "docker",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "\\\\.\\pipe\\docker_engine",
-					Type: &t,
-				},
-			},
-		})
-		mounts = append(mounts, corev1.VolumeMount{
-			MountPath: "\\\\.\\pipe\\docker_engine",
-			Name:      "docker",
-		})
-	} else {
-		socket := corev1.HostPathType("Socket")
-		volumes = append(volumes, corev1.Volume{
-			Name: "docker",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/var/run/docker.sock",
-					Type: &socket,
-				},
-			},
-		})
-		mounts = append(mounts, corev1.VolumeMount{
-			MountPath: "/var/run/docker.sock",
-			Name:      "docker",
-		})
-	}
-
-	env := []corev1.EnvVar{
-		{
-			Name:  "AGENT_IMAGE",
-			Value: settings.AgentImage.Get(),
-		},
-	}
-
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		env = append(env,
-			corev1.EnvVar{
-				Name:  "PREFIX_PATH",
-				Value: cluster.Spec.RancherKubernetesEngineConfig.PrefixPath,
-			},
-			corev1.EnvVar{
-				Name:  "WINDOWS_PREFIX_PATH",
-				Value: cluster.Spec.RancherKubernetesEngineConfig.WindowsPrefixPath,
-			},
-		)
-	}
-
-	var imagePullSecrets []corev1.LocalObjectReference
-	// We don't need the value of these secrets, however their existence means there should be a secret to add to the list
-	// of imagePullSecrets
-	if cluster.GetSecret(v3.ClusterPrivateRegistrySecret) != "" || cluster.Spec.ClusterSecrets.PrivateRegistryECRSecret != "" {
-		if url, _, err := util.GeneratePrivateRegistryEncodedDockerConfig(cluster, m.secretLister); err != nil {
-			return nil, err
-		} else if url != "" {
-			imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: "cattle-private-registry"})
-		}
-	}
-
-	fiveMin := int32(5 * 60)
-	job := batchv1.Job{
-		ObjectMeta: meta,
-		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: &fiveMin,
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						cleanupPodLabel: node.Name,
-					},
-				},
-				Spec: corev1.PodSpec{
-					ImagePullSecrets: imagePullSecrets,
-					RestartPolicy:    "Never",
-					NodeSelector: map[string]string{
-						"kubernetes.io/hostname": node.Status.NodeName,
-					},
-					Tolerations: tolerations,
-					Volumes:     volumes,
-					Containers: []corev1.Container{
-						{
-							Name:            clean.NodeCleanupContainerName,
-							Image:           systemtemplate.GetDesiredAgentImage(cluster),
-							Args:            []string{"--", "agent", "clean", "job"},
-							Env:             env,
-							VolumeMounts:    mounts,
-							ImagePullPolicy: corev1.PullIfNotPresent,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return userContext.K8sClient.BatchV1().Jobs("default").Create(context.TODO(), &job, metav1.CreateOptions{})
 }
 
 func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) *v3.Node {
