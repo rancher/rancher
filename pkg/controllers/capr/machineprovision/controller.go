@@ -804,39 +804,38 @@ func getCondition(d data.Object, conditionType string) *summary.Condition {
 	return nil
 }
 
-func constructFilesSecret(annotations map[string]string, config map[string]interface{}) *corev1.Secret {
-	secretData := make(map[string][]byte)
-	// Check if the required driver has aliased fields
-	if aliasedFields, exists := annotations["fileToFieldAliases"]; exists {
-		fileToFieldAliasMap := nodedriver.ParseKeyValueString(aliasedFields)
-
-		for schemaField, driverField := range fileToFieldAliasMap {
-			if fileContents, ok := config[schemaField].(string); ok {
-				// Delete our aliased fields
-				delete(config, schemaField)
-				if fileContents == "" {
-					continue
-				}
-
-				fileName := driverField
-				if ok := nodedriver.SSHKeyFields[schemaField]; ok {
-					fileName = "id_rsa"
-				}
-
-				// The ending newline gets stripped, add em back
-				if !strings.HasSuffix(fileContents, "\n") {
-					fileContents = fileContents + "\n"
-				}
-
-				// Add the file to the secret
-				secretData[fileName] = []byte(fileContents)
-				// Add the field and path
-				config[driverField] = path.Join(pathToMachineFiles, fileName)
-			}
-		}
-		return &corev1.Secret{Data: secretData}
+func constructFilesSecret(aliasedFields string, config map[string]interface{}) *corev1.Secret {
+	fileToFieldAliasMap := nodedriver.ParseKeyValueString(aliasedFields)
+	if len(fileToFieldAliasMap) == 0 {
+		return nil
 	}
-	return nil
+
+	secretData := make(map[string][]byte)
+	for schemaField, driverField := range fileToFieldAliasMap {
+		if fileContents, ok := config[schemaField].(string); ok {
+			// Delete our aliased fields
+			delete(config, schemaField)
+			if fileContents == "" {
+				continue
+			}
+
+			fileName := driverField
+			if ok := nodedriver.SSHKeyFields[schemaField]; ok {
+				fileName = "id_rsa"
+			}
+
+			// The ending newline gets stripped, add em back
+			if !strings.HasSuffix(fileContents, "\n") {
+				fileContents = fileContents + "\n"
+			}
+
+			// Add the file to the secret
+			secretData[fileName] = []byte(fileContents)
+			// Add the field and path
+			config[driverField] = path.Join(pathToMachineFiles, fileName)
+		}
+	}
+	return &corev1.Secret{Data: secretData}
 }
 
 func (h *handler) constructCertsSecret(machineName, machineNamespace string) (*corev1.Secret, error) {

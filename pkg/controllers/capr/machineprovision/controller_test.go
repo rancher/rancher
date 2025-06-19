@@ -166,16 +166,14 @@ func TestReconcileStatus(t *testing.T) {
 
 func TestConstructFilesSecret(t *testing.T) {
 	testCases := []struct {
-		name           string
-		annotations    map[string]string
-		config         map[string]interface{}
-		expectedSecret *corev1.Secret
+		name               string
+		inputAliasedFields string
+		config             map[string]interface{}
+		expectedSecret     *corev1.Secret
 	}{
 		{
-			name: "no fileToFieldAliases annotation",
-			annotations: map[string]string{
-				"publicCredentialFields": "userdata",
-			},
+			name:               "no fileToFieldAliases annotation",
+			inputAliasedFields: "",
 			config: map[string]interface{}{
 				"sshPort":  "22",
 				"userdata": "/path/to/machine/files/userdata",
@@ -183,10 +181,8 @@ func TestConstructFilesSecret(t *testing.T) {
 			expectedSecret: nil,
 		},
 		{
-			name: "known driver with fileToFieldAliases annotation",
-			annotations: map[string]string{
-				"fileToFieldAliases": "userdata:userdata",
-			},
+			name:               "known driver with fileToFieldAliases annotation",
+			inputAliasedFields: "userdata:userdata",
 			config: map[string]interface{}{
 				"sshPort":  "22",
 				"userdata": "/path/to/machine/files/userdata",
@@ -198,10 +194,8 @@ func TestConstructFilesSecret(t *testing.T) {
 			},
 		},
 		{
-			name: "custom driver with fileToFieldAliases annotation",
-			annotations: map[string]string{
-				"fileToFieldAliases": "foo:bar",
-			},
+			name:               "custom driver with fileToFieldAliases annotation",
+			inputAliasedFields: "foo:bar",
 			config: map[string]interface{}{
 				"foo":     "randomValue",
 				"sshPort": "22",
@@ -213,10 +207,8 @@ func TestConstructFilesSecret(t *testing.T) {
 			},
 		},
 		{
-			name: "empty config content",
-			annotations: map[string]string{
-				"fileToFieldAliases": "foo:bar",
-			},
+			name:               "empty config content",
+			inputAliasedFields: "foo:bar",
 			config: map[string]interface{}{
 				"foo": "",
 			},
@@ -225,10 +217,8 @@ func TestConstructFilesSecret(t *testing.T) {
 			},
 		},
 		{
-			name: "sshKey field config changes",
-			annotations: map[string]string{
-				"fileToFieldAliases": "sshKeyContents:sshKeyPath",
-			},
+			name:               "sshKey field config changes",
+			inputAliasedFields: "sshKeyContents:sshKeyPath",
 			config: map[string]interface{}{
 				"sshKeyContents": "/path/to/machine/files/sshContent",
 			},
@@ -241,7 +231,7 @@ func TestConstructFilesSecret(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			secret := constructFilesSecret(tc.annotations, tc.config)
+			secret := constructFilesSecret(tc.inputAliasedFields, tc.config)
 			assert.Equal(t, tc.expectedSecret, secret)
 		})
 	}

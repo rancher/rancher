@@ -71,10 +71,12 @@ type Lifecycle struct {
 }
 
 func (m *Lifecycle) Create(obj *v32.NodeDriver) (runtime.Object, error) {
+	logrus.Debugf("Handling creation of node driver %s", obj.Name)
 	return m.download(obj)
 }
 
 func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
+	logrus.Debugf("Downloading node driver %s", obj.Name)
 	driverLock.Lock()
 	defer driverLock.Unlock()
 	if !obj.Spec.Active && !obj.Spec.AddCloudCredential {
@@ -162,7 +164,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 
 	obj = m.addVersionInfo(obj)
 
-	obj, err = m.addUIHintsAnno(driverName, obj)
+	obj, err = m.addUIHintsAnno(obj)
 	if err != nil {
 		return obj, errs.Wrap(err, "failed JSON in addUIHintsAnno")
 	}
@@ -322,7 +324,7 @@ func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) *v32.NodeDriver {
 	return obj
 }
 
-func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v32.NodeDriver) (*v32.NodeDriver, error) {
+func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	if aliasedField, ok := obj.Annotations[aliasedAnno]; ok {
 		anno := make(map[string]map[string]string)
 		aliases := ParseKeyValueString(aliasedField)

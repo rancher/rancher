@@ -132,7 +132,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 
 	// The files secret must be constructed before toArgs is called because
 	// constructFilesSecret replaces file contents and creates a secret to be passed as a volume.
-	filesSecret = constructFilesSecret(nd.Annotations, args)
+	filesSecret = constructFilesSecret(nd.Annotations["fileToFieldAliases"], args)
 	if create {
 		cmd = append(cmd, "create",
 			fmt.Sprintf("--driver=%s", driver),
