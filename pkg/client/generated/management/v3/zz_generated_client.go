@@ -35,14 +35,10 @@ type Client struct {
 	Feature                                   FeatureOperations
 	ComposeConfig                             ComposeConfigOperations
 	KontainerDriver                           KontainerDriverOperations
-	EtcdBackup                                EtcdBackupOperations
 	CloudCredential                           CloudCredentialOperations
 	ManagementSecret                          ManagementSecretOperations
 	ClusterTemplate                           ClusterTemplateOperations
 	ClusterTemplateRevision                   ClusterTemplateRevisionOperations
-	RkeK8sSystemImage                         RkeK8sSystemImageOperations
-	RkeK8sServiceOption                       RkeK8sServiceOptionOperations
-	RkeAddon                                  RkeAddonOperations
 	FleetWorkspace                            FleetWorkspaceOperations
 	RancherUserNotification                   RancherUserNotificationOperations
 	OIDCClient                                OIDCClientOperations
@@ -86,14 +82,10 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Feature = newFeatureClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)
-	client.EtcdBackup = newEtcdBackupClient(client)
 	client.CloudCredential = newCloudCredentialClient(client)
 	client.ManagementSecret = newManagementSecretClient(client)
 	client.ClusterTemplate = newClusterTemplateClient(client)
 	client.ClusterTemplateRevision = newClusterTemplateRevisionClient(client)
-	client.RkeK8sSystemImage = newRkeK8sSystemImageClient(client)
-	client.RkeK8sServiceOption = newRkeK8sServiceOptionClient(client)
-	client.RkeAddon = newRkeAddonClient(client)
 	client.FleetWorkspace = newFleetWorkspaceClient(client)
 	client.RancherUserNotification = newRancherUserNotificationClient(client)
 	client.OIDCClient = newOIDCClientClient(client)

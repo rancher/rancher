@@ -41,11 +41,9 @@ var (
 		Init(rkeTypes).
 		Init(composeType).
 		Init(kontainerTypes).
-		Init(etcdBackupTypes).
 		Init(credTypes).
 		Init(mgmtSecretTypes).
 		Init(clusterTemplateTypes).
-		Init(driverMetadataTypes).
 		Init(encryptionTypes).
 		Init(fleetTypes).
 		Init(notificationTypes).
@@ -111,16 +109,6 @@ func mgmtSecretTypes(schemas *types.Schemas) *types.Schemas {
 			return field
 		})
 	})
-}
-
-func driverMetadataTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		AddMapperForType(&Version, v3.RkeK8sSystemImage{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.RkeK8sServiceOption{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.RkeAddon{}, m.Drop{Field: "namespaceId"}).
-		MustImport(&Version, v3.RkeK8sSystemImage{}).
-		MustImport(&Version, v3.RkeK8sServiceOption{}).
-		MustImport(&Version, v3.RkeAddon{})
 }
 
 func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
@@ -698,10 +686,6 @@ func kontainerTypes(schemas *types.Schemas) *types.Schemas {
 				"refresh": {},
 			}
 		})
-}
-
-func etcdBackupTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.MustImport(&Version, v3.EtcdBackup{})
 }
 
 func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {

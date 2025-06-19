@@ -35,14 +35,10 @@ type Config struct {
 	Features                                   map[string]managementClient.Feature                                   `json:"features,omitempty" yaml:"features,omitempty"`
 	ComposeConfigs                             map[string]managementClient.ComposeConfig                             `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
 	KontainerDrivers                           map[string]managementClient.KontainerDriver                           `json:"kontainerDrivers,omitempty" yaml:"kontainerDrivers,omitempty"`
-	EtcdBackups                                map[string]managementClient.EtcdBackup                                `json:"etcdBackups,omitempty" yaml:"etcdBackups,omitempty"`
 	CloudCredentials                           map[string]managementClient.CloudCredential                           `json:"cloudCredentials,omitempty" yaml:"cloudCredentials,omitempty"`
 	ManagementSecrets                          map[string]managementClient.ManagementSecret                          `json:"managementSecrets,omitempty" yaml:"managementSecrets,omitempty"`
 	ClusterTemplates                           map[string]managementClient.ClusterTemplate                           `json:"clusterTemplates,omitempty" yaml:"clusterTemplates,omitempty"`
 	ClusterTemplateRevisions                   map[string]managementClient.ClusterTemplateRevision                   `json:"clusterTemplateRevisions,omitempty" yaml:"clusterTemplateRevisions,omitempty"`
-	RkeK8sSystemImages                         map[string]managementClient.RkeK8sSystemImage                         `json:"rkeK8sSystemImages,omitempty" yaml:"rkeK8sSystemImages,omitempty"`
-	RkeK8sServiceOptions                       map[string]managementClient.RkeK8sServiceOption                       `json:"rkeK8sServiceOptions,omitempty" yaml:"rkeK8sServiceOptions,omitempty"`
-	RkeAddons                                  map[string]managementClient.RkeAddon                                  `json:"rkeAddons,omitempty" yaml:"rkeAddons,omitempty"`
 	FleetWorkspaces                            map[string]managementClient.FleetWorkspace                            `json:"fleetWorkspaces,omitempty" yaml:"fleetWorkspaces,omitempty"`
 	RancherUserNotifications                   map[string]managementClient.RancherUserNotification                   `json:"rancherUserNotifications,omitempty" yaml:"rancherUserNotifications,omitempty"`
 	OIDCClients                                map[string]managementClient.OIDCClient                                `json:"oidcClients,omitempty" yaml:"oidcClients,omitempty"`

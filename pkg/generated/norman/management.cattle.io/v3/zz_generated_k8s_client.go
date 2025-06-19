@@ -40,13 +40,9 @@ type Interface interface {
 	FeaturesGetter
 	ComposeConfigsGetter
 	KontainerDriversGetter
-	EtcdBackupsGetter
 	CloudCredentialsGetter
 	ClusterTemplatesGetter
 	ClusterTemplateRevisionsGetter
-	RkeK8sSystemImagesGetter
-	RkeK8sServiceOptionsGetter
-	RkeAddonsGetter
 	FleetWorkspacesGetter
 	RancherUserNotificationsGetter
 	OIDCClientsGetter
@@ -492,20 +488,6 @@ func (c *Client) KontainerDrivers(namespace string) KontainerDriverInterface {
 	}
 }
 
-type EtcdBackupsGetter interface {
-	EtcdBackups(namespace string) EtcdBackupInterface
-}
-
-func (c *Client) EtcdBackups(namespace string) EtcdBackupInterface {
-	sharedClient := c.clientFactory.ForResourceKind(EtcdBackupGroupVersionResource, EtcdBackupGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &EtcdBackupResource, EtcdBackupGroupVersionKind, etcdBackupFactory{})
-	return &etcdBackupClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
 type CloudCredentialsGetter interface {
 	CloudCredentials(namespace string) CloudCredentialInterface
 }
@@ -542,48 +524,6 @@ func (c *Client) ClusterTemplateRevisions(namespace string) ClusterTemplateRevis
 	sharedClient := c.clientFactory.ForResourceKind(ClusterTemplateRevisionGroupVersionResource, ClusterTemplateRevisionGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterTemplateRevisionResource, ClusterTemplateRevisionGroupVersionKind, clusterTemplateRevisionFactory{})
 	return &clusterTemplateRevisionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type RkeK8sSystemImagesGetter interface {
-	RkeK8sSystemImages(namespace string) RkeK8sSystemImageInterface
-}
-
-func (c *Client) RkeK8sSystemImages(namespace string) RkeK8sSystemImageInterface {
-	sharedClient := c.clientFactory.ForResourceKind(RkeK8sSystemImageGroupVersionResource, RkeK8sSystemImageGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RkeK8sSystemImageResource, RkeK8sSystemImageGroupVersionKind, rkeK8sSystemImageFactory{})
-	return &rkeK8sSystemImageClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type RkeK8sServiceOptionsGetter interface {
-	RkeK8sServiceOptions(namespace string) RkeK8sServiceOptionInterface
-}
-
-func (c *Client) RkeK8sServiceOptions(namespace string) RkeK8sServiceOptionInterface {
-	sharedClient := c.clientFactory.ForResourceKind(RkeK8sServiceOptionGroupVersionResource, RkeK8sServiceOptionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RkeK8sServiceOptionResource, RkeK8sServiceOptionGroupVersionKind, rkeK8sServiceOptionFactory{})
-	return &rkeK8sServiceOptionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type RkeAddonsGetter interface {
-	RkeAddons(namespace string) RkeAddonInterface
-}
-
-func (c *Client) RkeAddons(namespace string) RkeAddonInterface {
-	sharedClient := c.clientFactory.ForResourceKind(RkeAddonGroupVersionResource, RkeAddonGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RkeAddonResource, RkeAddonGroupVersionKind, rkeAddonFactory{})
-	return &rkeAddonClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

@@ -44,7 +44,6 @@ var (
 	CognitoProviderResourceName                           = "cognitoproviders"
 	ComposeConfigResourceName                             = "composeconfigs"
 	DynamicSchemaResourceName                             = "dynamicschemas"
-	EtcdBackupResourceName                                = "etcdbackups"
 	FeatureResourceName                                   = "features"
 	FleetWorkspaceResourceName                            = "fleetworkspaces"
 	FreeIpaProviderResourceName                           = "freeipaproviders"
@@ -72,9 +71,6 @@ var (
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
-	RkeAddonResourceName                                  = "rkeaddons"
-	RkeK8sServiceOptionResourceName                       = "rkek8sserviceoptions"
-	RkeK8sSystemImageResourceName                         = "rkek8ssystemimages"
 	RoleTemplateResourceName                              = "roletemplates"
 	SamlProviderResourceName                              = "samlproviders"
 	SamlTokenResourceName                                 = "samltokens"
@@ -137,8 +133,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ComposeConfigList{},
 		&DynamicSchema{},
 		&DynamicSchemaList{},
-		&EtcdBackup{},
-		&EtcdBackupList{},
 		&Feature{},
 		&FeatureList{},
 		&FleetWorkspace{},
@@ -193,12 +187,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectRoleTemplateBindingList{},
 		&RancherUserNotification{},
 		&RancherUserNotificationList{},
-		&RkeAddon{},
-		&RkeAddonList{},
-		&RkeK8sServiceOption{},
-		&RkeK8sServiceOptionList{},
-		&RkeK8sSystemImage{},
-		&RkeK8sSystemImageList{},
 		&RoleTemplate{},
 		&RoleTemplateList{},
 		&SamlProvider{},

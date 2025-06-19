@@ -298,23 +298,6 @@ func NewDynamicSchema(namespace, name string, obj DynamicSchema) *DynamicSchema 
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// EtcdBackupList is a list of EtcdBackup resources
-type EtcdBackupList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []EtcdBackup `json:"items"`
-}
-
-func NewEtcdBackup(namespace, name string, obj EtcdBackup) *EtcdBackup {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("EtcdBackup").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // FeatureList is a list of Feature resources
 type FeatureList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -767,57 +750,6 @@ type RancherUserNotificationList struct {
 
 func NewRancherUserNotification(namespace, name string, obj RancherUserNotification) *RancherUserNotification {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RancherUserNotification").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RkeAddonList is a list of RkeAddon resources
-type RkeAddonList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []RkeAddon `json:"items"`
-}
-
-func NewRkeAddon(namespace, name string, obj RkeAddon) *RkeAddon {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RkeAddon").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RkeK8sServiceOptionList is a list of RkeK8sServiceOption resources
-type RkeK8sServiceOptionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []RkeK8sServiceOption `json:"items"`
-}
-
-func NewRkeK8sServiceOption(namespace, name string, obj RkeK8sServiceOption) *RkeK8sServiceOption {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RkeK8sServiceOption").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RkeK8sSystemImageList is a list of RkeK8sSystemImage resources
-type RkeK8sSystemImageList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []RkeK8sSystemImage `json:"items"`
-}
-
-func NewRkeK8sSystemImage(namespace, name string, obj RkeK8sSystemImage) *RkeK8sSystemImage {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RkeK8sSystemImage").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
