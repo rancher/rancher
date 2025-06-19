@@ -36,45 +36,6 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
     assert template_reloaded.links.revisions is not None
 
 
-def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               [], admin_mc)
-    remove_resource(cluster_template)
-    tId = cluster_template.id
-    client = admin_mc.client
-
-    cconfig = {
-        "rancherKubernetesEngineConfig": {
-            "kubernetesVersion": "1.15"
-        }
-    }
-    with pytest.raises(ApiError) as e:
-        client.create_cluster_template_revision(clusterConfig=cconfig,
-                                                clusterTemplateId=tId,
-                                                enabled="true")
-    assert e.value.error.status == 422
-
-    # template k8s question needed if using generic version
-    cconfig = {
-        "rancherKubernetesEngineConfig": {
-            "kubernetesVersion": "1.15.x"
-        }
-    }
-    questions = [{
-                  "variable": "dockerRootDir",
-                  "required": "false",
-                  "type": "string",
-                  "default": "/var/lib/docker"
-                 }]
-    with pytest.raises(ApiError) as e:
-        client.create_cluster_template_revision(name=random_str(),
-                                                clusterConfig=cconfig,
-                                                clusterTemplateId=tId,
-                                                questions=questions,
-                                                enabled="true")
-    assert e.value.error.status == 422
-
-
 @pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_default_pod_sec(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc,
@@ -112,68 +73,6 @@ def test_default_pod_sec(admin_mc, list_remove_resource):
     assert cluster.defaultPodSecurityPolicyTemplateId == "restricted"
     client.delete(cluster)
     wait_for_cluster_to_be_deleted(client, cluster.id)
-
-
-def test_cron_schedule(admin_mc, list_remove_resource):
-    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
-    remove_list = [cluster_template]
-    list_remove_resource(remove_list)
-
-    tId = cluster_template.id
-    client = admin_mc.client
-    cconfig = {
-        "dockerRootDir": "/var/lib/docker",
-        "enableClusterAlerting": "false",
-        "enableClusterMonitoring": "false",
-        "enableNetworkPolicy": "false",
-        "labels": {},
-        "clusterTemplateRevisionId": "cattle-global-data:ctr-xxxxx",
-        "name": "testclusterfromtemplate",
-        "rancherKubernetesEngineConfig": {},
-        "scheduledClusterScan": {
-            "enabled": "true",
-            "scanConfig": {
-                "cisScanConfig": {
-                    "failuresOnly": "false",
-                    "overrideBenchmarkVersion": "rke-cis-1.4",
-                    "profile": "permissive",
-                    "skip": "null"
-                }
-            },
-            "scheduleConfig": {
-                "cronSchedule": ""
-            }
-        },
-        "type": "cluster"
-    }
-    rev = client.create_cluster_template_revision(name=random_str(),
-                                                  clusterConfig=cconfig,
-                                                  clusterTemplateId=tId,
-                                                  enabled="true")
-
-    time.sleep(2)
-    cluster = wait_for_cluster_create(client, name=random_str(),
-                                      clusterTemplateRevisionId=rev.id)
-    remove_list.insert(0, cluster)
-    assert cluster.conditions[0].type == 'Pending'
-    assert cluster.conditions[0].status == 'True'
-    client.delete(cluster)
-    wait_for_cluster_to_be_deleted(client, cluster.id)
-
-
-def test_check_default_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               [], admin_mc)
-    remove_resource(cluster_template)
-    templateId = cluster_template.id
-    first_revision = \
-        create_cluster_template_revision(admin_mc.client, templateId)
-    client = admin_mc.client
-    wait_for_default_revision(client, templateId, first_revision.id)
-    # delete the cluster template revision, it should error out
-    with pytest.raises(ApiError) as e:
-        client.delete(first_revision)
-    assert e.value.error.status == 403
 
 
 @pytest.mark.skip
@@ -371,79 +270,6 @@ def test_check_enforcement(admin_mc, remove_resource,
     remove_list.insert(0, cluster3)
     client.update_by_id_setting(id='cluster-template-enforcement',
                                 value="false")
-
-
-def test_revision_creation_permission(admin_mc, remove_resource,
-                                      user_factory):
-    user_readonly = user_factory()
-    user_owner = user_factory()
-    members = [{"userPrincipalId": "local://" + user_readonly.user.id,
-                "accessType": "read-only"},
-               {"userPrincipalId": "local://" + user_owner.user.id,
-                "accessType": "owner"}]
-    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
-    remove_resource(cluster_template)
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    split = cluster_template.id.split(":")
-    name = split[1]
-    rb_name = name + "-ct-r"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_readonly.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
-    rb_name = name + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_owner.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
-    templateId = cluster_template.id
-    # user with accessType=owner should be able to create revision
-    # since a standard user can add revisions to template shared
-    # with owner access
-
-    create_cluster_template_revision(user_owner.client, templateId)
-
-    # user with read-only accessType should get Forbidden error
-    with pytest.raises(ApiError) as e:
-        create_cluster_template_revision(user_readonly.client, templateId)
-    assert e.value.error.status == 403
-
-
-def test_updated_members_revision_access(admin_mc, remove_resource,
-                                         user_factory):
-    # create cluster template without members and a revision
-    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
-    remove_resource(cluster_template)
-    templateId = cluster_template.id
-    rev = \
-        create_cluster_template_revision(admin_mc.client, templateId)
-
-    # update template to add a user as member
-    user_member = user_factory()
-    members = [{"userPrincipalId": "local://" + user_member.user.id,
-                "accessType": "read-only"}]
-    admin_mc.client.update(cluster_template, members=members)
-
-    # this member should get access to existing revision "rev"
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    split = rev.id.split(":")
-    name = split[1]
-    rb_name = name + "-ctr-r"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_member.user.id, rb_name),
-             timeout=120,
-             fail_handler=fail_handler(rb_resource))
-    revision = user_member.client.by_id_cluster_template_revision(rev.id)
-    assert revision is not None
-
-    # remove this user from cluster_template members list
-    admin_mc.client.update(cluster_template, members=[])
-
-    # now this user should not be able to see that revision
-    try:
-        user_member.client.by_id_cluster_template_revision(rev.id)
-    except ApiError as e:
-        assert e.error.status == 403
 
 
 def test_permissions_removed_on_downgrading_access(admin_mc, remove_resource,
@@ -785,22 +611,6 @@ def test_template_delete_by_members(admin_mc, remove_resource,
 
     admin_mc.client.delete(cluster)
     wait_for_cluster_to_be_deleted(admin_mc.client, cluster.id)
-
-
-def test_template_access(admin_mc, remove_resource, user_factory):
-    user = user_factory()
-    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
-    remove_resource(cluster_template)
-    templateId = cluster_template.id
-    rev = create_cluster_template_revision(admin_mc.client, templateId)
-
-    wait_for_clusterTemplate_list_failure(user.client, rev)
-
-    with pytest.raises(ApiError) as e:
-        user.client.create_cluster(name=random_str(),
-                                   clusterTemplateRevisionId=rev.id,
-                                   description="template from cluster")
-    assert e.value.error.status == 404
 
 
 @pytest.mark.skip

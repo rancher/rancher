@@ -23,7 +23,6 @@ const (
 	provisioningV2WindowsNodeCommandFormat         = `%s curl.exe -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
 	provisioningV2InsecureNodeCommandFormat        = "%s curl --insecure -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
 	provisioningV2InsecureWindowsNodeCommandFormat = `%s curl.exe --insecure -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
-	loginCommandFormat                             = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat                       = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
 
@@ -152,24 +151,6 @@ func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) 
 	return ""
 }
 
-func NodeCommand(token string, cluster *v3.Cluster) (string, error) {
-	ca := systemtemplate.CAChecksum()
-	if ca != "" {
-		ca = " --ca-checksum " + ca
-	}
-
-	rootURL, err := getRootURL()
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf(nodeCommandFormat,
-		AgentEnvVars(cluster, Docker),
-		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
-		rootURL,
-		token,
-		ca), nil
-}
-
 func ShareMntCommand(nodeName, token string, cluster *v3.Cluster) ([]string, error) {
 	rootURL, err := getRootURL()
 	if err != nil {
@@ -189,30 +170,6 @@ func ShareMntCommand(nodeName, token string, cluster *v3.Cluster) ([]string, err
 	}
 
 	return cmd, nil
-}
-
-func LoginCommand(reg rketypes.PrivateRegistry) string {
-	return fmt.Sprintf(
-		loginCommandFormat,
-		// escape password special characters so it is interpreted correctly when command is executed
-		escapeSpecialChars(reg.Password),
-		reg.User,
-		reg.URL,
-	)
-}
-
-// escapeSpecialChars escapes ", `, $, \ from a string s
-func escapeSpecialChars(s string) string {
-	var escaped []rune
-	for _, r := range s {
-		switch r {
-		case '"', '`', '$', '\\': // escape
-			escaped = append(escaped, '\\', r)
-		default: // no escape
-			escaped = append(escaped, r)
-		}
-	}
-	return string(escaped)
 }
 
 func getRootURL() (string, error) {

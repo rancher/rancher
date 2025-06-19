@@ -30,7 +30,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/setting"
 	"github.com/rancher/rancher/pkg/api/norman/store/cert"
 	"github.com/rancher/rancher/pkg/api/norman/store/cluster"
-	clustertemplatestore "github.com/rancher/rancher/pkg/api/norman/store/clustertemplate"
 	featStore "github.com/rancher/rancher/pkg/api/norman/store/feature"
 	globalRoleStore "github.com/rancher/rancher/pkg/api/norman/store/globalrole"
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
@@ -447,14 +446,12 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterTemplateType)
 	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
-	schema.Store = clustertemplatestore.WrapStore(schema.Store, management)
 
 	schema.Formatter = wrapper.Formatter
 	schema.LinkHandler = wrapper.LinkHandler
 
 	revisionSchema := schemas.Schema(&managementschema.Version, client.ClusterTemplateRevisionType)
 	revisionSchema.Store = namespacedresource.Wrap(revisionSchema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
-	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store, management)
 	revisionSchema.Formatter = wrapper.RevisionFormatter
 	revisionSchema.CollectionFormatter = wrapper.CollectionFormatter
 	revisionSchema.ActionHandler = wrapper.ClusterTemplateRevisionsActionHandler
