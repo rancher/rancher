@@ -272,13 +272,15 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 
 		// check if any of the aggregated CR grant updatepsa permission
 		if rbacAuth.RulesAllow(psaRec, cr.Rules...) {
-			namespacePSACR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, prtb.RoleTemplateName)
+			namespacePSACR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, namespacePSA)
 			if err != nil {
 				return nil, err
 			}
 			neededCRBs = append(neededCRBs, namespacePSACR)
 		}
-		return neededCRBs, nil
+		if len(neededCRBs) > 0 {
+			return neededCRBs, nil
+		}
 	}
 	// Didn't have edit access to namespaces, needs read access binding
 	namespaceCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceReadOnly)
