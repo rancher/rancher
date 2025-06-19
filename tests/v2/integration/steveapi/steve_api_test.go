@@ -2789,11 +2789,11 @@ func (s *steveAPITestSuite) TestCRUD() {
 func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
 	assert.Equal(s.T(), len(expect), len(list))
 
-	expectedKeys := make([]string, len(expect))
+	expectedKeys := make([]string, 0, len(expect))
 	for _, v := range expect {
 		expectedKeys = append(expectedKeys, path.Join(v["namespace"], v["name"]))
 	}
-	listKeys := make([]string, len(list))
+	listKeys := make([]string, 0, len(list))
 	for _, obj := range list {
 		listKeys = append(listKeys, path.Join(obj.Namespace, obj.Name))
 	}
@@ -2801,11 +2801,11 @@ func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list [
 }
 
 func (s *steveAPITestSuite) assertListContains(expect []map[string]string, list []clientv1.SteveAPIObject) {
-	expectedKeys := make([]string, len(expect))
+	expectedKeys := make([]string, 0, len(expect))
 	for _, v := range expect {
 		expectedKeys = append(expectedKeys, path.Join(v["namespace"], v["name"]))
 	}
-	listKeys := make([]string, len(list))
+	listKeys := make([]string, 0, len(list))
 	for _, obj := range list {
 		listKeys = append(listKeys, path.Join(obj.Namespace, obj.Name))
 	}
