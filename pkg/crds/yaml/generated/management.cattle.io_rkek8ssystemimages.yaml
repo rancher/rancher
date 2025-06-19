@@ -1,0 +1,166 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: rkek8ssystemimages.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: RkeK8sSystemImage
+    listKind: RkeK8sSystemImageList
+    plural: rkek8ssystemimages
+    singular: rkek8ssystemimage
+  scope: Namespaced
+  versions:
+  - name: v3
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          systemImages:
+            properties:
+              aciCniDeployContainer:
+                description: Cni deployer container image for Cisco ACI
+                type: string
+              aciControllerContainer:
+                description: Controller container image for Cisco ACI
+                type: string
+              aciGbpServerContainer:
+                description: GBP Server container image for Cisco ACI
+                type: string
+              aciHostContainer:
+                description: host container image for Cisco ACI
+                type: string
+              aciMcastContainer:
+                description: mcast daemon container image for Cisco ACI
+                type: string
+              aciOpflexContainer:
+                description: opflex agent container image for Cisco ACI
+                type: string
+              aciOpflexServerContainer:
+                description: Opflex Server container image for Cisco ACI
+                type: string
+              aciOvsContainer:
+                description: OpenvSwitch container image for Cisco ACI
+                type: string
+              alpine:
+                description: Alpine image
+                type: string
+              calicoCni:
+                description: Calico CNI image
+                type: string
+              calicoControllers:
+                description: Calico Controllers image
+                type: string
+              calicoCtl:
+                description: Calicoctl image
+                type: string
+              calicoFlexVol:
+                description: CalicoFlexVol image
+                type: string
+              calicoNode:
+                description: Calico Node image
+                type: string
+              canalCni:
+                description: Canal CNI image
+                type: string
+              canalControllers:
+                description: Canal Controllers Image needed for Calico/Canal v3.14.0+
+                type: string
+              canalFlannel:
+                description: CanalFlannel image
+                type: string
+              canalFlexVol:
+                description: CanalFlexVol image
+                type: string
+              canalNode:
+                description: Canal Node Image
+                type: string
+              certDownloader:
+                description: rke-cert-deployer image
+                type: string
+              coredns:
+                description: CoreDNS image
+                type: string
+              corednsAutoscaler:
+                description: CoreDNS autoscaler image
+                type: string
+              dnsmasq:
+                description: DNSMasq image
+                type: string
+              etcd:
+                description: etcd image
+                type: string
+              flannel:
+                description: Flannel image
+                type: string
+              flannelCni:
+                description: Flannel CNI image
+                type: string
+              ingress:
+                description: Ingress Controller image
+                type: string
+              ingressBackend:
+                description: Ingress Controller Backend image
+                type: string
+              ingressWebhook:
+                description: Ingress Webhook image
+                type: string
+              kubedns:
+                description: KubeDNS image
+                type: string
+              kubednsAutoscaler:
+                description: KubeDNS autoscaler image
+                type: string
+              kubednsSidecar:
+                description: KubeDNS side car image
+                type: string
+              kubernetes:
+                description: Kubernetes image
+                type: string
+              kubernetesServicesSidecar:
+                description: rke-service-sidekick image
+                type: string
+              metricsServer:
+                description: Metrics Server image
+                type: string
+              nginxProxy:
+                description: rke-nginx-proxy image
+                type: string
+              nodelocal:
+                description: Nodelocal image
+                type: string
+              podInfraContainer:
+                description: Pod infra container image
+                type: string
+              weaveCni:
+                description: Weave CNI image
+                type: string
+              weaveNode:
+                description: Weave Node image
+                type: string
+              windowsPodInfraContainer:
+                description: Pod infra container image for Windows
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true

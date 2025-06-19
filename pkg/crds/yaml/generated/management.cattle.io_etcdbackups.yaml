@@ -1,0 +1,144 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: etcdbackups.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: EtcdBackup
+    listKind: EtcdBackupList
+    plural: etcdbackups
+    singular: etcdbackup
+  scope: Namespaced
+  versions:
+  - name: v3
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: backup spec
+            properties:
+              backupConfig:
+                description: backupConfig
+                properties:
+                  enabled:
+                    description: Enable or disable recurring backups in rancher
+                    type: boolean
+                  intervalHours:
+                    description: Backup interval in hours
+                    type: integer
+                  retention:
+                    description: Number of backups to keep
+                    type: integer
+                  s3BackupConfig:
+                    description: s3 target
+                    properties:
+                      accessKey:
+                        description: Access key ID
+                        type: string
+                      bucketName:
+                        description: name of the bucket to use for backup
+                        type: string
+                      customCa:
+                        description: CustomCA is used to connect to custom s3 endpoints
+                        type: string
+                      endpoint:
+                        description: Endpoint is used if this is not an AWS API
+                        type: string
+                      folder:
+                        description: Folder to place the files
+                        type: string
+                      region:
+                        description: AWS Region, AWS spcific
+                        type: string
+                      secretKey:
+                        description: Secret access key
+                        type: string
+                    required:
+                    - endpoint
+                    type: object
+                  safeTimestamp:
+                    description: replace special characters in snapshot names
+                    type: boolean
+                  timeout:
+                    description: Backup execution timeout
+                    type: integer
+                required:
+                - s3BackupConfig
+                type: object
+              clusterId:
+                description: cluster ID
+                type: string
+              filename:
+                description: actual file name on the target
+                type: string
+              manual:
+                description: manual backup flag
+                type: boolean
+            type: object
+          status:
+            description: backup status
+            properties:
+              clusterObject:
+                description: json + gzipped + base64 backup of the cluster object
+                  when the backup was created
+                type: string
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              kubernetesVersion:
+                description: version of k8s in the backup pulled from rke config
+                type: string
+            required:
+            - conditions
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
