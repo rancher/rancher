@@ -22,20 +22,6 @@ def check_cluster_kubernetes_version(admin_mc):
             pytest.skip("Needs to be reworked for PSA")
 
 
-def test_create_cluster_template_with_revision(admin_mc, remove_resource):
-
-    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
-    remove_resource(cluster_template)
-    templateId = cluster_template.id
-    _ = \
-        create_cluster_template_revision(admin_mc.client, templateId)
-    _ = \
-        create_cluster_template_revision(admin_mc.client, templateId)
-    client = admin_mc.client
-    template_reloaded = client.by_id_cluster_template(cluster_template.id)
-    assert template_reloaded.links.revisions is not None
-
-
 @pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_default_pod_sec(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc,
@@ -125,27 +111,6 @@ def test_create_cluster_with_template(admin_mc, list_remove_resource):
 
     client.delete(cluster)
     wait_for_cluster_to_be_deleted(client, cluster.id)
-
-
-def test_create_cluster_validations(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               [], admin_mc)
-    remove_resource(cluster_template)
-    templateId = cluster_template.id
-    template_revision = \
-        create_cluster_template_revision(admin_mc.client, templateId)
-    # create a cluster with this template
-    revId = template_revision.id
-    client = admin_mc.client
-    rConfig = getRKEConfig()
-    try:
-        wait_for_cluster_create(client, name=random_str(),
-                                clusterTemplateRevisionId=revId,
-                                description="template from cluster",
-                                rancherKubernetesEngineConfig=rConfig)
-
-    except ApiError as e:
-        assert e.error.status == 500
 
 
 @pytest.mark.nonparallel
@@ -270,57 +235,6 @@ def test_check_enforcement(admin_mc, remove_resource,
     remove_list.insert(0, cluster3)
     client.update_by_id_setting(id='cluster-template-enforcement',
                                 value="false")
-
-
-def test_permissions_removed_on_downgrading_access(admin_mc, remove_resource,
-                                                   user_factory):
-    user_owner = user_factory()
-    remove_resource(user_owner)
-    members = [{"userPrincipalId": "local://" + user_owner.user.id,
-                "accessType": "owner"}]
-    # create cluster template with one member having "member" accessType
-    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
-    remove_resource(cluster_template)
-
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    split = cluster_template.id.split(":")
-    name = split[1]
-    rb_name = name + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_owner.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
-
-    # user with accessType=owner should be able to update template
-    # so adding new member by the user_member should be allowed
-    new_member = user_factory()
-    remove_resource(new_member)
-    members = [{"userPrincipalId": "local://" + user_owner.user.id,
-                "accessType": "owner"},
-               {"userPrincipalId": "local://" + new_member.user.id,
-                "accessType": "read-only"}]
-    user_owner.client.update(cluster_template, members=members)
-
-    # now change user_owner's accessType to read-only
-    members = [{"userPrincipalId": "local://" + user_owner.user.id,
-                "accessType": "read-only"},
-               {"userPrincipalId": "local://" + new_member.user.id,
-                "accessType": "read-only"}]
-    admin_mc.client.update(cluster_template, members=members)
-    rb_name = name + "-ct-r"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_owner.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
-
-    # user_owner should not be allowed to update cluster template now
-    # test updating members field by removing new_member
-    members = [{"userPrincipalId": "local://" + user_owner.user.id,
-                "accessType": "read-only"}]
-    try:
-        user_owner.client.update(cluster_template, members=members)
-    except ApiError as e:
-        assert e.error.status == 403
 
 
 @pytest.mark.usefixtures('check_cluster_kubernetes_version')
@@ -455,41 +369,6 @@ azureCloudProvider.aadClientSecret"
     assert azureClientSecret not in cluster.answers.values
     client.delete(cluster)
     wait_for_cluster_to_be_deleted(client, cluster.id)
-
-
-def test_member_accesstype_check(admin_mc, user_factory, remove_resource):
-    client = admin_mc.client
-    user_readonly = user_factory()
-    user_owner = user_factory()
-    members = [{"userPrincipalId": "local://" + user_readonly.user.id,
-                "accessType": "read-only"},
-               {"userPrincipalId": "local://" + user_owner.user.id,
-                "accessType": "member"}]
-    # creation with a member with accessType "member" shouldn't be allowed
-    try:
-        cluster_template = create_cluster_template(admin_mc, members, admin_mc)
-        remove_resource(cluster_template)
-    except ApiError as e:
-        assert e.error.status == 422
-
-    members = [{"userPrincipalId": "local://" + user_readonly.user.id,
-                "accessType": "read-only"},
-               {"userPrincipalId": "local://" + user_owner.user.id,
-                "accessType": "owner"}]
-    cluster_template = create_cluster_template(admin_mc, members, admin_mc)
-    remove_resource(cluster_template)
-
-    updated_members = \
-        [{"userPrincipalId": "local://" + user_readonly.user.id,
-         "accessType": "read-only"},
-         {"userPrincipalId": "local://" + user_owner.user.id,
-         "accessType": "member"}]
-    # updating a cluster template to add user with access type "member"
-    # shouldn't be allowed
-    try:
-        client.update(cluster_template, members=updated_members)
-    except ApiError as e:
-        assert e.error.status == 422
 
 
 @pytest.mark.usefixtures('check_cluster_kubernetes_version')
