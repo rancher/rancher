@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+const fileToFieldAliasesAnno = "nodedriver.cattle.io/file-to-field-aliases"
+
 func Test_removeMachineDriverByURLPrefix(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -112,7 +114,7 @@ func TestGetAnnotations(t *testing.T) {
 			inputDriver: nil,
 			driverName:  Amazonec2driver,
 			expectedAnnotations: map[string]string{
-				"fileToFieldAliases":      "sshKeyContents:sshKeypath,userdata:userdata",
+				fileToFieldAliasesAnno:    "sshKeyContents:sshKeypath,userdata:userdata",
 				"privateCredentialFields": "secretKey",
 				"publicCredentialFields":  "accessKey",
 			},
@@ -131,7 +133,7 @@ func TestGetAnnotations(t *testing.T) {
 			driverName: DigitalOceandriver,
 			expectedAnnotations: map[string]string{
 				"foo":                     "bar",
-				"fileToFieldAliases":      "sshKeyContents:sshKeyPath,userdata:userdata",
+				fileToFieldAliasesAnno:    "sshKeyContents:sshKeyPath,userdata:userdata",
 				"privateCredentialFields": "accessToken",
 			},
 		},
@@ -141,13 +143,13 @@ func TestGetAnnotations(t *testing.T) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: GoogleDriver,
 					Annotations: map[string]string{
-						"fileToFieldAliases": "foo:bar",
+						fileToFieldAliasesAnno: "foo:bar",
 					},
 				},
 			},
 			driverName: GoogleDriver,
 			expectedAnnotations: map[string]string{
-				"fileToFieldAliases":      "authEncodedJson:authEncodedJson,userdata:userdata",
+				fileToFieldAliasesAnno:    "authEncodedJson:authEncodedJson,userdata:userdata",
 				"privateCredentialFields": "authEncodedJson",
 			},
 		},
@@ -158,7 +160,7 @@ func TestGetAnnotations(t *testing.T) {
 					Annotations: map[string]string{
 						"foo":                    "bar",
 						"baz":                    "baz",
-						"fileToFieldAliases":     "userdata:userdata",
+						fileToFieldAliasesAnno:   "userdata:userdata",
 						"publicCredentialFields": "publicKey",
 						"defaults":               "clusterType:imported,port:123",
 					},
@@ -169,7 +171,7 @@ func TestGetAnnotations(t *testing.T) {
 			expectedAnnotations: map[string]string{
 				"foo":                    "bar",
 				"baz":                    "baz",
-				"fileToFieldAliases":     "userdata:userdata",
+				fileToFieldAliasesAnno:   "userdata:userdata",
 				"publicCredentialFields": "publicKey",
 				"defaults":               "clusterType:imported,port:123",
 			},

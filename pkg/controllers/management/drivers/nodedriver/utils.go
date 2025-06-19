@@ -19,6 +19,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	FileToFieldAliasesAnno = "nodedriver.cattle.io/file-to-field-aliases"
+)
+
 func FlagToField(flag cli.Flag) (string, v32.Field, error) {
 	field := v32.Field{
 		Create: true,

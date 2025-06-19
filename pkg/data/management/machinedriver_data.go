@@ -2,6 +2,7 @@ package management
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"reflect"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/features"
 	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -305,9 +307,7 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, cre
 func getAnnotations(nodeDriver *v3.NodeDriver, driverName string) map[string]string {
 	annotations := map[string]string{}
 	if nodeDriver != nil {
-		for k, v := range nodeDriver.Annotations {
-			annotations[k] = v
-		}
+		maps.Copy(annotations, nodeDriver.Annotations)
 	}
 
 	fields, exists := DriverData[driverName]
@@ -339,7 +339,7 @@ func getAnnotations(nodeDriver *v3.NodeDriver, driverName string) map[string]str
 		annotations["defaults"] = formatMap(fields.Defaults)
 	}
 	if len(fields.FileToFieldAliases) > 0 {
-		annotations["fileToFieldAliases"] = formatMap(fields.FileToFieldAliases)
+		annotations[nodedriver.FileToFieldAliasesAnno] = formatMap(fields.FileToFieldAliases)
 	}
 
 	return annotations

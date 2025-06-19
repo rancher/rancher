@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -132,7 +133,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 
 	// The files secret must be constructed before toArgs is called because
 	// constructFilesSecret replaces file contents and creates a secret to be passed as a volume.
-	filesSecret = constructFilesSecret(nd.Annotations["fileToFieldAliases"], args)
+	filesSecret = constructFilesSecret(nd.Annotations[nodedriver.FileToFieldAliasesAnno], args)
 	if create {
 		cmd = append(cmd, "create",
 			fmt.Sprintf("--driver=%s", driver),

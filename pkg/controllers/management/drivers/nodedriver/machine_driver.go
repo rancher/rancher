@@ -37,7 +37,6 @@ var (
 const (
 	driverNameLabel  = "io.cattle.node_driver.name"
 	uiFieldHintsAnno = "io.cattle.nodedriver/ui-field-hints"
-	aliasedAnno      = "fileToFieldAliases"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -181,7 +180,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		if err != nil {
 			return nil, err
 		}
-		if fileToFieldAliases, exists := obj.Annotations[aliasedAnno]; exists && strings.Contains(fileToFieldAliases, name) {
+		if fileToFieldAliases, exists := obj.Annotations[FileToFieldAliasesAnno]; exists && strings.Contains(fileToFieldAliases, name) {
 			fields := ParseKeyValueString(fileToFieldAliases)
 			for schemaField, driverField := range fields {
 				if driverField == name {
@@ -293,7 +292,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 		return true
 	}
 
-	if _, ok := obj.Annotations[aliasedAnno]; ok {
+	if _, ok := obj.Annotations[FileToFieldAliasesAnno]; ok {
 		if val, ok := obj.Annotations[uiFieldHintsAnno]; !ok || val == "" {
 			return true
 		}
@@ -325,7 +324,7 @@ func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) *v32.NodeDriver {
 }
 
 func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
-	if aliasedField, ok := obj.Annotations[aliasedAnno]; ok {
+	if aliasedField, ok := obj.Annotations[FileToFieldAliasesAnno]; ok {
 		anno := make(map[string]map[string]string)
 		aliases := ParseKeyValueString(aliasedField)
 		for field, _ := range aliases {
