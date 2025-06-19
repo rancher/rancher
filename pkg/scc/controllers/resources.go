@@ -78,15 +78,28 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 		}
 	}
 
+	/*
+		The Registration URL precedence is:
+			- The value from the entrypoint secret (if set),
+			- The Global Env value (if set),
+			- Staging SCC (Only, if Dev mode)
+			- Nothing (Prod SCC; default) [also used for offline mode]
+	*/
 	var regUrlBytes []byte
 	regUrlString := ""
 	if regMode == v1.RegistrationModeOnline {
+		if consts.IsDevMode() {
+			regUrlBytes = []byte(consts.RegistrationUrl)
+			regUrlString = string(consts.StagingSCCUrl)
+		}
+
 		regUrlBytes, ok = secret.Data[consts.RegistrationUrl]
 		if ok && len(regUrlBytes) != 0 {
 			regUrlString = string(regUrlBytes)
-		} else if consts.IsDevMode() {
-			regUrlBytes = []byte(consts.RegistrationUrl)
-			regUrlString = string(consts.StagingSCCUrl)
+		} else if util.HasGlobalPrimeRegistrationUrl() {
+			globalRegistrationUrl := util.GetGlobalPrimeRegistrationUrl()
+			regUrlBytes = []byte(globalRegistrationUrl)
+			regUrlString = globalRegistrationUrl
 		}
 	}
 

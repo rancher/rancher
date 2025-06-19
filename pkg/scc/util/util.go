@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -84,4 +85,15 @@ func BytesToMiBRounded(bytes int) int {
 		return 0
 	}
 	return (bytes + MiB - 1) / MiB
+}
+
+// primeSCCRegistrationHostUrl tracks a global custom registration URL for online registrations
+var primeSCCRegistrationHostUrl = os.Getenv("PRIME_SCC_REGISTRATION_HOST_URL")
+
+func HasGlobalPrimeRegistrationUrl() bool {
+	return primeSCCRegistrationHostUrl != ""
+}
+
+func GetGlobalPrimeRegistrationUrl() string {
+	return primeSCCRegistrationHostUrl
 }
