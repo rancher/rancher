@@ -13,7 +13,6 @@ import (
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
-	"github.com/rancher/rancher/pkg/api/norman/customization/etcdbackup"
 	"github.com/rancher/rancher/pkg/api/norman/customization/feature"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
@@ -69,7 +68,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterType,
 		client.DynamicSchemaType,
-		client.EtcdBackupType,
 		client.FeatureType,
 		client.FleetWorkspaceType,
 		client.GlobalRoleBindingType,
@@ -86,9 +84,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
-		client.RkeK8sSystemImageType,
-		client.RkeK8sServiceOptionType,
-		client.RkeAddonType,
 		client.RoleTemplateType,
 		client.SamlTokenType,
 		client.SettingType,
@@ -126,8 +121,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	RoleTemplate(schemas, apiContext)
 	KontainerDriver(schemas, apiContext)
 	ClusterTemplates(schemas, apiContext)
-	SystemImages(schemas, apiContext)
-	EtcdBackups(schemas, apiContext)
 	RancherUserNotifications(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
@@ -185,7 +178,6 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 		UserMgr:                       managementContext.UserManager,
 		ClusterManager:                clusterManager,
 		NodeTemplateGetter:            managementContext.Management,
-		BackupClient:                  managementContext.Management.EtcdBackups(""),
 		ClusterTemplateClient:         managementContext.Management.ClusterTemplates(""),
 		ClusterTemplateRevisionClient: managementContext.Management.ClusterTemplateRevisions(""),
 		SubjectAccessReviewClient:     managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
@@ -408,10 +400,7 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
 	metadataHandler := md.MetadataController{
-		SystemImagesController:   management.Wrangler.Mgmt.RkeK8sSystemImage(),
-		ServiceOptionsController: management.Wrangler.Mgmt.RkeK8sServiceOption(),
-		Addons:                   management.Wrangler.Mgmt.RkeAddon(),
-		Settings:                 management.Wrangler.Mgmt.Setting(),
+		Settings: management.Wrangler.Mgmt.Setting(),
 	}
 
 	handler := kontainerdriver.ActionHandler{
@@ -443,16 +432,6 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 	revisionSchema.Formatter = wrapper.RevisionFormatter
 	revisionSchema.CollectionFormatter = wrapper.CollectionFormatter
 	revisionSchema.ActionHandler = wrapper.ClusterTemplateRevisionsActionHandler
-}
-
-func SystemImages(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.RkeK8sSystemImageType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
-}
-
-func EtcdBackups(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.EtcdBackupType)
-	schema.Formatter = etcdbackup.Formatter
 }
 
 func RancherUserNotifications(schemas *types.Schemas, management *config.ScaledContext) {

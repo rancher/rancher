@@ -18,8 +18,6 @@ type ActionHandler struct {
 }
 
 type ListHandler struct {
-	SysImageLister  v3.RkeK8sSystemImageLister
-	SysImages       v3.RkeK8sSystemImageInterface
 	ConfigMapLister v1.ConfigMapLister
 }
 
