@@ -25,7 +25,6 @@ type ActionHandler struct {
 	NodeTemplateGetter            v3.NodeTemplatesGetter
 	UserMgr                       user.Manager
 	ClusterManager                *clustermanager.Manager
-	BackupClient                  v3.EtcdBackupInterface
 	ClusterTemplateClient         v3.ClusterTemplateInterface
 	ClusterTemplateRevisionClient v3.ClusterTemplateRevisionInterface
 	SubjectAccessReviewClient     v1.SubjectAccessReviewInterface
@@ -45,17 +44,6 @@ func canUpdateCluster(apiContext *types.APIContext) bool {
 
 func canUpdateClusterWithValues(apiContext *types.APIContext, values map[string]interface{}) bool {
 	return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, values, apiContext.Schema) == nil
-}
-
-func canBackupEtcd(apiContext *types.APIContext, namespace string) bool {
-	if apiContext == nil {
-		return false
-	}
-	etcdBackupSchema := types.Schema{ID: mgmtclient.EtcdBackupType}
-	backupMap := map[string]interface{}{
-		"namespaceId": namespace,
-	}
-	return apiContext.AccessControl.CanDo(v3.EtcdBackupGroupVersionKind.Group, v3.EtcdBackupResource.Name, "create", apiContext, backupMap, &etcdBackupSchema) == nil
 }
 
 func canCreateClusterTemplate(sar v1.SubjectAccessReviewInterface, apiContext *types.APIContext) bool {
