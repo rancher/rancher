@@ -2809,7 +2809,7 @@ func (s *steveAPITestSuite) assertListContains(expect []map[string]string, list 
 	for _, obj := range list {
 		listKeys = append(listKeys, path.Join(obj.Namespace, obj.Name))
 	}
-	assert.Subset(s.T(), listKeys, expectedKeys, "list did not contain expected results")
+	assert.Subset(s.T(), expectedKeys, listKeys, "list did not contain expected results")
 }
 
 func (s *steveAPITestSuite) assertListExcludes(expect []map[string]string, list []clientv1.SteveAPIObject) {
