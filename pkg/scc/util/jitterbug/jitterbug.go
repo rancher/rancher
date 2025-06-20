@@ -21,7 +21,6 @@ type JitterChecker struct {
 	calculator      Calculator
 	callable        JitterFunction
 	tickChan        <-chan time.Time
-	ticker          *time.Ticker
 	triggerInterval time.Duration
 }
 
