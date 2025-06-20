@@ -74,7 +74,7 @@ const (
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
-	ClusterDriverRKE      = "rancherKubernetesEngine"
+	ClusterDriverRKE      = "rancherKubernetesEngine" // Deprecated: RKE clusters are deprecated
 	ClusterDriverK3s      = "k3s"
 	ClusterDriverK3os     = "k3os"
 	ClusterDriverRke2     = "rke2"

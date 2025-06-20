@@ -8,11 +8,9 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -339,68 +337,6 @@ func hasLocalTargets(targetProjects []string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-// CheckAccessToUpdateMembers checks if the request is updating members list, and if the caller has permission to do so
-func CheckAccessToUpdateMembers(members []v32.Member, data map[string]interface{}, ownerAccess bool) error {
-	var requestUpdatesMembers bool
-	// Check if members are being updated, if yes, make sure only member with owner permission is making this update request
-	newMembers := convert.ToMapSlice(data[GlobalDnsFieldMembers])
-	originalMembers := members
-	if len(newMembers) != len(originalMembers) && !ownerAccess {
-		return fmt.Errorf("only members with owner access can update members")
-	}
-
-	newMemberAccessType := make(map[string]string)
-	for _, m := range newMembers {
-		if userPrincipalName, ok := m[client.MemberFieldUserPrincipalID]; ok && userPrincipalName != nil {
-			newMemberAccessType[convert.ToString(m[client.MemberFieldUserPrincipalID])] = convert.ToString(m[client.MemberFieldAccessType])
-		}
-		if groupPrincipalName, ok := m[client.MemberFieldGroupPrincipalID]; ok && groupPrincipalName != nil {
-			newMemberAccessType[convert.ToString(m[client.MemberFieldGroupPrincipalID])] = convert.ToString(m[client.MemberFieldAccessType])
-		}
-	}
-
-	originalMemberAccessType := make(map[string]string)
-	originalMembersFoundInRequest := make(map[string]bool) // map to check whether all existing members are present in the current request, if not then this request is trying to update members list
-	for _, m := range originalMembers {
-		if m.UserPrincipalName != "" {
-			originalMemberAccessType[m.UserPrincipalName] = m.AccessType
-		}
-		if m.GroupPrincipalName != "" {
-			originalMemberAccessType[m.GroupPrincipalName] = m.AccessType
-		}
-	}
-
-	// go through all members in the current request, check if each exists in the original global DNS
-	// if it exists, check that the access type hasn't changed, if it has changed, this means the req is updating members
-	// if the member from req doesn't exist in original global DNS, this means the new request is adding a new member, hence updating members list
-	for key, accessType := range newMemberAccessType {
-		if val, ok := originalMemberAccessType[key]; ok {
-			if val != accessType {
-				requestUpdatesMembers = true
-				break
-			}
-			// mark this original member as present in the current request
-			originalMembersFoundInRequest[key] = true
-		} else {
-			requestUpdatesMembers = true
-			break
-		}
-	}
-	if requestUpdatesMembers && !ownerAccess {
-		return fmt.Errorf("only members with owner access can add new members")
-	}
-
-	// at this point, all members in the new request have been found in the original global DNS with the same access type
-	// but we need to check if all members from the original global DNS are also present in the current request
-	for member := range originalMemberAccessType {
-		// if any member is not found, this means the current request is updating members list by deleting this member
-		if !originalMembersFoundInRequest[member] && !ownerAccess {
-			return fmt.Errorf("only members with owner access can delete existing members")
-		}
-	}
-	return nil
 }
 
 func (ma *MemberAccess) GetAccessTypeOfCaller(callerID, creatorID, name string, members []v32.Member) (string, error) {

@@ -1,20 +1,39 @@
 package rkecerts
 
 import (
-	"encoding/json"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"strings"
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rkeCluster "github.com/rancher/rke/cluster"
-	"github.com/rancher/rke/pki"
-	"github.com/rancher/rke/pki/cert"
-	v1 "k8s.io/api/core/v1"
 )
 
-func CleanCertificateBundle(certs map[string]pki.CertificatePKI) {
+// CertificateBlockType is a possible value for pem.Block.Type.
+const CertificateBlockType = "CERTIFICATE"
+
+type CertificatePKI struct {
+	Certificate    *x509.Certificate        `json:"-"`
+	Key            *rsa.PrivateKey          `json:"-"`
+	CSR            *x509.CertificateRequest `json:"-"`
+	CertificatePEM string                   `json:"certificatePEM"`
+	KeyPEM         string                   `json:"keyPEM"`
+	CSRPEM         string                   `json:"-"`
+	Config         string                   `json:"config"`
+	Name           string                   `json:"name"`
+	CommonName     string                   `json:"commonName"`
+	OUName         string                   `json:"ouName"`
+	EnvName        string                   `json:"envName"`
+	Path           string                   `json:"path"`
+	KeyEnvName     string                   `json:"keyEnvName"`
+	KeyPath        string                   `json:"keyPath"`
+	ConfigEnvName  string                   `json:"configEnvName"`
+	ConfigPath     string                   `json:"configPath"`
+}
+
+func CleanCertificateBundle(certs map[string]CertificatePKI) {
 	for name := range certs {
 		if strings.Contains(name, "token") || strings.Contains(name, "header") || strings.Contains(name, "admin") {
 			delete(certs, name)
@@ -33,7 +52,7 @@ func GetCertExpiration(c string) (v32.CertExpiration, error) {
 }
 
 func GetCertExpirationDate(c string) (*time.Time, error) {
-	certs, err := cert.ParseCertsPEM([]byte(c))
+	certs, err := ParseCertsPEM([]byte(c))
 	if err != nil {
 		return nil, err
 	}
@@ -43,18 +62,33 @@ func GetCertExpirationDate(c string) (*time.Time, error) {
 	return &certs[0].NotAfter, nil
 }
 
-func CertBundleFromConfig(cm *v1.ConfigMap) (map[string]pki.CertificatePKI, error) {
-	if cm == nil {
-		return nil, errors.New("full-cluster-state configmap not found")
+// ParseCertsPEM returns the x509.Certificates contained in the given PEM-encoded byte array
+// Returns an error if a certificate could not be parsed, or if the data does not contain any certificates
+func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
+	ok := false
+	certs := []*x509.Certificate{}
+	for len(pemCerts) > 0 {
+		var block *pem.Block
+		block, pemCerts = pem.Decode(pemCerts)
+		if block == nil {
+			break
+		}
+		// Only use PEM "CERTIFICATE" blocks without extra headers
+		if block.Type != CertificateBlockType || len(block.Headers) != 0 {
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return certs, err
+		}
+
+		certs = append(certs, cert)
+		ok = true
 	}
-	rawCerts, ok := cm.Data[rkeCluster.FullStateConfigMapName]
+
 	if !ok {
-		return nil, errors.New("full-cluster-state configmap does not contain data")
+		return certs, errors.New("data does not contain any valid RSA or ECDSA certificates")
 	}
-	rkeFullState := &rkeCluster.FullState{}
-	err := json.Unmarshal([]byte(rawCerts), rkeFullState)
-	if err != nil {
-		return nil, err
-	}
-	return rkeFullState.CurrentState.CertificatesBundle, nil
+	return certs, nil
 }

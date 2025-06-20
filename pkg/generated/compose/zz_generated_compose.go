@@ -13,7 +13,6 @@ type Config struct {
 	NodePools                                  map[string]managementClient.NodePool                                  `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	Nodes                                      map[string]managementClient.Node                                      `json:"nodes,omitempty" yaml:"nodes,omitempty"`
 	NodeDrivers                                map[string]managementClient.NodeDriver                                `json:"nodeDrivers,omitempty" yaml:"nodeDrivers,omitempty"`
-	NodeTemplates                              map[string]managementClient.NodeTemplate                              `json:"nodeTemplates,omitempty" yaml:"nodeTemplates,omitempty"`
 	PodSecurityAdmissionConfigurationTemplates map[string]managementClient.PodSecurityAdmissionConfigurationTemplate `json:"podSecurityAdmissionConfigurationTemplates,omitempty" yaml:"podSecurityAdmissionConfigurationTemplates,omitempty"`
 	Projects                                   map[string]managementClient.Project                                   `json:"projects,omitempty" yaml:"projects,omitempty"`
 	GlobalRoles                                map[string]managementClient.GlobalRole                                `json:"globalRoles,omitempty" yaml:"globalRoles,omitempty"`
@@ -35,14 +34,8 @@ type Config struct {
 	Features                                   map[string]managementClient.Feature                                   `json:"features,omitempty" yaml:"features,omitempty"`
 	ComposeConfigs                             map[string]managementClient.ComposeConfig                             `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
 	KontainerDrivers                           map[string]managementClient.KontainerDriver                           `json:"kontainerDrivers,omitempty" yaml:"kontainerDrivers,omitempty"`
-	EtcdBackups                                map[string]managementClient.EtcdBackup                                `json:"etcdBackups,omitempty" yaml:"etcdBackups,omitempty"`
 	CloudCredentials                           map[string]managementClient.CloudCredential                           `json:"cloudCredentials,omitempty" yaml:"cloudCredentials,omitempty"`
 	ManagementSecrets                          map[string]managementClient.ManagementSecret                          `json:"managementSecrets,omitempty" yaml:"managementSecrets,omitempty"`
-	ClusterTemplates                           map[string]managementClient.ClusterTemplate                           `json:"clusterTemplates,omitempty" yaml:"clusterTemplates,omitempty"`
-	ClusterTemplateRevisions                   map[string]managementClient.ClusterTemplateRevision                   `json:"clusterTemplateRevisions,omitempty" yaml:"clusterTemplateRevisions,omitempty"`
-	RkeK8sSystemImages                         map[string]managementClient.RkeK8sSystemImage                         `json:"rkeK8sSystemImages,omitempty" yaml:"rkeK8sSystemImages,omitempty"`
-	RkeK8sServiceOptions                       map[string]managementClient.RkeK8sServiceOption                       `json:"rkeK8sServiceOptions,omitempty" yaml:"rkeK8sServiceOptions,omitempty"`
-	RkeAddons                                  map[string]managementClient.RkeAddon                                  `json:"rkeAddons,omitempty" yaml:"rkeAddons,omitempty"`
 	FleetWorkspaces                            map[string]managementClient.FleetWorkspace                            `json:"fleetWorkspaces,omitempty" yaml:"fleetWorkspaces,omitempty"`
 	RancherUserNotifications                   map[string]managementClient.RancherUserNotification                   `json:"rancherUserNotifications,omitempty" yaml:"rancherUserNotifications,omitempty"`
 	OIDCClients                                map[string]managementClient.OIDCClient                                `json:"oidcClients,omitempty" yaml:"oidcClients,omitempty"`

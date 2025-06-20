@@ -20,11 +20,8 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,18 +30,10 @@ import (
 
 type Store struct {
 	types.Store
-	ShellHandler                  types.RequestHandler
-	mu                            sync.Mutex
-	KontainerDriverLister         v3.KontainerDriverLister
-	ClusterTemplateLister         v3.ClusterTemplateLister
-	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
-	NodeLister                    v3.NodeLister
-	ClusterLister                 v3.ClusterLister
-	DialerFactory                 dialer.Factory
-	ClusterClient                 dynamic.ResourceInterface
-	SecretClient                  v1.SecretInterface
-	SecretLister                  v1.SecretLister
-	secretMigrator                *secretmigrator.Migrator
+	ShellHandler          types.RequestHandler
+	mu                    sync.Mutex
+	KontainerDriverLister v3.KontainerDriverLister
+	ClusterClient         dynamic.ResourceInterface
 }
 
 type transformer struct {
@@ -109,19 +98,9 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 	}
 
 	s := &Store{
-		Store:                         t,
-		KontainerDriverLister:         mgmt.Management.KontainerDrivers("").Controller().Lister(),
-		ShellHandler:                  linkHandler.LinkHandler,
-		ClusterTemplateLister:         mgmt.Management.ClusterTemplates("").Controller().Lister(),
-		ClusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions("").Controller().Lister(),
-		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
-		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
-		DialerFactory:                 mgmt.Dialer,
-		SecretLister:                  mgmt.Core.Secrets("").Controller().Lister(),
-		secretMigrator: secretmigrator.NewMigrator(
-			mgmt.Core.Secrets("").Controller().Lister(),
-			mgmt.Core.Secrets(""),
-		),
+		Store:                 t,
+		KontainerDriverLister: mgmt.Management.KontainerDrivers("").Controller().Lister(),
+		ShellHandler:          linkHandler.LinkHandler,
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(&mgmt.RESTConfig)
