@@ -118,9 +118,10 @@ func TestTelemetryManagedNodes(t *testing.T) {
 
 func TestTelemetryLocalClusterCompute(t *testing.T) {
 	type testcase struct {
-		input       telInput
-		expectedCpu int64
-		expectedMem resource.Quantity
+		input          telInput
+		expectedCpu    int
+		expectedMem    resource.Quantity
+		expectedMemInt int
 	}
 
 	assert := assert.New(t)
@@ -143,8 +144,9 @@ func TestTelemetryLocalClusterCompute(t *testing.T) {
 				managedClusters: []*v3.Cluster{},
 				managedNodes:    map[ClusterID][]*v3.Node{},
 			},
-			expectedCpu: 1,
-			expectedMem: resource.MustParse("8Mi"),
+			expectedCpu:    1,
+			expectedMem:    resource.MustParse("8Mi"),
+			expectedMemInt: 8388608,
 		},
 	}
 
@@ -162,18 +164,19 @@ func TestTelemetryLocalClusterCompute(t *testing.T) {
 		assert.NoError(err)
 		mem, err := clT.MemoryCapacityBytes()
 		assert.NoError(err)
-		expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
-		assert.True(ok)
+		//expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
+		//assert.True(ok)
 		assert.Equal(tc.expectedCpu, cores, "mismatched cpu cores reported")
-		assert.Equal(expectedMem, mem, "mismatched memory reported")
+		assert.Equal(tc.expectedMemInt, mem, "mismatched memory reported")
 	}
 }
 
 func TestTelemetryLocalNodeCompute(t *testing.T) {
 	type testcase struct {
-		input       telInput
-		expectedCpu int64
-		expectedMem resource.Quantity
+		input          telInput
+		expectedCpu    int
+		expectedMem    resource.Quantity
+		expectedMemInt int
 	}
 
 	assert := assert.New(t)
@@ -225,8 +228,9 @@ func TestTelemetryLocalNodeCompute(t *testing.T) {
 				managedClusters: []*v3.Cluster{},
 				managedNodes:    map[ClusterID][]*v3.Node{},
 			},
-			expectedCpu: 26,
-			expectedMem: resource.MustParse("23Gi"),
+			expectedCpu:    26,
+			expectedMem:    resource.MustParse("23Gi"),
+			expectedMemInt: 24696061952,
 		},
 	}
 
@@ -239,8 +243,8 @@ func TestTelemetryLocalNodeCompute(t *testing.T) {
 			tc.input.managedNodes,
 		)
 		clT := rancherT.LocalClusterTelemetry()
-		totalCores := int64(0)
-		totalMemory := int64(0)
+		totalCores := int(0)
+		totalMemory := int(0)
 
 		for _, nodeT := range clT.PerNodeTelemetry() {
 			cores, err := nodeT.CpuCores()
@@ -250,18 +254,19 @@ func TestTelemetryLocalNodeCompute(t *testing.T) {
 			totalCores += cores
 			totalMemory += memBytes
 		}
-		expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
-		assert.True(ok)
+		//expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
+		//assert.True(ok)
 		assert.Equal(tc.expectedCpu, totalCores, "mismatched cpu cores reported")
-		assert.Equal(expectedMem, totalMemory, "mismatched memory reported")
+		assert.Equal(tc.expectedMemInt, totalMemory, "mismatched memory reported")
 	}
 }
 
 func TestTelemetryClusterCompute(t *testing.T) {
 	type testcase struct {
-		input       telInput
-		expectedCpu int64
-		expectedMem resource.Quantity
+		input          telInput
+		expectedCpu    int
+		expectedMem    resource.Quantity
+		expectedMemInt int
 	}
 	assert := assert.New(t)
 
@@ -287,8 +292,9 @@ func TestTelemetryClusterCompute(t *testing.T) {
 				},
 				managedNodes: map[ClusterID][]*v3.Node{},
 			},
-			expectedCpu: 1,
-			expectedMem: resource.MustParse("8Mi"),
+			expectedCpu:    1,
+			expectedMem:    resource.MustParse("8Mi"),
+			expectedMemInt: 8388608,
 		},
 		{
 			input: telInput{
@@ -320,8 +326,9 @@ func TestTelemetryClusterCompute(t *testing.T) {
 				},
 				managedNodes: map[ClusterID][]*v3.Node{},
 			},
-			expectedCpu: 16,
-			expectedMem: resource.MustParse("32Gi"),
+			expectedCpu:    16,
+			expectedMem:    resource.MustParse("32Gi"),
+			expectedMemInt: 34359738368,
 		},
 	}
 	for _, tc := range testcases {
@@ -332,8 +339,8 @@ func TestTelemetryClusterCompute(t *testing.T) {
 			tc.input.managedClusters,
 			tc.input.managedNodes,
 		)
-		totalCores := int64(0)
-		totalMem := int64(0)
+		totalCores := int(0)
+		totalMem := int(0)
 		for _, clT := range rancherT.PerManagedClusterTelemetry() {
 			cores, err := clT.CpuCores()
 			assert.NoError(err)
@@ -342,18 +349,19 @@ func TestTelemetryClusterCompute(t *testing.T) {
 			totalCores += cores
 			totalMem += bytes
 		}
-		expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
-		assert.True(ok)
+		// expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
+		// assert.True(ok)
 		assert.Equal(tc.expectedCpu, totalCores, "mismatched cpu cores reported")
-		assert.Equal(expectedMem, totalMem, "mismatched memory reported")
+		assert.Equal(tc.expectedMemInt, totalMem, "mismatched memory reported")
 	}
 }
 
 func TestTelemetryPerNodeCompute(t *testing.T) {
 	type testcase struct {
-		input       telInput
-		expectedCpu int64
-		expectedMem resource.Quantity
+		input          telInput
+		expectedCpu    int
+		expectedMem    resource.Quantity
+		expectedMemInt int
 	}
 	assert := assert.New(t)
 
@@ -451,8 +459,9 @@ func TestTelemetryPerNodeCompute(t *testing.T) {
 					},
 				},
 			},
-			expectedCpu: 135,
-			expectedMem: resource.MustParse("169Gi"),
+			expectedCpu:    135,
+			expectedMem:    resource.MustParse("169Gi"),
+			expectedMemInt: 181462368256,
 		},
 	}
 	for _, tc := range testcases {
@@ -463,8 +472,8 @@ func TestTelemetryPerNodeCompute(t *testing.T) {
 			tc.input.managedClusters,
 			tc.input.managedNodes,
 		)
-		totalCores := int64(0)
-		totalMem := int64(0)
+		totalCores := int(0)
+		totalMem := int(0)
 		for _, clT := range rancherT.PerManagedClusterTelemetry() {
 			for _, nodeT := range clT.PerNodeTelemetry() {
 				cores, err := nodeT.CpuCores()
@@ -475,9 +484,9 @@ func TestTelemetryPerNodeCompute(t *testing.T) {
 				totalMem += memBytes
 			}
 		}
-		expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
-		assert.True(ok)
+		// expectedMem, ok := tc.expectedMem.AsDec().Unscaled()
+		// assert.True(ok)
 		assert.Equal(tc.expectedCpu, totalCores, "mismatched cpu cores reported")
-		assert.Equal(expectedMem, totalMem, "mismatched memory reported")
+		assert.Equal(tc.expectedMemInt, totalMem, "mismatched memory reported")
 	}
 }
