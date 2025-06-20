@@ -62,7 +62,7 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		statusCode: http.StatusOK,
 	}
 	h.next.ServeHTTP(wr, req)
-	wr.Store()
+	wr.Apply()
 
 	respTimestamp := time.Now().Format(time.RFC3339)
 
@@ -106,8 +106,6 @@ func (w *wrapWriter) Header() http.Header {
 func (w *wrapWriter) WriteHeader(statusCode int) {
 	w.wroteHeader = true
 	w.statusCode = statusCode
-
-	w.next.WriteHeader(statusCode)
 }
 
 func (w *wrapWriter) Write(body []byte) (int, error) {
@@ -138,7 +136,7 @@ func (w *wrapWriter) Flush() {
 	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(w.next))
 }
 
-func (w *wrapWriter) Store() {
+func (w *wrapWriter) Apply() {
 	maps.Copy(w.next.Header(), w.headers)
 	w.next.WriteHeader(w.statusCode)
 	w.next.Write(w.buf.Bytes())
