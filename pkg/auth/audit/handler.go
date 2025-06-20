@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"reflect"
@@ -55,13 +56,20 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	context := context.WithValue(req.Context(), userKeyValue, user)
 	req = req.WithContext(context)
 
-	wr := &wrapWriter{ResponseWriter: rw, statusCode: http.StatusOK}
+	wr := &wrapWriter{
+		next: rw,
+
+		headers:    rw.Header(),
+		statusCode: http.StatusOK,
+	}
 	h.next.ServeHTTP(wr, req)
+	wr.Store()
 
 	respTimestamp := time.Now().Format(time.RFC3339)
 
 	log, err := newLog(user, req, wr, reqTimestamp, respTimestamp)
 	if err != nil {
+		// todo: this writes to an already written request, we should just log a warning and continue with a partial log
 		util.ReturnHTTPError(rw, req, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -82,40 +90,62 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 type wrapWriter struct {
-	http.ResponseWriter
+	next http.ResponseWriter
+
+	wroteHeader bool
+	headers     http.Header
+
+	wroteBody bool
+	buf       bytes.Buffer
+
 	statusCode int
-	buf        bytes.Buffer
 }
 
-func (aw *wrapWriter) WriteHeader(statusCode int) {
-	aw.ResponseWriter.WriteHeader(statusCode)
-	aw.statusCode = statusCode
+func (w *wrapWriter) Header() http.Header {
+	if w.wroteHeader || w.wroteBody {
+		return maps.Clone(w.headers)
+	}
+
+	return w.headers
 }
 
-func (aw *wrapWriter) Write(body []byte) (int, error) {
-	aw.buf.Write(body)
-	return aw.ResponseWriter.Write(body)
+func (w *wrapWriter) WriteHeader(statusCode int) {
+	w.wroteHeader = true
+	w.statusCode = statusCode
+
+	w.next.WriteHeader(statusCode)
 }
 
-func (aw *wrapWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if hijacker, ok := aw.ResponseWriter.(http.Hijacker); ok {
+func (w *wrapWriter) Write(body []byte) (int, error) {
+	w.wroteBody = true
+	return w.buf.Write(body)
+}
+
+func (w *wrapWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := w.next.(http.Hijacker); ok {
 		return hijacker.Hijack()
 	}
-	return nil, nil, fmt.Errorf("upstream ResponseWriter of type %v does not implement http.Hijacker", reflect.TypeOf(aw.ResponseWriter))
+	return nil, nil, fmt.Errorf("upstream ResponseWriter of type %v does not implement http.Hijacker", reflect.TypeOf(w.next))
 }
 
-func (aw *wrapWriter) CloseNotify() <-chan bool {
-	if cn, ok := aw.ResponseWriter.(http.CloseNotifier); ok {
+func (w *wrapWriter) CloseNotify() <-chan bool {
+	if cn, ok := w.next.(http.CloseNotifier); ok {
 		return cn.CloseNotify()
 	}
-	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.CloseNotifier", reflect.TypeOf(aw.ResponseWriter))
+	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.CloseNotifier", reflect.TypeOf(w.next))
 	return make(<-chan bool)
 }
 
-func (aw *wrapWriter) Flush() {
-	if f, ok := aw.ResponseWriter.(http.Flusher); ok {
+func (w *wrapWriter) Flush() {
+	if f, ok := w.next.(http.Flusher); ok {
 		f.Flush()
 		return
 	}
-	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(aw.ResponseWriter))
+	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(w.next))
+}
+
+func (w *wrapWriter) Store() {
+	maps.Copy(w.next.Header(), w.headers)
+	w.next.WriteHeader(w.statusCode)
+	w.next.Write(w.buf.Bytes())
 }
