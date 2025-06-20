@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.23.10
 
 replace (
 	golang.org/x/net => golang.org/x/net v0.36.0 // CVE-2025-22870
