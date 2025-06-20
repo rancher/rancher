@@ -14,7 +14,6 @@ type Interface interface {
 	NodePoolsGetter
 	NodesGetter
 	NodeDriversGetter
-	NodeTemplatesGetter
 	PodSecurityAdmissionConfigurationTemplatesGetter
 	ProjectsGetter
 	GlobalRolesGetter
@@ -41,8 +40,6 @@ type Interface interface {
 	ComposeConfigsGetter
 	KontainerDriversGetter
 	CloudCredentialsGetter
-	ClusterTemplatesGetter
-	ClusterTemplateRevisionsGetter
 	FleetWorkspacesGetter
 	RancherUserNotificationsGetter
 	OIDCClientsGetter
@@ -118,20 +115,6 @@ func (c *Client) NodeDrivers(namespace string) NodeDriverInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NodeDriverGroupVersionResource, NodeDriverGroupVersionKind.Kind, false)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodeDriverResource, NodeDriverGroupVersionKind, nodeDriverFactory{})
 	return &nodeDriverClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type NodeTemplatesGetter interface {
-	NodeTemplates(namespace string) NodeTemplateInterface
-}
-
-func (c *Client) NodeTemplates(namespace string) NodeTemplateInterface {
-	sharedClient := c.clientFactory.ForResourceKind(NodeTemplateGroupVersionResource, NodeTemplateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodeTemplateResource, NodeTemplateGroupVersionKind, nodeTemplateFactory{})
-	return &nodeTemplateClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
@@ -496,34 +479,6 @@ func (c *Client) CloudCredentials(namespace string) CloudCredentialInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CloudCredentialGroupVersionResource, CloudCredentialGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CloudCredentialResource, CloudCredentialGroupVersionKind, cloudCredentialFactory{})
 	return &cloudCredentialClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ClusterTemplatesGetter interface {
-	ClusterTemplates(namespace string) ClusterTemplateInterface
-}
-
-func (c *Client) ClusterTemplates(namespace string) ClusterTemplateInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ClusterTemplateGroupVersionResource, ClusterTemplateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterTemplateResource, ClusterTemplateGroupVersionKind, clusterTemplateFactory{})
-	return &clusterTemplateClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ClusterTemplateRevisionsGetter interface {
-	ClusterTemplateRevisions(namespace string) ClusterTemplateRevisionInterface
-}
-
-func (c *Client) ClusterTemplateRevisions(namespace string) ClusterTemplateRevisionInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ClusterTemplateRevisionGroupVersionResource, ClusterTemplateRevisionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterTemplateRevisionResource, ClusterTemplateRevisionGroupVersionKind, clusterTemplateRevisionFactory{})
-	return &clusterTemplateRevisionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
