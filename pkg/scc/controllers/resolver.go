@@ -19,7 +19,7 @@ func (h *handler) initResolvers(ctx context.Context) {
 }
 
 func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	ret := []relatedresource.Key{}
+	var ret []relatedresource.Key
 	if namespace != h.systemNamespace {
 		return ret, nil
 	}
@@ -37,6 +37,12 @@ func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Ob
 		h.log.Warnf("failed to find hash for secret %s/%s", namespace, name)
 		return ret, nil
 	}
+	// TODO: rework indexers / resolvers and potentially remove that pattern
+	defer func() {
+		if r := recover(); r != nil {
+			h.log.Errorf("recovered from panic in secret %s/%s with hash %s: %v", namespace, name, curHash, r)
+		}
+	}()
 	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, curHash)
 	if err != nil {
 		return ret, err
