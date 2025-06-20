@@ -5,7 +5,6 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -19,40 +18,14 @@ import (
 
 // ActionHandler used for performing various cluster actions.
 type ActionHandler struct {
-	NodepoolGetter                v3.NodePoolsGetter
-	NodeLister                    v3.NodeLister
-	ClusterClient                 v3.ClusterInterface
-	NodeTemplateGetter            v3.NodeTemplatesGetter
-	UserMgr                       user.Manager
-	ClusterManager                *clustermanager.Manager
-	ClusterTemplateClient         v3.ClusterTemplateInterface
-	ClusterTemplateRevisionClient v3.ClusterTemplateRevisionInterface
-	SubjectAccessReviewClient     v1.SubjectAccessReviewInterface
-	TokenClient                   v3.TokenInterface
-	Auth                          requests.Authenticator
-}
-
-func canUpdateCluster(apiContext *types.APIContext) bool {
-	if apiContext == nil {
-		return false
-	}
-	cluster := map[string]interface{}{
-		"id": apiContext.ID,
-	}
-	return canUpdateClusterWithValues(apiContext, cluster)
-}
-
-func canUpdateClusterWithValues(apiContext *types.APIContext, values map[string]interface{}) bool {
-	return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, values, apiContext.Schema) == nil
-}
-
-func canCreateClusterTemplate(sar v1.SubjectAccessReviewInterface, apiContext *types.APIContext) bool {
-	if apiContext == nil {
-		return false
-	}
-	callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-	canCreateTemplates, _ := CanCreateRKETemplate(callerID, sar)
-	return canCreateTemplates
+	NodepoolGetter            v3.NodePoolsGetter
+	NodeLister                v3.NodeLister
+	ClusterClient             v3.ClusterInterface
+	UserMgr                   user.Manager
+	ClusterManager            *clustermanager.Manager
+	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
+	TokenClient               v3.TokenInterface
+	Auth                      requests.Authenticator
 }
 
 // ClusterActionHandler runs the handler for the provided cluster action in the given context.
