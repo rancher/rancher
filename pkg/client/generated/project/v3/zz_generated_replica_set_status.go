@@ -8,6 +8,7 @@ const (
 	ReplicaSetStatusFieldObservedGeneration   = "observedGeneration"
 	ReplicaSetStatusFieldReadyReplicas        = "readyReplicas"
 	ReplicaSetStatusFieldReplicas             = "replicas"
+	ReplicaSetStatusFieldTerminatingReplicas  = "terminatingReplicas"
 )
 
 type ReplicaSetStatus struct {
@@ -17,4 +18,5 @@ type ReplicaSetStatus struct {
 	ObservedGeneration   int64                 `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 	ReadyReplicas        int64                 `json:"readyReplicas,omitempty" yaml:"readyReplicas,omitempty"`
 	Replicas             int64                 `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	TerminatingReplicas  *int64                `json:"terminatingReplicas,omitempty" yaml:"terminatingReplicas,omitempty"`
 }
