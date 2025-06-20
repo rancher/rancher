@@ -7,6 +7,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -263,6 +264,150 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotSecrets, tt.wantSecrets) {
 				t.Errorf("namespaceHandler.getProjectScopedSecretsFromNamespace() gotSecrets = %v, want %v", gotSecrets, tt.wantSecrets)
+			}
+		})
+	}
+}
+
+const (
+	projectName = "p-testproject"
+	clusterName = "c-testcluster"
+	backingNS   = "test-backing-ns"
+)
+
+var (
+	secretToMigrate = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "s1",
+			Namespace: backingNS,
+			Labels:    map[string]string{normanCreatorLabel: "norman", "otherLabel": "val"},
+			Annotations: map[string]string{
+				oldPSSAnnotation + clusterName: "true",
+				"otherAnno":                    "val",
+			},
+			Finalizers: []string{oldPSSFinalizer + clusterName, "otherFinalizer"},
+		},
+	}
+	migratedSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "s1",
+			Namespace: backingNS,
+			Labels: map[string]string{
+				"otherLabel":             "val",
+				projectScopedSecretLabel: projectName,
+			},
+			Annotations: map[string]string{
+				"otherAnno": "val",
+			},
+			Finalizers: []string{"otherFinalizer"},
+		},
+	}
+
+	testProject = &v3.Project{
+		ObjectMeta: metav1.ObjectMeta{Name: projectName},
+		Spec:       v3.ProjectSpec{ClusterName: clusterName},
+		Status:     v3.ProjectStatus{BackingNamespace: backingNS},
+	}
+)
+
+func Test_namespaceHandler_migrateExistingProjectScopedSecrets(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	validSelectorReq, _ := labels.NewRequirement(normanCreatorLabel, selection.Equals, []string{"norman"})
+	validSelector := labels.NewSelector().Add(*validSelectorReq)
+
+	tests := []struct {
+		name                  string
+		project               *v3.Project
+		setupManagementCache  func(m *fake.MockCacheInterface[*corev1.Secret])
+		setupManagementClient func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList], t *testing.T, project *v3.Project)
+		wantErr               bool
+	}{
+		{
+			name:    "no secrets found with norman label",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "error listing secrets from cache",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name:    "one migrated secret",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{secretToMigrate}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList], t *testing.T, project *v3.Project) {
+				m.EXPECT().Update(migratedSecret).Return(nil, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "multiple migrated secrets",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{secretToMigrate.DeepCopy(), secretToMigrate.DeepCopy()}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList], t *testing.T, project *v3.Project) {
+				m.EXPECT().Update(migratedSecret).Return(nil, nil).Times(2)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "secret update fails",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{secretToMigrate}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList], t *testing.T, project *v3.Project) {
+				m.EXPECT().Update(migratedSecret).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name:    "multiple migrated secrets, failures not blocking",
+			project: testProject,
+			setupManagementCache: func(m *fake.MockCacheInterface[*corev1.Secret]) {
+				m.EXPECT().List(backingNS, validSelector).Return([]*corev1.Secret{secretToMigrate.DeepCopy(), secretToMigrate.DeepCopy()}, nil)
+			},
+			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList], t *testing.T, project *v3.Project) {
+				m.EXPECT().Update(migratedSecret).Return(nil, errDefault).Times(2)
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			managementSecretCacheMock := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			managementSecretClientMock := fake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+
+			if tt.setupManagementCache != nil {
+				tt.setupManagementCache(managementSecretCacheMock)
+			}
+			if tt.setupManagementClient != nil {
+				tt.setupManagementClient(managementSecretClientMock, t, tt.project)
+			}
+
+			n := &namespaceHandler{
+				managementSecretCache:  managementSecretCacheMock,
+				managementSecretClient: managementSecretClientMock,
+			}
+
+			err := n.migrateExistingProjectScopedSecrets(tt.project)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
