@@ -408,10 +408,7 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
 	metadataHandler := md.MetadataController{
-		SystemImagesController:   management.Wrangler.Mgmt.RkeK8sSystemImage(),
-		ServiceOptionsController: management.Wrangler.Mgmt.RkeK8sServiceOption(),
-		Addons:                   management.Wrangler.Mgmt.RkeAddon(),
-		Settings:                 management.Wrangler.Mgmt.Setting(),
+		Settings: management.Wrangler.Mgmt.Setting(),
 	}
 
 	handler := kontainerdriver.ActionHandler{
@@ -419,16 +416,11 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		MetadataHandler:       metadataHandler,
 	}
-	lh := kontainerdriver.ListHandler{
-		SysImageLister:  management.Management.RkeK8sSystemImages("").Controller().Lister(),
-		SysImages:       management.Management.RkeK8sSystemImages(""),
-		ConfigMapLister: management.Core.ConfigMaps("").Controller().Lister(),
-	}
+
 	schema.ActionHandler = handler.ActionHandler
 	schema.CollectionFormatter = kontainerdriver.CollectionFormatter
 	schema.Formatter = kontainerdriver.NewFormatter(management)
 	schema.Store = kontainerdriver.NewStore(management, schema.Store)
-	schema.ListHandler = lh.ListHandler
 	kontainerDriverValidator := kontainerdriver.Validator{
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
