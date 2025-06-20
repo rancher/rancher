@@ -7,10 +7,20 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+// RKECommonNodeConfig is a common configuration shared between node driver and custom machines.
 type RKECommonNodeConfig struct {
-	Labels                    map[string]string `json:"labels,omitempty"`
-	Taints                    []corev1.Taint    `json:"taints,omitempty"`
-	CloudCredentialSecretName string            `json:"cloudCredentialSecretName,omitempty"`
+	// Labels is a list of labels to apply to the machines created by the CAPI machine deployment.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+	// Taints is a list of taints to apply to the machines created by the CAPI machine deployment.
+	// +optional
+	Taints []corev1.Taint `json:"taints,omitempty"`
+	// CloudCredentialSecretName is the id of the secret used to provision the cluster.
+	// This field must be in the format of "namespace:name".
+	// NOTE: this field overrides the field of the same name on the cluster spec, allowing individual machine pools to
+	// use separate credentials.
+	// +optional
+	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
 }
 
 type RKEMachineStatus struct {

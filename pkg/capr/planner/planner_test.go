@@ -462,7 +462,7 @@ func Test_getInstallerImage(t *testing.T) {
 				Spec: rkev1.RKEControlPlaneSpec{
 					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
 						MachineGlobalConfig: rkev1.GenericMap{
-							Data: map[string]any{
+							Data: map[string]interface{}{
 								"system-default-registry": "test.rancher.io",
 							},
 						},
@@ -480,7 +480,7 @@ func Test_getInstallerImage(t *testing.T) {
 						MachineSelectorConfig: []rkev1.RKESystemConfig{
 							{
 								Config: rkev1.GenericMap{
-									Data: map[string]any{
+									Data: map[string]interface{}{
 										"system-default-registry": "test.rancher.io",
 									},
 								},
@@ -498,14 +498,14 @@ func Test_getInstallerImage(t *testing.T) {
 				Spec: rkev1.RKEControlPlaneSpec{
 					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
 						MachineGlobalConfig: rkev1.GenericMap{
-							Data: map[string]any{
+							Data: map[string]interface{}{
 								"system-default-registry": "test.rancher.io",
 							},
 						},
 						MachineSelectorConfig: []rkev1.RKESystemConfig{
 							{
 								Config: rkev1.GenericMap{
-									Data: map[string]any{
+									Data: map[string]interface{}{
 										"system-default-registry": "test2.rancher.io",
 									},
 								},

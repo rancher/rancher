@@ -17,13 +17,29 @@ const (
 )
 
 type ETCDSnapshotS3 struct {
-	Endpoint            string `json:"endpoint,omitempty"`
-	EndpointCA          string `json:"endpointCA,omitempty"`
-	SkipSSLVerify       bool   `json:"skipSSLVerify,omitempty"`
-	Bucket              string `json:"bucket,omitempty"`
-	Region              string `json:"region,omitempty"`
+	// Endpoint is the S3 endpoint used for snapshot operations.
+	Endpoint string `json:"endpoint,omitempty"`
+	// EndpointCA is the CA certificate for validating the S3 endpoint.
+	EndpointCA string `json:"endpointCA,omitempty"`
+	// SkipSSLVerify is a flag used to ignore certificate validation errors when using the configured endpoint.
+	SkipSSLVerify bool `json:"skipSSLVerify,omitempty"`
+	// Bucket is the name of the S3 bucket used for snapshot operations.
+	Bucket string `json:"bucket,omitempty"`
+	// Region is the S3 region used for snapshot operations.
+	Region string `json:"region,omitempty"`
+	// CloudCredentialName is the name of the secret containing the credentials used to access the S3 bucket.
+	// The secret is expected to have the following keys:
+	// - accessKey [required]
+	// - secretKey [required]
+	// - defaultRegion
+	// - defaultEndpoint
+	// - defaultEndpointCA
+	// - defaultSkipSSLVerify
+	// - defaultBucket
+	// - defaultFolder
 	CloudCredentialName string `json:"cloudCredentialName,omitempty"`
-	Folder              string `json:"folder,omitempty"`
+	// Folder is the name of the S3 folder used for snapshot operations.
+	Folder string `json:"folder,omitempty"`
 }
 
 type ETCDSnapshotCreate struct {
@@ -32,12 +48,15 @@ type ETCDSnapshotCreate struct {
 }
 
 type ETCDSnapshotRestore struct {
-	// Name refers to the name of the associated etcdsnapshot object
+	// Name refers to the name of the associated etcdsnapshot object.
 	Name string `json:"name,omitempty"`
 
 	// Changing the Generation is the only thing required to initiate a snapshot restore.
+	// +optional
 	Generation int `json:"generation,omitempty"`
 	// Set to either none (or empty string), all, or kubernetesVersion
+	// +kubebuilder:validation:Enum=none;all;kubernetesVersion
+	// +optional
 	RestoreRKEConfig string `json:"restoreRKEConfig,omitempty"`
 }
 
@@ -74,8 +93,16 @@ type ETCDSnapshotStatus struct {
 }
 
 type ETCD struct {
-	DisableSnapshots     bool            `json:"disableSnapshots,omitempty"`
-	SnapshotScheduleCron string          `json:"snapshotScheduleCron,omitempty"`
-	SnapshotRetention    int             `json:"snapshotRetention,omitempty"`
-	S3                   *ETCDSnapshotS3 `json:"s3,omitempty"`
+	// DisableSnapshots disables the creation of snapshots for the cluster.
+	// +optional
+	DisableSnapshots bool `json:"disableSnapshots,omitempty"`
+	// SnapshotScheduleCron is the cron schedule for the snapshot creation.
+	// +optional
+	SnapshotScheduleCron string `json:"snapshotScheduleCron,omitempty"`
+	// SnapshotRetention is the number of snapshots the downstream cluster should retain per snapshot generation.
+	// +optional
+	SnapshotRetention int `json:"snapshotRetention,omitempty"`
+	// S3 defines the S3 configuration for the cluster if enabled.
+	// +optional
+	S3 *ETCDSnapshotS3 `json:"s3,omitempty"`
 }
