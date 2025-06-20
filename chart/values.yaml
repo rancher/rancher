@@ -6,15 +6,24 @@ additionalTrustedCAs: false
 antiAffinity: preferred
 topologyKey: kubernetes.io/hostname
 
-# Audit Logs
 # Source: https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-api-audit-log
-# The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
-# level: Verbosity of logs, 0 to 3. 0 is off, 3 most verbose.
-# Docs: https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-api-audit-log#audit-log-levels
 auditLog:
+  enabled: false
+
+  # level can be one of 0, 1, 2, or 3 with 3 being the most verbose. This value is a system level default and may
+  # impact the verbosity on any AuditPolicies you define. See below for a description of each log level:
+  #   0: Only log metadata such as URI, method, user, etc
+  #   1: Log metadata, request headers, and response headers
+  #   2: Log metadata, request header, response headers, and request body
+  #   3: Log metadata, request header, response heaeders, request body, and response body
+  level: 0
+
+  # destination may be one of "sidecar" or "hostpath". When set to "sidecar" logs will be sent and output to a sidecar
+  # container called "rancher-audit-log". When "hostpath" logs are written to a hostpath volume called "audit-log" to
+  # a directory configured by auditLog.hostPath.
   destination: sidecar
   hostPath: /var/log/rancher/audit/
-  level: 0
+
   maxAge: 1
   maxBackup: 1
   maxSize: 100
