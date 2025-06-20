@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
@@ -103,7 +102,6 @@ func (m *Lifecycle) setupCustom(obj *apimgmtv3.Node) {
 		Labels:           obj.Spec.CustomConfig.Label,
 		Port:             "22",
 		Role:             roles(obj),
-		Taints:           taints.GetRKETaintsFromStrings(obj.Spec.CustomConfig.Taints),
 	}
 
 	if obj.Status.NodeConfig.User == "" {
