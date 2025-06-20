@@ -49,6 +49,10 @@ if [ -z $TARGET ] || [ $TARGET = "server" ]; then
     --platform="${OS}/${ARCH}" \
     --target server \
     --file ./package/Dockerfile .
+
+  if [ "$REPO" != "rancher" ]; then
+    docker push "${REPO}"/rancher:"${TAG}" &
+  fi
 fi
 
 if [ -z $TARGET ] || [ $TARGET = "agent" ]; then
@@ -65,4 +69,8 @@ if [ -z $TARGET ] || [ $TARGET = "agent" ]; then
     --platform="${OS}/${ARCH}" \
     --target agent \
     --file ./package/Dockerfile .
+
+    if [ "$REPO" != "rancher" ]; then
+      docker push "${REPO}"/rancher-agent:"${TAG}" &
+    fi
 fi

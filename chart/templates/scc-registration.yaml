@@ -1,0 +1,35 @@
+{{- /*
+These Secrets and the ConfigMap are only intended to be used the first time Rancher is installed.
+This is a workaround for when the scc.cattle.io CRDs may not (almost always won't) be installed
+when the helm chart is installed. After that time, users should use the CRDs - potentially this chart should if they are there?
+*/}}
+{{- if and .Values.registration.enabled .Values.registration.regCode }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cattle-scc-system
+  annotations:
+    "helm.sh/resource-policy": keep
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "scc-registration"
+  namespace: "cattle-scc-system"
+  annotations:
+    "helm.sh/resource-policy": keep
+  labels: {{ include "rancher.labels" . | nindent 4 }}{{ include "rancher.commonLabels" (dict "context" . "partOf" "rancher") | indent 4 }}
+type: Opaque
+data:
+  mode: {{ default "online" .Values.registration.mode | b64enc | quote }}
+{{- if .Values.registration.regCode }}
+  regCode: {{ .Values.registration.regCode | b64enc | quote }}
+{{- end }}
+{{- if .Values.registration.registrationUrl }}
+  registrationUrl: {{ .Values.registration.registrationUrl | b64enc | quote }}
+{{- end }}
+{{- if .Values.registration.certificate }}
+  certificate: {{ .Values.registration.certificate | b64enc | quote  }}
+{{- end }}
+{{ end -}}
