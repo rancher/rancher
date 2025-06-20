@@ -16,6 +16,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type HashType int
+
+const (
+	NameHash HashType = iota
+	ContentHash
+)
+
+func (ht *HashType) String() string {
+	if *ht == NameHash {
+		return "name"
+	}
+
+	return "content"
+}
+
+type hashCleanupRequest struct {
+	hash     string
+	hashType any
+}
+
 const (
 	dataKeyRegistrationType = "registrationType"
 )

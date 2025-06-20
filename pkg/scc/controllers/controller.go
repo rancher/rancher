@@ -170,13 +170,14 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			return h.prepareSecretSalt(incomingObj)
 		}
 
-		incomingHash := incomingObj.GetLabels()[consts.LabelSccHash]
+		incomingNameHash := incomingObj.GetLabels()[consts.LabelNameSuffix]
+		incomingContentHash := incomingObj.GetLabels()[consts.LabelSccHash]
 		params, err := extractRegistrationParamsFromSecret(incomingObj)
 		if err != nil {
 			return incomingObj, fmt.Errorf("failed to extract registration params from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 
-		if incomingHash == "" {
+		if incomingContentHash == "" {
 			h.log.Info("incoming hash empty, prepare it")
 			// update secret with useful annotations & labels
 			newSecret := incomingObj.DeepCopy()
@@ -197,10 +198,13 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 
 		// If secret hash has changed make sure that we submit objects that correspond to that hash
 		// are cleaned up
-		if incomingHash != params.contentHash {
+		if incomingNameHash != params.nameId {
 			h.log.Info("must cleanup existing registration managed by secret")
-			if cleanUpErr := h.cleanupRegistrationByHash(incomingHash); cleanUpErr != nil {
-				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingHash, cleanUpErr)
+			if cleanUpErr := h.cleanupRegistrationByHash(hashCleanupRequest{
+				incomingNameHash,
+				NameHash,
+			}); cleanUpErr != nil {
+				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingContentHash, cleanUpErr)
 				return incomingObj, cleanUpErr
 			}
 		}
@@ -249,9 +253,16 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 	return incomingObj, nil
 }
 
-func (h *handler) cleanupRegistrationByHash(hash string) error {
-	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, hash)
-	h.log.Infof("found %d matching registrations to clean up", len(regs))
+func (h *handler) cleanupRegistrationByHash(cleanupRequest hashCleanupRequest) error {
+	var regs []*v1.Registration
+	var err error
+	if cleanupRequest.hashType == ContentHash {
+		regs, err = h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, cleanupRequest.hash)
+	} else {
+		regs, err = h.registrationCache.GetByIndex(IndexRegistrationsByNameHash, cleanupRequest.hash)
+	}
+
+	h.log.Infof("found %d matching registrations to clean up the %s hash", len(regs), cleanupRequest.hashType)
 	if err != nil {
 		return err
 	}
@@ -299,7 +310,10 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 			return incomingObj, nil
 		}
 
-		if err := h.cleanupRegistrationByHash(hash); err != nil {
+		if err := h.cleanupRegistrationByHash(hashCleanupRequest{
+			hash,
+			ContentHash,
+		}); err != nil {
 			h.log.Errorf("failed to cleanup registrations for hash %s: %v", hash, err)
 			return nil, err
 		}
