@@ -66,7 +66,9 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 		clusterindex.Register(ctx, wrangler)
 		provisioningv2.Register(ctx, wrangler, kubeconfigManager)
 		if features.RKE2.Enabled() {
-			capr.Register(ctx, wrangler, kubeconfigManager)
+			if err := capr.Register(ctx, wrangler, kubeconfigManager); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -2,11 +2,13 @@ package dynamicschema
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema/sample"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/crd"
@@ -14,6 +16,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/schemas"
 	"github.com/rancher/wrangler/v3/pkg/schemas/openapi"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,13 +31,21 @@ const (
 type handler struct {
 	schemaCache       mgmtcontrollers.DynamicSchemaCache
 	schemasController mgmtcontrollers.DynamicSchemaController
+	sampleProps       *apiextv1.JSONSchemaProps
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context) error {
+	sampleProps, err := sample.GetSampleProps()
+	if err != nil {
+		return err
+	}
+
 	h := handler{
 		schemaCache:       clients.Mgmt.DynamicSchema().Cache(),
 		schemasController: clients.Mgmt.DynamicSchema(),
+		sampleProps:       sampleProps,
 	}
+
 	mgmtcontrollers.RegisterDynamicSchemaGeneratingHandler(ctx,
 		clients.Mgmt.DynamicSchema(),
 		clients.Apply.WithCacheTypes(clients.CRD.CustomResourceDefinition()),
@@ -44,6 +55,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		&generic.GeneratingHandlerOptions{
 			AllowClusterScoped: true,
 		})
+
+	return nil
 }
 
 func getStatusSchema(allSchemas *schemas.Schemas) (*schemas.Schema, error) {
@@ -64,6 +77,7 @@ func addConfigSchema(name string, specSchema *schemas.Schema, allSchemas *schema
 	return id, allSchemas.AddSchema(schemas.Schema{
 		ID:             id,
 		ResourceFields: nodeConfigFields,
+		Description:    fmt.Sprintf("%s is the configuration for the rancher %s node driver flags for machines in a machine pool.", convert.Capitalize(id), name),
 	})
 }
 
@@ -73,12 +87,14 @@ func addMachineSchema(name string, specSchema, statusSchema *schemas.Schema, all
 		ID: id,
 		ResourceFields: map[string]schemas.Field{
 			"spec": {
-				Type: specSchema.ID,
+				Type:        specSchema.ID,
+				Description: "Desired state of the machine, generated from the pool configuration.",
 			},
 			"status": {
 				Type: statusSchema.ID,
 			},
 		},
+		Description: fmt.Sprintf("%s is a CAPI infrastructure machine for the rancher %s infrastructure provider.", convert.Capitalize(id), name),
 	})
 }
 
@@ -88,7 +104,8 @@ func addMachineTemplateSchema(name string, specSchema *schemas.Schema, allSchema
 		ID: templateTemplateSpecSchemaID,
 		ResourceFields: map[string]schemas.Field{
 			"spec": {
-				Type: specSchema.ID,
+				Type:        specSchema.ID,
+				Description: "Specification of the template object.",
 			},
 		},
 	})
@@ -101,10 +118,12 @@ func addMachineTemplateSchema(name string, specSchema *schemas.Schema, allSchema
 		ID: templateSpecSchemaID,
 		ResourceFields: map[string]schemas.Field{
 			"template": {
-				Type: templateTemplateSpecSchemaID,
+				Type:        templateTemplateSpecSchemaID,
+				Description: "Template for creating new machines.",
 			},
 			"clusterName": {
-				Type: "string",
+				Type:        "string",
+				Description: "Name of the cluster (provisioning.cattle.io) that generated this template.",
 			},
 		},
 	})
@@ -117,9 +136,11 @@ func addMachineTemplateSchema(name string, specSchema *schemas.Schema, allSchema
 		ID: id,
 		ResourceFields: map[string]schemas.Field{
 			"spec": {
-				Type: templateSpecSchemaID,
+				Type:        templateSpecSchemaID,
+				Description: "Specification of the machines in the template, generated from the pool configuration.",
 			},
 		},
+		Description: fmt.Sprintf("%s is a CAPI infrastructure machine template for the rancher %s infrastructure provider.", convert.Capitalize(id), name),
 	})
 }
 
@@ -260,7 +281,8 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 	}
 
 	specSchema.ResourceFields["providerID"] = schemas.Field{
-		Type: "string",
+		Type:        "string",
+		Description: "Identifier for the machine, corresponds to the node object providerID.",
 	}
 
 	for name, field := range specSchema.ResourceFields {
@@ -274,6 +296,84 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 	}
 
 	return allSchemas.Schema(specSchema.ID), nil
+}
+
+func getCRD(props *apiextv1.JSONSchemaProps, id, group string) *crd.CRD {
+	_, ok := props.Properties["status"]
+
+	return &crd.CRD{
+		GVK: schema.GroupVersionKind{
+			Group:   group,
+			Version: rkev1.SchemeGroupVersion.Version,
+			Kind:    convert.Capitalize(id),
+		},
+		Schema: props,
+		Labels: map[string]string{
+			"cluster.x-k8s.io/v1beta1":       "v1",
+			"auth.cattle.io/cluster-indexed": "true",
+		},
+		Status: ok,
+	}
+}
+
+func getConfigCRD(schemas *schemas.Schemas, id string) (runtime.Object, error) {
+	props, err := openapi.ToOpenAPI(id, schemas)
+	if err != nil {
+		return nil, err
+	}
+
+	crd := getCRD(props, id, MachineConfigAPIGroup)
+
+	crdObj, err := crd.ToCustomResourceDefinition()
+	if err != nil {
+		return nil, err
+	}
+
+	return crdObj, nil
+}
+
+func getMachineTemplateCRD(schemas *schemas.Schemas, sampleProps *apiextv1.JSONSchemaProps, id string) (runtime.Object, error) {
+	props, err := openapi.ToOpenAPI(id, schemas)
+	if err != nil {
+		return nil, err
+	}
+
+	// Substitute the "common" field for the sample to get the descriptions that
+	// were generated for it.
+	sampleProps = sampleProps.DeepCopy()
+	props.Properties["spec"].Properties["template"].Properties["spec"].Properties["common"] =
+		sampleProps.Properties["spec"].Properties["common"]
+
+	crd := getCRD(props, id, machineAPIGroup)
+
+	crdObj, err := crd.ToCustomResourceDefinition()
+	if err != nil {
+		return nil, err
+	}
+
+	return crdObj, nil
+}
+
+func getMachineCRD(schemas *schemas.Schemas, sampleProps *apiextv1.JSONSchemaProps, id string) (runtime.Object, error) {
+	props, err := openapi.ToOpenAPI(id, schemas)
+	if err != nil {
+		return nil, err
+	}
+
+	// Substitute the "common" and "status" fields for the sample to get the descriptions that
+	// were generated for it.
+	sampleProps = sampleProps.DeepCopy()
+	props.Properties["spec"].Properties["common"] = sampleProps.Properties["spec"].Properties["common"]
+	props.Properties["status"] = sampleProps.Properties["status"]
+
+	crd := getCRD(props, id, machineAPIGroup)
+
+	crdObj, err := crd.ToCustomResourceDefinition()
+	if err != nil {
+		return nil, err
+	}
+
+	return crdObj, nil
 }
 
 func (h *handler) OnChange(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) ([]runtime.Object, v3.DynamicSchemaStatus, error) {
@@ -306,37 +406,26 @@ func (h *handler) OnChange(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus)
 
 	var result []runtime.Object
 
-	for _, id := range []string{nodeConfigID, templateID, machineID} {
-		props, err := openapi.ToOpenAPI(id, schemas)
-		if err != nil {
-			return nil, status, err
-		}
-
-		_, ok := props.Properties["status"]
-		crd := crd.CRD{
-			GVK: schema.GroupVersionKind{
-				Group:   machineAPIGroup,
-				Version: rkev1.SchemeGroupVersion.Version,
-				Kind:    convert.Capitalize(id),
-			},
-			Schema: props,
-			Labels: map[string]string{
-				"cluster.x-k8s.io/v1beta1":       "v1",
-				"auth.cattle.io/cluster-indexed": "true",
-			},
-			Status: ok,
-		}
-
-		if nodeConfigID == id {
-			crd.GVK.Group = MachineConfigAPIGroup
-		}
-
-		crdObj, err := crd.ToCustomResourceDefinition()
-		if err != nil {
-			return nil, status, err
-		}
-		result = append(result, crdObj)
+	crdObj, err := getConfigCRD(schemas, nodeConfigID)
+	if err != nil {
+		return nil, status, err
 	}
+
+	result = append(result, crdObj)
+
+	crdObj, err = getMachineTemplateCRD(schemas, h.sampleProps, templateID)
+	if err != nil {
+		return nil, status, err
+	}
+
+	result = append(result, crdObj)
+
+	crdObj, err = getMachineCRD(schemas, h.sampleProps, machineID)
+	if err != nil {
+		return nil, status, err
+	}
+
+	result = append(result, crdObj)
 
 	return result, status, nil
 }
