@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
+	jsonpath "github.com/rancher/jsonpath/pkg"
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/auth/audit/jsonpath"
 )
 
 const (
