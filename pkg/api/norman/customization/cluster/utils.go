@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -12,16 +11,11 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
-	authV1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	clientauthv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"k8s.io/client-go/util/retry"
 )
 
 type noopCloser struct {
@@ -132,39 +126,4 @@ func waitForNS(nsClient v1.NamespaceInterface, namespaces []string) {
 			time.Sleep(2 * time.Second)
 		}
 	}
-}
-
-func CanCreateRKETemplate(callerID string, subjectAccessReviewClient clientauthv1.SubjectAccessReviewInterface) (bool, error) {
-	review := authV1.SubjectAccessReview{
-		Spec: authV1.SubjectAccessReviewSpec{
-			User: callerID,
-			ResourceAttributes: &authV1.ResourceAttributes{
-				Verb:     "create",
-				Resource: "clustertemplates",
-				Group:    "management.cattle.io",
-			},
-		},
-	}
-
-	result, err := subjectAccessReviewClient.Create(context.TODO(), &review, v12.CreateOptions{})
-	if err != nil {
-		return false, err
-	}
-	logrus.Debugf("CanCreateRKETemplate: %v", result)
-	return result.Status.Allowed, nil
-}
-
-// updateClusterWithRetryOnConflict attempts to update the cluster with the changes encoded in the updateFunc. It only retries if a conflict error is returned.
-func updateClusterWithRetryOnConflict(clusterClient v3.ClusterInterface, cluster *v3.Cluster, updateFunc func(*v3.Cluster) *v3.Cluster) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		currentCluster, err := clusterClient.Get(cluster.Name, v12.GetOptions{})
-		if err != nil {
-			return err
-		}
-		cluster = updateFunc(currentCluster)
-		if _, err = clusterClient.Update(cluster); err != nil {
-			return err
-		}
-		return nil
-	})
 }
