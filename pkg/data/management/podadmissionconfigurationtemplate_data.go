@@ -23,7 +23,7 @@ var FeatureAppNS = []string{
 	"cattle-neuvector-system",         // Neuvector
 	"cattle-monitoring-system",        // Monitoring and Sub-charts
 	"rancher-alerting-drivers",        // Alert Driver
-	"cis-operator-system",             // CIS Benchmark, RKE2 restricted PSA Config
+	"compliance-operator-system",      // Compliance Operator, RKE2 restricted PSA Config
 	"cattle-csp-adapter-system",       // CSP Adapter
 	"cattle-externalip-system",        // External IP Webhook
 	"cattle-gatekeeper-system",        // Gatekeeper
