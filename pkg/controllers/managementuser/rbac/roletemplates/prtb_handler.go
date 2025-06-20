@@ -5,17 +5,19 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/slice"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	rbacAuth "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 const (
@@ -23,6 +25,7 @@ const (
 	projectIDAnnotation = "field.cattle.io/projectId"
 	namespaceReadOnly   = "namespaces-readonly"
 	namespaceEdit       = "namespaces-edit"
+	namespacePSA        = "namespaces-psa"
 	namespacesCreate    = "create-ns"
 )
 
@@ -238,25 +241,49 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 		return nil, err
 	}
 
+	neededCRBs := []*rbacv1.ClusterRoleBinding{}
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
-	for _, rule := range cr.Rules {
-		hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, rbacv1.ResourceAll)
-		hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, rbacv1.APIGroupAll)
-		if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
-			if slice.ContainsString(rule.Verbs, rbacv1.VerbAll) || slice.ContainsString(rule.Verbs, "create") {
-				// need binding for create-ns and namespaces-edit
-				namespaceCreateCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, namespacesCreate)
-				if err != nil {
-					return nil, err
-				}
-				namespaceEditCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceEdit)
-				if err != nil {
-					return nil, err
-				}
-				return []*rbacv1.ClusterRoleBinding{namespaceCreateCR, namespaceEditCR}, nil
-			}
-		}
+
+	// check if any of the aggregated CR grant namespace creation permission
+	createNamespaceRec := authorizer.AttributesRecord{
+		Verb:            "create",
+		APIGroup:        "",
+		Resource:        "namespaces",
+		ResourceRequest: true,
 	}
+	if rbacAuth.RulesAllow(createNamespaceRec, cr.Rules...) {
+		namespaceCreateCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, namespacesCreate)
+		if err != nil {
+			return nil, err
+		}
+		namespaceEditCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceEdit)
+		if err != nil {
+			return nil, err
+		}
+		neededCRBs = append(neededCRBs, namespaceCreateCR, namespaceEditCR)
+
+	}
+
+	// check if any of the aggregated CR grant updatepsa permission
+	psaRec := authorizer.AttributesRecord{
+		Verb:            "updatepsa",
+		APIGroup:        management.GroupName,
+		Resource:        v3.ProjectResourceName,
+		Name:            prtb.ProjectName,
+		ResourceRequest: true,
+	}
+	if rbacAuth.RulesAllow(psaRec, cr.Rules...) {
+		namespacePSACR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, namespacePSA)
+		if err != nil {
+			return nil, err
+		}
+		neededCRBs = append(neededCRBs, namespacePSACR)
+	}
+
+	if len(neededCRBs) > 0 {
+		return neededCRBs, nil
+	}
+
 	// Didn't have edit access to namespaces, needs read access binding
 	namespaceCR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, projectName+"-"+namespaceReadOnly)
 	if err != nil {

@@ -421,6 +421,24 @@ var (
 			},
 		},
 	}
+	crbPSA = rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "crb-apzwokaidy",
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "namespaces-psa",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		},
+	}
 )
 
 func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
@@ -481,6 +499,22 @@ func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
 			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy()},
 		},
 		{
+			name: "namespaces psa cluster role",
+			prtb: defaultPRTB.DeepCopy(),
+			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					Rules: []rbacv1.PolicyRule{
+						{
+							Resources: []string{"projects"},
+							APIGroups: []string{"management.cattle.io"},
+							Verbs:     []string{"updatepsa"},
+						},
+					},
+				}, nil)
+			},
+			want: []*rbacv1.ClusterRoleBinding{crbPSA.DeepCopy()},
+		},
+		{
 			name: "wildcards create edit cluster roles",
 			prtb: defaultPRTB.DeepCopy(),
 			setupCRClient: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
@@ -494,7 +528,7 @@ func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
 					},
 				}, nil)
 			},
-			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy()},
+			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy(), crbPSA.DeepCopy()},
 		},
 	}
 	ctrl := gomock.NewController(t)
