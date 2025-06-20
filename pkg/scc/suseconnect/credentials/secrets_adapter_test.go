@@ -66,7 +66,9 @@ func TestBasicNewSecretsAdapter(t *testing.T) {
 		secretCache:     mockSecretsCache,
 		finalizerName:   Finalizer,
 		ownerRef:        testOwnerRef,
-		labels:          map[string]string{},
+		labels: map[string]string{
+			consts.LabelSccSecretRole: string(consts.SCCCredentialsRole),
+		},
 	}, secretsBackedCredentials)
 }
 
@@ -153,7 +155,9 @@ func TestNewSecretsAdapter(t *testing.T) {
 			password:    "system_testLoginPassword",
 			systemToken: "system_testLoginToken",
 		},
-		labels: map[string]string{},
+		labels: map[string]string{
+			consts.LabelSccSecretRole: string(consts.SCCCredentialsRole),
+		},
 	}, secretsBackedCredentials)
 
 	hasAuth := secretsBackedCredentials.HasAuthentication()
@@ -189,7 +193,9 @@ func TestSecretsAdapterCredentials_Basic(t *testing.T) {
 			password:    "system_testLoginPassword",
 			systemToken: "system_testLoginToken",
 		},
-		labels: map[string]string{},
+		labels: map[string]string{
+			consts.LabelSccSecretRole: string(consts.SCCCredentialsRole),
+		},
 	}, secretsBackedCredentials)
 
 	modifiedSecret := testSecret("", "", &map[string]string{
@@ -260,7 +266,9 @@ func TestSecretsAdapterSccCredentials(t *testing.T) {
 			password:    "system_testLoginPassword",
 			systemToken: "system_testLoginToken",
 		},
-		labels: map[string]string{},
+		labels: map[string]string{
+			consts.LabelSccSecretRole: string(consts.SCCCredentialsRole),
+		},
 	}, secretsBackedCredentials)
 
 	sccCrds := secretsBackedCredentials.SccCredentials()
@@ -288,7 +296,9 @@ func TestSecretEmptyTokenUpdate(t *testing.T) {
 			password:    "system_testLoginPassword",
 			systemToken: "system_testLoginToken",
 		},
-		labels: map[string]string{},
+		labels: map[string]string{
+			consts.LabelSccSecretRole: string(consts.SCCCredentialsRole),
+		},
 	}, secretsBackedCredentials)
 
 	modifiedSecret := testSecret("", "", &map[string]string{
