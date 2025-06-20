@@ -17,7 +17,7 @@ RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O -
     chown root:root /usr/bin/helm_v3 && \
     chmod +x /usr/bin/helm_v3
 
-ENV YQ_VERSION=v4.44.2
+ENV YQ_VERSION=v4.45.4
 RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O - | \
         tar xz && mv yq_linux_${BUILDARCH} /usr/bin/yq
 
