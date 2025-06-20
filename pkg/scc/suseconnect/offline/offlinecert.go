@@ -86,7 +86,6 @@ func (o *SecretManager) saveCertificateSecret() error {
 	}
 
 	labels := o.defaultLabels
-	labels[consts.LabelSccSecretRole] = string(consts.OfflineCertificate)
 	if offlineRequest.Labels == nil {
 		offlineRequest.Labels = labels
 	} else {

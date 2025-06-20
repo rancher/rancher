@@ -359,23 +359,25 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
+		return runMigrations(r.Wrangler)
+	})
+
+	r.Wrangler.OnLeader(func(ctx context.Context) error {
 		if features.RancherSCCRegistrationExtension.Enabled() {
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
-			// TODO: Also trigger install of the UI extension somewhere near here
 			err := scc.Setup(ctx, r.Wrangler)
 			if err != nil {
 				return err
 			}
 		}
-
-		return runMigrations(r.Wrangler)
+		return nil
 	})
-
 	if err := r.authServer.Start(ctx, false); err != nil {
 		return err
 	}
 
 	r.Wrangler.OnLeader(r.authServer.OnLeader)
+
 	r.auditLog.Start(ctx)
 
 	return r.Wrangler.Start(ctx)

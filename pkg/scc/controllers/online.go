@@ -3,7 +3,6 @@ package controllers
 import (
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"golang.org/x/sync/semaphore"
 	"net/http"
@@ -17,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -77,7 +75,7 @@ func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.R
 	// The other cases are either:
 	//	a. an error and should have had a code, OR
 	//	b. BAYG/RMT/etc based Registration and will not use a code
-	registrationCode := s.fetchRegCode(registrationObj)
+	registrationCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
 
 	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationUrl
 
@@ -179,24 +177,6 @@ func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registrat
 	return registration, nil
 }
 
-func (s sccOnlineMode) fetchRegCode(registrationObj *v1.Registration) string {
-	// Set to global default, or user configured value from the Registration resource
-	regCodeSecretRef := &corev1.SecretReference{
-		Namespace: s.systemNamespace,
-		Name:      consts.ResourceSCCEntrypointSecretName,
-	}
-	if registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef != nil {
-		regObjRegCodeSecretRef := registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef
-		if regObjRegCodeSecretRef.Name != "" && regObjRegCodeSecretRef.Namespace != "" {
-			regCodeSecretRef = regObjRegCodeSecretRef
-		} else {
-			s.log.Warn("registration code secret reference was set but cannot be used")
-		}
-	}
-
-	return suseconnect.FetchSccRegistrationCodeFrom(s.secrets, regCodeSecretRef)
-}
-
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
 	return !registrationObj.Status.ActivationStatus.Activated ||
 		registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero()
@@ -215,7 +195,7 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 		return fmt.Errorf("cannot load scc credentials: %w", credentialsErr)
 	}
 
-	registrationCode := s.fetchRegCode(registrationObj)
+	registrationCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
 	registrationUrl := registrationObj.Spec.RegistrationRequest.RegistrationUrl
 	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *registrationUrl)
 
@@ -232,23 +212,27 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 }
 
 func (s sccOnlineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registration) (*v1.Registration, error) {
-	now := metav1.Now()
-	registrationObj.Status.RegistrationExpiresAt = &now
 	v1.RegistrationConditionSccUrlReady.True(registrationObj)
 
 	credentialsErr := s.sccCredentials.Refresh()
 	if credentialsErr != nil {
 		return nil, fmt.Errorf("cannot load scc credentials: %w", credentialsErr)
 	}
-
 	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationUrl
 	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
-	productInfo, err := sccConnection.ProductInfo()
-	if err != nil {
-		return nil, fmt.Errorf("cannot load product info from scc: %w", err)
-	}
 
-	registrationObj.Status.RegisteredProduct = &productInfo.FriendlyName
+	activations, err := sccConnection.ActivationStatus()
+	if err != nil {
+		return nil, err
+	}
+	if len(activations) == 0 {
+		return nil, fmt.Errorf("no activations found for registration %q", registrationObj.Name)
+	}
+	// TODO: what if there are more than 1?
+	firstActivation := activations[0]
+
+	registrationObj.Status.RegistrationExpiresAt = &metav1.Time{Time: firstActivation.ExpiresAt}
+	registrationObj.Status.RegisteredProduct = &firstActivation.Product.FriendlyName
 	return registrationObj, nil
 }
 
@@ -350,6 +334,12 @@ func (s sccOnlineMode) Deregister() error {
 	credErr := s.sccCredentials.Remove()
 	if credErr != nil {
 		return credErr
+	}
+
+	regCodeSecretRef := s.registration.Spec.RegistrationRequest.RegistrationCodeSecretRef
+	regCodeErr := s.secrets.Delete(regCodeSecretRef.Namespace, regCodeSecretRef.Name, &metav1.DeleteOptions{})
+	if regCodeErr != nil {
+		return regCodeErr
 	}
 
 	return nil

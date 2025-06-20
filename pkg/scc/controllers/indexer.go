@@ -13,10 +13,10 @@ const (
 )
 
 func (h *handler) initIndexers() {
-	h.secretCache.AddIndexer(
-		IndexSecretsBySccHash,
-		h.secretToHash,
-	)
+	//h.secretCache.AddIndexer(
+	//	IndexSecretsBySccHash,
+	//	h.secretToHash,
+	//)
 	h.registrationCache.AddIndexer(
 		IndexRegistrationsBySccHash,
 		h.registrationToHash,
@@ -34,31 +34,31 @@ func (h *handler) secretToHash(secret *corev1.Secret) ([]string, error) {
 
 	hash, ok := secret.Labels[consts.LabelSccHash]
 	if !ok {
-		return nil, nil
+		return []string{}, nil
 	}
 	return []string{hash}, nil
 }
 
 func (h *handler) registrationToHash(reg *v1.Registration) ([]string, error) {
 	if reg == nil {
-		return nil, nil
+		return []string{}, nil
 	}
 
 	hash, ok := reg.Labels[consts.LabelSccHash]
 	if !ok {
-		return nil, nil
+		return []string{}, nil
 	}
 	return []string{hash}, nil
 }
 
 func (h *handler) registrationToNameHash(reg *v1.Registration) ([]string, error) {
 	if reg == nil {
-		return nil, nil
+		return []string{}, nil
 	}
 
 	hash, ok := reg.Labels[consts.LabelNameSuffix]
 	if !ok {
-		return nil, nil
+		return []string{}, nil
 	}
 	return []string{hash}, nil
 }

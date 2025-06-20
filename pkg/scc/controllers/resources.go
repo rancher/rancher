@@ -66,6 +66,21 @@ func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, erro
 	return secret, nil
 }
 
+func getCurrentRegURL(secret *corev1.Secret) (regURL []byte) {
+	regUrlBytes, ok := secret.Data[consts.RegistrationUrl]
+	if ok {
+		return regUrlBytes
+	}
+	if util.HasGlobalPrimeRegistrationUrl() {
+		globalRegistrationUrl := util.GetGlobalPrimeRegistrationUrl()
+		return []byte(globalRegistrationUrl)
+	}
+	if consts.IsDevMode() {
+		return []byte(consts.StagingSCCUrl)
+	}
+	return []byte{}
+}
+
 func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationParams, error) {
 	incomingSalt := []byte(secret.GetLabels()[consts.LabelObjectSalt])
 
@@ -90,29 +105,24 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 	offlineRegCertData, certOk := secret.Data[consts.SecretKeyOfflineRegCert]
 	hasOfflineCert := certOk && len(offlineRegCertData) > 0
 
-	/*
-		The Registration URL precedence is:
-			- The value from the entrypoint secret (if set),
-			- The Global Env value (if set),
-			- Staging SCC (Only, if Dev mode)
-			- Nothing (Prod SCC; default) [also used for offline mode]
-	*/
 	var regUrlBytes []byte
 	regUrlString := ""
 	if regMode == v1.RegistrationModeOnline {
-		if consts.IsDevMode() {
-			regUrlBytes = []byte(consts.RegistrationUrl)
-			regUrlString = string(consts.StagingSCCUrl)
-		}
-
-		regUrlBytes, ok = secret.Data[consts.RegistrationUrl]
-		if ok && len(regUrlBytes) != 0 {
-			regUrlString = string(regUrlBytes)
-		} else if util.HasGlobalPrimeRegistrationUrl() {
-			globalRegistrationUrl := util.GetGlobalPrimeRegistrationUrl()
-			regUrlBytes = []byte(globalRegistrationUrl)
-			regUrlString = globalRegistrationUrl
-		}
+		regUrlBytes = getCurrentRegURL(secret)
+		regUrlString = string(regUrlBytes)
+		//if consts.IsDevMode() {
+		//	regUrlBytes = []byte(consts.StagingSCCUrl)
+		//	regUrlString = string(consts.StagingSCCUrl)
+		//}
+		//
+		//regUrlBytes, ok = secret.Data[consts.RegistrationUrl]
+		//if ok && len(regUrlBytes) != 0 {
+		//	regUrlString = string(regUrlBytes)
+		//} else if util.HasGlobalPrimeRegistrationUrl() {
+		//	globalRegistrationUrl := util.GetGlobalPrimeRegistrationUrl()
+		//	regUrlBytes = []byte(globalRegistrationUrl)
+		//	regUrlString = globalRegistrationUrl
+		//}
 	}
 
 	// TODO: do we care to validate this; online shouldn't have this at all, offline has it eventually
@@ -124,7 +134,7 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 	nameData = append(nameData, regUrlBytes...)
 	data := append(nameData, offlineRegCertData...)
 
-	// Generate a has for the name data
+	// Generate a hash for the name data
 	if _, err := hasher.Write(nameData); err != nil {
 		return RegistrationParams{}, fmt.Errorf("failed to hash name data: %v", err)
 	}
@@ -140,11 +150,11 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 		regType:            regMode,
 		nameId:             nameId,
 		contentHash:        contentsId,
-		regCode:            string(regCode),
+		regCode:            regCode,
 		hasOfflineCertData: hasOfflineCert,
 		offlineCertData:    &offlineRegCertData,
-		secretRef: &corev1.SecretReference{
-			Name:      consts.ResourceSCCEntrypointSecretName,
+		regCodeSecretRef: &corev1.SecretReference{
+			Name:      consts.RegistrationCodeSecretName(nameId),
 			Namespace: secret.Namespace,
 		},
 		regUrl: regUrlString,
@@ -155,10 +165,10 @@ type RegistrationParams struct {
 	regType            v1.RegistrationMode
 	nameId             string
 	contentHash        string
-	regCode            string
+	regCode            []byte
 	regUrl             string
 	hasOfflineCertData bool
-	secretRef          *corev1.SecretReference
+	regCodeSecretRef   *corev1.SecretReference
 	offlineCertData    *[]byte
 }
 
@@ -217,10 +227,10 @@ func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
 
 	if params.regType == v1.RegistrationModeOnline {
 		regSpec.RegistrationRequest = &v1.RegistrationRequest{
-			RegistrationCodeSecretRef: params.secretRef,
+			RegistrationCodeSecretRef: params.regCodeSecretRef,
 		}
 	} else if params.regType == v1.RegistrationModeOffline && params.hasOfflineCertData {
-		regSpec.OfflineRegistrationCertificateSecretRef = params.secretRef
+		regSpec.OfflineRegistrationCertificateSecretRef = params.regCodeSecretRef
 	}
 
 	// check if params has regUrl and use, otherwise check if devmode and when true use staging Scc url
@@ -229,6 +239,39 @@ func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
 	}
 
 	return regSpec
+}
+
+func (h *handler) regCodeFromSecretEntrypoint(params RegistrationParams) (*corev1.Secret, error) {
+	secretName := consts.RegistrationCodeSecretName(params.nameId)
+
+	regcodeSecret, err := h.secretCache.Get(h.systemNamespace, secretName)
+	if err != nil && apierrors.IsNotFound(err) {
+		regcodeSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: h.systemNamespace,
+				Name:      secretName,
+			},
+			Data: map[string][]byte{
+				consts.SecretKeyRegistrationCode: params.regCode,
+			},
+		}
+	}
+
+	if regcodeSecret.Labels == nil {
+		regcodeSecret.Labels = map[string]string{}
+	}
+	defaultLabels := params.Labels()
+	defaultLabels[consts.LabelSccSecretRole] = string(consts.RegistrationCode)
+	maps.Copy(regcodeSecret.Labels, defaultLabels)
+
+	if !slices.Contains(regcodeSecret.Finalizers, consts.FinalizerSccRegistration) {
+		if regcodeSecret.Finalizers == nil {
+			regcodeSecret.Finalizers = []string{}
+		}
+		regcodeSecret.Finalizers = append(regcodeSecret.Finalizers, consts.FinalizerSccRegistration)
+	}
+
+	return regcodeSecret, nil
 }
 
 func (h *handler) offlineCertFromSecretEntrypoint(params RegistrationParams) (*corev1.Secret, error) {
@@ -250,7 +293,9 @@ func (h *handler) offlineCertFromSecretEntrypoint(params RegistrationParams) (*c
 	if offlineCertSecret.Labels == nil {
 		offlineCertSecret.Labels = map[string]string{}
 	}
-	maps.Copy(offlineCertSecret.Labels, params.Labels())
+	defaultLabels := params.Labels()
+	defaultLabels[consts.LabelSccSecretRole] = string(consts.OfflineCertificate)
+	maps.Copy(offlineCertSecret.Labels, defaultLabels)
 
 	if !slices.Contains(offlineCertSecret.Finalizers, consts.FinalizerSccRegistration) {
 		if offlineCertSecret.Finalizers == nil {

@@ -98,6 +98,19 @@ func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
 }
 
 func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registration) (*v1.Registration, error) {
+	// TODO: can we actually get the SCC systemID in offline mode?
+	/*
+		certReader, err := s.offlineSecrets.OfflineCertificateReader()
+		if err != nil {
+			return registrationObj, fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
+		}
+
+		offlineCert, certErr := registration.OfflineCertificateFrom(certReader)
+		if certErr != nil {
+			return registrationObj, fmt.Errorf("activate failed, cannot prepare offline certificate: %w", certErr)
+		}
+	*/
+
 	v1.ActivationConditionOfflineDone.True(registrationObj)
 	return registrationObj, nil
 }

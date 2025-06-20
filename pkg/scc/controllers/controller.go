@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/offline"
 	"maps"
+	"slices"
 	"time"
 
 	"github.com/rancher/rancher/pkg/scc/consts"
@@ -204,12 +205,22 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 				incomingNameHash,
 				NameHash,
 			}); cleanUpErr != nil {
-				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingContentHash, cleanUpErr)
+				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingNameHash, cleanUpErr)
 				return incomingObj, cleanUpErr
 			}
 		}
+		//if incomingContentHash != params.contentHash {
+		//	h.log.Info("must cleanup existing registration managed by secret")
+		//	if cleanUpErr := h.cleanupRegistrationByHash(hashCleanupRequest{
+		//		incomingContentHash,
+		//		ContentHash,
+		//	}); cleanUpErr != nil {
+		//		h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingContentHash, cleanUpErr)
+		//		return incomingObj, cleanUpErr
+		//	}
+		//}
 
-		h.log.Info("create or update registration managed by secert")
+		h.log.Info("create or update registration managed by secret")
 
 		// update secret with useful annotations & labels
 		newSecret := incomingObj.DeepCopy()
@@ -234,6 +245,17 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			}
 
 			if err := h.createOrUpdateSecret(offlineCertSecret); err != nil {
+				return incomingObj, err
+			}
+		}
+
+		if params.regType == v1.RegistrationModeOnline {
+			regCodeSecret, err := h.regCodeFromSecretEntrypoint(params)
+			if err != nil {
+				return incomingObj, err
+			}
+
+			if err := h.createOrUpdateSecret(regCodeSecret); err != nil {
 				return incomingObj, err
 			}
 		}
@@ -268,6 +290,10 @@ func (h *handler) cleanupRegistrationByHash(cleanupRequest hashCleanupRequest) e
 	}
 
 	for _, reg := range regs {
+		if !slices.Contains(reg.Finalizers, consts.FinalizerSccRegistration) {
+			continue
+		}
+
 		if retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var remainingFin []string
 			for _, finalizer := range reg.Finalizers {
@@ -310,6 +336,8 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 			return incomingObj, nil
 		}
 
+		// TODO: (alex) needs some thought about how we actually map entrypoint secret cleanup
+		// here based on the control flow changes in OnChange
 		if err := h.cleanupRegistrationByHash(hashCleanupRequest{
 			hash,
 			ContentHash,
@@ -528,7 +556,9 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			updated := registrationObj.DeepCopy()
 			// TODO(o&b): When offline calls this it should immediately sync the OfflineRegistrationRequest secret content
 			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
-			return h.registrations.Update(updated)
+
+			_, err := h.registrations.Update(updated)
+			return registrationObj, err
 		} else {
 			// Todo: online/offline  handler should have a sync now
 			updated := registrationObj.DeepCopy()

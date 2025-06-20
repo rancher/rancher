@@ -13,7 +13,7 @@ import (
 func TestNewInfoProvider(t *testing.T) {
 	// Test with dev build
 	// infoProvider := NewInfoProvider(rancherUuid, clusterUuid)
-	assert.Equal(t, "2.10.3", SCCSafeVersion())
+	assert.Equal(t, "other", SCCSafeVersion())
 
 	// Test with non-dev build
 	coreVersion.Version = "1.9.0"

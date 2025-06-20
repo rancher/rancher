@@ -19,30 +19,33 @@ func (h *handler) initResolvers(ctx context.Context) {
 }
 
 func (h *handler) resolveEntrypointSecret(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	var ret []relatedresource.Key
+	ret := []relatedresource.Key{}
 	if namespace != h.systemNamespace {
-		return nil, nil
+		return ret, nil
 	}
 	if name != consts.ResourceSCCEntrypointSecretName {
-		return nil, nil
+		return ret, nil
 	}
 
 	secret, ok := obj.(*corev1.Secret)
 	if !ok {
-		return nil, nil
+		return ret, nil
 	}
 
 	curHash, ok := secret.GetLabels()[consts.LabelSccHash]
 	if !ok {
 		h.log.Warnf("failed to find hash for secret %s/%s", namespace, name)
-		return nil, nil
+		return ret, nil
 	}
 	regs, err := h.registrationCache.GetByIndex(IndexRegistrationsBySccHash, curHash)
 	if err != nil {
-		return nil, err
+		return ret, err
 	}
 	h.log.Infof("resolved entrypoint secret to : %d registrations", len(regs))
 	for _, reg := range regs {
+		if reg == nil {
+			continue
+		}
 		ret = append(ret, relatedresource.Key{
 			Name: reg.GetName(),
 		})

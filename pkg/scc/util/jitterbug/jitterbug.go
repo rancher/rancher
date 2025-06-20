@@ -14,6 +14,7 @@ func jitterbugContextLogger() log.StructuredLogger {
 	return log.NewLog().WithField("subcomponent", "jitterbug")
 }
 
+// JitterChecker is not go-routine safe
 type JitterChecker struct {
 	log             log.StructuredLogger
 	config          *Config
@@ -25,6 +26,7 @@ type JitterChecker struct {
 }
 
 // NewJitterChecker will complete initialization of optional Config fields and return a jitter checker
+// It is not a go-routine safe
 func NewJitterChecker(config *Config, callable JitterFunction) *JitterChecker {
 	calculator := NewJitterCalculator(config, nil)
 	return NewJitterCheckerFromCalculator(*calculator, callable)

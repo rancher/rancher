@@ -9,12 +9,17 @@ const (
 const (
 	ResourceSCCEntrypointSecretName      = "scc-registration"
 	SCCSystemCredentialsSecretNamePrefix = "scc-system-credentials-"
+	RegistrationCodeSecretNamePrefix     = "registration-code-"
 	OfflineRequestSecretNamePrefix       = "offline-request-"
 	OfflineCertificateSecretNamePrefix   = "offline-certificate-"
 )
 
 func SCCCredentialsSecretName(namePartIn string) string {
 	return fmt.Sprintf("%s%s", SCCSystemCredentialsSecretNamePrefix, namePartIn)
+}
+
+func RegistrationCodeSecretName(namePartIn string) string {
+	return fmt.Sprintf("%s%s", RegistrationCodeSecretNamePrefix, namePartIn)
 }
 
 func OfflineRequestSecretName(namePartIn string) string {
@@ -54,6 +59,7 @@ type SecretRole string
 
 const (
 	SCCCredentialsRole SecretRole = "scc-credentials"
+	RegistrationCode   SecretRole = "reg-code"
 	OfflineRequestRole SecretRole = "offline-request"
 	OfflineCertificate SecretRole = "offline-certificate"
 )

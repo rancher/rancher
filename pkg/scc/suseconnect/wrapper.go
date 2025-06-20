@@ -142,6 +142,14 @@ func (sw *SccWrapper) Activate(regCode string) (*registration.Metadata, *registr
 	return metaData, product, err
 }
 
+func (sw *SccWrapper) ActivationStatus() ([]*registration.Activation, error) {
+	activations, err := registration.FetchActivations(sw.conn)
+	if err != nil {
+		return nil, err
+	}
+	return activations, nil
+}
+
 func (sw *SccWrapper) ProductInfo() (*registration.Product, error) {
 	identifier, version, arch := sw.systemInfo.GetProductIdentifier()
 	return registration.FetchProductInfo(sw.conn, identifier, version, arch)
