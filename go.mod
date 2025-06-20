@@ -11,17 +11,18 @@ replace (
 	github.com/docker/docker => github.com/docker/docker v20.10.27+incompatible // rancher-machine requires a replace is set
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
+
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	github.com/rancher/steve => github.com/swastik959/steve v0.0.0-20250618125816-d382d9bf7dd0
 
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
-	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.28.0
-	go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v1.28.0
-	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.28.0
-	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.28.0
-	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v1.3.1
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0
+	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.33.0
+	go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v1.33.0
+	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.33.0
+	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.33.0
+	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v1.4.0
 	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.17.0-rancher1
@@ -46,7 +47,7 @@ replace (
 	k8s.io/kms => k8s.io/kms v0.33.1
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.33.1
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.33.1
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.33.1
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.33.1
 	k8s.io/kubectl => k8s.io/kubectl v0.33.1
@@ -251,6 +252,7 @@ require (
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.33.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.33.0 // indirect
@@ -329,7 +331,6 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-github/v29 v29.0.3 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.2 // indirect
