@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -70,28 +68,6 @@ func GetToDiffTaints(current, desired []v1.Taint) (toAdd map[int]v1.Taint, toDel
 		}
 	}
 	return toAdd, toDel
-}
-
-func GetRKETaintsFromStrings(sources []string) []rketypes.RKETaint {
-	rtn := make([]rketypes.RKETaint, len(sources))
-	for i, source := range sources {
-		t := GetTaintFromString(source)
-		rtn[i] = rketypes.RKETaint{
-			Key:       t.Key,
-			Value:     t.Value,
-			Effect:    t.Effect,
-			TimeAdded: t.TimeAdded,
-		}
-	}
-	return rtn
-}
-
-func GetStringsFromTaint(taints []v1.Taint) []string {
-	var rtn []string
-	for _, taint := range taints {
-		rtn = append(rtn, GetTaintsString(taint))
-	}
-	return rtn
 }
 
 func GetTaintsFromStrings(sources []string) []v1.Taint {

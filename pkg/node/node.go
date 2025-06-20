@@ -22,12 +22,6 @@ func GetNodeName(machine *v3.Node) string {
 	if machine.Status.NodeName != "" {
 		return machine.Status.NodeName
 	}
-	// to handle the case when machine was provisioned first
-	if machine.Status.NodeConfig != nil {
-		if machine.Status.NodeConfig.HostnameOverride != "" {
-			return machine.Status.NodeConfig.HostnameOverride
-		}
-	}
 	return ""
 }
 
@@ -47,29 +41,8 @@ func IgnoreNode(name string, labels map[string]string) bool {
 // IsNodeForNode returns true if node names or addresses are equal
 func IsNodeForNode(node *corev1.Node, machine *v3.Node) bool {
 	nodeName := GetNodeName(machine)
-	if nodeName == node.Name {
-		return true
-	}
 
-	machineAddress := ""
-	if machine.Status.NodeConfig != nil {
-		if machine.Status.NodeConfig.InternalAddress == "" {
-			// rke defaults internal address to address
-			machineAddress = machine.Status.NodeConfig.Address
-		} else {
-			machineAddress = machine.Status.NodeConfig.InternalAddress
-		}
-	}
-
-	if machineAddress == "" {
-		return false
-	}
-
-	if machineAddress == GetNodeInternalAddress(node) {
-		return true
-	}
-
-	return false
+	return nodeName == node.Name
 }
 
 func GetNodeInternalAddress(node *corev1.Node) string {
