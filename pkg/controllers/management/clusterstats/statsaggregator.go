@@ -89,7 +89,11 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object,
 func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
 	if v, ok := s.lastReconcile.Load(key); ok {
 		lastReconcile := v.(time.Time)
-		return quietPeriod - time.Since(lastReconcile)
+		if wait := quietPeriod - time.Since(lastReconcile); wait > 0 {
+			// only return positive values
+			// the workqueue implementation accounts for negative or zero values, but let's play safe
+			return wait
+		}
 	}
 	return 0
 }
