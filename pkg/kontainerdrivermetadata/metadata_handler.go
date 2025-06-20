@@ -13,22 +13,14 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/channelserver"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type MetadataController struct {
-	NamespacesController     v1.NamespaceController
-	SystemImagesController   mgmtcontrollers.RkeK8sSystemImageController
-	ServiceOptionsController mgmtcontrollers.RkeK8sServiceOptionController
-	Addons                   mgmtcontrollers.RkeAddonController
-	Settings                 mgmtcontrollers.SettingController
-	url                      *MetadataURL
-	wranglerContext          *wrangler.Context
+	Settings        mgmtcontrollers.SettingController
+	url             *MetadataURL
+	wranglerContext *wrangler.Context
 }
 
 type MetadataURL struct {
@@ -45,6 +37,7 @@ const (
 	rkeMetadataConfig = "rke-metadata-config"
 	refreshInterval   = "refresh-interval-minutes"
 	fileLoc           = "data/data.json"
+	DataJSONLocation  = "/var/lib/rancher-data/driver-metadata/data.json"
 )
 
 var (
@@ -60,12 +53,8 @@ var (
 func Register(ctx context.Context, wCtx *wrangler.Context) {
 
 	m := &MetadataController{
-		SystemImagesController:   wCtx.Mgmt.RkeK8sSystemImage(),
-		ServiceOptionsController: wCtx.Mgmt.RkeK8sServiceOption(),
-		NamespacesController:     wCtx.Core.Namespace(),
-		Addons:                   wCtx.Mgmt.RkeAddon(),
-		Settings:                 wCtx.Mgmt.Setting(),
-		wranglerContext:          wCtx,
+		Settings:        wCtx.Mgmt.Setting(),
+		wranglerContext: wCtx,
 	}
 
 	wCtx.Mgmt.Setting().OnChange(ctx, "rke-metadata-handler", m.sync)
@@ -75,10 +64,6 @@ func Register(ctx context.Context, wCtx *wrangler.Context) {
 func (m *MetadataController) sync(_ string, setting *v3.Setting) (*v3.Setting, error) {
 	if setting == nil || (setting.Name != rkeMetadataConfig) {
 		return nil, nil
-	}
-
-	if _, err := m.NamespacesController.Get(namespace.GlobalNamespace, metav1.GetOptions{}); err != nil {
-		return nil, fmt.Errorf("failed to get %s namespace", namespace.GlobalNamespace)
 	}
 
 	value := setting.Value
@@ -123,29 +108,17 @@ func (m *MetadataController) refresh() error {
 	defer deleteMap(m.url)
 	if err := m.Refresh(m.url); err != nil {
 		logrus.Warnf("%v, Fallback to refresh from local file path %v", err, DataJSONLocation)
-		return errors.Wrapf(m.createOrUpdateMetadataFromLocal(), "failed to refresh from local file path: %s", DataJSONLocation)
+		return errors.Wrapf(err, "failed to refresh from local file path: %s", DataJSONLocation)
 	}
 	setFinalPath(m.url)
 	return nil
 }
 
 func (m *MetadataController) Refresh(url *MetadataURL) error {
-	data, err := loadData(url)
+	_, err := loadData(url)
 	if err != nil {
 		return errors.Wrapf(err, "failed to refresh data from upstream %v", url.path)
 	}
 	logrus.Infof("driverMetadata: refreshing data from upstream %v", url.path)
-	return errors.Wrap(m.createOrUpdateMetadata(data), "failed to create or update driverMetadata")
-}
-
-func GetURLSettingValue() (*MetadataURL, error) {
-	settingValues, err := getSettingValues(settings.RkeMetadataConfig.Get())
-	if err != nil {
-		return nil, err
-	}
-	url, err := parseURL(settingValues)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing url %v %v", url, err)
-	}
-	return url, nil
+	return errors.Wrap(err, "failed to create or update driverMetadata")
 }
