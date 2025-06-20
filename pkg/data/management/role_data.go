@@ -43,7 +43,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
@@ -64,10 +63,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
 	rb.addRole("Manage Features", "features-manage").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
-	rb.addRole("Create RKE Templates", "clustertemplates-create").
-		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
-	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").
-		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
 	rb.addRole("View Rancher Metrics", "view-rancher-metrics").
 		addRule().apiGroups("management.cattle.io").resources("ranchermetrics").verbs("get")
 	if features.OIDCProvider.Enabled() {
@@ -401,9 +396,7 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "clustertemplaterevisions").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch").

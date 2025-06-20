@@ -5,9 +5,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/values"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -20,7 +18,6 @@ type Formatter struct {
 	KontainerDriverLister     v3.KontainerDriverLister
 	nodeLister                v3.NodeLister
 	clusterLister             v3.ClusterLister
-	clusterSpecPwdFields      map[string]interface{}
 	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
 }
 
@@ -29,7 +26,6 @@ func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContex
 		KontainerDriverLister:     managementContext.Management.KontainerDrivers("").Controller().Lister(),
 		nodeLister:                managementContext.Management.Nodes("").Controller().Lister(),
 		clusterLister:             managementContext.Management.Clusters("").Controller().Lister(),
-		clusterSpecPwdFields:      gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
 		SubjectAccessReviewClient: managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 	}
 	return &clusterFormatter
@@ -71,25 +67,6 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		setIntIfNil(configMap, "nodeVolumeSize", 20)
 	}
 
-	if clusterTemplateAnswers, ok := resource.Values["answers"]; ok {
-		answerMap := convert.ToMapInterface(convert.ToMapInterface(clusterTemplateAnswers)["values"])
-		hideClusterTemplateAnswers(answerMap, f.clusterSpecPwdFields)
-
-		appliedAnswers := values.GetValueN(resource.Values, "appliedSpec", "answers")
-
-		if appliedAnswers != nil {
-			appliedAnswerMap := convert.ToMapInterface(convert.ToMapInterface(appliedAnswers)["values"])
-			hideClusterTemplateAnswers(appliedAnswerMap, f.clusterSpecPwdFields)
-		}
-
-		failedAnswers := values.GetValueN(resource.Values, "failedSpec", "answers")
-
-		if failedAnswers != nil {
-			failedAnswerMap := convert.ToMapInterface(convert.ToMapInterface(failedAnswers)["values"])
-			hideClusterTemplateAnswers(failedAnswerMap, f.clusterSpecPwdFields)
-		}
-	}
-
 	nodes, err := f.nodeLister.List(resource.ID, labels.Everything())
 	if err != nil {
 		logrus.Warnf("error getting node list for cluster %s: %s", resource.ID, err)
@@ -107,16 +84,6 @@ func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
 func setIntIfNil(configMap map[string]interface{}, fieldName string, replaceVal int) {
 	if configMap[fieldName] == nil {
 		configMap[fieldName] = replaceVal
-	}
-}
-
-func hideClusterTemplateAnswers(answerMap map[string]interface{}, clusterSpecPwdFields map[string]interface{}) {
-	for key := range answerMap {
-		pwdVal := values.GetValueN(clusterSpecPwdFields, strings.Split(key, ".")...)
-		if pwdVal != nil {
-			//hide this answer
-			delete(answerMap, key)
-		}
 	}
 }
 
