@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -245,6 +247,99 @@ func listSharedSubnets(ctx context.Context, cap *Capabilities) ([]byte, int, err
 	}
 
 	return encodeOutput(result)
+}
+
+// listDiskTypes lists the available disk types for a given GCP project and region.
+func listDiskTypes(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	client, err := getComputeServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	result, err := client.DiskTypes.List(cap.ProjectID, cap.Zone).Do()
+	if err != nil {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to list disk types: %w", err)
+	}
+
+	return encodeOutput(result)
+}
+
+// listFamiliesFromProject iterates over all images in one or more projects and extracts
+// unique families. Multiple projects can be passed in a comma-delimited format
+// (project1,project2). This is a workaround to a limitation within the GCP API,
+// which does not provide a single API call to achieve this.
+func listFamiliesFromProject(ctx context.Context, cap *Capabilities, projects string, showDeprecated bool) ([]byte, int, error) {
+	client, err := getComputeServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	// ensure we only process each item once, as listing all
+	// images in a project is intensive
+	uniqueProjects := make(map[string]struct{})
+	for _, project := range strings.Split(projects, ",") {
+		uniqueProjects[project] = struct{}{}
+	}
+
+	families := make(map[string][]string)
+	for project := range uniqueProjects {
+		req := client.Images.List(project)
+		if !showDeprecated {
+			// 'NOT deprecated:*' specifies that the deprecated field should have no subfields set.
+			//  If the deprecated field has any subfields set, the image is either DEPRECATED or OBSOLETE.
+			req.Filter("NOT deprecated:*")
+		}
+
+		image, err := req.Do()
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+
+		for _, img := range image.Items {
+			if !slices.Contains(families[project], img.Family) && img.Family != "" {
+				families[project] = append(families[project], img.Family)
+			}
+		}
+	}
+
+	return encodeOutput(families)
+}
+
+// listImageFamilyForProject retrieves the images included in a given
+// image family for the given project. Multiple families can be passed
+// in a comma-delimited format (family1,family2), however all families
+// must belong to the same project (i.e. you can't get SLES
+// families from the ubuntu-os-cloud project).
+func listImageFamilyForProject(ctx context.Context, cap *Capabilities, imageProject, imageFamilies string, showDeprecated bool) ([]byte, int, error) {
+	client, err := getComputeServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	uniqueFamilies := make(map[string]struct{})
+	for _, part := range strings.Split(imageFamilies, ",") {
+		uniqueFamilies[part] = struct{}{}
+	}
+
+	var out []*compute.Image
+	for fam := range uniqueFamilies {
+		itr := client.Images.List(imageProject)
+		itr.Filter(fmt.Sprintf("family=%s", fam))
+		if !showDeprecated {
+			// 'NOT deprecated:*' specifies that the deprecated field should have no subfields set.
+			//  If the deprecated field has any subfields set, the image is either DEPRECATED or OBSOLETE.
+			itr.Filter(fmt.Sprintf("NOT deprecated:* AND family=%s", fam))
+		}
+
+		image, err := itr.Do()
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+
+		out = append(out, image.Items...)
+	}
+
+	return encodeOutput(out)
 }
 
 func encodeOutput(result interface{}) ([]byte, int, error) {

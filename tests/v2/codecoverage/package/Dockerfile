@@ -1,7 +1,7 @@
-FROM registry.suse.com/bci/bci-micro:15.6 AS final
+FROM registry.suse.com/bci/bci-micro:15.7 AS final
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS builder
+FROM registry.suse.com/bci/bci-base:15.7 AS builder
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -45,12 +45,12 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.12
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.11
+ARG CATTLE_KDM_BRANCH=dev-v2.12
 
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher127
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher128
 ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.16
@@ -66,7 +66,7 @@ ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.13-rc.1
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.13-rc.2
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
@@ -176,7 +176,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 ENV CATTLE_UI_VERSION 2.9.0
 ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0
-ENV CATTLE_CLI_VERSION v2.11.0-rc.1
+ENV CATTLE_CLI_VERSION v2.12.0-rc.1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=

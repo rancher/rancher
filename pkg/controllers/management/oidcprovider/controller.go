@@ -3,6 +3,7 @@ package oidcprovider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -16,7 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -83,11 +84,11 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	}
 
 	k8sSecret, err := c.secretCache.Get(secretNamespace, clientID)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	// generate client secret and store it in a k8s secret.
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		clientSecret, err := c.generator.GenerateClientSecret()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate client secret: %w", err)
@@ -113,7 +114,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 				clientSecretName: clientSecret,
 			},
 		})
-		if err != nil && !errors.IsAlreadyExists(err) {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return nil, fmt.Errorf("failed to create client secret: %w", err)
 		}
 
@@ -125,11 +126,13 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 		patchBytes, err := json.Marshal(patchData)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create clientID status patch: %w", err)
+			// delete previously created secret as it will be created when a new clientID is generated in the next reconciliation loop
+			return nil, errors.Join(c.secretClient.Delete(secretNamespace, clientID, &metav1.DeleteOptions{}), fmt.Errorf("failed to create clientID status patch: %w", err))
 		}
 		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.MergePatchType, patchBytes, "status")
 		if err != nil {
-			return nil, fmt.Errorf("failed to apply clientID status patch: %w", err)
+			// delete previously created secret as it will be created when a new clientID is generated in the next reconciliation loop
+			return nil, errors.Join(c.secretClient.Delete(secretNamespace, clientID, &metav1.DeleteOptions{}), fmt.Errorf("failed to apply clientID status patch: %w", err))
 		}
 	}
 
@@ -143,6 +146,9 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		clientSecretName, err := findNextSecretKey(k8sSecret.Data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find next secret key: %w", err)
+		}
+		if k8sSecret.Data == nil {
+			k8sSecret.Data = map[string][]byte{}
 		}
 		k8sSecret.Data[clientSecretName] = []byte(clientSecret)
 		if k8sSecret.Annotations == nil {
@@ -161,7 +167,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 	}
 
-	// regenerate client secret if the cattle.io/oidc-client-secret-create annotation is present.
+	// regenerate client secret if the cattle.io/oidc-client-secret-regenerate annotation is present.
 	// client secrets ids are comma separated
 	if clientSecretIDs, ok := oidcClient.Annotations[regenerateClientSecretAnn]; ok {
 		csids := strings.Split(clientSecretIDs, ",")
@@ -187,7 +193,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 	}
 
-	// remove client secret if the cattle.io/oidc-client-secret-create annotation is present.
+	// remove client secret if the cattle.io/oidc-client-secret-remove annotation is present.
 	// client secrets ids are comma separated
 	if clientSecretIDs, ok := oidcClient.Annotations[removeClientSecretAnn]; ok {
 		csids := strings.Split(clientSecretIDs, ",")
@@ -234,14 +240,18 @@ func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, s
 	}
 
 	if !reflect.DeepEqual(oidcClient.Status, observedStatus) {
-		patchData := map[string]interface{}{
-			"status": observedStatus,
+		patchOp := []map[string]interface{}{
+			{
+				"op":    "add",
+				"path":  "/status",
+				"value": observedStatus,
+			},
 		}
-		patchBytes, err := json.Marshal(patchData)
+		patchBytes, err := json.Marshal(patchOp)
 		if err != nil {
 			return fmt.Errorf("failed to create status patch: %w", err)
 		}
-		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.MergePatchType, patchBytes, "status")
+		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.JSONPatchType, patchBytes, "status")
 		if err != nil {
 			return fmt.Errorf("failed to apply status patch: %w", err)
 		}

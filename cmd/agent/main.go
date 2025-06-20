@@ -27,12 +27,10 @@ import (
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/agent/cluster"
-	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/agent/rancher"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
-	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -44,6 +42,7 @@ var (
 
 const (
 	Token          = "X-API-Tunnel-Token"
+	Params         = "X-API-Tunnel-Params"
 	caFileLocation = "/etc/kubernetes/ssl/certs/serverca"
 )
 
@@ -54,10 +53,6 @@ func main() {
 	if len(os.Args) > 1 {
 		err = runArgs(ctx)
 	} else {
-		if _, err = reconcileKubelet(ctx); err != nil {
-			logrus.Warnf("failed to reconcile kubelet, error: %v", err)
-		}
-
 		configureLogrus()
 
 		logserver.StartServerWithDefaults()
@@ -105,26 +100,12 @@ func initFeatures() {
 	features.InitializeFeatures(nil, os.Getenv("CATTLE_FEATURES"))
 }
 
-func isCluster() bool {
-	return os.Getenv("CATTLE_CLUSTER") == "true"
-}
-
 func getParams() (map[string]interface{}, error) {
-	if isCluster() {
-		return cluster.Params()
-	}
-	return node.Params(), nil
+	return cluster.Params()
 }
 
 func getTokenAndURL() (string, string, error) {
-	token, url, err := node.TokenAndURL()
-	if err != nil {
-		return "", "", err
-	}
-	if token == "" {
-		return cluster.TokenAndURL()
-	}
-	return token, url, nil
+	return cluster.TokenAndURL()
 }
 
 func isConnect() bool {
@@ -140,50 +121,6 @@ func connected() {
 	if err != nil {
 		f.Close()
 	}
-}
-
-func cleanup(ctx context.Context) error {
-	if os.Getenv("CATTLE_K8S_MANAGED") != "true" {
-		return nil
-	}
-
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	args := filters.NewArgs()
-	args.Add("label", "io.cattle.agent=true")
-
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		return err
-	}
-
-	for _, container := range containers {
-		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
-			continue
-		}
-
-		if strings.Contains(container.Names[0], "share-mnt") {
-			continue
-		}
-
-		container := container
-		go func() {
-			time.Sleep(15 * time.Second)
-			logrus.Infof("Removing unmanaged agent %s(%s)", container.Names[0], container.ID)
-			c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
-				Force: true,
-			})
-		}()
-	}
-
-	return nil
 }
 
 func run(ctx context.Context) error {
@@ -206,8 +143,8 @@ func run(ctx context.Context) error {
 	}
 
 	headers := http.Header{
-		Token:                      {token},
-		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
+		Token:  {token},
+		Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
 
 	serverURL, err := url.Parse(server)
@@ -339,61 +276,21 @@ func run(ctx context.Context) error {
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
-		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		httpClient := http.Client{
-			Timeout: 300 * time.Second,
-		}
-		if transport != nil {
-			httpClient.Transport = transport
-		}
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-		if err != nil {
-			return err
-		}
 
 		if writeCertsOnly {
 			exitCertWriter(ctx)
 		}
 
-		if isCluster() {
-			err = rancher.Run(topContext)
-			if err != nil {
-				logrus.Fatal(err)
-			}
-			return nil
+		err = rancher.Run(topContext)
+		if err != nil {
+			logrus.Fatal(err)
 		}
-
-		if err := cleanup(context.Background()); err != nil {
-			logrus.Warnf("Unable to perform docker cleanup: %v", err)
-		}
-
-		go func() {
-			logrus.Infof("Starting plan monitor, checking every %v seconds", interval)
-			tt := time.Duration(interval) * time.Second
-			for {
-				select {
-				case <-time.After(tt):
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-					if err != nil {
-						logrus.Errorf("failed to check plan: %v", err)
-					} else if receivedInterval != 0 && receivedInterval != interval {
-						tt = time.Duration(receivedInterval) * time.Second
-						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
 		return nil
 	}
 
-	if isCluster() {
-		go func() {
-			log.Println(http.ListenAndServe("localhost:6060", nil))
-		}()
-	}
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	for {
 		wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
@@ -479,47 +376,6 @@ func certinfo(cert *x509.Certificate) {
 	logrus.Infof("NotAfter: %+v", cert.NotAfter)
 	logrus.Infof("SignatureAlgorithm: %+v", cert.SignatureAlgorithm)
 	logrus.Infof("PublicKeyAlgorithm: %+v", cert.PublicKeyAlgorithm)
-}
-
-// reconcileKubelet restarts kubelet in unmanaged agents
-func reconcileKubelet(ctx context.Context) (bool, error) {
-	if os.Getenv("CATTLE_K8S_MANAGED") == "true" {
-		return true, nil
-	}
-
-	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
-	if writeCertsOnly {
-		return true, nil
-	}
-
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
-	if err != nil {
-		return false, err
-	}
-	defer c.Close()
-
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=kubelet")
-
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	for _, container := range containers {
-		if len(container.Names) > 0 && strings.Contains(container.Names[0], "kubelet") {
-			nodeName := os.Getenv("CATTLE_NODE_NAME")
-			logrus.Infof("node %v is not registered, restarting kubelet now", nodeName)
-			if err := c.ContainerRestart(ctx, container.ID, nil); err != nil {
-				return false, err
-			}
-			break
-		}
-	}
-	return false, nil
 }
 
 func configureLogrus() {

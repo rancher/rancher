@@ -2,14 +2,14 @@ FROM registry.suse.com/bci/golang:1.24
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher127
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher128
 ENV CATTLE_K3S_VERSION v1.32.1+k3s1
 ENV HELM_UNITTEST_VERSION 0.3.2
 # k3d ci version
 ENV K3D_VERSION v5.7.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.11
+ENV CATTLE_KDM_BRANCH=dev-v2.12
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci

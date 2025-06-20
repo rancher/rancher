@@ -41,7 +41,7 @@ const (
 	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
 	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
 	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
-	aggregationLabel                  = "management.cattle.io/aggregates"
+	AggregationLabel                  = "management.cattle.io/aggregates"
 	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
 	promotedSuffix                    = "promoted"
@@ -336,11 +336,11 @@ func IsAdminGlobalRole(rtName string, grLister normanv3.GlobalRoleLister) (bool,
 	return false, nil
 }
 
-// CreateOrUpdateResource creates or updates the given resource
-//   - getResource is a func that returns a single object and an error
-//   - obj is the resource to create or update
-//   - client is the Wrangler client to use to get/create/update resource
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same where T is an updated resource
+// CreateOrUpdateResource creates or updates the given non-namespaced resource
+//   - obj is the resource to create or update.
+//   - client is the Wrangler client to use to get/create/update resource.
+//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
+//     T is an updated version of the resource.
 func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
 	// attempt to get the resource
 	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
@@ -362,6 +362,30 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 		}
 	}
 	return nil
+}
+
+// CreateOrUpdateNamespacedResource creates or updates the given namespaced resource.
+//   - obj is the resource to create or update.
+//   - client is the Wrangler client to use to get/create/update resource.
+//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
+//     T is an updated version of the resource.
+func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) (T, error) {
+	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return obj, err
+		}
+		// resource doesn't exist, create it
+		logrus.Infof("%T %s being created in namespace %s", obj, obj.GetName(), obj.GetNamespace())
+		return client.Create(obj)
+	}
+
+	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
+		logrus.Infof("%T %s in namespace %s needs to be updated", obj, obj.GetName(), obj.GetNamespace())
+		return client.Update(updatedResource)
+
+	}
+	return obj, nil
 }
 
 // AreClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.
@@ -397,9 +421,9 @@ func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1
 		same = false
 		metav1.SetMetaDataAnnotation(&currentCR.ObjectMeta, clusterRoleOwnerAnnotation, want)
 	}
-	if got, want := currentCR.Labels[aggregationLabel], wantedCR.Labels[aggregationLabel]; got != want {
+	if got, want := currentCR.Labels[AggregationLabel], wantedCR.Labels[AggregationLabel]; got != want {
 		same = false
-		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, aggregationLabel, want)
+		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, AggregationLabel, want)
 	}
 	return same, currentCR
 }
@@ -422,7 +446,7 @@ func BuildClusterRole(name, ownerName string, rules []rbacv1.PolicyRule) *rbacv1
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
-			Labels:      map[string]string{aggregationLabel: name},
+			Labels:      map[string]string{AggregationLabel: name},
 			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},
 		},
 		Rules: rules,
@@ -437,12 +461,12 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	ownerName := rt.Name
 
 	// aggregate our own cluster role
-	roleTemplateLabels := []metav1.LabelSelector{{MatchLabels: map[string]string{aggregationLabel: crName}}}
+	roleTemplateLabels := []metav1.LabelSelector{{MatchLabels: map[string]string{AggregationLabel: crName}}}
 
 	// aggregate every inherited role template
 	for _, roleTemplateName := range rt.RoleTemplateNames {
 		labelSelector := metav1.LabelSelector{
-			MatchLabels: map[string]string{aggregationLabel: AggregatedClusterRoleNameFor(nameTransformer(roleTemplateName))},
+			MatchLabels: map[string]string{AggregationLabel: AggregatedClusterRoleNameFor(nameTransformer(roleTemplateName))},
 		}
 		roleTemplateLabels = append(roleTemplateLabels, labelSelector)
 	}
@@ -453,7 +477,7 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 			Name: aggregatingCRName,
 			// Label so other cluster roles can aggregate this one
 			Labels: map[string]string{
-				aggregationLabel: aggregatingCRName,
+				AggregationLabel: aggregatingCRName,
 			},
 			// Annotation to identify which role template owns the cluster role
 			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},

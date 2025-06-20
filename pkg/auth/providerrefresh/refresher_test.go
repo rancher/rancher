@@ -152,18 +152,14 @@ func TestRefreshAttributes(t *testing.T) {
 	eLoginSecretLocal := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-login-local"},
 		Data: map[string][]byte{
-			exttokens.FieldAnnotations:     []byte("null"),
-			exttokens.FieldEnabled:         []byte("true"),
-			exttokens.FieldFinalizers:      []byte("null"),
-			exttokens.FieldHash:            []byte("kla9jkdmj"),
-			exttokens.FieldKind:            []byte(exttokens.IsLogin),
-			exttokens.FieldLabels:          []byte("null"),
-			exttokens.FieldLastUpdateTime:  []byte("13:00:05"),
-			exttokens.FieldOwnerReferences: []byte("null"),
-			exttokens.FieldPrincipal:       localPrincipalBytes,
-			exttokens.FieldTTL:             []byte("4000"),
-			exttokens.FieldUID:             []byte("2905498-kafld-lkad"),
-			exttokens.FieldUserID:          []byte("user-abcde"),
+			exttokens.FieldEnabled:        []byte("true"),
+			exttokens.FieldHash:           []byte("kla9jkdmj"),
+			exttokens.FieldKind:           []byte(exttokens.IsLogin),
+			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
+			exttokens.FieldPrincipal:      localPrincipalBytes,
+			exttokens.FieldTTL:            []byte("4000"),
+			exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
+			exttokens.FieldUserID:         []byte("user-abcde"),
 		},
 	}
 
@@ -196,18 +192,14 @@ func TestRefreshAttributes(t *testing.T) {
 	eDerivedSecretShibboleth := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde-derived-shibboleth"},
 		Data: map[string][]byte{
-			exttokens.FieldAnnotations:     []byte("null"),
-			exttokens.FieldEnabled:         []byte("true"),
-			exttokens.FieldFinalizers:      []byte("null"),
-			exttokens.FieldHash:            []byte("kla9jkdmj"),
-			exttokens.FieldKind:            []byte(""),
-			exttokens.FieldLabels:          []byte("null"),
-			exttokens.FieldLastUpdateTime:  []byte("13:00:05"),
-			exttokens.FieldOwnerReferences: []byte("null"),
-			exttokens.FieldPrincipal:       shibbolethPrincipalBytes,
-			exttokens.FieldTTL:             []byte("4000"),
-			exttokens.FieldUID:             []byte("2905498-kafld-lkad"),
-			exttokens.FieldUserID:          []byte("user-abcde"),
+			exttokens.FieldEnabled:        []byte("true"),
+			exttokens.FieldHash:           []byte("kla9jkdmj"),
+			exttokens.FieldKind:           []byte(""),
+			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
+			exttokens.FieldPrincipal:      shibbolethPrincipalBytes,
+			exttokens.FieldTTL:            []byte("4000"),
+			exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
+			exttokens.FieldUserID:         []byte("user-abcde"),
 		},
 	}
 
@@ -568,7 +560,7 @@ func TestRefreshAttributes(t *testing.T) {
 						return nil, nil
 					},
 				}),
-				extTokenStore: exttokens.NewSystem(nil, secrets, users, nil,
+				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil,
 					exttokens.NewTimeHandler(),
 					exttokens.NewHashHandler(),
 					exttokens.NewAuthHandler()),

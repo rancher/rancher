@@ -178,6 +178,26 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
 			ReleaseNamespace:    namespace.System,
+			ChartName:           chart.RemoteDialerProxyChartName,
+			ExactVersionSetting: settings.RemoteDialerProxyVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{}
+				// add priority class value
+				h.setPriorityClass(values, chart.RemoteDialerProxyChartName)
+				return values
+			},
+			Enabled: func() bool {
+				// do not deploy RDP in downstream cluster
+				if features.MCMAgent.Enabled() {
+					return false
+				}
+
+				return ext.RDPEnabled()
+			},
+			RemoveNamespace: false,
+		},
+		{
+			ReleaseNamespace:    namespace.System,
 			ChartName:           chart.WebhookChartName,
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
@@ -319,27 +339,6 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					toUninstall, !versionManagementEnabled, noManagedPlan)
 				return toUninstall
 			}(),
-		},
-		{
-			ReleaseNamespace:    namespace.System,
-			ChartName:           chart.RemoteDialerProxyChartName,
-			ExactVersionSetting: settings.RemoteDialerProxyVersion,
-			Values: func() map[string]interface{} {
-				values := map[string]interface{}{}
-				// add priority class value
-				h.setPriorityClass(values, chart.RemoteDialerProxyChartName)
-				return values
-			},
-			Enabled: func() bool {
-				// do not deploy RDP in downstream cluster
-				if features.MCMAgent.Enabled() {
-					return false
-				}
-
-				return features.ImperativeApiExtension.Enabled() && ext.RDPEnabled()
-			},
-			Uninstall:       !features.ImperativeApiExtension.Enabled(),
-			RemoveNamespace: false,
 		},
 	}
 }

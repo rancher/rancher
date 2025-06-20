@@ -10,6 +10,7 @@ COMMIT_DATE=$(git --no-pager log -1 --format='%ct')
 COMMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed -E 's/[^a-zA-Z0-9]+/-/g')
 GIT_TAG=${GIT_TAG:-$(git tag -l --contains HEAD | head -n 1)}
 LAST_TAG=${GIT_TAG:-'v0.0.0'}
+CHART_VERSION=${CHART_VERSION:-""}
 
 if [ -n "$GIT_TAG" ]; then
   TAG=$GIT_TAG
@@ -28,8 +29,13 @@ else
 fi
 
 # Chart tag.
-if [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
+# if the chart version is set, use it
+if [[ -n "${CHART_VERSION}" ]]; then
+    CHART_VERSION="${CHART_VERSION}"
+# if there isn't any uncommited change and the tag is set, use the tag
+elif [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
     CHART_VERSION="${GIT_TAG}"
+# if there is uncommited changes, use the default last tag and mark it as dirty
 elif [[ "$DIRTY" ]]; then
     CHART_VERSION="${LAST_TAG}${DIRTY}.commit-${COMMIT}"
 else

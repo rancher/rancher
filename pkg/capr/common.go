@@ -692,31 +692,4 @@ func ToOwnerReference(typeMeta metav1.TypeMeta, objectMeta metav1.ObjectMeta) me
 		Controller:         &[]bool{true}[0],
 		BlockOwnerDeletion: &[]bool{true}[0],
 	}
-
-}
-
-// GetTaints returns a slice of taints for the machine in question
-func GetTaints(existingTaints, runtime string, isControlPlane, isEtcd, isWorker bool) ([]corev1.Taint, error) {
-	var taints []corev1.Taint
-	if existingTaints != "" {
-		if err := json.Unmarshal([]byte(existingTaints), &taints); err != nil {
-			return taints, err
-		}
-	}
-	if !isWorker {
-		// k3s charts do not have correct tolerations when the master node is both controlplane and etcd
-		if isEtcd && (runtime != RuntimeK3S || !isControlPlane) {
-			taints = append(taints, corev1.Taint{
-				Key:    "node-role.kubernetes.io/etcd",
-				Effect: corev1.TaintEffectNoExecute,
-			})
-		}
-		if isControlPlane {
-			taints = append(taints, corev1.Taint{
-				Key:    "node-role.kubernetes.io/control-plane",
-				Effect: corev1.TaintEffectNoSchedule,
-			})
-		}
-	}
-	return taints, nil
 }

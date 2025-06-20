@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/api/access"
@@ -54,8 +55,14 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 	capa := &Capabilities{}
 
+	resourceType := mux.Vars(req)["resource"]
+
 	if credID := req.URL.Query().Get("cloudCredentialId"); credID != "" {
-		if errCode, err := h.getCloudCredential(req, capa, credID); err != nil {
+
+		// endpointRequiresProjectId indicates if an endpoint requires the project ID of the _users_ GCP environment
+		endpointRequiresProjectId := resourceType != "gkeImageFamilies" && resourceType != "gkeFamiliesFromProject"
+
+		if errCode, err := h.getCloudCredential(req, capa, credID, endpointRequiresProjectId); err != nil {
 			handleErr(writer, errCode, err)
 			return
 		}
@@ -72,8 +79,6 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	var serialized []byte
 	var errCode int
 	var err error
-
-	resourceType := mux.Vars(req)["resource"]
 
 	switch resourceType {
 	case "gkeMachineTypes":
@@ -133,12 +138,55 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 			return
 		}
 		writer.Write(serialized)
+	case "gkeFamiliesFromProject":
+		project := req.URL.Query().Get("imageProjects")
+		if project == "" {
+			handleErr(writer, http.StatusBadRequest, fmt.Errorf("must provide the 'imageProjects' query param"))
+			return
+		}
+
+		showDeprecated := strings.ToLower(req.URL.Query().Get("showDeprecated")) == "true"
+
+		if serialized, errCode, err = listFamiliesFromProject(req.Context(), capa, project, showDeprecated); err != nil {
+			logrus.Errorf("[gke-handler] error getting families from project: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
+	case "gkeImageFamilies":
+		imageFamily := req.URL.Query().Get("imageFamilies")
+		if imageFamily == "" {
+			handleErr(writer, http.StatusBadRequest, fmt.Errorf("must provide the 'imageFamilies' query param"))
+			return
+		}
+
+		imageProject := req.URL.Query().Get("imageProject")
+		if imageProject == "" {
+			handleErr(writer, http.StatusBadRequest, fmt.Errorf("must provide the 'imageProject' query param"))
+			return
+		}
+
+		showDeprecated := strings.ToLower(req.URL.Query().Get("showDeprecated")) == "true"
+
+		if serialized, errCode, err = listImageFamilyForProject(req.Context(), capa, imageProject, imageFamily, showDeprecated); err != nil {
+			logrus.Errorf("[gke-handler] error getting images from image family: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
+	case "gkeDiskTypes":
+		if serialized, errCode, err = listDiskTypes(req.Context(), capa); err != nil {
+			logrus.Errorf("[gke-handler] error getting disk types: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
 	default:
 		handleErr(writer, httperror.NotFound.Status, fmt.Errorf("invalid endpoint %v", resourceType))
 	}
 }
 
-func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credID string) (int, error) {
+func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credID string, projectIDRequired bool) (int, error) {
 	ns, name := ref.Parse(credID)
 	if ns == "" || name == "" {
 		logrus.Errorf("[GKE] invalid cloud credential ID %s", credID)
@@ -170,7 +218,7 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	cap.Credentials = string(cc.Data["googlecredentialConfig-authEncodedJson"])
 
 	cap.ProjectID = req.URL.Query().Get("projectId")
-	if cap.ProjectID == "" {
+	if cap.ProjectID == "" && projectIDRequired {
 		logrus.Errorf("[GKE] error getting projectId")
 		return http.StatusBadRequest, fmt.Errorf("error getting projectId")
 	}

@@ -165,7 +165,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				secrets.EXPECT().Cache().Return(nil)
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantUserInfo: &user.DefaultInfo{
@@ -228,20 +228,16 @@ func TestAuthenticateImpersonation(t *testing.T) {
 						Data: map[string][]byte{
 							exttokenstore.FieldUserID: []byte("impUser"),
 							// everything else to satisfy the ext token read checks
-							exttokenstore.FieldAnnotations:     []byte("null"),
-							exttokenstore.FieldEnabled:         []byte("true"),
-							exttokenstore.FieldFinalizers:      []byte("null"),
-							exttokenstore.FieldHash:            []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:            []byte(exttokenstore.IsLogin),
-							exttokenstore.FieldLabels:          []byte("null"),
-							exttokenstore.FieldLastUpdateTime:  []byte("13:00"),
-							exttokenstore.FieldOwnerReferences: []byte("null"),
-							exttokenstore.FieldPrincipal:       principalBytes,
-							exttokenstore.FieldTTL:             []byte("57600000"),
-							exttokenstore.FieldUID:             []byte("2905498-kafld-lkad"),
+							exttokenstore.FieldEnabled:        []byte("true"),
+							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
+							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
+							exttokenstore.FieldPrincipal:      principalBytes,
+							exttokenstore.FieldTTL:            []byte("57600000"),
+							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
 						},
 					}, nil)
-				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantUserInfo: &user.DefaultInfo{
@@ -384,7 +380,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				secrets.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "request token user does not match impersonation user",
@@ -434,22 +430,18 @@ func TestAuthenticateImpersonation(t *testing.T) {
 						Data: map[string][]byte{
 							exttokenstore.FieldUserID: []byte("someoneelse"),
 							// everything else to satisfy the ext token read checks
-							exttokenstore.FieldAnnotations:     []byte("null"),
-							exttokenstore.FieldEnabled:         []byte("true"),
-							exttokenstore.FieldFinalizers:      []byte("null"),
-							exttokenstore.FieldHash:            []byte("kadjsf;alkd"),
-							exttokenstore.FieldKind:            []byte(exttokenstore.IsLogin),
-							exttokenstore.FieldLabels:          []byte("null"),
-							exttokenstore.FieldLastUpdateTime:  []byte("13:00"),
-							exttokenstore.FieldOwnerReferences: []byte("null"),
-							exttokenstore.FieldPrincipal:       principalBytes,
-							exttokenstore.FieldTTL:             []byte("57600000"),
-							exttokenstore.FieldUID:             []byte("2905498-kafld-lkad"),
+							exttokenstore.FieldEnabled:        []byte("true"),
+							exttokenstore.FieldHash:           []byte("kadjsf;alkd"),
+							exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+							exttokenstore.FieldLastUpdateTime: []byte("13:00"),
+							exttokenstore.FieldPrincipal:      principalBytes,
+							exttokenstore.FieldTTL:            []byte("57600000"),
+							exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
 						},
 					}, nil)
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "request token user does not match impersonation user",
@@ -485,7 +477,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				secrets.EXPECT().Cache().Return(nil)
-				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "multiple requesttokenid values",
@@ -618,7 +610,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				scache.EXPECT().
 					Get("cattle-tokens", "kubeconfig-u-user5zfww").
 					Return(nil, errors.New("unexpected error"))
-				store := exttokenstore.NewSystem(nil, secrets, users, cache, nil, nil, nil)
+				store := exttokenstore.NewSystem(nil, nil, secrets, users, cache, nil, nil, nil)
 				return store
 			},
 			wantErr: "error getting request token",

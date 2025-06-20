@@ -64,7 +64,7 @@ type TokenResponse struct {
 	// AccessToken is the refresh token generated.
 	RefreshToken string `json:"refresh_token,omitempty"`
 	// ExpiresIn indicates when id_token and access_token expire.
-	ExpiresIn int `json:"expires_in"`
+	ExpiresIn time.Duration `json:"expires_in"`
 	// TokenType is the OAuth 2.0 Token Type value. The value must be Bearer.
 	TokenType string `json:"token_type"`
 }
@@ -274,8 +274,8 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 // createTokenResponse creates an id_token, access_token and refresh_token for a valid Rancher token
 func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v3.OIDCClient, nonce string, scopes []string) (TokenResponse, *oidcerror.Error) {
 	// verify Rancher token and user are valid
-	if rancherToken.Expired {
-		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token is expired")
+	if tokens.IsExpired(*rancherToken) {
+		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token has expired")
 	}
 	if rancherToken.Enabled != nil && !*rancherToken.Enabled {
 		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token is disabled")
@@ -317,13 +317,13 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	// create id_token
 	idClaims := jwt.MapClaims{
 		"aud": []string{oidcClient.Status.ClientID},
-		"exp": h.now().Add(oidcClient.Spec.TokenExpirationSeconds * time.Second).Unix(),
+		"exp": h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
 		"iss": settings.ServerURL.Get() + "/oidc",
 		"iat": h.now().Unix(),
 		"sub": rancherToken.UserID,
 	}
 	if slices.Contains(scopes, "profile") {
-		idClaims["preferred_username"] = user.DisplayName
+		idClaims["name"] = user.DisplayName
 	}
 	if nonce != "" {
 		idClaims["nonce"] = nonce
@@ -345,7 +345,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	// create access_token
 	accessClaims := jwt.MapClaims{
 		"aud":   []string{oidcClient.Status.ClientID},
-		"exp":   h.now().Add(oidcClient.Spec.TokenExpirationSeconds * time.Second).Unix(),
+		"exp":   h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
 		"iss":   settings.ServerURL.Get() + "/oidc",
 		"iat":   h.now().Unix(),
 		"sub":   rancherToken.UserID,
@@ -374,7 +374,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		rancherTokenHash := hex.EncodeToString(hash[:])
 		refreshClaims := jwt.MapClaims{
 			"aud":                []string{oidcClient.Status.ClientID},
-			"exp":                h.now().Add(oidcClient.Spec.RefreshTokenExpirationSeconds * time.Second).Unix(),
+			"exp":                h.now().Add(time.Duration(oidcClient.Spec.RefreshTokenExpirationSeconds) * time.Second).Unix(),
 			"iat":                h.now().Unix(),
 			"sub":                rancherToken.UserID,
 			"rancher_token_hash": rancherTokenHash,
@@ -397,7 +397,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		}
 	}
 
-	resp.ExpiresIn = int(oidcClient.Spec.TokenExpirationSeconds * time.Second)
+	resp.ExpiresIn = time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second
 
 	return resp, nil
 }

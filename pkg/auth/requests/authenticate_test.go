@@ -684,18 +684,14 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			CreationTimestamp: metav1.NewTime(now),
 		},
 		Data: map[string][]byte{
-			exttokenstore.FieldAnnotations:     []byte("null"),
-			exttokenstore.FieldEnabled:         []byte("true"),
-			exttokenstore.FieldFinalizers:      []byte("null"),
-			exttokenstore.FieldHash:            []byte(tokenHash),
-			exttokenstore.FieldKind:            []byte(exttokenstore.IsLogin),
-			exttokenstore.FieldLabels:          []byte("null"),
-			exttokenstore.FieldLastUpdateTime:  []byte("13:00"),
-			exttokenstore.FieldOwnerReferences: []byte("null"),
-			exttokenstore.FieldPrincipal:       principalBytes,
-			exttokenstore.FieldTTL:             []byte("57600000"),
-			exttokenstore.FieldUID:             []byte("2905498-kafld-lkad"),
-			exttokenstore.FieldUserID:          []byte(userID),
+			exttokenstore.FieldEnabled:        []byte("true"),
+			exttokenstore.FieldHash:           []byte(tokenHash),
+			exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+			exttokenstore.FieldLastUpdateTime: []byte("13:00"),
+			exttokenstore.FieldPrincipal:      principalBytes,
+			exttokenstore.FieldTTL:            []byte("57600000"),
+			exttokenstore.FieldUID:            []byte("2905498-kafld-lkad"),
+			exttokenstore.FieldUserID:         []byte(userID),
 		},
 	}
 
@@ -764,7 +760,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			return nil, nil
 		}).AnyTimes()
 
-	store := exttokenstore.NewSystem(nil, secrets, users, nil, nil, nil, nil)
+	store := exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 
 	authenticator := tokenAuthenticator{
 		ctx:                 context.Background(),
@@ -863,7 +859,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			AnyTimes()
 		newSecrets.EXPECT().Patch("cattle-tokens", token.Name, k8stypes.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).Times(1)
-		authenticator.extTokenStore = exttokenstore.NewSystem(nil, newSecrets, users, nil, nil, nil, nil)
+		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil)
 
 		tokenSecret.Data["last-used-at"] = []byte(now.
 			Add(-time.Second).
@@ -1010,7 +1006,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			Get("cattle-tokens", token.Name).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, token.Name)).
 			Times(1)
-		authenticator.extTokenStore = exttokenstore.NewSystem(nil, newSecrets, users, nil, nil, nil, nil)
+		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil)
 
 		userRefresher.reset()
 
@@ -1032,7 +1028,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			Get("cattle-tokens", token.Name).
 			Return(nil, fmt.Errorf("some error")).
 			Times(1)
-		authenticator.extTokenStore = exttokenstore.NewSystem(nil, newSecrets, users, nil, nil, nil, nil)
+		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil)
 
 		userRefresher.reset()
 

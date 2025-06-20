@@ -69,8 +69,6 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	ua := newUserAttributeController(management.WithAgent(userAttributeController))
 	s := newAuthSettingController(ctx, management)
 	rt := newRoleTemplateLifecycle(management, clusterManager)
-	grbLegacy := newLegacyGRBCleaner(management)
-	rtLegacy := newLegacyRTCleaner(management)
 	prtbServiceAccountFinder := newPRTBServiceAccountController(management)
 
 	management.Management.Clusters("").AddHandler(ctx, project_cluster.ClusterCreateController, c.Sync)
@@ -80,13 +78,11 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.AuthConfigs("").AddHandler(ctx, authConfigControllerName, ac.sync)
 	management.Management.UserAttributes("").AddHandler(ctx, userAttributeController, ua.sync)
 	management.Management.Settings("").AddHandler(ctx, authSettingController, s.sync)
-	management.Management.GlobalRoleBindings("").AddHandler(ctx, "legacy-grb-cleaner", grbLegacy.sync)
-	management.Management.RoleTemplates("").AddHandler(ctx, "legacy-rt-cleaner", rtLegacy.sync)
 	globalroles.Register(ctx, management, clusterManager)
 
 	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {
-		roletemplates.Register(ctx, management)
+		roletemplates.Register(ctx, management, clusterManager)
 	} else {
 		management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
 		management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)

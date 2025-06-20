@@ -132,10 +132,7 @@ func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	err = userContext.Apps.DaemonSets("cattle-system").Delete("cattle-node-agent", deleteOptions)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
+	
 	return nil
 }
 

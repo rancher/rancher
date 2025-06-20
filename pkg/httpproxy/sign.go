@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -13,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
-	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/rancher/norman/httperror"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/utils"
@@ -85,8 +86,8 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 		return err
 	}
 	service, region := a.getServiceAndRegion(req.URL.Host)
-	creds := credentials.NewStaticCredentials(secret["accessKey"], secret["secretKey"], "")
-	awsSigner := v4.NewSigner(creds)
+	credentialProvider := credentials.NewStaticCredentialsProvider(secret["accessKey"], secret["secretKey"], "")
+	awsSigner := v4.NewSigner()
 	var body []byte
 	if req.Body != nil {
 		body, err = ioutil.ReadAll(req.Body)
@@ -94,6 +95,11 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 			return fmt.Errorf("error reading request body %v", err)
 		}
 	}
+
+	h := sha256.New()
+	h.Write(body)
+	payloadHash := hex.EncodeToString(h.Sum(nil))
+
 	oldHeader, newHeader := http.Header{}, http.Header{}
 	for header, value := range req.Header {
 		if _, ok := requiredHeadersForAws[strings.ToLower(header)]; ok {
@@ -103,10 +109,25 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 		}
 	}
 	req.Header = newHeader
-	_, err = awsSigner.Sign(req, bytes.NewReader(body), service, region, time.Now())
+	err = awsSigner.SignHTTP(req.Context(), credentialProvider.Value, req, payloadHash, service, region, time.Now())
 	if err != nil {
 		return err
 	}
+
+	// The V2 SDK does not implement internally the sign with body method as per https://github.com/aws/aws-sdk-go/blob/main/aws/signer/v4/v4.go#L357
+	// Therefore we need the below in order for the body to be included with the forwarded request.
+
+	var reader io.ReadCloser
+	var bodyReader io.ReadSeeker
+	bodyReader = bytes.NewReader(body)
+	if bodyReader != nil {
+		var ok bool
+		if reader, ok = bodyReader.(io.ReadCloser); !ok {
+			reader = ioutil.NopCloser(bodyReader)
+		}
+	}
+	req.Body = reader
+
 	for key, val := range oldHeader {
 		req.Header.Add(key, strings.Join(val, ""))
 	}

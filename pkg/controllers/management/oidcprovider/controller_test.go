@@ -105,19 +105,23 @@ func TestOnChange(t *testing.T) {
 				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
 
 				// update status with client secret
-				patchData = map[string]interface{}{
-					"status": v3.OIDCClientStatus{
-						ClientID: fakeClientId,
-						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
-							secretKeyPrefix + "1": {
-								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
-								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+				patchOp := []map[string]interface{}{
+					{
+						"op":   "add",
+						"path": "/status",
+						"value": v3.OIDCClientStatus{
+							ClientID: fakeClientId,
+							ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+								secretKeyPrefix + "1": {
+									CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+									LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+								},
 							},
 						},
 					},
 				}
-				patchBytes, _ = json.Marshal(patchData)
-				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
+				patchBytes, _ = json.Marshal(patchOp)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.JSONPatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
 		},
 		"clientID and clientSecret are not created for an existing OIDCClient": {
@@ -207,23 +211,26 @@ func TestOnChange(t *testing.T) {
 				p.oidcClient.EXPECT().Update(client).Return(client, nil)
 
 				// update status with client secret
-				patchData := map[string]interface{}{
-					"status": v3.OIDCClientStatus{
-						ClientID: fakeClientId,
-						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
-							secretKeyPrefix + "1": {
-								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
-							},
-							secretKeyPrefix + "2": {
-								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
-								LastFiveCharacters: fakeClientSecret2[len(fakeClientSecret2)-5:],
+				patchOp := []map[string]interface{}{
+					{
+						"op":   "add",
+						"path": "/status",
+						"value": v3.OIDCClientStatus{
+							ClientID: fakeClientId,
+							ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+								secretKeyPrefix + "1": {
+									LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+								},
+								secretKeyPrefix + "2": {
+									CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+									LastFiveCharacters: fakeClientSecret2[len(fakeClientSecret2)-5:],
+								},
 							},
 						},
 					},
 				}
-
-				patchBytes, _ := json.Marshal(patchData)
-				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
+				patchBytes, _ := json.Marshal(patchOp)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.JSONPatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
 		},
 		"client secret is regenerated with annotation": {
@@ -295,19 +302,23 @@ func TestOnChange(t *testing.T) {
 				p.oidcClient.EXPECT().Update(client).Return(client, nil)
 
 				// update status with client secret
-				patchData := map[string]interface{}{
-					"status": v3.OIDCClientStatus{
-						ClientID: fakeClientId,
-						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
-							secretKeyPrefix + "1": {
-								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
-								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+				patchOp := []map[string]interface{}{
+					{
+						"op":   "add",
+						"path": "/status",
+						"value": v3.OIDCClientStatus{
+							ClientID: fakeClientId,
+							ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+								secretKeyPrefix + "1": {
+									CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+									LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+								},
 							},
 						},
 					},
 				}
-				patchBytes, _ := json.Marshal(patchData)
-				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
+				patchBytes, _ := json.Marshal(patchOp)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.JSONPatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
 		},
 		"client secret is removed with annotation": {
@@ -381,21 +392,89 @@ func TestOnChange(t *testing.T) {
 				p.oidcClient.EXPECT().Update(client).Return(client, nil)
 
 				// update status with client secret
-				patchData := map[string]interface{}{
-					"status": v3.OIDCClientStatus{
-						ClientID: fakeClientId,
-						ClientSecrets: map[string]v3.OIDCClientSecretStatus{
-							secretKeyPrefix + "2": {
-								CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
-								LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+				patchOp := []map[string]interface{}{
+					{
+						"op":   "add",
+						"path": "/status",
+						"value": v3.OIDCClientStatus{
+							ClientID: fakeClientId,
+							ClientSecrets: map[string]v3.OIDCClientSecretStatus{
+								secretKeyPrefix + "2": {
+									CreatedAt:          fmt.Sprintf("%d", fakeNow.Unix()),
+									LastFiveCharacters: fakeClientSecret[len(fakeClientSecret)-5:],
+								},
 							},
 						},
 					},
 				}
-
-				patchBytes, _ := json.Marshal(patchData)
-				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, nil)
+				patchBytes, _ := json.Marshal(patchOp)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.JSONPatchType, patchBytes, "status").Return(oidcClient, nil)
 			},
+		},
+		"secret is deleted when clientID status patch fails": {
+			oidcClient: &v3.OIDCClient{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fakeOIDCClientName,
+					UID:  fakeOIDCClientUID,
+				},
+			},
+
+			setupMock: func(p *mockParams, oidcClient *v3.OIDCClient) {
+				p.generator.EXPECT().GenerateClientID().Return(fakeClientId, nil)
+				p.oidcClientCache.EXPECT().List(labels.Everything()).Return(nil, nil)
+				p.secretCache.EXPECT().Get(secretNamespace, fakeClientId).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				p.generator.EXPECT().GenerateClientSecret().Return(fakeClientSecret, nil)
+				p.secretClient.EXPECT().Create(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "1": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
+						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
+					},
+					StringData: map[string]string{
+						secretKeyPrefix + "1": fakeClientSecret,
+					},
+				}).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeClientId,
+						Annotations: map[string]string{
+							clientSecretCreatedAtPrefixAnn + secretKeyPrefix + "1": fmt.Sprintf("%d", fakeNow.Unix()),
+						},
+						Namespace: secretNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "OIDCClient",
+								Name:       fakeOIDCClientName,
+								UID:        fakeOIDCClientUID,
+							},
+						},
+					},
+					Data: map[string][]byte{
+						secretKeyPrefix + "1": []byte(fakeClientSecret),
+					},
+				}, nil)
+
+				// update status with client id
+				patchData := map[string]interface{}{
+					"status": map[string]interface{}{
+						"clientID": fakeClientId,
+					},
+				}
+				patchBytes, _ := json.Marshal(patchData)
+				p.oidcClient.EXPECT().Patch(fakeOIDCClientName, types.MergePatchType, patchBytes, "status").Return(oidcClient, errors.NewBadRequest("unexpected"))
+				p.secretClient.EXPECT().Delete(secretNamespace, fakeClientId, &metav1.DeleteOptions{}).Return(nil)
+			},
+			expectedErr: "failed to apply clientID status patch: unexpected",
 		},
 	}
 

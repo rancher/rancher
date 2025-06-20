@@ -8,6 +8,8 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -22,8 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 const owner = "owner-user"
@@ -69,6 +73,8 @@ func newPRTBLifecycle(m *manager, management *config.ManagementContext, nsInform
 		rbClient:   m.workload.RBAC.RoleBindings(""),
 		crbLister:  m.workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crbClient:  m.workload.RBAC.ClusterRoleBindings(""),
+		crClient:   m.workload.RBAC.ClusterRoles(""),
+		crLister:   m.workload.RBAC.ClusterRoles("").Controller().Lister(),
 		prtbClient: management.Management.ProjectRoleTemplateBindings(""),
 	}
 }
@@ -81,6 +87,8 @@ type prtbLifecycle struct {
 	rbClient   typesrbacv1.RoleBindingInterface
 	crbLister  typesrbacv1.ClusterRoleBindingLister
 	crbClient  typesrbacv1.ClusterRoleBindingInterface
+	crClient   typesrbacv1.ClusterRoleInterface
+	crLister   typesrbacv1.ClusterRoleLister
 	prtbClient v3.ProjectRoleTemplateBindingInterface
 }
 
@@ -129,6 +137,10 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		return err
 	}
 
+	if err := p.ensurePSAPermissions(binding, roles); err != nil {
+		return fmt.Errorf("couldn't ensure psa permissions: %w", err)
+	}
+
 	if err := p.m.ensureRoles(roles); err != nil {
 		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
@@ -152,6 +164,92 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	return p.reconcileProjectAccessToGlobalResources(binding, roles)
 }
 
+// ensurePSAPermissions creates the necessary ClusterRole and ClusterRoleBinding
+// to give the 'updatepsa' permission to the project.
+func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBinding, roles map[string]*v3.RoleTemplate) error {
+	// extract project name from the format "cluster-name:project-name"
+	_, projectName, found := strings.Cut(binding.ProjectName, ":")
+	if !found {
+		return fmt.Errorf("invalid project name format")
+	}
+
+	// create AttributesRecord to test if roles allow the updatepsa operation
+	psaRec := authorizer.AttributesRecord{
+		Verb:            "updatepsa",
+		APIGroup:        management.GroupName,
+		Resource:        v32.ProjectResourceName,
+		Name:            binding.ProjectName,
+		ResourceRequest: true,
+	}
+
+	// check if any of the RoleTemplates grant updatepsa permission
+	hasUpdatePSAPermission := false
+	for _, role := range roles {
+		if rbac.RulesAllow(psaRec, role.Rules...) {
+			hasUpdatePSAPermission = true
+		}
+	}
+
+	// only create RBAC resources if user has updatepsa permission
+	if !hasUpdatePSAPermission {
+		return nil
+	}
+
+	// ensure ClusterRole exists with correct updatepsa rules
+	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
+	psaCRWanted := addUpdatepsaClusterRole(projectName)
+	psaCR, err := p.crLister.Get("", psaCRName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// create ClusterRole if it doesn't exist
+			psaCR, err = p.crClient.Create(psaCRWanted)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	// verify existing ClusterRole has the correct updatepsa rules
+	if !reflect.DeepEqual(psaCR.Rules, psaCRWanted.Rules) {
+		// if the CR have been modified, restore it
+		psaCR = addUpdatepsaClusterRole(projectName)
+		_, err = p.crClient.Update(psaCR)
+		if err != nil {
+			return err
+		}
+	}
+
+	// create ClusterRoleBinding to bind the ClusterRole to the user/group
+	psaCRB := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-updatepsa", projectName),
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     psaCRName,
+		},
+	}
+
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
+	if err != nil {
+		return err
+	}
+	psaCRB.Subjects = []rbacv1.Subject{subject}
+
+	_, err = p.crbClient.Create(psaCRB)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+}
+
+// ensurePRTBDelete cleans up all RBAC resources (RoleBindings, ServiceAccount, etc)
+// associated with a ProjectRoleTemplateBinding when it's deleted.
+// This ensures proper cleanup and prevents orphaned permissions.
 func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding) error {
 	// Get namespaces belonging to project
 	namespaces, err := p.nsIndexer.ByIndex(namespace.NsByProjectIndex, binding.ProjectName)
@@ -176,11 +274,76 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		}
 	}
 
+	if err := p.ensurePSAPermissionsDelete(binding); err != nil {
+		return fmt.Errorf("error deleting psa RBAC resources: %w", err)
+	}
+
 	if err := p.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
 		return fmt.Errorf("error deleting service account impersonator: %w", err)
 	}
 
 	return p.reconcileProjectAccessToGlobalResourcesForDelete(binding)
+}
+
+// ensurePSAPermissionsDelete removes the ClusterRole and ClusterRoleBinding
+// that were created to grant 'updatepsa' permissions when a ProjectRoleTemplateBinding
+// is deleted. This function only performs cleanup if the binding's RoleTemplate
+// actually granted updatepsa permissions, ensuring proper cleanup of PSA-related
+// RBAC resources without affecting unrelated bindings.
+func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTemplateBinding) error {
+	psaRec := authorizer.AttributesRecord{
+		Verb:            "updatepsa",
+		APIGroup:        management.GroupName,
+		Resource:        v32.ProjectResourceName,
+		Name:            binding.ProjectName,
+		ResourceRequest: true,
+	}
+	_, projectName, found := strings.Cut(binding.ProjectName, ":")
+	if !found {
+		return fmt.Errorf("invalid project name format")
+	}
+	prtbRoleTemplate, err := p.rtLister.Get("", binding.RoleTemplateName)
+	if err != nil {
+		return err
+	}
+
+	if rbac.RulesAllow(psaRec, prtbRoleTemplate.Rules...) {
+		// delete the ClusterRoleBinding first
+		// if ClusterRole is not used by other ClusterRoleBindings:
+		// then delete the ClusterRole
+		// skip the deletion otherwhise
+		psaCRBName := fmt.Sprintf("%s-updatepsa", projectName)
+		err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
+		}
+		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
+		isUsed := p.isClusterRoleUsed(psaCRName)
+		if !isUsed {
+			err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("error deleting clusterrole %v: %w", psaCRName, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// IsClusterRoleUsed checks if a ClusterRole is referenced by any ClusterRoleBinding
+func (p *prtbLifecycle) isClusterRoleUsed(clusterRoleName string) bool {
+	bindings, err := p.crbClient.List(metav1.ListOptions{})
+	if err != nil {
+		return false
+	}
+
+	for _, binding := range bindings.Items {
+		if binding.RoleRef.Kind == "ClusterRole" && binding.RoleRef.Name == clusterRoleName {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
@@ -357,7 +520,8 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	desiredResourceNames := sets.New(baseRule.ResourceNames...)
 
 	// if the currentVerbs and the currentResourceNames matches the desired state we can return
-	if currentVerbs.Equal(newVerbs) && currentResourceNames.Equal(desiredResourceNames) {
+	// if the number of verbs desired is 0, we don't need to check ResourceNames because we don't want any rule
+	if currentVerbs.Equal(newVerbs) && (newVerbs.Len() == 0 || currentResourceNames.Equal(desiredResourceNames)) {
 		return roleName, nil
 	}
 

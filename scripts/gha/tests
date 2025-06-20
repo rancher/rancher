@@ -48,7 +48,7 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.11/data/data.json | jq -r ".$DIST.releases[-1].version")
+export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.12/data/data.json | jq -r ".$DIST.releases[-1].version")
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
@@ -105,6 +105,15 @@ echo "Waiting for K3s kubeconfig to be generated"
   --exit-command "dump_rancher_logs" `# Dump logs to find out why K3s did not start` \
   "stat /etc/rancher/k3s/k3s.yaml &>/dev/null"
 
+echo "Waiting up to 5 minutes for the api-extension deployment"
+./scripts/retry \
+  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --sleep 2 `# Sleep for 2 seconds in between attempts` \
+  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
+  --message "api-extension was not available after {{elapsed}} seconds" `# Print this progress message` \
+  --exit-command "dump_rancher_logs" `# Dump logs to find out why api-extension did not start` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/api-extension &>/dev/null"
+
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
   --timeout 300 `# Time out after 300 seconds (5 min)` \
@@ -122,15 +131,6 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why capi-controller-manager did not start` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager  &>/dev/null"
-
-echo "Waiting up to 5 minutes for the api-extension deployment"
-./scripts/retry \
-  --timeout 300 `# Time out after 300 seconds (5 min)` \
-  --sleep 2 `# Sleep for 2 seconds in between attempts` \
-  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
-  --message "api-extension was not available after {{elapsed}} seconds" `# Print this progress message` \
-  --exit-command "dump_rancher_logs" `# Dump logs to find out why api-extension did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/api-extension &>/dev/null"
 
 
 echo Running integrationsetup

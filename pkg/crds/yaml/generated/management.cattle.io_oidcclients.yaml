@@ -65,12 +65,14 @@ spec:
                   RefreshTokenExpirationSeconds defines how long (in seconds)
                   a refresh token remains valid before expiration.
                 format: int64
+                minimum: 1
                 type: integer
               tokenExpirationSeconds:
                 description: |-
                   TokenExpirationSeconds specifies the duration (in seconds) before
                   an access token and ID token expire.
                 format: int64
+                minimum: 1
                 type: integer
             required:
             - refreshTokenExpirationSeconds

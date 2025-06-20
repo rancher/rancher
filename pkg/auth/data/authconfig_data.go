@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
+	"github.com/rancher/rancher/pkg/auth/providers/cognito"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
@@ -76,6 +77,9 @@ func AuthConfigs(management *config.ManagementContext) error {
 	}
 
 	if err := addAuthConfig(genericoidc.Name, client.GenericOIDCConfigType, false, management); err != nil {
+		return err
+	}
+	if err := addAuthConfig(cognito.Name, client.CognitoConfigType, false, management); err != nil {
 		return err
 	}
 

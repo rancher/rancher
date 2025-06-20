@@ -46,35 +46,6 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.AddAction(request, v32.ClusterActionGenerateKubeconfig)
 	resource.AddAction(request, v32.ClusterActionImportYaml)
 
-	// If this is an RKE1 cluster only
-	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
-		resource.AddAction(request, v32.ClusterActionExportYaml)
-
-		// If a user has the backupetcd role/privilege, add it- In this case, the resource is the cluster, so use
-		// the ID as the namespace for the ETCD check since that's where the backups live
-		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok && canBackupEtcd(request, resource.ID) {
-			resource.AddAction(request, v32.ClusterActionBackupEtcd)
-		}
-
-		// If user has permissions to update the cluster
-		if canUpdateClusterWithValues(request, resource.Values) {
-			if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
-				resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
-			}
-			resource.AddAction(request, v32.ClusterActionRotateCertificates)
-			if rotateEncryptionKeyEnabled(f.clusterLister, resource.ID) {
-				resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
-			}
-
-			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
-				if err := request.AccessControl.CanDo(v3.ClusterTemplateGroupVersionKind.Group, v3.ClusterTemplateResource.Name, "create", request, resource.Values, request.Schema); err == nil {
-					resource.AddAction(request, v32.ClusterActionSaveAsTemplate)
-				}
-			}
-		}
-
-	}
-
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok && gkeConfig != nil {
 		configMap, ok := gkeConfig.(map[string]interface{})
 		if !ok {
