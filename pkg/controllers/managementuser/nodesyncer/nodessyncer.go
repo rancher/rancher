@@ -699,10 +699,6 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
-		cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore {
-		return true, nil
-	}
 	if cluster.Status.Driver == "imported" {
 		return false, nil
 	}

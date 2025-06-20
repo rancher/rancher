@@ -78,21 +78,20 @@ func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, 
 	}
 
 	var isValidCluster bool
-	if request.ID == "" {
-		isValidCluster = spec.RancherKubernetesEngineConfig != nil
-	} else {
+
+	if request.ID != "" {
 		cluster, err := v.ClusterLister.Get("", request.ID)
 		if err != nil {
 			return err
 		}
 		isValidCluster = cluster.Status.Driver == "" ||
-			cluster.Status.Driver == v32.ClusterDriverRKE ||
 			cluster.Status.Driver == v32.ClusterDriverImported ||
 			cluster.Status.Driver == v32.ClusterDriverK3s ||
 			cluster.Status.Driver == v32.ClusterDriverRke2
 	}
+
 	if !isValidCluster {
-		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE, RKE2, or K3s")
+		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE2, or K3s")
 	}
 
 	if spec.LocalClusterAuthEndpoint.CACerts != "" && spec.LocalClusterAuthEndpoint.FQDN == "" {
