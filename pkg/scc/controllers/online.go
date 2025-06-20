@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"golang.org/x/sync/semaphore"
 	"net/http"
 	"sync"
@@ -139,10 +140,10 @@ func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Regis
 	return registrationIn
 }
 
-func (s sccOnlineMode) ReconcileRegisterError(registration *v1.Registration, registerErr error) *v1.Registration {
+func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error) *v1.Registration {
 	if isNonRecoverableHttpError(registerErr) {
 		return s.reconcileNonRecoverableHttpError(
-			registration,
+			registrationObj,
 			registerErr,
 			func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration {
 				preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(*httpCode), httpCode)
@@ -158,10 +159,7 @@ func (s sccOnlineMode) ReconcileRegisterError(registration *v1.Registration, reg
 		)
 	}
 
-	v1.ResourceConditionReady.False(registration)
-	v1.ResourceConditionProgressing.False(registration)
-	v1.ResourceConditionFailure.SetError(registration, "could not complete registration", registerErr)
-	return registration
+	return shared.PrepareFailed(registrationObj, registerErr)
 }
 
 func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {

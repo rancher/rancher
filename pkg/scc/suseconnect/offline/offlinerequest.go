@@ -125,3 +125,11 @@ func (o *SecretManager) UpdateOfflineRequest(inReq *registration.OfflineRequest)
 
 	return o.saveRequestSecret()
 }
+
+func (o *SecretManager) RemoveOfflineRequest() error {
+	delErr := o.secrets.Delete(o.secretNamespace, o.requestSecretName, &metav1.DeleteOptions{})
+	if delErr != nil && apierrors.IsNotFound(delErr) {
+		return nil
+	}
+	return delErr
+}

@@ -1,6 +1,7 @@
 package offline
 
 import (
+	"fmt"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -35,4 +36,20 @@ func New(
 		ownerRef:              ownerRef,
 		defaultLabels:         labels,
 	}
+}
+
+func (o *SecretManager) Remove() error {
+	var err error
+	certErr := o.RemoveOfflineCertificate()
+	if certErr != nil {
+		err = fmt.Errorf("failed to remove offline certificate: %v", certErr)
+	}
+	requestErr := o.RemoveOfflineRequest()
+	if requestErr != nil {
+		err = fmt.Errorf("failed to remove offline request: %v", requestErr)
+	}
+	if requestErr != nil && certErr != nil {
+		err = fmt.Errorf("failed to remove both offline request & certificate: %v; %v", requestErr, certErr)
+	}
+	return err
 }

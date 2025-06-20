@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
@@ -88,15 +87,8 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 		}
 	}
 
-	var offlineCertDecoded []byte
 	offlineRegCertData, certOk := secret.Data[consts.SecretKeyOfflineRegCert]
-	if regMode == v1.RegistrationModeOffline {
-		var err error
-		offlineCertDecoded, err = base64.StdEncoding.DecodeString(string(offlineRegCertData))
-		if err != nil {
-			return RegistrationParams{}, err
-		}
-	}
+	hasOfflineCert := certOk && len(offlineRegCertData) > 0
 
 	/*
 		The Registration URL precedence is:
@@ -149,8 +141,8 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 		nameId:             nameId,
 		contentHash:        contentsId,
 		regCode:            string(regCode),
-		hasOfflineCertData: certOk && len(offlineRegCertData) > 0,
-		offlineCertData:    &offlineCertDecoded,
+		hasOfflineCertData: hasOfflineCert,
+		offlineCertData:    &offlineRegCertData,
 		secretRef: &corev1.SecretReference{
 			Name:      consts.ResourceSCCEntrypointSecretName,
 			Namespace: secret.Namespace,

@@ -2,6 +2,7 @@ package offline
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -127,7 +128,7 @@ func (o *SecretManager) UpdateOfflineCertificate(inReq *registration.OfflineRequ
 	// TODO: get sha of request/secret data then compare to see if actually needs update?
 	o.offlineRequest = jsonOfflineRequest
 
-	return o.saveRequestSecret()
+	return o.saveCertificateSecret()
 }
 
 func (o *SecretManager) OfflineCertificateReader() (io.Reader, error) {
@@ -136,7 +137,19 @@ func (o *SecretManager) OfflineCertificateReader() (io.Reader, error) {
 		return nil, err
 	}
 
-	reader := bytes.NewReader(certBytes)
+	encodedCertBytes := make([]byte, base64.StdEncoding.EncodedLen(len(certBytes)))
+	// TODO remove after SCC library update
+	base64.StdEncoding.Encode(encodedCertBytes, certBytes)
+
+	reader := bytes.NewReader(encodedCertBytes)
 
 	return reader, nil
+}
+
+func (o *SecretManager) RemoveOfflineCertificate() error {
+	delErr := o.secrets.Delete(o.secretNamespace, o.certificateSecretName, &metav1.DeleteOptions{})
+	if delErr != nil && apierrors.IsNotFound(delErr) {
+		return nil
+	}
+	return delErr
 }
