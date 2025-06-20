@@ -10,6 +10,7 @@ const (
 	PodStatusFieldMessage                    = "message"
 	PodStatusFieldNodeIp                     = "nodeIp"
 	PodStatusFieldNominatedNodeName          = "nominatedNodeName"
+	PodStatusFieldObservedGeneration         = "observedGeneration"
 	PodStatusFieldPhase                      = "phase"
 	PodStatusFieldPodIPs                     = "podIPs"
 	PodStatusFieldPodIp                      = "podIp"
@@ -29,6 +30,7 @@ type PodStatus struct {
 	Message                    string                   `json:"message,omitempty" yaml:"message,omitempty"`
 	NodeIp                     string                   `json:"nodeIp,omitempty" yaml:"nodeIp,omitempty"`
 	NominatedNodeName          string                   `json:"nominatedNodeName,omitempty" yaml:"nominatedNodeName,omitempty"`
+	ObservedGeneration         int64                    `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 	Phase                      string                   `json:"phase,omitempty" yaml:"phase,omitempty"`
 	PodIPs                     []PodIP                  `json:"podIPs,omitempty" yaml:"podIPs,omitempty"`
 	PodIp                      string                   `json:"podIp,omitempty" yaml:"podIp,omitempty"`
