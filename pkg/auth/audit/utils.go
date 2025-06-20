@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"regexp"
 
+	jsonpath "github.com/rancher/jsonpath/pkg"
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/auth/audit/jsonpath"
 )
 
 func mergeLogVerbosities(lhs auditlogv1.LogVerbosity, rhs auditlogv1.LogVerbosity) auditlogv1.LogVerbosity {
