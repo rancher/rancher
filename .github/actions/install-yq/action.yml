@@ -3,7 +3,7 @@ description: "Install yq from source"
 inputs:
   version:
     description: "yq version"
-    default: v4.45.1
+    default: v4.45.4
   arch:
     description: "host arch"
     required: true
