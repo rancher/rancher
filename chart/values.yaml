@@ -258,10 +258,6 @@ extraObjects: []
 registration:
   enabled: false
   regCode: ""
-  ## Alternative Registration Endpoint
-  # For users with a local RMT server you can use an alternative registration endpoint to register your cluster.
-  # This will cause the registration process to sync with your RMT server instead of with the SCC.
-  # registrationEndpointURL: "https://my-rmt-server.example.com"
   ## Air-gap Users
   # If your cluster is in an air-gap, then using offline mode (or a local RMT server) may be necessary.
   # To complete the offline registration via helm is a multi-step process - or you can complete it via the Rancher UI.
@@ -283,3 +279,8 @@ registration:
   # Step 5.b. Using Rancher UI upload the certificate to complete the registration.
   # Step 5.c  Using helm with the certificate value field and then `helm upgrade` rancher.
   # certificate: {}
+  ## Alternative Registration Endpoint
+  # For users with a local RMT server you can use an alternative registration endpoint to register your cluster.
+  # This will cause the registration process to sync with your RMT server instead of with the SCC.
+  # registrationUrl: "https://my-rmt-server.example.com"
+  

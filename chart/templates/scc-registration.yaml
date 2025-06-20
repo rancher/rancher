@@ -22,9 +22,14 @@ metadata:
   labels: {{ include "rancher.labels" . | nindent 4 }}{{ include "rancher.commonLabels" (dict "context" . "partOf" "rancher") | indent 4 }}
 type: Opaque
 data:
-  regCode: {{ .Values.registration.regCode | b64enc }}
-  mode: {{ default "online" .Values.registration.mode }}
-{{- if .Values.registration.registrationEndpointURL }}
-  registrationEndpointURL: {{ .Values.registration.registrationEndpointURL | quote }}
+  mode: {{ default "online" .Values.registration.mode | b64enc | quote }}
+{{- if .Values.registration.regCode }}
+  regCode: {{ .Values.registration.regCode | b64enc | quote }}
+{{- end }}
+{{- if .Values.registration.registrationUrl }}
+  registrationUrl: {{ .Values.registration.registrationUrl | b64enc | quote }}
+{{- end }}
+{{- if .Values.registration.certificate }}
+  certificate: {{ .Values.registration.certificate | b64enc | quote  }}
 {{- end }}
 {{ end -}}

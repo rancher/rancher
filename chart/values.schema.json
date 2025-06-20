@@ -70,35 +70,13 @@
           "type": "string",
           "description": "The registration code which will be saved to a secret"
         },
-        "regCodeRef": {
-          "type": "object",
-          "description": "The reference to the secret which contains registration code",
-          "required": ["secretName", "secretNamespace"],
-          "properties": {
-            "secretName": {
-              "type": "string"
-            },
-            "secretNamespace": {
-              "type": "string"
-            }
-          }
-        },
         "certificate": {
           "type": "string",
           "description": "The offline registration certificate provided by SCC - which will be saved to a secret"
         },
-        "certificateRef": {
-          "type": "object",
-          "description": "The reference to the secret which contains offline registration certificate provided by SCC",
-          "required": ["secretName", "secretNamespace"],
-          "properties": {
-            "secretName": {
-              "type": "string"
-            },
-            "secretNamespace": {
-              "type": "string"
-            }
-          }
+        "registrationUrl": {
+          "type": "string",
+          "description": "An alternative registration endpoint URL"
         }
       }
     }
