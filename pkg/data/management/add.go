@@ -9,10 +9,6 @@ import (
 )
 
 func Add(ctx context.Context, wrangler *wrangler.Context, management *config.ManagementContext) error {
-	if err := sshKeyCleanup(management); err != nil {
-		return err
-	}
-
 	_, err := addRoles(wrangler, management)
 	if err != nil {
 		return err
