@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -67,12 +66,7 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	respTimestamp := time.Now().Format(time.RFC3339)
 
-	log, err := newLog(user, req, wr, reqTimestamp, respTimestamp)
-	if err != nil {
-		// todo: this writes to an already written request, we should just log a warning and continue with a partial log
-		util.ReturnHTTPError(rw, req, http.StatusInternalServerError, err.Error())
-		return
-	}
+	log := newLog(user, req, wr, reqTimestamp, respTimestamp)
 
 	if err := h.writer.Write(log); err != nil {
 		// Locking after next is called to avoid performance hits on the request.

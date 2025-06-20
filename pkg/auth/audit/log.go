@@ -91,7 +91,7 @@ type log struct {
 	rawResponseBody []byte
 }
 
-func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp string, respTimestamp string) (*log, error) {
+func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp string, respTimestamp string) *log {
 	log := &log{
 		AuditID:       k8stypes.UID(uuid.NewRandom().String()),
 		RequestURI:    req.RequestURI,
@@ -115,7 +115,12 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 	if methodsWithBody[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read request body: %w", err)
+			body, err = json.Marshal(map[string]any{
+				"responseReadError": err.Error(),
+			})
+			if err != nil {
+				body = []byte(`{"responseReadError": "failed to read response body"}`)
+			}
 		}
 
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
@@ -127,7 +132,7 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 		log.rawRequestBody = body
 	}
 
-	return log, nil
+	return log
 }
 
 func (l *log) decompressResponse() error {
