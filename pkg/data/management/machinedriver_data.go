@@ -2,6 +2,7 @@ package management
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"reflect"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/features"
 	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -18,6 +20,7 @@ import (
 )
 
 const (
+	AlibabaDriver      = "aliyunecs"
 	Amazonec2driver    = "amazonec2"
 	Azuredriver        = "azure"
 	DigitalOceandriver = "digitalocean"
@@ -30,6 +33,7 @@ const (
 	OpenstackDriver    = "openstack"
 	PacketDriver       = "packet"
 	PhoenixNAPDriver   = "pnap"
+	PodDriver          = "pod"
 	RackspaceDriver    = "rackspace"
 	SoftLayerDriver    = "softlayer"
 	Vmwaredriver       = "vmwarevsphere"
@@ -37,29 +41,100 @@ const (
 	OutscaleDriver     = "outscale"
 )
 
-var DriverData = map[string]map[string][]string{
-	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey"}, "privateCredentialFields": []string{"secretKey"}},
-	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId", "tenantId", "environment"}, "privateCredentialFields": []string{"clientSecret"}, "optionalCredentialFields": []string{"tenantId"}},
-	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
-	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
-	HarvesterDriver:    {"publicCredentialFields": []string{"clusterType", "clusterId"}, "privateCredentialFields": []string{"kubeconfigContent"}, "optionalCredentialFields": []string{"clusterId"}},
-	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
-	NutanixDriver:      {"publicCredentialFields": []string{"endpoint", "username", "port"}, "privateCredentialFields": []string{"password"}},
-	OCIDriver:          {"publicCredentialFields": []string{"tenancyId", "userId", "fingerprint"}, "privateCredentialFields": []string{"privateKeyContents"}, "passwordFields": []string{"privateKeyPassphrase"}},
-	OTCDriver:          {"publicCredentialFields": []string{"accessKey", "username"}, "privateCredentialFields": []string{"secretKey", "password", "token"}},
-	OpenstackDriver:    {"privateCredentialFields": []string{"password"}},
-	PacketDriver:       {"privateCredentialFields": []string{"apiKey"}},
-	PhoenixNAPDriver:   {"publicCredentialFields": []string{"clientIdentifier"}, "privateCredentialFields": []string{"clientSecret"}},
-	RackspaceDriver:    {"privateCredentialFields": []string{"apiKey"}},
-	SoftLayerDriver:    {"privateCredentialFields": []string{"apiKey"}},
-	Vmwaredriver:       {"publicCredentialFields": []string{"username", "vcenter", "vcenterPort"}, "privateCredentialFields": []string{"password"}},
-	GoogleDriver:       {"privateCredentialFields": []string{"authEncodedJson"}},
-	OutscaleDriver:     {"publicCredentialFields": []string{"accessKey", "region"}, "privateCredentialFields": []string{"secretKey"}},
+// DriverDataConfig contains driver‑specific metadata that is parsed as
+// annotations on the corresponding NodeDriver object.
+// FileToFieldAliases field maps `Schema field => driver field`
+type DriverDataConfig struct {
+	FileToFieldAliases       map[string]string
+	PublicCredentialFields   []string
+	PrivateCredentialFields  []string
+	PasswordFields           []string
+	OptionalCredentialFields []string
+	Defaults                 map[string]string
 }
 
-var driverDefaults = map[string]map[string]string{
-	HarvesterDriver: {"clusterType": "imported"},
-	Vmwaredriver:    {"vcenterPort": "443"},
+var DriverData = map[string]DriverDataConfig{
+	AlibabaDriver: {
+		FileToFieldAliases: map[string]string{"sshKeyContents": "sshKeypath"},
+	},
+	Amazonec2driver: {
+		FileToFieldAliases:      map[string]string{"sshKeyContents": "sshKeypath", "userdata": "userdata"},
+		PublicCredentialFields:  []string{"accessKey"},
+		PrivateCredentialFields: []string{"secretKey"},
+	},
+	Azuredriver: {
+		FileToFieldAliases:       map[string]string{"customData": "customData"},
+		PublicCredentialFields:   []string{"clientId", "subscriptionId", "tenantId", "environment"},
+		PrivateCredentialFields:  []string{"clientSecret"},
+		OptionalCredentialFields: []string{"tenantId"},
+	},
+	DigitalOceandriver: {
+		FileToFieldAliases:      map[string]string{"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
+		PrivateCredentialFields: []string{"accessToken"},
+	},
+	ExoscaleDriver: {
+		FileToFieldAliases:      map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
+		PrivateCredentialFields: []string{"apiSecretKey"},
+	},
+	HarvesterDriver: {
+		PublicCredentialFields:   []string{"clusterType", "clusterId"},
+		PrivateCredentialFields:  []string{"kubeconfigContent"},
+		OptionalCredentialFields: []string{"clusterId"},
+		Defaults:                 map[string]string{"clusterType": "imported"},
+	},
+	Linodedriver: {
+		PrivateCredentialFields: []string{"token"},
+		PasswordFields:          []string{"rootPass"},
+	},
+	NutanixDriver: {
+		PublicCredentialFields:  []string{"endpoint", "username", "port"},
+		PrivateCredentialFields: []string{"password"},
+	},
+	OCIDriver: {
+		PublicCredentialFields:  []string{"tenancyId", "userId", "fingerprint"},
+		PrivateCredentialFields: []string{"privateKeyContents"},
+		PasswordFields:          []string{"privateKeyPassphrase"},
+	},
+	OTCDriver: {
+		FileToFieldAliases:      map[string]string{"privateKeyFile": "privateKeyFile"},
+		PublicCredentialFields:  []string{"accessKey", "username"},
+		PrivateCredentialFields: []string{"secretKey", "password", "token"},
+	},
+	OpenstackDriver: {
+		FileToFieldAliases:      map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
+		PrivateCredentialFields: []string{"password"},
+	},
+	PacketDriver: {
+		FileToFieldAliases:      map[string]string{"userdata": "userdata"},
+		PrivateCredentialFields: []string{"apiKey"},
+	},
+	PhoenixNAPDriver: {
+		PublicCredentialFields:  []string{"clientIdentifier"},
+		PrivateCredentialFields: []string{"clientSecret"},
+	},
+	PodDriver: {
+		FileToFieldAliases: map[string]string{"userdata": "userdata"},
+	},
+	RackspaceDriver: {
+		PrivateCredentialFields: []string{"apiKey"},
+	},
+	SoftLayerDriver: {
+		PrivateCredentialFields: []string{"apiKey"},
+	},
+	Vmwaredriver: {
+		FileToFieldAliases:      map[string]string{"cloudConfig": "cloud-config"},
+		PublicCredentialFields:  []string{"username", "vcenter", "vcenterPort"},
+		PrivateCredentialFields: []string{"password"},
+		Defaults:                map[string]string{"vcenterPort": "443"},
+	},
+	GoogleDriver: {
+		FileToFieldAliases:      map[string]string{"authEncodedJson": "authEncodedJson", "userdata": "userdata"},
+		PrivateCredentialFields: []string{"authEncodedJson"},
+	},
+	OutscaleDriver: {
+		PublicCredentialFields:  []string{"accessKey", "region"},
+		PrivateCredentialFields: []string{"secretKey"},
+	},
 }
 
 func addMachineDrivers(management *config.ManagementContext) error {
@@ -183,22 +258,7 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, cre
 		return err
 	}
 	// annotations can have keys cred and password, values []string to be considered as a part of cloud credential
-	annotations := map[string]string{}
-	if m != nil {
-		for k, v := range m.Annotations {
-			annotations[k] = v
-		}
-	}
-	for key, fields := range DriverData[name] {
-		annotations[key] = strings.Join(fields, ",")
-	}
-	defaults := []string{}
-	for key, val := range driverDefaults[name] {
-		defaults = append(defaults, fmt.Sprintf("%s:%s", key, val))
-	}
-	if len(defaults) > 0 {
-		annotations["defaults"] = strings.Join(defaults, ",")
-	}
+	annotations := getAnnotations(m, name)
 
 	if m != nil {
 		n := m.DeepCopy()
@@ -240,6 +300,49 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, cre
 	})
 
 	return err
+}
+
+// getAnnotations returns a merged set of annotations combining the given NodeDriver's annotations
+// with driver-specific credential metadata derived from DriverData.
+func getAnnotations(nodeDriver *v3.NodeDriver, driverName string) map[string]string {
+	annotations := map[string]string{}
+	if nodeDriver != nil {
+		maps.Copy(annotations, nodeDriver.Annotations)
+	}
+
+	fields, exists := DriverData[driverName]
+	if !exists {
+		return annotations
+	}
+
+	// Helper: formats map[string]string to key:value comma-separated string
+	formatMap := func(mp map[string]string) string {
+		pairs := make([]string, 0, len(mp))
+		for k, v := range mp {
+			pairs = append(pairs, fmt.Sprintf("%s:%s", k, v))
+		}
+		return strings.Join(pairs, ",")
+	}
+
+	for key, val := range map[string][]string{
+		"publicCredentialFields":   fields.PublicCredentialFields,
+		"privateCredentialFields":  fields.PrivateCredentialFields,
+		"optionalCredentialFields": fields.OptionalCredentialFields,
+		"passwordFields":           fields.PasswordFields,
+	} {
+		if len(val) > 0 {
+			annotations[key] = strings.Join(val, ",")
+		}
+	}
+
+	if len(fields.Defaults) > 0 {
+		annotations["defaults"] = formatMap(fields.Defaults)
+	}
+	if len(fields.FileToFieldAliases) > 0 {
+		annotations[nodedriver.FileToFieldAliasesAnno] = formatMap(fields.FileToFieldAliases)
+	}
+
+	return annotations
 }
 
 // Delete a deprecated or invalid node driver. Don't return errors to avoid affecting

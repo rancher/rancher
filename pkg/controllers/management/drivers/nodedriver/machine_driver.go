@@ -25,23 +25,8 @@ import (
 )
 
 var (
-	SchemaLock = sync.Mutex{}
-	driverLock = sync.Mutex{}
-	// DriverToSchemaFields maps Driver field => schema field
-	// The opposite of this lives in pkg/controllers/management/node/controller.go
-	DriverToSchemaFields = map[string]map[string]string{
-		"aliyunecs":     {"sshKeypath": "sshKeyContents"},
-		"amazonec2":     {"sshKeypath": "sshKeyContents", "userdata": "userdata"},
-		"azure":         {"customData": "customData"},
-		"digitalocean":  {"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
-		"exoscale":      {"sshKey": "sshKey", "userdata": "userdata"},
-		"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-		"otc":           {"privateKeyFile": "privateKeyFile"},
-		"packet":        {"userdata": "userdata"},
-		"pod":           {"userdata": "userdata"},
-		"vmwarevsphere": {"cloud-config": "cloudConfig"},
-		"google":        {"authEncodedJson": "authEncodedJson", "userdata": "userdata"},
-	}
+	SchemaLock   = sync.Mutex{}
+	driverLock   = sync.Mutex{}
 	SSHKeyFields = map[string]bool{
 		"sshKeyContents": true,
 		"sshKey":         true,
@@ -85,10 +70,12 @@ type Lifecycle struct {
 }
 
 func (m *Lifecycle) Create(obj *v32.NodeDriver) (runtime.Object, error) {
+	logrus.Debugf("Handling creation of node driver %s", obj.Name)
 	return m.download(obj)
 }
 
 func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
+	logrus.Debugf("Downloading node driver %s", obj.Name)
 	driverLock.Lock()
 	defer driverLock.Unlock()
 	if !obj.Spec.Active && !obj.Spec.AddCloudCredential {
@@ -176,7 +163,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 
 	obj = m.addVersionInfo(obj)
 
-	obj, err = m.addUIHintsAnno(driverName, obj)
+	obj, err = m.addUIHintsAnno(obj)
 	if err != nil {
 		return obj, errs.Wrap(err, "failed JSON in addUIHintsAnno")
 	}
@@ -193,11 +180,13 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		if err != nil {
 			return nil, err
 		}
-		if aliases, ok := DriverToSchemaFields[driverName]; ok {
-			// convert path fields to their alias to take file contents
-			if alias, ok := aliases[name]; ok {
-				name = alias
-				field.Description = fmt.Sprintf("File contents for %v", alias)
+		if fileToFieldAliases, exists := obj.Annotations[FileToFieldAliasesAnno]; exists && strings.Contains(fileToFieldAliases, name) {
+			fields := ParseKeyValueString(fileToFieldAliases)
+			for schemaField, driverField := range fields {
+				if driverField == name {
+					name = schemaField
+					field.Description = fmt.Sprintf("File contents for %v", schemaField)
+				}
 			}
 		}
 
@@ -303,9 +292,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 		return true
 	}
 
-	driverName := strings.TrimPrefix(obj.Spec.DisplayName, drivers.DockerMachineDriverPrefix)
-
-	if _, ok := DriverToSchemaFields[driverName]; ok {
+	if _, ok := obj.Annotations[FileToFieldAliasesAnno]; ok {
 		if val, ok := obj.Annotations[uiFieldHintsAnno]; !ok || val == "" {
 			return true
 		}
@@ -336,12 +323,12 @@ func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) *v32.NodeDriver {
 	return obj
 }
 
-func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v32.NodeDriver) (*v32.NodeDriver, error) {
-	if aliases, ok := DriverToSchemaFields[driverName]; ok {
+func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
+	if aliasedField, ok := obj.Annotations[FileToFieldAliasesAnno]; ok {
 		anno := make(map[string]map[string]string)
-
-		for _, aliased := range aliases {
-			anno[aliased] = map[string]string{
+		aliases := ParseKeyValueString(aliasedField)
+		for field, _ := range aliases {
+			anno[field] = map[string]string{
 				"type": "multiline",
 			}
 		}
@@ -492,20 +479,10 @@ func getCredFields(annotations map[string]string) (map[string]bool, map[string]b
 		}
 		return data
 	}
-	getDefaults := func(fields string) map[string]string {
-		data := map[string]string{}
-		for _, pattern := range strings.Split(fields, ",") {
-			split := strings.SplitN(pattern, ":", 2)
-			if len(split) == 2 {
-				data[split[0]] = split[1]
-			}
-		}
-		return data
-	}
 	return getMap(annotations["publicCredentialFields"]),
 		getMap(annotations["privateCredentialFields"]),
 		getMap(annotations["passwordFields"]),
-		getDefaults(annotations["defaults"]),
+		ParseKeyValueString(annotations["defaults"]),
 		getMap(annotations["optionalCredentialFields"])
 }
 
