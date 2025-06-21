@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/settings"
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -86,7 +85,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	// get ingress endpoint group by service
 	serviceToIngressEndpoints := make(map[string][]v32.PublicEndpoint)
 	for _, ingress := range ingresses {
-		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, settings.IsRKE.Get() == "true")
+		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, false)
 		if err != nil {
 			return err
 		}

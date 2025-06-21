@@ -13,10 +13,6 @@ ARCH="${ARCH:-amd64}"
 REPO="${REPO:-rancher}"
 CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
 CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
-RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
-if [[ -z "$RKE_VERSION" ]]; then
-    RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
-fi
 CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
 CATTLE_REMOTEDIALER_PROXY_VERSION=$(yq '.remoteDialerProxyVersion' < build.yaml)
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq '.cspAdapterMinVersion' < build.yaml)
@@ -39,7 +35,6 @@ if [ -z $TARGET ] || [ $TARGET = "server" ]; then
     --build-arg ARCH="${ARCH}" \
     --build-arg IMAGE_REPO="${REPO}" \
     --build-arg COMMIT="${COMMIT}" \
-    --build-arg RKE_VERSION="${RKE_VERSION}" \
     --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
     --build-arg CATTLE_REMOTEDIALER_PROXY_VERSION="${CATTLE_REMOTEDIALER_PROXY_VERSION}" \
     --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
@@ -62,7 +57,6 @@ if [ -z $TARGET ] || [ $TARGET = "agent" ]; then
     --build-arg RANCHER_TAG="${TAG}" \
     --build-arg RANCHER_REPO="${REPO}" \
     --build-arg COMMIT="${COMMIT}" \
-    --build-arg RKE_VERSION="${RKE_VERSION}" \
     --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
     --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
     --tag "${REPO}"/rancher-agent:"${TAG}" \

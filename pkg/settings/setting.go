@@ -81,7 +81,6 @@ var (
 	InstallUUID                         = NewSetting("install-uuid", "")
 	InternalServerURL                   = NewSetting("internal-server-url", "")
 	InternalCACerts                     = NewSetting("internal-cacerts", "")
-	IsRKE                               = NewSetting("is-rke", "")
 	JailerTimeout                       = NewSetting("jailer-timeout", "60")
 	KubernetesVersion                   = NewSetting("k8s-version", "")
 	KubernetesVersionToServiceOptions   = NewSetting("k8s-version-to-service-options", "")
@@ -93,7 +92,6 @@ var (
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
-	RkeVersion                          = NewSetting("rke-version", "")
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
 	ServerURL                           = NewSetting("server-url", "")
@@ -139,8 +137,8 @@ var (
 	ClusterAgentDefaultPriorityClass       = NewSetting("cluster-agent-default-priority-class", ClusterAgentPriorityClass)
 	ClusterAgentDefaultPodDisruptionBudget = NewSetting("cluster-agent-default-pod-disruption-budget", ClusterAgentPodDisruptionBudget)
 
-	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
-	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
+	Rke2DefaultVersion = NewSetting("rke2-default-version", "1.33.x")
+	K3sDefaultVersion  = NewSetting("k3s-default-version", "1.33.x")
 
 	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
@@ -292,10 +290,10 @@ var (
 	UIIssues = NewSetting("ui-issues", "")
 
 	// UIKubernetesDefaultVersion Ember UI specific.
-	UIKubernetesDefaultVersion = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
+	UIKubernetesDefaultVersion = NewSetting("ui-k8s-default-version-range", "<=1.33.x")
 
 	// UIKubernetesSupportedVersions Ember UI specific.
-	UIKubernetesSupportedVersions = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
+	UIKubernetesSupportedVersions = NewSetting("ui-k8s-supported-versions-range", ">= 1.31.0 <=1.33.x")
 
 	// UIOfflinePreferred controls whether UI assets are served locally by the server container ('true') or from the remote URL defined in the ui-index and ui-dashboard-index settings ('false).
 	// The `dynamic` option will use remote assets for `-head` builds, otherwise the local assets for production builds.

@@ -45,7 +45,6 @@ runs:
         build-args: |
           "VERSION=${{ env.TAG }}"
           "COMMIT=${{ env.COMMIT }}"
-          "RKE_VERSION=${{ steps.env.outputs.RKE_VERSION }}"
           "ARCH=${{ env.ARCH }}"
           "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
           "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}"

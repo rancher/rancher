@@ -6,7 +6,6 @@ import (
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	"github.com/rancher/rancher/pkg/ingresswrapper"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -39,7 +38,7 @@ func (c *IngressEndpointsController) sync(key string, obj ingresswrapper.Ingress
 }
 
 func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj ingresswrapper.Ingress) (bool, error) {
-	fromObj, err := convertIngressToPublicEndpoints(obj, settings.IsRKE.Get() == "true")
+	fromObj, err := convertIngressToPublicEndpoints(obj, false)
 	if err != nil {
 		return false, err
 	}
