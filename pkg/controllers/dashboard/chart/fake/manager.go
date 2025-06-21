@@ -39,41 +39,41 @@ func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 }
 
 // Ensure mocks base method.
-func (m *MockManager) Ensure(namespace, name, minVersion, exactVersion string, values map[string]any, takeOwnership bool, installImageOverride string) error {
+func (m *MockManager) Ensure(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]any, takeOwnership bool, installImageOverride string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ensure", namespace, name, minVersion, exactVersion, values, takeOwnership, installImageOverride)
+	ret := m.ctrl.Call(m, "Ensure", namespace, chartName, releaseName, minVersion, exactVersion, values, takeOwnership, installImageOverride)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Ensure indicates an expected call of Ensure.
-func (mr *MockManagerMockRecorder) Ensure(namespace, name, minVersion, exactVersion, values, takeOwnership, installImageOverride any) *gomock.Call {
+func (mr *MockManagerMockRecorder) Ensure(namespace, chartName, releaseName, minVersion, exactVersion, values, takeOwnership, installImageOverride any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ensure", reflect.TypeOf((*MockManager)(nil).Ensure), namespace, name, minVersion, exactVersion, values, takeOwnership, installImageOverride)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ensure", reflect.TypeOf((*MockManager)(nil).Ensure), namespace, chartName, releaseName, minVersion, exactVersion, values, takeOwnership, installImageOverride)
 }
 
 // Remove mocks base method.
-func (m *MockManager) Remove(namespace, name string) {
+func (m *MockManager) Remove(namespace, releaseName string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Remove", namespace, name)
+	m.ctrl.Call(m, "Remove", namespace, releaseName)
 }
 
 // Remove indicates an expected call of Remove.
-func (mr *MockManagerMockRecorder) Remove(namespace, name any) *gomock.Call {
+func (mr *MockManagerMockRecorder) Remove(namespace, releaseName any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockManager)(nil).Remove), namespace, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockManager)(nil).Remove), namespace, releaseName)
 }
 
 // Uninstall mocks base method.
-func (m *MockManager) Uninstall(namespace, name string) error {
+func (m *MockManager) Uninstall(namespace, releaseName string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Uninstall", namespace, name)
+	ret := m.ctrl.Call(m, "Uninstall", namespace, releaseName)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Uninstall indicates an expected call of Uninstall.
-func (mr *MockManagerMockRecorder) Uninstall(namespace, name any) *gomock.Call {
+func (mr *MockManagerMockRecorder) Uninstall(namespace, releaseName any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Uninstall", reflect.TypeOf((*MockManager)(nil).Uninstall), namespace, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Uninstall", reflect.TypeOf((*MockManager)(nil).Uninstall), namespace, releaseName)
 }
