@@ -18,7 +18,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/rancher/rke/hosts"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 )
@@ -26,6 +25,14 @@ import (
 const (
 	DockerPipe = "/var/run/docker.sock"
 	HostMount  = "/host"
+
+	toCleanCNIBin       = "/opt/cni/"
+	toCleanCNIConf      = "/etc/cni/"
+	toCleanSSLDir       = "/etc/kubernetes/"
+	toCleanEtcdDir      = "/var/lib/etcd/"
+	toCleanCNILib       = "/var/lib/cni/"
+	toCleanCalicoRun    = "/var/run/calico/"
+	toCleanTempCertPath = "/etc/kubernetes/.tmp/"
 )
 
 func Run(ctx context.Context, args []string) error {
@@ -376,14 +383,14 @@ func getPaths() []string {
 
 	// all paths on the hosts to rm -rf
 	return []string{
-		hosts.ToCleanCNIConf, hosts.ToCleanCNIBin,
+		toCleanCNIConf, toCleanCNIBin,
 		"/opt/rke", "/run/secrets/kubernetes.io",
 		"/run/calico", "/run/flannel", "/var/log/containers", "/var/log/pods",
-		hosts.ToCleanCalicoRun,
-		path.Join(pathPrefix, hosts.ToCleanSSLDir),
-		path.Join(pathPrefix, hosts.ToCleanTempCertPath),
-		path.Join(pathPrefix, hosts.ToCleanEtcdDir),
-		path.Join(pathPrefix, hosts.ToCleanCNILib),
+		toCleanCalicoRun,
+		path.Join(pathPrefix, toCleanSSLDir),
+		path.Join(pathPrefix, toCleanTempCertPath),
+		path.Join(pathPrefix, toCleanEtcdDir),
+		path.Join(pathPrefix, toCleanCNILib),
 		path.Join(pathPrefix, "/var/lib/kubelet"),
 		path.Join(pathPrefix, "/var/lib/calico"),
 		path.Join(pathPrefix, "/var/lib/weave"),

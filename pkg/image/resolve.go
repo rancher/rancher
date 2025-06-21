@@ -9,12 +9,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	util "github.com/rancher/rancher/pkg/cluster"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	rketypes "github.com/rancher/rke/types"
-	img "github.com/rancher/rke/types/image"
 )
+
+var Mirrors = map[string]string{}
 
 // ExportConfig provides parameters you can define to configure image exporting for Rancher components
 type ExportConfig struct {
@@ -30,13 +29,6 @@ const (
 	Linux OSType = iota
 	Windows
 )
-
-const imageListDelimiter = "\n"
-
-var osTypeImageListName = map[OSType]string{
-	Windows: "windows-rancher-images",
-	Linux:   "rancher-images",
-}
 
 // Resolve calls ResolveWithCluster passing nil into the cluster argument.
 // returns the image concatenated with the URL of the system default registry.
@@ -64,19 +56,13 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 // Rancher charts, system images and extension images of Rancher are fetched.
 // GetImages is called during runtime by Rancher catalog package which is deprecated.
 // It is actually used for generation rancher-images.txt for airgap scenarios.
-func GetImages(exportConfig ExportConfig, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages) ([]string, []string, error) {
+func GetImages(exportConfig ExportConfig, externalImages map[string][]string, imagesFromArgs []string) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]struct{})
 
 	// fetch images from charts
 	charts := Charts{exportConfig}
 	if err := charts.FetchImages(imagesSet); err != nil {
 		return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
-	}
-
-	// fetch images from system images
-	system := System{exportConfig}
-	if err := system.FetchImages(rkeSystemImages, imagesSet); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to fetch images from system")
 	}
 
 	// fetch images from extension catalog images
@@ -99,32 +85,6 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	imagesList, imagesAndSourcesList := generateImageAndSourceLists(imagesSet)
 
 	return imagesList, imagesAndSourcesList, nil
-}
-
-func AddImagesToImageListConfigMap(cm *v1.ConfigMap, rancherVersion string) error {
-	exportConfig := ExportConfig{
-		OsType:         Windows,
-		RancherVersion: rancherVersion,
-	}
-	windowsImages, _, err := GetImages(exportConfig, nil, []string{}, nil)
-	if err != nil {
-		return err
-	}
-	exportConfig.OsType = Linux
-	linuxImages, _, err := GetImages(exportConfig, nil, []string{}, nil)
-	if err != nil {
-		return err
-	}
-	cm.Data = make(map[string]string, 2)
-	cm.Data[osTypeImageListName[Windows]] = strings.Join(windowsImages, imageListDelimiter)
-	cm.Data[osTypeImageListName[Linux]] = strings.Join(linuxImages, imageListDelimiter)
-	return nil
-}
-
-func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) ([]string, []string) {
-	windowsImages := strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
-	linuxImages := strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
-	return windowsImages, linuxImages
 }
 
 func IsValidSemver(version string) bool {
@@ -163,7 +123,7 @@ func addSourceToImage(imagesSet map[string]map[string]struct{}, image string, so
 
 func convertMirroredImages(imagesSet map[string]map[string]struct{}) {
 	for image := range imagesSet {
-		convertedImage := img.Mirror(image)
+		convertedImage := mirror(image)
 		if image == convertedImage {
 			continue
 		}
@@ -201,4 +161,29 @@ func getSourcesList(imageSources map[string]struct{}) string {
 	}
 	sort.Strings(sources)
 	return strings.Join(sources, ",")
+}
+
+func mirror(image string) string {
+	orig := image
+	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") {
+		return image
+	}
+
+	image = strings.Replace(image, "gcr.io/google_containers", "rancher", 1)
+	image = strings.Replace(image, "quay.io/coreos/", "rancher/coreos-", 1)
+	image = strings.Replace(image, "quay.io/calico/", "rancher/calico-", 1)
+	image = strings.Replace(image, "plugins/docker", "rancher/plugins-docker", 1)
+	image = strings.Replace(image, "k8s.gcr.io/defaultbackend", "rancher/nginx-ingress-controller-defaultbackend", 1)
+	image = strings.Replace(image, "k8s.gcr.io/k8s-dns-node-cache", "rancher/k8s-dns-node-cache", 1)
+	image = strings.Replace(image, "plugins/docker", "rancher/plugins-docker", 1)
+	image = strings.Replace(image, "kibana", "rancher/kibana", 1)
+	image = strings.Replace(image, "jenkins/", "rancher/jenkins-", 1)
+	image = strings.Replace(image, "alpine/git", "rancher/alpine-git", 1)
+	image = strings.Replace(image, "prom/", "rancher/prom-", 1)
+	image = strings.Replace(image, "quay.io/pires", "rancher", 1)
+	image = strings.Replace(image, "coredns/", "rancher/coredns-", 1)
+	image = strings.Replace(image, "minio/", "rancher/minio-", 1)
+
+	Mirrors[image] = orig
+	return image
 }

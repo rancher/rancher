@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/git"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/types/kdm"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 )
@@ -38,15 +37,15 @@ func parseURL(rkeData map[string]interface{}) (*MetadataURL, error) {
 	return url, nil
 }
 
-func loadData(url *MetadataURL) (kdm.Data, error) {
+func loadData(url *MetadataURL) (Data, error) {
 	if url.isGit {
 		return getDataGit(url.path, url.branch)
 	}
 	return getDataHTTP(url.path)
 }
 
-func getDataHTTP(url string) (kdm.Data, error) {
-	var data kdm.Data
+func getDataHTTP(url string) (Data, error) {
+	var data Data
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return data, fmt.Errorf("driverMetadata err %v", err)
@@ -67,8 +66,8 @@ func getDataHTTP(url string) (kdm.Data, error) {
 	return data, nil
 }
 
-func getDataGit(urlPath, branch string) (kdm.Data, error) {
-	var data kdm.Data
+func getDataGit(urlPath, branch string) (Data, error) {
+	var data Data
 
 	if _, err := os.Stat(dataPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(dataPath, 0755); err != nil {
