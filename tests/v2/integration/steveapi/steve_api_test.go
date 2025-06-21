@@ -16,12 +16,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
-	kubenamespaces "github.com/rancher/tests/actions/kubeapi/namespaces"
-	"github.com/rancher/tests/actions/kubeapi/rbac"
-	"github.com/rancher/tests/actions/kubeapi/secrets"
-	"github.com/rancher/tests/actions/namespaces"
-	stevesecrets "github.com/rancher/tests/actions/secrets"
-	"github.com/rancher/tests/actions/serviceaccounts"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	clientv1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -31,6 +26,12 @@ import (
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	kubenamespaces "github.com/rancher/tests/actions/kubeapi/namespaces"
+	"github.com/rancher/tests/actions/kubeapi/rbac"
+	"github.com/rancher/tests/actions/kubeapi/secrets"
+	"github.com/rancher/tests/actions/namespaces"
+	stevesecrets "github.com/rancher/tests/actions/secrets"
+	"github.com/rancher/tests/actions/serviceaccounts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -548,11 +549,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	}
 }
 
-func (s *steveAPITestSuite) TestList() {
-	subSession := s.session.NewSession()
-	defer subSession.Cleanup()
-
-	tests := []struct {
+type testListStruct struct {
 		description    string
 		user           string
 		namespace      string
@@ -560,7 +557,117 @@ func (s *steveAPITestSuite) TestList() {
 		expect         []map[string]string
 		expectExcludes bool
 		expectContains bool
-	}{
+}
+
+	var nonSQLListTests = []testListStruct{
+		{
+			description: "user:user-a,namespace:none,query:limit=8&continue=" + continueToken,
+			user:        "user-a",
+			namespace:   "",
+			query:       "limit=8&continue=" + continueToken,
+			expect: []map[string]string{
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
+			user:        "user-a",
+			namespace:   "test-ns-1",
+			query:       "limit=3&continue=" + continueToken,
+			expect: []map[string]string{
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
+			// the remaining chunk is all from test-ns-5
+			expect: []map[string]string{
+				{"name": "test5", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+			},
+		},
+		{
+			description: "user:user-b,namespace:none,query:limit=3&continue=" + continueToken,
+			user:        "user-b",
+			namespace:   "",
+			query:       "limit=3&continue=" + continueToken,
+			expect: []map[string]string{
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-b,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
+			user:        "user-b",
+			namespace:   "test-ns-1",
+			query:       "limit=3&continue=" + continueToken,
+			expect: []map[string]string{
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-c,namespace:none,query:limit=3&continue=" + continueToken,
+			user:        "user-c",
+			namespace:   "",
+			query:       "limit=3&continue=" + continueToken,
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize=6&limit=20",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize~6&limit=20",
+			// limit is applied BEFORE filter and pagesize, which is why not all test5 secrets appear in the result
+			expect: []map[string]string{
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test4"},
+				{"name": "test4"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
+			expect: []map[string]string{
+				{"name": "test4"},
+				{"name": "test4"},
+				{"name": "test3"},
+				{"name": "test3"},
+				{"name": "test3"},
+				{"name": "test3"},
+			},
+		},
+	}
+
+	var SQLRequiringListTests = []testListStruct{
+	}
+
+func (s *steveAPITestSuite) TestList() {
+	subSession := s.session.NewSession()
+	defer subSession.Cleanup()
+
+	tests := []testListStruct{
 		// user-a
 		{
 			description: "user:user-a,namespace:none,query:none",
@@ -715,22 +822,6 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:limit=8&continue=" + continueToken,
-			user:        "user-a",
-			namespace:   "",
-			query:       "limit=8&continue=" + continueToken,
-			expect: []map[string]string{
-				{"name": "test4", "namespace": "test-ns-2"},
-				{"name": "test5", "namespace": "test-ns-2"},
-				{"name": "test1", "namespace": "test-ns-3"},
-				{"name": "test2", "namespace": "test-ns-3"},
-				{"name": "test3", "namespace": "test-ns-3"},
-				{"name": "test4", "namespace": "test-ns-3"},
-				{"name": "test5", "namespace": "test-ns-3"},
-				{"name": "test1", "namespace": "test-ns-4"},
-			},
-		},
-		{
 			description: "user:user-a,namespace:test-ns-1,query:limit=3",
 			user:        "user-a",
 			namespace:   "test-ns-1",
@@ -739,16 +830,6 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
-			},
-		},
-		{
-			description: "user:user-a,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
-			user:        "user-a",
-			namespace:   "test-ns-1",
-			query:       "limit=3&continue=" + continueToken,
-			expect: []map[string]string{
-				{"name": "test4", "namespace": "test-ns-1"},
-				{"name": "test5", "namespace": "test-ns-1"},
 			},
 		},
 		{
@@ -781,10 +862,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			description: "user:user-a,namespace:none,query:filter=metadata.name~1,metadata.namespace~1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.name=1,metadata.namespace=1",
+			query:       "filter=metadata.name~1,metadata.namespace~1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -798,10 +879,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte~3,metadata.labels.test-label~2&filter=metadata.namespace~1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			query:       "filter=metadata.labels.test-label-gte~3,metadata.labels.test-label~2&filter=metadata.namespace~1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -810,10 +891,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.name!=1",
+			description: "user:user-a,namespace:none,query:filter=metadata.name!~1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.name!=1",
+			query:       "filter=metadata.name!~1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1048,47 +1129,6 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test5", "namespace": "test-ns-1"},
 			},
 		},
-		{
-			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20",
-			user:        "user-a",
-			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20",
-			// limit is applied BEFORE filter and pagesize, which is why not all test5 secrets appear in the result
-			expect: []map[string]string{
-				{"name": "test5"},
-				{"name": "test5"},
-				{"name": "test5"},
-				{"name": "test5"},
-				{"name": "test4"},
-				{"name": "test4"},
-			},
-		},
-		{
-			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
-			user:        "user-a",
-			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
-			expect: []map[string]string{
-				{"name": "test4"},
-				{"name": "test4"},
-				{"name": "test3"},
-				{"name": "test3"},
-				{"name": "test3"},
-				{"name": "test3"},
-			},
-		},
-		{
-			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
-			user:        "user-a",
-			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
-			// the remaining chunk is all from test-ns-5
-			expect: []map[string]string{
-				{"name": "test5", "namespace": "test-ns-5"},
-				{"name": "test4", "namespace": "test-ns-5"},
-				{"name": "test3", "namespace": "test-ns-5"},
-			},
-		},
 
 		// user-b
 		{
@@ -1125,28 +1165,28 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:labelSelector=test-label=2",
+			description: "user:user-b,namespace:none,query:labelSelector=test-label~2",
 			user:        "user-b",
 			namespace:   "",
-			query:       "labelSelector=test-label=2",
+			query:       "labelSelector=test-label~2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-1,query:labelSelector=test-label=2",
+			description: "user:user-b,namespace:test-ns-1,query:labelSelector=test-label~2",
 			user:        "user-b",
 			namespace:   "test-ns-1",
-			query:       "labelSelector=test-label=2",
+			query:       "labelSelector=test-label~2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-2,query:labelSelector=test-label=2",
+			description: "user:user-b,namespace:test-ns-2,query:labelSelector=test-label~2",
 			user:        "user-b",
 			namespace:   "test-ns-2",
-			query:       "labelSelector=test-label=2",
+			query:       "labelSelector=test-label~2",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1222,10 +1262,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:limit=3",
+			description: "user:user-b,namespace:none,query:limit~3",
 			user:        "user-b",
 			namespace:   "",
-			query:       "limit=3",
+			query:       "limit~3",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1233,20 +1273,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:limit=3&continue=" + continueToken,
-			user:        "user-b",
-			namespace:   "",
-			query:       "limit=3&continue=" + continueToken,
-			expect: []map[string]string{
-				{"name": "test4", "namespace": "test-ns-1"},
-				{"name": "test5", "namespace": "test-ns-1"},
-			},
-		},
-		{
-			description: "user:user-b,namespace:test-ns-1,query:limit=3",
+			description: "user:user-b,namespace:test-ns-1,query:limit~3",
 			user:        "user-b",
 			namespace:   "test-ns-1",
-			query:       "limit=3",
+			query:       "limit~3",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1254,20 +1284,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
-			user:        "user-b",
-			namespace:   "test-ns-1",
-			query:       "limit=3&continue=" + continueToken,
-			expect: []map[string]string{
-				{"name": "test4", "namespace": "test-ns-1"},
-				{"name": "test5", "namespace": "test-ns-1"},
-			},
-		},
-		{
-			description: "user:user-b,namespace:test-ns-5,query:limit=3",
+			description: "user:user-b,namespace:test-ns-5,query:limit~3",
 			user:        "user-b",
 			namespace:   "test-ns-5",
-			query:       "limit=3",
+			query:       "limit~3",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1296,10 +1316,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			description: "user:user-b,namespace:none,query:filter=metadata.name~1,metadata.namespace~1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.name=1,metadata.namespace=1",
+			query:       "filter=metadata.name~1,metadata.namespace~1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1309,10 +1329,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte~3,metadata.labels.test-label~2&filter=metadata.namespace~1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			query:       "filter=metadata.labels.test-label-gte~3,metadata.labels.test-label~2&filter=metadata.namespace~1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1321,10 +1341,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.name!=1",
+			description: "user:user-b,namespace:none,query:filter=metadata.name!~1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.name!=1",
+			query:       "filter=metadata.name!~1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1467,20 +1487,20 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=2",
+			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize=2",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=2",
+			query:       "filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize=2",
 			expect: []map[string]string{
 				{"name": "test5", "namespace": "test-ns-1"},
 				{"name": "test4", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=2&page=2&revision=" + revisionNum,
+			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize=2&page=2&revision=" + revisionNum,
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=2&page=2&revision=" + revisionNum,
+			query:       "filter=metadata.labels.test-label-gte~3&sort=-metadata.name&pagesize=2&page=2&revision=" + revisionNum,
 			expect: []map[string]string{
 				{"name": "test3", "namespace": "test-ns-1"},
 			},
@@ -1519,10 +1539,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:labelSelector=test-label=2",
+			description: "user:user-c,namespace:none,query:labelSelector=test-label~2",
 			user:        "user-c",
 			namespace:   "",
-			query:       "labelSelector=test-label=2",
+			query:       "labelSelector=test-label~2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-2"},
@@ -1530,19 +1550,19 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-1,query:labelSelector=test-label=2",
+			description: "user:user-c,namespace:test-ns-1,query:labelSelector=test-label~2",
 			user:        "user-c",
 			namespace:   "test-ns-1",
-			query:       "labelSelector=test-label=2",
+			query:       "labelSelector=test-label~2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-5,query:labelSelector=test-label=2",
+			description: "user:user-c,namespace:test-ns-5,query:labelSelector=test-label~2",
 			user:        "user-c",
 			namespace:   "test-ns-5",
-			query:       "labelSelector=test-label=2",
+			query:       "labelSelector=test-label~2",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1649,17 +1669,6 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:limit=3&continue=" + continueToken,
-			user:        "user-c",
-			namespace:   "",
-			query:       "limit=3&continue=" + continueToken,
-			expect: []map[string]string{
-				{"name": "test2", "namespace": "test-ns-2"},
-				{"name": "test1", "namespace": "test-ns-3"},
-				{"name": "test2", "namespace": "test-ns-3"},
-			},
-		},
-		{
 			description: "user:user-c,namespace:test-ns-1,query:limit=3",
 			user:        "user-c",
 			namespace:   "test-ns-1",
@@ -1704,10 +1713,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			description: "user:user-c,namespace:none,query:filter=metadata.name~1,metadata.namespace~1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.name=1,metadata.namespace=1",
+			query:       "filter=metadata.name~1,metadata.namespace~1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1727,10 +1736,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte~3,metadata.labels.test-label~2&filter=metadata.namespace~1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			query:       "filter=metadata.labels.test-label-gte~3,metadata.labels.test-label~2&filter=metadata.namespace~1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
@@ -2456,6 +2465,18 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 	}
+    if features.UISQLCache.Enabled() {
+		tests = append(tests, SQLRequiringListTests...)
+	} else {
+		tests = append(tests, nonSQLListTests...)
+		// Map the SQL-available '~' match operator to the old '=' operator
+		// In non-SQL, '=' does a partial match when the value arg isn't quoted.
+		for i := range len(tests) {
+			tests[i].description = strings.ReplaceAll(tests[i].description, "~", "=")
+			tests[i].query = strings.ReplaceAll(tests[i].query, "~", "=")
+		}
+		
+	}
 
 	var csvWriter *csv.Writer
 	var jsonDir string
@@ -2672,7 +2693,7 @@ func (s *steveAPITestSuite) TestLinks() {
 
 	secretObj, err := secretClient.Create(corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      namegenerator.AppendRandomString("steve-secret"),
+			Name:      namegenerator.AppendRandomString("steve-secret-squirrel"),
 			Namespace: namespaceMap["test-ns-1"],
 		},
 		Data: map[string][]byte{"foo": []byte("bar")},
@@ -2695,6 +2716,10 @@ func (s *steveAPITestSuite) TestLinks() {
 		"view":   fmt.Sprintf("https://%s/api/v1/namespaces/%s/secrets/%s", host, secretObj.Namespace, secretObj.Name),
 	}
 
+	// delete
+	err = secretClient.Delete(readObj)
+	require.NoError(s.T(), err)
+
 	assert.Equal(s.T(), expectedID, id)
 	assert.Equal(s.T(), expectedLinks, links)
 }
@@ -2712,7 +2737,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		// create
 		secretObj, err := secretClient.Create(corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      namegenerator.AppendRandomString("steve-secret"),
+				Name:      namegenerator.AppendRandomString("steve-secret-garden"),
 				Namespace: namespaceMap["test-ns-1"], // need to specify the namespace for a namespaced resource if using a global endpoint ("/v1/secrets")
 			},
 			Data: map[string][]byte{"foo": []byte("bar")},
@@ -2751,7 +2776,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		// create
 		secretObj, err := secretClient.Create(corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: namegenerator.AppendRandomString("steve-secret"),
+				Name: namegenerator.AppendRandomString("steve-secret-six"),
 				// no need to provide a namespace since using a namespaced endpoint ("/v1/secrets/test-ns-1")
 			},
 			Data: map[string][]byte{"foo": []byte("bar")},
@@ -2784,14 +2809,14 @@ func (s *steveAPITestSuite) TestCRUD() {
 		assert.Nil(s.T(), readObj)
 	})
 }
-func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
-	assert.Equal(s.T(), len(expect), len(list))
-	for i, w := range expect {
+func (s *steveAPITestSuite) assertListIsEqual(expectedList []map[string]string, receivedList []clientv1.SteveAPIObject) {
+	assert.Equal(s.T(), len(expectedList), len(receivedList))
+	for i, w := range expectedList {
 		if name, ok := w["name"]; ok {
-			assert.Equal(s.T(), name, list[i].Name)
+			assert.Equal(s.T(), name, receivedList[i].Name, fmt.Sprintf("diff at index %d: expecting name %q, got %q", i, name, receivedList[i].Name))
 		}
 		if ns, ok := w["namespace"]; ok {
-			assert.Equal(s.T(), namespaceMap[ns], list[i].Namespace)
+			assert.Equal(s.T(), namespaceMap[ns], receivedList[i].Namespace, fmt.Sprintf("diff at index %d: expecting namespace mapped:%q (raw:%q), got %q", i, namespaceMap[ns], ns, receivedList[i].Namespace))
 		}
 	}
 }
