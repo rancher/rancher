@@ -8,7 +8,6 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	rketypes "github.com/rancher/rke/types"
 	assertlib "github.com/stretchr/testify/assert"
 )
 
@@ -186,7 +185,7 @@ func TestGetImages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{}, map[string]rketypes.RKESystemImages{})
+			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{})
 			assertlib.NoError(t, err)
 
 			for _, expected := range tt.expected {
