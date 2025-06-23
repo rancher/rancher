@@ -107,7 +107,6 @@ func (m *MetadataController) refresh() error {
 	}
 	defer deleteMap(m.url)
 	if err := m.Refresh(m.url); err != nil {
-		logrus.Warnf("%v, Fallback to refresh from local file path %v", err, DataJSONLocation)
 		return errors.Wrapf(err, "failed to refresh from local file path: %s", DataJSONLocation)
 	}
 	setFinalPath(m.url)
