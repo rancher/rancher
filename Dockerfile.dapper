@@ -3,7 +3,7 @@ FROM registry.suse.com/bci/golang:1.24
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher129
-ENV CATTLE_K3S_VERSION v1.33.0+k3s1
+ENV CATTLE_K3S_VERSION v1.33.1+k3s1
 ENV HELM_UNITTEST_VERSION 0.3.2
 # k3d ci version
 ENV K3D_VERSION v5.7.1
@@ -33,11 +33,11 @@ ENV CONTROLLER_GEN_VERSION v0.17.1
 RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
 
 # YAML processor for release configuration.
-ENV YQ_VERSION v4.45.4
+ENV YQ_VERSION v4.44.2
 RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH}.tar.gz -O - | tar xz && mv yq_linux_${ARCH} /usr/bin/yq
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.33.0-k3s1 \
+COPY --from=rancher/k3s:v1.33.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
