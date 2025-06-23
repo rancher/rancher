@@ -38,11 +38,3 @@ runs:
     - name: Package
       shell: bash
       run: ./scripts/chart/package
-    - name: Upload chart
-      uses: actions/upload-artifact@v4
-      with:
-        name: chart
-        path: ./bin/chart/*
-        if-no-files-found: error
-        retention-days: 4
-        overwrite: true
