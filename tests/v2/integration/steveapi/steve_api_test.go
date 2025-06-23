@@ -2811,7 +2811,22 @@ func (s *steveAPITestSuite) TestCRUD() {
 }
 func (s *steveAPITestSuite) assertListIsEqual(expectedList []map[string]string, receivedList []clientv1.SteveAPIObject) {
 	assert.Equal(s.T(), len(expectedList), len(receivedList))
-	assert.Equal(s.T(), expectedList, receivedList)
+	receivedSubset := make([]map[string]string, len(receivedList))
+	for i, r := range receivedList {
+		receivedSubset[i] = map[string]string{"name": r.Name, "namespace": r.Namespace}
+	}
+	expectedSubset := make([]map[string]string, len(expectedList))
+	for i, w := range expectedList {
+		vals := map[string]string{"name": w["name"]}
+		ns, ok := w["namespace"]
+		if ok {
+			vals["namespace"] = namespaceMap[ns]
+		} else {
+			vals["namespace"] = ""
+		}
+		expectedSubset[i] = vals
+	}
+	assert.Equal(s.T(), expectedSubset, receivedSubset)
 	length := len(expectedList)
 	if length > len(receivedList) {
 		length = len(receivedList)
