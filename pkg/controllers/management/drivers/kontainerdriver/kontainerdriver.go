@@ -146,13 +146,18 @@ func (l *Lifecycle) createDynamicSchema(obj *v3.KontainerDriver) error {
 }
 
 func (l *Lifecycle) createOrUpdateDynamicSchema(obj *v3.KontainerDriver) error {
+	// Skipping creation or update of dynamic schema for AKS, GKE and EKS drivers
+	// since they are now using KEv2.
+	if obj.Name == "googlekubernetesengine" || obj.Name == "azurekubernetesservice" || obj.Name == "amazonelasticcontainerservice" {
+		return nil
+	}
+
 	dynamicSchema, err := l.dynamicSchemasLister.Get("", strings.ToLower(getDynamicTypeName(obj)))
 	if errors.IsNotFound(err) {
 		return l.createDynamicSchema(obj)
 	}
 	if err != nil {
 		return err
-
 	}
 
 	return l.updateDynamicSchema(dynamicSchema, obj)
@@ -452,7 +457,7 @@ func (l *Lifecycle) Remove(obj *v3.KontainerDriver) (runtime.Object, error) {
 		return nil, fmt.Errorf("error deleting dynamic schema: %v", err)
 	}
 
-	if err := l.removeFieldFromCluster(obj); err != nil {
+	if err := l.removeFieldFromCluster(obj); err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
 
@@ -468,7 +473,7 @@ func (l *Lifecycle) removeFieldFromCluster(obj *v3.KontainerDriver) error {
 
 	nodeSchema, err := l.dynamicSchemasLister.Get("", "cluster")
 	if err != nil {
-		return fmt.Errorf("error getting schema: %v", err) // this error may fire during Rancher startup
+		return fmt.Errorf("error getting schema: %w", err) // this error may fire during Rancher startup
 	}
 
 	nodeSchema = nodeSchema.DeepCopy()

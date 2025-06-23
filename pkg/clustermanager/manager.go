@@ -23,7 +23,6 @@ import (
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -341,13 +340,6 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 				} else {
 					ht.DialContext = nil
 					ht.DialTLS = tlsDialer
-				}
-			}
-			if cluster.Status.Driver == "googleKubernetesEngine" && cluster.Spec.GenericEngineConfig != nil {
-				cred, _ := (*cluster.Spec.GenericEngineConfig)["credential"].(string)
-				rt, err = gke.Oauth2Transport(context.RunContext, rt, cred)
-				if err != nil {
-					logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 				}
 			}
 			return rt
