@@ -184,7 +184,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(RKEConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	out.LocalClusterAuthEndpoint = in.LocalClusterAuthEndpoint
+	if in.LocalClusterAuthEndpoint != nil {
+		in, out := &in.LocalClusterAuthEndpoint, &out.LocalClusterAuthEndpoint
+		*out = new(rkecattleiov1.LocalClusterAuthEndpoint)
+		**out = **in
+	}
 	if in.AgentEnvVars != nil {
 		in, out := &in.AgentEnvVars, &out.AgentEnvVars
 		*out = make([]rkecattleiov1.EnvVar, len(*in))
@@ -307,7 +311,11 @@ func (in *RKEConfig) DeepCopyInto(out *RKEConfig) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	out.MachinePoolDefaults = in.MachinePoolDefaults
+	if in.MachinePoolDefaults != nil {
+		in, out := &in.MachinePoolDefaults, &out.MachinePoolDefaults
+		*out = new(RKEMachinePoolDefaults)
+		**out = **in
+	}
 	if in.InfrastructureRef != nil {
 		in, out := &in.InfrastructureRef, &out.InfrastructureRef
 		*out = new(corev1.ObjectReference)

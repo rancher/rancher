@@ -58,10 +58,14 @@ spec:
                 description: AgentEnvVars is a list of environment variables that
                   will be set on the cluster agent deployment and system agent service.
                 items:
+                  description: EnvVar represents a key value pair for an environment
+                    variable.
                   properties:
                     name:
+                      description: Name is the name of the environment variable.
                       type: string
                     value:
+                      description: Value is the value of the environment variable.
                       type: string
                   type: object
                 type: array
@@ -2243,8 +2247,12 @@ spec:
                       AdditionalManifest is a string containing a yaml blob to insert in the
                       /var/lib/rancher/<rke2/k3s>/server/manifests/rancher/addons.yaml file.
                       The distro will automatically create these resources.
+                      Resources created as additional manifests will be deleted if removed from additional manifests.
                     type: string
                   chartValues:
+                    description: |-
+                      ChartValues is a map whose keys correspond to charts to be installed by the distro, with values corresponding
+                      to the helm values configurable in the chart.
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   dataDirectories:
@@ -2342,6 +2350,8 @@ spec:
                           to initiate a snapshot restore.
                         type: integer
                       name:
+                        description: Name refers to the name of the associated etcdsnapshot
+                          object.
                         type: string
                       restoreRKEConfig:
                         description: Set to either none (or empty string), all, or
@@ -2398,6 +2408,9 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   machineGlobalConfig:
+                    description: |-
+                      MachineGlobalConfig is a list of distro arguments which will be copied to
+                      /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml for all machines.
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   machinePoolDefaults:
@@ -2432,6 +2445,7 @@ spec:
                             provisioned by this pool should be controlplane nodes.
                           type: boolean
                         displayName:
+                          description: Deprecated
                           type: string
                         drainBeforeDelete:
                           description: DrainBeforeDelete defines whether the machines
@@ -2448,8 +2462,8 @@ spec:
                             Since rancher-machine based MachineTemplates are not api-versioned, this field is used to drop new fields added
                             to the driver if it has been upgraded since initial provisioning. This allows node drivers to be upgraded
                             without triggering a reconciliation of the provisioning cluster.
-                            NOTE: By removing this field, machine pools will be upgraded to the latest version of the node driver.
-                            If the spec is the same as it was at creation, the machine pool will not trigger a rollout.
+                            NOTE: This field can only be removed if the "provisioning.cattle.io/allow-dynamic-schema-drop" annotation is
+                            present on the provisioning cluster object, otherwise it will be reinserted.
                           type: string
                         etcdRole:
                           description: EtcdRole defines whether the machines provisioned
@@ -2545,6 +2559,8 @@ spec:
                             Name is the internal name of the machine pool.
                             The generated CAPI machine deployment will be a concatenation of the cluster name and the machine pool name
                             which, if over 63 characters is truncated to 54 with a sha256sum appended.
+                          maxLength: 63
+                          minLength: 1
                           type: string
                         nodeStartupTimeout:
                           description: |-
@@ -2571,6 +2587,7 @@ spec:
                           description: Quantity is the desired number of machines
                             in the machine pool.
                           format: int32
+                          minimum: 0
                           type: integer
                         rollingUpdate:
                           description: RollingUpdate is the configuration for the
@@ -2581,7 +2598,7 @@ spec:
                               - type: integer
                               - type: string
                               description: |-
-                                The maximum number of machines that can be scheduled above the
+                                MaxSurge is the maximum number of machines that can be scheduled above the
                                 desired number of machines.
                                 Value can be an absolute number (ex: 5) or a percentage of
                                 desired machines (ex: 10%).
@@ -2600,7 +2617,7 @@ spec:
                               - type: integer
                               - type: string
                               description: |-
-                                The maximum number of machines that can be unavailable during the update.
+                                MaxUnavailable is the maximum number of machines that can be unavailable during the update.
                                 Value can be an absolute number (ex: 5) or a percentage of desired
                                 machines (ex: 10%).
                                 Absolute number is calculated from percentage by rounding down.
@@ -2660,8 +2677,14 @@ spec:
                           description: WorkerRole defines whether the machines provisioned
                             by this pool should be worker nodes.
                           type: boolean
+                      required:
+                      - name
                       type: object
+                    maxItems: 1000
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   machineSelectorConfig:
                     description: |-
                       MachineSelectorConfig is a list of distro arguments which will be copied to
@@ -2677,8 +2700,8 @@ spec:
                           x-kubernetes-preserve-unknown-fields: true
                         machineLabelSelector:
                           description: |-
-                            MachineLabelSelector is a label selector that is used to match machines.
-                            An empty label selector matches all machines.
+                            MachineLabelSelector is a label selector used to match machines.
+                            An empty/null label selector matches all machines.
                           properties:
                             matchExpressions:
                               description: matchExpressions is a list of label selector
@@ -2737,21 +2760,44 @@ spec:
                           items:
                             properties:
                               configMap:
+                                description: ConfigMap is the configuration for mapping
+                                  a configmap containing arbitrary data to a series
+                                  of files on the system-agent host.
                                 properties:
                                   defaultPermissions:
+                                    description: DefaultPermissions provides a fallback
+                                      value for all files within the configmap/secret.
                                     type: string
                                   items:
+                                    description: Items is a list of mappings from
+                                      the keys within the resource to the files to
+                                      create on the downstream machine.
                                     items:
                                       properties:
                                         dynamic:
+                                          description: |-
+                                            Dynamic indicates whether the rendered file should be included when calculating the restart stamp
+                                            i.e. whether changes to this resource should trigger draining when reconciling.
                                           type: boolean
                                         hash:
+                                          description: Hash is used to ensure that
+                                            the data within the configmap or secret
+                                            matches the expected sha256sum of the
+                                            value at the provided key.
                                           type: string
                                         key:
+                                          description: Key is the key used to index
+                                            the associated configmap or secret.
                                           type: string
                                         path:
+                                          description: Path is the absolute path the
+                                            data within the configmap or secret should
+                                            be written to by the system-agent.
                                           type: string
                                         permissions:
+                                          description: Permissions specifies the desired
+                                            permissions for this file on the machine's
+                                            filesystem.
                                           type: string
                                       required:
                                       - key
@@ -2760,26 +2806,52 @@ spec:
                                     minItems: 1
                                     type: array
                                   name:
+                                    description: |-
+                                      Name is the name of the resource.
+                                      The namespace is required to be the same as the related RKEControlPlane object.
                                     type: string
                                 required:
                                 - name
                                 type: object
                               secret:
+                                description: Secret is the configuration for mapping
+                                  a secret containing arbitrary data to a series of
+                                  files on the system-agent host.
                                 properties:
                                   defaultPermissions:
+                                    description: DefaultPermissions provides a fallback
+                                      value for all files within the configmap/secret.
                                     type: string
                                   items:
+                                    description: Items is a list of mappings from
+                                      the keys within the resource to the files to
+                                      create on the downstream machine.
                                     items:
                                       properties:
                                         dynamic:
+                                          description: |-
+                                            Dynamic indicates whether the rendered file should be included when calculating the restart stamp
+                                            i.e. whether changes to this resource should trigger draining when reconciling.
                                           type: boolean
                                         hash:
+                                          description: Hash is used to ensure that
+                                            the data within the configmap or secret
+                                            matches the expected sha256sum of the
+                                            value at the provided key.
                                           type: string
                                         key:
+                                          description: Key is the key used to index
+                                            the associated configmap or secret.
                                           type: string
                                         path:
+                                          description: Path is the absolute path the
+                                            data within the configmap or secret should
+                                            be written to by the system-agent.
                                           type: string
                                         permissions:
+                                          description: Permissions specifies the desired
+                                            permissions for this file on the machine's
+                                            filesystem.
                                           type: string
                                       required:
                                       - key
@@ -2788,6 +2860,9 @@ spec:
                                     minItems: 1
                                     type: array
                                   name:
+                                    description: |-
+                                      Name is the name of the resource.
+                                      The namespace is required to be the same as the related RKEControlPlane object.
                                     type: string
                                 required:
                                 - name
@@ -2795,8 +2870,9 @@ spec:
                             type: object
                           type: array
                         machineLabelSelector:
-                          description: MachineLabelSelector is a label selector used
-                            to match machines.
+                          description: |-
+                            MachineLabelSelector is a label selector used to match machines.
+                            An empty/null label selector matches all machines.
                           properties:
                             matchExpressions:
                               description: matchExpressions is a list of label selector
@@ -2849,13 +2925,17 @@ spec:
                     properties:
                       stackPreference:
                         description: |-
-                          Specifies which networking stack to prefer for external cluster communication. In practice, this is used by the
+                          StackPreference specifies which networking stack to prefer for external cluster communication. In practice, this is used by the
                           planner to render the various probes to force IPv4, IPv6, or default to localhost. There is currently no
                           sanitization or validation as cluster configuration can be specified with machineGlobalConfig and
                           machineSelectorConfig, which although easy to instrument to determine a potential interface, user defined
                           configuration can be specified in the `/etc/rancher/<rke2/k3s>/config.yaml.d` directory either manually or via
                           cloud-init, and there is currently no mechanism to extract the completely rendered configuration via the planner
                           nor various engines themselves.
+                        enum:
+                        - ipv4
+                        - ipv6
+                        - dual
                         type: string
                     type: object
                   provisionGeneration:
@@ -2873,19 +2953,27 @@ spec:
                             to communicate with the registry.
                           properties:
                             authConfigSecretName:
-                              description: Auth contains information to authenticate
-                                to the registry.
+                              description: |-
+                                AuthConfigSecretName contains information to authenticate to the registry.
+                                The accepted keys are as follows:
+                                - username
+                                - password
+                                - auth
+                                - identityToken
                               type: string
                             caBundle:
-                              description: CABundle
+                              description: CABundle is the CA chain used when communicating
+                                with the image registry.
                               format: byte
                               type: string
                             insecureSkipVerify:
-                              description: InsecureSkipVerify
+                              description: InsecureSkipVerify indicates whether validation
+                                of the server's certificate should be skipped.
                               type: boolean
                             tlsSecretName:
                               description: |-
-                                TLSSecretName is a pair of Cert/Key which are used when creating the transport
+                                TLSSecretName is the name of the secret residing within the same namespace as the RKEControlPlane object
+                                that contains the keys "Cert" and "Key" which are used when creating the transport
                                 that communicates with the registry.
                               type: string
                           type: object
@@ -2950,6 +3038,9 @@ spec:
                         type: integer
                     type: object
                   upgradeStrategy:
+                    description: UpgradeStrategy contains the concurrency and drain
+                      configuration to be used when upgrading machine pools of servers
+                      and agents.
                     properties:
                       controlPlaneConcurrency:
                         description: |-
@@ -2957,11 +3048,13 @@ spec:
                           The default value is 1, a 0 value is infinite. Percentages are also accepted.
                         type: string
                       controlPlaneDrainOptions:
-                        description: DrainOptions contains the drain configuration
-                          for a machine pool.
+                        description: ControlPlaneDrainOptions is the drain configuration
+                          to be used when draining controlplane nodes, during both
+                          upgrades and machine rollouts.
                         properties:
                           deleteEmptyDirData:
-                            description: Continue even if there are pods using emptyDir
+                            description: DeleteEmptyDirData instructs the drain operation
+                              to proceed even if there are pods using emptyDir
                             type: boolean
                           disableEviction:
                             description: DisableEviction forces drain to use delete
@@ -2972,6 +3065,7 @@ spec:
                               for the machine pool before upgrading.
                             type: boolean
                           force:
+                            default: false
                             description: |-
                               Force specifies whether to drain the node even if there are pods not managed by a ReplicationController, Job, or DaemonSet.
                               Drain will not proceed without Force set to true if there are such pods.
@@ -2982,6 +3076,7 @@ spec:
                               If negative, the default value specified in the pod will be used.
                             type: integer
                           ignoreDaemonSets:
+                            default: true
                             description: |-
                               IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
                               If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
@@ -3006,8 +3101,8 @@ spec:
                               type: object
                             type: array
                           preDrainHooks:
-                            description: PreDrainHooks is a list of hooks to run prior
-                              to draining a node
+                            description: PreDrainHooks is a list of hooks to run before
+                              draining a node
                             items:
                               properties:
                                 annotation:
@@ -3020,12 +3115,14 @@ spec:
                             type: array
                           skipWaitForDeleteTimeoutSeconds:
                             description: SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp
-                              older than N seconds, skip waiting for the pod.  Seconds
+                              older than N seconds, skip waiting for the pod. Seconds
                               must be greater than 0 to skip.
+                            minimum: 0
                             type: integer
                           timeout:
                             description: Time to wait (in seconds) before giving up
                               for one try
+                            minimum: 0
                             type: integer
                         required:
                         - deleteEmptyDirData
@@ -3033,7 +3130,6 @@ spec:
                         - enabled
                         - force
                         - gracePeriod
-                        - ignoreDaemonSets
                         - skipWaitForDeleteTimeoutSeconds
                         - timeout
                         type: object
@@ -3043,11 +3139,13 @@ spec:
                           The default value is 1, a 0 value is infinite. Percentages are also accepted.
                         type: string
                       workerDrainOptions:
-                        description: DrainOptions contains the drain configuration
-                          for a machine pool.
+                        description: WorkerDrainOptions is the drain configuration
+                          to be used when draining worker nodes, during both upgrades
+                          and machine rollouts.
                         properties:
                           deleteEmptyDirData:
-                            description: Continue even if there are pods using emptyDir
+                            description: DeleteEmptyDirData instructs the drain operation
+                              to proceed even if there are pods using emptyDir
                             type: boolean
                           disableEviction:
                             description: DisableEviction forces drain to use delete
@@ -3058,6 +3156,7 @@ spec:
                               for the machine pool before upgrading.
                             type: boolean
                           force:
+                            default: false
                             description: |-
                               Force specifies whether to drain the node even if there are pods not managed by a ReplicationController, Job, or DaemonSet.
                               Drain will not proceed without Force set to true if there are such pods.
@@ -3068,6 +3167,7 @@ spec:
                               If negative, the default value specified in the pod will be used.
                             type: integer
                           ignoreDaemonSets:
+                            default: true
                             description: |-
                               IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
                               If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
@@ -3092,8 +3192,8 @@ spec:
                               type: object
                             type: array
                           preDrainHooks:
-                            description: PreDrainHooks is a list of hooks to run prior
-                              to draining a node
+                            description: PreDrainHooks is a list of hooks to run before
+                              draining a node
                             items:
                               properties:
                                 annotation:
@@ -3106,12 +3206,14 @@ spec:
                             type: array
                           skipWaitForDeleteTimeoutSeconds:
                             description: SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp
-                              older than N seconds, skip waiting for the pod.  Seconds
+                              older than N seconds, skip waiting for the pod. Seconds
                               must be greater than 0 to skip.
+                            minimum: 0
                             type: integer
                           timeout:
                             description: Time to wait (in seconds) before giving up
                               for one try
+                            minimum: 0
                             type: integer
                         required:
                         - deleteEmptyDirData
@@ -3119,7 +3221,6 @@ spec:
                         - enabled
                         - force
                         - gracePeriod
-                        - ignoreDaemonSets
                         - skipWaitForDeleteTimeoutSeconds
                         - timeout
                         type: object
@@ -3193,8 +3294,6 @@ spec:
                   previously been reported as true.
                 type: boolean
             type: object
-        required:
-        - spec
         type: object
     served: true
     storage: true

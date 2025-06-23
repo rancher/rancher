@@ -85,23 +85,31 @@ type RKEConfig struct {
 	// ETCDSnapshotCreate is the configuration for the etcd snapshot creation operation.
 	// +optional
 	ETCDSnapshotCreate *rkev1.ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
+
 	// ETCDSnapshotRestore is the configuration for the etcd snapshot restore operation.
 	// +optional
 	ETCDSnapshotRestore *rkev1.ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
+
 	// RotateCertificates is the configuration for the certificate rotation operation.
 	// +optional
 	RotateCertificates *rkev1.RotateCertificates `json:"rotateCertificates,omitempty"`
+
 	// RotateEncryptionKeys is the configuration for the encryption key rotation operation.
 	// +optional
 	RotateEncryptionKeys *rkev1.RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
 
 	// MachinePools is a list of machine pools to be created in the provisioning cluster.
 	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=1000
 	MachinePools []RKEMachinePool `json:"machinePools,omitempty"`
+
 	// MachinePoolDefaults is the default configuration for machine pools.
 	// This configuration will be applied to all machine pools unless overridden by the machine pool configuration.
 	// +optional
 	MachinePoolDefaults *RKEMachinePoolDefaults `json:"machinePoolDefaults,omitempty"`
+
 	// InfrastructureRef is a reference to the infrastructure cluster object that is required when provisioning a CAPI cluster.
 	// NOTE: in practice this will always be a rkecluster.rke.cattle.io.
 	// +optional
@@ -117,43 +125,61 @@ type RKEMachinePool struct {
 	// themselves.
 	// +optional
 	Paused bool `json:"paused,omitempty"`
+
 	// EtcdRole defines whether the machines provisioned by this pool should be etcd nodes.
 	// +optional
 	EtcdRole bool `json:"etcdRole,omitempty"`
+
 	// ControlPlaneRole defines whether the machines provisioned by this pool should be controlplane nodes.
 	// +optional
 	ControlPlaneRole bool `json:"controlPlaneRole,omitempty"`
+
 	// WorkerRole defines whether the machines provisioned by this pool should be worker nodes.
 	// +optional
 	WorkerRole bool `json:"workerRole,omitempty"`
+
 	// DrainBeforeDelete defines whether the machines provisioned by this pool should be drained prior to deletion.
 	// +optional
 	DrainBeforeDelete bool `json:"drainBeforeDelete,omitempty"`
+
 	// DrainBeforeDeleteTimeout defines the timeout for draining the machines provisioned by this pool before deletion.
 	// +optional
 	DrainBeforeDeleteTimeout *metav1.Duration `json:"drainBeforeDeleteTimeout,omitempty"`
+
 	// NodeConfig is a reference to a MachineConfig object that will be used to configure the machines provisioned by this pool.
 	// The NodeConfig object will, in turn, be used to create a corresponding MachineTemplate object for the generated
 	// machine deployment.
 	NodeConfig *corev1.ObjectReference `json:"machineConfigRef,omitempty" wrangler:"required"`
+
 	// Name is the internal name of the machine pool.
 	// The generated CAPI machine deployment will be a concatenation of the cluster name and the machine pool name
 	// which, if over 63 characters is truncated to 54 with a sha256sum appended.
+	// +required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name,omitempty" wrangler:"required"`
+
+	// Deprecated
 	// +optional
 	DisplayName string `json:"displayName,omitempty"`
+
 	// Quantity is the desired number of machines in the machine pool.
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Quantity *int32 `json:"quantity,omitempty"`
+
 	// RollingUpdate is the configuration for the rolling update of the generated machine deployment.
 	// +optional
 	RollingUpdate *RKEMachinePoolRollingUpdate `json:"rollingUpdate,omitempty"`
+
 	// MachineDeploymentLabels are the labels to add to the generated machine deployment.
 	// +optional
 	MachineDeploymentLabels map[string]string `json:"machineDeploymentLabels,omitempty"`
+
 	// MachineDeploymentAnnotations are the annotations to add to the generated machine deployment.
 	// +optional
 	MachineDeploymentAnnotations map[string]string `json:"machineDeploymentAnnotations,omitempty"`
+
 	// NodeStartupTimeout allows setting the maximum time for MachineHealthCheck
 	// to consider a Machine unhealthy if a corresponding Node isn't associated
 	// through a `Spec.ProviderID` field.
@@ -168,31 +194,37 @@ type RKEMachinePool struct {
 	// If you wish to disable this feature, set the value explicitly to 0.
 	// +optional
 	NodeStartupTimeout *metav1.Duration `json:"nodeStartupTimeout,omitempty"`
+
 	// UnhealthyNodeTimeout specifies the maximum duration a generated MachineHealthCheck should wait before marking a
 	// not ready machine as unhealthy.
 	// +optional
 	UnhealthyNodeTimeout *metav1.Duration `json:"unhealthyNodeTimeout,omitempty"`
+
 	// MaxUnhealthy specifies the minimum number of unhealthy machines that a MachineHealthCheck can tolerate before
 	// remediating unhealthy machines.
 	// +optional
 	MaxUnhealthy *string `json:"maxUnhealthy,omitempty"`
+
 	// UnhealthyRange specifies the number of unhealthy machines in which a MachineHealthCheck is allowed to remediate.
 	// +optional
 	UnhealthyRange *string `json:"unhealthyRange,omitempty"`
+
 	// MachineOS is the operating system of the machines provisioned by this pool.
 	// This is only used to designate linux versus windows nodes.
 	// +kubebuilder:default:=linux
 	// +kubebuilder:validation:Enum=linux;windows
 	// +optional
 	MachineOS string `json:"machineOS,omitempty"`
+
 	// DynamicSchemaSpec is a copy of the dynamic schema object's spec field at the time the machine pool was created.
 	// Since rancher-machine based MachineTemplates are not api-versioned, this field is used to drop new fields added
 	// to the driver if it has been upgraded since initial provisioning. This allows node drivers to be upgraded
 	// without triggering a reconciliation of the provisioning cluster.
-	// NOTE: By removing this field, machine pools will be upgraded to the latest version of the node driver.
-	// If the spec is the same as it was at creation, the machine pool will not trigger a rollout.
+	// NOTE: This field can only be removed if the "provisioning.cattle.io/allow-dynamic-schema-drop" annotation is
+	// present on the provisioning cluster object, otherwise it will be reinserted.
 	// +optional
 	DynamicSchemaSpec string `json:"dynamicSchemaSpec,omitempty"`
+
 	// HostnameLengthLimit defines the maximum length of the hostname for machines in this pool.
 	// For windows nodes, the hostname must be less than 15 characters.
 	// +kubebuilder:validation:Minimum=10
@@ -202,7 +234,7 @@ type RKEMachinePool struct {
 }
 
 type RKEMachinePoolRollingUpdate struct {
-	// The maximum number of machines that can be unavailable during the update.
+	// MaxUnavailable is the maximum number of machines that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired
 	// machines (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down.
@@ -217,7 +249,7 @@ type RKEMachinePoolRollingUpdate struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// The maximum number of machines that can be scheduled above the
+	// MaxSurge is the maximum number of machines that can be scheduled above the
 	// desired number of machines.
 	// Value can be an absolute number (ex: 5) or a percentage of
 	// desired machines (ex: 10%).
@@ -252,34 +284,43 @@ type AgentDeploymentCustomization struct {
 	// AppendTolerations is a list of tolerations that will be appended to the agent deployment.
 	// +optional
 	AppendTolerations []v1.Toleration `json:"appendTolerations,omitempty"`
+
 	// OverrideAffinity is an affinity that will be used to override the agent deployment's affinity.
 	// +optional
 	OverrideAffinity *v1.Affinity `json:"overrideAffinity,omitempty"`
+
 	// OverrideResourceRequirements defines the limits, requests, and claims of compute resources for a given container.
 	// +optional
 	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+
 	// SchedulingCustomization is an optional configuration that will be used to override the agent deployment's scheduling customization.
 	// +optional
 	SchedulingCustomization *AgentSchedulingCustomization `json:"schedulingCustomization,omitempty"`
 }
 
 type AgentSchedulingCustomization struct {
+
 	// +optional
 	PriorityClass *PriorityClassSpec `json:"priorityClass,omitempty"`
+
 	// +optional
 	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
 
 type PriorityClassSpec struct {
+
 	// +optional
 	Value int `json:"value,omitempty"`
+
 	// +optional
 	PreemptionPolicy *v1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 type PodDisruptionBudgetSpec struct {
+
 	// +optional
 	MinAvailable string `json:"minAvailable,omitempty"`
+
 	// +optional
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 }
@@ -337,7 +378,8 @@ type Cluster struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the desired state of the cluster.
-	Spec ClusterSpec `json:"spec"`
+	// +optional
+	Spec ClusterSpec `json:"spec,omitempty"`
 	// Status is the observed state of the cluster.
 	// +optional
 	Status ClusterStatus `json:"status,omitempty"`
