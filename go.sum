@@ -274,8 +274,8 @@ github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymF
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/ericpromislow/steve v0.0.0-20250623201902-8053cfbdfd72 h1:NV7OawQsCCvUxqS6AXnm1+pklp3rs2cTGRyZHp+kLUo=
-github.com/ericpromislow/steve v0.0.0-20250623201902-8053cfbdfd72/go.mod h1:sulHdix8kXnS03BxVs4zwps/Iy9G3RiIUxt0SHyHUhs=
+github.com/ericpromislow/steve v0.0.0-20250623203829-9e656a955423 h1:lFll2Y2i+q8fJHvrexBZ0MvXdev/vQNi/9j5fA0NZlY=
+github.com/ericpromislow/steve v0.0.0-20250623203829-9e656a955423/go.mod h1:sulHdix8kXnS03BxVs4zwps/Iy9G3RiIUxt0SHyHUhs=
 github.com/evanphx/json-patch v5.9.11+incompatible h1:ixHHqfcGvxhWkniF1tWxBHA0yb4Z+d1UQi45df52xW8=
 github.com/evanphx/json-patch v5.9.11+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.9.11 h1:/8HVnzMq13/3x9TPvjG08wUGqBTmZBsCWzjTM0wiaDU=
