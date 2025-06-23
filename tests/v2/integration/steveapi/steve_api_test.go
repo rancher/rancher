@@ -2811,7 +2811,13 @@ func (s *steveAPITestSuite) TestCRUD() {
 }
 func (s *steveAPITestSuite) assertListIsEqual(expectedList []map[string]string, receivedList []clientv1.SteveAPIObject) {
 	assert.Equal(s.T(), len(expectedList), len(receivedList))
-	for i, w := range expectedList {
+	assert.Equal(s.T(), expectedList, receivedList)
+	length := len(expectedList)
+	if length > len(receivedList) {
+		length = len(receivedList)
+	}
+	for i := range length {
+		w := expectedList[i]
 		if name, ok := w["name"]; ok {
 			assert.Equal(s.T(), name, receivedList[i].Name, fmt.Sprintf("diff at index %d: expecting name %q, got %q", i, name, receivedList[i].Name))
 		}

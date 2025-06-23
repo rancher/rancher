@@ -257,7 +257,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		AuthMiddleware:  steveauth.ExistingContext,
 		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
 		ClusterRegistry: opts.ClusterRegistry,
-		SQLCache:        features.UISQLCache.Enabled(),
+		SQLCache:        features.UISQLCache.Enabled() || true,
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
 			DefaultMaximumEventsCount: defaultSQLCacheMaxEventsCount,
 		},

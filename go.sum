@@ -744,8 +744,8 @@ github.com/rancher/helm/v3 v3.17.0-rancher1 h1:CAitia3a0jagclTn+QACzpoV8s5fU52xN
 github.com/rancher/helm/v3 v3.17.0-rancher1/go.mod h1:Mo7eGyKPPHlS0Ml67W8z/lbkox/gD9Xt1XpD6bxvZZA=
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
 github.com/rancher/kubernetes-provider-detector v0.1.5/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
-github.com/rancher/lasso v0.2.3-rc1 h1:dRerAaAiziQKSVasSQe3Av2aNGokjidzZD/bLLLIQT4=
-github.com/rancher/lasso v0.2.3-rc1/go.mod h1:L8ct0T/HAYTWLKWPBQCZvluqmr72Yl5YOewjgRRvnMk=
+github.com/rancher/lasso v0.2.3-rc2 h1:NXCjqUCvmvrA0pKK7aEYykxGBpxMjUR0x83j9AoApn8=
+github.com/rancher/lasso v0.2.3-rc2/go.mod h1:G+KeeOaKRjp+qGp0bV6VbLhYrq1vHbJPbDh40ejg5yE=
 github.com/rancher/machine v0.15.0-rancher128 h1:hM2o3b8BDH7JdORMg0gLCBIUTNWJ8K59TndQ5Vx9FCc=
 github.com/rancher/machine v0.15.0-rancher128/go.mod h1:kRTdtUr/tmLQltMgWRhBelX8JIPKvKHJRdtjL8Zy/ww=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
@@ -911,8 +911,8 @@ go.opentelemetry.io/proto/otlp v1.3.1 h1:TrMUixzpM0yuc/znrFTP9MMRh8trP93mkCiDVeX
 go.opentelemetry.io/proto/otlp v1.3.1/go.mod h1:0X1WI4de4ZsLrrJNLAQbFeLCm3T7yBkR0XqQ7niQU+8=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
-go.uber.org/mock v0.5.0 h1:KAMbZvZPyBPWgD14IrIQ38QCyjwpvVVV6K/bHl1IwQU=
-go.uber.org/mock v0.5.0/go.mod h1:ge71pBPLYDk7QIi1LupWxdAykm7KIEFchiOqd6z7qMM=
+go.uber.org/mock v0.5.2 h1:LbtPTcP8A5k9WPXj54PPPbjcI4Y6lhyOZXn+VS7wNko=
+go.uber.org/mock v0.5.2/go.mod h1:wLlUxC2vVTPTaE3UD51E0BGOAElKrILxhVSDYQLld5o=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 go.uber.org/zap v1.27.0 h1:aJMhYGrd5QSmlpLMr2MftRKl7t8J8PTZPA732ud/XR8=

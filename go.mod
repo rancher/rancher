@@ -139,7 +139,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.12.0
 	github.com/rancher/gke-operator v1.11.0
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.2.3-rc1
+	github.com/rancher/lasso v0.2.3-rc2
 	github.com/rancher/machine v0.15.0-rancher128
 	github.com/rancher/norman v0.6.1
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -158,7 +158,7 @@ require (
 	github.com/urfave/cli v1.22.16
 	github.com/vishvananda/netlink v1.3.1-0.20240905180732-b1ce50cfa9be
 	github.com/vmware/govmomi v0.42.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.36.0
 	golang.org/x/mod v0.23.0
 	golang.org/x/net v0.38.0
