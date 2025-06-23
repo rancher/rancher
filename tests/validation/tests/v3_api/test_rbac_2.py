@@ -45,6 +45,6 @@ def test_logging_rbac_v2(cluster_role, command, authorization, name):
 @pytest.mark.parametrize("cluster_role, command, authorization, name",
                          rbac_test_file_reader(os.path.join(
                              DATA_SUBDIR,
-                             'rbac/cis/cis_rbac.json')))
-def test_cis_rbac_v2(cluster_role, command, authorization, name):
+                             'rbac/compliance/compliance_rbac.json')))
+def test_compliance_rbac(cluster_role, command, authorization, name):
     validate_cluster_role_rbac(cluster_role, command, authorization, name)
