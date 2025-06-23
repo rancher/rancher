@@ -31,18 +31,50 @@ type EnvVar struct {
 }
 
 type RKEControlPlaneSpec struct {
-	RKEClusterSpecCommon
+	RKEClusterSpecCommon `json:",inline"`
 
-	AgentEnvVars             []EnvVar                 `json:"agentEnvVars,omitempty"`
-	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint"`
-	ETCDSnapshotCreate       *ETCDSnapshotCreate      `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotRestore      *ETCDSnapshotRestore     `json:"etcdSnapshotRestore,omitempty"`
-	RotateCertificates       *RotateCertificates      `json:"rotateCertificates,omitempty"`
-	RotateEncryptionKeys     *RotateEncryptionKeys    `json:"rotateEncryptionKeys,omitempty"`
-	KubernetesVersion        string                   `json:"kubernetesVersion,omitempty"`
-	ClusterName              string                   `json:"clusterName,omitempty" wrangler:"required"`
-	ManagementClusterName    string                   `json:"managementClusterName,omitempty" wrangler:"required"`
-	UnmanagedConfig          bool                     `json:"unmanagedConfig,omitempty"`
+	// AgentEnvVars is a list of environment variables that will be set on the cluster agent deployment and system agent service.
+	// +optional
+	AgentEnvVars []EnvVar `json:"agentEnvVars,omitempty"`
+
+	// LocalClusterAuthEndpoint is the configuration for the local cluster auth endpoint.
+	// +optional
+	// +nullable
+	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
+
+	// ETCDSnapshotCreate is the configuration for the etcd snapshot creation operation.
+	// +optional
+	ETCDSnapshotCreate *ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
+
+	// ETCDSnapshotRestore is the configuration for the etcd snapshot restore operation.
+	// +optional
+	ETCDSnapshotRestore *ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
+
+	// RotateCertificates is the configuration for the certificate rotation operation.
+	// +optional
+	RotateCertificates *RotateCertificates `json:"rotateCertificates,omitempty"`
+
+	// RotateEncryptionKeys is the configuration for the encryption key rotation operation.
+	// +optional
+	RotateEncryptionKeys *RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
+
+	// KubernetesVersion is the desired version of RKE2/K3s for the cluster.
+	// This field is only populated for provisioned and custom clusters.
+	// +optional
+	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
+
+	// ClusterName is the name of the provisioning cluster object.
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// ManagementClusterName is the name of the management cluster object that relates to this cluster.
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	ManagementClusterName string `json:"managementClusterName,omitempty"`
+
+	// UnamanagedConfig indicates whether the configuration files for this cluster are managed by Rancher or externally.
+	UnmanagedConfig bool `json:"unmanagedConfig,omitempty"`
 }
 
 type NetworkingStackPreference = string
@@ -189,13 +221,15 @@ type ETCD struct {
 	S3 *ETCDSnapshotS3 `json:"s3,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!self.enabled || has(self.fqdn) || !has(self.caCerts)",message="CACerts defined but FQDN is not defined"
+
 type LocalClusterAuthEndpoint struct {
 	// Enabled indicates whether the local cluster auth endpoint should be enabled.
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 
 	// FQDN is the fully qualified domain name of the local cluster auth endpoint.
-	// TODO: cannot be empty if enabled
+	// +kubebuilder:validation:MaxLength=255
 	// +optional
 	FQDN string `json:"fqdn,omitempty"`
 
@@ -213,7 +247,8 @@ type RKESystemConfig struct {
 	// Config is a map of distro arguments which will be copied to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the machine matches the label selector.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Config GenericMap `json:"config,omitempty" wrangler:"nullable"`
+	// +nullable
+	Config GenericMap `json:"config,omitempty"`
 }
 
 type RKEProvisioningFiles struct {
@@ -297,6 +332,7 @@ type DrainHook struct {
 	// Annotation that will need to be populated on the machine-plan secret with the value from the annotation
 	// "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node. The annotation
 	// "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post-drain.
+	// +kubebuilder:validation:MaxLength=63
 	Annotation string `json:"annotation,omitempty"`
 }
 
@@ -313,6 +349,7 @@ type ProvisioningFileSource struct {
 type K8sObjectFileSource struct {
 	// Name is the name of the resource.
 	// The namespace is required to be the same as the related RKEControlPlane object.
+	// +kubebuilder:validation:MaxLength=63
 	Name string `json:"name"`
 
 	// Items is a list of mappings from the keys within the resource to the files to create on the downstream machine.
@@ -388,12 +425,14 @@ type RegistryConfig struct {
 	// - password
 	// - auth
 	// - identityToken
+	// +kubebuilder:validation:MaxLength=63
 	// +optional
 	AuthConfigSecretName string `json:"authConfigSecretName,omitempty"`
 
 	// TLSSecretName is the name of the secret residing within the same namespace as the RKEControlPlane object
 	// that contains the keys "Cert" and "Key" which are used when creating the transport
 	// that communicates with the registry.
+	// +kubebuilder:validation:MaxLength=63
 	// +optional
 	TLSSecretName string `json:"tlsSecretName,omitempty"`
 
@@ -446,21 +485,74 @@ type RotateEncryptionKeys struct {
 }
 
 type RKEControlPlaneStatus struct {
-	AppliedSpec                   *RKEControlPlaneSpec                `json:"appliedSpec,omitempty"`
-	Conditions                    []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	Ready                         bool                                `json:"ready,omitempty"`
-	ObservedGeneration            int64                               `json:"observedGeneration"`
-	CertificateRotationGeneration int64                               `json:"certificateRotationGeneration"`
-	RotateEncryptionKeys          *RotateEncryptionKeys               `json:"rotateEncryptionKeys,omitempty"`
-	RotateEncryptionKeysPhase     RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase,omitempty"`
-	RotateEncryptionKeysLeader    string                              `json:"rotateEncryptionKeysLeader,omitempty"`
-	ETCDSnapshotRestore           *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
-	ETCDSnapshotRestorePhase      ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
-	ETCDSnapshotCreate            *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotCreatePhase       ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
-	ConfigGeneration              int64                               `json:"configGeneration,omitempty"`
-	Initialized                   bool                                `json:"initialized,omitempty"`
-	AgentConnected                bool                                `json:"agentConnected,omitempty"`
+	// AppliedSpec is the state for which the last reconciliation loop for the controlplane was completed.
+	// +optional
+	AppliedSpec *RKEControlPlaneSpec `json:"appliedSpec,omitempty"`
+
+	// Conditions is a representation of the current state of the RKEControlPlane object,
+	// this includes its machine reconciliation status (Bootstrapped, Provisioned, Stable, Reconciled),
+	// the status of the system-upgrade-controller (SystemUpgradeControllerReady), and CAPI required conditions
+	// (ScalingUp, ScalingDown, RollingOut). Information related to
+	// errors encountered while transitioning to one of these states will be
+	// populated in the Message and Reason fields.
+	// +optional
+	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+
+	// Ready denotes that the API server has been initialized and is ready to receive requests.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// ObservedGeneration is the generation for which the RKEControlPlane has started processing.
+	ObservedGeneration int64 `json:"observedGeneration"`
+
+	// CertificateRotationGeneration is the last observed state for which the certificate rotation operation was successful.
+	// +optional
+	CertificateRotationGeneration int64 `json:"certificateRotationGeneration,omitempty"`
+
+	// RotateEncryptionKeys is the state for which the last encryption key rotation operation was successful.
+	// +optional
+	RotateEncryptionKeys *RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
+
+	// RotateEncryptionKeysPhase is the current phase the encryption key rotation operation is currently executing.
+	// +optional
+	RotateEncryptionKeysPhase RotateEncryptionKeysPhase `json:"rotateEncryptionKeysPhase,omitempty"`
+
+	// RotateEncryptionKeysLeader is the name of the CAPI machine object which has been elected leader of the controlplane nodes for
+	// encryption key rotation purposes.
+	// +optional
+	RotateEncryptionKeysLeader string `json:"rotateEncryptionKeysLeader,omitempty"`
+
+	// ETCDSnapshotRestore is the state for which the last etcd snapshot restore operation was successful.
+	// +optional
+	ETCDSnapshotRestore *ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
+
+	// ETCDSnapshotRestorePhase is the current phase the etcd snapshot restore operation is currently executing.
+	// +kubebuilder:validation:Enum=Started;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster;Finished;Failed
+	// +optional
+	ETCDSnapshotRestorePhase ETCDSnapshotPhase `json:"etcdSnapshotRestorePhase,omitempty"`
+
+	// ETCDSnapshotCreate is the state for which the last etcd snapshot create operation was successful.
+	// +optional
+	ETCDSnapshotCreate *ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
+
+	// ETCDSnapshotCreatePhase is the current phase the etcd snapshot create operation is currently executing.
+	// +kubebuilder:validation:Enum=Started;RestartCluster;Finished;Failed
+	// +optional
+	ETCDSnapshotCreatePhase ETCDSnapshotPhase `json:"etcdSnapshotCreatePhase,omitempty"`
+
+	// ConfigGeneration is the current generation of the configuration for a given cluster.
+	// Changing this value (which is done automatically during an etcd restore) will trigger a reconciliation loop
+	// which will invoke draining (if enabled).
+	// +optional
+	ConfigGeneration int64 `json:"configGeneration,omitempty"`
+
+	// Initialized denotes that the API server is initialized and worker nodes can be joined to the cluster.
+	// +optional
+	Initialized bool `json:"initialized,omitempty"`
+
+	// AgentConnected denotes that the cluster-agent connection is currently established for the cluster.
+	// +optional
+	AgentConnected bool `json:"agentConnected,omitempty"`
 }
 
 type ETCDSnapshotPhase string
@@ -478,13 +570,26 @@ const (
 )
 
 // +genclient
-// +kubebuilder:skipversion
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels="cluster.x-k8s.io/v1beta1=v1"
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels['cluster\\.x-k8s\\.io/cluster-name']",description="Cluster"
+// +kubebuilder:printcolumn:name="Initialized",type=string,JSONPath=".status.initialized",description="This denotes whether or not the control plane is initialized"
+// +kubebuilder:printcolumn:name="API Server Available",type=boolean,JSONPath=".status.ready",description="RKEControlPlane API Server is ready to receive requests"
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp",description="Time duration since creation of RKEControlPlane"
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.kubernetesVersion",description="Kubernetes version associated with this control plane"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// RKEControlPlane is the Schema for the controlplane.
 type RKEControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RKEControlPlaneSpec   `json:"spec"`
+	// Spec is the desired state of the controlplane.
+	// +optional
+	Spec RKEControlPlaneSpec `json:"spec"`
+
+	// Status is the observed state of the controlplane.
+	// +optional
 	Status RKEControlPlaneStatus `json:"status,omitempty"`
 }

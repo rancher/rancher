@@ -73,6 +73,7 @@ spec:
                 description: |-
                   CloudCredentialSecretName is the id of the secret used to provision the cluster.
                   This field must be in the format of "namespace:name".
+                maxLength: 63
                 type: string
               clusterAPIConfig:
                 description: ClusterAPIConfig is deprecated and will be removed in
@@ -2213,8 +2214,8 @@ spec:
                   This field is only populated for provisioned and custom clusters.
                 type: string
               localClusterAuthEndpoint:
-                description: LocalClusterAuthEndpoint is an optional field that can
-                  be used to configure the local cluster auth endpoint.
+                description: LocalClusterAuthEndpoint is the configuration for the
+                  local cluster auth endpoint.
                 properties:
                   caCerts:
                     description: CACerts is the CA certificate for the local cluster
@@ -2227,8 +2228,12 @@ spec:
                   fqdn:
                     description: FQDN is the fully qualified domain name of the local
                       cluster auth endpoint.
+                    maxLength: 255
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: CACerts defined but FQDN is not defined
+                  rule: '!self.enabled || has(self.fqdn) || !has(self.caCerts)'
               redeploySystemAgentGeneration:
                 description: |-
                   RedeploySystemAgentGeneration is used to force the redeployment of the system agent via
@@ -2809,6 +2814,7 @@ spec:
                                     description: |-
                                       Name is the name of the resource.
                                       The namespace is required to be the same as the related RKEControlPlane object.
+                                    maxLength: 63
                                     type: string
                                 required:
                                 - name
@@ -2863,6 +2869,7 @@ spec:
                                     description: |-
                                       Name is the name of the resource.
                                       The namespace is required to be the same as the related RKEControlPlane object.
+                                    maxLength: 63
                                     type: string
                                 required:
                                 - name
@@ -2960,6 +2967,7 @@ spec:
                                 - password
                                 - auth
                                 - identityToken
+                              maxLength: 63
                               type: string
                             caBundle:
                               description: CABundle is the CA chain used when communicating
@@ -2975,6 +2983,7 @@ spec:
                                 TLSSecretName is the name of the secret residing within the same namespace as the RKEControlPlane object
                                 that contains the keys "Cert" and "Key" which are used when creating the transport
                                 that communicates with the registry.
+                              maxLength: 63
                               type: string
                           type: object
                         description: |-
@@ -3097,6 +3106,7 @@ spec:
                                     Annotation that will need to be populated on the machine-plan secret with the value from the annotation
                                     "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node. The annotation
                                     "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 63
                                   type: string
                               type: object
                             type: array
@@ -3110,6 +3120,7 @@ spec:
                                     Annotation that will need to be populated on the machine-plan secret with the value from the annotation
                                     "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node. The annotation
                                     "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 63
                                   type: string
                               type: object
                             type: array
@@ -3188,6 +3199,7 @@ spec:
                                     Annotation that will need to be populated on the machine-plan secret with the value from the annotation
                                     "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node. The annotation
                                     "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 63
                                   type: string
                               type: object
                             type: array
@@ -3201,6 +3213,7 @@ spec:
                                     Annotation that will need to be populated on the machine-plan secret with the value from the annotation
                                     "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node. The annotation
                                     "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 63
                                   type: string
                               type: object
                             type: array
@@ -3238,10 +3251,12 @@ spec:
                 description: |-
                   ClientSecretName is the name of the kubeconfig secret that is used to connect to the cluster.
                   This secret is typically named "<cluster-name>-kubeconfig" and lives in the namespace of the cluster object.
+                maxLength: 63
                 type: string
               clusterName:
                 description: Name of the cluster.management.cattle.io object that
                   relates to this cluster.
+                maxLength: 63
                 type: string
               conditions:
                 description: Conditions is a representation of the Cluster's current
@@ -3282,6 +3297,7 @@ spec:
                   Defaults to the namespace of the cluster object, which is usually "fleet-default".
                   If the provisioningv2-fleet-workspace-back-population feature is enabled and the cluster has the
                   "provisioning.cattle.io/fleet-workspace-name" annotation, this will be set to the value of the annotation.
+                maxLength: 63
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation for

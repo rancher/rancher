@@ -12,6 +12,7 @@ import (
 type ClusterSpec struct {
 	// CloudCredentialSecretName is the id of the secret used to provision the cluster.
 	// This field must be in the format of "namespace:name".
+	// +kubebuilder:validation:MaxLength=63
 	// +optional
 	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
 
@@ -29,7 +30,7 @@ type ClusterSpec struct {
 	// +optional
 	RKEConfig *RKEConfig `json:"rkeConfig,omitempty"`
 
-	// LocalClusterAuthEndpoint is an optional field that can be used to configure the local cluster auth endpoint.
+	// LocalClusterAuthEndpoint is the configuration for the local cluster auth endpoint.
 	// +optional
 	LocalClusterAuthEndpoint *rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 
@@ -149,7 +150,8 @@ type RKEMachinePool struct {
 	// NodeConfig is a reference to a MachineConfig object that will be used to configure the machines provisioned by this pool.
 	// The NodeConfig object will, in turn, be used to create a corresponding MachineTemplate object for the generated
 	// machine deployment.
-	NodeConfig *corev1.ObjectReference `json:"machineConfigRef,omitempty" wrangler:"required"`
+	// +required
+	NodeConfig *corev1.ObjectReference `json:"machineConfigRef,omitempty"`
 
 	// Name is the internal name of the machine pool.
 	// The generated CAPI machine deployment will be a concatenation of the cluster name and the machine pool name
@@ -157,9 +159,10 @@ type RKEMachinePool struct {
 	// +required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name,omitempty" wrangler:"required"`
+	Name string `json:"name,omitempty"`
 
-	// Deprecated
+	// DisplayName is the display name for the generated CAPI machinedeployment object.
+	// Deprecated: this field is currently unused and will be removed in a future version.
 	// +optional
 	DisplayName string `json:"displayName,omitempty"`
 
@@ -331,6 +334,7 @@ type ClusterStatus struct {
 	Ready bool `json:"ready,omitempty"`
 
 	// Name of the cluster.management.cattle.io object that relates to this cluster.
+	// +kubebuilder:validation:MaxLength=63
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
 
@@ -338,11 +342,13 @@ type ClusterStatus struct {
 	// Defaults to the namespace of the cluster object, which is usually "fleet-default".
 	// If the provisioningv2-fleet-workspace-back-population feature is enabled and the cluster has the
 	// "provisioning.cattle.io/fleet-workspace-name" annotation, this will be set to the value of the annotation.
+	// +kubebuilder:validation:MaxLength=63
 	// +optional
 	FleetWorkspaceName string `json:"fleetWorkspaceName,omitempty"`
 
 	// ClientSecretName is the name of the kubeconfig secret that is used to connect to the cluster.
 	// This secret is typically named "<cluster-name>-kubeconfig" and lives in the namespace of the cluster object.
+	// +kubebuilder:validation:MaxLength=63
 	// +optional
 	ClientSecretName string `json:"clientSecretName,omitempty"`
 
@@ -369,7 +375,6 @@ type ClusterStatus struct {
 // +kubebuilder:printcolumn:name="Cluster Name",type=string,JSONPath=".status.clusterName"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.ready"
-// +kubebuilder:object:root=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Cluster is the Schema for the provisioning API.

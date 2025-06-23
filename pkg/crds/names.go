@@ -248,7 +248,7 @@ var MigratedResources = map[string]bool{
 	"rkebootstraps.rke.cattle.io":                                     false,
 	"rkebootstraptemplates.rke.cattle.io":                             false,
 	"rkeclusters.rke.cattle.io":                                       false,
-	"rkecontrolplanes.rke.cattle.io":                                  false,
+	"rkecontrolplanes.rke.cattle.io":                                  true,
 	"rkek8sserviceoptions.management.cattle.io":                       false,
 	"rkek8ssystemimages.management.cattle.io":                         false,
 	"roletemplates.management.cattle.io":                              true,
