@@ -41,7 +41,6 @@ import (
 
 const (
 	AgentForceDeployAnn = "io.cattle.agent.force.deploy"
-	nodeImage           = "nodeImage"
 	clusterImage        = "clusterImage"
 )
 
@@ -217,7 +216,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
-	_, ca := getAgentImages(cluster.Name)
+	ca := getAgentImages(cluster.Name)
 	if cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
@@ -600,8 +599,8 @@ func (cd *clusterDeploy) cacheAgentImages(name string) error {
 }
 
 func agentImagesCached(name string) bool {
-	na, ca := getAgentImages(name)
-	return na != "" && ca != ""
+	ca := getAgentImages(name)
+	return ca != ""
 }
 
 func controlPlaneTaintsCached(name string) bool {
@@ -613,10 +612,10 @@ func controlPlaneTaintsCached(name string) bool {
 	return false
 }
 
-func getAgentImages(name string) (string, string) {
+func getAgentImages(name string) string {
 	agentImagesMutex.RLock()
 	defer agentImagesMutex.RUnlock()
-	return "", agentImages[clusterImage][name]
+	return agentImages[clusterImage][name]
 }
 
 func getCachedControlPlaneTaints(name string) []corev1.Taint {

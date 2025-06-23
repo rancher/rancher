@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-const GetStateTimeout = time.Second * 30
+const getStateTimeout = time.Second * 30
 
 const (
 	FullStateConfigMapName = "full-cluster-state"
@@ -109,7 +109,7 @@ func getFullStateFromK8s(ctx context.Context, k8sClient kubernetes.Interface) (*
 	// Back off for 1s between attempts.
 	backoff := wait.Backoff{
 		Duration: time.Second,
-		Steps:    int(GetStateTimeout.Seconds()),
+		Steps:    int(getStateTimeout.Seconds()),
 	}
 
 	// Try to fetch secret or configmap in k8s.
