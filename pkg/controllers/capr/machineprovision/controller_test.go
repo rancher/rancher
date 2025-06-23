@@ -163,3 +163,76 @@ func TestReconcileStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestConstructFilesSecret(t *testing.T) {
+	testCases := []struct {
+		name               string
+		inputAliasedFields string
+		config             map[string]interface{}
+		expectedSecret     *corev1.Secret
+	}{
+		{
+			name:               "no fileToFieldAliases annotation",
+			inputAliasedFields: "",
+			config: map[string]interface{}{
+				"sshPort":  "22",
+				"userdata": "/path/to/machine/files/userdata",
+			},
+			expectedSecret: nil,
+		},
+		{
+			name:               "known driver with fileToFieldAliases annotation",
+			inputAliasedFields: "userdata:userdata",
+			config: map[string]interface{}{
+				"sshPort":  "22",
+				"userdata": "/path/to/machine/files/userdata",
+			},
+			expectedSecret: &corev1.Secret{
+				Data: map[string][]byte{
+					"userdata": []byte("/path/to/machine/files/userdata\n"),
+				},
+			},
+		},
+		{
+			name:               "custom driver with fileToFieldAliases annotation",
+			inputAliasedFields: "foo:bar",
+			config: map[string]interface{}{
+				"foo":     "randomValue",
+				"sshPort": "22",
+			},
+			expectedSecret: &corev1.Secret{
+				Data: map[string][]byte{
+					"bar": []byte("randomValue\n"),
+				},
+			},
+		},
+		{
+			name:               "empty config content",
+			inputAliasedFields: "foo:bar",
+			config: map[string]interface{}{
+				"foo": "",
+			},
+			expectedSecret: &corev1.Secret{
+				Data: map[string][]byte{},
+			},
+		},
+		{
+			name:               "sshKey field config changes",
+			inputAliasedFields: "sshKeyContents:sshKeyPath",
+			config: map[string]interface{}{
+				"sshKeyContents": "/path/to/machine/files/sshContent",
+			},
+			expectedSecret: &corev1.Secret{
+				Data: map[string][]byte{
+					"id_rsa": []byte("/path/to/machine/files/sshContent\n"),
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			secret := constructFilesSecret(tc.inputAliasedFields, tc.config)
+			assert.Equal(t, tc.expectedSecret, secret)
+		})
+	}
+}
