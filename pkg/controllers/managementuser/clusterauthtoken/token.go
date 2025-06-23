@@ -127,8 +127,8 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	return nil, err
 }
 
-// ExtRemove is called when a given ext token is delete, and is responsible for
-// removing the ClusterAuthToken in a downstream cluster.
+// ExtRemove is called when a given ext token is deleted,
+// and removes the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) ExtRemove(token *extv1.Token) (*extv1.Token, error) {
 	return nil, h.remove(token.GetName(), token.GetUserID(), extTokenUserClusterKey(token))
 }
