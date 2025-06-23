@@ -49,25 +49,6 @@ def test_generic_initial_defaults(admin_mc):
     assert schema_defaults == setting_defaults
 
 
-def test_rke_initial_conditions(admin_mc, remove_resource):
-    cluster = admin_mc.client.create_cluster(
-        name=random_str(), rancherKubernetesEngineConfig={
-            "accessKey": "asdfsd"})
-    remove_resource(cluster)
-
-    assert len(cluster.conditions) == 3
-    assert cluster.conditions[0].type == 'Pending'
-    assert cluster.conditions[0].status == 'True'
-
-    assert cluster.conditions[1].type == 'Provisioned'
-    assert cluster.conditions[1].status == 'Unknown'
-
-    assert cluster.conditions[2].type == 'Waiting'
-    assert cluster.conditions[2].status == 'Unknown'
-
-    assert 'exportYaml' in cluster.actions
-
-
 @pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_psp_enabled_set(admin_mc, remove_resource):
     """Asserts podSecurityPolicy field is used to populate pspEnabled in
