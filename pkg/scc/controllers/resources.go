@@ -242,7 +242,7 @@ func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
 }
 
 func (h *handler) regCodeFromSecretEntrypoint(params RegistrationParams) (*corev1.Secret, error) {
-	secretName := consts.RegistrationCodeSecretName(params.nameId)
+	secretName := params.regCodeSecretRef.Name
 
 	regcodeSecret, err := h.secretCache.Get(h.systemNamespace, secretName)
 	if err != nil && apierrors.IsNotFound(err) {
@@ -264,11 +264,11 @@ func (h *handler) regCodeFromSecretEntrypoint(params RegistrationParams) (*corev
 	defaultLabels[consts.LabelSccSecretRole] = string(consts.RegistrationCode)
 	maps.Copy(regcodeSecret.Labels, defaultLabels)
 
-	if !slices.Contains(regcodeSecret.Finalizers, consts.FinalizerSccRegistration) {
+	if !slices.Contains(regcodeSecret.Finalizers, consts.FinalizerSccRegistrationCode) {
 		if regcodeSecret.Finalizers == nil {
 			regcodeSecret.Finalizers = []string{}
 		}
-		regcodeSecret.Finalizers = append(regcodeSecret.Finalizers, consts.FinalizerSccRegistration)
+		regcodeSecret.Finalizers = append(regcodeSecret.Finalizers, consts.FinalizerSccRegistrationCode)
 	}
 
 	return regcodeSecret, nil

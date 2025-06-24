@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"golang.org/x/sync/semaphore"
 	"net/http"
@@ -336,8 +337,25 @@ func (s sccOnlineMode) Deregister() error {
 		return credErr
 	}
 
+	// TODO refactor this to a cleanup
 	regCodeSecretRef := s.registration.Spec.RegistrationRequest.RegistrationCodeSecretRef
-	regCodeErr := s.secrets.Delete(regCodeSecretRef.Namespace, regCodeSecretRef.Name, &metav1.DeleteOptions{})
+	regCodeSecret, regCodeErr := s.secrets.Get(regCodeSecretRef.Namespace, regCodeSecretRef.Name, metav1.GetOptions{})
+	if regCodeErr != nil {
+		return regCodeErr
+	}
+	var remainingFin []string
+	for _, finalizer := range regCodeSecret.Finalizers {
+		if finalizer != consts.FinalizerSccRegistrationCode {
+			remainingFin = append(remainingFin, finalizer)
+		}
+	}
+	regCodeSecret.Finalizers = remainingFin
+	regCodeSecret, regCodeErr = s.secrets.Update(regCodeSecret)
+	if regCodeErr != nil {
+		return regCodeErr
+	}
+
+	regCodeErr = s.secrets.Delete(regCodeSecretRef.Namespace, regCodeSecretRef.Name, &metav1.DeleteOptions{})
 	if regCodeErr != nil {
 		return regCodeErr
 	}

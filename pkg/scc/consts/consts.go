@@ -35,8 +35,9 @@ const (
 )
 
 const (
-	FinalizerSccCredentials  = "scc.cattle.io/managed-credentials"
-	FinalizerSccRegistration = "scc.cattle.io/managed-registration"
+	FinalizerSccCredentials      = "scc.cattle.io/managed-credentials"
+	FinalizerSccRegistration     = "scc.cattle.io/managed-registration"
+	FinalizerSccRegistrationCode = "scc.cattle.io/managed-registration-code"
 )
 
 const (
