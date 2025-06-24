@@ -274,8 +274,6 @@ github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymF
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/ericpromislow/steve v0.0.0-20250623213351-9094152cbc92 h1:s4PooSpolTpOHaU1K1nkLcOvZx2h78axziIQek4RwqU=
-github.com/ericpromislow/steve v0.0.0-20250623213351-9094152cbc92/go.mod h1:sulHdix8kXnS03BxVs4zwps/Iy9G3RiIUxt0SHyHUhs=
 github.com/evanphx/json-patch v5.9.11+incompatible h1:ixHHqfcGvxhWkniF1tWxBHA0yb4Z+d1UQi45df52xW8=
 github.com/evanphx/json-patch v5.9.11+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.9.11 h1:/8HVnzMq13/3x9TPvjG08wUGqBTmZBsCWzjTM0wiaDU=
@@ -760,6 +758,8 @@ github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHR
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20250411212007-f3f2fd268849 h1:hxa/Y0LRTx8BzMPxirT9Yg3IZg2YXus7+smLLn5n9tw=
 github.com/rancher/shepherd v0.0.0-20250411212007-f3f2fd268849/go.mod h1:IVVaLrIQ1/1Fk7KTrkhpKFlgaqhh3uv27CokmEhXHJc=
+github.com/rancher/steve v0.6.17 h1:w9GJC0MCENYQkC5l3RJrGn8t4uut3B62OcwC4NpAoSA=
+github.com/rancher/steve v0.6.17/go.mod h1:sulHdix8kXnS03BxVs4zwps/Iy9G3RiIUxt0SHyHUhs=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab h1:Ttxt14bAImsWyFrtQZ314GW2DeExrYRNoAb+u9V3RiA=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250306000150-b1a9781accab/go.mod h1:9gzmXntv/s0sEDBERi/fS58PRt5HFUfZr7niDGsDbAA=
 github.com/rancher/tests/actions v0.0.0-20250505204226-5b136337f7c5 h1:iatxRcqkupXLGISfU5zRA37po3YO7Pqq/Ao7bIqFsu4=
