@@ -1,9 +1,11 @@
 FROM python:3.11
 
+SHELL ["/bin/bash", "-c"] 
+
 ARG KUBECTL_VERSION=v1.27.10
-ENV WORKSPACE /src/rancher-validation
+ENV WORKSPACE=/src/rancher-validation
 WORKDIR $WORKSPACE
-ENV PYTHONPATH /src/rancher-validation
+ENV PYTHONPATH=/src/rancher-validation
 ARG RKE_VERSION=v1.0.2
 ARG CLI_VERSION=v2.3.2
 ARG RANCHER_HELM_VERSION=v3.9.0
@@ -13,41 +15,44 @@ ARG TERRAFORM_VERSION=0.12.10
 ARG EXTERNAL_ENCODED_VPN
 ARG VPN_ENCODED_LOGIN
 
-
 COPY [".", "$WORKSPACE"]
 
-RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
-    mv kubectl /bin/kubectl && \
-    chmod +x /bin/kubectl  && \
-    wget https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 && \
-    mv rke_linux-amd64 /bin/rke && \
-    chmod +x /bin/rke && \
-    wget https://github.com/rancher/cli/releases/download/$CLI_VERSION/rancher-linux-amd64-$CLI_VERSION.tar.gz && \
-    tar -x -f rancher-linux-amd64-$CLI_VERSION.tar.gz && \
-    mv rancher-$CLI_VERSION/rancher /bin/rancherctl && \
-    chmod +x /bin/rancherctl && \
-    wget https://get.helm.sh/helm-$RANCHER_HELM_VERSION-linux-amd64.tar.gz && \
-    tar -x -f helm-$RANCHER_HELM_VERSION-linux-amd64.tar.gz && \
-    mv linux-amd64/helm /bin/helm_v3 && \
-    chmod +x /bin/helm_v3 && \
-    wget https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
-    apt-get update && \
-    apt-get install unzip && \
-    unzip terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
-    chmod u+x terraform && \
-    mv terraform /usr/local/bin && \
-    wget "https://github.com/vmware-tanzu/sonobuoy/releases/download/v$SONOBUOY_VERSION/sonobuoy_$SONOBUOY_VERSION"_linux_amd64.tar.gz && \
-    tar -xzf "sonobuoy_$SONOBUOY_VERSION"_linux_amd64.tar.gz -C /tmp && \
-    mv /tmp/sonobuoy /usr/local/bin && \
-    chmod +x /usr/local/bin/sonobuoy && \
-    wget https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
-    unzip awscli-exe-linux-x86_64.zip && \
-    ./aws/install && \
-    # curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
-    cd $WORKSPACE && \
-    pip install --upgrade pip && \
-    pip install -r requirements_v3api.txt
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    openssl \
+    curl \
+    unzip && \
+    rm -rf /var/lib/apt/lists/*
 
-# necessary to run if statements using [[ ]]
-SHELL ["/bin/bash", "-c"] 
+RUN curl -fsSL --retry 5 --retry-delay 5 -o /bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl \
+    && chmod +x /bin/kubectl
 
+RUN curl -fsSL --retry 5 --retry-delay 5 -o /bin/rke https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 \
+    && chmod +x /bin/rke
+
+RUN curl -fsSL --retry 5 --retry-delay 5 -o rancher-cli.tar.gz https://github.com/rancher/cli/releases/download/$CLI_VERSION/rancher-linux-amd64-$CLI_VERSION.tar.gz \
+    && tar -xzf rancher-cli.tar.gz \
+    && mv rancher-$CLI_VERSION/rancher /bin/rancherctl \
+    && chmod +x /bin/rancherctl
+
+RUN curl -fsSL --retry 5 --retry-delay 5 -o helm.tar.gz https://github.com/helm/helm/releases/download/${RANCHER_HELM_VERSION}/helm-${RANCHER_HELM_VERSION#v}-linux-amd64.tar.gz \
+    && tar -xzf helm.tar.gz \
+    && mv linux-amd64/helm /bin/helm_v3 \
+    && chmod +x /bin/helm_v3
+
+RUN curl -fsSL --retry 5 --retry-delay 5 -o terraform.zip https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip \
+    && unzip terraform.zip \
+    && chmod u+x terraform \
+    && mv terraform /usr/local/bin
+
+RUN curl -fsSL --retry 5 --retry-delay 5 -o sonobuoy.tar.gz https://github.com/vmware-tanzu/sonobuoy/releases/download/v$SONOBUOY_VERSION/sonobuoy_$SONOBUOY_VERSION_linux_amd64.tar.gz \
+    && tar -xzf sonobuoy.tar.gz -C /tmp \
+    && mv /tmp/sonobuoy /usr/local/bin \
+    && chmod +x /usr/local/bin/sonobuoy
+
+RUN curl -fsSL --retry 5 --retry-delay 5 -o awscli.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip \
+    && unzip awscli.zip \
+    && ./aws/install
+
+RUN pip install --upgrade pip && pip install -r requirements_v3api.txt
