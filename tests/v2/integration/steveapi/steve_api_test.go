@@ -2500,7 +2500,6 @@ func (s *steveAPITestSuite) TestList() {
 			}
 			if changed {
 				query = strings.Join(parts, "&")
-				fmt.Fprintf(os.Stderr, "QQQ: changing query %d <%s> to <%s>\n", i, tests[i].query, query)
 				tests[i].query = query
 			}
 		}
