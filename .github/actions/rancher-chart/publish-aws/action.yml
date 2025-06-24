@@ -11,8 +11,8 @@ runs:
       run: |
         aws s3 cp --recursive ./bin/chart s3://${{ env.CHARTS_BUCKET_NAME }}/server-charts
     - name: Invalidate Cloudfront cache
+      if: ${{ env.CHARTS_DISTRIBUTION_ID != '' }}
       env:
-        CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
         AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }}
         AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }}
       shell: bash

@@ -1,10 +1,11 @@
-name: Hotfix Release
+name: Security Release
 on:
   push:
     tags:
-      - "v*-hotfix*"
+      - "v*-security*"
 env:
   COMMIT: ${{ github.sha }}
+  DOCKERIO_REGISTRY: "docker.io"
   AWS_DEFAULT_REGION: "us-east-1"
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
@@ -67,15 +68,15 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
       - name: push
         uses: ./.github/actions/push-images
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: registry.suse.com/bci/bci-base:latest
     permissions:
       contents: read
       id-token: write
@@ -99,14 +100,14 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | AWS_ACCESS_KEY_ID_CHARTS ;
-            secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | AWS_SECRET_ACCESS_KEY_CHARTS ;
-            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
-            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
-            secret/data/github/repo/${{ github.repository }}/chart-optimus-uploader/credentials stagingChartsOptimusBucketName | CHARTS_BUCKET_NAME ;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID_CHARTS;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CHARTS;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials chartsBucketName | CHARTS_BUCKET_NAME;
       - name: publish
         env:
-          CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
+          CHARTS_BUCKET_NAME: ${{ env.CHARTS_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CHARTS }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CHARTS }}
         uses: ./.github/actions/rancher-chart/publish-aws
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
@@ -127,9 +128,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
       - name: build
         uses: ./.github/actions/build-images/installer
   merge-server-agent-installer-manifests:
@@ -145,9 +146,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to Docker Registry
@@ -186,8 +187,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials accessKeyId | AWS_ACCESS_KEY_ID ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY ;
-            secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials primeArtifactsBucketName | ARTIFACTS_BUCKET_NAME;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials artifactBucketName | ARTIFACTS_BUCKET_NAME;
       - name: publish to aws
         uses: ./.github/actions/images-files/publish-aws
