@@ -141,6 +141,28 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 }
 
 func (c *CredentialSecretsAdapter) Remove() error {
+	currentSecret, err := c.secretCache.Get(c.secretNamespace, c.secretName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if slices.Contains(currentSecret.Finalizers, c.finalizerName) {
+		var newFinalizers []string
+		for _, finalizer := range currentSecret.Finalizers {
+			if finalizer != c.finalizerName {
+				newFinalizers = append(newFinalizers, finalizer)
+			}
+		}
+		currentSecret.Finalizers = newFinalizers
+
+		if _, updateErr := c.secrets.Update(currentSecret); updateErr != nil {
+			if apierrors.IsNotFound(updateErr) {
+				return nil
+			}
+
+			return updateErr
+		}
+	}
+
 	return c.secrets.Delete(c.secretNamespace, c.secretName, &metav1.DeleteOptions{})
 }
 

@@ -209,16 +209,14 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 				return incomingObj, cleanUpErr
 			}
 		}
-		//if incomingContentHash != params.contentHash {
-		//	h.log.Info("must cleanup existing registration managed by secret")
-		//	if cleanUpErr := h.cleanupRegistrationByHash(hashCleanupRequest{
-		//		incomingContentHash,
-		//		ContentHash,
-		//	}); cleanUpErr != nil {
-		//		h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingContentHash, cleanUpErr)
-		//		return incomingObj, cleanUpErr
-		//	}
-		//}
+
+		if incomingContentHash != params.contentHash {
+			h.log.Info("must cleanup existing registration managed by secret")
+			if cleanUpErr := h.cleanupRelatedSecretsByHash(incomingContentHash); cleanUpErr != nil {
+				h.log.Errorf("failed to cleanup registrations for hash %s: %v", incomingNameHash, cleanUpErr)
+				return incomingObj, cleanUpErr
+			}
+		}
 
 		h.log.Info("create or update registration managed by secret")
 
@@ -315,9 +313,60 @@ func (h *handler) cleanupRegistrationByHash(cleanupRequest hashCleanupRequest) e
 			continue
 		}
 		if deleteErr != nil {
-			return fmt.Errorf("failed to delete registration %s: %w", reg.Name, err)
+			return fmt.Errorf("failed to delete registration %s: %w", reg.Name, deleteErr)
 		}
 	}
+	return nil
+}
+
+func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
+	secrets, err := h.secretCache.GetByIndex(IndexSecretsBySccHash, contentHash)
+	h.log.Infof("found %d matching related secrets to clean up; content hash of %s", len(secrets), contentHash)
+	if err != nil {
+		return err
+	}
+
+	// It should never be in there, but just in case don't act on the entrypoint
+	secrets = slices.Collect(func(yield func(secret *corev1.Secret) bool) {
+		for _, secret := range secrets {
+			if secret.Name != consts.ResourceSCCEntrypointSecretName {
+				if !yield(secret) {
+					return
+				}
+			}
+		}
+	})
+
+	for _, secret := range secrets {
+		if !slices.Contains(secret.Finalizers, consts.FinalizerSccCredentials) || !slices.Contains(secret.Finalizers, consts.FinalizerSccRegistrationCode) {
+			continue
+		}
+
+		if retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var remainingFin []string
+			for _, finalizer := range secret.Finalizers {
+				if finalizer != consts.FinalizerSccCredentials && finalizer != consts.FinalizerSccRegistrationCode {
+					remainingFin = append(remainingFin, finalizer)
+				}
+			}
+			secret.Finalizers = remainingFin
+
+			_, updateErr := h.secrets.Update(secret)
+			return updateErr
+		}); retryErr != nil {
+			return retryErr
+		}
+
+		deleteErr := h.secrets.Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
+		if apierrors.IsNotFound(deleteErr) {
+			h.log.Debugf("Related Secret %s/%s already deleted", secret.Namespace, secret.Name)
+			continue
+		}
+		if deleteErr != nil {
+			return fmt.Errorf("failed to delete secret %s/%s: %w", secret.Namespace, secret.Name, deleteErr)
+		}
+	}
+
 	return nil
 }
 
@@ -344,6 +393,10 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 		}); err != nil {
 			h.log.Errorf("failed to cleanup registrations for hash %s: %v", hash, err)
 			return nil, err
+		}
+		if cleanUpErr := h.cleanupRelatedSecretsByHash(hash); cleanUpErr != nil {
+			h.log.Errorf("failed to cleanup registrations for hash %s: %v", hash, cleanUpErr)
+			return incomingObj, cleanUpErr
 		}
 
 		return incomingObj, nil

@@ -328,7 +328,8 @@ func (s sccOnlineMode) Deregister() error {
 	// Finalizers on the credential secret have helped this case, but it's still invalid if users edit the secret manually for some reason.
 	err := sccConnection.Deregister()
 	if err != nil {
-		return err
+		s.log.Warn("Deregister failure will be logged but not prevent cleanup")
+		s.log.Error("Failed to deregister SCC registration: %v", err)
 	}
 
 	// Delete SCC credentials after successful Deregister
