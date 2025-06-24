@@ -744,9 +744,12 @@ var nonSQLListTests = []listTestType{
 	},
 }
 
+//var isSingleDigitRegex = regexp.MustCompile(`^\d$`)
+
 func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
+	usingSQLCache := features.UISQLCache.Enabled()
 
 	tests := []listTestType{
 		// user-a
@@ -916,10 +919,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.name=test1,metadata.namespace=1",
+			description: "user:user-a,namespace:none,query:filter=metadata.name=test1,metadata.namespace=test-ns-1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.name=test1,metadata.namespace=1",
+			query:       "filter=metadata.name=test1,metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -933,10 +936,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1341,10 +1344,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.name=test1,metadata.namespace=1",
+			description: "user:user-b,namespace:none,query:filter=metadata.name=test1,metadata.namespace=test-ns-1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.name=test1,metadata.namespace=1",
+			query:       "filter=metadata.name=test1,metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1354,10 +1357,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1710,10 +1713,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.name=test1,metadata.namespace=1",
+			description: "user:user-c,namespace:none,query:filter=metadata.name=test1,metadata.namespace=test-ns-1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.name=test1,metadata.namespace=1",
+			query:       "filter=metadata.name=test1,metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1733,10 +1736,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
@@ -2462,8 +2465,42 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 	}
-	if !features.UISQLCache.Enabled() {
+	if !usingSQLCache {
 		tests = append(tests, nonSQLListTests...)
+	} else {
+		// map labelSelector and fieldSelector params to the VAI equivalents
+		// ensure metadata.namespace tests are doing partial matching because
+		// the actual namespaces are given an `auto` prefix and a random suffix
+		for i, test := range tests {
+			query := test.query
+			parts := strings.Split(query, "&")
+			changed := false
+			for j, part := range parts {
+				subparts := strings.Split(part, "=")
+				if subparts[0] == "labelSelector" {
+					//if isSingleDigitRegex.MatchString(subparts[2]) {
+					//	subparts[2] = "test" + subparts[2]
+					//}
+					parts[j] = fmt.Sprintf("filter=metadata.labels[%s]=%s", subparts[1], subparts[2])
+					changed = true
+				} else if subparts[0] == "fieldSelector" {
+					op := "="
+					if subparts[1] == "metadata.namespace" {
+						op = "~"
+					}
+					parts[j] = fmt.Sprintf("filter=%s%s%s", subparts[1], op, subparts[2])
+					changed = true
+				} else if subparts[0] == "label" {
+					parts[j] = fmt.Sprintf("filter=%s=%s", subparts[1], subparts[2])
+					changed = true
+				}
+			}
+			if changed {
+				query = strings.Join(parts, "&")
+				fmt.Fprintf(os.Stderr, "QQQ: changing query %d <%s> to <%s>\n", i, tests[i].query, query)
+				tests[i].query = query
+			}
+		}
 	}
 
 	var csvWriter *csv.Writer
@@ -2532,7 +2569,11 @@ func (s *steveAPITestSuite) TestList() {
 			if _, ok := query["revision"]; ok {
 				query["revision"] = []string{s.lastRevision}
 			}
-			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"="+testID)
+			if usingSQLCache {
+				query["filter"] = append(query["filter"], fmt.Sprintf("metadata.labels[%s]~%s", steveAPITestLabel, testID))
+			} else {
+				query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"="+testID)
+			}
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
