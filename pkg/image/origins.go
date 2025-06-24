@@ -240,6 +240,7 @@ var OriginMap = map[string]string{
 	"prometheus-federator":                                    "https://github.com/rancher/prometheus-federator",
 	"pushprox-client":                                         "https://github.com/rancher/PushProx",
 	"pushprox-proxy":                                          "https://github.com/rancher/PushProx",
+	"pushprox":                                                "https://github.com/rancher/PushProx",
 	"rancher":                                                 "https://github.com/rancher/rancher",
 	"rancher-agent":                                           "https://github.com/rancher/rancher",
 	"rancher-csp-adapter":                                     "https://github.com/rancher/csp-adapter",
