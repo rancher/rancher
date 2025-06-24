@@ -329,7 +329,7 @@ func (s sccOnlineMode) Deregister() error {
 	err := sccConnection.Deregister()
 	if err != nil {
 		s.log.Warn("Deregister failure will be logged but not prevent cleanup")
-		s.log.Error("Failed to deregister SCC registration: %v", err)
+		s.log.Errorf("Failed to deregister SCC registration: %v", err)
 	}
 
 	// Delete SCC credentials after successful Deregister

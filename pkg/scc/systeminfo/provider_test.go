@@ -30,7 +30,7 @@ func TestGetProductIdentifier(t *testing.T) {
 	rancherUuid := uuid.Parse(uuid.New())
 	clusterUuid := uuid.Parse(uuid.New())
 
-	infoProvider := NewInfoProvider(rancherUuid, clusterUuid, nil)
+	infoProvider := NewInfoProvider(nil).SetUuids(rancherUuid, clusterUuid)
 	product, version, architecture := infoProvider.GetProductIdentifier()
 	assert.Equal(t, "rancher", product)
 	// When in dev mode, the info provider has to "lie" in order to connect with SCC
