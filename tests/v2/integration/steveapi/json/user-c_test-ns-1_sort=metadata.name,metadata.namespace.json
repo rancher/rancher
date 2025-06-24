@@ -12,6 +12,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
+        "fields": [
+          "test1",
+          "Opaque",
+          0,
+          "11m"
+        ],
         "labels": {
           "test.cattle.io/steveapi": "nondeterministicid"
         },
@@ -35,6 +41,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
+        "fields": [
+          "test2",
+          "Opaque",
+          0,
+          "11m"
+        ],
         "labels": {
           "test-label": "2",
           "test.cattle.io/steveapi": "nondeterministicid"

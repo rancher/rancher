@@ -1,5 +1,6 @@
 {
   "actions": {},
+  "continue": "nondeterministictoken",
   "count": 3,
   "data": [
     {
@@ -12,6 +13,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test5"
       },
       "metadata": {
+        "fields": [
+          "test5",
+          "Opaque",
+          0,
+          "11m"
+        ],
         "labels": {
           "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -36,6 +43,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test4"
       },
       "metadata": {
+        "fields": [
+          "test4",
+          "Opaque",
+          0,
+          "11m"
+        ],
         "labels": {
           "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -54,7 +67,11 @@
   "links": {
     "self": "https://rancherurl/v1/secrets"
   },
-  "pages": 2,
+  "pagination": {
+    "first": "https://rancherurl/v1/secrets",
+    "next": "https://rancherurl/v1/secrets?continue=nondeterministictoken\u0026filter=metadata.labels.test-label-gte%3D3\u0026filter=metadata.labels%5Btest.cattle.io%2Fsteveapi%5D~wuhhl\u0026pagesize=2\u0026sort=-metadata.name",
+    "partial": true
+  },
   "resourceType": "secret",
   "revision": "100",
   "type": "collection"

@@ -12,6 +12,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test3"
       },
       "metadata": {
+        "fields": [
+          "test3",
+          "Opaque",
+          0,
+          "11m"
+        ],
         "labels": {
           "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -30,7 +36,6 @@
   "links": {
     "self": "https://rancherurl/v1/secrets"
   },
-  "pages": 2,
   "resourceType": "secret",
   "revision": "100",
   "type": "collection"
