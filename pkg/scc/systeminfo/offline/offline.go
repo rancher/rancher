@@ -9,7 +9,10 @@ import (
 )
 
 func offlineValidatorContextLogger() log.StructuredLogger {
-	return log.NewLog().WithField("subcomponent", "offline-cert-validator")
+	logBuilder := &log.Builder{
+		SubComponent: "offline-cert-validator",
+	}
+	return logBuilder.ToLogger()
 }
 
 type offlineCertError struct {

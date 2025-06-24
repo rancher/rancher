@@ -89,14 +89,8 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 	rancherVersion := systeminfo.GetVersion()
 	rancherTelemetry := telemetry.NewTelemetryGatherer(rancherVersion, wContext.Mgmt.Cluster().Cache(), wContext.Mgmt.Node().Cache())
 
-	devMode := false
-	if consts.IsDevMode() {
-		devMode = true
-		logger = logger.WithField("devMode", true)
-	}
-
 	return &sccOperator{
-		devMode:                 devMode,
+		devMode:                 consts.IsDevMode(),
 		log:                     logger,
 		sccResourceFactory:      sccResources,
 		secrets:                 wContext.Core.Secret(),

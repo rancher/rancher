@@ -13,7 +13,10 @@ import (
 )
 
 func sccContextLogger() log.StructuredLogger {
-	return log.NewLog().WithField("subcomponent", "suse-connect")
+	logBuilder := &log.Builder{
+		SubComponent: "suse-connect",
+	}
+	return logBuilder.ToLogger()
 }
 
 type SccWrapper struct {

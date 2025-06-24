@@ -11,7 +11,10 @@ import (
 type JitterFunction func(nextTrigger, strictDeadline time.Duration) (bool, error)
 
 func jitterbugContextLogger() log.StructuredLogger {
-	return log.NewLog().WithField("subcomponent", "jitterbug")
+	logBuilder := &log.Builder{
+		SubComponent: "jitterbug",
+	}
+	return logBuilder.ToLogger()
 }
 
 // JitterChecker is not go-routine safe

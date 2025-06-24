@@ -9,7 +9,10 @@ import (
 )
 
 func utilTestsContextLogger() log.StructuredLogger {
-	return log.NewLog().WithField("subcomponent", "jitterbug-tests")
+	logBuilder := &log.Builder{
+		SubComponent: "jitterbug-tests",
+	}
+	return logBuilder.ToLogger()
 }
 
 func TestNewJitterChecker(t *testing.T) {
