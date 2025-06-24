@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
@@ -16,20 +15,27 @@ import (
 
 func TestDefaultPolicies(t *testing.T) {
 	machineDataInput, machineDataWant := []byte("{"), []byte("{")
-	for _, v := range management.DriverData {
-		for key, value := range v {
-			if strings.HasPrefix(key, "optional") {
-				continue
-			}
-			public := strings.HasPrefix(key, "public")
-			for _, item := range value {
-				machineDataInput = append(machineDataInput, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
-				if public {
-					machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
-				} else {
-					machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \""+redacted+"\",")...)
-				}
-			}
+	addToMachineData := func(item string, redact bool) {
+		machineDataInput = append(machineDataInput, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
+
+		if redact {
+			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \""+redacted+"\",")...)
+		} else {
+			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
+		}
+	}
+
+	for _, fields := range management.DriverData {
+		for _, item := range fields.PublicCredentialFields {
+			addToMachineData(item, false)
+		}
+
+		for _, item := range fields.PrivateCredentialFields {
+			addToMachineData(item, true)
+		}
+
+		for _, item := range fields.PasswordFields {
+			addToMachineData(item, true)
 		}
 	}
 
