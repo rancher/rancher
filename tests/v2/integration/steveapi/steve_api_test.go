@@ -948,10 +948,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.name!=1",
+			description: "user:user-a,namespace:none,query:filter=metadata.name!=test1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.name!=1",
+			query:       "filter=metadata.name!=test1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1369,10 +1369,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.name!=1",
+			description: "user:user-b,namespace:none,query:filter=metadata.name!=test1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.name!=1",
+			query:       "filter=metadata.name!=test1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -2486,13 +2486,16 @@ func (s *steveAPITestSuite) TestList() {
 				} else if subparts[0] == "fieldSelector" {
 					op := "="
 					if subparts[1] == "metadata.namespace" {
+						// Use the partial-match operator because actual namespaces have a random prefix and suffix
 						op = "~"
 					}
 					parts[j] = fmt.Sprintf("filter=%s%s%s", subparts[1], op, subparts[2])
 					changed = true
-				} else if subparts[0] == "label" {
-					parts[j] = fmt.Sprintf("filter=%s=%s", subparts[1], subparts[2])
-					changed = true
+				} else if subparts[0] == "filter" {
+					if strings.Contains(part, "metadata.namespace=") {
+						changed = true
+						parts[j] = strings.ReplaceAll(part, "metadata.namespace=", "metadata.namespace~")
+					}
 				}
 			}
 			if changed {
