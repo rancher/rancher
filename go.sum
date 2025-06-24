@@ -461,8 +461,6 @@ github.com/hashicorp/golang-lru/arc/v2 v2.0.5 h1:l2zaLDubNhW4XO3LnliVj0GXO3+/CGN
 github.com/hashicorp/golang-lru/arc/v2 v2.0.5/go.mod h1:ny6zBSQZi2JxIeYcv7kt2sH2PXJtirBN7RDhRpxPkxU=
 github.com/hashicorp/golang-lru/v2 v2.0.5 h1:wW7h1TG88eUIJ2i69gaE3uNVtEPIagzhGvHgwfx2Vm4=
 github.com/hashicorp/golang-lru/v2 v2.0.5/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
-github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972 h1:Bah0yCXJwqJ7v2QLGdwkQoI/PBXYIBSkyTfirp6nbRk=
-github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972/go.mod h1:Q86X8hc61JXhE5XxYLKmrSRWby/Oe8IIYZIBgmGVkTA=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
@@ -703,8 +701,8 @@ github.com/rancher/helm/v3 v3.18.3-rancher1 h1:ZiCSY38ZT6iPhFidF378rn2j8UoJp7+Jo
 github.com/rancher/helm/v3 v3.18.3-rancher1/go.mod h1:wUc4n3txYBocM7S9RjTeZBN9T/b5MjffpcSsWEjSIpw=
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
 github.com/rancher/kubernetes-provider-detector v0.1.5/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
-github.com/rancher/lasso v0.2.3-rc1 h1:dRerAaAiziQKSVasSQe3Av2aNGokjidzZD/bLLLIQT4=
-github.com/rancher/lasso v0.2.3-rc1/go.mod h1:L8ct0T/HAYTWLKWPBQCZvluqmr72Yl5YOewjgRRvnMk=
+github.com/rancher/lasso v0.2.3-rc3 h1:kkYnARdFeY6A9E2XnjfQbG8CssHQwobPMIFqPRGpVxc=
+github.com/rancher/lasso v0.2.3-rc3/go.mod h1:G+KeeOaKRjp+qGp0bV6VbLhYrq1vHbJPbDh40ejg5yE=
 github.com/rancher/machine v0.15.0-rancher129 h1:nbzPtL7GmkUjadjJLXeo524YqpOCUMO9aQZXqxszXTU=
 github.com/rancher/machine v0.15.0-rancher129/go.mod h1:JmWwNMujPjkTs+RJ39uqfsR04MgePTzv+ScLwVlVfqo=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
@@ -727,8 +725,8 @@ github.com/rancher/tests/actions v0.0.0-20250505204226-5b136337f7c5 h1:iatxRcqku
 github.com/rancher/tests/actions v0.0.0-20250505204226-5b136337f7c5/go.mod h1:H5+LNaXMUkUuaN8xT018YtPzuYEsnayElp+DhHlXRVU=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
-github.com/rancher/wrangler/v3 v3.2.2-rc.1 h1:UoReGk+6sZD9uVoCpwdFWrznhVs4jKDsZ+fNNMJ0EQE=
-github.com/rancher/wrangler/v3 v3.2.2-rc.1/go.mod h1:G+gawqOKIo7i1jtgPKvzU3RzA+3OCaAsYVxq03Iya20=
+github.com/rancher/wrangler/v3 v3.2.2-rc.3 h1:ObcqAxQkQFP6r1YI3zJhi9v9PE+UUNNZpelz6NSpQnc=
+github.com/rancher/wrangler/v3 v3.2.2-rc.3/go.mod h1:ukbwLYT+MTCx+43aXNQNYxZizQpeo0gILK05k4RoW7o=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 h1:EaDatTxkdHG+U3Bk4EUr+DZ7fOGwTfezUiUJMaIcaho=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5/go.mod h1:fyalQWdtzDBECAQFBJuQe5bzQ02jGd5Qcbgb97Flm7U=
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb27yVE+gIAfeqp8LUCc=

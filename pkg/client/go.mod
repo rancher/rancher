@@ -16,7 +16,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rancher/wrangler/v3 v3.2.2-rc.1 // indirect
+	github.com/rancher/wrangler/v3 v3.2.2-rc.3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.38.0 // indirect
