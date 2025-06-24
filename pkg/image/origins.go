@@ -266,6 +266,7 @@ var OriginMap = map[string]string{
 	"wins":                                                    "https://github.com/rancher/wins",
 	"wmi_exporter-package":                                    "https://github.com/rancher/wmi_exporter-package",
 	"kuberlr-kubectl":                                         "https://github.com/rancher/kuberlr-kubectl",
+	"compliance-operator":                                     "https://github.com/rancher/compliance-operator",
 }
 
 const (
