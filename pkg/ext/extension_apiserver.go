@@ -288,10 +288,12 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			panic(err)
 		}
 
-		// ext controller setup ...
-		err = clusterauthtoken.RegisterExtIndexers(core.Ext().V1())
-		if err != nil {
-			panic(err)
+		if features.ExtTokens.Enabled() {
+			// ext controller setup ...
+			err = clusterauthtoken.RegisterExtIndexers(core.Ext().V1())
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		err = controllerFactory.SharedCacheFactory().Start(ctx)
