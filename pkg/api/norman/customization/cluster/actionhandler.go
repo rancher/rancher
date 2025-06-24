@@ -12,20 +12,15 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
-	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 // ActionHandler used for performing various cluster actions.
 type ActionHandler struct {
-	NodepoolGetter            v3.NodePoolsGetter
-	NodeLister                v3.NodeLister
-	ClusterClient             v3.ClusterInterface
-	UserMgr                   user.Manager
-	ClusterManager            *clustermanager.Manager
-	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
-	TokenClient               v3.TokenInterface
-	Auth                      requests.Authenticator
+	NodeLister     v3.NodeLister
+	UserMgr        user.Manager
+	ClusterManager *clustermanager.Manager
+	Auth           requests.Authenticator
 }
 
 // ClusterActionHandler runs the handler for the provided cluster action in the given context.

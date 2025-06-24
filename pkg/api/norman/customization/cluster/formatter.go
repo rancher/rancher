@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -89,30 +88,4 @@ func setIntIfNil(configMap map[string]interface{}, fieldName string, replaceVal 
 
 func (f *Formatter) CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
 	collection.AddAction(request, "createFromTemplate")
-}
-
-func gatherClusterSpecPwdFields(schemas *types.Schemas, schema *types.Schema) map[string]interface{} {
-
-	data := map[string]interface{}{}
-
-	for name, field := range schema.ResourceFields {
-		fieldType := field.Type
-		if strings.HasPrefix(fieldType, "array") {
-			fieldType = strings.Split(fieldType, "[")[1]
-			fieldType = fieldType[:len(fieldType)-1]
-		}
-		subSchema := schemas.Schema(&managementschema.Version, fieldType)
-		if subSchema != nil {
-			value := gatherClusterSpecPwdFields(schemas, subSchema)
-			if len(value) > 0 {
-				data[name] = value
-			}
-		} else {
-			if field.Type == "password" {
-				data[name] = "true"
-			}
-		}
-	}
-
-	return data
 }

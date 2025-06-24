@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	cleanupPodLabel                    = "rke.cattle.io/cleanup-node"
 	userNodeRemoveAnnotationPrefix     = "lifecycle.cattle.io/create.user-node-remove_"
 	userNodeRemoveCleanupAnnotationOld = "nodes.management.cattle.io/user-node-remove-cleanup"
 )

@@ -161,14 +161,10 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 	schema.Store = clusterStore
 
 	handler := ccluster.ActionHandler{
-		NodepoolGetter:            managementContext.Management,
-		NodeLister:                managementContext.Management.Nodes("").Controller().Lister(),
-		ClusterClient:             managementContext.Management.Clusters(""),
-		UserMgr:                   managementContext.UserManager,
-		ClusterManager:            clusterManager,
-		SubjectAccessReviewClient: managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
-		TokenClient:               managementContext.Management.Tokens(""),
-		Auth:                      requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, managementContext),
+		NodeLister:     managementContext.Management.Nodes("").Controller().Lister(),
+		UserMgr:        managementContext.UserManager,
+		ClusterManager: clusterManager,
+		Auth:           requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, managementContext),
 	}
 
 	clusterValidator := ccluster.Validator{

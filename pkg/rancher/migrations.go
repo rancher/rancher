@@ -50,7 +50,6 @@ const (
 	capiMigratedKey                            = "capiMigrated"
 	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
 	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
-	rkeClustersAnnotatedForMigrationKey        = "rkeClustersAnnotatedForMigration"
 	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
 	importedClusterManagedFieldsMigratedKey    = "importedClusterManagedFieldsMigrated"
 	rkeCleanupCompletedKey                     = "rkecleanupcompleted"
@@ -654,10 +653,8 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 
 func rkeResourcesCleanup(w *wrangler.Context) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), rkeCleanupMigration)
-	if err != nil {
-		return fmt.Errorf("error getting configmap %s: %w", rkeCleanupMigration, err)
-	} else if cm == nil {
-		return nil
+	if err != nil || cm == nil {
+		return err
 	}
 
 	// Check if this migration has already run.
