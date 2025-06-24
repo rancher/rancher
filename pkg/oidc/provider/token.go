@@ -178,7 +178,7 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 		if clientSecret == string(cs) {
 			clientSecretFound = true
 			if err := h.updateClientSecretUsedTimeStamp(oidcClient, key); err != nil {
-				logrus.Errorf("[OIDC provider] failed to update client secret used timestamp: %v", err)
+				logrus.Errorf("[OIDC provider] failed to update client secret's used timestamp: %v", err)
 			}
 			break
 		}
