@@ -14,6 +14,7 @@ const (
 	ContainerStatusFieldRestartCount             = "restartCount"
 	ContainerStatusFieldStarted                  = "started"
 	ContainerStatusFieldState                    = "state"
+	ContainerStatusFieldStopSignal               = "stopSignal"
 	ContainerStatusFieldUser                     = "user"
 	ContainerStatusFieldVolumeMounts             = "volumeMounts"
 )
@@ -31,6 +32,7 @@ type ContainerStatus struct {
 	RestartCount             int64                 `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
 	Started                  *bool                 `json:"started,omitempty" yaml:"started,omitempty"`
 	State                    *ContainerState       `json:"state,omitempty" yaml:"state,omitempty"`
+	StopSignal               string                `json:"stopSignal,omitempty" yaml:"stopSignal,omitempty"`
 	User                     *ContainerUser        `json:"user,omitempty" yaml:"user,omitempty"`
 	VolumeMounts             []VolumeMountStatus   `json:"volumeMounts,omitempty" yaml:"volumeMounts,omitempty"`
 }

@@ -10,7 +10,7 @@ ARG VERSION
 ENV CHART_VERSION=${VERSION}
 
 # set up helm 3
-ENV HELM_VERSION=v3.17.1
+ENV HELM_VERSION=v3.18.3
 RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O - | \
     tar -xz --strip-components=1 -C /usr/bin && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
