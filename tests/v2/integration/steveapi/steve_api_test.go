@@ -2680,7 +2680,7 @@ func (s *steveAPITestSuite) TestLinks() {
 
 	secretObj, err := secretClient.Create(corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      namegenerator.AppendRandomString("steve-secret"),
+			Name:      namegenerator.AppendRandomString("steve-secret-squirrel"),
 			Namespace: namespaceMap["test-ns-1"],
 		},
 		Data: map[string][]byte{"foo": []byte("bar")},
@@ -2703,6 +2703,10 @@ func (s *steveAPITestSuite) TestLinks() {
 		"view":   fmt.Sprintf("https://%s/api/v1/namespaces/%s/secrets/%s", host, secretObj.Namespace, secretObj.Name),
 	}
 
+	// delete
+	err = secretClient.Delete(readObj)
+	require.NoError(s.T(), err)
+
 	assert.Equal(s.T(), expectedID, id)
 	assert.Equal(s.T(), expectedLinks, links)
 }
@@ -2720,7 +2724,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		// create
 		secretObj, err := secretClient.Create(corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      namegenerator.AppendRandomString("steve-secret"),
+				Name:      namegenerator.AppendRandomString("steve-secret-garden"),
 				Namespace: namespaceMap["test-ns-1"], // need to specify the namespace for a namespaced resource if using a global endpoint ("/v1/secrets")
 			},
 			Data: map[string][]byte{"foo": []byte("bar")},
@@ -2759,7 +2763,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		// create
 		secretObj, err := secretClient.Create(corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: namegenerator.AppendRandomString("steve-secret"),
+				Name: namegenerator.AppendRandomString("steve-secret-six"),
 				// no need to provide a namespace since using a namespaced endpoint ("/v1/secrets/test-ns-1")
 			},
 			Data: map[string][]byte{"foo": []byte("bar")},
