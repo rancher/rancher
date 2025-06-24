@@ -23,9 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests"
-	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/clusterrouter"
-	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
@@ -361,12 +359,6 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {
 			return err
-		}
-
-		if features.RKE2.Enabled() {
-			if err := resetRkeControlPlanes(r.Wrangler); err != nil {
-				return err
-			}
 		}
 
 		return runMigrations(r.Wrangler)
@@ -761,54 +753,4 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	}
 
 	return found, nil
-}
-
-// resetRkeControlPlanes sets the SystemAgentUpgraded and SystemUpgradeControllerReady conditions False and removes
-// the rke.cattle.io/applied-system-agent-upgrader-hash annotation if they are found in rkeControlPlane, to ensure
-// the system-agent-upgrader resources to be installed - especially in scenarios where Rancher is upgraded to 2.12.x,
-// then rolled back to 2.11.x, and later upgraded to 2.12.x again *without* restoring the local cluster
-func resetRkeControlPlanes(w *wrangler.Context) error {
-	rkeControlPlanes, err := w.RKE.RKEControlPlane().List("fleet-default", metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, item := range rkeControlPlanes.Items {
-		needsUpdate := false
-		needsStatusUpdate := false
-
-		if item.Annotations != nil {
-			if _, ok := item.Annotations[managesystemagent.AppliedSystemAgentUpgraderHashAnnotation]; ok {
-				needsUpdate = true
-			}
-		}
-		if capr.SystemAgentUpgraded.IsTrue(&item) || capr.SystemUpgradeControllerReady.IsTrue(&item) {
-			needsStatusUpdate = true
-		}
-		if !needsUpdate && !needsStatusUpdate {
-			continue
-		}
-
-		obj := item.DeepCopy()
-
-		if needsUpdate {
-			delete(obj.Annotations, managesystemagent.AppliedSystemAgentUpgraderHashAnnotation)
-			if obj, err = w.RKE.RKEControlPlane().Update(obj); err != nil {
-				return err
-			}
-		}
-		if needsStatusUpdate {
-			capr.SystemAgentUpgraded.False(obj)
-			capr.SystemAgentUpgraded.Message(obj, "")
-			capr.SystemAgentUpgraded.Reason(obj, "waiting for initialization")
-
-			capr.SystemUpgradeControllerReady.False(obj)
-			capr.SystemUpgradeControllerReady.Message(obj, "")
-			capr.SystemUpgradeControllerReady.Reason(obj, "waiting for initialization")
-
-			if _, err := w.RKE.RKEControlPlane().UpdateStatus(obj); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

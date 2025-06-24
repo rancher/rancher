@@ -8,7 +8,6 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
@@ -18,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
-	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,8 +30,6 @@ type handler struct {
 }
 
 func Register(ctx context.Context, context *config.UserContext) {
-	mgmtWrangler := context.Management.Wrangler
-
 	h := handler{
 		mgmtClusterName:      context.ClusterName,
 		clusterCache:         context.Management.Wrangler.Provisioning.Cluster().Cache(),
@@ -41,21 +37,43 @@ func Register(ctx context.Context, context *config.UserContext) {
 		downstreamPlanClient: context.Plan.V1().Plan(),
 	}
 
-	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, mgmtWrangler.RKE.RKEControlPlane(),
+	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, context.Management.Wrangler.RKE.RKEControlPlane(),
 		"", "sync-system-upgrade-controller-condition", h.syncSystemUpgradeControllerCondition)
-
-	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, mgmtWrangler.RKE.RKEControlPlane(),
-		"", "sync-system-agent-upgrader-condition", h.syncSystemAgentUpgraderCondition)
 }
 
 // syncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the downstream cluster
-// and sets a condition on the control-plane object
+// and manages the SystemUpgradeControllerReady condition on the RKEControlPlane object
 func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return status, nil
 	}
 	if obj.Spec.ManagementClusterName != h.mgmtClusterName {
 		return status, nil
+	}
+
+	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
+	if targetVersion == "" {
+		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
+		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("the SystemUpgradeControllerChartVersion setting is not set"))
+		capr.SystemUpgradeControllerReady.Message(&status, "")
+		capr.SystemUpgradeControllerReady.False(&status)
+		return status, nil
+	}
+
+	if capr.SystemUpgradeControllerReady.IsTrue(&status) {
+		actual := capr.SystemUpgradeControllerReady.GetMessage(&status)
+		if actual == targetVersion {
+			// Skip if the target version of the app has been installed
+			return status, nil
+		} else if actual == "" {
+			// If SystemUpgradeControllerReady is true but its message is empty, this may occur in scenarios where Rancher
+			// is upgraded to 2.12.x, then rolled back to 2.11.x, and later re-upgraded to 2.12.x without restoring the local cluster.
+			// In such cases, the condition should be rest
+			capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("reset the condition"))
+			capr.SystemUpgradeControllerReady.Message(&status, "")
+			capr.SystemUpgradeControllerReady.False(&status)
+			return status, nil
+		}
 	}
 
 	cluster, err := h.getCluster()
@@ -67,6 +85,9 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		return status, nil
 	}
 
+	// In rare cases, downstream cluster may become disconnected even if the Connected condition was recently true.
+	// If that happens, the following Get call can hang until it times out, causing this handler to take longer to return
+	// and delaying the execution of other handlers.
 	name := appName(obj.Spec.ClusterName)
 	app, err := h.downstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -85,12 +106,8 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		return status, nil
 	}
 
-	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
-	if targetVersion == "" {
-		logrus.Warn("[rkecontrolplanecondition] SystemUpgradeControllerChartVersion setting is not set")
-	}
 	version := app.Spec.Chart.Metadata.Version
-	if version != targetVersion && targetVersion != "" {
+	if version != targetVersion {
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be updated to %s", app.Name, targetVersion))
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
@@ -107,61 +124,6 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	capr.SystemUpgradeControllerReady.Reason(&status, "")
 	capr.SystemUpgradeControllerReady.Message(&status, version)
 	capr.SystemUpgradeControllerReady.True(&status)
-
-	return status, nil
-}
-
-// syncSystemAgentUpgraderCondition checks the status of the system-agent-upgrader plan in the downstream cluster
-// and sets a condition on the ControlPlane CR
-func (h *handler) syncSystemAgentUpgraderCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
-		return status, nil
-	}
-	if obj.Spec.ManagementClusterName != h.mgmtClusterName {
-		return status, nil
-	}
-
-	cluster, err := h.getCluster()
-	if err != nil {
-		return status, err
-	}
-	// Skip if Rancher does not have a connection to the cluster
-	if !clusterconnected.Connected.IsTrue(cluster) {
-		return status, nil
-	}
-
-	plan, err := h.downstreamPlanClient.Get(namespace.System, managesystemagent.SystemAgentUpgrader, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		// if we couldn't find the plan then we know it's not ready
-		capr.SystemAgentUpgraded.Reason(&status, err.Error())
-		capr.SystemAgentUpgraded.Message(&status, "")
-		capr.SystemAgentUpgraded.False(&status)
-		// don't return the error, otherwise the status won't be set to 'false'
-		return status, nil
-	} else if err != nil {
-		return status, err
-	}
-
-	if plan.DeletionTimestamp != nil {
-		capr.SystemAgentUpgraded.Reason(&status, "plan is deleted, waiting for new plan to be created")
-		capr.SystemAgentUpgraded.Message(&status, "")
-		capr.SystemAgentUpgraded.False(&status)
-		return status, nil
-	}
-
-	// get the target version
-	version := managesystemagent.SystemAgentUpgraderVersion()
-
-	if version != plan.Status.LatestVersion || !planv1.PlanComplete.IsTrue(plan) {
-		capr.SystemAgentUpgraded.Reason(&status, fmt.Sprintf("waiting for system-agent-upgrader Plan %s to complete execution", version))
-		capr.SystemAgentUpgraded.Message(&status, "")
-		capr.SystemAgentUpgraded.False(&status)
-		return status, nil
-	}
-
-	capr.SystemAgentUpgraded.Reason(&status, "")
-	capr.SystemAgentUpgraded.Message(&status, plan.Status.LatestVersion)
-	capr.SystemAgentUpgraded.True(&status)
 
 	return status, nil
 }

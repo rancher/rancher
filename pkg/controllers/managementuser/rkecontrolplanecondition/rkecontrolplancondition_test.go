@@ -116,11 +116,33 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			clusterCacheIsInvoked: false,
 		},
 		{
-			name: "failed to get cluster",
+			name: "chart version is not set",
+			setup: setupConfig{
+				mgmtClusterName: mgmtClusterName,
+				cluster:         basicCluster,
+			},
+			input: &v1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      controlPlaneName,
+					Namespace: namespace.System,
+				},
+				Spec: v1.RKEControlPlaneSpec{
+					ManagementClusterName: mgmtClusterName,
+				},
+			},
+			wantError:             false,
+			wantedConditionStatus: "False",
+			appClientIsInvoked:    false,
+			planClientIsInvoked:   false,
+			clusterCacheIsInvoked: false,
+		},
+		{
+			name: "fail to get cluster",
 			setup: setupConfig{
 				mgmtClusterName: mgmtClusterName,
 				cluster:         basicCluster,
 				clusterError:    fmt.Errorf("some error"),
+				chartVersion:    "160.1.0",
 			},
 			input: &v1.RKEControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
@@ -138,7 +160,7 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			clusterCacheIsInvoked: true,
 		},
 		{
-			name: "cluster is not ready",
+			name: "cluster is not connected",
 			setup: setupConfig{
 				mgmtClusterName: mgmtClusterName,
 				cluster: &prov.Cluster{
@@ -155,6 +177,7 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 						},
 					},
 				},
+				chartVersion: "160.1.0",
 			},
 			input: &v1.RKEControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
@@ -183,8 +206,9 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 					Spec:   catalog.ReleaseSpec{},
 					Status: catalog.ReleaseStatus{},
 				},
-				cluster:  basicCluster,
-				appError: apierror.NewNotFound(catalog.Resource("app"), appName(provClusterName)),
+				cluster:      basicCluster,
+				appError:     apierror.NewNotFound(catalog.Resource("app"), appName(provClusterName)),
+				chartVersion: "160.1.0",
 			},
 			input: &v1.RKEControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
@@ -215,8 +239,9 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 					Spec:   catalog.ReleaseSpec{},
 					Status: catalog.ReleaseStatus{},
 				},
-				cluster:  basicCluster,
-				appError: apierror.NewInternalError(fmt.Errorf("something goes wrong")),
+				cluster:      basicCluster,
+				appError:     apierror.NewInternalError(fmt.Errorf("something goes wrong")),
+				chartVersion: "160.1.0",
 			},
 			input: &v1.RKEControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
@@ -248,8 +273,9 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 					Spec:   catalog.ReleaseSpec{},
 					Status: catalog.ReleaseStatus{},
 				},
-				cluster:  basicCluster,
-				appError: nil,
+				cluster:      basicCluster,
+				appError:     nil,
+				chartVersion: "160.1.0",
 			},
 			input: &v1.RKEControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
@@ -532,360 +558,6 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			// as it includes a lastUpdateTime field that is difficult to mock
 			if capr.SystemUpgradeControllerReady.GetStatus(&got) != tt.wantedConditionStatus {
 				t.Errorf("syncSystemUpgradeControllerCondition() got = %v, expected SystemUpgradeControllerReady condition status value = %v", got, tt.wantedConditionStatus)
-			}
-		})
-	}
-}
-
-func Test_handler_syncSystemAgentStatus(t *testing.T) {
-
-	tests := []testCase{
-		{
-			name: "rkeControlPlane is being deleted",
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              controlPlaneName,
-					Namespace:         namespace.System,
-					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ClusterName: provClusterName,
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             false,
-			wantedConditionStatus: "",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   false,
-			clusterCacheIsInvoked: false,
-		},
-		{
-			name: "rkeControlPlane is for a different cluster",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ManagementClusterName: "another-cluster",
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             false,
-			wantedConditionStatus: "",
-			planClientIsInvoked:   false,
-		},
-		{
-			name: "failed to get cluster",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				cluster:         basicCluster,
-				clusterError:    fmt.Errorf("some error"),
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ManagementClusterName: mgmtClusterName,
-				},
-			},
-			wantError:             true,
-			wantedConditionStatus: "",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   false,
-			clusterCacheIsInvoked: true,
-		},
-		{
-			name: "cluster is not ready",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				cluster: &prov.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      provClusterName,
-						Namespace: namespace.System,
-					},
-					Status: prov.ClusterStatus{
-						Conditions: []genericcondition.GenericCondition{
-							{
-								Type:   "Connected",
-								Status: "False",
-							},
-						},
-					},
-				},
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ManagementClusterName: mgmtClusterName,
-				},
-			},
-			wantError:             false,
-			wantedConditionStatus: "",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   false,
-			clusterCacheIsInvoked: true,
-		},
-		{
-			name: "fail to get the plan with notFound error",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				plan: &upgradev1.Plan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "another-plan",
-						Namespace: namespace.System,
-					},
-				},
-				cluster:  basicCluster,
-				appError: apierror.NewNotFound(upgradev1.Resource("plan"), "system-upgrade-controller"),
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ManagementClusterName: mgmtClusterName,
-					ClusterName:           provClusterName,
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             false,
-			wantedConditionStatus: "False",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   true,
-			clusterCacheIsInvoked: true,
-		},
-		{
-			name: "fail to get the plan with non-notFound error",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				plan: &upgradev1.Plan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "system-upgrade-controller",
-						Namespace: namespace.System,
-					},
-				},
-				cluster:  basicCluster,
-				appError: apierror.NewInternalError(fmt.Errorf("something goes wrong")),
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ManagementClusterName: mgmtClusterName,
-					ClusterName:           provClusterName,
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             true,
-			wantedConditionStatus: "",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   true,
-			clusterCacheIsInvoked: true,
-		},
-		{
-			name: "plan is being deleted",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				plan: &upgradev1.Plan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "system-upgrade-controller",
-						Namespace:         namespace.System,
-						DeletionTimestamp: &metav1.Time{Time: time.Now()},
-					},
-				},
-				cluster:  basicCluster,
-				appError: nil,
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ClusterName:           provClusterName,
-					ManagementClusterName: mgmtClusterName,
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             false,
-			wantedConditionStatus: "False",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   true,
-			clusterCacheIsInvoked: true,
-		},
-		{
-			name: "plan.Status.LatestVersion is out of sync",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				plan: &upgradev1.Plan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "system-upgrade-controller",
-						Namespace: namespace.System,
-					},
-					Spec: upgradev1.PlanSpec{},
-					Status: upgradev1.PlanStatus{
-						LatestVersion: "out-of-sync",
-					},
-				},
-				cluster:  basicCluster,
-				appError: nil,
-				image:    "rancher/system-agent:v0.3.13-rc.2-suc",
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ClusterName:           provClusterName,
-					ManagementClusterName: mgmtClusterName,
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             false,
-			wantedConditionStatus: "False",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   true,
-			clusterCacheIsInvoked: true,
-		},
-		{
-			name: "plan is not complete yet",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				plan: &upgradev1.Plan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "system-upgrade-controller",
-						Namespace: namespace.System,
-					},
-					Spec: upgradev1.PlanSpec{},
-					Status: upgradev1.PlanStatus{
-						Conditions: []genericcondition.GenericCondition{
-							{
-								Type:   "Complete",
-								Status: "False",
-							},
-						},
-					},
-				},
-				cluster:  basicCluster,
-				appError: nil,
-				image:    "rancher/system-agent:v0.3.13-rc.2-suc",
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ClusterName:           provClusterName,
-					ManagementClusterName: mgmtClusterName,
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             false,
-			wantedConditionStatus: "False",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   true,
-			clusterCacheIsInvoked: true,
-		},
-		{
-			name: "system-agent is upgraded successfully",
-			setup: setupConfig{
-				mgmtClusterName: mgmtClusterName,
-				plan: &upgradev1.Plan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "system-upgrade-controller",
-						Namespace: namespace.System,
-					},
-					Spec: upgradev1.PlanSpec{},
-					Status: upgradev1.PlanStatus{
-						LatestVersion: "v0.3.13-rc.2-suc",
-						Conditions: []genericcondition.GenericCondition{
-							{
-								Type:   "Complete",
-								Status: "True",
-							},
-						},
-					},
-				},
-				cluster:  basicCluster,
-				appError: nil,
-				image:    "rancher/system-agent:v0.3.13-rc.2-suc",
-			},
-			input: &v1.RKEControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controlPlaneName,
-					Namespace: namespace.System,
-				},
-				Spec: v1.RKEControlPlaneSpec{
-					ClusterName:           provClusterName,
-					ManagementClusterName: mgmtClusterName,
-				},
-				Status: v1.RKEControlPlaneStatus{},
-			},
-			wantError:             false,
-			wantedConditionStatus: "True",
-			appClientIsInvoked:    false,
-			planClientIsInvoked:   true,
-			clusterCacheIsInvoked: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			bc := fake.NewMockControllerInterface[*catalog.App, *catalog.AppList](ctrl)
-			pc := fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl)
-			cc := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
-			h := &handler{
-				mgmtClusterName:      tt.setup.mgmtClusterName,
-				clusterCache:         cc,
-				downstreamAppClient:  bc,
-				downstreamPlanClient: pc,
-			}
-			if tt.appClientIsInvoked {
-				bc.EXPECT().Get(namespace.System, appName(tt.input.Spec.ClusterName), metav1.GetOptions{}).Return(tt.setup.app, tt.setup.appError)
-			}
-			if tt.clusterCacheIsInvoked {
-				cc.EXPECT().GetByIndex(cluster.ByCluster, tt.setup.mgmtClusterName).Return([]*prov.Cluster{tt.setup.cluster}, tt.setup.clusterError)
-			}
-			if tt.planClientIsInvoked {
-				pc.EXPECT().Get(namespace.System, managesystemagent.SystemAgentUpgrader, metav1.GetOptions{}).Return(tt.setup.plan, tt.setup.appError)
-			}
-
-			if tt.setup.image != "" {
-				current := settings.SystemAgentUpgradeImage.Get()
-				if err := settings.SystemAgentUpgradeImage.Set(tt.setup.image); err != nil {
-					t.Errorf("failed to set up : %v", err)
-				}
-				defer func() {
-					err := settings.SystemAgentUpgradeImage.Set(current)
-					if err != nil {
-
-					}
-				}()
-			}
-			got, err := h.syncSystemAgentUpgraderCondition(tt.input, tt.input.Status)
-
-			if (err != nil) != tt.wantError {
-				t.Errorf("syncSystemAgentUpgraderCondition() error = %v, wantError %v", err, tt.wantError)
-				return
-			}
-			// Check the condition's status value instead of the entire object,
-			// as it includes a lastUpdateTime field that is difficult to mock
-			if capr.SystemAgentUpgraded.GetStatus(&got) != tt.wantedConditionStatus {
-				t.Errorf("syncSystemAgentUpgraderCondition() got = %v, expected SystemAgentUpgraded condition status value = %v", got, tt.wantedConditionStatus)
 			}
 		})
 	}

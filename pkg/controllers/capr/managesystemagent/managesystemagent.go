@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -17,6 +18,7 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
@@ -74,6 +76,7 @@ var (
 type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
 	bundles                   fleetcontrollers.BundleController
+	cluster                   provisioningcontrollers.ClusterController
 	rkeControlPlanes          v1.RKEControlPlaneController
 	managedCharts             v3.ManagedChartController
 	secrets                   corev1controllers.SecretController
@@ -83,6 +86,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),
+		cluster:                   clients.Provisioning.Cluster(),
 		rkeControlPlanes:          clients.RKE.RKEControlPlane(),
 		managedCharts:             clients.Mgmt.ManagedChart(),
 		secrets:                   clients.Core.Secret(),
@@ -105,9 +109,12 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 		return cluster, nil
 	}
 	if settings.SystemAgentUpgradeImage.Get() == "" {
-		logrus.Warnf("[managesystemagent] cluster %s/%s: skip installing system-agent-upgrader, "+
-			"the SystemAgentUpgradeImage setting is empty", cluster.Namespace, cluster.Name)
-		return cluster, nil
+		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set, skip installing system-agent-upgrader", cluster.Namespace, cluster.Name)
+		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set", cluster.Namespace, cluster.Name)
+	}
+	if settings.SystemUpgradeControllerChartVersion.Get() == "" {
+		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set, skip installing system-agent-upgrader", cluster.Namespace, cluster.Name)
+		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
 	}
 	// Skip if Rancher does not have a connection to the cluster
 	if !clusterconnected.Connected.IsTrue(cluster) {
@@ -135,10 +142,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	}
 
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
-	if targetVersion == "" {
-		logrus.Warnf("[managesystemagent] cluster %s/%s: SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
-	}
-	if targetVersion != "" && targetVersion != capr.SystemUpgradeControllerReady.GetMessage(cp) {
+	if targetVersion != capr.SystemUpgradeControllerReady.GetMessage(cp) {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: waiting for system-upgrade-controller to be upgraded to %s",
 			cluster.Namespace, cluster.Name, targetVersion)
 		return cluster, nil
@@ -200,6 +204,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 
 	// Limit the number of cluster to be processed simultaneously
 	if installCounter.Load() >= int32(settings.SystemAgentUpgraderInstallConcurrency.GetInt()) {
+		h.cluster.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
 		return cluster, nil
 	}
 	installCounter.Add(1)
@@ -532,13 +537,22 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		return cluster, nil
 	}
 
-	dropAnno := false
+	if settings.SystemAgentUpgradeImage.Get() == "" {
+		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set, skip uninstalling Fleet-based apps", cluster.Namespace, cluster.Name)
+		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set", cluster.Namespace, cluster.Name)
+	}
+	if settings.SystemUpgradeControllerChartVersion.Get() == "" {
+		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set, skip uninstalling Fleet-based apps", cluster.Namespace, cluster.Name)
+		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
+	}
+
+	dropAnnotation := false
 	defer func() {
 		// The AppliedSystemAgentUpgraderHashAnnotation annotation should not exist when Fleet bundles are present.
-		// This can occur if Rancher is upgraded, rolled back, and then upgraded again.
-		// In such cases, remove the annotation if it exists to ensure the system-agent-upgrader template
-		// is applied by the InstallSystemAgentUpgrader function.
-		if !dropAnno {
+		// This may exist if Rancher is upgraded to 2.12.x, then rolled back to 2.11.x, and later re-upgraded to 2.12.x without restoring the local cluster.
+		// In such cases, remove the annotation if it exists to ensure the system-agent-upgrader will be
+		// applied by the InstallSystemAgentUpgrader function.
+		if !dropAnnotation {
 			return
 		}
 		cp, err := h.rkeControlPlanes.Cache().Get(cluster.Namespace, cluster.Name)
@@ -562,6 +576,7 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 
 	// Limit the number of cluster to be processed simultaneously
 	if uninstallCounter.Load() >= int32(settings.K3sBasedUpgraderUninstallConcurrency.GetInt()) {
+		h.cluster.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
 		return cluster, nil
 	}
 	uninstallCounter.Add(1)
@@ -577,7 +592,7 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		logrus.Infof("[managesystemagent] cluster %s/%s: uninstalling the bundle %s", cluster.Namespace, cluster.Name, bundle.Name)
 		err := h.bundles.Delete(bundle.Namespace, bundle.Name, &metav1.DeleteOptions{})
 		if err == nil {
-			dropAnno = true
+			dropAnnotation = true
 		} else if !errors.IsNotFound(err) {
 			return nil, err
 		}
@@ -593,7 +608,7 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		logrus.Infof("[managesystemagent] cluster %s/%s: uninstalling the managedChart %s", cluster.Namespace, cluster.Name, sucName)
 		err := h.managedCharts.Delete(managedChart.Namespace, managedChart.Name, &metav1.DeleteOptions{})
 		if err == nil {
-			dropAnno = true
+			dropAnnotation = true
 		} else if !errors.IsNotFound(err) {
 			return nil, err
 		}

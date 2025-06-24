@@ -113,11 +113,6 @@ const (
 	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
 	Bootstrapped                 = condition.Cond("Bootstrapped")
 
-	// SystemAgentUpgraded indicates whether the system-agent in the given cluster has been upgraded to the target version.
-	// Since the system-agent binary version cannot be directly retrieved from the node,
-	// the system-agent-upgrader Plan is used as the source of truth.
-	SystemAgentUpgraded = condition.Cond("SystemAgentUpgraded")
-
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
 
