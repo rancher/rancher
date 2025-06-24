@@ -916,10 +916,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			description: "user:user-a,namespace:none,query:filter=metadata.name=test1,metadata.namespace=1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.name=1,metadata.namespace=1",
+			query:       "filter=metadata.name=test1,metadata.namespace=1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1341,10 +1341,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			description: "user:user-b,namespace:none,query:filter=metadata.name=test1,metadata.namespace=1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.name=1,metadata.namespace=1",
+			query:       "filter=metadata.name=test1,metadata.namespace=1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1710,10 +1710,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			description: "user:user-c,namespace:none,query:filter=metadata.name=test1,metadata.namespace=1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.name=1,metadata.namespace=1",
+			query:       "filter=metadata.name=test1,metadata.namespace=1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
