@@ -344,7 +344,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
 		users.EXPECT().Cache().Return(nil)
 
-		eTokenStore := etoken.NewSystem(nil, eSecretClient, users, nil, nil, nil, nil, nil)
+		eTokenStore := etoken.NewSystem(nil, nil, eSecretClient, users, nil, nil, nil, nil, nil)
 
 		handler := &clusterAuthTokenHandler{
 			eTokenCache: eTokenCache,
@@ -424,7 +424,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
 		users.EXPECT().Cache().Return(nil)
 
-		eTokenStore := etoken.NewSystem(nil, eSecretClient, users, nil, nil, nil, nil, nil)
+		eTokenStore := etoken.NewSystem(nil, nil, eSecretClient, users, nil, nil, nil, nil, nil)
 
 		handler := &clusterAuthTokenHandler{
 			eTokenCache: eTokenCache,
