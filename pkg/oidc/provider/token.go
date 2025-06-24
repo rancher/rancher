@@ -41,6 +41,12 @@ type signingKeyGetter interface {
 	GetPublicKey(kid string) (*rsa.PublicKey, error)
 }
 
+type jsonPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
 type tokenHandler struct {
 	tokenCache          wrangmgmtv3.TokenCache
 	tokenClient         wrangmgmtv3.TokenClient
@@ -178,7 +184,7 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 		if clientSecret == string(cs) {
 			clientSecretFound = true
 			if err := h.updateClientSecretUsedTimeStamp(oidcClient, key); err != nil {
-				logrus.Errorf("[OIDC provider] failed to add OIDC Client ID to Rancher token: %v", err)
+				logrus.Errorf("[OIDC provider] failed to update client secret's used timestamp: %v", err)
 			}
 			break
 		}
@@ -392,7 +398,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		}
 		resp.RefreshToken = refreshTokenString
 
-		if err := h.addOIDCClientIDToRancherToken(oidcClient.Name, rancherToken.Name); err != nil {
+		if err := h.addOIDCClientIDToRancherToken(oidcClient.Name, rancherToken); err != nil {
 			return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to add OIDC Client ID to Rancher token: %v", err))
 		}
 	}
@@ -403,15 +409,23 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 }
 
 func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient, clientSecretID string) interface{} {
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
-		Op:    "add",
-		Path:  "/metadata/annotations/cattle.io.oidc-client-secret-used-" + clientSecretID,
-		Value: fmt.Sprintf("%d", h.now().Unix()),
-	}})
+	var patch []byte
+	var err error
+	if oidcClient.Annotations != nil {
+		patch, err = json.Marshal([]jsonPatch{{
+			Op:    "add",
+			Path:  "/metadata/annotations/cattle.io.oidc-client-secret-used-" + clientSecretID,
+			Value: fmt.Sprintf("%d", h.now().Unix()),
+		}})
+	} else {
+		patch, err = json.Marshal([]jsonPatch{{
+			Op:   "add",
+			Path: "/metadata/annotations",
+			Value: map[string]string{
+				"cattle.io.oidc-client-secret-used-" + clientSecretID: fmt.Sprintf("%d", h.now().Unix()),
+			},
+		}})
+	}
 	if err != nil {
 		return err
 	}
@@ -421,20 +435,28 @@ func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient
 	return err
 }
 
-func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, rancherTokenName string) error {
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
-		Op:    "add",
-		Path:  "/metadata/labels/cattle.io.oidc-client-" + oidcClientName,
-		Value: "true",
-	}})
+func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, rancherToken *v3.Token) error {
+	var patch []byte
+	var err error
+	if rancherToken.Labels != nil {
+		patch, err = json.Marshal([]jsonPatch{{
+			Op:    "add",
+			Path:  "/metadata/labels/cattle.io.oidc-client-" + oidcClientName,
+			Value: "true",
+		}})
+	} else {
+		patch, err = json.Marshal([]jsonPatch{{
+			Op:   "add",
+			Path: "/metadata/labels",
+			Value: map[string]string{
+				"cattle.io.oidc-client-" + oidcClientName: "true",
+			},
+		}})
+	}
 	if err != nil {
 		return err
 	}
-	_, err = h.tokenClient.Patch(rancherTokenName, types.JSONPatchType, patch)
+	_, err = h.tokenClient.Patch(rancherToken.Name, types.JSONPatchType, patch)
 
 	return err
 }
