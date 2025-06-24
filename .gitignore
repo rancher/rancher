@@ -16,6 +16,10 @@ vendor
 /tests/integration/MANIFEST
 tests/integration/MANIFEST
 tests/integration/.idea/
+/tests/v2/integration/steveapi/json/
+/tests/v2/integration/steveapi/output.csv
+tests/v2/integration/steveapi/json/
+tests/v2/integration/steveapi/output.csv
 /tests/.cache
 /tests/.tox
 /tests/integration/.tox/
