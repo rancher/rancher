@@ -45,6 +45,8 @@ jobs:
   integration-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
+    permissions:
+      contents: read
   push-images:
     needs: [unit-tests, integration-tests]
     strategy:
@@ -103,6 +105,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
             secret/data/github/repo/${{ github.repository }}/chart-optimus-uploader/credentials stagingChartsOptimusBucketName | CHARTS_BUCKET_NAME ;
       - name: publish
+        env:
+          CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
         uses: ./.github/actions/rancher-chart/publish-aws
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
