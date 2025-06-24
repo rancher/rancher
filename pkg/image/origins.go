@@ -61,7 +61,6 @@ var OriginMap = map[string]string{
 	"harvester-cloud-provider":                                "https://github.com/harvester/cloud-provider-harvester",
 	"harvester-csi-driver":                                    "https://github.com/harvester/harvester-csi-driver",
 	"helm-project-operator":                                   "https://github.com/rancher/helm-project-operator",
-	"hyperkube":                                               "https://github.com/rancher/hyperkube",
 	"istio-1.5-migration":                                     "https://github.com/rancher/istio-1.5-migration",
 	"istio-installer":                                         "https://github.com/rancher/istio-installer",
 	"istio-kubectl":                                           "https://github.com/istio/istio",

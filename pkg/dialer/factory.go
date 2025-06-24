@@ -18,7 +18,6 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/transport"
 )
@@ -32,14 +31,12 @@ var ErrAgentDisconnected = errors.New("cluster agent disconnected")
 func NewFactory(apiContext *config.ScaledContext, wrangler *wrangler.Context) (*Factory, error) {
 	return &Factory{
 		clusterLister: apiContext.Management.Clusters("").Controller().Lister(),
-		nodeLister:    apiContext.Management.Nodes("").Controller().Lister(),
 		TunnelServer:  wrangler.TunnelServer,
 		dialHolders:   map[string]*transport.DialHolder{},
 	}, nil
 }
 
 type Factory struct {
-	nodeLister    v3.NodeLister
 	clusterLister v3.ClusterLister
 	TunnelServer  *remotedialer.Server
 
@@ -168,26 +165,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 	}
 	logrus.Tracef("dialerFactory: no tunnel session found for cluster [%s], falling back to nodeDialer", cluster.Name)
 
-	// Try to connect to a node for the cluster dialer
-	nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-
-	for _, node := range nodes {
-		if node.DeletionTimestamp == nil && v32.NodeConditionProvisioned.IsTrue(node) &&
-			(node.Spec.ControlPlane || v32.NodeConditionReady.IsTrue(node)) {
-			logrus.Tracef("dialerFactory: using node [%s]/[%s] for nodeDialer",
-				node.Labels["management.cattle.io/nodename"], node.Name)
-			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
-				return func(ctx context.Context, network, address string) (net.Conn, error) {
-					logrus.Tracef("dialerFactory: Returning network [%s] and address [%s] as nodeDialer", network, address)
-					return nodeDialer(ctx, network, address)
-				}, nil
-			}
-		}
-	}
-
 	if !retryOnError {
 		logrus.Debugf("No active connection for cluster [%s], returning", cluster.Name)
 		return nil, ErrAgentDisconnected
@@ -219,56 +196,6 @@ func hostPort(cluster *v3.Cluster) string {
 		return u.Host
 	}
 	return u.Host + ":443"
-}
-
-func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, error) {
-	machine, err := f.nodeLister.Get(clusterName, machineName)
-	if err != nil {
-		return nil, err
-	}
-
-	sessionKey := machineSessionKey(machine)
-	if f.TunnelServer.HasSession(sessionKey) {
-		network, address := "unix", "/var/run/docker.sock"
-		if machine.Status.InternalNodeStatus.NodeInfo.OperatingSystem == "windows" {
-			network, address = "npipe", "//./pipe/docker_engine"
-		}
-		d := f.TunnelServer.Dialer(sessionKey)
-		return func(ctx context.Context, _ string, _ string) (net.Conn, error) {
-			return d(ctx, network, address)
-		}, nil
-	}
-
-	return nil, fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)
-}
-
-func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
-	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		d, err := f.nodeDialer(clusterName, machineName)
-		if err != nil {
-			return nil, err
-		}
-		return d(ctx, network, address)
-	}, nil
-}
-
-func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
-	machine, err := f.nodeLister.Get(clusterName, machineName)
-	if err != nil {
-		return nil, err
-	}
-
-	sessionKey := machineSessionKey(machine)
-	if f.TunnelServer.HasSession(sessionKey) {
-		d := f.TunnelServer.Dialer(sessionKey)
-		return dialer.Dialer(d), nil
-	}
-
-	return nil, fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)
-}
-
-func machineSessionKey(machine *v3.Node) string {
-	return fmt.Sprintf("%s:%s", machine.Namespace, machine.Name)
 }
 
 func isProxyAddress(address string) bool {

@@ -21,6 +21,4 @@ type Factory interface {
 	// Using a custom Dial in rest.Config will cause this cache to grow indefinitely.
 	// see: https://github.com/kubernetes/kubernetes/issues/125818
 	ClusterDialHolder(clusterName string, retryOnError bool) (*transport.DialHolder, error)
-	DockerDialer(clusterName, machineName string) (Dialer, error)
-	NodeDialer(clusterName, machineName string) (Dialer, error)
 }
