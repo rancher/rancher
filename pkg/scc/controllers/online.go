@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"golang.org/x/sync/semaphore"
 	"net/http"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -344,13 +345,11 @@ func (s sccOnlineMode) Deregister() error {
 	if regCodeErr != nil {
 		return regCodeErr
 	}
-	var remainingFin []string
-	for _, finalizer := range regCodeSecret.Finalizers {
-		if finalizer != consts.FinalizerSccRegistrationCode {
-			remainingFin = append(remainingFin, finalizer)
-		}
+	if slices.Contains(regCodeSecret.Finalizers, consts.FinalizerSccRegistrationCode) {
+		index := slices.Index(regCodeSecret.Finalizers, consts.FinalizerSccRegistrationCode)
+		regCodeSecret.Finalizers = slices.Delete(regCodeSecret.Finalizers, index, 1)
 	}
-	regCodeSecret.Finalizers = remainingFin
+
 	regCodeSecret, regCodeErr = s.secrets.Update(regCodeSecret)
 	if regCodeErr != nil {
 		return regCodeErr
