@@ -1,0 +1,90 @@
+ARG RANCHER_TAG=dev
+ARG RANCHER_REPO=rancher
+ARG REGISTRY=docker.io
+ARG RANCHER_IMAGE=${REGISTRY}/${RANCHER_REPO}/rancher:${RANCHER_TAG}
+ARG ARCH
+ARG VERSION=dev
+
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS build
+ARG VERSION=${VERSION}
+ARG CGO_ENABLED=0
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static"
+ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /app
+
+# Only invalidate cache if mod files changes.
+COPY go.mod go.sum .
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+RUN go mod download
+
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+
+FROM ${RANCHER_IMAGE} AS rancher
+
+FROM registry.suse.com/bci/bci-micro:15.6 AS final
+
+FROM registry.suse.com/bci/bci-base:15.6 AS zypper
+
+# Install system packages using builder image that has zypper
+COPY --from=final / /chroot/
+
+# Install some packages with zypper in the chroot of the final micro image
+RUN zypper refresh && \
+    zypper --installroot /chroot -n in --no-recommends \
+    curl util-linux ca-certificates ca-certificates-mozilla jq git-core hostname iproute2 vim-small less \
+	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat openssl patterns-base-fips && \
+    zypper --installroot /chroot clean -a && \
+    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+
+# Main stage using bci-micro as the base image.
+FROM final
+
+# Copy binaries and configuration files from zypper to micro.
+COPY --from=zypper /chroot/ /
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
+
+ARG ARCH=amd64
+ENV KUBECTL_VERSION v1.30.5
+
+RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
+    chmod +x /usr/bin/kubectl
+
+LABEL io.cattle.agent=true
+
+ARG RANCHER_REPO=rancher
+ENV AGENT_IMAGE ${RANCHER_REPO}/rancher-agent:${VERSION}
+# For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
+ARG CATTLE_RANCHER_WEBHOOK_VERSION
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
+COPY --from=rancher /usr/bin/tini /usr/bin/
+COPY --from=build /app/agent /usr/bin/
+COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
+WORKDIR /var/lib/rancher
+
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
+      "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
+      "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
+      "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
+      "org.opencontainers.image.version"=${VERSION} \
+      "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
+
+ENTRYPOINT ["run.sh"]
