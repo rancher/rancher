@@ -16,18 +16,21 @@ const (
 )
 
 type InfoProvider struct {
-	RancherUuid uuid.UUID
-	ClusterUuid uuid.UUID
+	rancherUuid uuid.UUID
+	clusterUuid uuid.UUID
 	nodeCache   v3.NodeCache
 }
 
-func NewInfoProvider(rancherUuid uuid.UUID, clusterUuid uuid.UUID, nodeCache v3.NodeCache) *InfoProvider {
-
+func NewInfoProvider(nodeCache v3.NodeCache) *InfoProvider {
 	return &InfoProvider{
-		RancherUuid: rancherUuid,
-		ClusterUuid: clusterUuid,
-		nodeCache:   nodeCache,
+		nodeCache: nodeCache,
 	}
+}
+
+func (i *InfoProvider) SetUuids(rancherUuid uuid.UUID, clusterUuid uuid.UUID) *InfoProvider {
+	i.rancherUuid = rancherUuid
+	i.clusterUuid = clusterUuid
+	return i
 }
 
 // GetVersion returns a version number for the systeminfo provider

@@ -62,11 +62,11 @@ func (e *InfoExporter) GetProductIdentifier() (string, string, string) {
 }
 
 func (e *InfoExporter) RancherUuid() uuid.UUID {
-	return e.infoProvider.RancherUuid
+	return e.infoProvider.rancherUuid
 }
 
 func (e *InfoExporter) ClusterUuid() uuid.UUID {
-	return e.infoProvider.ClusterUuid
+	return e.infoProvider.clusterUuid
 }
 
 func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
@@ -115,7 +115,7 @@ func (e *InfoExporter) preparedForSCC() RancherSCCInfo {
 	}
 
 	return RancherSCCInfo{
-		UUID:             e.infoProvider.RancherUuid,
+		UUID:             e.infoProvider.rancherUuid,
 		RancherUrl:       ServerUrl(),
 		Version:          exporter.RancherVersion(),
 		Nodes:            nodeCount,
