@@ -8,7 +8,10 @@ import (
 )
 
 func credsContextLogger() log.StructuredLogger {
-	return log.NewLog().WithField("subcomponent", "suse-connect-creds")
+	logBuilder := &log.Builder{
+		SubComponent: "suse-connect-creds",
+	}
+	return logBuilder.ToLogger()
 }
 
 type CredentialType int

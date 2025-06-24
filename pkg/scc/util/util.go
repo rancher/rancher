@@ -11,7 +11,10 @@ import (
 )
 
 func utilContextLogger() log.StructuredLogger {
-	return log.NewLog().WithField("subcomponent", "util")
+	logBuilder := &log.Builder{
+		SubComponent: "util",
+	}
+	return logBuilder.ToLogger()
 }
 
 func JSONToBase64(data interface{}) ([]byte, error) {

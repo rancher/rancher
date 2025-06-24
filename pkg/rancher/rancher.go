@@ -349,13 +349,6 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}
 	}
 
-	if features.RancherSCCRegistrationExtension.Enabled() {
-		r.Wrangler.OnLeader(func(ctx context.Context) error {
-			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
-			return scc.Setup(ctx, r.Wrangler)
-		})
-	}
-
 	r.Wrangler.OnLeader(func(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
@@ -368,6 +361,13 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 		return runMigrations(r.Wrangler)
 	})
+
+	if features.RancherSCCRegistrationExtension.Enabled() {
+		r.Wrangler.OnLeader(func(ctx context.Context) error {
+			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
+			return scc.Setup(ctx, r.Wrangler)
+		})
+	}
 
 	if err := r.authServer.Start(ctx, false); err != nil {
 		return err

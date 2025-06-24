@@ -3,9 +3,11 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"golang.org/x/sync/semaphore"
 	"net/http"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -327,7 +329,8 @@ func (s sccOnlineMode) Deregister() error {
 	// Finalizers on the credential secret have helped this case, but it's still invalid if users edit the secret manually for some reason.
 	err := sccConnection.Deregister()
 	if err != nil {
-		return err
+		s.log.Warn("Deregister failure will be logged but not prevent cleanup")
+		s.log.Errorf("Failed to deregister SCC registration: %v", err)
 	}
 
 	// Delete SCC credentials after successful Deregister
@@ -336,8 +339,23 @@ func (s sccOnlineMode) Deregister() error {
 		return credErr
 	}
 
+	// TODO refactor this to a cleanup
 	regCodeSecretRef := s.registration.Spec.RegistrationRequest.RegistrationCodeSecretRef
-	regCodeErr := s.secrets.Delete(regCodeSecretRef.Namespace, regCodeSecretRef.Name, &metav1.DeleteOptions{})
+	regCodeSecret, regCodeErr := s.secrets.Get(regCodeSecretRef.Namespace, regCodeSecretRef.Name, metav1.GetOptions{})
+	if regCodeErr != nil {
+		return regCodeErr
+	}
+	if slices.Contains(regCodeSecret.Finalizers, consts.FinalizerSccRegistrationCode) {
+		index := slices.Index(regCodeSecret.Finalizers, consts.FinalizerSccRegistrationCode)
+		regCodeSecret.Finalizers = slices.Delete(regCodeSecret.Finalizers, index, 1)
+	}
+
+	regCodeSecret, regCodeErr = s.secrets.Update(regCodeSecret)
+	if regCodeErr != nil {
+		return regCodeErr
+	}
+
+	regCodeErr = s.secrets.Delete(regCodeSecretRef.Namespace, regCodeSecretRef.Name, &metav1.DeleteOptions{})
 	if regCodeErr != nil {
 		return regCodeErr
 	}

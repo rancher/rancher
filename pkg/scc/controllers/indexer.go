@@ -13,10 +13,10 @@ const (
 )
 
 func (h *handler) initIndexers() {
-	//h.secretCache.AddIndexer(
-	//	IndexSecretsBySccHash,
-	//	h.secretToHash,
-	//)
+	h.secretCache.AddIndexer(
+		IndexSecretsBySccHash,
+		h.secretToHash,
+	)
 	h.registrationCache.AddIndexer(
 		IndexRegistrationsBySccHash,
 		h.registrationToHash,

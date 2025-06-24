@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/telemetry"
 
@@ -15,7 +13,6 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
 	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
@@ -28,16 +25,15 @@ import (
 )
 
 type sccOperator struct {
-	devMode                 bool
-	log                     log.StructuredLogger
-	sccResourceFactory      *scc.Factory
-	secrets                 corev1.SecretController
-	systemInfoProvider      *systeminfo.InfoProvider
-	systemInfoExporter      *systeminfo.InfoExporter
-	systemRegistrationReady chan struct{}
+	devMode            bool
+	log                log.StructuredLogger
+	sccResourceFactory *scc.Factory
+	secrets            corev1.SecretController
+	systemInfoProvider *systeminfo.InfoProvider
+	systemInfoExporter *systeminfo.InfoExporter
 }
 
-func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperator, error) {
+func setup(wContext *wrangler.Context, logger log.StructuredLogger, infoProvider *systeminfo.InfoProvider) (*sccOperator, error) {
 	namespaces := wContext.Core.Namespace()
 	var kubeSystemNS *k8sv1.Namespace
 
@@ -80,52 +76,19 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger) (*sccOperato
 	if parsedRancherUUID == nil || parsedkubeSystemNSUID == nil {
 		return nil, fmt.Errorf("invalid UUID format: rancherUuid=%s, kubeSystemNS.UID=%s", rancherUuid, string(kubeSystemNS.UID))
 	}
-	infoProvider := systeminfo.NewInfoProvider(
-		parsedRancherUUID,
-		parsedkubeSystemNSUID,
-		wContext.Mgmt.Node().Cache(),
-	)
+	infoProvider = infoProvider.SetUuids(parsedRancherUUID, parsedkubeSystemNSUID)
 
 	rancherVersion := systeminfo.GetVersion()
 	rancherTelemetry := telemetry.NewTelemetryGatherer(rancherVersion, wContext.Mgmt.Cluster().Cache(), wContext.Mgmt.Node().Cache())
 
-	devMode := false
-	if consts.IsDevMode() {
-		devMode = true
-		logger = logger.WithField("devMode", true)
-	}
-
 	return &sccOperator{
-		devMode:                 devMode,
-		log:                     logger,
-		sccResourceFactory:      sccResources,
-		secrets:                 wContext.Core.Secret(),
-		systemInfoProvider:      infoProvider,
-		systemInfoExporter:      systeminfo.NewInfoExporter(infoProvider, rancherTelemetry),
-		systemRegistrationReady: make(chan struct{}),
+		devMode:            consts.IsDevMode(),
+		log:                logger,
+		sccResourceFactory: sccResources,
+		secrets:            wContext.Core.Secret(),
+		systemInfoProvider: infoProvider,
+		systemInfoExporter: systeminfo.NewInfoExporter(infoProvider, rancherTelemetry),
 	}, nil
-}
-
-func (so *sccOperator) waitForSystemReady(onSystemReady func()) {
-	// Currently we only wait for ServerUrl not being empty, this is a good start as without the URL we cannot start.
-	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
-	// TODO: expand wait to include verifying at least local cluster is ready too - this prevents issues with offline clusters
-	defer onSystemReady()
-	if systeminfo.IsServerUrlReady() &&
-		(so.systemInfoProvider != nil && so.systemInfoProvider.IsLocalReady()) {
-		close(so.systemRegistrationReady)
-		return
-	}
-	so.log.Info("Waiting for server-url and/or local cluster to be ready")
-	wait.Until(func() {
-		// Todo: also wait for local cluster ready
-		if systeminfo.IsServerUrlReady() {
-			so.log.Info("can now start controllers; server URL and local cluster are now ready.")
-			close(so.systemRegistrationReady)
-		} else {
-			so.log.Info("cannot start controllers yet; server URL and/or local cluster are not ready.")
-		}
-	}, 15*time.Second, so.systemRegistrationReady)
 }
 
 // Setup initializes the SCC Operator and configures it to start when Rancher is in appropriate state.
@@ -134,17 +97,25 @@ func Setup(
 	wContext *wrangler.Context,
 ) error {
 	operatorLogger := log.NewLog()
+	operatorLogger.Debug("Preparing to setup SCC operator")
 
-	operatorLogger.Debug("Setting up SCC Operator")
-	initOperator, err := setup(wContext, operatorLogger)
-	if err != nil {
-		return fmt.Errorf("error setting up scc operator: %s", err.Error())
+	infoProvider := systeminfo.NewInfoProvider(
+		wContext.Mgmt.Node().Cache(),
+	)
+
+	starter := sccStarter{
+		log:                     operatorLogger.WithField("component", "scc-starter"),
+		systemInfoProvider:      infoProvider,
+		systemRegistrationReady: make(chan struct{}),
 	}
 
-	// Because the controller `Register` call will start activation refresh timers,
-	// we need to wait for the system to be ready before starting the controller.
-	// Doing it this way is more simple than tying the controller starting those timers to `systemRegistrationReady`
-	go initOperator.waitForSystemReady(func() {
+	go starter.waitForSystemReady(func() {
+		operatorLogger.Debug("Setting up SCC Operator")
+		initOperator, err := setup(wContext, operatorLogger, infoProvider)
+		if err != nil {
+			starter.log.Errorf("error setting up scc operator: %s", err.Error())
+		}
+
 		controllers.Register(
 			ctx,
 			consts.DefaultSCCNamespace,
@@ -158,8 +129,8 @@ func Setup(
 		}
 	})
 
-	if initOperator.systemRegistrationReady != nil {
-		initOperator.log.Info("SCC operator initialized; controllers waiting to start until system is ready")
+	if starter.systemRegistrationReady != nil {
+		operatorLogger.Info("SCC operator initialized; controllers waiting to start until system is ready")
 	}
 
 	return nil
