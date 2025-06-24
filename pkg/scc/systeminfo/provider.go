@@ -56,7 +56,8 @@ func (i *InfoProvider) GetProductIdentifier() (string, string, string) {
 
 func (i *InfoProvider) IsLocalReady() bool {
 	localNodes, nodesErr := i.nodeCache.List("local", labels.Everything())
-	if nodesErr != nil && len(localNodes) > 0 {
+	// TODO: should this also check status of nodes and only count ready/healthy nodes?
+	if nodesErr == nil && len(localNodes) > 0 {
 		return true
 	}
 
