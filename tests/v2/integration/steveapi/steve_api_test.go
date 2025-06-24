@@ -2796,14 +2796,45 @@ func (s *steveAPITestSuite) TestCRUD() {
 		assert.Nil(s.T(), readObj)
 	})
 }
-func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
-	assert.Equal(s.T(), len(expect), len(list))
-	for i, w := range expect {
-		if name, ok := w["name"]; ok {
-			assert.Equal(s.T(), name, list[i].Name)
+func (s *steveAPITestSuite) assertListIsEqual(expectedList []map[string]string, receivedList []clientv1.SteveAPIObject) {
+	assert.Equal(s.T(), len(expectedList), len(receivedList))
+	receivedSubset := make([]map[string]string, len(receivedList))
+	includeNamespace := false
+	if len(expectedList) > 0 {
+		_, includeNamespace = expectedList[0]["namespace"]
+	}
+
+	for i, r := range receivedList {
+		vals := map[string]string{"name": r.Name}
+		if includeNamespace {
+			vals["namespace"] = r.Namespace
+		} else {
+			vals["namespace"] = ""
 		}
-		if ns, ok := w["namespace"]; ok {
-			assert.Equal(s.T(), namespaceMap[ns], list[i].Namespace)
+		receivedSubset[i] = vals
+	}
+	expectedSubset := make([]map[string]string, len(expectedList))
+	for i, w := range expectedList {
+		vals := map[string]string{"name": w["name"]}
+		if includeNamespace {
+			vals["namespace"] = namespaceMap[w["namespace"]]
+		} else {
+			vals["namespace"] = ""
+		}
+		expectedSubset[i] = vals
+	}
+	assert.Equal(s.T(), expectedSubset, receivedSubset)
+	length := len(expectedList)
+	if length > len(receivedList) {
+		length = len(receivedList)
+	}
+	for i := range length {
+		w := expectedList[i]
+		if name, ok := w["name"]; ok {
+			assert.Equal(s.T(), name, receivedList[i].Name, fmt.Sprintf("diff at index %d: expecting name %q, got %q", i, name, receivedList[i].Name))
+		}
+		if ns, ok := w["namespace"]; includeNamespace && ok {
+			assert.Equal(s.T(), namespaceMap[ns], receivedList[i].Namespace, fmt.Sprintf("diff at index %d: expecting namespace mapped:%q (raw:%q), got %q", i, namespaceMap[ns], ns, receivedList[i].Namespace))
 		}
 	}
 }
