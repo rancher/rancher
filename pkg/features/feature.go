@@ -131,7 +131,7 @@ var (
 	UISQLCache = newFeature(
 		"ui-sql-cache",
 		"Improve performance by enabling SQLite-backed caching. This also enables server-side pagination and other scaling based performance improvements.",
-		false,
+		true,
 		false,
 		true)
 	RKE1UI = newFeature(

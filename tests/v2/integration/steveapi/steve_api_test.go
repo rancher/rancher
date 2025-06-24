@@ -16,12 +16,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
-	kubenamespaces "github.com/rancher/tests/actions/kubeapi/namespaces"
-	"github.com/rancher/tests/actions/kubeapi/rbac"
-	"github.com/rancher/tests/actions/kubeapi/secrets"
-	"github.com/rancher/tests/actions/namespaces"
-	stevesecrets "github.com/rancher/tests/actions/secrets"
-	"github.com/rancher/tests/actions/serviceaccounts"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	clientv1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -31,6 +25,12 @@ import (
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	kubenamespaces "github.com/rancher/tests/actions/kubeapi/namespaces"
+	"github.com/rancher/tests/actions/kubeapi/rbac"
+	"github.com/rancher/tests/actions/kubeapi/secrets"
+	"github.com/rancher/tests/actions/namespaces"
+	stevesecrets "github.com/rancher/tests/actions/secrets"
+	"github.com/rancher/tests/actions/serviceaccounts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -2459,6 +2459,7 @@ func (s *steveAPITestSuite) TestList() {
 
 	var csvWriter *csv.Writer
 	var jsonDir string
+	fmt.Fprintf(os.Stderr, "QQQ: s.clusterID: %s\n", s.clusterID)
 	if s.clusterID == "local" {
 		var fp *os.File
 		var err error
@@ -2537,6 +2538,26 @@ func (s *steveAPITestSuite) TestList() {
 			} else if test.expectExcludes {
 				s.assertListExcludes(test.expect, secretList.Data)
 			} else {
+				if len(test.expect) != len(secretList.Data) {
+					fmt.Fprintf(os.Stderr, "QQQ: Expected %d items, got %d\n", len(test.expect), len(secretList.Data))
+					lim := len(test.expect)
+					if len(secretList.Data) < lim {
+						lim = len(secretList.Data)
+					}
+					for i := range lim {
+						d := secretList.Data[i]
+						e := test.expect[i]
+						fmt.Fprintf(os.Stderr, "QQQ: line[%d]: name:%s, ns:%s, expected name %s\n", i, d.Name, d.Namespace, e["name"])
+					}
+					if len(test.expect) > len(secretList.Data) {
+						e := test.expect[len(test.expect)-1]
+						ns, ok := e["namespace"]
+						if !ok {
+							ns = ""
+						}
+						fmt.Fprintf(os.Stderr, "QQQ: line[%d]: got name:%s, ns:%s\n", len(test.expect)-1, e["name"], ns)
+					}
+				}
 				s.assertListIsEqual(test.expect, secretList.Data)
 			}
 
@@ -2672,7 +2693,7 @@ func (s *steveAPITestSuite) TestLinks() {
 
 	secretObj, err := secretClient.Create(corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      namegenerator.AppendRandomString("steve-secret"),
+			Name:      namegenerator.AppendRandomString("steve-secret-squirrel"),
 			Namespace: namespaceMap["test-ns-1"],
 		},
 		Data: map[string][]byte{"foo": []byte("bar")},
@@ -2712,7 +2733,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		// create
 		secretObj, err := secretClient.Create(corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      namegenerator.AppendRandomString("steve-secret"),
+				Name:      namegenerator.AppendRandomString("steve-secret-santa"),
 				Namespace: namespaceMap["test-ns-1"], // need to specify the namespace for a namespaced resource if using a global endpoint ("/v1/secrets")
 			},
 			Data: map[string][]byte{"foo": []byte("bar")},
@@ -2751,7 +2772,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		// create
 		secretObj, err := secretClient.Create(corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: namegenerator.AppendRandomString("steve-secret"),
+				Name: namegenerator.AppendRandomString("steve-secret-deodorant"),
 				// no need to provide a namespace since using a namespaced endpoint ("/v1/secrets/test-ns-1")
 			},
 			Data: map[string][]byte{"foo": []byte("bar")},
