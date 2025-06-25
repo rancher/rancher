@@ -89,8 +89,12 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
+	salt, err := p.saltGenerator()
+	if err != nil {
+		return fmt.Errorf("failed to generate salt: %w", err)
+	}
 
-	hashedNewPassword, err := p.hashKey(newPassword, secret.Data["salt"], iterations, keyLength)
+	hashedNewPassword, err := p.hashKey(newPassword, salt, iterations, keyLength)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -104,7 +108,7 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 		Path: "/data",
 		Value: map[string][]byte{
 			"password": hashedNewPassword,
-			"salt":     secret.Data["salt"],
+			"salt":     salt,
 		},
 	}})
 	if err != nil {
