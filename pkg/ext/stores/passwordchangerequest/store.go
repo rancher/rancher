@@ -53,7 +53,7 @@ type Store struct {
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
 
-// NewSystemFromWrangler is a convenience function for creating a system token
+// New is a convenience function for creating a password change request
 // store. It initializes the returned store from the provided wrangler context.
 func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
 	pwdManager := pbkdf2.New(wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret())
