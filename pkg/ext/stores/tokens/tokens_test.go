@@ -248,7 +248,6 @@ func Test_Store_GroupVersionKind(t *testing.T) {
 	assert.Equal(t, GVK, store.GroupVersionKind(ext.SchemeGroupVersion))
 }
 
-
 func Test_Store_Delete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
@@ -479,8 +478,10 @@ func Test_Store_Watch(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
+
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
-			Return(NewWatcher(), nil)
+			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -492,16 +493,14 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		cancel()
+		// receive bookmark event
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		cancel()
+		consumer.Stop()
 	})
 
 	t.Run("closing backend channel does not close watch channel", func(t *testing.T) {
@@ -513,7 +512,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcher()
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -527,14 +526,13 @@ func Test_Store_Watch(t *testing.T) {
 
 		watcher.Done() // close backend channel
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		// still receive bookmark event
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
+
+		consumer.Stop()
 	})
 
 	t.Run("event for non-secret is ignored", func(t *testing.T) {
@@ -546,7 +544,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Namespace{}},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -558,16 +560,14 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel - no further events
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
 	t.Run("event for broken secret is ignored", func(t *testing.T) {
@@ -579,7 +579,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Secret{}})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Secret{}},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -591,19 +595,17 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
-	t.Run("event for non-owned secret is ignored", func(t *testing.T) {
+	t.Run("no events for non-owned secret", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
@@ -612,8 +614,9 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
+		// return fake bookmark for easy channel management
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		// Expect a watch() call with filter for user
-		watcher := NewWatcher()
 		secrets.EXPECT().Watch("cattle-tokens", metav1.ListOptions{
 			LabelSelector: UserIDLabel + "=lkajdl/ksjlkds",
 		}).Return(watcher, nil)
@@ -626,16 +629,14 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel
+		// receive fake bookmark event for easy channel management
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel
+		consumer.Stop()
 	})
 
 	t.Run("receive event for owned secret, not current", func(t *testing.T) {
@@ -665,15 +666,7 @@ func Test_Store_Watch(t *testing.T) {
 		assert.Equal(t, &properToken, event.Object)
 
 		watcher.Done() // close backend channel
-
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		consumer.Stop()
 	})
 
 	t.Run("receive event for owned secret, current", func(t *testing.T) {
@@ -703,15 +696,7 @@ func Test_Store_Watch(t *testing.T) {
 		assert.Equal(t, &properTokenCurrent, event.Object)
 
 		watcher.Done() // close backend channel
-
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		consumer.Stop()
 	})
 
 	t.Run("event for error is ignored", func(t *testing.T) {
@@ -723,7 +708,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Error})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Namespace{}, Type: watch.Error},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -735,16 +724,14 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel - no further events
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
 	t.Run("event for bad bookmark is ignored", func(t *testing.T) {
@@ -756,7 +743,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Bookmark})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Namespace{}, Type: watch.Bookmark},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -768,16 +759,14 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel - no further events
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
 	t.Run("receive event for bookmark", func(t *testing.T) {
@@ -801,25 +790,13 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		event, more := (<-consumer.ResultChan()) // receive update event
+		event, more := (<-consumer.ResultChan()) // receive bookmark event
 		assert.True(t, more)
 		assert.Equal(t, watch.Bookmark, event.Type)
-		assert.Equal(t, &ext.Token{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "",
-			},
-		}, event.Object)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
 		watcher.Done() // close backend channel
-
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		consumer.Stop()
 	})
 }
 
@@ -2124,15 +2101,11 @@ func (u *mockUser) GetExtra() map[string][]string {
 
 // implementation of the k8s watch interface for mocking
 
-func NewWatcher() *mockWatch {
-	return &mockWatch{
-		ch: make(chan watch.Event),
+func NewWatcherFor(e ...watch.Event) *mockWatch {
+	ch := make(chan watch.Event, len(e))
+	for _, ev := range e {
+		ch <- ev
 	}
-}
-
-func NewWatcherFor(e watch.Event) *mockWatch {
-	ch := make(chan watch.Event, 1)
-	ch <- e
 	return &mockWatch{
 		ch: ch,
 	}
