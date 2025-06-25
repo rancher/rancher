@@ -96,13 +96,13 @@ func (in *RegistrationRequest) DeepCopyInto(out *RegistrationRequest) {
 		*out = new(corev1.SecretReference)
 		**out = **in
 	}
-	if in.RegistrationUrl != nil {
-		in, out := &in.RegistrationUrl, &out.RegistrationUrl
+	if in.RegistrationAPIUrl != nil {
+		in, out := &in.RegistrationAPIUrl, &out.RegistrationAPIUrl
 		*out = new(string)
 		**out = **in
 	}
-	if in.ServerCertificateSecretRef != nil {
-		in, out := &in.ServerCertificateSecretRef, &out.ServerCertificateSecretRef
+	if in.RegistrationAPICertificateSecretRef != nil {
+		in, out := &in.RegistrationAPICertificateSecretRef, &out.RegistrationAPICertificateSecretRef
 		*out = new(corev1.SecretReference)
 		**out = **in
 	}
@@ -206,11 +206,6 @@ func (in *SystemActivationState) DeepCopyInto(out *SystemActivationState) {
 	if in.LastValidatedTS != nil {
 		in, out := &in.LastValidatedTS, &out.LastValidatedTS
 		*out = (*in).DeepCopy()
-	}
-	if in.Certificate != nil {
-		in, out := &in.Certificate, &out.Certificate
-		*out = new(string)
-		**out = **in
 	}
 	if in.SystemUrl != nil {
 		in, out := &in.SystemUrl, &out.SystemUrl

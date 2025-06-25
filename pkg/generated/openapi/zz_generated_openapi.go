@@ -871,13 +871,13 @@ func schema_pkg_apis_scccattleio_v1_RegistrationRequest(ref common.ReferenceCall
 							Ref: ref("k8s.io/api/core/v1.SecretReference"),
 						},
 					},
-					"registrationUrl": {
+					"registrationAPIUrl": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
 						},
 					},
-					"serverCertficateSecretRef": {
+					"registrationAPICertificateSecretRef": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.SecretReference"),
 						},
@@ -1020,12 +1020,6 @@ func schema_pkg_apis_scccattleio_v1_SystemActivationState(ref common.ReferenceCa
 					"lastValidatedTS": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-						},
-					},
-					"certificate": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
 						},
 					},
 					"systemUrl": {

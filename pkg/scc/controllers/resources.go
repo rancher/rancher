@@ -235,7 +235,7 @@ func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
 
 	// check if params has regUrl and use, otherwise check if devmode and when true use staging Scc url
 	if params.regUrl != "" {
-		regSpec.RegistrationRequest.RegistrationUrl = &params.regUrl
+		regSpec.RegistrationRequest.RegistrationAPIUrl = &params.regUrl
 	}
 
 	return regSpec
