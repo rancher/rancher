@@ -1,7 +1,6 @@
+// passwordchangerequest implements the store for the new public API passwordchangerequest resources
 package passwordchangerequest
 
-// tokens implements the store for the new public API token resources, also
-// known as ext tokens.
 import (
 	"context"
 	"fmt"

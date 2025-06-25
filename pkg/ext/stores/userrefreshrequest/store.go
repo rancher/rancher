@@ -1,7 +1,6 @@
+// userrefreshrequest implements the store for the new public API userrefreshrequest resources
 package userrefreshrequest
 
-// tokens implements the store for the new public API token resources, also
-// known as ext tokens.
 import (
 	"context"
 	"fmt"
