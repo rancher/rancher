@@ -547,33 +547,6 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 	}
 
 	dropAnnotation := false
-	defer func() {
-		// The AppliedSystemAgentUpgraderHashAnnotation annotation should not exist when Fleet bundles are present.
-		// This may exist if Rancher is upgraded to 2.12.x, then rolled back to 2.11.x, and later re-upgraded to 2.12.x without restoring the local cluster.
-		// In such cases, remove the annotation if it exists to ensure the system-agent-upgrader will be
-		// applied by the InstallSystemAgentUpgrader function.
-		if !dropAnnotation {
-			return
-		}
-		cp, err := h.rkeControlPlanes.Cache().Get(cluster.Namespace, cluster.Name)
-		if err != nil {
-			return
-		}
-		if cp.Annotations == nil {
-			return
-		}
-		if _, ok := cp.Annotations[AppliedSystemAgentUpgraderHashAnnotation]; !ok {
-			return
-		}
-		logrus.Debugf("[managesystemagent] cluster %s/%s: removing AppliedSystemAgentUpgraderHashAnnotation", cluster.Namespace, cluster.Name)
-		cp = cp.DeepCopy()
-		delete(cp.Annotations, AppliedSystemAgentUpgraderHashAnnotation)
-		if _, err = h.rkeControlPlanes.Update(cp); err != nil {
-			logrus.Warnf("[managesystemagent] cluster %s/%s: failed to remove AppliedSystemAgentUpgraderHashAnnotation: %s",
-				cluster.Namespace, cluster.Name, err.Error())
-		}
-	}()
-
 	// Limit the number of cluster to be processed simultaneously
 	if uninstallCounter.Load() >= int32(settings.K3sBasedUpgraderUninstallConcurrency.GetInt()) {
 		h.cluster.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
@@ -612,6 +585,30 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		} else if !errors.IsNotFound(err) {
 			return nil, err
 		}
+	}
+
+	// The AppliedSystemAgentUpgraderHashAnnotation annotation should not exist when Fleet bundles are present.
+	// This may exist if Rancher is upgraded to 2.12.x, then rolled back to 2.11.x, and later re-upgraded to 2.12.x without restoring the local cluster.
+	// In such cases, remove the annotation if it exists to ensure the system-agent-upgrader will be
+	// applied by the InstallSystemAgentUpgrader function.
+	if !dropAnnotation {
+		return cluster, nil
+	}
+	cp, err := h.rkeControlPlanes.Cache().Get(cluster.Namespace, cluster.Name)
+	if err != nil {
+		return cluster, err
+	}
+	if cp.Annotations == nil {
+		return cluster, nil
+	}
+	if _, ok := cp.Annotations[AppliedSystemAgentUpgraderHashAnnotation]; !ok {
+		return cluster, nil
+	}
+	logrus.Debugf("[managesystemagent] cluster %s/%s: removing AppliedSystemAgentUpgraderHashAnnotation", cluster.Namespace, cluster.Name)
+	cp = cp.DeepCopy()
+	delete(cp.Annotations, AppliedSystemAgentUpgraderHashAnnotation)
+	if _, err = h.rkeControlPlanes.Update(cp); err != nil {
+		return cluster, err
 	}
 
 	return cluster, nil

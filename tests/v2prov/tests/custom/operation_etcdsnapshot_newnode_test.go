@@ -19,11 +19,8 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode creates a custom 2 node cluster with a controlplane+worker and
@@ -138,43 +135,6 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating restoration required", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
 	})
-
-	etcdMachines, err := clients.CAPI.Machine().List(c.Namespace, metav1.ListOptions{LabelSelector: capr.EtcdRoleLabel + "=true"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var newEtcdMachine *capi.Machine
-	for _, machine := range etcdMachines.Items {
-		if machine.DeletionTimestamp == nil {
-			newEtcdMachine = &machine
-		}
-	}
-	if newEtcdMachine == nil {
-		t.Fatal("no etcd machine found")
-	}
-
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		snapshot2, err := clients.RKE.ETCDSnapshot().Get(snapshot.Namespace, snapshot.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			t.Logf("snapshot %s/%s not found, creating one...", snapshot.Namespace, snapshot.Name)
-			snapshot = snapshot.DeepCopy()
-			snapshot.Labels[capr.MachineIDLabel] = newEtcdMachine.Labels[capr.MachineIDLabel]
-			snapshot.OwnerReferences = []metav1.OwnerReference{capr.ToOwnerReference(newEtcdMachine.TypeMeta, newEtcdMachine.ObjectMeta)}
-			snapshot.UID = ""
-			snapshot.ResourceVersion = ""
-			snapshot, err = clients.RKE.ETCDSnapshot().Create(snapshot)
-			return err
-		}
-		t.Logf("updating snapshot %s/%s", snapshot.Namespace, snapshot.Name)
-		snapshot = snapshot2.DeepCopy()
-		snapshot.Labels[capr.MachineIDLabel] = newEtcdMachine.Labels[capr.MachineIDLabel]
-		snapshot.OwnerReferences = []metav1.OwnerReference{capr.ToOwnerReference(newEtcdMachine.TypeMeta, newEtcdMachine.ObjectMeta)}
-		snapshot, err = clients.RKE.ETCDSnapshot().Update(snapshot)
-		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
 
 	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm, 2)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
