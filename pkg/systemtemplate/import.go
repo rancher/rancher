@@ -45,7 +45,6 @@ type clusterAgentContext struct {
 	Namespace             string
 	URLPlain              string
 	IsPreBootstrap        bool
-	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
 	AppendTolerations     string
@@ -228,7 +227,6 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
 		IsPreBootstrap:        isPreBootstrap,
-		IsRKE:                 false,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
 		AppendTolerations:     agentAppendTolerations,
