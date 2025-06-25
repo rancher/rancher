@@ -2,7 +2,7 @@ name: Provisioning tests
 on:
   workflow_call:
 env:
-  TAG: v2.11-${{ github.sha }}-head
+  TAG: ${{ github.sha }}-head
   COMMIT: ${{ github.sha }}
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
