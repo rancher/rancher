@@ -50,49 +50,36 @@ func main() {
 	var err error
 	ctx := context.Background()
 
-	if len(os.Args) > 1 {
-		err = runArgs(ctx)
+	configureLogrus()
+
+	logserver.StartServerWithDefaults()
+
+	initFeatures()
+
+	// The cleanup is only performed by the cattle-cluster-agent,
+	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
+	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
+		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
+		go clean.UnusedCattleCredentials()
+	}
+
+	if os.Getenv("CLUSTER_CLEANUP") == "true" {
+		err = clean.Cluster()
+	} else if os.Getenv("BINDING_CLEANUP") == "true" {
+		err = errors.Join(
+			clean.DuplicateBindings(nil),
+			clean.OrphanBindings(nil),
+		)
+	} else if os.Getenv("AD_GUID_CLEANUP") == "true" {
+		dryrun := os.Getenv("DRY_RUN") == "true"
+		deleteMissingUsers := os.Getenv("AD_DELETE_MISSING_GUID_USERS") == "true"
+		err = adunmigration.UnmigrateAdGUIDUsers(nil, dryrun, deleteMissingUsers)
 	} else {
-		configureLogrus()
-
-		logserver.StartServerWithDefaults()
-
-		initFeatures()
-
-		// The cleanup is only performed by the cattle-cluster-agent,
-		// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
-		if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
-			logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
-			go clean.UnusedCattleCredentials()
-		}
-
-		if os.Getenv("CLUSTER_CLEANUP") == "true" {
-			err = clean.Cluster()
-		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			err = errors.Join(
-				clean.DuplicateBindings(nil),
-				clean.OrphanBindings(nil),
-			)
-		} else if os.Getenv("AD_GUID_CLEANUP") == "true" {
-			dryrun := os.Getenv("DRY_RUN") == "true"
-			deleteMissingUsers := os.Getenv("AD_DELETE_MISSING_GUID_USERS") == "true"
-			err = adunmigration.UnmigrateAdGUIDUsers(nil, dryrun, deleteMissingUsers)
-		} else {
-			err = run(ctx)
-		}
+		err = run(ctx)
 	}
 
 	if err != nil {
 		logrus.Fatal(err)
-	}
-}
-
-func runArgs(ctx context.Context) error {
-	switch os.Args[1] {
-	case "clean":
-		return clean.Run(ctx, os.Args)
-	default:
-		return run(ctx)
 	}
 }
 

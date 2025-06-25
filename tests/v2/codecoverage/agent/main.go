@@ -56,40 +56,27 @@ func main() {
 func runAgent(ctx context.Context) {
 	var err error
 
-	if len(os.Args) > 1 {
-		err = runArgs(ctx)
+	logrus.SetOutput(colorable.NewColorableStdout())
+	logserver.StartServerWithDefaults()
+	if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	initFeatures()
+
+	if os.Getenv("CLUSTER_CLEANUP") == "true" {
+		err = clean.Cluster()
+	} else if os.Getenv("BINDING_CLEANUP") == "true" {
+		err = errors.Join(
+			clean.DuplicateBindings(nil),
+			clean.OrphanBindings(nil),
+		)
 	} else {
-		logrus.SetOutput(colorable.NewColorableStdout())
-		logserver.StartServerWithDefaults()
-		if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-
-		initFeatures()
-
-		if os.Getenv("CLUSTER_CLEANUP") == "true" {
-			err = clean.Cluster()
-		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			err = errors.Join(
-				clean.DuplicateBindings(nil),
-				clean.OrphanBindings(nil),
-			)
-		} else {
-			err = run(ctx)
-		}
+		err = run(ctx)
 	}
 
 	if err != nil {
 		logrus.Fatal(err)
-	}
-}
-
-func runArgs(ctx context.Context) error {
-	switch os.Args[1] {
-	case "clean":
-		return clean.Run(ctx, os.Args)
-	default:
-		return run(ctx)
 	}
 }
 
