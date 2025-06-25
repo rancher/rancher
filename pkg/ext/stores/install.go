@@ -34,15 +34,10 @@ func InstallStores(
 	logrus.Infof("Successfully installed useractivity store")
 
 	if features.ExtTokens.Enabled() {
-		tokenStore := tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer())
-		if err := tokenStore.EnsureNamespace(); err != nil {
-			return fmt.Errorf("error ensuring token namespace: %w", err)
-		}
-
 		if err := server.Install(
 			tokens.PluralName,
 			tokens.GVK,
-			tokenStore,
+			tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer()),
 		); err != nil {
 			return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
 		}
@@ -57,15 +52,10 @@ func InstallStores(
 			return fmt.Errorf("error getting user manager: %w", err)
 		}
 
-		kubeconfigStore := kubeconfig.New(wranglerContext, server.GetAuthorizer(), userManager)
-		if err = kubeconfigStore.EnsureNamespace(); err != nil {
-			return fmt.Errorf("error ensuring kubeconfig namespace: %w", err)
-		}
-
 		if err := server.Install(
 			extv1.KubeconfigResourceName,
 			extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
-			kubeconfigStore,
+			kubeconfig.New(wranglerContext, server.GetAuthorizer(), userManager),
 		); err != nil {
 			return fmt.Errorf("unable to install kubeconfig store: %w", err)
 		}

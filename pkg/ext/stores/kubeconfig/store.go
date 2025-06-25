@@ -117,6 +117,7 @@ type Store struct {
 	getServerURL        func() string
 	shouldGenerateToken func() bool
 	tableConverter      rest.TableConvertor
+	ensureNamespace     sync.Once
 }
 
 // New creates a new instance of [Store].
@@ -146,34 +147,40 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, us
 
 // EnsureNamespace ensures that the namespace for storing kubeconfig configMaps exists.
 func (s *Store) EnsureNamespace() error {
-	var backoff = wait.Backoff{
-		Duration: 100 * time.Millisecond,
-		Factor:   2,
-		Jitter:   .2,
-		Steps:    10, // Up to ~51 seconds.
-	}
+	var err error
 
-	return wait.ExponentialBackoff(backoff, func() (bool, error) {
-		_, err := s.nsCache.Get(namespace)
-		if err == nil {
+	s.ensureNamespace.Do(func() {
+		var backoff = wait.Backoff{
+			Duration: 100 * time.Millisecond,
+			Factor:   2,
+			Jitter:   .2,
+			Steps:    5,
+		}
+
+		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+			_, err := s.nsCache.Get(namespace)
+			if err == nil {
+				return true, nil
+			}
+
+			if !apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("error getting namespace %s: %w", namespace, err)
+			}
+
+			_, err = s.nsClient.Create(&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				return false, fmt.Errorf("error creating namespace %s: %w", namespace, err)
+			}
+
 			return true, nil
-		}
-
-		if !apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("error getting namespace %s: %w", namespace, err)
-		}
-
-		_, err = s.nsClient.Create(&corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
 		})
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return false, fmt.Errorf("error creating namespace %s: %w", namespace, err)
-		}
-
-		return true, nil
 	})
+
+	return err
 }
 
 // isUnique returns true if the given slice of strings contains unique values.
@@ -413,6 +420,10 @@ func (s *Store) Create(
 		kubeConfigID = names.SimpleNameGenerator.GenerateName(namePrefix)
 		configMap.Name = kubeConfigID
 	} else {
+		if err = s.EnsureNamespace(); err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %w", namespace, err))
+		}
+
 		configMap, err = s.configMapClient.Create(configMap)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error creating configmap for kubeconfig: %w", err))

@@ -248,7 +248,6 @@ func Test_Store_GroupVersionKind(t *testing.T) {
 	assert.Equal(t, GVK, store.GroupVersionKind(ext.SchemeGroupVersion))
 }
 
-
 func Test_Store_Delete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
@@ -1201,6 +1200,9 @@ func Test_Store_Create(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			// assemble and configure a store from mock clients ...
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			nsCache.EXPECT().Get(TokenNamespace).AnyTimes()
+
 			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
@@ -1214,7 +1216,7 @@ func Test_Store_Create(t *testing.T) {
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			secrets.EXPECT().Cache().Return(scache)
 
-			store := New(nil, nil, nil, secrets, users, tcache, timer, hasher, auth)
+			store := New(nil, nil, nsCache, secrets, users, tcache, timer, hasher, auth)
 			test.storeSetup(nil, secrets, scache, ucache, tcache, timer, hasher, auth)
 
 			// perform test and validate results
