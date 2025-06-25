@@ -79,7 +79,7 @@ func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.R
 	//	b. BAYG/RMT/etc based Registration and will not use a code
 	registrationCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
 
-	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationUrl
+	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
 
 	// Initiate connection to SCC & verify reg code is for Rancher
 	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
@@ -198,7 +198,7 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	}
 
 	registrationCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
-	registrationUrl := registrationObj.Spec.RegistrationRequest.RegistrationUrl
+	registrationUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
 	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *registrationUrl)
 
 	metaData, product, err := sccConnection.Activate(registrationCode)
@@ -220,7 +220,7 @@ func (s sccOnlineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registra
 	if credentialsErr != nil {
 		return nil, fmt.Errorf("cannot load scc credentials: %w", credentialsErr)
 	}
-	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationUrl
+	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
 	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
 
 	activations, err := sccConnection.ActivationStatus()
@@ -269,7 +269,7 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) error {
 	}
 
 	regCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
-	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationUrl
+	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
 	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
 
 	metaData, product, err := sccConnection.Activate(regCode)
@@ -320,7 +320,7 @@ func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, ke
 
 func (s sccOnlineMode) Deregister() error {
 	_ = s.sccCredentials.Refresh()
-	regUrl := s.registration.Spec.RegistrationRequest.RegistrationUrl
+	regUrl := s.registration.Spec.RegistrationRequest.RegistrationAPIUrl
 	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
 	// TODO : this causes deletion to fail if the credentials are invalid. I think we
 	// need to do a best effort check to see if it was ever registered before

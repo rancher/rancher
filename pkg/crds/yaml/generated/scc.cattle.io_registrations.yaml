@@ -75,7 +75,7 @@ spec:
                 x-kubernetes-map-type: atomic
               registrationRequest:
                 properties:
-                  registrationCodeSecretRef:
+                  registrationAPICertificateSecretRef:
                     description: |-
                       SecretReference represents a Secret Reference. It has enough information to retrieve secret
                       in any namespace
@@ -90,9 +90,9 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
-                  registrationUrl:
+                  registrationAPIUrl:
                     type: string
-                  serverCertficateSecretRef:
+                  registrationCodeSecretRef:
                     description: |-
                       SecretReference represents a Secret Reference. It has enough information to retrieve secret
                       in any namespace
@@ -120,8 +120,6 @@ spec:
                   activated:
                     default: false
                     type: boolean
-                  certificate:
-                    type: string
                   lastValidatedTS:
                     format: date-time
                     type: string

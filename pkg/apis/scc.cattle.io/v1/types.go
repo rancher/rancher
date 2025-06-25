@@ -78,9 +78,9 @@ func (rs *RegistrationSpec) WithoutSyncNow() *RegistrationSpec {
 type RegistrationRequest struct {
 	RegistrationCodeSecretRef *corev1.SecretReference `json:"registrationCodeSecretRef,omitempty"`
 	// +optional
-	RegistrationUrl *string `json:"registrationUrl,omitempty"`
+	RegistrationAPIUrl *string `json:"registrationAPIUrl,omitempty"`
 	// +optional
-	ServerCertificateSecretRef *corev1.SecretReference `json:"serverCertficateSecretRef,omitempty"`
+	RegistrationAPICertificateSecretRef *corev1.SecretReference `json:"registrationAPICertificateSecretRef,omitempty"`
 }
 
 type RegistrationStatus struct {
@@ -113,8 +113,6 @@ type SystemActivationState struct {
 	Activated bool `json:"activated"`
 	// +optional
 	LastValidatedTS *metav1.Time `json:"lastValidatedTS"`
-	// +optional
-	Certificate *string `json:"certificate,omitempty"`
 	// +optional
 	SystemUrl *string `json:"systemUrl,omitempty"`
 }
