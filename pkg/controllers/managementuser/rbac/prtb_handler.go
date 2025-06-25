@@ -196,9 +196,8 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	}
 
 	// ensure ClusterRole exists with correct updatepsa rules
-	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
-	psaCRWanted := addUpdatepsaClusterRole(projectName)
-	psaCR, err := p.crLister.Get("", psaCRName)
+	psaCRWanted := addUpdatepsaClusterRole(binding.UserName, projectName)
+	psaCR, err := p.crLister.Get("", psaCRWanted.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// create ClusterRole if it doesn't exist
@@ -214,7 +213,7 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	// verify existing ClusterRole has the correct updatepsa rules
 	if !reflect.DeepEqual(psaCR.Rules, psaCRWanted.Rules) {
 		// if the CR have been modified, restore it
-		psaCR = addUpdatepsaClusterRole(projectName)
+		psaCR = addUpdatepsaClusterRole(binding.UserName, projectName)
 		_, err = p.crClient.Update(psaCR)
 		if err != nil {
 			return err
@@ -224,12 +223,12 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	// create ClusterRoleBinding to bind the ClusterRole to the user/group
 	psaCRB := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-updatepsa", projectName),
+			Name: fmt.Sprintf("crb-%s-%s-updatepsa", binding.UserName, projectName),
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
-			Name:     psaCRName,
+			Name:     psaCR.Name,
 		},
 	}
 
