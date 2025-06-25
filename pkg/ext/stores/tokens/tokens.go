@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	reflect "reflect"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	extcommon "github.com/rancher/rancher/pkg/ext/common"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -120,7 +120,6 @@ type SystemStore struct {
 	hasher          hashHandler         // access to generation and hashing of secret values
 	auth            authHandler         // access to user retrieval from context
 	tableConverter  rest.TableConvertor // custom column formatting
-	ensureNamespace sync.Once
 }
 
 // NewFromWrangler is a convenience function for creating a token store.
@@ -243,42 +242,9 @@ func (t *Store) New() runtime.Object {
 func (t *Store) Destroy() {
 }
 
-// EnsureNamespace ensures that the namespace for storing token secrets exists.
-func (t *SystemStore) EnsureNamespace() error {
-	var err error
-
-	t.ensureNamespace.Do(func() {
-		var backoff = wait.Backoff{
-			Duration: 100 * time.Millisecond,
-			Factor:   2,
-			Jitter:   .2,
-			Steps:    5,
-		}
-
-		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			_, err := t.namespaceCache.Get(TokenNamespace)
-			if err == nil {
-				return true, nil
-			}
-
-			if !apierrors.IsNotFound(err) {
-				return false, fmt.Errorf("error getting namespace %s: %w", TokenNamespace, err)
-			}
-
-			_, err = t.namespaceClient.Create(&corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: TokenNamespace,
-				},
-			})
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				return false, fmt.Errorf("error creating namespace %s: %w", TokenNamespace, err)
-			}
-
-			return true, nil
-		})
-	})
-
-	return err
+// ensureNamespace ensures that the namespace for storing token secrets exists.
+func (t *SystemStore) ensureNamespace() error {
+	return extcommon.EnsureNamespace(t.namespaceCache, t.namespaceClient, TokenNamespace)
 }
 
 // Create implements [rest.Creator], the interface to support the `create`
@@ -588,7 +554,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	secret.ObjectMeta.Name = ""
 	secret.ObjectMeta.GenerateName = GeneratePrefix
 
-	if err = t.EnsureNamespace(); err != nil {
+	if err = t.ensureNamespace(); err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %w", TokenNamespace, err))
 	}
 
