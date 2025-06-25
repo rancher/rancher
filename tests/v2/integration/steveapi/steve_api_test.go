@@ -744,8 +744,6 @@ var nonSQLListTests = []listTestType{
 	},
 }
 
-//var isSingleDigitRegex = regexp.MustCompile(`^\d$`)
-
 func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
@@ -2478,9 +2476,6 @@ func (s *steveAPITestSuite) TestList() {
 			for j, part := range parts {
 				subparts := strings.Split(part, "=")
 				if subparts[0] == "labelSelector" {
-					//if isSingleDigitRegex.MatchString(subparts[2]) {
-					//	subparts[2] = "test" + subparts[2]
-					//}
 					parts[j] = fmt.Sprintf("filter=metadata.labels[%s]=%s", subparts[1], subparts[2])
 					changed = true
 				} else if subparts[0] == "fieldSelector" {
@@ -2493,6 +2488,8 @@ func (s *steveAPITestSuite) TestList() {
 					changed = true
 				} else if subparts[0] == "filter" {
 					if strings.Contains(part, "metadata.namespace=") {
+						// No need to break the filter down into sub-filters because in the test suite we don't
+						// have any VALUES that match 'metadata.namespace='
 						changed = true
 						parts[j] = strings.ReplaceAll(part, "metadata.namespace=", "metadata.namespace~")
 					}
