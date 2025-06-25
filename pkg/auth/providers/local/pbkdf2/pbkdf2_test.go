@@ -186,6 +186,7 @@ func TestUpdatePassword(t *testing.T) {
 	fakePassword := "fake-password"
 	fakeNewPasswordHash := "fake-new-password-hash"
 	fakePasswordSalt := "fake-password-salt"
+	fakeNewPasswordSalt := "fake-new-password-salt"
 
 	tests := map[string]struct {
 		userID             string
@@ -193,6 +194,7 @@ func TestUpdatePassword(t *testing.T) {
 		mockHashKey        func(password string, salt []byte, iter, keyLength int) ([]byte, error)
 		mockSecretClient   func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList]
 		mockSecretCache    func() *fake.MockCacheInterface[*v1.Secret]
+		mockSaltGenerator  func() ([]byte, error)
 		expectErrorMessage string
 	}{
 		"the secret is updated with the new hashed password": {
@@ -226,12 +228,15 @@ func TestUpdatePassword(t *testing.T) {
 					Path: "/data",
 					Value: map[string][]byte{
 						"password": []byte(fakeNewPasswordHash),
-						"salt":     []byte(fakePasswordSalt),
+						"salt":     []byte(fakeNewPasswordSalt),
 					},
 				}})
 				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
 
 				return mock
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 		},
 		"error when secret can't be fetched": {
@@ -245,6 +250,9 @@ func TestUpdatePassword(t *testing.T) {
 			},
 			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
 				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 			expectErrorMessage: "failed to get password secret: unexpected error",
 		},
@@ -270,6 +278,9 @@ func TestUpdatePassword(t *testing.T) {
 			},
 			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
 				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 			expectErrorMessage: "failed to hash password: unexpected error",
 		},
@@ -304,12 +315,15 @@ func TestUpdatePassword(t *testing.T) {
 					Path: "/data",
 					Value: map[string][]byte{
 						"password": []byte(fakeNewPasswordHash),
-						"salt":     []byte(fakePasswordSalt),
+						"salt":     []byte(fakeNewPasswordSalt),
 					},
 				}})
 				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, errors.New("unexpected error"))
 
 				return mock
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 			expectErrorMessage: "failed to patch secret: unexpected error",
 		},
@@ -319,9 +333,10 @@ func TestUpdatePassword(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			p := Pbkdf2{
-				secretClient: test.mockSecretClient(),
-				secretLister: test.mockSecretCache(),
-				hashKey:      test.mockHashKey,
+				secretClient:  test.mockSecretClient(),
+				secretLister:  test.mockSecretCache(),
+				hashKey:       test.mockHashKey,
+				saltGenerator: test.mockSaltGenerator,
 			}
 			err := p.UpdatePassword(test.userID, test.password)
 			if test.expectErrorMessage == "" {
@@ -341,6 +356,7 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 	fakeNewPasswordHash := "fake-new-password-hash"
 	fakeCurrentPasswordHash := "fake-password-hash"
 	fakePasswordSalt := "fake-password-salt"
+	fakeNewPasswordSalt := "fake-password-new-salt"
 
 	tests := map[string]struct {
 		userID             string
@@ -350,6 +366,7 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 		mockSecretClient   func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList]
 		mockSecretCache    func() *fake.MockCacheInterface[*v1.Secret]
 		expectErrorMessage string
+		mockSaltGenerator  func() ([]byte, error)
 	}{
 		"the secret is updated with the new hashed password": {
 			userID:          fakeUserID,
@@ -391,11 +408,14 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 					Path: "/data",
 					Value: map[string][]byte{
 						"password": []byte(fakeNewPasswordHash),
-						"salt":     []byte(fakePasswordSalt),
+						"salt":     []byte(fakeNewPasswordSalt),
 					},
 				}})
 				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
 				return mock
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 		},
 		"error when secret can't be fetched": {
@@ -409,6 +429,9 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 			},
 			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
 				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 			expectErrorMessage: "failed to get password secret: unexpected error",
 		},
@@ -434,6 +457,9 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 			},
 			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
 				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 			expectErrorMessage: "failed to hash password: unexpected error",
 		},
@@ -477,12 +503,15 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 					Path: "/data",
 					Value: map[string][]byte{
 						"password": []byte(fakeNewPasswordHash),
-						"salt":     []byte(fakePasswordSalt),
+						"salt":     []byte(fakeNewPasswordSalt),
 					},
 				}})
 				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, errors.New("unexpected error"))
 
 				return mock
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
 			},
 			expectErrorMessage: "failed to patch secret: unexpected error",
 		},
@@ -492,9 +521,10 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			p := Pbkdf2{
-				secretClient: test.mockSecretClient(),
-				secretLister: test.mockSecretCache(),
-				hashKey:      test.mockHashKey,
+				secretClient:  test.mockSecretClient(),
+				secretLister:  test.mockSecretCache(),
+				hashKey:       test.mockHashKey,
+				saltGenerator: test.mockSaltGenerator,
 			}
 			err := p.VerifyAndUpdatePassword(test.userID, test.currentPassword, test.newPassword)
 			if test.expectErrorMessage == "" {
