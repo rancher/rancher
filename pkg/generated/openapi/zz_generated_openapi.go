@@ -524,7 +524,7 @@ func schema_pkg_apis_extcattleio_v1_SelfUser(ref common.ReferenceCallback) commo
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec is the desired state of the PasswordChangeRequest.",
+							Description: "Status is the most recently observed state of the Self User.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUserStatus"),
 						},
