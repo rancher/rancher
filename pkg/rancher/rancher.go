@@ -235,8 +235,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	if err := ext.RDPStart(ctx, restConfig, wranglerContext); err != nil {
-		return nil, err
+	if ext.RDPEnabled() {
+		if err := ext.RDPStart(ctx, restConfig, wranglerContext); err != nil {
+			return nil, err
+		}
 	}
 
 	extensionOpts := ext.DefaultOptions()

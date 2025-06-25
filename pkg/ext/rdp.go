@@ -88,12 +88,7 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 }
 
 func RDPEnabled() bool {
-	switch os.Getenv(rdpEnabledEnvVar) {
-	case "true":
-		return false
-	default:
-		return true
-	}
+	return os.Getenv(rdpEnabledEnvVar) != "true"
 }
 
 func GetOrCreateRDPConnectSecret(secretController corecontrollers.SecretController) (string, error) {
