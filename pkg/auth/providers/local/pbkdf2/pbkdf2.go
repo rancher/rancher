@@ -135,7 +135,7 @@ func (p *Pbkdf2) VerifyAndUpdatePassword(userId string, currentPassword, newPass
 }
 
 // VerifyPassword verifies if the password stored is the same as the password provided.
-// if the password stored is usign the legacy hashing algorithm (bcrypt) it will be updated to PBKDF2.
+// if the password stored is using the legacy hashing algorithm (bcrypt) it will be updated to PBKDF2.
 func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, user.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
