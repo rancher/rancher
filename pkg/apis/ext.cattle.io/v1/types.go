@@ -316,7 +316,7 @@ type SelfUser struct {
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	// Spec is the desired state of the PasswordChangeRequest.
+	// Status is the most recently observed state of the Self User.
 	// +optional
 	Status SelfUserStatus `json:"status,omitempty"`
 }
