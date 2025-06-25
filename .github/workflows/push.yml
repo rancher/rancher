@@ -47,6 +47,8 @@ jobs:
   integration-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
+    permissions:
+      contents: read
   push-images:
     needs: [unit-tests, integration-tests]
     strategy:
