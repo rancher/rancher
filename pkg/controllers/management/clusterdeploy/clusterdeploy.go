@@ -55,7 +55,6 @@ var (
 	controlPlaneTaintsMutex sync.RWMutex
 	controlPlaneTaints      = make(map[string][]corev1.Taint)
 	controlPlaneLabels      = map[string]string{
-		"node-role.kubernetes.io/master":        "true",
 		"node-role.kubernetes.io/controlplane":  "true",
 		"node-role.kubernetes.io/control-plane": "true",
 	}
