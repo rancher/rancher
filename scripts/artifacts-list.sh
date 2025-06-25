@@ -11,7 +11,6 @@ export ARTIFACTS=(
   "rancher-load-images.sh"
   "rancher-mirror-to-rancher-org.ps1"
   "rancher-mirror-to-rancher-org.sh"
-  "rancher-rke-k8s-versions.txt"
   "rancher-save-images.ps1"
   "rancher-save-images.sh"
   "rancher-windows-images-sources.txt"
