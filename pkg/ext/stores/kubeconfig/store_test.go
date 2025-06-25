@@ -383,6 +383,9 @@ func TestStoreCreate(t *testing.T) {
 		}
 	}).AnyTimes()
 
+	nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+	nsCache.EXPECT().Get(namespace).AnyTimes()
+
 	defaultTTLSeconds := int64(43200)
 	getDefaultTTL := func() (*int64, error) {
 		millis := defaultTTLSeconds * 1000
@@ -418,6 +421,7 @@ func TestStoreCreate(t *testing.T) {
 
 		store := &Store{
 			authorizer:          authorizer,
+			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
 			tokenCache:          tokenCache,
@@ -550,6 +554,7 @@ func TestStoreCreate(t *testing.T) {
 
 		store := &Store{
 			authorizer:          commonAuthorizer,
+			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
 			tokenCache:          tokenCache,
@@ -749,6 +754,7 @@ func TestStoreCreate(t *testing.T) {
 
 		store := &Store{
 			authorizer:          authorizer,
+			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
 			tokenCache:          tokenCache,
