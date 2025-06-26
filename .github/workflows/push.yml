@@ -139,6 +139,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
             secret/data/github/repo/${{ github.repository }}/chart-optimus-uploader/credentials stagingChartsOptimusBucketName | CHARTS_BUCKET_NAME ;
       - name: publish
+        env:
+          CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
         uses: ./.github/actions/rancher-chart/publish-aws
   build-installer:
     needs: [merge-server-manifest]
