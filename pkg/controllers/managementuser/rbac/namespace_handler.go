@@ -500,10 +500,10 @@ func addManageNSPermission(clusterRole *rbacv1.ClusterRole, projectName string) 
 
 // addUpdatepsaClusterRole returns a ClusterRole with the updatepsa verb enabled.
 // The name of the ClusterRole has the following format: <project_name>-namespaces-psa
-func addUpdatepsaClusterRole(userName, projectName string) *rbacv1.ClusterRole {
+func addUpdatepsaClusterRole(projectName string) *rbacv1.ClusterRole {
 	clusterRole := &rbacv1.ClusterRole{}
-	crName := "%s-%s-namespaces-psa"
-	clusterRole.Name = fmt.Sprintf(crName, userName, projectName)
+	crName := "%s-namespaces-psa"
+	clusterRole.Name = fmt.Sprintf(crName, projectName)
 	clusterRole.Rules = append(clusterRole.Rules, rbacv1.PolicyRule{
 		APIGroups:     []string{management.GroupName},
 		Verbs:         []string{"updatepsa"},

@@ -196,7 +196,7 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	}
 
 	// ensure ClusterRole exists with correct updatepsa rules
-	psaCRWanted := addUpdatepsaClusterRole(binding.UserName, projectName)
+	psaCRWanted := addUpdatepsaClusterRole(projectName)
 	psaCR, err := p.crLister.Get("", psaCRWanted.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -213,30 +213,34 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	// verify existing ClusterRole has the correct updatepsa rules
 	if !reflect.DeepEqual(psaCR.Rules, psaCRWanted.Rules) {
 		// if the CR have been modified, restore it
-		psaCR = addUpdatepsaClusterRole(binding.UserName, projectName)
+		psaCR = addUpdatepsaClusterRole(projectName)
 		_, err = p.crClient.Update(psaCR)
 		if err != nil {
 			return err
 		}
 	}
 
-	// create ClusterRoleBinding to bind the ClusterRole to the user/group
-	psaCRB := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("crb-%s-%s-updatepsa", binding.UserName, projectName),
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     psaCR.Name,
-		},
+	ref := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
+		Kind:     "ClusterRole",
+		Name:     psaCR.Name,
 	}
 
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}
-	psaCRB.Subjects = []rbacv1.Subject{subject}
+
+	psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
+
+	// create ClusterRoleBinding to bind the ClusterRole to the user/group
+	psaCRB := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: psaCRBName,
+		},
+		RoleRef:  ref,
+		Subjects: []rbacv1.Subject{subject},
+	}
 
 	_, err = p.crbClient.Create(psaCRB)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
