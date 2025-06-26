@@ -107,42 +107,6 @@ jobs:
         env:
           CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
         uses: ./.github/actions/rancher-chart/publish-aws
-  merge-server-manifest:
-    needs: [push-images]
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
-      - name: merge
-        uses: ./.github/actions/merge-manifests/server
-  merge-agent-manifest:
-    needs: [push-images]
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
-      - name: merge
-        uses: ./.github/actions/merge-manifests/agent
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -167,24 +131,6 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: build
         uses: ./.github/actions/build-images/installer
-  merge-installer-manifest:
-    needs: [build-installer]
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
-      - name: merge
-        uses: ./.github/actions/merge-manifests/installer
   create-images-files:
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
@@ -217,7 +163,7 @@ jobs:
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
-    needs: [merge-server-manifest, merge-agent-manifest, merge-installer-manifest]
+    needs: [merge-installer-manifest]
     permissions:
       contents: read
       id-token: write
