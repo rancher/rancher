@@ -108,6 +108,42 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: merge
         uses: ./.github/actions/merge-manifests/agent
+  build-publish-chart:
+    needs: [push-images]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: 'build-chart-push-${{ github.repository }}-${{ github.ref_name }}'
+      # instead of cancelling other runs, wait until they are finished
+      cancel-in-progress: false
+    env:
+      ARCH: amd64
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/rancher-chart/build
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | AWS_ACCESS_KEY_ID_CHARTS ;
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | AWS_SECRET_ACCESS_KEY_CHARTS ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/chart-optimus-uploader/credentials stagingChartsOptimusBucketName | CHARTS_BUCKET_NAME ;
+      - name: publish
+        env:
+          CHARTS_DISTRIBUTION_ID: EKGBR3PUZ9J56
+        uses: ./.github/actions/rancher-chart/publish-aws
   build-installer:
     needs: [merge-server-manifest]
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
