@@ -81,7 +81,7 @@ jobs:
       contents: read
       id-token: write
     concurrency:
-      group: 'build-chart-tag'
+      group: 'build-chart-push-${{ github.repository }}-${{ github.ref_name }}'
       # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
     env:
