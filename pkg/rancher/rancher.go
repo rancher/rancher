@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/rancher/rancher/pkg/scc"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -393,16 +394,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	go r.Steve.StartAggregation(ctx)
 
 	if !features.MCMAgent.Enabled() && r.kubeAggregationReadyChan != nil {
-		go func() {
-			logrus.Infof("Waiting for %s imperative API to be ready", r.aggregationRegistrationTimeout)
-
-			select {
-			case <-r.kubeAggregationReadyChan:
-				logrus.Info("kube-apiserver connected to imperative api")
-			case <-time.After(r.aggregationRegistrationTimeout):
-				logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
-			}
-		}()
+		go r.checkAPIAggregationOrDie()
 	}
 
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
@@ -417,6 +409,19 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+// checkAPIAggregationOrDie will wait for the kubeapi server to contact the configured APIService endpoints.
+// If the condition is not met within the aggregationRegistrationTimeout the Rancher process will exit with an error.
+func (r *Rancher) checkAPIAggregationOrDie() {
+	logrus.Infof("Waiting for %s imperative API to be ready", r.aggregationRegistrationTimeout)
+
+	select {
+	case <-r.kubeAggregationReadyChan:
+		logrus.Info("kube-apiserver connected to imperative api")
+	case <-time.After(r.aggregationRegistrationTimeout):
+		logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
+	}
 }
 
 func (r *Rancher) startAggregation(ctx context.Context) {
