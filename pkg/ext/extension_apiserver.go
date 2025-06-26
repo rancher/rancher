@@ -258,3 +258,42 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	return extensionAPIServer, nil
 }
+
+const apiAggregationPreCheckedAnnotation = "ext.cattle.io/aggregation-available-checked"
+
+// AggregationPreCheck allows verifying if a previous execution of Rancher already checked API Agreggation works in the upstream cluster
+func AggregationPreCheck(client wranglerapiregistrationv1.APIServiceClient) bool {
+	apiservice, err := client.Get(APIServiceName, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	return apiservice.Annotations[apiAggregationPreCheckedAnnotation] == "true"
+}
+
+// SetAggregationCheck adds an annotation in the extension APIService object, so it can later be retrieved by AggregationPreCheck
+func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, value bool) {
+	apiservice, err := client.Get(APIServiceName, metav1.GetOptions{})
+	if err != nil {
+		logrus.Warnf("failed to set aggregation check for APIService: %v", err)
+		return
+	}
+
+	previous := apiservice.Annotations[apiAggregationPreCheckedAnnotation] == "true"
+	if previous == value {
+		// already set
+		return
+	}
+
+	if value {
+		if apiservice.Annotations == nil {
+			apiservice.Annotations = make(map[string]string)
+		}
+		apiservice.Annotations[apiAggregationPreCheckedAnnotation] = "true"
+	} else {
+		delete(apiservice.Annotations, apiAggregationPreCheckedAnnotation)
+	}
+
+	if _, err := client.Update(apiservice); err != nil {
+		logrus.Warnf("failed to set aggregation check for APIService: %v", err)
+	}
+}

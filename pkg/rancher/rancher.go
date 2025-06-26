@@ -253,6 +253,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if extensionAPIServer != nil {
 		kubeAggregationReadyChan = extensionAPIServer.Registered()
 	}
+	// Only wait for ExtensionAPIServer if it was never validated before
+	skipWaitForExtensionAPIServer := ext.AggregationPreCheck(wranglerContext.API.APIService())
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
@@ -265,7 +267,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
 			DefaultMaximumEventsCount: defaultSQLCacheMaxEventsCount,
 		},
-		ExtensionAPIServer: extensionAPIServer,
+		ExtensionAPIServer:            extensionAPIServer,
+		SkipWaitForExtensionAPIServer: skipWaitForExtensionAPIServer,
 	})
 	if err != nil {
 		return nil, err
@@ -416,11 +419,30 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 func (r *Rancher) checkAPIAggregationOrDie() {
 	logrus.Infof("Waiting for %s imperative API to be ready", r.aggregationRegistrationTimeout)
 
-	select {
-	case <-r.kubeAggregationReadyChan:
-		logrus.Info("kube-apiserver connected to imperative api")
-	case <-time.After(r.aggregationRegistrationTimeout):
-		logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
+	ctx, cancel := context.WithTimeout(context.Background(), r.aggregationRegistrationTimeout)
+	defer cancel()
+
+	apiserviceClient := r.Wrangler.API.APIService()
+	waitingForAPIService := !r.Steve.SkipWaitForExtensionAPIServer
+	for {
+		select {
+		// Case 1: ExtensionServer was contacted by the Kube API,
+		case <-r.kubeAggregationReadyChan:
+			logrus.Info("kube-apiserver connected to imperative api")
+			ext.SetAggregationCheck(apiserviceClient, true)
+			return
+		// Case 2: ExtensionServer in a different replica was contacted by the Kube API
+		//         Only valid if Steve was configured to wait. Otherwise, it would short-circuit here directly here
+		case <-time.After(5 * time.Second):
+			if waitingForAPIService && ext.AggregationPreCheck(apiserviceClient) {
+				logrus.Info("kube-apiserver connected to imperative api")
+				return
+			}
+		// Case 3: the Kube API didn't contact the Extension Server within the configured timeout, interpreted as API Aggregation not being supported in the cluster
+		case <-ctx.Done():
+			ext.SetAggregationCheck(apiserviceClient, false)
+			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
+		}
 	}
 }
 
