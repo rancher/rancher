@@ -55,7 +55,9 @@ case $CHART_VERSION in
   CHART_REPO="latest" ;;
 +([0-9]).+([0-9]).+([0-9])) # All release tags
   CHART_REPO="latest" ;;
-*) # Anything else - Future use
+*-head*)                                                          # All head tags
+  CHART_REPO="release-$(echo $CHART_VERSION | cut -d '-' -f1)" ;; # release-2.11
+*)                                                                # Anything else - Future use
   CHART_REPO="dev" ;;
 esac
 
