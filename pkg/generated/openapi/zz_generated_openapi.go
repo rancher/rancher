@@ -585,14 +585,14 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 				Description: "TokenStatus defines the most recently observed status of the Token.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"tokenValue": {
+					"value": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Value is the access key. It is shown only on token creation and not saved.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"tokenHash": {
+					"hash": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Hash is the hash of the Value.",
 							Type:        []string{"string"},
