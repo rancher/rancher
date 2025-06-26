@@ -3,7 +3,6 @@ on:
   push:
     tags:
       - "v*"
-      - "!v*-hotfix*"
 env:
   COMMIT: ${{ github.sha }}
   AWS_DEFAULT_REGION: "us-east-1"
@@ -11,8 +10,6 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  REGISTRY: "docker.io"
-  GH_CLI_VERSION: "2.72.0"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -69,8 +66,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: push
         uses: ./.github/actions/push-images
   build-publish-chart:
@@ -100,9 +98,12 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-access-key/credentials token | AWS_ACCESS_KEY_ID_CHARTS ;
+            secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | AWS_SECRET_ACCESS_KEY_CHARTS ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials accessKeyId | AWS_ACCESS_KEY_ID_CACHE_INVALIDATION ;
+            secret/data/github/repo/${{ github.repository }}/chart-dns-invalidator/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION ;
       - name: publish
-        uses: ./.github/actions/rancher-chart/publish-gcp
+        uses: ./.github/actions/rancher-chart/publish-aws
   merge-server-manifest:
     needs: [push-images]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -116,8 +117,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: merge
         uses: ./.github/actions/merge-manifests/server
   merge-agent-manifest:
@@ -133,8 +135,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: merge
         uses: ./.github/actions/merge-manifests/agent
   build-installer:
@@ -156,8 +159,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: build
         uses: ./.github/actions/build-images/installer
   merge-installer-manifest:
@@ -173,8 +177,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: merge
         uses: ./.github/actions/merge-manifests/installer
   create-images-files:
@@ -194,51 +199,15 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials accessKeyId | AWS_ACCESS_KEY_ID ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials primeArtifactsBucketName | ARTIFACTS_BUCKET_NAME ;
-      - name: publish to gh
-        uses: ./.github/actions/images-files/publish-gh
       - name: publish to aws
         uses: ./.github/actions/images-files/publish-aws
-  docker-image-digests:
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
-    needs: [create-images-files, merge-agent-manifest, merge-server-manifest]
-    permissions:
-      contents: write
-      id-token: write
-    env:
-      ARTIFACTS_BASE_DIR: "dist"
-      LINUX_AMD64_FILE: "rancher-images-digests-linux-amd64.txt"
-      LINUX_ARM64_FILE: "rancher-images-digests-linux-arm64.txt"
-      WINDOWS_2019_FILE: "rancher-images-digests-windows-ltsc2019.txt"
-      WINDOWS_2022_FILE: "rancher-images-digests-windows-ltsc2022.txt"
-      CHECKSUM_FILE: "images-digests-sha256sum.txt"
-    steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: generate
-        uses: ./.github/actions/images-digests/generate
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
-      - name: publish to gh
-        uses: ./.github/actions/images-digests/publish-gh
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
-    needs: [merge-server-manifest, merge-agent-manifest, docker-image-digests, merge-installer-manifest]
+    needs: [merge-server-manifest, merge-agent-manifest, merge-installer-manifest]
     permissions:
       contents: read
       id-token: write
