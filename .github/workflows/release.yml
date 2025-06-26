@@ -189,7 +189,7 @@ jobs:
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
-    needs: [merge-server-agent-installer-manifests]
+    needs: [merge-server-agent-installer-manifests, create-images-files]
     permissions:
       contents: read
       id-token: write
