@@ -163,7 +163,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 			return cd(ctx, network, address)
 		}, nil
 	}
-	logrus.Tracef("dialerFactory: no tunnel session found for cluster [%s], falling back to nodeDialer", cluster.Name)
 
 	if !retryOnError {
 		logrus.Debugf("No active connection for cluster [%s], returning", cluster.Name)
