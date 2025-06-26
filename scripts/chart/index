@@ -5,10 +5,17 @@ set -e
 echo "-- chart/index --"
 
 cd $(dirname $0)/../..
-mkdir -p build
-
 repo_index=${1}
 
-echo "Getting current index from ${repo_index}"
-curl -f -H 'Cache-Control: max-age=0,no-cache' -H 'Host: releases.rancher.com' "https://c.storage.googleapis.com/server-charts/${repo_index}/index.yaml?$(date +%s%N)" -o build/index.yaml
-helm_v3 repo index --merge build/index.yaml ./bin/chart/${repo_index}
+# Do not merge the repo index if it is a release repo.
+# These repos contain only the latest version of the chart.
+if [[ "${repo_index}" =~ "release-" ]]; then
+  helm_v3 repo index ./bin/chart/${repo_index}
+else
+  mkdir -p build
+
+  echo "Getting current index from ${repo_index}"
+  curl -f -H 'Cache-Control: max-age=0,no-cache' -H 'Host: releases.rancher.com' "https://c.storage.googleapis.com/server-charts/${repo_index}/index.yaml?$(date +%s%N)" -o build/index.yaml
+
+  helm_v3 repo index --merge build/index.yaml ./bin/chart/${repo_index}
+fi
