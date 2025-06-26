@@ -195,13 +195,9 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials accessKeyId | AWS_ACCESS_KEY_ID ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader/credentials primeArtifactsBucketName | ARTIFACTS_BUCKET_NAME ;
-      - name: publish to gh
-        uses: ./.github/actions/images-files/publish-gh
       - name: publish to aws
         uses: ./.github/actions/images-files/publish-aws
   docker-image-digests:
