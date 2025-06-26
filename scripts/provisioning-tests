@@ -77,7 +77,16 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
+eval "$(grep '^ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_VERSION' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+
+export CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
+export CATTLE_REMOTEDIALER_PROXY_VERSION=$(yq '.remoteDialerProxyVersion' < build.yaml)
 export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(yq '.provisioningCAPIVersion' < build.yaml)
+export CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq '.cspAdapterMinVersion' < build.yaml)
+export CATTLE_FLEET_VERSION=$(yq '.fleetVersion' < build.yaml)
 
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Only set SOME_K8S_VERSION if it is empty -- for KDM provisioning tests, this value should already be populated

@@ -3,7 +3,7 @@ package system
 // mockgen --build_flags=--mod=mod -package system -destination=./mock_system_test.go github.com/rancher/rancher/pkg/catalogv2/system ContentClient,OperationClient,HelmClient
 
 import (
-	context "context"
+	"context"
 	"errors"
 	"testing"
 
@@ -24,7 +24,8 @@ func TestManagerRemovesRelease(t *testing.T) {
 	t.Parallel()
 	webhook := desiredKey{
 		namespace:            "cattle-system",
-		name:                 "rancher-webhook",
+		chartName:            "rancher-webhook",
+		releaseName:          "rancher-webhook",
 		minVersion:           "1.1.1",
 		exactVersion:         "1.2.0",
 		installImageOverride: "some-image",
@@ -42,8 +43,9 @@ func TestManagerRemovesRelease(t *testing.T) {
 
 	// Assert that the lookup of key to delete only needs namespace and name.
 	webhook = desiredKey{
-		namespace: "cattle-system",
-		name:      "rancher-webhook",
+		namespace:   "cattle-system",
+		chartName:   "rancher-webhook",
+		releaseName: "rancher-webhook",
 	}
 	charts[webhook] = map[string]any{}
 	assert.Equal(t, charts, manager.desiredCharts)
@@ -227,19 +229,22 @@ func TestInstallCharts(t *testing.T) {
 			desiredCharts: map[desiredKey]map[string]any{
 				{
 					namespace:    "cattle-fleet-system",
-					name:         "fleet",
+					chartName:    "fleet",
+					releaseName:  "fleet",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "rancher-webhook",
+					chartName:    "rancher-webhook",
+					releaseName:  "rancher-webhook",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "aks-operator",
+					chartName:    "aks-operator",
+					releaseName:  "aks-operator",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
@@ -262,19 +267,22 @@ func TestInstallCharts(t *testing.T) {
 			desiredCharts: map[desiredKey]map[string]any{
 				{
 					namespace:    "cattle-fleet-system",
-					name:         "fleet",
+					chartName:    "fleet",
+					releaseName:  "fleet",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "rancher-webhook",
+					chartName:    "rancher-webhook",
+					releaseName:  "rancher-webhook",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "aks-operator",
+					chartName:    "aks-operator",
+					releaseName:  "aks-operator",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
@@ -297,19 +305,22 @@ func TestInstallCharts(t *testing.T) {
 			desiredCharts: map[desiredKey]map[string]any{
 				{
 					namespace:    "cattle-fleet-system",
-					name:         "fleet",
+					chartName:    "fleet",
+					releaseName:  "fleet",
 					minVersion:   "1.0.0",
 					exactVersion: "",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "rancher-webhook",
+					chartName:    "rancher-webhook",
+					releaseName:  "rancher-webhook",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "aks-operator",
+					chartName:    "aks-operator",
+					releaseName:  "aks-operator",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
@@ -333,19 +344,22 @@ func TestInstallCharts(t *testing.T) {
 			desiredCharts: map[desiredKey]map[string]any{
 				{
 					namespace:    "cattle-fleet-system",
-					name:         "fleet",
+					chartName:    "fleet",
+					releaseName:  "fleet",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "rancher-webhook",
+					chartName:    "rancher-webhook",
+					releaseName:  "rancher-webhook",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "aks-operator",
+					chartName:    "aks-operator",
+					releaseName:  "aks-operator",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
@@ -368,19 +382,22 @@ func TestInstallCharts(t *testing.T) {
 			desiredCharts: map[desiredKey]map[string]any{
 				{
 					namespace:    "cattle-fleet-system",
-					name:         "fleet",
+					chartName:    "fleet",
+					releaseName:  "fleet",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "rancher-webhook",
+					chartName:    "rancher-webhook",
+					releaseName:  "rancher-webhook",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "aks-operator",
+					chartName:    "aks-operator",
+					releaseName:  "aks-operator",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
@@ -402,8 +419,9 @@ func TestInstallCharts(t *testing.T) {
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
-					namespace: "cattle-fleet-system",
-					name:      "fleet",
+					namespace:   "cattle-fleet-system",
+					chartName:   "fleet",
+					releaseName: "fleet",
 					// major, minor and patch segments match a version from the index, which is
 					// where Helm could return a matching version based on those segments, but not
 					// strictly equal to the specified one
@@ -412,13 +430,15 @@ func TestInstallCharts(t *testing.T) {
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "rancher-webhook",
+					chartName:    "rancher-webhook",
+					releaseName:  "rancher-webhook",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
 				{
 					namespace:    "cattle-system",
-					name:         "aks-operator",
+					chartName:    "aks-operator",
+					releaseName:  "aks-operator",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
@@ -446,7 +466,7 @@ func TestInstallCharts(t *testing.T) {
 			for dc := range test.desiredCharts {
 				var foundRelease *release.Release
 				for _, r := range test.releases {
-					if r.Name == dc.name && r.Namespace == dc.namespace {
+					if r.Name == dc.releaseName && r.Namespace == dc.namespace {
 						foundRelease = r
 					}
 				}
@@ -456,16 +476,16 @@ func TestInstallCharts(t *testing.T) {
 					foundReleases = []*release.Release{foundRelease}
 				}
 				// Call from installCharts and isInstalled
-				mockHelmClient.EXPECT().ListReleases(dc.namespace, dc.name, action.ListDeployed).
+				mockHelmClient.EXPECT().ListReleases(dc.namespace, dc.releaseName, action.ListDeployed).
 					Return(foundReleases, nil).
 					MaxTimes(2)
 
-				if test.expectInstalls[dc.name] {
+				if test.expectInstalls[dc.chartName] {
 					mockOperationClient.EXPECT().AddCpTaintsToTolerations([]v1.Toleration(nil)).Return([]v1.Toleration{{Value: "bar", Key: "foo"}}, nil)
 					// Call from install -> hasStatus
 					mockHelmClient.EXPECT().ListReleases(
 						dc.namespace,
-						dc.name,
+						dc.releaseName,
 						action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback,
 					).
 						Return(nil, nil)
