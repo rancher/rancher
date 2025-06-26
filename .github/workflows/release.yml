@@ -10,8 +10,7 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  REGISTRY: "docker.io"
-  GH_CLI_VERSION: "2.72.0"
+  REGISTRY: "stgregistry.suse.com"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -68,8 +67,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
       - name: push
         uses: ./.github/actions/push-images
   build-publish-chart:
@@ -115,8 +114,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
       - name: merge
         uses: ./.github/actions/merge-manifests/server
   merge-agent-manifest:
@@ -132,8 +131,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
       - name: merge
         uses: ./.github/actions/merge-manifests/agent
   build-installer:
@@ -155,8 +154,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
       - name: build
         uses: ./.github/actions/build-images/installer
   merge-installer-manifest:
@@ -172,8 +171,8 @@ jobs:
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
       - name: merge
         uses: ./.github/actions/merge-manifests/installer
   create-images-files:
