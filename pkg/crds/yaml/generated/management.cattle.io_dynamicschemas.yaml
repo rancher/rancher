@@ -1,0 +1,466 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: dynamicschemas.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: DynamicSchema
+    listKind: DynamicSchemaList
+    plural: dynamicschemas
+    singular: dynamicschema
+  scope: Cluster
+  versions:
+  - name: v3
+    schema:
+      openAPIV3Schema:
+        description: |-
+          DynamicSchema is the definition of a schema. Dynamic schemas are
+          created and used internally by Rancher to generate CRDs and API
+          endpoints, and should not be created manually.
+
+          DynamicSchema functionality for generating Rancher dynamic API
+          endpoints is limited. These endpoints are not backed by any stores,
+          and most related fields will not have any useful effect.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              Specification of the desired behavior of the the dynamic schema. More info:
+              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+            properties:
+              collectionActions:
+                additionalProperties:
+                  properties:
+                    input:
+                      description: |-
+                        Input should not be set.
+
+                        Deprecated: Input is deprecated and will be removed in a future
+                        version of Rancher.
+                      type: string
+                    output:
+                      description: |-
+                        Output should not be set.
+
+                        Deprecated: Output is deprecated and will be removed in a future
+                        version of Rancher.
+                      type: string
+                  type: object
+                description: |-
+                  CollectionActions should not be set.
+
+                  Deprecated: CollectionActions is deprecated and will be removed in
+                  a future version of Rancher.
+                type: object
+              collectionFields:
+                additionalProperties:
+                  properties:
+                    create:
+                      description: |-
+                        Create indicates that this field should not be set when creating a
+                        new object of a schema with this field through the Norman API.  A
+                        value for this field will be filtered out if present in the create
+                        request.
+                      type: boolean
+                    default:
+                      description: Default is the default value for the field.
+                      properties:
+                        boolValue:
+                          description: BoolValue is the default value for a Field
+                            of "bool" type.
+                          type: boolean
+                        intValue:
+                          description: IntValue is the default value for a Field of
+                            "int" type.
+                          type: integer
+                        stringSliceValue:
+                          description: |-
+                            StringSliceValue is the default value for a Field of "array[string]"
+                            type.
+                          items:
+                            type: string
+                          nullable: true
+                          type: array
+                        stringValue:
+                          description: |-
+                            StringValue is the default value for a Field of "string" or
+                            "password" type.
+                          type: string
+                      type: object
+                    description:
+                      description: Description is the description of this field.
+                      type: string
+                    dynamicField:
+                      description: |-
+                        DynamicField indicates this field should be removed from a schema
+                        when embedding another schema into it.
+                      type: boolean
+                    invalidChars:
+                      description: |-
+                        InvalidChars should not be set.
+
+                        Deprecated: InvalidChars is deprecated and will be removed in a
+                        future version of Rancher.
+                      type: string
+                    max:
+                      description: |-
+                        Max should not be set.
+
+                        Deprecated: Max is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    maxLength:
+                      description: |-
+                        MaxLength should not be set.
+
+                        Deprecated: MaxLength is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    min:
+                      description: |-
+                        Min should not be set.
+
+                        Deprecated: Min is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    minLength:
+                      description: |-
+                        MinLength should not be set.
+
+                        Deprecated: MinLength is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    nullable:
+                      description: |-
+                        Nullable indicates whether the field can take a null value in a valid
+                        object of a schema with this field.
+
+                        The Norman API will reject null values for non-nullable fields, and
+                        nullable is also used to determine if a field in a CRD derived from
+                        this schema will be nullable.
+                      type: boolean
+                    options:
+                      description: |-
+                        Options should not be set.
+
+                        Deprecated: Options is deprecated and will be removed in a future
+                        version of Rancher.
+                      items:
+                        type: string
+                      type: array
+                    required:
+                      description: |-
+                        Required indicates that this field is required when creating a new
+                        object of a schema with this field through the Norman API.
+                      type: boolean
+                    type:
+                      description: |-
+                        Type is the type of the field. Possible types are "string",
+                        "password", "boolean", "int", "array[string]" or another schema
+                        name.
+                      type: string
+                    unique:
+                      description: |-
+                        Unique should not be set.
+
+                        Deprecated: Unique is deprecated and will be removed in a future
+                        version of Rancher.
+                      type: boolean
+                    update:
+                      description: |-
+                        Update indicates that this field should not be modified when
+                        updating an object of a schema with this field through the Norman
+                        API.  A value for this field will be filtered out if present in the
+                        update request.
+                      type: boolean
+                    validChars:
+                      description: |-
+                        ValidChars should not be set.
+
+                        Deprecated: ValidChars is deprecated and will be removed in a
+                        future version of Rancher.
+                      type: string
+                  type: object
+                description: |-
+                  CollectionFields should not be set.
+
+                  Deprecated: CollectionFields is deprecated and will be removed in a
+                  future version of Rancher.
+                type: object
+              collectionFilters:
+                additionalProperties:
+                  properties:
+                    modifiers:
+                      description: |-
+                        Modifiers should not be set.
+
+                        Deprecated: Modifiers is deprecated and will be removed in a future
+                        version of Rancher.
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                description: |-
+                  CollectionFilters should not be set.
+
+                  Deprecated: CollectionFilters is deprecated and will be removed in
+                  a future version of Rancher.
+                type: object
+              collectionMethods:
+                description: |-
+                  CollectionMethods should not be set.
+
+                  Deprecated: CollectionMethods is deprecated and will be removed in
+                  a future version of Rancher.
+                items:
+                  type: string
+                type: array
+              dynamicSchemaVersion:
+                description: |-
+                  DynamicSchemaVersion should not be set.
+
+                  Deprecated: DynamicSchemaVersion is deprecated and will be removed
+                  in a future version of Rancher.
+                type: string
+              embed:
+                description: |-
+                  Embed determines whether the ResourceFields of this schema should be
+                  embedded into another schema (EmbedType).
+                type: boolean
+              embedType:
+                description: |-
+                  EmbedType defines the schema into which the ResourceFields of this
+                  schema should be embedded in.
+                type: string
+              includeableLinks:
+                description: |-
+                  IncludeableLinks should not be set.
+
+                  Deprecated: IncludeableLinks is deprecated and will be removed in a
+                  future version of Rancher.
+                items:
+                  type: string
+                type: array
+              pluralName:
+                description: |-
+                  PluralName should not be set.
+
+                  Deprecated: PluralName is deprecated and will be removed in a future
+                  version of Rancher.
+                type: string
+              resourceActions:
+                additionalProperties:
+                  properties:
+                    input:
+                      description: |-
+                        Input should not be set.
+
+                        Deprecated: Input is deprecated and will be removed in a future
+                        version of Rancher.
+                      type: string
+                    output:
+                      description: |-
+                        Output should not be set.
+
+                        Deprecated: Output is deprecated and will be removed in a future
+                        version of Rancher.
+                      type: string
+                  type: object
+                description: |-
+                  ResourceActions should not be set.
+
+                  Deprecated: ResourceActions is deprecated and will be removed in a
+                  future version of Rancher.
+                type: object
+              resourceFields:
+                additionalProperties:
+                  properties:
+                    create:
+                      description: |-
+                        Create indicates that this field should not be set when creating a
+                        new object of a schema with this field through the Norman API.  A
+                        value for this field will be filtered out if present in the create
+                        request.
+                      type: boolean
+                    default:
+                      description: Default is the default value for the field.
+                      properties:
+                        boolValue:
+                          description: BoolValue is the default value for a Field
+                            of "bool" type.
+                          type: boolean
+                        intValue:
+                          description: IntValue is the default value for a Field of
+                            "int" type.
+                          type: integer
+                        stringSliceValue:
+                          description: |-
+                            StringSliceValue is the default value for a Field of "array[string]"
+                            type.
+                          items:
+                            type: string
+                          nullable: true
+                          type: array
+                        stringValue:
+                          description: |-
+                            StringValue is the default value for a Field of "string" or
+                            "password" type.
+                          type: string
+                      type: object
+                    description:
+                      description: Description is the description of this field.
+                      type: string
+                    dynamicField:
+                      description: |-
+                        DynamicField indicates this field should be removed from a schema
+                        when embedding another schema into it.
+                      type: boolean
+                    invalidChars:
+                      description: |-
+                        InvalidChars should not be set.
+
+                        Deprecated: InvalidChars is deprecated and will be removed in a
+                        future version of Rancher.
+                      type: string
+                    max:
+                      description: |-
+                        Max should not be set.
+
+                        Deprecated: Max is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    maxLength:
+                      description: |-
+                        MaxLength should not be set.
+
+                        Deprecated: MaxLength is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    min:
+                      description: |-
+                        Min should not be set.
+
+                        Deprecated: Min is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    minLength:
+                      description: |-
+                        MinLength should not be set.
+
+                        Deprecated: MinLength is deprecated and will be removed in a future
+                        version of Rancher.
+                      format: int64
+                      type: integer
+                    nullable:
+                      description: |-
+                        Nullable indicates whether the field can take a null value in a valid
+                        object of a schema with this field.
+
+                        The Norman API will reject null values for non-nullable fields, and
+                        nullable is also used to determine if a field in a CRD derived from
+                        this schema will be nullable.
+                      type: boolean
+                    options:
+                      description: |-
+                        Options should not be set.
+
+                        Deprecated: Options is deprecated and will be removed in a future
+                        version of Rancher.
+                      items:
+                        type: string
+                      type: array
+                    required:
+                      description: |-
+                        Required indicates that this field is required when creating a new
+                        object of a schema with this field through the Norman API.
+                      type: boolean
+                    type:
+                      description: |-
+                        Type is the type of the field. Possible types are "string",
+                        "password", "boolean", "int", "array[string]" or another schema
+                        name.
+                      type: string
+                    unique:
+                      description: |-
+                        Unique should not be set.
+
+                        Deprecated: Unique is deprecated and will be removed in a future
+                        version of Rancher.
+                      type: boolean
+                    update:
+                      description: |-
+                        Update indicates that this field should not be modified when
+                        updating an object of a schema with this field through the Norman
+                        API.  A value for this field will be filtered out if present in the
+                        update request.
+                      type: boolean
+                    validChars:
+                      description: |-
+                        ValidChars should not be set.
+
+                        Deprecated: ValidChars is deprecated and will be removed in a
+                        future version of Rancher.
+                      type: string
+                  type: object
+                description: ResourceFields defines the schema fields and their types.
+                type: object
+              resourceMethods:
+                description: |-
+                  ResourceMethods should not be set.
+
+                  Deprecated: ResourceMethods is deprecated and will be removed in a
+                  future version of Rancher.
+                items:
+                  type: string
+                type: array
+              schemaName:
+                description: |-
+                  SchemaName is the id under which the schema will be registered in the
+                  Norman API. If unset, the dynamic schema resource name will be used.
+                type: string
+            type: object
+          status:
+            description: |-
+              Most recent observed status of the dynamic schema. More info:
+              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+            properties:
+              fake:
+                description: |-
+                  Fake should not be set.
+
+                  Deprecated: Fake is deprecated and will be removed in a future
+                  version of Rancher.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
