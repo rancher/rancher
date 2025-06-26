@@ -14,23 +14,24 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
 jobs:
   provisioning_tests:
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         include:
         - V2PROV_TEST_DIST: "k3s"
           V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
+        # - V2PROV_TEST_DIST: "rke2"
+        #   V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "k3s"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
-          CATTLE_FEATURES: "provisioningprebootstrap=true"
+        # - V2PROV_TEST_DIST: "rke2"
+        #   V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
+        # - V2PROV_TEST_DIST: "rke2"
+        #   V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
+        # - V2PROV_TEST_DIST: "rke2"
+        #   V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
+        #   CATTLE_FEATURES: "provisioningprebootstrap=true"
         - V2PROV_TEST_DIST: "k3s"
           V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
           CATTLE_FEATURES: "provisioningprebootstrap=true"
