@@ -218,7 +218,7 @@ var MigratedResources = map[string]bool{
 	"composeconfigs.management.cattle.io":                             false,
 	"custommachines.rke.cattle.io":                                    false,
 	"dockercredentials.project.cattle.io":                             false,
-	"dynamicschemas.management.cattle.io":                             false,
+	"dynamicschemas.management.cattle.io":                             true,
 	"etcdbackups.management.cattle.io":                                false,
 	"etcdsnapshots.rke.cattle.io":                                     false,
 	"extensionconfigs.runtime.cluster.x-k8s.io":                       false,
