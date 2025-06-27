@@ -48,26 +48,6 @@ type RKEClusterStatus struct {
 	Ready bool `json:"ready,omitempty"`
 }
 
-type NetworkingStackPreference string
-
-const (
-	// DualStackPreference signifies a dual stack networking strategy, defaulting "localhost" for communication on the
-	// loopback interface
-	DualStackPreference = NetworkingStackPreference("dual")
-
-	// SingleStackIPv4Preference signifies a single stack IPv4 networking strategy, defaulting "127.0.0.1" for
-	// communication on the loopback interface
-	SingleStackIPv4Preference = NetworkingStackPreference("ipv4")
-
-	// SingleStackIPv6Preference signifies a single stack IPv6 networking strategy, defaulting "::1" for
-	// communication on the loopback interface
-	SingleStackIPv6Preference = NetworkingStackPreference("ipv6")
-
-	// DefaultStackPreference is the stack preference used when no preference is defined, or is invalid. Defaults to
-	// "127.0.0.1" to support existing behavior.
-	DefaultStackPreference = SingleStackIPv4Preference
-)
-
 // Networking contains information regarding the desired and actual networking stack of the cluster.
 type Networking struct {
 	// Specifies which networking stack to prefer for external cluster communication. In practice, this is used by the
