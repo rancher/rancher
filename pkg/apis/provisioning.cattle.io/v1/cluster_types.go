@@ -381,7 +381,7 @@ type PriorityClassSpec struct {
 }
 
 // PodDisruptionBudgetSpec is the spec for the desired pod disruption budget for the cluster.
-// +kubebuilder:validation:XValidation:rule="(has(self.minAvailable) && self.minAvailable != "0" && (!has(self.maxAvailable) || self.maxAvailable == "0")) || (has(self.maxAvailable) && self.maxAvailable != "0" && (!has(self.minAvailable) || self.minAvailable == "0"))",message="both minAvailable and maxUnavailable cannot be set to a non zero value, at least one must be omitted or set to zero"
+// +kubebuilder:validation:XValidation:rule="(has(self.minAvailable) && self.minAvailable != \"0\" && (!has(self.maxAvailable) || self.maxAvailable == \"0\")) || (has(self.maxAvailable) && self.maxAvailable != \"0\" && (!has(self.minAvailable) || self.minAvailable == \"0\"))",message="both minAvailable and maxUnavailable cannot be set to a non-zero value, at least one must be omitted or set to zero"
 type PodDisruptionBudgetSpec struct {
 	// An eviction is allowed if at least "minAvailable" will still be
 	// available after the eviction, i.e. even in the absence of the evicted
