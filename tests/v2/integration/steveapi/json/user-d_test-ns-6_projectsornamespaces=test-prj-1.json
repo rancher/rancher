@@ -1,0 +1,12 @@
+{
+  "actions": {},
+  "createTypes": {
+    "secret": "https://rancherurl/v1/secrets"
+  },
+  "links": {
+    "self": "https://rancherurl/v1/secrets/test-ns-6"
+  },
+  "resourceType": "secret",
+  "revision": "100",
+  "type": "collection"
+}
