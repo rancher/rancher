@@ -98,7 +98,7 @@
   },
   "pagination": {
     "first": "https://rancherurl/v1/secrets",
-    "next": "https://rancherurl/v1/secrets?continue=nondeterministictoken\u0026filter=metadata.labels%5Btest.cattle.io%2Fsteveapi%5D~hmkvo\u0026pagesize=3",
+    "next": "https://rancherurl/v1/secrets?continue=nondeterministictoken\u0026filter=metadata.labels%5Btest.cattle.io%2Fsteveapi%5D~MYTAG\u0026pagesize=3",
     "partial": true
   },
   "resourceType": "secret",
