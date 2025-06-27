@@ -83,12 +83,6 @@ type RKEClusterSpecCommon struct {
 	ProvisionGeneration int `json:"provisionGeneration,omitempty"`
 }
 
-type LocalClusterAuthEndpoint struct {
-	Enabled bool   `json:"enabled,omitempty"`
-	FQDN    string `json:"fqdn,omitempty"`
-	CACerts string `json:"caCerts,omitempty"`
-}
-
 type RKESystemConfig struct {
 	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
 	Config               GenericMap            `json:"config,omitempty" wrangler:"nullable"`

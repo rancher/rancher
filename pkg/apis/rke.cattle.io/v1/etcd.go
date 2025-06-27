@@ -26,21 +26,6 @@ type ETCDSnapshotS3 struct {
 	Folder              string `json:"folder,omitempty"`
 }
 
-type ETCDSnapshotCreate struct {
-	// Changing the Generation is the only thing required to initiate a snapshot creation.
-	Generation int `json:"generation,omitempty"`
-}
-
-type ETCDSnapshotRestore struct {
-	// Name refers to the name of the associated etcdsnapshot object
-	Name string `json:"name,omitempty"`
-
-	// Changing the Generation is the only thing required to initiate a snapshot restore.
-	Generation int `json:"generation,omitempty"`
-	// Set to either none (or empty string), all, or kubernetesVersion
-	RestoreRKEConfig string `json:"restoreRKEConfig,omitempty"`
-}
-
 // +genclient
 // +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

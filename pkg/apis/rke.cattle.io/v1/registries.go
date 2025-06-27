@@ -14,15 +14,6 @@ type Mirror struct {
 	Rewrites map[string]string `json:"rewrite,omitempty"`
 }
 
-const (
-	AuthConfigSecretType = "rke.cattle.io/auth-config"
-
-	UsernameAuthConfigSecretKey      = "username"
-	PasswordAuthConfigSecretKey      = "password"
-	AuthAuthConfigSecretKey          = "auth"
-	IdentityTokenAuthConfigSecretKey = "identityToken"
-)
-
 // AuthConfig contains the config related to authentication to a specific registry
 type AuthConfig struct {
 	// Username is the username to login the registry.
