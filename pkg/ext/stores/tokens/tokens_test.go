@@ -44,6 +44,11 @@ var (
 	properSecret            = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bogus",
+			Labels: map[string]string{
+				UserIDLabel:     properUser,
+				SecretKindLabel: SecretKindLabelValue,
+			},
+			UID: "bombastic",
 		},
 		Data: map[string][]byte{
 			FieldDescription:    []byte(""),
@@ -433,6 +438,36 @@ func Test_Store_Delete(t *testing.T) {
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
+
+		assert.True(t, ok)
+		assert.Nil(t, err)
+	})
+
+	t.Run("ok with uid precondition", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), "delete").
+			Return(&mockUser{name: properUser}, false, true, nil)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
+			Return(&properSecret, nil)
+		secrets.EXPECT().
+			Delete("cattle-tokens", "bogus", gomock.Any()).
+			DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+				// verify that the delete option data was properly translated
+				assert.Equal(t, options.Preconditions, metav1.NewUIDPreconditions("bombastic"))
+				return nil
+			})
+
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
+		_, ok, err := store.Delete(context.TODO(), "bogus", nil,
+			&metav1.DeleteOptions{
+				Preconditions: metav1.NewUIDPreconditions("2905498-kafld-lkad"),
+			})
 
 		assert.True(t, ok)
 		assert.Nil(t, err)
