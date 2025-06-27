@@ -12,7 +12,3 @@ const (
 	RotateEncryptionKeysPhaseDone                 RotateEncryptionKeysPhase = "Done"
 	RotateEncryptionKeysPhaseFailed               RotateEncryptionKeysPhase = "Failed"
 )
-
-type RotateEncryptionKeys struct {
-	Generation int64 `json:"generation,omitempty"`
-}

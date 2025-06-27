@@ -16,11 +16,6 @@ type RKEControlPlane struct {
 	Status            RKEControlPlaneStatus `json:"status,omitempty"`
 }
 
-type EnvVar struct {
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
-}
-
 type RKEControlPlaneSpec struct {
 	RKEClusterSpecCommon
 
