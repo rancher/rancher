@@ -73,7 +73,7 @@ type KubeConfig struct {
 	CurrentContext string
 }
 
-func formatCertString(certData string) string {
+func FormatCertString(certData string) string {
 	buf := &bytes.Buffer{}
 	if len(certData) > firstLen {
 		buf.WriteString(certData[:firstLen])
@@ -96,15 +96,7 @@ func caCertString() string {
 		return ""
 	}
 	certData = base64.StdEncoding.EncodeToString([]byte(certData))
-	return formatCertString(certData)
-}
-
-func FormatCert(data string) string {
-	if data == "" {
-		return ""
-	}
-
-	return formatCertString(base64.StdEncoding.EncodeToString([]byte(data)))
+	return FormatCertString(certData)
 }
 
 func getDefaultNode(clusterName, clusterID, host string) kubeNode {
@@ -150,7 +142,7 @@ func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clu
 		clusterNode := kubeNode{
 			ClusterName: clusterName + "-fqdn",
 			Server:      "https://" + cluster.LocalClusterAuthEndpoint.FQDN,
-			Cert:        formatCertString(fqdnCACerts),
+			Cert:        FormatCertString(fqdnCACerts),
 			User:        clusterName,
 		}
 		nodesForConfig = append(nodesForConfig, clusterNode)
@@ -161,7 +153,7 @@ func ForClusterTokenBased(cluster *clientv3.Cluster, nodes []*normanv3.Node, clu
 				clusterNode := kubeNode{
 					ClusterName: nodeName,
 					Server:      "https://" + node.GetEndpointNodeIP(n) + ":6443",
-					Cert:        formatCertString(cluster.CACert),
+					Cert:        FormatCertString(cluster.CACert),
 					User:        clusterName,
 				}
 				nodesForConfig = append(nodesForConfig, clusterNode)

@@ -256,12 +256,12 @@ func TestStoreUserFrom(t *testing.T) {
 func TestStoreCreate(t *testing.T) {
 	authTokenID := "token-nh98r"
 	serverURL := "https://rancher.example.com"
-	getServerURL := func() string {
-		return serverURL
-	}
+	getServerURL := func() string { return serverURL }
 	downstream1 := "c-m-tbgzfbgf"
 	downstream2 := "c-m-bxn2p7w6" // ACE enabled.
 
+	_, rancherCACert, err := generateCAKeyAndCert()
+	require.NoError(t, err)
 	_, localCACert, err := generateCAKeyAndCert()
 	require.NoError(t, err)
 	_, downstream1CACert, err := generateCAKeyAndCert()
@@ -272,12 +272,12 @@ func TestStoreCreate(t *testing.T) {
 	localCluster := &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "local"},
 		Spec:       v3.ClusterSpec{DisplayName: "local"},
-		Status:     v3.ClusterStatus{CACert: localCACert},
+		Status:     v3.ClusterStatus{CACert: base64.StdEncoding.EncodeToString([]byte(localCACert))},
 	}
 	downstream1Cluster := &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{Name: downstream1},
 		Spec:       v3.ClusterSpec{DisplayName: "downstream1"},
-		Status:     v3.ClusterStatus{CACert: downstream1CACert},
+		Status:     v3.ClusterStatus{CACert: base64.StdEncoding.EncodeToString([]byte(downstream1CACert))},
 	}
 	downstream2Cluster := &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{Name: downstream2},
@@ -289,7 +289,7 @@ func TestStoreCreate(t *testing.T) {
 				},
 			},
 		},
-		Status: v3.ClusterStatus{CACert: downstream2CACert},
+		Status: v3.ClusterStatus{CACert: base64.StdEncoding.EncodeToString([]byte(downstream2CACert))},
 	}
 
 	ctrl := gomock.NewController(t)
@@ -428,8 +428,9 @@ func TestStoreCreate(t *testing.T) {
 			clusterCache:        clusterCache,
 			nodeCache:           nodeCache,
 			userMgr:             userManager,
-			getServerURL:        getServerURL,
+			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
@@ -512,9 +513,11 @@ func TestStoreCreate(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, config.Clusters, 4)
 		assert.Equal(t, serverURL, config.Clusters[defaultClusterName].Server)
+		assert.Equal(t, rancherCACert, string(config.Clusters[defaultClusterName].CertificateAuthorityData))
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream1), config.Clusters["downstream1"].Server)
 		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, downstream2), config.Clusters["downstream2"].Server)
 		assert.Equal(t, "https://172.20.0.3:6443", config.Clusters["downstream2-cp"].Server)
+		assert.Equal(t, downstream2CACert, string(config.Clusters["downstream2-cp"].CertificateAuthorityData))
 
 		require.Len(t, config.Contexts, 4)
 		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].Cluster)
@@ -560,8 +563,9 @@ func TestStoreCreate(t *testing.T) {
 			tokenCache:          tokenCache,
 			clusterCache:        clusterCache,
 			userMgr:             userManager,
-			getServerURL:        getServerURL,
+			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
@@ -621,6 +625,7 @@ func TestStoreCreate(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, config.Clusters, 1)
 		assert.Equal(t, serverURL, config.Clusters["rancher"].Server)
+		assert.Empty(t, config.Clusters["rancher"].CertificateAuthorityData)
 
 		require.Len(t, config.Contexts, 1)
 		assert.Equal(t, "rancher", config.Contexts["rancher"].Cluster)
@@ -643,8 +648,9 @@ func TestStoreCreate(t *testing.T) {
 			clusterCache:        clusterCache,
 			nodeCache:           nodeCache,
 			userMgr:             userManager,
-			getServerURL:        getServerURL,
+			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
@@ -760,8 +766,9 @@ func TestStoreCreate(t *testing.T) {
 			tokenCache:          tokenCache,
 			clusterCache:        clusterCache,
 			userMgr:             userManager,
-			getServerURL:        getServerURL,
+			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
@@ -997,7 +1004,7 @@ func generateCAKeyAndCert() (*ecdsa.PrivateKey, string, error) {
 	}
 
 	pem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-	return key, base64.StdEncoding.EncodeToString(pem), nil
+	return key, string(pem), nil
 }
 
 func TestWatcherStop(t *testing.T) {
