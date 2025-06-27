@@ -47,7 +47,7 @@ spec:
           spec:
             description: |-
               Specification of the desired behavior of the Node Driver. More info:
-              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+              https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               active:
                 description: Active specifies if the driver can be used to provision
@@ -111,7 +111,7 @@ spec:
           status:
             description: |-
               Most recent observed status of the Node Driver. More info:
-              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+              https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               appliedChecksum:
                 description: |-
