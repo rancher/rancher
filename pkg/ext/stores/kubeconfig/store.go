@@ -2,6 +2,7 @@ package kubeconfig
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -424,7 +425,7 @@ func (s *Store) Create(
 		return ref, nil
 	}
 
-	caCert := kconfig.FormatCert(settings.CACerts.Get())
+	caCert := kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(settings.CACerts.Get())))
 	data := kconfig.KubeConfig{
 		Meta: kconfig.Meta{
 			Name:              kubeConfigID,
@@ -570,7 +571,7 @@ func (s *Store) Create(
 				data.Clusters = append(data.Clusters, kconfig.Cluster{
 					Name:   fqdnName,
 					Server: "https://" + authEndpoint.FQDN,
-					Cert:   kconfig.FormatCert(authEndpoint.CACerts),
+					Cert:   kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(authEndpoint.CACerts))),
 				})
 				data.Contexts = append(data.Contexts, kconfig.Context{
 					Name:    fqdnName,
@@ -599,7 +600,7 @@ func (s *Store) Create(
 				return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %w", cluster.Name, err))
 			}
 
-			clusterCerts := kconfig.FormatCert(cluster.Status.CACert)
+			clusterCerts := kconfig.FormatCertString(cluster.Status.CACert) // Already base64 encoded.
 			var isCurrentContextSet bool
 			for _, node := range nodes {
 				if !node.Spec.ControlPlane {
