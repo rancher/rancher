@@ -68,3 +68,5 @@ if [ -z $TARGET ] || [ $TARGET = "agent" ]; then
       docker push "${REPO}"/rancher-agent:"${TAG}" &
     fi
 fi
+
+wait
