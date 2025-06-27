@@ -11,7 +11,7 @@ import (
 
 func TestBundle_SafeMarshal(t *testing.T) {
 
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 12)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
