@@ -279,14 +279,14 @@ type NodeCommonParams struct {
 type NodeDriver struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the Node Driver. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +kubebuilder:validation:XValidation:rule="!has(self.checksum) || (self.checksum.size() in [0, 32, 40, 64, 128])",message="Checksum must be an md5, sha1, sha256, or sha512 digest."
 	Spec NodeDriverSpec `json:"spec"`
 	// Most recent observed status of the Node Driver. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status NodeDriverStatus `json:"status,omitempty"`
 }
