@@ -43,10 +43,3 @@ type ETCDSnapshotFile struct {
 type ETCDSnapshotStatus struct {
 	Missing bool `json:"missing"`
 }
-
-type ETCD struct {
-	DisableSnapshots     bool            `json:"disableSnapshots,omitempty"`
-	SnapshotScheduleCron string          `json:"snapshotScheduleCron,omitempty"`
-	SnapshotRetention    int             `json:"snapshotRetention,omitempty"`
-	S3                   *ETCDSnapshotS3 `json:"s3,omitempty"`
-}
