@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -292,7 +291,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	var auditLogOut io.Writer
+	var auditLogWriter *audit.Writer
 
 	if opts.AuditLogEnabled {
 		out := &lumberjack.Logger{
@@ -303,17 +302,13 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 		defer out.Close()
 
-		auditLogOut = out
-	} else {
-		auditLogOut = io.Discard
-	}
-
-	auditLogWriter, err := audit.NewWriter(auditLogOut, audit.WriterOptions{
-		DefaultPolicyLevel:     auditlogv1.Level(opts.AuditLogLevel),
-		DisableDefaultPolicies: !opts.AuditLogEnabled,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create audit log writer: %w", err)
+		auditLogWriter, err = audit.NewWriter(out, audit.WriterOptions{
+			DefaultPolicyLevel:     auditlogv1.Level(opts.AuditLogLevel),
+			DisableDefaultPolicies: !opts.AuditLogEnabled,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create audit log writer: %w", err)
+		}
 	}
 
 	if opts.AuditLogEnabled {
