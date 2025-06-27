@@ -921,6 +921,7 @@ func Test_ensurePSAPermissionsDelete(t *testing.T) {
 				binding: &apisV3.ProjectRoleTemplateBinding{
 					ProjectName:      "c-abc:p-example",
 					RoleTemplateName: "role_template_0",
+					UserName:         "u-zxv",
 				},
 			},
 			wantErr: false,
@@ -1031,6 +1032,7 @@ func Test_ensurePSAPermissionsDelete(t *testing.T) {
 				binding: &apisV3.ProjectRoleTemplateBinding{
 					ProjectName:      "c-abc:p-example",
 					RoleTemplateName: "role_template_0",
+					UserName:         "u-zxv",
 				},
 			},
 			wantErr: false,
