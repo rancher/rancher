@@ -20,7 +20,7 @@ func TestIsCalico(t *testing.T) {
 			name: "calico rke2",
 			controlPlane: &rkev1.RKEControlPlane{
 				Spec: rkev1.RKEControlPlaneSpec{
-					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
 						MachineGlobalConfig: rkev1.GenericMap{
 							Data: map[string]any{
 								"cni": "calico",
@@ -36,7 +36,7 @@ func TestIsCalico(t *testing.T) {
 			name: "calico+multus rke2",
 			controlPlane: &rkev1.RKEControlPlane{
 				Spec: rkev1.RKEControlPlaneSpec{
-					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
 						MachineGlobalConfig: rkev1.GenericMap{
 							Data: map[string]any{
 								"cni": "calico+multus",
@@ -52,7 +52,7 @@ func TestIsCalico(t *testing.T) {
 			name: "mispelled calico rke2",
 			controlPlane: &rkev1.RKEControlPlane{
 				Spec: rkev1.RKEControlPlaneSpec{
-					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
 						MachineGlobalConfig: rkev1.GenericMap{
 							Data: map[string]any{
 								"cni": "calicoo",
@@ -68,7 +68,7 @@ func TestIsCalico(t *testing.T) {
 			name: "calico k3s",
 			controlPlane: &rkev1.RKEControlPlane{
 				Spec: rkev1.RKEControlPlaneSpec{
-					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
 						MachineGlobalConfig: rkev1.GenericMap{
 							Data: map[string]any{
 								"cni": "calico",

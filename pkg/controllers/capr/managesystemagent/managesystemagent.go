@@ -291,7 +291,7 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 	if cluster.Spec.RKEConfig.DataDirectories.SystemAgent != "" {
 		env = append(env, corev1.EnvVar{
 			Name:  capr.SystemAgentDataDirEnvVar,
-			Value: capr.GetSystemAgentDataDir(&cluster.Spec.RKEConfig.RKEClusterSpecCommon),
+			Value: capr.GetSystemAgentDataDir(&cluster.Spec.RKEConfig.ClusterConfiguration),
 		})
 	}
 	var plans []runtime.Object

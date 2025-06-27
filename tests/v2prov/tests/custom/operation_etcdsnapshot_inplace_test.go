@@ -33,7 +33,7 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{
-				RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+				ClusterConfiguration: rkev1.ClusterConfiguration{
 					ETCD: &rkev1.ETCD{
 						DisableSnapshots: true,
 					},

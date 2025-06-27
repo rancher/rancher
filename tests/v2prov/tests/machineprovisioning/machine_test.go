@@ -490,7 +490,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+				ClusterConfiguration: rkev1.ClusterConfiguration{
 					UpgradeStrategy: rkev1.ClusterUpgradeStrategy{
 						ControlPlaneDrainOptions: drainOpt,
 						WorkerDrainOptions:       drainOpt,

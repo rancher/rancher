@@ -545,7 +545,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
-			RKEClusterSpecCommon:     rkeConfig.RKEClusterSpecCommon,
+			ClusterConfiguration:     rkeConfig.ClusterConfiguration,
 			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
 			ETCDSnapshotRestore:      rkeConfig.ETCDSnapshotRestore,
 			ETCDSnapshotCreate:       rkeConfig.ETCDSnapshotCreate,

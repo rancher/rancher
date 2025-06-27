@@ -460,7 +460,7 @@ func Test_getInstallerImage(t *testing.T) {
 			expected: "test.rancher.io/rancher/system-agent-installer-rke2:v1.25.7-rke2r1",
 			controlPlane: &rkev1.RKEControlPlane{
 				Spec: rkev1.RKEControlPlaneSpec{
-					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
 						MachineGlobalConfig: rkev1.GenericMap{
 							Data: map[string]any{
 								"system-default-registry": "test.rancher.io",
@@ -476,7 +476,7 @@ func Test_getInstallerImage(t *testing.T) {
 			expected: "test.rancher.io/rancher/system-agent-installer-rke2:v1.25.7-rke2r1",
 			controlPlane: &rkev1.RKEControlPlane{
 				Spec: rkev1.RKEControlPlaneSpec{
-					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
 						MachineSelectorConfig: []rkev1.RKESystemConfig{
 							{
 								Config: rkev1.GenericMap{
@@ -496,7 +496,7 @@ func Test_getInstallerImage(t *testing.T) {
 			expected: "test.rancher.io/rancher/system-agent-installer-rke2:v1.25.7-rke2r1",
 			controlPlane: &rkev1.RKEControlPlane{
 				Spec: rkev1.RKEControlPlaneSpec{
-					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
 						MachineGlobalConfig: rkev1.GenericMap{
 							Data: map[string]any{
 								"system-default-registry": "test.rancher.io",
