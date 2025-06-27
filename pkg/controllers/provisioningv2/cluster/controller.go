@@ -490,10 +490,12 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		}
 	}
 
-	spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
-		FQDN:    cluster.Spec.LocalClusterAuthEndpoint.FQDN,
-		CACerts: cluster.Spec.LocalClusterAuthEndpoint.CACerts,
-		Enabled: cluster.Spec.LocalClusterAuthEndpoint.Enabled,
+	if cluster.Spec.LocalClusterAuthEndpoint != nil {
+		spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
+			FQDN:    cluster.Spec.LocalClusterAuthEndpoint.FQDN,
+			CACerts: cluster.Spec.LocalClusterAuthEndpoint.CACerts,
+			Enabled: cluster.Spec.LocalClusterAuthEndpoint.Enabled,
+		}
 	}
 
 	newCluster := &v3.Cluster{
