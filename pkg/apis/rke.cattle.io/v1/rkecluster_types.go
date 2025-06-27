@@ -6,6 +6,27 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+type RKEClusterSpec struct {
+	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
+	// +optional
+	ControlPlaneEndpoint *capi.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
+}
+
+type RKEClusterStatus struct {
+	// Conditions is a representation of the current state of the RKE cluster.
+	// +optional
+	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+
+	// Ready denotes that the RKE cluster infrastructure is fully provisioned.
+	// NOTE:
+	// This field is part of the Cluster API contract, and it is used to
+	// orchestrate provisioning.
+	// The value of this field is never updated after provisioning is completed.
+	// Please use conditions to check the operational state of the cluster.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
@@ -31,24 +52,4 @@ type RKECluster struct {
 	// Status is the observed state of the RKECluster.
 	// +optional
 	Status RKEClusterStatus `json:"status,omitempty"`
-}
-
-type RKEClusterStatus struct {
-	// Conditions is a representation of the current state of the RKE cluster.
-	// +optional
-	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
-
-	// Ready denotes that the RKE cluster infrastructure is fully provisioned.
-	// NOTE:
-	// This field is part of the Cluster API contract, and it is used to
-	// orchestrate provisioning.
-	// The value of this field is never updated after provisioning is completed.
-	// Please use conditions to check the operational state of the cluster.
-	// +optional
-	Ready bool `json:"ready,omitempty"`
-}
-type RKEClusterSpec struct {
-	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
-	// +optional
-	ControlPlaneEndpoint *capi.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
 }
