@@ -196,9 +196,8 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 	}
 
 	// ensure ClusterRole exists with correct updatepsa rules
-	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
 	psaCRWanted := addUpdatepsaClusterRole(projectName)
-	psaCR, err := p.crLister.Get("", psaCRName)
+	psaCR, err := p.crLister.Get("", psaCRWanted.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// create ClusterRole if it doesn't exist
@@ -221,23 +220,27 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 		}
 	}
 
-	// create ClusterRoleBinding to bind the ClusterRole to the user/group
-	psaCRB := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-updatepsa", projectName),
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     psaCRName,
-		},
+	ref := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
+		Kind:     "ClusterRole",
+		Name:     psaCR.Name,
 	}
 
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}
-	psaCRB.Subjects = []rbacv1.Subject{subject}
+
+	psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
+
+	// create ClusterRoleBinding to bind the ClusterRole to the user/group
+	psaCRB := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: psaCRBName,
+		},
+		RoleRef:  ref,
+		Subjects: []rbacv1.Subject{subject},
+	}
 
 	_, err = p.crbClient.Create(psaCRB)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -312,12 +315,21 @@ func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTempla
 		// if ClusterRole is not used by other ClusterRoleBindings:
 		// then delete the ClusterRole
 		// skip the deletion otherwhise
-		psaCRBName := fmt.Sprintf("%s-updatepsa", projectName)
+		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
+		ref := rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     psaCRName,
+		}
+		subject, err := pkgrbac.BuildSubjectFromRTB(binding)
+		if err != nil {
+			return err
+		}
+		psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
 		err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
 		}
-		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
 		isUsed := p.isClusterRoleUsed(psaCRName)
 		if !isUsed {
 			err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})

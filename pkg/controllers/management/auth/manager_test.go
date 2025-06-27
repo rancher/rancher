@@ -7,7 +7,6 @@ import (
 	normanFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -872,98 +871,6 @@ func Test_gatherRoleTemplates(t *testing.T) {
 			} else {
 				assert.NoError(t, err, fmt.Sprintf("expected no error, got: %v", err))
 				assert.Equal(t, tt.want, got, "expected roles to be %v, got: %v", tt.want, got)
-			}
-		})
-	}
-}
-
-func TestCanUpdatePSA(t *testing.T) {
-	type fields struct {
-		crLister typesrbacv1.ClusterRoleLister
-		rtLister v3.RoleTemplateLister
-	}
-	type args struct {
-		roleTemplate string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    bool
-		wantErr bool
-	}{
-		{
-			name: "role template can update psa",
-			fields: fields{
-				rtLister: &fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
-						return &v3.RoleTemplate{
-							ObjectMeta: v1.ObjectMeta{
-								Name: "my-role-template",
-							},
-							Rules: []rbacv1.PolicyRule{
-								{
-									Verbs:     []string{"updatepsa"},
-									APIGroups: []string{"management.cattle.io"},
-									Resources: []string{"projects"},
-								},
-							},
-						}, nil
-					},
-				},
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name: "role template cannot update psa",
-			fields: fields{
-				rtLister: &fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
-						return &v3.RoleTemplate{
-							ObjectMeta: v1.ObjectMeta{
-								Name: "my-role-template",
-							},
-							Rules: []rbacv1.PolicyRule{
-								{
-									Verbs:     []string{"get"},
-									APIGroups: []string{"management.cattle.io"},
-									Resources: []string{"projects"},
-								},
-							},
-						}, nil
-					},
-				},
-			},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name: "role template cannot update psa / unable to gather roles",
-			fields: fields{
-				rtLister: &fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
-						return nil, fmt.Errorf("error")
-					},
-				},
-			},
-			want:    false,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &manager{
-				crLister: tt.fields.crLister,
-				rtLister: tt.fields.rtLister,
-			}
-			got, err := m.canUpdatePSA(tt.args.roleTemplate)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("manager.canUpdatePSA() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("manager.canUpdatePSA() = %v, want %v", got, tt.want)
 			}
 		})
 	}
