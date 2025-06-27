@@ -3,13 +3,44 @@ package v1
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 type ETCDSnapshotS3 struct {
-	Endpoint            string `json:"endpoint,omitempty"`
-	EndpointCA          string `json:"endpointCA,omitempty"`
-	SkipSSLVerify       bool   `json:"skipSSLVerify,omitempty"`
-	Bucket              string `json:"bucket,omitempty"`
-	Region              string `json:"region,omitempty"`
+	// Endpoint is the S3 endpoint used for snapshot operations.
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// EndpointCA is the CA certificate for validating the S3 endpoint.
+	// +optional
+	EndpointCA string `json:"endpointCA,omitempty"`
+
+	// SkipSSLVerify is a flag used to ignore certificate validation errors
+	// when using the configured endpoint.
+	// +optional
+	SkipSSLVerify bool `json:"skipSSLVerify,omitempty"`
+
+	// Bucket is the name of the S3 bucket used for snapshot operations.
+	// +optional
+	Bucket string `json:"bucket,omitempty"`
+
+	// Region is the S3 region used for snapshot operations.
+	// +optional
+	Region string `json:"region,omitempty"`
+
+	// CloudCredentialName is the name of the secret containing the
+	// credentials used to access the S3 bucket.
+	// The secret is expected to have the following keys:
+	// - accessKey [required]
+	// - secretKey [required]
+	// - defaultRegion
+	// - defaultEndpoint
+	// - defaultEndpointCA
+	// - defaultSkipSSLVerify
+	// - defaultBucket
+	// - defaultFolder
+	// +optional
 	CloudCredentialName string `json:"cloudCredentialName,omitempty"`
-	Folder              string `json:"folder,omitempty"`
+
+	// Folder is the name of the S3 folder used for snapshot operations.
+	// +optional
+	Folder string `json:"folder,omitempty"`
 }
 
 // +genclient
