@@ -8,21 +8,55 @@ import (
 )
 
 type RKECommonNodeConfig struct {
-	Labels                    map[string]string `json:"labels,omitempty"`
-	Taints                    []corev1.Taint    `json:"taints,omitempty"`
-	CloudCredentialSecretName string            `json:"cloudCredentialSecretName,omitempty"`
+	// +optional
+	// +nullable
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// +optional
+	// +nullable
+	Taints []corev1.Taint `json:"taints,omitempty"`
+
+	// +optional
+	// +nullable
+	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
 }
 
 type RKEMachineStatus struct {
-	Conditions                []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	JobName                   string                              `json:"jobName,omitempty"`
-	Ready                     bool                                `json:"ready,omitempty"`
-	DriverHash                string                              `json:"driverHash,omitempty"`
-	DriverURL                 string                              `json:"driverUrl,omitempty"`
-	CloudCredentialSecretName string                              `json:"cloudCredentialSecretName,omitempty"`
-	FailureReason             string                              `json:"failureReason,omitempty"`
-	FailureMessage            string                              `json:"failureMessage,omitempty"`
-	Addresses                 []capi.MachineAddress               `json:"addresses,omitempty"`
+	// Conditions is a representation of the machine's current state.
+	// +optional
+	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+
+	// JobName is the name of the provisioning job of the machine.
+	// +optional
+	JobName string `json:"jobName,omitempty"`
+
+	// Ready indicates whether the provider ID has been set in this machine's spec.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// DriverHash is the expected hash of the node driver binary used for provisioning the machine.
+	// +optional
+	DriverHash string `json:"driverHash,omitempty"`
+
+	// DriverURL is the url used to download the node driver binary for provisioning the machine.
+	// +optional
+	DriverURL string `json:"driverUrl,omitempty"`
+
+	// CloudCredentialSecretName is the secret name that was used as a credential to provision the machine.
+	// +optional
+	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
+
+	// FailureReason indicates whether the provisioning job failed on creation or on removal of the machine.
+	// +optional
+	FailureReason string `json:"failureReason,omitempty"`
+
+	// FailureMessage is the container termination message for a provisioning job that failed.
+	// +optional
+	FailureMessage string `json:"failureMessage,omitempty"`
+
+	// Addresses are the machine network addresses. Assigned by the CAPI controller.
+	// +optional
+	Addresses []capi.MachineAddress `json:"addresses,omitempty"`
 }
 
 // +genclient

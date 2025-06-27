@@ -1,0 +1,181 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: samples.rke-machine.cattle.io
+spec:
+  group: rke-machine.cattle.io
+  names:
+    kind: Sample
+    listKind: SampleList
+    plural: samples
+    singular: sample
+  scope: Namespaced
+  versions:
+  - name: sample
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              common:
+                description: Generic machine configuration.
+                properties:
+                  cloudCredentialSecretName:
+                    nullable: true
+                    type: string
+                  labels:
+                    additionalProperties:
+                      type: string
+                    nullable: true
+                    type: object
+                  taints:
+                    items:
+                      description: |-
+                        The node this Taint is attached to has the "effect" on
+                        any pod that does not tolerate the Taint.
+                      properties:
+                        effect:
+                          description: |-
+                            Required. The effect of the taint on pods
+                            that do not tolerate the taint.
+                            Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
+                          type: string
+                        key:
+                          description: Required. The taint key to be applied to a
+                            node.
+                          type: string
+                        timeAdded:
+                          description: |-
+                            TimeAdded represents the time at which the taint was added.
+                            It is only written for NoExecute taints.
+                          format: date-time
+                          type: string
+                        value:
+                          description: The taint value corresponding to the taint
+                            key.
+                          type: string
+                      required:
+                      - effect
+                      - key
+                      type: object
+                    nullable: true
+                    type: array
+                type: object
+            required:
+            - common
+            type: object
+          status:
+            description: Observed status of the Machine.
+            properties:
+              addresses:
+                description: Addresses are the machine network addresses. Assigned
+                  by the CAPI controller.
+                items:
+                  description: MachineAddress contains information for the node's
+                    address.
+                  properties:
+                    address:
+                      description: address is the machine address.
+                      maxLength: 256
+                      minLength: 1
+                      type: string
+                    type:
+                      description: type is the machine address type, one of Hostname,
+                        ExternalIP, InternalIP, ExternalDNS or InternalDNS.
+                      enum:
+                      - Hostname
+                      - ExternalIP
+                      - InternalIP
+                      - ExternalDNS
+                      - InternalDNS
+                      type: string
+                  required:
+                  - address
+                  - type
+                  type: object
+                type: array
+              cloudCredentialSecretName:
+                description: CloudCredentialSecretName is the secret name that was
+                  used as a credential to provision the machine.
+                type: string
+              conditions:
+                description: Conditions is a representation of the machine's current
+                  state.
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of cluster condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              driverHash:
+                description: DriverHash is the expected hash of the node driver binary
+                  used for provisioning the machine.
+                type: string
+              driverUrl:
+                description: DriverURL is the url used to download the node driver
+                  binary for provisioning the machine.
+                type: string
+              failureMessage:
+                description: FailureMessage is the container termination message for
+                  a provisioning job that failed.
+                type: string
+              failureReason:
+                description: FailureReason indicates whether the provisioning job
+                  failed on creation or on removal of the machine.
+                type: string
+              jobName:
+                description: JobName is the name of the provisioning job of the machine.
+                type: string
+              ready:
+                description: Ready indicates whether the provider ID has been set
+                  in this machine's spec.
+                type: boolean
+            type: object
+        required:
+        - metadata
+        - spec
+        - status
+        type: object
+    served: true
+    storage: true
