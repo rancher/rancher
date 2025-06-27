@@ -4,17 +4,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient
-// +kubebuilder:skipversion
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type RKEBootstrap struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RKEBootstrapSpec   `json:"spec"`
-	Status            RKEBootstrapStatus `json:"status,omitempty"`
-}
-
 type RKEBootstrapSpec struct {
 	ClusterName string `json:"clusterName,omitempty"`
 }
@@ -32,13 +21,24 @@ type RKEBootstrapStatus struct {
 // +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type RKEBootstrapTemplate struct {
+type RKEBootstrap struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RKEBootstrapTemplateSpec `json:"spec" wrangler:"required"`
+	Spec              RKEBootstrapSpec   `json:"spec"`
+	Status            RKEBootstrapStatus `json:"status,omitempty"`
 }
 
 type RKEBootstrapTemplateSpec struct {
 	ClusterName string       `json:"clusterName,omitempty"`
 	Template    RKEBootstrap `json:"template,omitempty" wrangler:"required"`
+}
+
+// +genclient
+// +kubebuilder:skipversion
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type RKEBootstrapTemplate struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              RKEBootstrapTemplateSpec `json:"spec" wrangler:"required"`
 }
