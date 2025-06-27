@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.23.4
 
-toolchain go1.23.7
+toolchain go1.23.10
 
 replace (
 	k8s.io/api => k8s.io/api v0.32.2
