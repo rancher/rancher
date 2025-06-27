@@ -315,12 +315,21 @@ func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTempla
 		// if ClusterRole is not used by other ClusterRoleBindings:
 		// then delete the ClusterRole
 		// skip the deletion otherwhise
-		psaCRBName := fmt.Sprintf("%s-updatepsa", projectName)
+		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
+		ref := rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     psaCRName,
+		}
+		subject, err := pkgrbac.BuildSubjectFromRTB(binding)
+		if err != nil {
+			return err
+		}
+		psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
 		err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
 		}
-		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
 		isUsed := p.isClusterRoleUsed(psaCRName)
 		if !isUsed {
 			err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})
