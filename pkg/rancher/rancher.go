@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/rancher/rancher/pkg/scc"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -18,12 +19,14 @@ import (
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
+	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	auditlogcontroller "github.com/rancher/rancher/pkg/controllers/auditlog/auditpolicy"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
@@ -36,6 +39,7 @@ import (
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/generated/controllers/auditlog.cattle.io"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
@@ -56,6 +60,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/unstructured"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"gopkg.in/natefinch/lumberjack.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -90,19 +95,19 @@ type Options struct {
 	AuditLogMaxage                 int
 	AuditLogMaxsize                int
 	AuditLogMaxbackup              int
-	AuditLevel                     int
+	AuditLogLevel                  int
+	AuditLogEnabled                bool
 	Features                       string
 	ClusterRegistry                string
 	AggregationRegistrationTimeout time.Duration
 }
 
 type Rancher struct {
-	Auth     steveauth.Middleware
-	Handler  http.Handler
-	Wrangler *wrangler.Context
-	Steve    *steveserver.Server
-
-	auditLog   *audit.LogWriter
+	Auth       steveauth.Middleware
+	Handler    http.Handler
+	Wrangler   *wrangler.Context
+	Steve      *steveserver.Server
+	auditLog   *audit.Writer
 	authServer *auth.Server
 	opts       *Options
 
@@ -286,11 +291,34 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, audit.Level(opts.AuditLevel), opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
-	auditFilter, err := audit.NewAuditLogMiddleware(auditLogWriter)
-	if err != nil {
-		return nil, err
+	var auditLogWriter *audit.Writer
+
+	if opts.AuditLogEnabled {
+		out := &lumberjack.Logger{
+			Filename:   opts.AuditLogPath,
+			MaxAge:     opts.AuditLogMaxage,
+			MaxBackups: opts.AuditLogMaxbackup,
+			MaxSize:    opts.AuditLogMaxsize,
+		}
+		defer out.Close()
+
+		auditLogWriter, err = audit.NewWriter(out, audit.WriterOptions{
+			DefaultPolicyLevel:     auditlogv1.Level(opts.AuditLogLevel),
+			DisableDefaultPolicies: !opts.AuditLogEnabled,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create audit log writer: %w", err)
+		}
 	}
+
+	if opts.AuditLogEnabled {
+		auditController := auditlog.New(wranglerContext.SharedControllerFactory)
+		if err := auditlogcontroller.Register(ctx, auditLogWriter, auditController); err != nil {
+			return nil, fmt.Errorf("failed to register audit log controller: %w", err)
+		}
+	}
+
+	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
 	wranglerContext.OnLeader(func(ctx context.Context) error {
