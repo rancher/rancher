@@ -118,9 +118,8 @@ type DrainOptions struct {
 	// If there are DaemonSet-managed pods, drain will not proceed without
 	// IgnoreDaemonSets set to true (even when set to true, kubectl won't
 	// delete pods - so setting default to true).
-	// +kubebuilder:default=true
 	// +optional
-	IgnoreDaemonSets bool `json:"ignoreDaemonSets,omitempty"`
+	IgnoreDaemonSets *bool `json:"ignoreDaemonSets,omitempty"`
 
 	// IgnoreErrors Ignore errors occurred between drain nodes in group
 	// NOTE: currently unimplemented
