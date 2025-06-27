@@ -533,6 +533,10 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 		return nil, err
 	}
 	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()
+	localClusterAuthEndpoint := rkev1.LocalClusterAuthEndpoint{}
+	if cluster.Spec.LocalClusterAuthEndpoint != nil {
+		localClusterAuthEndpoint = *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy()
+	}
 	return &rkev1.RKEControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -546,7 +550,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
 			ClusterConfiguration:     rkeConfig.ClusterConfiguration,
-			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
+			LocalClusterAuthEndpoint: localClusterAuthEndpoint,
 			ETCDSnapshotRestore:      rkeConfig.ETCDSnapshotRestore,
 			ETCDSnapshotCreate:       rkeConfig.ETCDSnapshotCreate,
 			RotateCertificates:       rkeConfig.RotateCertificates,
