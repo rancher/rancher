@@ -25,7 +25,7 @@ type DataDirectories struct {
 	K8sDistro string `json:"k8sDistro,omitempty"`
 }
 
-type RKEClusterSpecCommon struct {
+type ClusterConfiguration struct {
 	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
 	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
 	MachineGlobalConfig   GenericMap             `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`

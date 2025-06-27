@@ -71,7 +71,7 @@ type RKEMachinePoolRollingUpdate struct {
 // operations using the new fields will cause unnecessary plan thrashing.
 
 type RKEConfig struct {
-	rkev1.RKEClusterSpecCommon
+	rkev1.ClusterConfiguration
 
 	ETCDSnapshotCreate   *rkev1.ETCDSnapshotCreate   `json:"etcdSnapshotCreate,omitempty"`
 	ETCDSnapshotRestore  *rkev1.ETCDSnapshotRestore  `json:"etcdSnapshotRestore,omitempty"`
