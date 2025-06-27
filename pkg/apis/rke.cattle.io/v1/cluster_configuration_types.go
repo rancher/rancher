@@ -135,6 +135,25 @@ type RegistryConfig struct {
 	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
 }
 
+type ETCD struct {
+	// DisableSnapshots disables the creation of snapshots for the cluster.
+	// +optional
+	DisableSnapshots bool `json:"disableSnapshots,omitempty"`
+
+	// SnapshotScheduleCron is the cron schedule for the snapshot creation.
+	// +optional
+	SnapshotScheduleCron string `json:"snapshotScheduleCron,omitempty"`
+
+	// SnapshotRetention is the number of snapshots the downstream cluster
+	// should retain per snapshot generation.
+	// +optional
+	SnapshotRetention int `json:"snapshotRetention,omitempty"`
+
+	// S3 defines the S3 configuration for the cluster if enabled.
+	// +optional
+	S3 *ETCDSnapshotS3 `json:"s3,omitempty"`
+}
+
 // Networking contains information regarding the desired and actual networking stack of the cluster.
 type Networking struct {
 	// Specifies which networking stack to prefer for external cluster communication. In practice, this is used by the
