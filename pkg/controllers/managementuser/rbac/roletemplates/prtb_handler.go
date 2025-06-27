@@ -272,12 +272,30 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 		Name:            prtb.ProjectName,
 		ResourceRequest: true,
 	}
+	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
 	if rbacAuth.RulesAllow(psaRec, cr.Rules...) {
-		namespacePSACR, err := rbac.BuildClusterRoleBindingFromRTB(prtb, namespacePSA)
+		psaCR := rbac.BuildClusterRole(psaCRName, prtb.UserName, []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{management.GroupName},
+				Verbs:         []string{"updatepsa"},
+				Resources:     []string{v3.ProjectResourceName},
+				ResourceNames: []string{projectName},
+			},
+		})
+		cr, err := p.crClient.Create(psaCR)
+		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				fmt.Printf("======================== error creating CR %s: %v \n", psaCR.Name, err)
+			}
+			return nil, err
+		}
+		fmt.Println("=========================================")
+		fmt.Println(cr)
+		namespacePSACRB, err := rbac.BuildClusterRoleBindingFromRTB(prtb, psaCR.Name)
 		if err != nil {
 			return nil, err
 		}
-		neededCRBs = append(neededCRBs, namespacePSACR)
+		neededCRBs = append(neededCRBs, namespacePSACRB)
 	}
 
 	if len(neededCRBs) > 0 {
