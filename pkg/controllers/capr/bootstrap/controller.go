@@ -226,10 +226,10 @@ func (h *handler) getEnvVars(controlPlane *rkev1.RKEControlPlane) ([]corev1.EnvV
 			Value: env.Value,
 		})
 	}
-	if dir := controlPlane.Spec.DataDirectories.SystemAgent; dir != "" {
+	if controlPlane.Spec.DataDirectories != nil && controlPlane.Spec.DataDirectories.SystemAgent != "" {
 		result = append(result, corev1.EnvVar{
 			Name:  capr.SystemAgentDataDirEnvVar,
-			Value: dir,
+			Value: controlPlane.Spec.DataDirectories.SystemAgent,
 		})
 	}
 

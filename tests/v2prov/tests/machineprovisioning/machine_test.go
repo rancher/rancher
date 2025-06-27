@@ -459,7 +459,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 	defer clients.Close()
 
 	drainOpt := rkev1.DrainOptions{
-		IgnoreDaemonSets:                &[]bool{true}[0],
+		IgnoreDaemonSets:                true,
 		DeleteEmptyDirData:              true,
 		Enabled:                         true,
 		Force:                           true,

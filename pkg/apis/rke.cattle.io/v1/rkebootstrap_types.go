@@ -11,8 +11,9 @@ import (
 type RKEBootstrap struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RKEBootstrapSpec   `json:"spec"`
-	Status            RKEBootstrapStatus `json:"status,omitempty"`
+
+	Spec   RKEBootstrapSpec   `json:"spec"`
+	Status RKEBootstrapStatus `json:"status,omitempty"`
 }
 
 type RKEBootstrapSpec struct {
@@ -35,7 +36,8 @@ type RKEBootstrapStatus struct {
 type RKEBootstrapTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RKEBootstrapTemplateSpec `json:"spec" wrangler:"required"`
+
+	Spec RKEBootstrapTemplateSpec `json:"spec" wrangler:"required"`
 }
 
 type RKEBootstrapTemplateSpec struct {

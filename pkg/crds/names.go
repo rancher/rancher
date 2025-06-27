@@ -77,7 +77,6 @@ func CAPICRDs() []string {
 // RKE2CRDs returns a list of CRD names needed for RKE2.
 func RKE2CRDs() []string {
 	return []string{
-		"clusters.provisioning.cattle.io",
 		"custommachines.rke.cattle.io",
 		"etcdsnapshots.rke.cattle.io",
 		"rkebootstraps.rke.cattle.io",
@@ -211,7 +210,7 @@ var MigratedResources = map[string]bool{
 	"clusterroletemplatebindings.management.cattle.io":                true,
 	"clusters.cluster.x-k8s.io":                                       false,
 	"clusters.management.cattle.io":                                   false,
-	"clusters.provisioning.cattle.io":                                 false,
+	"clusters.provisioning.cattle.io":                                 true,
 	"clustertemplaterevisions.management.cattle.io":                   false,
 	"clustertemplates.management.cattle.io":                           false,
 	"clusteruserattributes.cluster.cattle.io":                         false,
@@ -260,7 +259,7 @@ var MigratedResources = map[string]bool{
 	"rkebootstraps.rke.cattle.io":                                     false,
 	"rkebootstraptemplates.rke.cattle.io":                             false,
 	"rkeclusters.rke.cattle.io":                                       false,
-	"rkecontrolplanes.rke.cattle.io":                                  false,
+	"rkecontrolplanes.rke.cattle.io":                                  true,
 	"rkek8sserviceoptions.management.cattle.io":                       false,
 	"rkek8ssystemimages.management.cattle.io":                         false,
 	"roletemplates.management.cattle.io":                              true,

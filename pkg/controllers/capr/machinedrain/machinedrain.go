@@ -198,7 +198,7 @@ func (h *handler) getHelper(machine *capi.Machine, drainOpts rkev1.DrainOptions)
 		Client:                          k8s,
 		Force:                           drainOpts.Force,
 		GracePeriodSeconds:              drainOpts.GracePeriod,
-		IgnoreAllDaemonSets:             drainOpts.IgnoreDaemonSets == nil || *drainOpts.IgnoreDaemonSets,
+		IgnoreAllDaemonSets:             drainOpts.IgnoreDaemonSets,
 		Timeout:                         time.Duration(timeout) * time.Second,
 		DeleteEmptyDirData:              drainOpts.DeleteEmptyDirData,
 		DisableEviction:                 drainOpts.DisableEviction,
