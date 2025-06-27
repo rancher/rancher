@@ -57,7 +57,6 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	wr := &wrapWriter{
 		next: rw,
 
-		// headers:    rw.Header(),
 		statusCode: http.StatusOK,
 	}
 	h.next.ServeHTTP(wr, req)
@@ -86,7 +85,6 @@ type wrapWriter struct {
 	next http.ResponseWriter
 
 	wroteHeader bool
-	// headers     http.Header
 
 	wroteBody bool
 	buf       bytes.Buffer
@@ -95,12 +93,6 @@ type wrapWriter struct {
 }
 
 func (w *wrapWriter) Header() http.Header {
-	// if w.wroteHeader || w.wroteBody {
-	// 	return maps.Clone(w.headers)
-	// }
-	//
-	// return w.headers
-
 	return w.next.Header()
 }
 
@@ -138,7 +130,6 @@ func (w *wrapWriter) Flush() {
 }
 
 func (w *wrapWriter) Apply() {
-	// maps.Copy(w.next.Header(), w.headers)
 	w.next.WriteHeader(w.statusCode)
 	w.next.Write(w.buf.Bytes())
 }
