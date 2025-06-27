@@ -4,27 +4,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Networking contains information regarding the desired and actual networking stack of the cluster.
-type Networking struct {
-	// Specifies which networking stack to prefer for external cluster communication. In practice, this is used by the
-	// planner to render the various probes to force IPv4, IPv6, or default to localhost. There is currently no
-	// sanitization or validation as cluster configuration can be specified with machineGlobalConfig and
-	// machineSelectorConfig, which although easy to instrument to determine a potential interface, user defined
-	// configuration can be specified in the `/etc/rancher/<rke2/k3s>/config.yaml.d` directory either manually or via
-	// cloud-init, and there is currently no mechanism to extract the completely rendered configuration via the planner
-	// nor various engines themselves.
-	StackPreference NetworkingStackPreference `json:"stackPreference,omitempty"`
-}
-
-type DataDirectories struct {
-	// Data directory for the system-agent connection info and plans
-	SystemAgent string `json:"systemAgent,omitempty"`
-	// Data directory for provisioning related files (idempotency)
-	Provisioning string `json:"provisioning,omitempty"`
-	// Data directory for the k8s distro
-	K8sDistro string `json:"k8sDistro,omitempty"`
-}
-
 type ClusterConfiguration struct {
 	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
 	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
@@ -43,16 +22,6 @@ type ClusterConfiguration struct {
 
 	// Increment to force all nodes to re-provision
 	ProvisionGeneration int `json:"provisionGeneration,omitempty"`
-}
-
-type RKESystemConfig struct {
-	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
-	Config               GenericMap            `json:"config,omitempty" wrangler:"nullable"`
-}
-
-type RKEProvisioningFiles struct {
-	MachineLabelSelector *metav1.LabelSelector    `json:"machineLabelSelector,omitempty"`
-	FileSources          []ProvisioningFileSource `json:"fileSources,omitempty"`
 }
 
 type ClusterUpgradeStrategy struct {
@@ -102,6 +71,16 @@ type DrainHook struct {
 	Annotation string `json:"annotation,omitempty"`
 }
 
+type RKESystemConfig struct {
+	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
+	Config               GenericMap            `json:"config,omitempty" wrangler:"nullable"`
+}
+
+type RKEProvisioningFiles struct {
+	MachineLabelSelector *metav1.LabelSelector    `json:"machineLabelSelector,omitempty"`
+	FileSources          []ProvisioningFileSource `json:"fileSources,omitempty"`
+}
+
 type ProvisioningFileSource struct {
 	Secret    K8sObjectFileSource `json:"secret,omitempty"`
 	ConfigMap K8sObjectFileSource `json:"configMap,omitempty"`
@@ -119,4 +98,25 @@ type KeyToPath struct {
 	Dynamic     bool   `json:"dynamic,omitempty"`
 	Permissions string `json:"permissions,omitempty"`
 	Hash        string `json:"hash,omitempty"`
+}
+
+// Networking contains information regarding the desired and actual networking stack of the cluster.
+type Networking struct {
+	// Specifies which networking stack to prefer for external cluster communication. In practice, this is used by the
+	// planner to render the various probes to force IPv4, IPv6, or default to localhost. There is currently no
+	// sanitization or validation as cluster configuration can be specified with machineGlobalConfig and
+	// machineSelectorConfig, which although easy to instrument to determine a potential interface, user defined
+	// configuration can be specified in the `/etc/rancher/<rke2/k3s>/config.yaml.d` directory either manually or via
+	// cloud-init, and there is currently no mechanism to extract the completely rendered configuration via the planner
+	// nor various engines themselves.
+	StackPreference NetworkingStackPreference `json:"stackPreference,omitempty"`
+}
+
+type DataDirectories struct {
+	// Data directory for the system-agent connection info and plans
+	SystemAgent string `json:"systemAgent,omitempty"`
+	// Data directory for provisioning related files (idempotency)
+	Provisioning string `json:"provisioning,omitempty"`
+	// Data directory for the k8s distro
+	K8sDistro string `json:"k8sDistro,omitempty"`
 }
