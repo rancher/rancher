@@ -114,6 +114,7 @@ type Store struct {
 	tokens              ctrlv3.TokenClient
 	userCache           ctrlv3.UserCache
 	userMgr             userManager
+	getCACert           func() string
 	getDefaultTTL       func() (*int64, error)
 	getServerURL        func() string
 	shouldGenerateToken func() bool
@@ -134,8 +135,9 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, us
 		userCache:       wranglerContext.Mgmt.User().Cache(),
 		userMgr:         userMgr,
 		authorizer:      authorizer,
-		getServerURL:    settings.ServerURL.Get,
+		getCACert:       settings.CACerts.Get,
 		getDefaultTTL:   tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds,
+		getServerURL:    settings.ServerURL.Get,
 		shouldGenerateToken: func() bool {
 			return strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
 		},
@@ -425,7 +427,7 @@ func (s *Store) Create(
 		return ref, nil
 	}
 
-	caCert := kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(settings.CACerts.Get())))
+	caCert := kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(s.getCACert())))
 	data := kconfig.KubeConfig{
 		Meta: kconfig.Meta{
 			Name:              kubeConfigID,
