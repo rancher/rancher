@@ -67,7 +67,7 @@ func TestParseKubeAPIServerArgs(t *testing.T) {
 			cluster := &provisioningv1.Cluster{
 				Spec: provisioningv1.ClusterSpec{
 					RKEConfig: &provisioningv1.RKEConfig{
-						RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+						ClusterConfiguration: rkev1.ClusterConfiguration{
 							MachineGlobalConfig: rkev1.GenericMap{
 								Data: make(map[string]any),
 							},

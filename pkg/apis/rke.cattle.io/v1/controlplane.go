@@ -17,7 +17,7 @@ type RKEControlPlane struct {
 }
 
 type RKEControlPlaneSpec struct {
-	RKEClusterSpecCommon
+	ClusterConfiguration
 
 	AgentEnvVars             []EnvVar                 `json:"agentEnvVars,omitempty"`
 	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint"`
