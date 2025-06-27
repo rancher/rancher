@@ -6,6 +6,16 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+type RKEClusterSpec struct {
+	// Not used in anyway, just here to make cluster-api happy
+	ControlPlaneEndpoint *capi.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
+}
+
+type RKEClusterStatus struct {
+	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+	Ready      bool                                `json:"ready,omitempty"`
+}
+
 // +genclient
 // +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -15,13 +25,4 @@ type RKECluster struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              RKEClusterSpec   `json:"spec"`
 	Status            RKEClusterStatus `json:"status,omitempty"`
-}
-
-type RKEClusterStatus struct {
-	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	Ready      bool                                `json:"ready,omitempty"`
-}
-type RKEClusterSpec struct {
-	// Not used in anyway, just here to make cluster-api happy
-	ControlPlaneEndpoint *capi.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
 }
