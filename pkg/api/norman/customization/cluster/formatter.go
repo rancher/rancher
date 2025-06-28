@@ -5,11 +5,8 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/values"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -20,7 +17,6 @@ type Formatter struct {
 	KontainerDriverLister     v3.KontainerDriverLister
 	nodeLister                v3.NodeLister
 	clusterLister             v3.ClusterLister
-	clusterSpecPwdFields      map[string]interface{}
 	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
 }
 
@@ -29,7 +25,6 @@ func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContex
 		KontainerDriverLister:     managementContext.Management.KontainerDrivers("").Controller().Lister(),
 		nodeLister:                managementContext.Management.Nodes("").Controller().Lister(),
 		clusterLister:             managementContext.Management.Clusters("").Controller().Lister(),
-		clusterSpecPwdFields:      gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
 		SubjectAccessReviewClient: managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 	}
 	return &clusterFormatter
@@ -71,49 +66,12 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		setIntIfNil(configMap, "nodeVolumeSize", 20)
 	}
 
-	if clusterTemplateAnswers, ok := resource.Values["answers"]; ok {
-		answerMap := convert.ToMapInterface(convert.ToMapInterface(clusterTemplateAnswers)["values"])
-		hideClusterTemplateAnswers(answerMap, f.clusterSpecPwdFields)
-
-		appliedAnswers := values.GetValueN(resource.Values, "appliedSpec", "answers")
-
-		if appliedAnswers != nil {
-			appliedAnswerMap := convert.ToMapInterface(convert.ToMapInterface(appliedAnswers)["values"])
-			hideClusterTemplateAnswers(appliedAnswerMap, f.clusterSpecPwdFields)
-		}
-
-		failedAnswers := values.GetValueN(resource.Values, "failedSpec", "answers")
-
-		if failedAnswers != nil {
-			failedAnswerMap := convert.ToMapInterface(convert.ToMapInterface(failedAnswers)["values"])
-			hideClusterTemplateAnswers(failedAnswerMap, f.clusterSpecPwdFields)
-		}
-	}
-
 	nodes, err := f.nodeLister.List(resource.ID, labels.Everything())
 	if err != nil {
 		logrus.Warnf("error getting node list for cluster %s: %s", resource.ID, err)
 	} else {
 		resource.Values["nodeCount"] = len(nodes)
 	}
-}
-
-// rotateEncryptionKeyEnabled returns true if the rotateEncryptionKey action should be enabled in the API view, otherwise, it returns false.
-func rotateEncryptionKeyEnabled(clusterLister v3.ClusterLister, clusterName string) bool {
-	cluster, err := clusterLister.Get("", clusterName)
-	if err != nil {
-		return false
-	}
-
-	// check that encryption is enabled on cluster
-	if cluster.Spec.RancherKubernetesEngineConfig == nil ||
-		cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig == nil ||
-		!cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.Enabled {
-		return false
-	}
-
-	// Cluster should not be in updating
-	return v32.ClusterConditionUpdated.IsTrue(cluster)
 }
 
 func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
@@ -128,42 +86,6 @@ func setIntIfNil(configMap map[string]interface{}, fieldName string, replaceVal 
 	}
 }
 
-func hideClusterTemplateAnswers(answerMap map[string]interface{}, clusterSpecPwdFields map[string]interface{}) {
-	for key := range answerMap {
-		pwdVal := values.GetValueN(clusterSpecPwdFields, strings.Split(key, ".")...)
-		if pwdVal != nil {
-			//hide this answer
-			delete(answerMap, key)
-		}
-	}
-}
-
 func (f *Formatter) CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
 	collection.AddAction(request, "createFromTemplate")
-}
-
-func gatherClusterSpecPwdFields(schemas *types.Schemas, schema *types.Schema) map[string]interface{} {
-
-	data := map[string]interface{}{}
-
-	for name, field := range schema.ResourceFields {
-		fieldType := field.Type
-		if strings.HasPrefix(fieldType, "array") {
-			fieldType = strings.Split(fieldType, "[")[1]
-			fieldType = fieldType[:len(fieldType)-1]
-		}
-		subSchema := schemas.Schema(&managementschema.Version, fieldType)
-		if subSchema != nil {
-			value := gatherClusterSpecPwdFields(schemas, subSchema)
-			if len(value) > 0 {
-				data[name] = value
-			}
-		} else {
-			if field.Type == "password" {
-				data[name] = "true"
-			}
-		}
-	}
-
-	return data
 }

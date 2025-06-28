@@ -13,25 +13,20 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
-	"github.com/rancher/rancher/pkg/namespace"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/settings"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Validator struct {
-	ClusterClient                 v3.ClusterInterface
-	ClusterLister                 v3.ClusterLister
-	ClusterTemplateLister         v3.ClusterTemplateLister
-	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
-	Users                         v3.UserInterface
-	GrbLister                     v3.GlobalRoleBindingLister
-	GrLister                      v3.GlobalRoleLister
+	ClusterClient v3.ClusterInterface
+	ClusterLister v3.ClusterLister
+	Users         v3.UserInterface
+	GrbLister     v3.GlobalRoleBindingLister
+	GrLister      v3.GlobalRoleLister
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -43,10 +38,6 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 
 	if err := convert.ToObj(data, &clientClusterSpec); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Client cluster spec conversion error")
-	}
-
-	if err := v.validateEnforcement(request, data); err != nil {
-		return err
 	}
 
 	if err := v.validateLocalClusterAuthEndpoint(request, &clusterSpec); err != nil {
@@ -78,73 +69,24 @@ func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, 
 	}
 
 	var isValidCluster bool
-	if request.ID == "" {
-		isValidCluster = spec.RancherKubernetesEngineConfig != nil
-	} else {
+
+	if request.ID != "" {
 		cluster, err := v.ClusterLister.Get("", request.ID)
 		if err != nil {
 			return err
 		}
 		isValidCluster = cluster.Status.Driver == "" ||
-			cluster.Status.Driver == v32.ClusterDriverRKE ||
 			cluster.Status.Driver == v32.ClusterDriverImported ||
 			cluster.Status.Driver == v32.ClusterDriverK3s ||
 			cluster.Status.Driver == v32.ClusterDriverRke2
 	}
+
 	if !isValidCluster {
-		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE, RKE2, or K3s")
+		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE2, or K3s")
 	}
 
 	if spec.LocalClusterAuthEndpoint.CACerts != "" && spec.LocalClusterAuthEndpoint.FQDN == "" {
 		return httperror.NewFieldAPIError(httperror.MissingRequired, "LocalClusterAuthEndpoint.FQDN", "CACerts defined but FQDN is not defined")
-	}
-
-	return nil
-}
-
-func (v *Validator) validateEnforcement(request *types.APIContext, data map[string]interface{}) error {
-
-	if !strings.EqualFold(settings.ClusterTemplateEnforcement.Get(), "true") {
-		return nil
-	}
-
-	var spec mgmtclient.Cluster
-	if err := convert.ToObj(data, &spec); err != nil {
-		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Cluster spec conversion error")
-	}
-
-	if !v.checkClusterForEnforcement(&spec) {
-		return nil
-	}
-
-	ma := gaccess.MemberAccess{
-		Users:     v.Users,
-		GrLister:  v.GrLister,
-		GrbLister: v.GrbLister,
-	}
-
-	// if user is admin, no checks needed
-	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
-
-	isAdmin, err := ma.IsAdmin(callerID)
-	if err != nil {
-		return err
-	}
-	if isAdmin {
-		return nil
-	}
-
-	// enforcement is true, template is a must
-	if spec.ClusterTemplateRevisionID == "" {
-		return httperror.NewFieldAPIError(httperror.MissingRequired, "", "A clusterTemplateRevision to create a cluster")
-	}
-
-	err = v.accessTemplate(request, &spec)
-	if err != nil {
-		if httperror.IsForbidden(err) || httperror.IsNotFound(err) {
-			return httperror.NewAPIError(httperror.NotFound, "The clusterTemplateRevision is not found")
-		}
-		return err
 	}
 
 	return nil
@@ -187,32 +129,6 @@ func (v *Validator) validateK3sBasedVersionUpgrade(request *types.APIContext, sp
 	}
 
 	return nil
-}
-
-func (v *Validator) checkClusterForEnforcement(spec *mgmtclient.Cluster) bool {
-	if spec.RancherKubernetesEngineConfig != nil {
-		return true
-	}
-
-	if spec.ClusterTemplateRevisionID != "" {
-		return true
-	}
-	return false
-}
-
-func (v *Validator) accessTemplate(request *types.APIContext, spec *mgmtclient.Cluster) error {
-	split := strings.SplitN(spec.ClusterTemplateRevisionID, ":", 2)
-	if len(split) != 2 {
-		return fmt.Errorf("error in splitting clusterTemplateRevision name %v", spec.ClusterTemplateRevisionID)
-	}
-	revName := split[1]
-	clusterTempRev, err := v.ClusterTemplateRevisionLister.Get(namespace.GlobalNamespace, revName)
-	if err != nil {
-		return err
-	}
-
-	var ctMap map[string]interface{}
-	return access.ByID(request, &mgmtSchema.Version, mgmtclient.ClusterTemplateType, clusterTempRev.Spec.ClusterTemplateName, &ctMap)
 }
 
 // validateGenericEngineConfig allows for additional validation of clusters that depend on Kontainer Engine or Rancher Machine driver

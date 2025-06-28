@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -12,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+const ownerBindingsAnno = "ownerBindingsCreated"
 
 func validMachineConfigGVK(gvk schema.GroupVersionKind) bool {
 	return gvk.Group == "rke-machine-config.cattle.io" &&
@@ -32,7 +33,7 @@ func (h *handler) OnMachineConfigChange(obj runtime.Object) (runtime.Object, err
 	// if owner bindings annotation is present, the node template is in the proper namespace and has had
 	// its creator rolebindings created
 	annotations := objMeta.GetAnnotations()
-	if annotations != nil && annotations[nodetemplate.OwnerBindingsAnno] == "true" {
+	if annotations != nil && annotations[ownerBindingsAnno] == "true" {
 		return obj, nil
 	}
 
@@ -68,7 +69,7 @@ func (h *handler) OnMachineConfigChange(obj runtime.Object) (runtime.Object, err
 
 	anns := objData.Map("metadata", "annotations")
 	// owner bindings annotation is meant to prevent bindings from being created again if they have been removed from creator
-	anns[nodetemplate.OwnerBindingsAnno] = "true"
+	anns[ownerBindingsAnno] = "true"
 	objData.SetNested(anns, "metadata", "annotations")
 
 	if _, err = h.dynamic.Update(&unstructured.Unstructured{Object: objData}); err != nil {

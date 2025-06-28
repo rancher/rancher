@@ -20,31 +20,19 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 )
 
 type Store struct {
 	types.Store
-	ShellHandler                  types.RequestHandler
-	mu                            sync.Mutex
-	KontainerDriverLister         v3.KontainerDriverLister
-	ClusterTemplateLister         v3.ClusterTemplateLister
-	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
-	NodeLister                    v3.NodeLister
-	ClusterLister                 v3.ClusterLister
-	DialerFactory                 dialer.Factory
-	ClusterClient                 dynamic.ResourceInterface
-	SecretClient                  v1.SecretInterface
-	SecretLister                  v1.SecretLister
-	secretMigrator                *secretmigrator.Migrator
+	ShellHandler          types.RequestHandler
+	mu                    sync.Mutex
+	KontainerDriverLister v3.KontainerDriverLister
+	ClusterClient         dynamic.ResourceInterface
 }
 
 type transformer struct {
@@ -52,7 +40,6 @@ type transformer struct {
 }
 
 func (t *transformer) TransformerFunc(_ *types.APIContext, _ *types.Schema, data map[string]interface{}, _ *types.QueryOptions) (map[string]interface{}, error) {
-	data = transformSetNilSnapshotFalse(data)
 	return t.transposeGenericConfigToDynamicField(data)
 }
 
@@ -109,19 +96,9 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 	}
 
 	s := &Store{
-		Store:                         t,
-		KontainerDriverLister:         mgmt.Management.KontainerDrivers("").Controller().Lister(),
-		ShellHandler:                  linkHandler.LinkHandler,
-		ClusterTemplateLister:         mgmt.Management.ClusterTemplates("").Controller().Lister(),
-		ClusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions("").Controller().Lister(),
-		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
-		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
-		DialerFactory:                 mgmt.Dialer,
-		SecretLister:                  mgmt.Core.Secrets("").Controller().Lister(),
-		secretMigrator: secretmigrator.NewMigrator(
-			mgmt.Core.Secrets("").Controller().Lister(),
-			mgmt.Core.Secrets(""),
-		),
+		Store:                 t,
+		KontainerDriverLister: mgmt.Management.KontainerDrivers("").Controller().Lister(),
+		ShellHandler:          linkHandler.LinkHandler,
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(&mgmt.RESTConfig)
@@ -135,33 +112,6 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 	return s
 }
 
-func transformSetNilSnapshotFalse(data map[string]interface{}) map[string]interface{} {
-	var (
-		etcd  interface{}
-		found bool
-	)
-
-	etcd, found = values.GetValue(data, "appliedSpec", "rancherKubernetesEngineConfig", "services", "etcd")
-	if found {
-		etcd := convert.ToMapInterface(etcd)
-		val, found := values.GetValue(etcd, "snapshot")
-		if !found || val == nil {
-			values.PutValue(data, false, "appliedSpec", "rancherKubernetesEngineConfig", "services", "etcd", "snapshot")
-		}
-	}
-
-	etcd, found = values.GetValue(data, "rancherKubernetesEngineConfig", "services", "etcd")
-	if found {
-		etcd := convert.ToMapInterface(etcd)
-		val, found := values.GetValue(etcd, "snapshot")
-		if !found || val == nil {
-			values.PutValue(data, false, "rancherKubernetesEngineConfig", "services", "etcd", "snapshot")
-		}
-	}
-
-	return data
-}
-
 func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	// Really we want a link handler but the URL parse makes it impossible to add links to clusters for now.  So this
 	// is basically a hack
@@ -170,24 +120,6 @@ func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	}
 
 	return r.Store.ByID(apiContext, schema, id)
-}
-
-type secrets struct {
-	regSecret                        *corev1.Secret
-	s3Secret                         *corev1.Secret
-	weaveSecret                      *corev1.Secret
-	vsphereSecret                    *corev1.Secret
-	vcenterSecret                    *corev1.Secret
-	openStackSecret                  *corev1.Secret
-	aadClientSecret                  *corev1.Secret
-	aadCertSecret                    *corev1.Secret
-	aciAPICUserKeySecret             *corev1.Secret
-	aciTokenSecret                   *corev1.Secret
-	aciKafkaClientKeySecret          *corev1.Secret
-	secretsEncryptionProvidersSecret *corev1.Secret
-	bastionHostSSHKeySecret          *corev1.Secret
-	kubeletExtraEnvSecret            *corev1.Secret
-	privateRegistryECRSecret         *corev1.Secret
 }
 
 func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {

@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
@@ -18,10 +20,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/yaml"
-	"strings"
 )
 
-func Wrap(store types.Store, ns v1.NamespaceInterface, secretLister v1.SecretLister, nodeTemplateLister v3.NodeTemplateLister, provClusterCache provv1.ClusterCache, tokenLister v3.TokenLister) types.Store {
+func Wrap(store types.Store, ns v1.NamespaceInterface, secretLister v1.SecretLister, provClusterCache provv1.ClusterCache, tokenLister v3.TokenLister) types.Store {
 	transformStore := &transform.Store{
 		Store: store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
@@ -37,11 +38,10 @@ func Wrap(store types.Store, ns v1.NamespaceInterface, secretLister v1.SecretLis
 	}
 
 	newStore := &Store{
-		Store:              transformStore,
-		SecretLister:       secretLister,
-		NodeTemplateLister: nodeTemplateLister,
-		ProvClusterCache:   provClusterCache,
-		TokenLister:        tokenLister,
+		Store:            transformStore,
+		SecretLister:     secretLister,
+		ProvClusterCache: provClusterCache,
+		TokenLister:      tokenLister,
 	}
 
 	return namespacedresource.Wrap(newStore, ns, namespace.GlobalNamespace)
@@ -84,10 +84,9 @@ func Validator(_ *types.APIContext, _ *types.Schema, data map[string]interface{}
 
 type Store struct {
 	types.Store
-	SecretLister       v1.SecretLister
-	NodeTemplateLister v3.NodeTemplateLister
-	ProvClusterCache   provv1.ClusterCache
-	TokenLister        v3.TokenLister
+	SecretLister     v1.SecretLister
+	ProvClusterCache provv1.ClusterCache
+	TokenLister      v3.TokenLister
 }
 
 type Set[E comparable] = map[E]struct{}
@@ -184,19 +183,5 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cloud credential is currently referenced by provisioning cluster %s", provClusters[0].Name))
 	}
 
-	// make sure the cloud credential isn't being used by an RKE1 node template
-	// which may be used by an active cluster
-	nodeTemplates, err := s.NodeTemplateLister.List("", labels.NewSelector())
-	if err != nil {
-		return nil, err
-	}
-	if len(nodeTemplates) > 0 {
-		for _, template := range nodeTemplates {
-			if template.Spec.CloudCredentialName != id {
-				continue
-			}
-			return nil, httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("Cloud credential is currently referenced by node template %s", template.Name))
-		}
-	}
 	return s.Store.Delete(apiContext, schema, id)
 }

@@ -29,10 +29,6 @@ func GetDriver(cluster *v3.Cluster, driverLister v3.KontainerDriverLister) (stri
 		return apimgmtv3.ClusterDriverGKE, nil
 	}
 
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		return apimgmtv3.ClusterDriverRKE, nil
-	}
-
 	if driver == nil {
 		return "", nil
 	}
