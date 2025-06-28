@@ -55,7 +55,7 @@ func InstallStores(
 		if err := server.Install(
 			extv1.KubeconfigResourceName,
 			extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
-			kubeconfig.New(wranglerContext, server.GetAuthorizer(), userManager),
+			kubeconfig.New(features.MCM.Enabled(), wranglerContext, server.GetAuthorizer(), userManager),
 		); err != nil {
 			return fmt.Errorf("unable to install kubeconfig store: %w", err)
 		}
