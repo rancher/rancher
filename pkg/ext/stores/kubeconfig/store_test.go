@@ -420,6 +420,7 @@ func TestStoreCreate(t *testing.T) {
 		userManager := &fakeUserManager{} // Subtest specific instance.
 
 		store := &Store{
+			mcmEnabled:          true,
 			authorizer:          authorizer,
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
@@ -556,6 +557,7 @@ func TestStoreCreate(t *testing.T) {
 		userManager := &fakeUserManager{} // Subtest specific instance.
 
 		store := &Store{
+			mcmEnabled:          true,
 			authorizer:          commonAuthorizer,
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
@@ -642,6 +644,7 @@ func TestStoreCreate(t *testing.T) {
 		userManager := &fakeUserManager{} // Subtest specific instance.
 
 		store := &Store{
+			mcmEnabled:          true,
 			authorizer:          commonAuthorizer,
 			userCache:           userCache,
 			tokenCache:          tokenCache,
@@ -759,6 +762,7 @@ func TestStoreCreate(t *testing.T) {
 		userManager := &fakeUserManager{} // Subtest specific instance.
 
 		store := &Store{
+			mcmEnabled:          true,
 			authorizer:          authorizer,
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
