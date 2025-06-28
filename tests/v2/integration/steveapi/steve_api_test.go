@@ -2610,6 +2610,14 @@ func (s *steveAPITestSuite) TestList() {
 					if containsReverseOrderSortName.MatchString(test.query) {
 						multiplier = -1
 					}
+					steveAPIObjects := make([]*clientv1.SteveAPIObject, len(secretList.Data))
+					for i, secret := range secretList.Data {
+						steveAPIObjects[i] = &secret
+					}
+					isSorted := slices.IsSortedFunc(steveAPIObjects, func(x, y *clientv1.SteveAPIObject) int {
+						return multiplier * strings.Compare(x.Name, y.Name)
+					})
+					assert.True(s.T(), isSorted, "secretList.Data is not sorted by name")
 					secretList.Data = slices.SortedStableFunc(slices.Values(secretList.Data),
 						func(x, y clientv1.SteveAPIObject) int {
 							nameDiff := strings.Compare(x.Name, y.Name)
