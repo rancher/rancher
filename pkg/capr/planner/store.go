@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -542,7 +543,7 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 	// In certain cases, it is possible that the joined-to annotation is not set. Attempt to determine the joined to
 	// annotation based on the delivered plan.
 	if !isInitNode(entry) && entry.Metadata.Annotations[capr.JoinedToAnnotation] == "" {
-		if configFirstHalf, configSecondHalf, found := strings.Cut(ConfigYamlFileName, "%s"); found {
+		if configFirstHalf, configSecondHalf, found := strings.Cut(JoinServerYamlFileName, "%s"); found {
 			for _, v := range entry.Plan.Plan.Files {
 				if strings.Contains(v.Path, configFirstHalf) && strings.Contains(v.Path, configSecondHalf) {
 					// We found our config file, process it to look for the joined node and then break
@@ -551,7 +552,7 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 						return err
 					}
 					var cf = map[string]interface{}{}
-					if err := json.Unmarshal(cfr, &cf); err != nil {
+					if err := yaml.Unmarshal(cfr, &cf); err != nil {
 						return err
 					}
 					if server, ok := cf["server"]; ok {

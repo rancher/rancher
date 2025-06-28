@@ -925,7 +925,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Annotations: map[string]string{},
 				},
 				Data: map[string][]byte{
-					"plan": []byte("{\"files\":[{\"content\":\"ewogICJzZXJ2ZXIiOiAiaHR0cHM6Ly8yOC44OS45My4yOjkzNDUiCn0=\",\"path\":\"/etc/rancher/k3s/config.yaml.d/50-rancher.yaml\"}]}"),
+					"plan": []byte("{\"files\":[{\"content\":\"ewogICJzZXJ2ZXIiOiAiaHR0cHM6Ly8yOC44OS45My4yOjkzNDUiCn0=\",\"path\":\"/etc/rancher/k3s/config.yaml.d/25-join-server.yaml\"}]}"),
 				},
 			},
 			updatedSecret: &corev1.Secret{
@@ -941,7 +941,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					},
 				},
 				Data: map[string][]byte{
-					"plan": []byte("{\"files\":[{\"content\":\"ewogICJzZXJ2ZXIiOiAiaHR0cHM6Ly8yOC44OS45My4yOjkzNDUiCn0=\",\"path\":\"/etc/rancher/k3s/config.yaml.d/50-rancher.yaml\"}]}"),
+					"plan": []byte("{\"files\":[{\"content\":\"ewogICJzZXJ2ZXIiOiAiaHR0cHM6Ly8yOC44OS45My4yOjkzNDUiCn0=\",\"path\":\"/etc/rancher/k3s/config.yaml.d/25-join-server.yaml\"}]}"),
 				},
 			},
 		},
