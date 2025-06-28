@@ -465,7 +465,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
 		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
-		assert.NotEmpty(t, kubeconfig.Spec.CurrentContext)
+		assert.NotEmpty(t, created.Spec.CurrentContext)
 		assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
 
 		require.NotNil(t, configMap)
@@ -848,6 +848,113 @@ func TestStoreCreate(t *testing.T) {
 		require.Len(t, userManager.clusterTokens, 0)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
+	})
+	t.Run("MCM disabled", func(t *testing.T) {
+		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			require.Equal(t, namePrefix, obj.GenerateName)
+
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		userManager := &fakeUserManager{} // Subtest specific instance.
+
+		store := &Store{
+			authorizer:          authorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenCache:          tokenCache,
+			clusterCache:        clusterCache,
+			userMgr:             userManager,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters: []string{"local"},
+			},
+		}
+		var createValidationCalled bool
+		createValidation := func(ctx context.Context, obj runtime.Object) error {
+			createValidationCalled = true
+			return nil
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, createValidation, options)
+		require.NoError(t, err)
+		assert.NotNil(t, obj)
+		assert.IsType(t, &ext.Kubeconfig{}, obj)
+
+		assert.True(t, createValidationCalled)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.NotEmpty(t, created.Name)
+		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
+		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
+		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
+		assert.NotEmpty(t, created.Spec.CurrentContext)
+		assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
+
+		require.NotNil(t, configMap)
+		assert.Equal(t, created.Name, configMap.Name) // Check against the created Kubeconfig instance.
+		assert.Equal(t, namespace, configMap.Namespace)
+		require.NotNil(t, configMap.Labels)
+		assert.Equal(t, userID, configMap.Labels[UserIDLabel])
+		assert.Equal(t, KindLabelValue, configMap.Labels[KindLabel])
+		require.NotNil(t, configMap.Annotations)
+		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
+		require.NotNil(t, configMap.Data)
+		assert.Equal(t, strconv.FormatInt(defaultTTLSeconds, 10), configMap.Data[TTLField])
+		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
+		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
+		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
+		require.NoError(t, err)
+		assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
+
+		require.NotNil(t, created.Status)
+		assert.NotEmpty(t, created.Status.Value)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+		require.Len(t, created.Status.Conditions, 1)
+		require.Len(t, created.Status.Tokens, 1)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+		require.Len(t, config.Clusters, 2)
+		assert.Equal(t, serverURL, config.Clusters[defaultClusterName].Server)
+		assert.Equal(t, rancherCACert, string(config.Clusters[defaultClusterName].CertificateAuthorityData))
+		assert.Equal(t, fmt.Sprintf("%s/k8s/clusters/%s", serverURL, "local"), config.Clusters["local"].Server)
+
+		require.Len(t, config.Contexts, 2)
+		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].Cluster)
+		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].AuthInfo)
+
+		require.Len(t, config.AuthInfos, 1)
+		require.Len(t, userManager.tokens, 1)
+		assert.Equal(t, userManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
+
+		assert.Equal(t, "local", config.CurrentContext)
 	})
 	t.Run("only a rancher user can create kubeconfig", func(t *testing.T) {
 		store := &Store{
