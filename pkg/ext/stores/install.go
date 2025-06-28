@@ -6,8 +6,11 @@ import (
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/ext/stores/kubeconfig"
+	"github.com/rancher/rancher/pkg/ext/stores/passwordchangerequest"
+	"github.com/rancher/rancher/pkg/ext/stores/selfuser"
 	"github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/ext/stores/useractivity"
+	"github.com/rancher/rancher/pkg/ext/stores/userrefreshrequest"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
@@ -62,6 +65,32 @@ func InstallStores(
 		logrus.Infof("Successfully installed kubeconfig store")
 	} else {
 		logrus.Infof("Feature ext-kubeconfigs is disabled")
+	}
+
+	err = server.Install(
+		passwordchangerequest.PluralName,
+		passwordchangerequest.GVK,
+		passwordchangerequest.New(wranglerContext, server.GetAuthorizer()))
+	if err != nil {
+		return fmt.Errorf("unable to install %s store: %w", passwordchangerequest.SingularName, err)
+	}
+	userRefreshStore, err := userrefreshrequest.New(wranglerContext, server.GetAuthorizer())
+	if err != nil {
+		return fmt.Errorf("unable to create %s store: %w", userrefreshrequest.SingularName, err)
+	}
+	err = server.Install(
+		userrefreshrequest.PluralName,
+		userrefreshrequest.GVK,
+		userRefreshStore)
+	if err != nil {
+		return fmt.Errorf("unable to install %s store: %w", userrefreshrequest.SingularName, err)
+	}
+	err = server.Install(
+		selfuser.PluralName,
+		selfuser.GVK,
+		selfuser.New())
+	if err != nil {
+		return fmt.Errorf("unable to install %s store: %w", selfuser.SingularName, err)
 	}
 
 	return nil

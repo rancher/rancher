@@ -106,16 +106,18 @@ type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName        string     `json:"displayName,omitempty"`
-	Description        string     `json:"description"`
-	Username           string     `json:"username,omitempty"`
-	Password           string     `json:"password,omitempty" norman:"writeOnly,noupdate"`
-	MustChangePassword bool       `json:"mustChangePassword,omitempty"`
-	PrincipalIDs       []string   `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
-	Me                 bool       `json:"me,omitempty" norman:"nocreate,noupdate"`
-	Enabled            *bool      `json:"enabled,omitempty" norman:"default=true"`
-	Spec               UserSpec   `json:"spec,omitempty"`
-	Status             UserStatus `json:"status"`
+	DisplayName string `json:"displayName,omitempty"`
+	Description string `json:"description"`
+	Username    string `json:"username,omitempty"`
+	// Deprecated
+	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
+	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
+	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
+	// Deprecated
+	Me      bool       `json:"me,omitempty" norman:"nocreate,noupdate"`
+	Enabled *bool      `json:"enabled,omitempty" norman:"default=true"`
+	Spec    UserSpec   `json:"spec,omitempty"`
+	Status  UserStatus `json:"status"`
 }
 
 // IsSystem returns true if the user is a system user.

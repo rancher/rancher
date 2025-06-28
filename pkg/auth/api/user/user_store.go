@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -9,23 +10,35 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
-const userByUsernameIndex = "auth.management.cattle.io/user-by-username"
+const (
+	userByUsernameIndex = "auth.management.cattle.io/user-by-username"
+)
+
+type PasswordCreator interface {
+	CreatePassword(user *v3.User, password string) error
+}
 
 type userStore struct {
 	types.Store
-	mu          sync.Mutex
-	userIndexer cache.Indexer
-	userManager user.Manager
+	mu           sync.Mutex
+	userIndexer  cache.Indexer
+	userManager  user.Manager
+	secretLister wranglerv1.SecretCache
+	secretClient wranglerv1.SecretClient
+	pwdCreator   PasswordCreator
 }
 
 func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -36,10 +49,13 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 	userInformer.AddIndexers(userIndexers)
 
 	store := &userStore{
-		Store:       schema.Store,
-		mu:          sync.Mutex{},
-		userIndexer: userInformer.GetIndexer(),
-		userManager: mgmt.UserManager,
+		Store:        schema.Store,
+		mu:           sync.Mutex{},
+		userIndexer:  userInformer.GetIndexer(),
+		userManager:  mgmt.UserManager,
+		secretClient: mgmt.Wrangler.Core.Secret(),
+		secretLister: mgmt.Wrangler.Core.Secret().Cache(),
+		pwdCreator:   pbkdf2.New(mgmt.Wrangler.Core.Secret().Cache(), mgmt.Wrangler.Core.Secret()),
 	}
 
 	t := &transform.Store{
@@ -85,46 +101,22 @@ func userByUsername(obj interface{}) ([]string, error) {
 	return []string{u.Username}, nil
 }
 
-func hashPassword(data map[string]interface{}) error {
-	pass, ok := data[client.UserFieldPassword].(string)
-	if !ok {
-		return errors.New("password not a string")
-	}
-	hashed, err := HashPasswordString(pass)
-	if err != nil {
-		return err
-	}
-	data[client.UserFieldPassword] = string(hashed)
-
-	return nil
-}
-
-func HashPasswordString(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", errors.Wrap(err, "problem encrypting password")
-	}
-	return string(hash), nil
-}
-
 func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	username, ok := data[client.UserFieldUsername].(string)
 	if !ok {
 		return nil, errors.New("invalid username")
 	}
 
-	password, ok := data[client.UserFieldPassword].(string)
+	pwd, ok := data[client.UserFieldPassword].(string)
 	if !ok {
 		return nil, errors.New("invalid password")
 	}
 
-	if err := validatePassword(username, "", password, settings.PasswordMinLength.GetInt()); err != nil {
+	if err := validatePassword(username, "", pwd, settings.PasswordMinLength.GetInt()); err != nil {
 		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	if err := hashPassword(data); err != nil {
-		return nil, err
-	}
+	delete(data, client.UserFieldPassword)
 
 	created, err := s.create(apiContext, schema, data)
 	if err != nil {
@@ -170,6 +162,25 @@ Tries:
 	}
 
 	delete(created, client.UserFieldPassword)
+
+	userId, ok := created[types.ResourceFieldID].(string)
+	if !ok {
+		return nil, errors.New("failed to get userId")
+	}
+	userUUID, ok := created[client.UserFieldUUID].(string)
+	if !ok {
+		return nil, errors.New("failed to get userId")
+	}
+
+	err = s.pwdCreator.CreatePassword(&v3.User{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: userId,
+			UID:  apitypes.UID(userUUID),
+		},
+	}, pwd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create secret password: %w", err)
+	}
 
 	return created, nil
 }
