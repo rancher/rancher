@@ -11,8 +11,9 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	img "github.com/rancher/rke/types/image"
 )
+
+var Mirrors = map[string]string{}
 
 // ExportConfig provides parameters you can define to configure image exporting for Rancher components
 type ExportConfig struct {
@@ -122,7 +123,7 @@ func addSourceToImage(imagesSet map[string]map[string]struct{}, image string, so
 
 func convertMirroredImages(imagesSet map[string]map[string]struct{}) {
 	for image := range imagesSet {
-		convertedImage := img.Mirror(image)
+		convertedImage := mirror(image)
 		if image == convertedImage {
 			continue
 		}
@@ -160,4 +161,29 @@ func getSourcesList(imageSources map[string]struct{}) string {
 	}
 	sort.Strings(sources)
 	return strings.Join(sources, ",")
+}
+
+func mirror(image string) string {
+	orig := image
+	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") {
+		return image
+	}
+
+	image = strings.Replace(image, "gcr.io/google_containers", "rancher", 1)
+	image = strings.Replace(image, "quay.io/coreos/", "rancher/coreos-", 1)
+	image = strings.Replace(image, "quay.io/calico/", "rancher/calico-", 1)
+	image = strings.Replace(image, "plugins/docker", "rancher/plugins-docker", 1)
+	image = strings.Replace(image, "k8s.gcr.io/defaultbackend", "rancher/nginx-ingress-controller-defaultbackend", 1)
+	image = strings.Replace(image, "k8s.gcr.io/k8s-dns-node-cache", "rancher/k8s-dns-node-cache", 1)
+	image = strings.Replace(image, "plugins/docker", "rancher/plugins-docker", 1)
+	image = strings.Replace(image, "kibana", "rancher/kibana", 1)
+	image = strings.Replace(image, "jenkins/", "rancher/jenkins-", 1)
+	image = strings.Replace(image, "alpine/git", "rancher/alpine-git", 1)
+	image = strings.Replace(image, "prom/", "rancher/prom-", 1)
+	image = strings.Replace(image, "quay.io/pires", "rancher", 1)
+	image = strings.Replace(image, "coredns/", "rancher/coredns-", 1)
+	image = strings.Replace(image, "minio/", "rancher/minio-", 1)
+
+	Mirrors[image] = orig
+	return image
 }

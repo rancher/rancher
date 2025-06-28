@@ -3,7 +3,6 @@ package project
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -12,11 +11,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/generated/compose"
 	provisioningcontrollerv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -79,21 +76,6 @@ func (h *Handler) ExportYamlHandler(actionName string, action *types.Action, api
 	apiContext.Response.Header().Set("Content-Type", "text/yaml")
 	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
 	return nil
-}
-
-func getID(id interface{}) (string, error) {
-	s, ok := id.(string)
-	if !ok {
-		return "", fmt.Errorf("could not convert %v", id)
-	}
-
-	split := strings.Split(s, ":")
-	return split[0] + ":" + split[len(split)-1], nil
-}
-
-// isProvisionedRke2Cluster check to see if this is a rancher provisioned rke2 cluster
-func isProvisionedRke2Cluster(cluster *v3.Cluster) bool {
-	return cluster.Status.Provider == v32.ClusterDriverRke2 && imported.IsAdministratedByProvisioningCluster(cluster)
 }
 
 // parseKubeApiServerArgs parses the "kube-apiserver-arg" available in the

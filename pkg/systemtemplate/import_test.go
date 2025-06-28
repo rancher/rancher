@@ -16,7 +16,6 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/image"
-	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -72,43 +71,6 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		expectedPodDisruptionBudgetHashes map[string]string
 	}{
 		{
-			name: "test-rke",
-			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rke",
-				},
-				Spec: apimgmtv3.ClusterSpec{
-					ClusterSpecBase: apimgmtv3.ClusterSpecBase{
-						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{},
-					},
-				},
-			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "c320a23c4620b7843d2f96ed114841e06873054c3d2b159355a056e1890acf82",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0d28ae2947ce0c5faef85ff59169a5f65e0490552bf9cb00f29a98eb97a02a7e",
-				"cattle-admin":                    "009abecc023b1e4ac1bc35e4153ef4492b2bc66a5972df9c5617a38f587c3f42",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "0df909395597974e60d905e9860bc0a02367bd2df74528d430c635c3f7afdeb0",
-				"cattle-admin-binding":                 "0da37cf0d4c4b4d068a3000967c4e37d11e1cecd126779633095dbe30b39c6ba",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "fd527fed9cae2e8b27f9610d64e9476e692a3dfde42954aeaecba450fe2b9571",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "9512a8430f6d32f31eac6e4446724dc5a336c3d9c8147c824f2734c2f8afe792",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "5cf160de85eaef5de9ce917130c64c23e91836920f7e9b2e2d7a8be8290079f2",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "b2ec2a5655ff908557b5a46695be7429c9eb5bf32c799e37832e57405ce54f46",
-			},
-		},
-		{
 			name: "test-provisioned-import",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -124,7 +86,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "7a316ba9d7aa643173f0ce0c4e2a0367bd8bea435ed82eb9cffd47e14aaaea0d",
+				"cattle-cluster-agent": "c806f310d6bd5aac20e1876f1aa5ac9f932cee248a13b55dcb2321b6b9713836",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -178,7 +140,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "7a316ba9d7aa643173f0ce0c4e2a0367bd8bea435ed82eb9cffd47e14aaaea0d",
+				"cattle-cluster-agent": "c806f310d6bd5aac20e1876f1aa5ac9f932cee248a13b55dcb2321b6b9713836",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -235,7 +197,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "341be40eb0356bccad79900b965c70dc10ca189a94dd0f2ed40576cd565d5ce4",
+				"cattle-cluster-agent": "1d201f3252e790ce7748982014e3941bea38896ff63176eebd56741110c243ca",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -283,7 +245,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "1dc709fd8333e74a79ff23470aecd426379cb6d64513a22586eaee27e0f1687e",
+				"cattle-cluster-agent": "0dec67921e95c4a7321c1bceea9f4c33c2ed32c8f1ddb2292ce0006d809ebf04",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{

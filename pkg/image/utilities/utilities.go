@@ -1,7 +1,6 @@
 package utilities
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -12,9 +11,8 @@ import (
 	"github.com/coreos/go-semver/semver"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
+	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/types/image"
-	"github.com/rancher/rke/types/kdm"
 )
 
 var (
@@ -77,7 +75,7 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("could not read data.json: %w", err)
 	}
-	data, err := kdm.FromData(b)
+	data, err := kontainerdrivermetadata.FromData(b)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
 	}
@@ -239,7 +237,7 @@ func MirrorScript(arch string, targetImages []string) error {
 
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		srcImage, ok := image.Mirrors[targetImage]
+		srcImage, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -258,7 +256,7 @@ func MirrorScript(arch string, targetImages []string) error {
 func saveImages(targetImages []string) []string {
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -272,7 +270,7 @@ func saveImagesAndSources(imagesAndSources []string) []string {
 	var saveImagesAndSources []string
 	for _, imageAndSources := range imagesAndSources {
 		targetImage := strings.Split(imageAndSources, " ")[0]
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -300,38 +298,6 @@ func checkImage(image string) error {
 	if strings.HasSuffix(imageNameTag[0], "-") {
 		return fmt.Errorf("Image [%s] has trailing '-', probably an error in image substitution", image)
 	}
-	return nil
-}
-
-func writeSliceToFile(filename string, versions []string) error {
-	log.Printf("Creating %s\n", filename)
-
-	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directories: %w", err)
-	}
-
-	save, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
-
-	defer func() {
-		if cerr := save.Close(); cerr != nil {
-			err = errors.Join(err, cerr)
-		}
-	}()
-
-	if err := save.Chmod(0755); err != nil {
-		return fmt.Errorf("failed to set file permissions: %w", err)
-	}
-
-	for _, version := range versions {
-		if _, err := fmt.Fprintln(save, version); err != nil {
-			return fmt.Errorf("failed to write to file: %w", err)
-		}
-	}
-
 	return nil
 }
 

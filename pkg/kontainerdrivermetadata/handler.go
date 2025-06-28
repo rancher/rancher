@@ -2,6 +2,7 @@ package kontainerdrivermetadata
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/blang/semver"
@@ -17,6 +18,13 @@ type MetadataController struct {
 	Settings        mgmtcontrollers.SettingController
 	wranglerContext *wrangler.Context
 	ctx             context.Context
+}
+
+type Data struct {
+	// K3S specific data, opaque and defined by the config file in kdm
+	K3S map[string]interface{} `json:"k3s,omitempty"`
+	// Rke2 specific data, defined by the config file in kdm
+	RKE2 map[string]interface{} `json:"rke2,omitempty"`
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
@@ -121,4 +129,13 @@ func getKubernetesVersionRange(ctx context.Context, runtime, serverVersion strin
 	maxVersion := versions[len(versions)-1]
 	uiSupported := fmt.Sprintf(">=v%d.%d.x <=v%d.%d.x", minVersion.Major, minVersion.Minor, maxVersion.Major, maxVersion.Minor)
 	return uiSupported, nil
+}
+
+func FromData(b []byte) (Data, error) {
+	d := &Data{}
+
+	if err := json.Unmarshal(b, d); err != nil {
+		return Data{}, err
+	}
+	return *d, nil
 }
