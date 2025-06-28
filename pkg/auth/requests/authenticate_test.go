@@ -760,7 +760,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			return nil, nil
 		}).AnyTimes()
 
-	store := exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
+	store := exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 
 	authenticator := tokenAuthenticator{
 		ctx:                 context.Background(),
@@ -859,7 +859,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			AnyTimes()
 		newSecrets.EXPECT().Patch("cattle-tokens", token.Name, k8stypes.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).Times(1)
-		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil)
+		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil, nil)
 
 		tokenSecret.Data["last-used-at"] = []byte(now.
 			Add(-time.Second).
@@ -1006,7 +1006,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			Get("cattle-tokens", token.Name).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, token.Name)).
 			Times(1)
-		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil)
+		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil, nil)
 
 		userRefresher.reset()
 
@@ -1028,7 +1028,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			Get("cattle-tokens", token.Name).
 			Return(nil, fmt.Errorf("some error")).
 			Times(1)
-		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil)
+		authenticator.extTokenStore = exttokenstore.NewSystem(nil, nil, newSecrets, users, nil, nil, nil, nil, nil)
 
 		userRefresher.reset()
 
