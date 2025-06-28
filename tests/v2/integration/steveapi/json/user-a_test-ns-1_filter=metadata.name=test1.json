@@ -1,0 +1,47 @@
+{
+  "actions": {},
+  "count": 1,
+  "createTypes": {
+    "secret": "https://rancherurl/v1/secrets"
+  },
+  "data": [
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test1",
+      "kind": "Secret",
+      "links": {
+        "patch": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
+      },
+      "metadata": {
+        "fields": [
+          "test1",
+          "Opaque",
+          0,
+          "0s"
+        ],
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    }
+  ],
+  "links": {
+    "self": "https://rancherurl/v1/secrets/test-ns-1"
+  },
+  "resourceType": "secret",
+  "revision": "100",
+  "type": "collection"
+}
