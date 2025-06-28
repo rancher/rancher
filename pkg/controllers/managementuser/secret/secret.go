@@ -32,7 +32,7 @@ import (
 // and creates the secrets in the cluster namespace
 
 const (
-	projectIDLabel             = "field.cattle.io/projectId"
+	projectIDAnnotation        = "field.cattle.io/projectId"
 	create                     = "create"
 	update                     = "update"
 	projectNamespaceAnnotation = "management.cattle.io/system-namespace"
@@ -90,7 +90,12 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 			return nil, nil
 		}
 
-		_, err := projectLister.Get(cluster.ClusterName, obj.Namespace)
+		clusterName, projectName, found := strings.Cut(obj.Annotations[projectIDAnnotation], ":")
+		// if it's not a project secret, ignore it
+		if !found {
+			return obj, nil
+		}
+		_, err := projectLister.Get(clusterName, projectName)
 		if errors.IsNotFound(err) {
 			return obj, nil
 		} else if err != nil {
@@ -312,11 +317,11 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 	}
 	logrus.Tracef("secretsController: sync called for key [%s] in namespace [%s]", key, obj.Name)
 	// field.cattle.io/projectId value is <cluster name>:<project name>
-	logrus.Tracef("secretsController: sync: key [%s], obj.Annotations[projectIDLabel]: [%s]", key, obj.Annotations[projectIDLabel])
-	if obj.Annotations[projectIDLabel] != "" {
-		clusterName, projectName, found := strings.Cut(obj.Annotations[projectIDLabel], ":")
+	logrus.Tracef("secretsController: sync: key [%s], obj.Annotations[projectIDLabel]: [%s]", key, obj.Annotations[projectIDAnnotation])
+	if obj.Annotations[projectIDAnnotation] != "" {
+		clusterName, projectName, found := strings.Cut(obj.Annotations[projectIDAnnotation], ":")
 		if !found {
-			logrus.Debugf("secretsController: sync: namespace %s projectId annotation %s is malformed, should be <cluster name>:<project name>", obj.Name, obj.Annotations[projectIDLabel])
+			logrus.Debugf("secretsController: sync: namespace %s projectId annotation %s is malformed, should be <cluster name>:<project name>", obj.Name, obj.Annotations[projectIDAnnotation])
 			return nil, nil
 		}
 
@@ -396,8 +401,13 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 		return toReturn, nil
 	}
 
-	// Ignore projects from other clusters. Project namespace name = project name, so use it to locate the project
-	_, err = s.projectLister.Get(s.clusterName, projectNamespace.Name)
+	// Ignore projects from other clusters.
+	clusterName, projectName, found := strings.Cut(obj.Annotations[projectIDAnnotation], ":")
+	if !found {
+		return toReturn, nil
+	}
+
+	_, err = s.projectLister.Get(clusterName, projectName)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return toReturn, nil
@@ -409,12 +419,10 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 	if err != nil {
 		return toReturn, err
 	}
-	// system project namespace name == project.Name
-	projectID := obj.Namespace
 
 	for _, namespace := range namespaces {
-		parts := strings.Split(namespace.Annotations[projectIDLabel], ":")
-		if len(parts) == 2 && parts[1] == projectID {
+		_, namespaceProjectName, found := strings.Cut(namespace.Annotations[projectIDAnnotation], ":")
+		if found && namespaceProjectName == projectName {
 			toReturn = append(toReturn, namespace)
 		}
 	}
@@ -423,12 +431,10 @@ func (s *Controller) getClusterNamespaces(obj *corev1.Secret) ([]*corev1.Namespa
 
 func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 	logrus.Tracef("secretsController: createOrUpdate called for [%s]", obj.Name)
-	if obj.Annotations[projectIDLabel] != "" {
-		parts := strings.Split(obj.Annotations[projectIDLabel], ":")
-		if len(parts) == 2 {
-			if parts[0] != s.clusterName {
-				return nil
-			}
+	if obj.Annotations[projectIDAnnotation] != "" {
+		clusterName, _, found := strings.Cut(obj.Annotations[projectIDAnnotation], ":")
+		if found && clusterName != s.clusterName {
+			return nil
 		}
 	}
 	clusterNamespaces, err := s.getClusterNamespaces(obj)
