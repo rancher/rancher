@@ -257,6 +257,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if extensionAPIServer != nil {
 		kubeAggregationReadyChan = extensionAPIServer.Registered()
 	}
+	// Only wait for ExtensionAPIServer if it was never validated before
+	skipWaitForExtensionAPIServer := ext.AggregationPreCheck(wranglerContext.API.APIService())
 
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
@@ -269,7 +271,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
 			DefaultMaximumEventsCount: defaultSQLCacheMaxEventsCount,
 		},
-		ExtensionAPIServer: extensionAPIServer,
+		ExtensionAPIServer:            extensionAPIServer,
+		SkipWaitForExtensionAPIServer: skipWaitForExtensionAPIServer,
 	})
 	if err != nil {
 		return nil, err
@@ -421,16 +424,7 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	go r.Steve.StartAggregation(ctx)
 
 	if !features.MCMAgent.Enabled() && r.kubeAggregationReadyChan != nil {
-		go func() {
-			logrus.Infof("Waiting for %s imperative API to be ready", r.aggregationRegistrationTimeout)
-
-			select {
-			case <-r.kubeAggregationReadyChan:
-				logrus.Info("kube-apiserver connected to imperative api")
-			case <-time.After(r.aggregationRegistrationTimeout):
-				logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
-			}
-		}()
+		go r.checkAPIAggregationOrDie()
 	}
 
 	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
@@ -445,6 +439,38 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+// checkAPIAggregationOrDie will wait for the kubeapi server to contact the configured APIService endpoints.
+// If the condition is not met within the aggregationRegistrationTimeout the Rancher process will exit with an error.
+func (r *Rancher) checkAPIAggregationOrDie() {
+	logrus.Infof("Waiting for %s imperative API to be ready", r.aggregationRegistrationTimeout)
+
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), r.aggregationRegistrationTimeout)
+	defer cancel()
+
+	apiserviceClient := r.Wrangler.API.APIService()
+	waitingForAPIService := !r.Steve.SkipWaitForExtensionAPIServer
+	for {
+		// Case 1: Successful - ExtensionServer was contacted by the Kube API, causing the channel to be closed.
+		// Case 2: Successful - ExtensionServer in a different replica was contacted by the Kube API, and that updated the APIService object annotation.
+		//         Only valid if Steve was configured to wait. Otherwise, it would short-circuit here directly here
+		// Case 3: Fatal - the Kube API didn't contact the Extension Server within the configured timeout, interpreted as API Aggregation not being supported in the cluster
+		select {
+		case <-r.kubeAggregationReadyChan:
+			logrus.Info("kube-apiserver connected to imperative api")
+			ext.SetAggregationCheck(apiserviceClient, true)
+			return
+		case <-time.After(5 * time.Second):
+			if waitingForAPIService && ext.AggregationPreCheck(apiserviceClient) {
+				logrus.Info("kube-apiserver connected to imperative api")
+				return
+			}
+		case <-ctxTimeout.Done():
+			ext.SetAggregationCheck(apiserviceClient, false)
+			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
+		}
+	}
 }
 
 func (r *Rancher) startAggregation(ctx context.Context) {
