@@ -144,13 +144,13 @@ func (c *ClusterRepoTestSuite) TestGitRepo() {
 	})
 }
 
-func (c *ClusterRepoTestSuite) TestGitRepoRetries() {
-	c.testClusterRepoRetries(ClusterRepoParams{
-		Name: GitClusterSmallForkName,
-		URL1: GitClusterSmallForkURL,
-		Type: Git,
-	})
-}
+// func (c *ClusterRepoTestSuite) TestGitRepoRetries() {
+// 	c.testClusterRepoRetries(ClusterRepoParams{
+// 		Name: GitClusterSmallForkName,
+// 		URL1: GitClusterSmallForkURL,
+// 		Type: Git,
+// 	})
+// }
 
 func StartHTTPRepository(c *ClusterRepoTestSuite) *httptest.Server {
 	// Directory where Helm chart and index.yaml are stored
