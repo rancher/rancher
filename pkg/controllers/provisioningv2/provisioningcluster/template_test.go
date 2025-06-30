@@ -87,7 +87,7 @@ func TestPopulateHostnameLengthLimitAnnotation(t *testing.T) {
 			annotations := map[string]string{}
 			tt.machinePool.Name = tt.name
 			err := populateHostnameLengthLimitAnnotation(tt.machinePool, &provv1.Cluster{Spec: provv1.ClusterSpec{RKEConfig: &provv1.RKEConfig{
-				MachinePoolDefaults: provv1.RKEMachinePoolDefaults{HostnameLengthLimit: tt.defaultHostnameLengthLimit},
+				MachinePoolDefaults: &provv1.RKEMachinePoolDefaults{HostnameLengthLimit: tt.defaultHostnameLengthLimit},
 			}}}, annotations)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, annotations)
