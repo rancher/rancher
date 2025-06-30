@@ -59,12 +59,13 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		statusCode: http.StatusOK,
 	}
+	rawBody, userName := copyReqBody(req)
 	h.next.ServeHTTP(wr, req)
 	wr.Apply()
 
 	respTimestamp := time.Now().Format(time.RFC3339)
 
-	log := newLog(user, req, wr, reqTimestamp, respTimestamp)
+	log := newLog(user, req, wr, reqTimestamp, respTimestamp, rawBody, userName)
 
 	if err := h.writer.Write(log); err != nil {
 		// Locking after next is called to avoid performance hits on the request.
