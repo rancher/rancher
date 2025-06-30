@@ -91,25 +91,7 @@ type log struct {
 	rawResponseBody []byte
 }
 
-func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp string, respTimestamp string) *log {
-	log := &log{
-		AuditID:       k8stypes.UID(uuid.NewRandom().String()),
-		RequestURI:    req.RequestURI,
-		User:          userInfo,
-		Method:        req.Method,
-		RemoteAddr:    req.RemoteAddr,
-		ResponseCode:  rw.statusCode,
-		UserLoginName: "",
-
-		RequestTimestamp:  reqTimestamp,
-		ResponseTimestamp: respTimestamp,
-
-		RequestHeader:  req.Header,
-		ResponseHeader: rw.Header(),
-
-		rawResponseBody: rw.buf.Bytes(),
-	}
-
+func copyReqBody(req *http.Request) (rawBody []byte, user string) {
 	contentType := req.Header.Get("Content-Type")
 
 	if methodsWithBody[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
@@ -126,10 +108,40 @@ func newLog(userInfo *User, req *http.Request, rw *wrapWriter, reqTimestamp stri
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
 
 		if loginName := getUserNameForBasicLogin(body); loginName != "" {
-			log.UserLoginName = loginName
+			user = loginName
 		}
 
-		log.rawRequestBody = body
+		rawBody = body
+	}
+	return
+}
+
+func newLog(
+	userInfo *User,
+	req *http.Request,
+	rw *wrapWriter,
+	reqTimestamp string,
+	respTimestamp string,
+	rawBody []byte,
+	userName string,
+) *log {
+	log := &log{
+		AuditID:       k8stypes.UID(uuid.NewRandom().String()),
+		RequestURI:    req.RequestURI,
+		User:          userInfo,
+		Method:        req.Method,
+		RemoteAddr:    req.RemoteAddr,
+		ResponseCode:  rw.statusCode,
+		UserLoginName: userName,
+
+		RequestTimestamp:  reqTimestamp,
+		ResponseTimestamp: respTimestamp,
+
+		RequestHeader:  req.Header,
+		ResponseHeader: rw.Header(),
+
+		rawRequestBody:  rawBody,
+		rawResponseBody: rw.buf.Bytes(),
 	}
 
 	return log
