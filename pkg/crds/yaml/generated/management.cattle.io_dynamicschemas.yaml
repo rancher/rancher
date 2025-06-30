@@ -22,9 +22,9 @@ spec:
           created and used internally by Rancher to generate CRDs and API
           endpoints, and should not be created manually.
 
-          DynamicSchema functionality for generating Rancher dynamic API
-          endpoints is limited. These endpoints are not backed by any stores,
-          and most related fields will not have any useful effect.
+          Functionality for generating Rancher dynamic API endpoints is
+          limited. These endpoints are not backed by any Norman stores, and
+          most related fields will not have any useful effect.
         properties:
           apiVersion:
             description: |-
@@ -46,31 +46,21 @@ spec:
           spec:
             description: |-
               Specification of the desired behavior of the the dynamic schema. More info:
-              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+              https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               collectionActions:
                 additionalProperties:
                   properties:
                     input:
-                      description: |-
-                        Input should not be set.
-
-                        Deprecated: Input is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Input has no useful effects and should not be set.
                       type: string
                     output:
-                      description: |-
-                        Output should not be set.
-
-                        Deprecated: Output is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Output has no useful effects and should not be
+                        set.
                       type: string
                   type: object
-                description: |-
-                  CollectionActions should not be set.
-
-                  Deprecated: CollectionActions is deprecated and will be removed in
-                  a future version of Rancher.
+                description: CollectionActions has no useful effects and should not
+                  be set.
                 type: object
               collectionFields:
                 additionalProperties:
@@ -116,42 +106,25 @@ spec:
                         when embedding another schema into it.
                       type: boolean
                     invalidChars:
-                      description: |-
-                        InvalidChars should not be set.
-
-                        Deprecated: InvalidChars is deprecated and will be removed in a
-                        future version of Rancher.
+                      description: InvalidChars has no useful effects and should not
+                        be set.
                       type: string
                     max:
-                      description: |-
-                        Max should not be set.
-
-                        Deprecated: Max is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Max has no useful effects and should not be set.
                       format: int64
                       type: integer
                     maxLength:
-                      description: |-
-                        MaxLength should not be set.
-
-                        Deprecated: MaxLength is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: MaxLength has no useful effects and should not
+                        be set.
                       format: int64
                       type: integer
                     min:
-                      description: |-
-                        Min should not be set.
-
-                        Deprecated: Min is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Min has no useful effects and should not be set.
                       format: int64
                       type: integer
                     minLength:
-                      description: |-
-                        MinLength should not be set.
-
-                        Deprecated: MinLength is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: MinLength has no useful effects and should not
+                        be set.
                       format: int64
                       type: integer
                     nullable:
@@ -164,11 +137,8 @@ spec:
                         this schema will be nullable.
                       type: boolean
                     options:
-                      description: |-
-                        Options should not be set.
-
-                        Deprecated: Options is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Options has no useful effects and should not be
+                        set.
                       items:
                         type: string
                       type: array
@@ -184,67 +154,45 @@ spec:
                         name.
                       type: string
                     unique:
-                      description: |-
-                        Unique should not be set.
-
-                        Deprecated: Unique is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Unique has no useful effects and should not be
+                        set.
                       type: boolean
                     update:
                       description: |-
-                        Update indicates that this field should not be modified when
-                        updating an object of a schema with this field through the Norman
-                        API.  A value for this field will be filtered out if present in the
-                        update request.
+                        Update indicates that this field should not be modified when updating
+                        an object of a schema with this field through the Norman API. A value
+                        for this field will be filtered out if present in the update request.
                       type: boolean
                     validChars:
-                      description: |-
-                        ValidChars should not be set.
-
-                        Deprecated: ValidChars is deprecated and will be removed in a
-                        future version of Rancher.
+                      description: ValidChars has no useful effects and should not
+                        be set.
                       type: string
                   type: object
-                description: |-
-                  CollectionFields should not be set.
-
-                  Deprecated: CollectionFields is deprecated and will be removed in a
-                  future version of Rancher.
+                description: CollectionFields has no useful effects and should not
+                  be set.
                 type: object
               collectionFilters:
                 additionalProperties:
                   properties:
                     modifiers:
-                      description: |-
-                        Modifiers should not be set.
-
-                        Deprecated: Modifiers is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Modifiers has no useful effects and should not
+                        be set.
                       items:
                         type: string
                       type: array
                   type: object
-                description: |-
-                  CollectionFilters should not be set.
-
-                  Deprecated: CollectionFilters is deprecated and will be removed in
-                  a future version of Rancher.
+                description: CollectionFilters has no useful effects and should not
+                  be set.
                 type: object
               collectionMethods:
-                description: |-
-                  CollectionMethods should not be set.
-
-                  Deprecated: CollectionMethods is deprecated and will be removed in
-                  a future version of Rancher.
+                description: CollectionMethods has no useful effects and should not
+                  be set.
                 items:
                   type: string
                 type: array
               dynamicSchemaVersion:
-                description: |-
-                  DynamicSchemaVersion should not be set.
-
-                  Deprecated: DynamicSchemaVersion is deprecated and will be removed
-                  in a future version of Rancher.
+                description: DynamicSchemaVersion has no useful effects and should
+                  not be set.
                 type: string
               embed:
                 description: |-
@@ -257,44 +205,27 @@ spec:
                   schema should be embedded in.
                 type: string
               includeableLinks:
-                description: |-
-                  IncludeableLinks should not be set.
-
-                  Deprecated: IncludeableLinks is deprecated and will be removed in a
-                  future version of Rancher.
+                description: IncludeableLinks has no useful effects and should not
+                  be set.
                 items:
                   type: string
                 type: array
               pluralName:
-                description: |-
-                  PluralName should not be set.
-
-                  Deprecated: PluralName is deprecated and will be removed in a future
-                  version of Rancher.
+                description: PluralName has no useful effects and should not be set.
                 type: string
               resourceActions:
                 additionalProperties:
                   properties:
                     input:
-                      description: |-
-                        Input should not be set.
-
-                        Deprecated: Input is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Input has no useful effects and should not be set.
                       type: string
                     output:
-                      description: |-
-                        Output should not be set.
-
-                        Deprecated: Output is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Output has no useful effects and should not be
+                        set.
                       type: string
                   type: object
-                description: |-
-                  ResourceActions should not be set.
-
-                  Deprecated: ResourceActions is deprecated and will be removed in a
-                  future version of Rancher.
+                description: ResourceActions has no useful effects and should not
+                  be set.
                 type: object
               resourceFields:
                 additionalProperties:
@@ -340,42 +271,25 @@ spec:
                         when embedding another schema into it.
                       type: boolean
                     invalidChars:
-                      description: |-
-                        InvalidChars should not be set.
-
-                        Deprecated: InvalidChars is deprecated and will be removed in a
-                        future version of Rancher.
+                      description: InvalidChars has no useful effects and should not
+                        be set.
                       type: string
                     max:
-                      description: |-
-                        Max should not be set.
-
-                        Deprecated: Max is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Max has no useful effects and should not be set.
                       format: int64
                       type: integer
                     maxLength:
-                      description: |-
-                        MaxLength should not be set.
-
-                        Deprecated: MaxLength is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: MaxLength has no useful effects and should not
+                        be set.
                       format: int64
                       type: integer
                     min:
-                      description: |-
-                        Min should not be set.
-
-                        Deprecated: Min is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Min has no useful effects and should not be set.
                       format: int64
                       type: integer
                     minLength:
-                      description: |-
-                        MinLength should not be set.
-
-                        Deprecated: MinLength is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: MinLength has no useful effects and should not
+                        be set.
                       format: int64
                       type: integer
                     nullable:
@@ -388,11 +302,8 @@ spec:
                         this schema will be nullable.
                       type: boolean
                     options:
-                      description: |-
-                        Options should not be set.
-
-                        Deprecated: Options is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Options has no useful effects and should not be
+                        set.
                       items:
                         type: string
                       type: array
@@ -408,35 +319,25 @@ spec:
                         name.
                       type: string
                     unique:
-                      description: |-
-                        Unique should not be set.
-
-                        Deprecated: Unique is deprecated and will be removed in a future
-                        version of Rancher.
+                      description: Unique has no useful effects and should not be
+                        set.
                       type: boolean
                     update:
                       description: |-
-                        Update indicates that this field should not be modified when
-                        updating an object of a schema with this field through the Norman
-                        API.  A value for this field will be filtered out if present in the
-                        update request.
+                        Update indicates that this field should not be modified when updating
+                        an object of a schema with this field through the Norman API. A value
+                        for this field will be filtered out if present in the update request.
                       type: boolean
                     validChars:
-                      description: |-
-                        ValidChars should not be set.
-
-                        Deprecated: ValidChars is deprecated and will be removed in a
-                        future version of Rancher.
+                      description: ValidChars has no useful effects and should not
+                        be set.
                       type: string
                   type: object
                 description: ResourceFields defines the schema fields and their types.
                 type: object
               resourceMethods:
-                description: |-
-                  ResourceMethods should not be set.
-
-                  Deprecated: ResourceMethods is deprecated and will be removed in a
-                  future version of Rancher.
+                description: ResourceMethods has no useful effects and should not
+                  be set.
                 items:
                   type: string
                 type: array
@@ -449,14 +350,10 @@ spec:
           status:
             description: |-
               Most recent observed status of the dynamic schema. More info:
-              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+              https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               fake:
-                description: |-
-                  Fake should not be set.
-
-                  Deprecated: Fake is deprecated and will be removed in a future
-                  version of Rancher.
+                description: Fake has no useful effects and should not be set.
                 type: string
             type: object
         required:
