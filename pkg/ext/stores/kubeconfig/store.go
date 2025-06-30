@@ -103,6 +103,7 @@ type userManager interface {
 // +k8s:deepcopy-gen=false
 // Store implements storage for [ext.Kubeconfig].
 type Store struct {
+	mcmEnabled          bool
 	authorizer          authorizer.Authorizer
 	configMapCache      v1.ConfigMapCache
 	configMapClient     v1.ConfigMapClient
@@ -122,14 +123,14 @@ type Store struct {
 }
 
 // New creates a new instance of [Store].
-func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, userMgr userManager) *Store {
-	return &Store{
+func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, userMgr userManager) *Store {
+	store := &Store{
+		mcmEnabled:      mcmEnabled,
 		configMapCache:  wranglerContext.Core.ConfigMap().Cache(),
 		configMapClient: wranglerContext.Core.ConfigMap(),
 		clusterCache:    wranglerContext.Mgmt.Cluster().Cache(),
 		nsCache:         wranglerContext.Core.Namespace().Cache(),
 		nsClient:        wranglerContext.Core.Namespace(),
-		nodeCache:       wranglerContext.Mgmt.Node().Cache(),
 		tokenCache:      wranglerContext.Mgmt.Token().Cache(),
 		tokens:          wranglerContext.Mgmt.Token(),
 		userCache:       wranglerContext.Mgmt.User().Cache(),
@@ -145,6 +146,12 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, us
 			TableGenerator: printers.NewTableGenerator().With(printHandler),
 		},
 	}
+
+	if mcmEnabled {
+		store.nodeCache = wranglerContext.Mgmt.Node().Cache()
+	}
+
+	return store
 }
 
 // ensureNamespace ensures that the namespace for storing kubeconfig configMaps exists.
@@ -567,63 +574,65 @@ func (s *Store) Create(
 				Token: tokenKey,
 			})
 
-			// If the ACE cluster has a FQDN, add a single entry for it.
-			if authEndpoint := cluster.Spec.LocalClusterAuthEndpoint; authEndpoint.FQDN != "" {
-				fqdnName := clusterName + "-fqdn"
-				data.Clusters = append(data.Clusters, kconfig.Cluster{
-					Name:   fqdnName,
-					Server: "https://" + authEndpoint.FQDN,
-					Cert:   kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(authEndpoint.CACerts))),
-				})
-				data.Contexts = append(data.Contexts, kconfig.Context{
-					Name:    fqdnName,
-					Cluster: fqdnName,
-					User:    clusterName,
-				})
+			if s.mcmEnabled { // Nodes are only available if MCM is enabled.
+				// If the ACE cluster has a FQDN, add a single entry for it.
+				if authEndpoint := cluster.Spec.LocalClusterAuthEndpoint; authEndpoint.FQDN != "" {
+					fqdnName := clusterName + "-fqdn"
+					data.Clusters = append(data.Clusters, kconfig.Cluster{
+						Name:   fqdnName,
+						Server: "https://" + authEndpoint.FQDN,
+						Cert:   kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(authEndpoint.CACerts))),
+					})
+					data.Contexts = append(data.Contexts, kconfig.Context{
+						Name:    fqdnName,
+						Cluster: fqdnName,
+						User:    clusterName,
+					})
 
-				if currentContext == cluster.Name {
-					data.CurrentContext = fqdnName
-				}
+					if currentContext == cluster.Name {
+						data.CurrentContext = fqdnName
+					}
 
-				continue
-			}
-
-			// Otherwise produce entries for each control plane node.
-			nodes, err := s.nodeCache.List(cluster.Name, labels.Everything())
-			if err != nil {
-				conditions = append(conditions, metav1.Condition{
-					Type:               FailedToListClusterNodesCond,
-					Status:             metav1.ConditionTrue,
-					Reason:             FailedToListClusterNodesCond,
-					Message:            fmt.Sprintf("error listing nodes for cluster %s: %s", cluster.Name, err),
-					LastTransitionTime: metav1.NewTime(time.Now()),
-				})
-
-				return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %w", cluster.Name, err))
-			}
-
-			clusterCerts := kconfig.FormatCertString(cluster.Status.CACert) // Already base64 encoded.
-			var isCurrentContextSet bool
-			for _, node := range nodes {
-				if !node.Spec.ControlPlane {
 					continue
 				}
 
-				nodeName := clusterName + "-" + strings.TrimPrefix(node.Spec.RequestedHostname, clusterName+"-")
-				data.Clusters = append(data.Clusters, kconfig.Cluster{
-					Name:   nodeName,
-					Server: "https://" + v3node.GetEndpointNodeIP(node) + ":6443",
-					Cert:   clusterCerts,
-				})
-				data.Contexts = append(data.Contexts, kconfig.Context{
-					Name:    nodeName,
-					Cluster: nodeName,
-					User:    clusterName,
-				})
+				// Otherwise produce entries for each control plane node.
+				nodes, err := s.nodeCache.List(cluster.Name, labels.Everything())
+				if err != nil {
+					conditions = append(conditions, metav1.Condition{
+						Type:               FailedToListClusterNodesCond,
+						Status:             metav1.ConditionTrue,
+						Reason:             FailedToListClusterNodesCond,
+						Message:            fmt.Sprintf("error listing nodes for cluster %s: %s", cluster.Name, err),
+						LastTransitionTime: metav1.NewTime(time.Now()),
+					})
 
-				if !isCurrentContextSet && currentContext == cluster.Name {
-					data.CurrentContext = nodeName // Set the current context to the first control plane node.
-					isCurrentContextSet = true
+					return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %w", cluster.Name, err))
+				}
+
+				clusterCerts := kconfig.FormatCertString(cluster.Status.CACert) // Already base64 encoded.
+				var isCurrentContextSet bool
+				for _, node := range nodes {
+					if !node.Spec.ControlPlane {
+						continue
+					}
+
+					nodeName := clusterName + "-" + strings.TrimPrefix(node.Spec.RequestedHostname, clusterName+"-")
+					data.Clusters = append(data.Clusters, kconfig.Cluster{
+						Name:   nodeName,
+						Server: "https://" + v3node.GetEndpointNodeIP(node) + ":6443",
+						Cert:   clusterCerts,
+					})
+					data.Contexts = append(data.Contexts, kconfig.Context{
+						Name:    nodeName,
+						Cluster: nodeName,
+						User:    clusterName,
+					})
+
+					if !isCurrentContextSet && currentContext == cluster.Name {
+						data.CurrentContext = nodeName // Set the current context to the first control plane node.
+						isCurrentContextSet = true
+					}
 				}
 			}
 		}
