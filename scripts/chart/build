@@ -31,5 +31,5 @@ sed -i -e "s@%POST_DELETE_IMAGE_NAME%@${post_delete_image_name}@g" build/chart/r
 sed -i -e "s/%POST_DELETE_IMAGE_TAG%/${post_delete_image_tag}/g" build/chart/rancher/values.yaml
 
 if [[ -v REGISTRY ]]; then
-  sed -i -e "s/rancherImage:\ rancher\/rancher/rancherImage:\ $REGISTRY\/rancher\/rancher" build/chart/rancher/values.yaml
+  sed -i -e "s/rancherImage:\ rancher\/rancher/rancherImage:\ $REGISTRY\/rancher\/rancher/" build/chart/rancher/values.yaml
 fi
