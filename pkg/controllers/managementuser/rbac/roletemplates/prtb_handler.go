@@ -27,6 +27,7 @@ const (
 	namespaceEdit       = "namespaces-edit"
 	namespacePSA        = "namespaces-psa"
 	namespacesCreate    = "create-ns"
+	updatePSAVerb       = "updatepsa"
 )
 
 type prtbHandler struct {
@@ -265,32 +266,31 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 	}
 
 	// check if any of the aggregated CR grant updatepsa permission
+	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
 	psaRec := authorizer.AttributesRecord{
-		Verb:            "updatepsa",
+		Verb:            updatePSAVerb,
 		APIGroup:        management.GroupName,
 		Resource:        v3.ProjectResourceName,
 		Name:            prtb.ProjectName,
 		ResourceRequest: true,
 	}
-	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
 	if rbacAuth.RulesAllow(psaRec, cr.Rules...) {
-		psaCR := rbac.BuildClusterRole(psaCRName, prtb.UserName, []rbacv1.PolicyRule{
+		// if rules allow user to use updatepsa,
+		// then we create the CR dedicated for the project.
+		psaCR := rbac.BuildClusterRole(psaCRName, prtb.RoleTemplateName, []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{management.GroupName},
-				Verbs:         []string{"updatepsa"},
+				Verbs:         []string{updatePSAVerb},
 				Resources:     []string{v3.ProjectResourceName},
 				ResourceNames: []string{projectName},
 			},
 		})
-		cr, err := p.crClient.Create(psaCR)
-		if err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				fmt.Printf("======================== error creating CR %s: %v \n", psaCR.Name, err)
-			}
+		_, err := p.crClient.Create(psaCR)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return nil, err
 		}
-		fmt.Println("=========================================")
-		fmt.Println(cr)
+
+		// here we prepare the CRB to give updatepsa permission to the user.
 		namespacePSACRB, err := rbac.BuildClusterRoleBindingFromRTB(prtb, psaCR.Name)
 		if err != nil {
 			return nil, err
