@@ -41,3 +41,6 @@ kontainer-engine
 k3s-images.txt
 k3s-airgap-images.tar
 data.json
+informer_object_cache.db
+informer_object_cache.db-shm
+informer_object_cache.db-wal
