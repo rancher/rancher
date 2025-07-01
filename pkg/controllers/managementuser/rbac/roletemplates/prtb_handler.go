@@ -290,7 +290,6 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 			return nil, err
 		}
 
-		// here we prepare the CRB to give updatepsa permission to the user.
 		namespacePSACRB, err := rbac.BuildClusterRoleBindingFromRTB(prtb, psaCR.Name)
 		if err != nil {
 			return nil, err
