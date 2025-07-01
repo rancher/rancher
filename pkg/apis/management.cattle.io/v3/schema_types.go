@@ -84,7 +84,7 @@ type DynamicSchemaSpec struct {
 	// +optional
 	// ---
 	// These are populated by Rancher to define which fields are supported
-	// by a given node or kontainer driver. They are also used and for
+	// by a given node or kontainer driver. They are also used for
 	// listing other schemas (see the "cluster", "nodeconfig",
 	// "nodetemplateconfig" and "credentialconfig" generated schemas).
 	ResourceFields map[string]Field `json:"resourceFields,omitempty"`
