@@ -276,7 +276,7 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 	}
 	if rbacAuth.RulesAllow(psaRec, cr.Rules...) {
 		// if rules allow user to use updatepsa,
-		// then we create the CR dedicated for the project.
+		// then we create a dedicated ClusterRole for the project.
 		psaCR := rbac.BuildClusterRole(psaCRName, prtb.RoleTemplateName, []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{management.GroupName},
