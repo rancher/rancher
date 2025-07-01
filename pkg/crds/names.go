@@ -1,6 +1,8 @@
 package crds
 
-import "github.com/rancher/rancher/pkg/features"
+import (
+	"github.com/rancher/rancher/pkg/features"
+)
 
 // RequiredCRDs returns a list of CRD to install based on enabled features.
 func RequiredCRDs() []string {
@@ -35,7 +37,20 @@ func RequiredCRDs() []string {
 	if features.RancherSCCRegistrationExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
 	}
-	return requiredCRDS
+
+	// get unique CRDs so they aren't registered twice
+	uniqueCRDs := make([]string, 0, len(requiredCRDS))
+	keys := map[string]struct{}{}
+	for _, crdName := range requiredCRDS {
+		if _, ok := keys[crdName]; ok {
+			continue
+		}
+
+		keys[crdName] = struct{}{}
+		uniqueCRDs = append(uniqueCRDs, crdName)
+	}
+
+	return uniqueCRDs
 }
 
 // BasicCRDs returns a list of CRD names needed to run rancher.
