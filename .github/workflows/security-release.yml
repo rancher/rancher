@@ -10,7 +10,6 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  GH_CLI_VERSION: "2.72.0"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -75,7 +74,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: registry.suse.com/bci/bci-base:15.7
     permissions:
       contents: read
       id-token: write
