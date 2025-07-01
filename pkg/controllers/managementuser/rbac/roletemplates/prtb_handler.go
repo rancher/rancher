@@ -266,7 +266,7 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 	}
 
 	// check if any of the aggregated CR grant updatepsa permission
-	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
+	psaCRName := projectName + "-namespaces-psa"
 	psaRec := authorizer.AttributesRecord{
 		Verb:            updatePSAVerb,
 		APIGroup:        management.GroupName,
