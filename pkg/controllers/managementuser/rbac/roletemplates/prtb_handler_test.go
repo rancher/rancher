@@ -423,13 +423,13 @@ var (
 	}
 	crbPSA = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "crb-apzwokaidy",
+			Name:   "crb-or6ne64g56",
 			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "namespaces-psa",
+			Name:     "p-xyz789-namespaces-psa",
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -511,6 +511,7 @@ func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
 						},
 					},
 				}, nil)
+				m.EXPECT().Create(gomock.All()).Return(&rbacv1.ClusterRole{}, nil)
 			},
 			want: []*rbacv1.ClusterRoleBinding{crbPSA.DeepCopy()},
 		},
@@ -527,6 +528,7 @@ func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
 						},
 					},
 				}, nil)
+				m.EXPECT().Create(gomock.All()).Return(&rbacv1.ClusterRole{}, nil)
 			},
 			want: []*rbacv1.ClusterRoleBinding{crbCreateNS.DeepCopy(), crbEdit.DeepCopy(), crbPSA.DeepCopy()},
 		},
