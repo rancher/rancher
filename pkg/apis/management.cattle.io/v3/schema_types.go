@@ -168,9 +168,10 @@ type Field struct {
 	// +optional
 	Nullable bool `json:"nullable,omitempty"`
 
-	// Create indicates that this field should not be set when creating a
-	// new object of this schema through the Norman API. A value for this
-	// field will be filtered out if present in the create request.
+	// Create indicates that this field should be excluded when creating a
+	// new object of this schema through the Norman API. If a value is
+	// provided for this field in a create request, it will be filtered out
+	// and ignored.
 	//
 	// No Norman stores are defined for DynamicSchemas, so no resources of
 	// this schema can be created in the Norman API.
@@ -188,8 +189,10 @@ type Field struct {
 	// +optional
 	Required bool `json:"required,omitempty"`
 
-	// Update indicates that this field should not be modified when updating
-	// an object of this schema through the Norman API.
+	// Update indicates that this field should remain unchanged when
+	// updating an object of this schema through the Norman API. If a value
+	// is provided for this field in an update request, it will be filtered
+	// out and ignored.
 	//
 	// No Norman stores are defined for DynamicSchemas, so no resources of
 	// this schema can be updated in the Norman API.
@@ -312,7 +315,7 @@ type Action struct {
 	// +optional
 	Input string `json:"input,omitempty"`
 
-	// Input is the output for a custom Norman API action.
+	// Output is the output for a custom Norman API action.
 	// +optional
 	Output string `json:"output,omitempty"`
 }
