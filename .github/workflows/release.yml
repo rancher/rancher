@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - "v*"
+      - "!v*-security*"
 env:
   COMMIT: ${{ github.sha }}
   AWS_DEFAULT_REGION: "us-east-1"
@@ -43,9 +44,9 @@ jobs:
         uses: ./.github/actions/build-images/agent
   integration-tests:
     needs: [build-server, build-agent]
-    with:
-      parent_run_id: ${{ github.run_id }}
     uses: ./.github/workflows/integration-tests.yml
+    permissions:
+      contents: read
   push-images:
     needs: [unit-tests, integration-tests]
     strategy:
@@ -170,6 +171,7 @@ jobs:
       contents: write
       id-token: write
     env:
+      REGISTRY: ""
       CHECKSUM_FILE: "sha256sum.txt"
       ARTIFACTS_BASE_DIR: "bin"
     steps:
